@@ -6,6 +6,7 @@ import tempfile
 from io import BytesIO
 
 import requests
+from utils.http_utils import http_get
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
 
@@ -16,14 +17,7 @@ logger = logging.getLogger(__name__)
 
 def get_image(image_url, timeout_seconds: float = 10.0):
     try:
-        response = requests.get(image_url, timeout=timeout_seconds)
-    except TypeError:
-        # Some tests monkeypatch requests.get without supporting timeout
-        try:
-            response = requests.get(image_url)
-        except Exception as e:
-            logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
-            return None
+        response = http_get(image_url, timeout=timeout_seconds)
     except Exception as e:
         logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
         return None

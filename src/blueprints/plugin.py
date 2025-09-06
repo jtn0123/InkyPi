@@ -147,6 +147,7 @@ def update_plugin_instance(instance_name):
     except APIError as e:
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception:
+        logger.exception("Error updating plugin instance")
         return json_error("An internal error occurred", status=500)
     return jsonify(
         {"success": True, "message": f"Updated plugin instance {instance_name}."}
@@ -182,6 +183,7 @@ def display_plugin_instance():
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
     except Exception:
+        logger.exception("Error displaying plugin instance")
         return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200

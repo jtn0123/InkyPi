@@ -5,12 +5,13 @@ import os
 import re
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+import time
 
 import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
 
 from utils.http_utils import json_error
-from utils.time_utils import calculate_seconds
+from utils.time_utils import calculate_seconds, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
@@ -49,7 +50,7 @@ def _rate_limit_ok(remote_addr: str | None) -> bool:
     try:
         key = remote_addr or "unknown"
         q = _REQUESTS[key]
-        now = datetime.now().timestamp()
+        now = time.time()
         # drop old timestamps
         cutoff = now - _RATE_LIMIT_WINDOW_SECONDS
         while q and q[0] < cutoff:
@@ -75,7 +76,14 @@ def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) 
 
 def _read_log_lines(hours: int) -> list[str]:
     """Read service logs for the last N hours and return as list of formatted lines."""
-    since = datetime.now() - timedelta(hours=hours)
+    # Use device timezone for consistency in all time computations
+    try:
+        from flask import current_app
+
+        device_config = current_app.config["DEVICE_CONFIG"]
+        since = now_device_tz(device_config) - timedelta(hours=hours)
+    except Exception:
+        since = datetime.now() - timedelta(hours=hours)
     lines: list[str] = []
     if not JOURNAL_AVAILABLE:
         # Development mode message when systemd journal is not accessible
@@ -164,6 +172,7 @@ def save_api_keys():
             {"success": True, "message": "API keys saved.", "updated": updated}
         )
     except Exception:
+        logger.exception("Error saving API keys")
         return json_error("An internal error occurred", status=500)
 
 
@@ -183,6 +192,7 @@ def delete_api_key():
         device_config.unset_env_key(key)
         return jsonify({"success": True, "message": f"Deleted {key}."})
     except Exception:
+        logger.exception("Error deleting API key")
         return json_error("An internal error occurred", status=500)
 
 
@@ -240,6 +250,7 @@ def save_settings():
     except RuntimeError as e:
         return json_error(str(e), status=500)
     except Exception:
+        logger.exception("Error saving device settings")
         return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Saved settings."})
 
@@ -265,7 +276,9 @@ def download_logs():
         buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)
         # Add date and time to the filename
-        now_str = datetime.now().strftime("%Y%m%d-%H%M%S")
+        now_str = now_device_tz(current_app.config["DEVICE_CONFIG"]).strftime(
+            "%Y%m%d-%H%M%S"
+        )
         filename = f"inkypi_{now_str}.log"
         return Response(
             buffer.read(),
@@ -274,7 +287,7 @@ def download_logs():
         )
 
     except Exception as e:
-        logger.error(f"Error reading logs: {e}")
+        logger.exception("Error reading logs")
         return Response(f"Error reading logs: {e}", status=500, mimetype="text/plain")
 
 
@@ -358,5 +371,5 @@ def api_logs():
             }
         )
     except Exception as e:
-        logger.error(f"/api/logs error: {e}")
+        logger.exception("/api/logs error")
         return json_error(str(e), status=500)

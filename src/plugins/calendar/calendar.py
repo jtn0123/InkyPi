@@ -9,6 +9,7 @@ from PIL import ImageColor
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.calendar.constants import FONT_SIZES, LOCALE_MAP
+from utils.http_utils import http_get
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +137,7 @@ class Calendar(BasePlugin):
 
     def fetch_calendar(self, calendar_url):
         try:
-            try:
-                response = requests.get(calendar_url, timeout=20)
-            except TypeError:
-                response = requests.get(calendar_url)
+            response = http_get(calendar_url, timeout=20)
             response.raise_for_status()
             return icalendar.Calendar.from_ical(response.text)
         except Exception as e:

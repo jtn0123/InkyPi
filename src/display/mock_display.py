@@ -25,7 +25,9 @@ class MockDisplay(AbstractDisplay):
     def display_image(self, image, image_settings=None):
         if image_settings is None:
             image_settings = []
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        from utils.time_utils import now_device_tz
+
+        timestamp = now_device_tz(self.device_config).strftime("%Y%m%d_%H%M%S")
         filepath = os.path.join(self.output_dir, f"display_{timestamp}.png")
         image.save(filepath, "PNG")
 

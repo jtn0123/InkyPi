@@ -200,3 +200,35 @@ def test_update_plugin_instance_missing(client):
         "/update_plugin_instance/does-not-exist", data={"plugin_id": "ai_text"}
     )
     assert resp.status_code in (200, 500)
+
+
+def test_save_plugin_settings_creates_then_updates(client, monkeypatch):
+    # First: create new default instance
+    data = {
+        "plugin_id": "ai_text",
+        "title": "T1",
+        "textModel": "gpt-4o",
+        "textPrompt": "Hi",
+    }
+    resp = client.post("/save_plugin_settings", data=data)
+    assert resp.status_code == 200
+    instance_name = resp.get_json()["instance_name"]
+    assert instance_name == "ai_text_saved_settings"
+
+    # Second: update existing instance via another save
+    data2 = {
+        "plugin_id": "ai_text",
+        "title": "T2",
+        "textModel": "gpt-4o",
+        "textPrompt": "Hi again",
+    }
+    resp2 = client.post("/save_plugin_settings", data=data2)
+    assert resp2.status_code == 200
+    assert resp2.get_json()["instance_name"] == instance_name
+
+    # Third: open plugin page and confirm instance prepopulates
+    page = client.get("/plugin/ai_text")
+    assert page.status_code == 200
+    body = page.get_data(as_text=True)
+    # The saved title value should appear in HTML (template uses settings to fill form)
+    assert ("T2" in body) or ("Hi again" in body)

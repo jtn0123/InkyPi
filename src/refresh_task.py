@@ -7,6 +7,7 @@ import pytz
 from PIL import Image
 
 from model import PlaylistManager, RefreshInfo
+from utils.time_utils import now_device_tz
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash
 
@@ -195,8 +196,7 @@ class RefreshTask:
 
     def _get_current_datetime(self):
         """Retrieves the current datetime based on the device's configured timezone."""
-        tz_str = self.device_config.get_config("timezone", default="UTC")
-        return datetime.now(pytz.timezone(tz_str))
+        return now_device_tz(self.device_config)
 
     def _determine_next_plugin(self, playlist_manager, latest_refresh_info, current_dt):
         """Determines the next plugin to refresh based on the active playlist, plugin cycle interval, and current time."""

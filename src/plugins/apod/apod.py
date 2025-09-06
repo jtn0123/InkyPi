@@ -14,6 +14,7 @@ import requests
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import http_get
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +49,12 @@ class Apod(BasePlugin):
             params["date"] = settings["customDate"]
 
         try:
-            response = requests.get(
+            response = http_get(
                 "https://api.nasa.gov/planetary/apod", params=params, timeout=15
             )
-        except TypeError:
-            response = requests.get(
-                "https://api.nasa.gov/planetary/apod", params=params
-            )
-
-        if response.status_code != 200:
-            logger.error(f"NASA API error: {response.text}")
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"NASA API error: {str(e)}")
             raise RuntimeError("Failed to retrieve NASA APOD.")
 
         data = response.json()
@@ -68,11 +65,8 @@ class Apod(BasePlugin):
         image_url = data.get("hdurl") or data.get("url")
 
         try:
-            try:
-                img_data = requests.get(image_url, timeout=30)
-            except TypeError:
-                img_data = requests.get(image_url)
-            # Open image in a context and copy to fully load/close handle
+            img_data = http_get(image_url, timeout=30)
+            img_data.raise_for_status()
             with Image.open(BytesIO(img_data.content)) as _img:
                 image = _img.copy()
         except Exception as e:

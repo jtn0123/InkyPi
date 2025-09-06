@@ -178,9 +178,9 @@ def history_clear():
                 os.remove(p)
                 count += 1
         return jsonify({"success": True, "message": f"Cleared {count} images"}), 200
-    except Exception as e:
+    except Exception:
         logger.exception("Error clearing history images")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
 
 @history_bp.route("/history/storage")

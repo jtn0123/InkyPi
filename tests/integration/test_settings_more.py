@@ -358,3 +358,42 @@ def test_settings_log_contains_filter():
     filtered = [line for line in test_lines if "connection" in line.lower()]
     assert len(filtered) == 1
     assert "Database connection failed" in filtered[0]
+
+
+def test_rate_limit_ok_threshold(monkeypatch):
+    import blueprints.settings as settings_mod
+
+    # Use a local deque for a fake addr so we can manipulate it
+    addr = "1.2.3.4"
+    q = settings_mod._REQUESTS[addr]
+    q.clear()
+
+    # Fill to just under the limit
+    for _ in range(settings_mod._RATE_LIMIT_MAX_REQUESTS - 1):
+        assert settings_mod._rate_limit_ok(addr) is True
+
+    # Next should still pass (reaches limit)
+    assert settings_mod._rate_limit_ok(addr) is True
+    # And the next should be denied until timestamps age out
+    assert settings_mod._rate_limit_ok(addr) is False
+
+
+def test_api_logs_warnings_alias_combines_warn_and_errors(client, monkeypatch):
+    import blueprints.settings as settings_mod
+
+    def fake_read(hours: int):
+        return [
+            "Jan 01 host app[1]: INFO started",
+            "Jan 01 host app[1]: WARNING something odd",
+            "Jan 01 host app[1]: Error mixed case error",
+            "Jan 01 host app[1]: CRITICAL boom",
+        ]
+
+    monkeypatch.setattr(settings_mod, "_read_log_lines", fake_read)
+
+    resp = client.get("/api/logs?level=warnings")
+    assert resp.status_code == 200
+    lines = resp.get_json()["lines"]
+    # Should include WARNING and errors/critical entries
+    assert any("WARNING" in ln for ln in lines)
+    assert any("CRITICAL" in ln.upper() or "ERROR" in ln.upper() for ln in lines)

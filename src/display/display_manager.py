@@ -96,7 +96,9 @@ class DisplayManager:
 
         # Also persist a timestamped copy in history for browsing/reload
         try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            from utils.time_utils import now_device_tz
+
+            timestamp = now_device_tz(self.device_config).strftime("%Y%m%d_%H%M%S")
             history_filename = f"display_{timestamp}.png"
             history_path = os.path.join(
                 self.device_config.history_image_dir, history_filename

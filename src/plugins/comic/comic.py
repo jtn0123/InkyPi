@@ -7,6 +7,7 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import http_get
 
 LANCZOS = Resampling.LANCZOS
 
@@ -42,10 +43,10 @@ class Comic(BasePlugin):
         width, height = dimensions
 
         try:
-            response = requests.get(image_url, stream=True, timeout=20)
-        except TypeError:
-            response = requests.get(image_url, stream=True)
-        response.raise_for_status()
+            response = http_get(image_url, timeout=20, stream=True)
+            response.raise_for_status()
+        except Exception as e:
+            raise RuntimeError(f"Failed to download comic image: {str(e)}")
 
         with Image.open(BytesIO(response.content)) as img:
             img.thumbnail((width, height), LANCZOS)

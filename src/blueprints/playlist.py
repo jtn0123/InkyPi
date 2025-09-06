@@ -189,6 +189,7 @@ def format_relative_time(iso_date_string):
         raise ValueError("Input datetime doesn't have a timezone.")
 
     # Get the current time in the same timezone as the input datetime
+    # Use timezone-aware now matching dt's tzinfo
     now = datetime.now(dt.tzinfo)
     delta = now - dt
 

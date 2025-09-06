@@ -6,6 +6,7 @@ import pytz
 import requests
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import http_get
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,8 @@ class Weather(BasePlugin):
             api_url = f"https://api.farmsense.net/v1/moonphases/?d={timestamp}"
 
             try:
-                resp = requests.get(api_url, verify=False)
+                resp = http_get(api_url, timeout=10)
+                resp.raise_for_status()
                 moon = resp.json()[0]
                 phase_raw = moon.get("Phase", "New Moon")
                 illum_pct = float(moon.get("Illumination", 0)) * 100
@@ -744,16 +746,10 @@ class Weather(BasePlugin):
     def get_weather_data(self, api_key, units, lat, long):
         url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
         try:
-            response = requests.get(url, timeout=20)
-        except TypeError:
-            response = requests.get(url)
-        if not 200 <= response.status_code < 300:
-            content_str = (
-                response.content.decode("utf-8", errors="replace")
-                if isinstance(response.content, bytes | bytearray)
-                else str(response.content)
-            )
-            logging.error(f"Failed to retrieve weather data: {content_str}")
+            response = http_get(url, timeout=20)
+            response.raise_for_status()
+        except Exception as e:
+            logging.error(f"Failed to retrieve weather data: {str(e)}")
             raise RuntimeError("Failed to retrieve weather data.")
 
         return response.json()
@@ -761,17 +757,10 @@ class Weather(BasePlugin):
     def get_air_quality(self, api_key, lat, long):
         url = AIR_QUALITY_URL.format(lat=lat, long=long, api_key=api_key)
         try:
-            response = requests.get(url, timeout=20)
-        except TypeError:
-            response = requests.get(url)
-
-        if not 200 <= response.status_code < 300:
-            content_str = (
-                response.content.decode("utf-8", errors="replace")
-                if isinstance(response.content, bytes | bytearray)
-                else str(response.content)
-            )
-            logging.error(f"Failed to get air quality data: {content_str}")
+            response = http_get(url, timeout=20)
+            response.raise_for_status()
+        except Exception as e:
+            logging.error(f"Failed to get air quality data: {str(e)}")
             raise RuntimeError("Failed to retrieve air quality data.")
 
         return response.json()
@@ -779,17 +768,10 @@ class Weather(BasePlugin):
     def get_location(self, api_key, lat, long):
         url = GEOCODING_URL.format(lat=lat, long=long, api_key=api_key)
         try:
-            response = requests.get(url, timeout=20)
-        except TypeError:
-            response = requests.get(url)
-
-        if not 200 <= response.status_code < 300:
-            content_str = (
-                response.content.decode("utf-8", errors="replace")
-                if isinstance(response.content, bytes | bytearray)
-                else str(response.content)
-            )
-            logging.error(f"Failed to get location: {content_str}")
+            response = http_get(url, timeout=20)
+            response.raise_for_status()
+        except Exception as e:
+            logging.error(f"Failed to get location: {str(e)}")
             raise RuntimeError("Failed to retrieve location.")
 
         location_data = response.json()[0]
@@ -806,17 +788,12 @@ class Weather(BasePlugin):
             + f"&{unit_params}"
         )
         try:
-            response = requests.get(url, timeout=20)
-        except TypeError:
-            response = requests.get(url)
-
-        if not 200 <= response.status_code < 300:
-            content_str = (
-                response.content.decode("utf-8", errors="replace")
-                if isinstance(response.content, bytes | bytearray)
-                else str(response.content)
+            response = http_get(url, timeout=20)
+            response.raise_for_status()
+        except Exception as e:
+            logging.error(
+                f"Failed to retrieve Open-Meteo weather data: {str(e)}"
             )
-            logging.error(f"Failed to retrieve Open-Meteo weather data: {content_str}")
             raise RuntimeError("Failed to retrieve Open-Meteo weather data.")
 
         return response.json()
@@ -824,17 +801,11 @@ class Weather(BasePlugin):
     def get_open_meteo_air_quality(self, lat, long):
         url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
         try:
-            response = requests.get(url, timeout=20)
-        except TypeError:
-            response = requests.get(url)
-        if not 200 <= response.status_code < 300:
-            content_str = (
-                response.content.decode("utf-8", errors="replace")
-                if isinstance(response.content, bytes | bytearray)
-                else str(response.content)
-            )
+            response = http_get(url, timeout=20)
+            response.raise_for_status()
+        except Exception as e:
             logging.error(
-                f"Failed to retrieve Open-Meteo air quality data: {content_str}"
+                f"Failed to retrieve Open-Meteo air quality data: {str(e)}"
             )
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
 

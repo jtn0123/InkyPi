@@ -6,6 +6,7 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import http_get
 
 LANCZOS = Resampling.LANCZOS
 
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 def grab_image(image_url, dimensions, timeout_ms=40000):
     """Grab an image from a URL and resize it to the specified dimensions."""
     try:
-        response = requests.get(image_url, timeout=timeout_ms / 1000)
+        response = http_get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
         with Image.open(BytesIO(response.content)) as _img:
             img = _img.resize(dimensions, LANCZOS)

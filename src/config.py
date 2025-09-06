@@ -4,6 +4,7 @@ import os
 import shutil
 
 from dotenv import load_dotenv, set_key, unset_key
+from typing import Any
 
 from model import PlaylistManager, RefreshInfo
 
@@ -117,7 +118,15 @@ class Config:
         with open(self.config_file) as f:
             config = json.load(f)
 
-        logger.debug("Loaded config:\n%s", json.dumps(config, indent=3))
+        # Log a sanitized summary instead of full config to avoid leaking secrets
+        try:
+            logger.debug(
+                "Loaded config (sanitized):\n%s",
+                json.dumps(self._sanitize_config_for_log(config), indent=3),
+            )
+        except Exception:
+            # Never break startup due to logging
+            logger.debug("Loaded config (sanitized): <unavailable>")
 
         return config
 
@@ -276,3 +285,67 @@ class Config:
         # Create a temporary plugin instance to get the image path
         plugin_instance = PluginInstance(plugin_id, instance_name, {}, {})
         return os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())
+
+    @staticmethod
+    def _sanitize_config_for_log(config_dict):
+        """Return a sanitized copy of the config for logging.
+
+        - Masks values for any keys that look secret-ish: contains one of
+          ['secret', 'token', 'api', 'key', 'password'] (case-insensitive).
+        - Replaces playlist plugin_settings with a summary to avoid leaking plugin
+          credentials saved in settings.
+        - Keeps non-sensitive high-level fields as-is for debuggability.
+        """
+        def _looks_sensitive(key_name: str) -> bool:
+            lowered = key_name.lower()
+            return any(s in lowered for s in ("secret", "token", "api", "key", "password"))
+
+        def _mask(value):
+            if isinstance(value, dict):
+                return {k: ("***" if _looks_sensitive(k) else _mask(v)) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_mask(v) for v in value]
+            # Do not attempt to log raw bytes or large strings; keep small scalars
+            if isinstance(value, (int, float, bool)) or value is None:
+                return value
+            if isinstance(value, str):
+                # Keep short benign strings; mask long ones
+                return value if len(value) <= 64 and not any(c in value for c in ("\n", "\r")) else "***"
+            return "<omitted>"
+
+        sanitized: dict[str, Any] = {}
+        for key, value in (config_dict or {}).items():
+            if key == "playlist_config" and isinstance(value, dict):
+                playlists = value.get("playlists", []) if isinstance(value.get("playlists"), list) else []
+                sanitized_playlists = []
+                for pl in playlists:
+                    try:
+                        pl_name = pl.get("name")
+                        plugins = pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
+                        sanitized_playlists.append(
+                            {
+                                "name": pl_name,
+                                "num_plugins": len(plugins),
+                                # Do not expose per-plugin settings; only summarize ids/names
+                                "plugins": [
+                                    {
+                                        "plugin_id": p.get("plugin_id"),
+                                        "name": p.get("name"),
+                                        "has_settings": bool(p.get("plugin_settings")),
+                                    }
+                                    for p in plugins
+                                ],
+                            }
+                        )
+                    except Exception:
+                        sanitized_playlists.append({"name": "<unknown>", "num_plugins": 0})
+                sanitized[key] = {
+                    "active_playlist": value.get("active_playlist"),
+                    "playlists": sanitized_playlists,
+                }
+            elif _looks_sensitive(key):
+                sanitized[key] = "***"
+            else:
+                sanitized[key] = _mask(value)
+
+        return sanitized

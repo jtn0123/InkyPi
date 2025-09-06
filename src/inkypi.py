@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 import argparse
 import logging
 import os
-import random
+import secrets
 
 from flask import Flask, request
 from jinja2 import ChoiceLoader, FileSystemLoader
@@ -146,6 +146,34 @@ def create_app():
     app.config["DISPLAY_MANAGER"] = display_manager
     app.config["REFRESH_TASK"] = refresh_task
 
+    # Configure Flask SECRET_KEY: prefer env/.env; persist a dev fallback for stability
+    secret = os.getenv("SECRET_KEY")
+    if not secret:
+        try:
+            secret = device_config.load_env_key("SECRET_KEY")
+        except Exception:
+            secret = None
+    if not secret:
+        generated = secrets.token_hex(32)
+        if DEV_MODE:
+            try:
+                device_config.set_env_key("SECRET_KEY", generated)
+                secret = generated
+                logger.info("SECRET_KEY not found; generated and persisted a dev fallback in .env")
+            except Exception:
+                secret = generated
+                logger.warning(
+                    "SECRET_KEY not found; generated a non-persistent dev fallback"
+                )
+        else:
+            # In production, do not persist automatically; warn for operator action
+            secret = generated
+            logger.warning(
+                "SECRET_KEY not set; generated an ephemeral secret. "
+                "Configure SECRET_KEY in environment or .env for stable sessions."
+            )
+    app.secret_key = secret
+
     # Set additional parameters
     app.config["MAX_FORM_PARTS"] = 10_000
     # Enforce maximum request payload size (bytes)
@@ -260,7 +288,6 @@ if __name__ == "__main__":
 
     try:
         # Run the Flask app
-        app.secret_key = str(random.randint(100000, 999999))
 
         # Get local IP address for display (only in dev mode when running on non-Pi)
         if DEV_MODE:

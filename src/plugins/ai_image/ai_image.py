@@ -6,6 +6,7 @@ from openai import OpenAI
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import http_get
 
 logger = logging.getLogger(__name__)
 
@@ -116,11 +117,8 @@ class AIImage(BasePlugin):
 
         response = ai_client.images.generate(**args)
         image_url = response.data[0].url
-        try:
-            response = requests.get(image_url, timeout=30)
-        except TypeError:
-            response = requests.get(image_url)
-        # Open in context and copy to close underlying file handle
+        response = http_get(image_url, timeout=30)
+        response.raise_for_status()
         with Image.open(BytesIO(response.content)) as _img:
             return _img.copy()
 
