@@ -2,10 +2,10 @@
 import os
 from pathlib import Path
 from PIL import Image
+from plugins.plugin_registry import load_plugins
 
 from display.display_manager import DisplayManager
-from refresh_task import RefreshTask, ManualRefresh
-from plugins.plugin_registry import load_plugins
+from refresh_task import ManualRefresh, RefreshTask
 
 
 def test_manual_update_triggers_display_and_refresh_info(device_config_dev, monkeypatch):
