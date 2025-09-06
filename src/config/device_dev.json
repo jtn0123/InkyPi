@@ -42,6 +42,17 @@
                             "interval": 3600
                         },
                         "latest_refresh_time": "2025-09-06T20:54:54.841422+00:00"
+                    },
+                    {
+                        "plugin_id": "apod",
+                        "name": "apod_saved_settings",
+                        "plugin_settings": {
+                            "randomizeApod": "true"
+                        },
+                        "refresh": {
+                            "interval": 3600
+                        },
+                        "latest_refresh_time": null
                     }
                 ],
                 "current_plugin_index": 0
@@ -50,11 +61,9 @@
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T20:54:54.841422+00:00",
-        "image_hash": "a3e09ef0ccc9ab0298c1f2e9b0a3199f820de8e562807298cc4765a5e30d4df2",
-        "refresh_type": "Playlist",
-        "plugin_id": "weather",
-        "playlist": "Default",
-        "plugin_instance": "weather_saved_settings"
+        "refresh_time": "2025-09-06T23:25:02.510466+00:00",
+        "image_hash": "78576290d96934f2edcce46fe9875cfe2b83cfdd5c1435610315c16e04a3cbf0",
+        "refresh_type": "Manual Update",
+        "plugin_id": "apod"
     }
 }
