@@ -29,24 +29,52 @@ class FakeMonoEPD:
         self.slept = True
 
 
-class FakeBiColorEPD(FakeMonoEPD):
-    # Simulate display with signature that accepts two buffers
-    # Make signature compatible with FakeMonoEPD: accept primary buf and *args
-    def display(self, buf, *args):
-        # Mirror behavior used by tests: store two buffers when provided
-        if args:
-            # tests expect (buf1, buf2)
-            self.displayed.append((buf, args[0]))
-        else:
-            self.displayed.append((buf, None))
+class FakeBiColorEPD:
+    def __init__(self):
+        self.width = 800
+        self.height = 480
+        self.inited = False
+        self.cleared = False
+        self.displayed = []
+        self.slept = False
+
+    def Init(self):
+        self.inited = True
+
+    def getbuffer(self, img):
+        return ("buf", img.size)
+
+    def display(self, buf1, buf2):
+        # tests expect (buf1, buf2) where both are tuples from getbuffer
+        self.displayed.append((buf1, buf2))
+
+    def Clear(self):
+        self.cleared = True
+
+    def sleep(self):
+        self.slept = True
 
 
 def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
+    # Ensure the real display package is imported first
+    if "display" not in sys.modules:
+        try:
+            import display
+        except ImportError:
+            pass
+
     # Create fake module: display.waveshare_epd.<module_name>
     ws_pkg = types.ModuleType("display.waveshare_epd")
     # Ensure parent packages exist in sys.modules for importlib to find
     display_pkg = sys.modules.get("display")
     if display_pkg is None:
+        display_pkg = types.ModuleType("display")
+        sys.modules["display"] = display_pkg
+    elif hasattr(display_pkg, '__path__'):
+        # If display is already a proper package, don't override it
+        pass
+    else:
+        # If display exists but is not a package, we need to replace it
         display_pkg = types.ModuleType("display")
         sys.modules["display"] = display_pkg
     sys.modules["display.waveshare_epd"] = ws_pkg
@@ -55,7 +83,8 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
 
     class EPD(epd_class):
         pass
-    epd_mod.EPD = EPD
+    # Assign EPD attribute via setattr to avoid static analyzer complaints
+    setattr(epd_mod, "EPD", EPD)
 
     sys.modules[f"display.waveshare_epd.{module_name}"] = epd_mod
 
