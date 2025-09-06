@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-from plugins.plugin_registry import load_plugins, get_plugin_instance, PLUGIN_CLASSES
+from plugins.plugin_registry import get_plugin_instance, load_plugins, PLUGIN_CLASSES
 
 
 def test_load_and_get_plugin_instance():

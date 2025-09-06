@@ -1,4 +1,5 @@
 import importlib
+from typing import Dict, List
 from PIL import Image
 
 
@@ -84,7 +85,7 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
     import utils.image_utils as image_utils
     image_utils = importlib.reload(image_utils)
 
-    recorded = {"cmds": []}
+    recorded: Dict[str, List[List[str]]] = {"cmds": []}
 
     class Result:
         returncode = 0
@@ -139,7 +140,7 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
     import utils.image_utils as image_utils
     image_utils = importlib.reload(image_utils)
 
-    recorded = {"cmds": []}
+    recorded: Dict[str, List[List[str]]] = {"cmds": []}
 
     class Result:
         returncode = 0

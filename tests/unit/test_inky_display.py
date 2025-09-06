@@ -29,7 +29,7 @@ def _install_fake_inky(monkeypatch, fake_disp):
     # Provide a stub package/module tree for 'inky.auto'
     inky_pkg = types.ModuleType("inky")
     inky_auto_mod = types.ModuleType("inky.auto")
-    inky_auto_mod.auto = lambda: fake_disp
+    inky_auto_mod.auto = lambda: fake_disp  # type: ignore
     monkeypatch.setitem(sys.modules, "inky", inky_pkg)
     monkeypatch.setitem(sys.modules, "inky.auto", inky_auto_mod)
 
