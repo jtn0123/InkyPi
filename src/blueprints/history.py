@@ -1,12 +1,25 @@
 import os
 import logging
 from typing import List, Dict
+from datetime import datetime
 
 from flask import Blueprint, current_app, render_template, jsonify, request, send_from_directory
 
 logger = logging.getLogger(__name__)
 
 history_bp = Blueprint('history', __name__)
+
+
+def _format_size(num_bytes: int) -> str:
+    size: float = float(num_bytes)
+    try:
+        for unit in ["B", "KB", "MB", "GB", "TB"]:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
+    except Exception:
+        return "-"
 
 
 def _list_history_images(history_dir: str) -> List[Dict]:
@@ -20,14 +33,20 @@ def _list_history_images(history_dir: str) -> List[Dict]:
         files = []
 
     files.sort(key=lambda f: os.path.getmtime(os.path.join(history_dir, f)), reverse=True)
-    return [
-        {
+    result: List[Dict] = []
+    for f in files:
+        full_path = os.path.join(history_dir, f)
+        mtime = os.path.getmtime(full_path)
+        size = os.path.getsize(full_path)
+        dt = datetime.fromtimestamp(mtime)
+        result.append({
             "filename": f,
-            "mtime": os.path.getmtime(os.path.join(history_dir, f)),
-            "size": os.path.getsize(os.path.join(history_dir, f)),
-        }
-        for f in files
-    ]
+            "mtime": mtime,
+            "mtime_str": dt.strftime("%b %d, %Y %I:%M %p").lstrip('0').replace(' 0', ' '),
+            "size": size,
+            "size_str": _format_size(size),
+        })
+    return result
 
 
 @history_bp.route('/history')

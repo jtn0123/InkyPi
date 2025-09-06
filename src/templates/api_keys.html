@@ -15,11 +15,104 @@
                 const result = await resp.json();
                 if (resp.ok) {
                     showResponseModal('success', `Success! ${result.message}`);
+                    // Update the configured status for keys that were updated
+                    if (result.updated && result.updated.length > 0) {
+                        updateConfiguredStatus(result.updated);
+                    }
                 } else {
                     showResponseModal('failure', `Error! ${result.error}`);
                 }
             } catch (e) {
                 alert('Failed to save keys.');
+            }
+        }
+
+        function clearField(inputId) {
+            const input = document.getElementById(inputId);
+            input.value = '';
+            input.focus();
+        }
+
+        function updateConfiguredStatus(updatedKeys) {
+            updatedKeys.forEach(key => {
+                let statusId, inputId;
+                if (key === 'OPEN_AI_SECRET') {
+                    statusId = 'openai-status';
+                    inputId = 'openai-input';
+                } else if (key === 'OPEN_WEATHER_MAP_SECRET') {
+                    statusId = 'openweather-status';
+                    inputId = 'openweather-input';
+                } else if (key === 'NASA_SECRET') {
+                    statusId = 'nasa-status';
+                    inputId = 'nasa-input';
+                } else if (key === 'UNSPLASH_ACCESS_KEY') {
+                    statusId = 'unsplash-status';
+                    inputId = 'unsplash-input';
+                }
+
+                if (statusId) {
+                    const statusElement = document.getElementById(statusId);
+                    const inputElement = document.getElementById(inputId);
+                    const value = inputElement.value;
+
+                    if (value && value !== '••••••••••••••••••••••••••••••••') {
+                        // Key was set
+                        statusElement.textContent = 'Configured: Yes (••••••••••••••••••••••••••••••••)';
+                        inputElement.value = '••••••••••••••••••••••••••••••••';
+                        // Add delete button and clear button if they don't exist
+                        addDeleteAndClearButtons(statusId.replace('-status', ''), key);
+                    } else if (value === '') {
+                        // Key was cleared
+                        statusElement.textContent = 'Configured: No';
+                        // Remove delete button and clear button
+                        removeDeleteAndClearButtons(statusId.replace('-status', ''));
+                    }
+                }
+            });
+        }
+
+        function addDeleteAndClearButtons(sectionId, keyName) {
+            const formGroup = document.querySelector(`#${sectionId}-status`).parentElement;
+            const inputContainer = formGroup.querySelector('.input-container');
+
+            // Add clear button if not exists
+            if (!inputContainer.querySelector('.clear-button')) {
+                const clearButton = document.createElement('button');
+                clearButton.type = 'button';
+                clearButton.className = 'clear-button';
+                clearButton.textContent = '×';
+                clearButton.onclick = () => clearField(`${sectionId}-input`);
+                inputContainer.appendChild(clearButton);
+            }
+
+            // Add delete button if not exists
+            if (!formGroup.querySelector('.delete-button')) {
+                const deleteButton = document.createElement('button');
+                deleteButton.type = 'button';
+                deleteButton.className = 'header-button delete-button';
+                deleteButton.style.backgroundColor = '#E53935';
+                deleteButton.style.color = '#fff';
+                deleteButton.style.marginTop = '8px';
+                deleteButton.textContent = 'Delete';
+                deleteButton.onclick = () => deleteKey(keyName);
+                formGroup.appendChild(deleteButton);
+            }
+        }
+
+        function removeDeleteAndClearButtons(sectionId) {
+            const formGroup = document.querySelector(`#${sectionId}-status`).parentElement;
+            const inputContainer = formGroup.querySelector('.input-container');
+
+            // Remove clear button
+            const clearButton = inputContainer.querySelector('.clear-button');
+            if (clearButton) {
+                clearButton.remove();
+            }
+
+            // Remove delete button
+            const deleteButton = formGroup.querySelector('.delete-button');
+            if (deleteButton) {
+                deleteButton.remove();
             }
         }
 
@@ -31,11 +124,46 @@
                 const result = await resp.json();
                 if (resp.ok) {
                     showResponseModal('success', `Success! ${result.message}`);
+                    // Update the configured status for the deleted key
+                    updateDeletedStatus(keyName);
                 } else {
                     showResponseModal('failure', `Error! ${result.error}`);
                 }
             } catch (e) {
                 alert('Failed to delete key.');
+            }
+        }
+
+        function updateDeletedStatus(keyName) {
+            let statusId, inputId, sectionId;
+            if (keyName === 'OPEN_AI_SECRET') {
+                statusId = 'openai-status';
+                inputId = 'openai-input';
+                sectionId = 'openai';
+            } else if (keyName === 'OPEN_WEATHER_MAP_SECRET') {
+                statusId = 'openweather-status';
+                inputId = 'openweather-input';
+                sectionId = 'openweather';
+            } else if (keyName === 'NASA_SECRET') {
+                statusId = 'nasa-status';
+                inputId = 'nasa-input';
+                sectionId = 'nasa';
+            } else if (keyName === 'UNSPLASH_ACCESS_KEY') {
+                statusId = 'unsplash-status';
+                inputId = 'unsplash-input';
+                sectionId = 'unsplash';
+            }
+
+            if (statusId) {
+                const statusElement = document.getElementById(statusId);
+                const inputElement = document.getElementById(inputId);
+
+                // Update status to No
+                statusElement.textContent = 'Configured: No';
+                // Clear the input field
+                inputElement.value = '';
+                // Remove delete and clear buttons
+                removeDeleteAndClearButtons(sectionId);
             }
         }
     </script>
@@ -55,30 +183,58 @@
             <div class="settings-container">
                 <div class="form-group">
                     <label class="form-label">OpenAI</label>
-                    <div>Configured: {{ 'Yes (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'No' }}</div>
-                    <input type="password" name="OPEN_AI_SECRET" placeholder="Enter new value (optional)" class="form-input" />
-                    <button type="button" class="header-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>
+                    <div id="openai-status">Configured: {{ 'Yes (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'No' }}</div>
+                    <div class="input-container">
+                        <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}" />
+                        {% if masked.OPEN_AI_SECRET %}
+                        <button type="button" class="clear-button" onclick="clearField('openai-input')">×</button>
+                        {% endif %}
+                    </div>
+                    {% if masked.OPEN_AI_SECRET %}
+                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>
+                    {% endif %}
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">OpenWeatherMap</label>
-                    <div>Configured: {{ 'Yes (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'No' }}</div>
-                    <input type="password" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter new value (optional)" class="form-input" />
-                    <button type="button" class="header-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>
+                    <div id="openweather-status">Configured: {{ 'Yes (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'No' }}</div>
+                    <div class="input-container">
+                        <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}" />
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}
+                        <button type="button" class="clear-button" onclick="clearField('openweather-input')">×</button>
+                        {% endif %}
+                    </div>
+                    {% if masked.OPEN_WEATHER_MAP_SECRET %}
+                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>
+                    {% endif %}
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">NASA APOD</label>
-                    <div>Configured: {{ 'Yes (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'No' }}</div>
-                    <input type="password" name="NASA_SECRET" placeholder="Enter new value (optional)" class="form-input" />
-                    <button type="button" class="header-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('NASA_SECRET')">Delete</button>
+                    <div id="nasa-status">Configured: {{ 'Yes (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'No' }}</div>
+                    <div class="input-container">
+                        <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}" />
+                        {% if masked.NASA_SECRET %}
+                        <button type="button" class="clear-button" onclick="clearField('nasa-input')">×</button>
+                        {% endif %}
+                    </div>
+                    {% if masked.NASA_SECRET %}
+                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('NASA_SECRET')">Delete</button>
+                    {% endif %}
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Unsplash</label>
-                    <div>Configured: {{ 'Yes (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'No' }}</div>
-                    <input type="password" name="UNSPLASH_ACCESS_KEY" placeholder="Enter new value (optional)" class="form-input" />
-                    <button type="button" class="header-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>
+                    <div id="unsplash-status">Configured: {{ 'Yes (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'No' }}</div>
+                    <div class="input-container">
+                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}" />
+                        {% if masked.UNSPLASH_ACCESS_KEY %}
+                        <button type="button" class="clear-button" onclick="clearField('unsplash-input')">×</button>
+                        {% endif %}
+                    </div>
+                    {% if masked.UNSPLASH_ACCESS_KEY %}
+                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>
+                    {% endif %}
                 </div>
             </div>
         </form>

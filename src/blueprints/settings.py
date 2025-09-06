@@ -6,6 +6,8 @@ import os
 import pytz
 import logging
 import io
+import re
+from collections import defaultdict, deque
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
@@ -21,6 +23,80 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
+
+# Guardrails and limits for logs APIs
+MAX_LOG_HOURS = 24
+MIN_LOG_HOURS = 1
+MAX_LOG_LINES = 2000
+MIN_LOG_LINES = 50
+MAX_RESPONSE_BYTES = 512 * 1024  # 512 KB safety cap
+
+# Simple in-process rate limiter (per remote addr)
+_REQUESTS: dict[str, deque] = defaultdict(deque)
+_RATE_LIMIT_WINDOW_SECONDS = 60
+_RATE_LIMIT_MAX_REQUESTS = 120
+
+
+def _rate_limit_ok(remote_addr: str | None) -> bool:
+    try:
+        key = remote_addr or "unknown"
+        q = _REQUESTS[key]
+        now = datetime.now().timestamp()
+        # drop old timestamps
+        cutoff = now - _RATE_LIMIT_WINDOW_SECONDS
+        while q and q[0] < cutoff:
+            q.popleft()
+        if len(q) >= _RATE_LIMIT_MAX_REQUESTS:
+            return False
+        q.append(now)
+        return True
+    except Exception:
+        # On any failure, allow rather than block
+        return True
+
+
+def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) -> int:
+    try:
+        if value is None:
+            return default
+        parsed = int(value)
+        return max(min_value, min(parsed, max_value))
+    except Exception:
+        return default
+
+
+def _read_log_lines(hours: int) -> list[str]:
+    """Read service logs for the last N hours and return as list of formatted lines."""
+    since = datetime.now() - timedelta(hours=hours)
+    lines: list[str] = []
+    if not JOURNAL_AVAILABLE:
+        # Development mode message when systemd journal is not accessible
+        lines.append("Log download not available in development mode (cysystemd not installed).")
+        lines.append(f"Logs would normally show InkyPi service logs from the last {hours} hours.")
+        lines.append("")
+        lines.append("To see Flask development logs, check your terminal output.")
+        return lines
+
+    # Journal available path
+    reader = JournalReader()
+    reader.open(JournalOpenMode.SYSTEM)
+    reader.add_filter(Rule("_SYSTEMD_UNIT", "inkypi.service"))
+    reader.seek_realtime_usec(int(since.timestamp() * 1_000_000))
+
+    for record in reader:
+        try:
+            ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
+            formatted_ts = ts.strftime("%b %d %H:%M:%S")
+        except Exception:
+            formatted_ts = "??? ?? ??:??:??"
+
+        data = record.data
+        hostname = data.get("_HOSTNAME", "unknown-host")
+        identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
+        pid = data.get("_PID", "?")
+        msg = data.get("MESSAGE", "").rstrip()
+        lines.append(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}")
+    return lines
 
 @settings_bp.route('/settings')
 def settings_page():
@@ -140,43 +216,10 @@ def shutdown():
 @settings_bp.route('/download-logs')
 def download_logs():
     try:
-        buffer = io.StringIO()
-        
-        # Get 'hours' from query parameters, default to 2 if not provided or invalid
-        hours_str = request.args.get('hours', '2')
-        try:
-            hours = int(hours_str)
-        except ValueError:
-            hours = 2
-        since = datetime.now() - timedelta(hours=hours)
-
-        if not JOURNAL_AVAILABLE:
-            # Return a message when running in development mode without systemd
-            buffer.write(f"Log download not available in development mode (cysystemd not installed).\n")
-            buffer.write(f"Logs would normally show InkyPi service logs from the last {hours} hours.\n")
-            buffer.write(f"\nTo see Flask development logs, check your terminal output.\n")
-        else:
-            reader = JournalReader()
-            reader.open(JournalOpenMode.SYSTEM)
-            reader.add_filter(Rule("_SYSTEMD_UNIT", "inkypi.service"))
-            reader.seek_realtime_usec(int(since.timestamp() * 1_000_000))
-
-            for record in reader:
-                try:
-                    ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
-                    formatted_ts = ts.strftime("%b %d %H:%M:%S")
-                except Exception:
-                    formatted_ts = "??? ?? ??:??:??"
-
-                data = record.data
-                hostname = data.get("_HOSTNAME", "unknown-host")
-                identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
-                pid = data.get("_PID", "?")
-                msg = data.get("MESSAGE", "").rstrip()
-
-                # Format the log entry similar to the journalctl default output
-                buffer.write(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}\n")
-
+        # Guardrail hours clamp
+        hours = _clamp_int(request.args.get('hours'), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+        lines = _read_log_lines(hours)
+        buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)
         # Add date and time to the filename
         now_str = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -190,4 +233,56 @@ def download_logs():
     except Exception as e:
         logger.error(f"Error reading logs: {e}")
         return Response(f"Error reading logs: {e}", status=500, mimetype="text/plain")
+
+
+@settings_bp.route('/api/logs')
+def api_logs():
+    """JSON logs API with server-side filter, level selection and limits."""
+    try:
+        if not _rate_limit_ok(request.remote_addr):
+            return jsonify({"error": "Too many requests"}), 429
+
+        hours = _clamp_int(request.args.get('hours'), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+        limit = _clamp_int(request.args.get('limit'), 500, MIN_LOG_LINES, MAX_LOG_LINES)
+        contains = (request.args.get('contains') or '').strip()
+        if len(contains) > 200:
+            contains = contains[:200]
+        level = (request.args.get('level') or 'all').lower()
+
+        # Read raw lines then apply filtering server-side
+        lines = _read_log_lines(hours)
+
+        if contains:
+            lc = contains.lower()
+            lines = [ln for ln in lines if lc in ln.lower()]
+
+        if level == 'errors':
+            err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+            lines = [ln for ln in lines if err_re.search(ln)]
+        elif level in ('warn', 'warnings', 'warn_errors'):
+            err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+            warn_re = re.compile(r"\bWARNING\b", re.IGNORECASE)
+            lines = [ln for ln in lines if err_re.search(ln) or warn_re.search(ln)]
+
+        truncated = False
+        if len(lines) > limit:
+            truncated = True
+            lines = lines[-limit:]
+
+        # Response size guardrail
+        joined = "\n".join(lines)
+        while len(joined.encode('utf-8', errors='ignore')) > MAX_RESPONSE_BYTES and len(lines) > 100:
+            truncated = True
+            lines = lines[len(lines)//4:]
+            joined = "\n".join(lines)
+
+        return jsonify({
+            "lines": lines,
+            "count": len(lines),
+            "truncated": truncated,
+            "meta": {"hours": hours, "limit": limit, "level": level, "contains": contains}
+        })
+    except Exception as e:
+        logger.error(f"/api/logs error: {e}")
+        return jsonify({"error": str(e)}), 500
 

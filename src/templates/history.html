@@ -89,18 +89,21 @@
         {% if images|length == 0 %}
             <p>No history yet.</p>
         {% else %}
-        <div class="button-grid">
+        <div class="history-grid">
             {% for img in images %}
-            <div class="icon-button" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
-                <a href="{{ url_for('history.history_image', filename=img.filename) }}" target="_blank">
-                    <img src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" class="icon-image" style="object-fit:cover;">
+            <div class="history-card">
+                <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" target="_blank">
+                    <img src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}">
                 </a>
-                <div style="display:flex;gap:8px;">
-                    <button id="btn-{{ img.filename }}" class="header-button" onclick="redisplay('{{ img.filename }}')">Display</button>
-                    <a class="header-button" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
-                    <button class="header-button" style="background-color: #c4515b;" onclick="deleteImage('{{ img.filename }}')">Delete</button>
+                <div class="history-meta">
+                    <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
+                    <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
                 </div>
-                <small class="font-weight-normal">{{ img.filename }} • {{ (img.size / 1024) | round(1) }} KB</small>
+                <div class="history-actions">
+                    <button id="btn-{{ img.filename }}" class="btn btn-primary" onclick="redisplay('{{ img.filename }}')">Display</button>
+                    <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
+                    <button class="btn btn-danger" onclick="deleteImage('{{ img.filename }}')">Delete</button>
+                </div>
             </div>
             {% endfor %}
         </div>

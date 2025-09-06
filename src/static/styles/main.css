@@ -838,6 +838,97 @@ body {
   font-weight: normal; /* or 400 */
 }
 
+/* History Grid */
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.history-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+
+.history-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: block;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-sub {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  background-color: #e5e7eb;
+  color: #333;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn:hover {
+  background-color: #d1d5db;
+}
+
+.btn-primary {
+  background-color: #1abc9c;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: #16a085;
+}
+
+.btn-danger {
+  background-color: #c4515b;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background-color: #a93943;
+}
+
 /* Settings page responsive two-column layout */
 .settings-grid {
   display: grid;
@@ -867,4 +958,35 @@ body {
   .settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* API Keys input container styling */
+.input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: auto;
+}
+
+.clear-button {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s ease;
+}
+
+.clear-button:hover {
+    background-color: #f0f0f0;
+    color: #666;
 }
