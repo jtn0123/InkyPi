@@ -137,22 +137,53 @@ jobs:
         run: |
           . .venv/bin/activate
           python src/inkypi.py --dev --web-only &
-          for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then break; fi
+          SERVER_PID=$!
+
+          # Wait for server to start and determine the correct URL
+          SERVER_URL=""
+          for i in $(seq 1 30); do
+            # Try localhost first (most common case)
+            if curl -fsS --max-time 2 http://127.0.0.1:8080/ >/dev/null 2>&1; then
+              SERVER_URL="http://127.0.0.1:8080"
+              break
+            fi
+            # Try common container IPs
+            for ip in 172.18.0.2 172.17.0.2; do
+              if curl -fsS --max-time 2 http://${ip}:8080/ >/dev/null 2>&1; then
+                SERVER_URL="http://${ip}:8080"
+                break 2
+              fi
+            done
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8080/ >/dev/null
-          curl -fsS http://127.0.0.1:8080/settings >/dev/null
-          curl -fsS http://127.0.0.1:8080/playlist >/dev/null
-          curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/preview | tee preview_code.txt
-          curl -fsS http://127.0.0.1:8080/plugin/clock >/dev/null
-          curl -fsS http://127.0.0.1:8080/plugin/images/clock/faces/digital.png >/dev/null
-          curl -fsS "http://127.0.0.1:8080/download-logs?hours=2" >/dev/null
-          curl -fsS "http://127.0.0.1:8080/api/logs?hours=2&limit=200" >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/update_now >/dev/null
+
+          if [ -z "$SERVER_URL" ]; then
+            echo "Server did not start within 30 seconds" >&2
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Using server URL: $SERVER_URL"
+
+          # Test all routes
+          curl -fsS ${SERVER_URL}/ >/dev/null
+          curl -fsS ${SERVER_URL}/settings >/dev/null
+          curl -fsS ${SERVER_URL}/playlist >/dev/null
+          curl -sS -o /dev/null -w "%{http_code}\n" ${SERVER_URL}/preview | tee preview_code.txt
+          curl -fsS ${SERVER_URL}/plugin/clock >/dev/null
+          curl -fsS ${SERVER_URL}/plugin/images/clock/faces/digital.png >/dev/null
+          curl -fsS "${SERVER_URL}/download-logs?hours=2" >/dev/null
+          curl -fsS "${SERVER_URL}/api/logs?hours=2&limit=200" >/dev/null
+          curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/save_plugin_settings >/dev/null
+          curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/update_now >/dev/null
           if [ ! -f src/static/images/processed_image.png ] && [ ! -f mock_display_output/latest.png ]; then
-            echo "Expected preview image not found" >&2; exit 1; fi
-          curl -fsS http://127.0.0.1:8080/preview >/dev/null
+            echo "Expected preview image not found" >&2
+            kill $SERVER_PID 2>/dev/null || true
+            exit 1
+          fi
+          curl -fsS ${SERVER_URL}/preview >/dev/null
+
+          # Cleanup
+          kill $SERVER_PID 2>/dev/null || true
 
 
