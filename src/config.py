@@ -1,12 +1,12 @@
+import functools
+import importlib
 import json
 import logging
 import os
 import shutil
-import functools
+from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
-from typing import Any, cast
-import importlib
 
 # Optional dependency: jsonschema for validating device.json (loaded dynamically to avoid typing issues)
 try:
@@ -318,11 +318,10 @@ class Config:
         message including the failing path and (safely) the invalid value when helpful.
         If the validator or schema is unavailable, validation is skipped.
         """
-        try:
-            if jsonschema is None:
-                # Minimal fallback validation when jsonschema isn't available
-                # Only validate fields that tests rely upon (e.g., orientation enum)
-                orientation = None  # type: ignore
+        # First: fallback validation when jsonschema isn't available
+        if jsonschema is None:
+            # Only validate orientation if provided; schema does not require it
+            if "orientation" in config:
                 try:
                     orientation = config.get("orientation")
                 except Exception:
@@ -331,16 +330,17 @@ class Config:
                     raise ValueError(
                         f"device.json failed schema validation: orientation: invalid value (got: {repr(orientation)})"
                     )
-                return
+            # No further schema checks available; exit early
+            return
 
-            # jsonschema is available, proceed with full validation
+        # jsonschema is available, proceed with full validation inside a try/except
+        try:
             schema_path = os.path.join(self._schema_dir(), "device_config.schema.json")
             if not os.path.isfile(schema_path):
                 logger.warning("Device config schema not found at %s; skipping validation", schema_path)
                 return
             schema = _load_json_schema(schema_path)
-            if jsonschema:
-                jsonschema.Draft202012Validator(schema).validate(config)
+            jsonschema.Draft202012Validator(schema).validate(config)
         except Exception as ex:
             # If this is a jsonschema ValidationError, wrap with user-friendly ValueError; else warn
             try:
@@ -388,7 +388,7 @@ class Config:
             if isinstance(value, list):
                 return [_mask(v) for v in value]
             # Do not attempt to log raw bytes or large strings; keep small scalars
-            if isinstance(value, (int, float, bool)) or value is None:
+            if isinstance(value, int | float | bool) or value is None:
                 return value
             if isinstance(value, str):
                 # Keep short benign strings; mask long ones

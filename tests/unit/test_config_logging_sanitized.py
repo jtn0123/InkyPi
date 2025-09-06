@@ -26,7 +26,7 @@ def test_config_logging_is_sanitized(monkeypatch, tmp_path, caplog):
                     ],
                 }
             ],
-            "active_playlist": None,
+            "active_playlist": "",
         },
         # Fields that look sensitive
         "api_token": "token-123",

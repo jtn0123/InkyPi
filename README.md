@@ -155,6 +155,14 @@ python scripts/plugin_validator.py weather         # validate a single plugin
   - `device_config.schema.json`
   - `plugin-info.schema.json`
 
+### Optional: Structured (JSON) logging
+
+Enable JSON logs via environment variable (defaults remain plain text from `src/config/logging.conf`):
+
+```bash
+INKYPI_LOG_FORMAT=json INKYPI_LOG_LEVEL=DEBUG python -m src.inkypi --web-only --dev
+```
+
 ## Waveshare Display Support
 
 Waveshare offers a range of e-Paper displays, similar to the Inky screens from Pimoroni, but with slightly different requirements. While Inky displays auto-configure via the inky Python library, Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd).

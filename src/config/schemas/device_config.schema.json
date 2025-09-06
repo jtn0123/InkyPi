@@ -62,7 +62,7 @@
             }
           }
         },
-        "active_playlist": { "type": "string" }
+        "active_playlist": { "type": ["string", "null"] }
       }
     },
     "refresh_info": { "type": "object" }

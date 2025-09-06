@@ -9,7 +9,7 @@ def _write_min_config(path, name="TestCfg"):
         "display_type": "mock",
         "resolution": [800, 480],
         "orientation": "horizontal",
-        "playlist_config": {"playlists": [], "active_playlist": None},
+        "playlist_config": {"playlists": [], "active_playlist": ""},
         "refresh_info": {
             "refresh_time": None,
             "image_hash": None,

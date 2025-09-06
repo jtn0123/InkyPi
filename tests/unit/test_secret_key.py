@@ -20,7 +20,7 @@ def _write_min_device_config(path):
             "sharpness": 1.0,
             "contrast": 1.0,
         },
-        "playlist_config": {"playlists": [], "active_playlist": None},
+        "playlist_config": {"playlists": [], "active_playlist": ""},
         "refresh_info": {
             "refresh_time": None,
             "image_hash": None,
@@ -104,10 +104,6 @@ def test_secret_key_prod_ephemeral(tmp_path, monkeypatch):
         # .env may not be created at all
         assert True
 
-import importlib
-import os
-import sys
-
 
 def _reload_inkypi(monkeypatch, argv=None, env=None):
     if argv is None:
@@ -160,7 +156,7 @@ def test_secret_key_persisted_in_dev_env_file(monkeypatch, tmp_path):
 
     # Verify persisted in .env
     env_path = os.path.join(str(tmp_path), ".env")
-    with open(env_path, "r") as f:
+    with open(env_path) as f:
         content = f.read()
     assert f"SECRET_KEY={generated}" in content
 

@@ -1,5 +1,4 @@
 import json
-import os
 import pytest
 
 
@@ -25,7 +24,7 @@ def test_device_config_invalid_orientation_raises(tmp_path, monkeypatch):
         "orientation": "diagonal",  # invalid against schema enum
         "plugin_cycle_interval_seconds": 300,
         "image_settings": {"saturation": 1.0, "brightness": 1.0, "sharpness": 1.0, "contrast": 1.0},
-        "playlist_config": {"playlists": [], "active_playlist": None},
+        "playlist_config": {"playlists": [], "active_playlist": ""},
         "refresh_info": {"refresh_time": None, "image_hash": None, "refresh_type": "Manual Update", "plugin_id": ""},
     }
     config_file = tmp_path / "device.json"

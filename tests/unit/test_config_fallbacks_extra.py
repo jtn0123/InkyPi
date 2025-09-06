@@ -8,7 +8,7 @@ def _write_min_config(path, name="Cfg"):
         "display_type": "mock",
         "resolution": [800, 480],
         "orientation": "horizontal",
-        "playlist_config": {"playlists": [], "active_playlist": None},
+        "playlist_config": {"playlists": [], "active_playlist": ""},
         "refresh_info": {
             "refresh_time": None,
             "image_hash": None,
@@ -61,7 +61,7 @@ def test_determine_config_path_bootstrap_failure(monkeypatch, tmp_path):
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     # Simulate missing install template so bootstrap fails
     # Also ensure config dir not creatable by mocking shutil.copyfile to raise
-    import shutil as real_shutil
+    import shutil
 
     def _boom(*_a, **_kw):
         raise OSError("copy failed")
