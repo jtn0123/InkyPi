@@ -4,6 +4,7 @@ from typing import List, Dict
 from datetime import datetime
 
 from flask import Blueprint, current_app, render_template, jsonify, request, send_from_directory
+from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
 
@@ -111,20 +112,20 @@ def history_redisplay():
         data = request.get_json(force=True)
         filename = (data or {}).get('filename')
         if not filename:
-            return jsonify({"error": "filename is required"}), 400
+            return json_error("filename is required", status=400)
 
         # Prevent path traversal; only allow files within the history dir
         safe_path = os.path.normpath(os.path.join(history_dir, filename))
         if not safe_path.startswith(os.path.abspath(history_dir)):
-            return jsonify({"error": "invalid filename"}), 400
+            return json_error("invalid filename", status=400)
         if not os.path.exists(safe_path):
-            return jsonify({"error": "file not found"}), 404
+            return json_error("file not found", status=404)
 
         display_manager.display_preprocessed_image(safe_path)
         return jsonify({"success": True, "message": "Display updated"}), 200
     except Exception as e:
         logger.exception("Error redisplaying history image")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
 
 @history_bp.route('/history/delete', methods=['POST'])
@@ -135,16 +136,16 @@ def history_delete():
         data = request.get_json(force=True) or {}
         filename = data.get('filename')
         if not filename:
-            return jsonify({"error": "filename is required"}), 400
+            return json_error("filename is required", status=400)
         safe_path = os.path.normpath(os.path.join(history_dir, filename))
         if not safe_path.startswith(os.path.abspath(history_dir)):
-            return jsonify({"error": "invalid filename"}), 400
+            return json_error("invalid filename", status=400)
         if os.path.exists(safe_path):
             os.remove(safe_path)
         return jsonify({"success": True, "message": "Deleted"}), 200
     except Exception as e:
         logger.exception("Error deleting history image")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
 
 @history_bp.route('/history/clear', methods=['POST'])
@@ -189,6 +190,6 @@ def history_storage():
         }), 200
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
-        return jsonify({'error': 'failed to get storage info'}), 500
+        return json_error('failed to get storage info', status=500)
 
 

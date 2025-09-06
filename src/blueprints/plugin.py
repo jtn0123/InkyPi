@@ -184,7 +184,7 @@ def update_now():
             
     except Exception as e:
         logger.exception(f"Error in update_now: {str(e)}")
-        return json_error("An internal error occurred", status=500)
+        return json_error(f"An error occurred: {str(e)}", status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
