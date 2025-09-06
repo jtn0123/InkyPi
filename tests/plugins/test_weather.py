@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import pytest
 from unittest.mock import patch, MagicMock
+from typing import cast, List
 
 
 def test_weather_openweathermap_success(client, monkeypatch):
@@ -226,9 +227,9 @@ def test_openmeteo_forecast_parsing():
     # This should trigger the forecast parsing logic
     try:
         # The parsing logic should handle the data structure
-        temp_max = forecast_data.get("temperature_2m_max", [])
-        temp_min = forecast_data.get("temperature_2m_min", [])
-        weather_codes = forecast_data.get("weathercode", [])
+        temp_max = cast(List[float], forecast_data.get("temperature_2m_max", []))
+        temp_min = cast(List[float], forecast_data.get("temperature_2m_min", []))
+        weather_codes = cast(List[int], forecast_data.get("weathercode", []))
 
         assert len(temp_max) > 0
         assert len(temp_min) > 0
@@ -274,8 +275,8 @@ def test_openmeteo_hourly_parsing():
     }
 
     # Test the parsing logic for humidity and pressure
-    humidity_hourly_times = hourly_data.get('time', [])
-    humidity_values = hourly_data.get('relative_humidity_2m', [])
+    humidity_hourly_times = cast(List[str], hourly_data.get('time', []))
+    humidity_values = cast(List[int], hourly_data.get('relative_humidity_2m', []))
 
     for i, time_str in enumerate(humidity_hourly_times):
         try:
@@ -286,7 +287,7 @@ def test_openmeteo_hourly_parsing():
             continue
 
     # Test pressure parsing
-    pressure_values = hourly_data.get('surface_pressure', [])
+    pressure_values = cast(List[int], hourly_data.get('surface_pressure', []))
     for i, time_str in enumerate(humidity_hourly_times):
         try:
             # This covers the pressure parsing logic
@@ -605,8 +606,8 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_vertical_orientation(device_config_dev, monkeypatch):
-    """Test weather plugin with vertical orientation."""
+def test_weather_vertical_orientation_openmeteo(device_config_dev, monkeypatch):
+    """Test weather plugin with vertical orientation using OpenMeteo."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
