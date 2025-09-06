@@ -1,6 +1,6 @@
 import logging
-from display.abstract_display import AbstractDisplay
 
+from display.abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class InkyDisplay(AbstractDisplay):
 
         logger.info("Displaying image to Inky display.")
         if not image:
-            raise ValueError(f"No image provided.")
+            raise ValueError("No image provided.")
 
         # Display the image on the Inky display
         self.inky_display.set_image(image)

@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
-from PIL import Image
 from io import BytesIO
+
+from PIL import Image
 
 
 def test_image_url_happy(monkeypatch, device_config_dev):

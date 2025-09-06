@@ -5,13 +5,15 @@ and displays it on the InkyPi device. It supports optional manual date selection
 For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 """
 
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image
-from io import BytesIO
-import requests
 import logging
-from random import randint
 from datetime import datetime, timedelta
+from io import BytesIO
+from random import randint
+
+import requests
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 

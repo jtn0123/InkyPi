@@ -1,18 +1,24 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportMissingModuleSource=false, reportRedeclaration=false
-from flask import Blueprint, request, jsonify, current_app, render_template, Response
-from utils.http_utils import json_error
-from utils.time_utils import calculate_seconds
-from datetime import datetime, timedelta
-import os
-import pytz
-import logging
 import io
+import logging
+import os
 import re
 from collections import defaultdict, deque
+from datetime import datetime, timedelta
+
+import pytz
+from flask import Blueprint, Response, current_app, jsonify, render_template, request
+
+from utils.http_utils import json_error
+from utils.time_utils import calculate_seconds
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
-    from cysystemd.reader import JournalReader, JournalOpenMode, Rule  # type: ignore[import-not-found]
+    from cysystemd.reader import (  # type: ignore[import-not-found]
+        JournalOpenMode,
+        JournalReader,
+        Rule,
+    )
     JOURNAL_AVAILABLE = True
 except ImportError:
     JOURNAL_AVAILABLE = False
@@ -138,7 +144,7 @@ def save_api_keys():
                 device_config.set_env_key(key, value)
                 updated.append(key)
         return jsonify({"success": True, "message": "API keys saved.", "updated": updated})
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
 
 @settings_bp.route('/settings/delete_api_key', methods=['POST'])
@@ -151,7 +157,7 @@ def delete_api_key():
     try:
         device_config.unset_env_key(key)
         return jsonify({"success": True, "message": f"Deleted {key}."})
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
 
 @settings_bp.route('/save_settings', methods=['POST'])
@@ -199,7 +205,7 @@ def save_settings():
             refresh_task.signal_config_change()
     except RuntimeError as e:
         return json_error(str(e), status=500)
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Saved settings."})
 

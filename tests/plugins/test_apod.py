@@ -1,8 +1,9 @@
 # pyright: reportMissingImports=false
 from io import BytesIO
-from unittest.mock import patch, MagicMock
-from PIL import Image
+from unittest.mock import MagicMock, patch
+
 import pytest
+from PIL import Image
 
 
 def test_apod_success(monkeypatch, device_config_dev):
@@ -73,8 +74,9 @@ def test_apod_success(client, monkeypatch):
         return R()
 
     # Mock image fetch
-    from PIL import Image
     from io import BytesIO
+
+    from PIL import Image
     def fake_get_image(url):
         img = Image.new('RGB', (64, 64), 'black')
         buf = BytesIO()

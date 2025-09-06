@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from flask import jsonify, Request, request
-
+from flask import Request, jsonify, request
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ class APIError(Exception):
         Optional structured details to aid clients
     """
 
-    def __init__(self, message: str, status: int = 400, code: Optional[int | str] = None, details: Optional[dict[str, Any]] = None) -> None:
+    def __init__(self, message: str, status: int = 400, code: int | str | None = None, details: dict[str, Any] | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.status = status
@@ -32,7 +31,7 @@ class APIError(Exception):
         self.details = details
 
 
-def json_error(message: str, status: int = 400, code: Optional[int | str] = None, details: Optional[dict[str, Any]] = None):
+def json_error(message: str, status: int = 400, code: int | str | None = None, details: dict[str, Any] | None = None):
     payload: dict[str, Any] = {"error": message}
     if code is not None:
         payload["code"] = code
@@ -41,7 +40,7 @@ def json_error(message: str, status: int = 400, code: Optional[int | str] = None
     return jsonify(payload), status
 
 
-def json_success(message: Optional[str] = None, status: int = 200, **payload: Any):
+def json_success(message: str | None = None, status: int = 200, **payload: Any):
     body: dict[str, Any] = {"success": True}
     if message is not None:
         body["message"] = message
@@ -49,7 +48,7 @@ def json_success(message: Optional[str] = None, status: int = 200, **payload: An
     return jsonify(body), status
 
 
-def wants_json(req: Optional[Request] = None) -> bool:
+def wants_json(req: Request | None = None) -> bool:
     """Heuristic to decide if the current request expects JSON.
 
     We keep this conservative to avoid affecting HTML routes.

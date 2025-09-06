@@ -1,13 +1,14 @@
-import threading
-import time
-import os
 import logging
+import os
+import threading
+from datetime import datetime
+
 import pytz
-from datetime import datetime, timezone
+from PIL import Image
+
+from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash
-from model import RefreshInfo, PlaylistManager
-from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +174,7 @@ class RefreshTask:
         playlist = playlist_manager.determine_active_playlist(current_dt)
         if not playlist:
             playlist_manager.active_playlist = None
-            logger.info(f"No active playlist determined.")
+            logger.info("No active playlist determined.")
             return None, None
 
         playlist_manager.active_playlist = playlist.name

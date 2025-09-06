@@ -1,9 +1,16 @@
-import os
 import logging
-from typing import List, Dict
+import os
 from datetime import datetime
 
-from flask import Blueprint, current_app, render_template, jsonify, request, send_from_directory
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_from_directory,
+)
+
 from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
@@ -23,7 +30,7 @@ def _format_size(num_bytes: int) -> str:
         return "-"
 
 
-def _list_history_images(history_dir: str) -> List[Dict]:
+def _list_history_images(history_dir: str) -> list[dict]:
     try:
         files = [
             f for f in os.listdir(history_dir)
@@ -41,7 +48,7 @@ def _list_history_images(history_dir: str) -> List[Dict]:
             return 0.0
 
     files.sort(key=lambda f: _safe_mtime(os.path.join(history_dir, f)), reverse=True)
-    result: List[Dict] = []
+    result: list[dict] = []
     for f in files:
         full_path = os.path.join(history_dir, f)
         try:
@@ -123,7 +130,7 @@ def history_redisplay():
 
         display_manager.display_preprocessed_image(safe_path)
         return jsonify({"success": True, "message": "Display updated"}), 200
-    except Exception as e:
+    except Exception:
         logger.exception("Error redisplaying history image")
         return json_error("An internal error occurred", status=500)
 
@@ -143,7 +150,7 @@ def history_delete():
         if os.path.exists(safe_path):
             os.remove(safe_path)
         return jsonify({"success": True, "message": "Deleted"}), 200
-    except Exception as e:
+    except Exception:
         logger.exception("Error deleting history image")
         return json_error("An internal error occurred", status=500)
 

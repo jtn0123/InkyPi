@@ -1,17 +1,17 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image, ImageOps, ImageColor
+from PIL import Image, ImageColor, ImageOps
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
-from typing import List, Optional
-from io import BytesIO
 import logging
 import random
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
 
 class ImageUpload(BasePlugin):
-    def open_image(self, img_index: int, image_locations: List[str]) -> Image.Image:
+    def open_image(self, img_index: int, image_locations: list[str]) -> Image.Image:
         if not image_locations:
             raise RuntimeError("No images provided.")
         # Open the image using Pillow

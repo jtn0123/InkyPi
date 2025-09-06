@@ -1,12 +1,11 @@
 import fnmatch
-import json
 import logging
 import os
 from datetime import datetime
 
-from utils.image_utils import resize_image, change_orientation, apply_image_enhancement
-from display.mock_display import MockDisplay
 from display.abstract_display import AbstractDisplay
+from display.mock_display import MockDisplay
+from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
 
 logger = logging.getLogger(__name__)
 

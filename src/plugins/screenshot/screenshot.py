@@ -1,7 +1,7 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image
-from utils.image_utils import take_screenshot
 import logging
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import take_screenshot
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,11 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from datetime import datetime, timedelta
-from utils.image_utils import get_image
-from PIL import Image
 import logging
+from datetime import datetime, timedelta
+
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.newspaper.constants import NEWSPAPERS
+from utils.image_utils import get_image
 
 logger = logging.getLogger(__name__)
 

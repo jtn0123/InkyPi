@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
+import pytz
 
 import model
+from model import Playlist, PlaylistManager, PluginInstance
 
 
 def test_refresh_info_to_from_dict_and_datetime():
@@ -90,10 +92,6 @@ def test_playlist_manager_operations():
     assert model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=5)) is False
 
 # pyright: reportMissingImports=false
-from datetime import datetime, timedelta
-import pytz
-
-from model import PlaylistManager, Playlist, PluginInstance
 
 
 def test_should_refresh_interval_true():

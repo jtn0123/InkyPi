@@ -1,5 +1,6 @@
 import sys
 import types
+
 import pytest
 from PIL import Image
 
@@ -59,7 +60,9 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
     # Ensure the real display package is imported first
     if "display" not in sys.modules:
         try:
-            import display
+            import importlib.util
+            if importlib.util.find_spec("display"):
+                import display
         except ImportError:
             pass
 

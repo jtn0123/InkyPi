@@ -1,11 +1,13 @@
-from plugins.base_plugin.base_plugin import BasePlugin
+from io import BytesIO
 from PIL import Image
 from PIL.Image import Resampling
-from io import BytesIO
-LANCZOS = Resampling.LANCZOS
-import feedparser  # type: ignore[import-untyped]
 import re
+import feedparser  # type: ignore[import-untyped]
 import requests
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 COMICS = [
     "XKCD",

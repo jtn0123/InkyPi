@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 def test_ai_image_missing_api_key(device_config_dev):
@@ -60,9 +61,10 @@ def test_ai_image_generate_image_success(client, monkeypatch):
     monkeypatch.setattr(ai_image_mod, 'OpenAI', FakeOpenAI, raising=True)
 
     # Mock requests.get to image URL
+    from io import BytesIO
+
     import requests
     from PIL import Image
-    from io import BytesIO
     def fake_get(url):
         img = Image.new('RGB', (64, 64), 'black')
         buf = BytesIO()

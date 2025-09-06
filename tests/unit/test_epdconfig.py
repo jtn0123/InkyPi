@@ -1,8 +1,9 @@
 import importlib
 import sys
 import types
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 def make_fake_gpio_module():
@@ -140,7 +141,7 @@ def test_gpio_operations_raspberry_pi(monkeypatch):
 
     # Test digital read
     busy_value = epdconfig.digital_read(24)  # BUSY_PIN
-    assert isinstance(busy_value, (int, bool))
+    assert isinstance(busy_value, int | bool)
 
 
 def test_gpio_operations_without_hardware(monkeypatch):
@@ -426,7 +427,7 @@ def test_sunrise_x3_platform(monkeypatch):
     epdconfig.digital_write(25, 0)
 
     value = epdconfig.digital_read(24)
-    assert isinstance(value, (int, bool))
+    assert isinstance(value, int | bool)
 
     epdconfig.module_exit()
 
@@ -500,7 +501,7 @@ def test_platform_detection_edge_cases(monkeypatch):
 
 def test_gpio_pin_constants():
     """Test that GPIO pin constants are correctly defined."""
-    from display.waveshare_epd.epdconfig import RaspberryPi, JetsonNano, SunriseX3
+    from display.waveshare_epd.epdconfig import JetsonNano, RaspberryPi, SunriseX3
 
     # Test Raspberry Pi pin definitions
     rpi = RaspberryPi()
@@ -573,7 +574,7 @@ def test_pin_mapping_comprehensive(monkeypatch):
 
         # Test digital read
         value = epdconfig.digital_read(pin)
-        assert isinstance(value, (int, bool))
+        assert isinstance(value, int | bool)
 
 
 def test_jetson_platform_mock_spi_fallback(monkeypatch):

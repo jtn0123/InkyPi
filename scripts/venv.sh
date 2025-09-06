@@ -25,7 +25,7 @@ fi
 python -m pip install --upgrade pip
 python -m pip install --no-cache-dir -r $REQUIREMENTS_FILE
 
-export PYTHONPATH="$SRC_DIR:$PYTHONPATH"
+export PYTHONPATH="$SRC_DIR${PYTHONPATH:+:$PYTHONPATH}"
 export SRC_DIR=$SRC_DIR
 
 echo "Python virtual environment initialized, run 'deactivate' to exit"

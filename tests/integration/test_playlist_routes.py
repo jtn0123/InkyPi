@@ -1,5 +1,4 @@
 # pyright: reportMissingImports=false
-import json
 
 
 def test_playlist_page_renders(client):

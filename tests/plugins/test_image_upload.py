@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
-from PIL import Image
 from io import BytesIO
+
+from PIL import Image
 
 
 def build_upload(name: str, content: bytes, content_type: str = 'image/png'):
@@ -83,7 +84,6 @@ def test_image_upload_rejects_oversize(client, monkeypatch):
 
     upload = build_upload('huge.png', big, 'image/png')
 
-    import os
     monkeypatch.setenv('MAX_UPLOAD_BYTES', str(1024 * 1024))  # 1MB limit
 
     import utils.app_utils as app_utils
@@ -123,7 +123,7 @@ def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev
     content = buf.getvalue()
 
     # Save to temp path and feed via settings
-    import os, tempfile
+    import tempfile
     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tf:
         tf.write(content)
         tf.flush()

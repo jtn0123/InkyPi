@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import json
 import os
+
 import pytest
 from PIL import Image
 
@@ -24,7 +25,7 @@ def test_manual_update_propagates_plugin_exception(device_config_dev, monkeypatc
 
     # Start refresh task and attempt manual update
     from display.display_manager import DisplayManager
-    from refresh_task import RefreshTask, ManualRefresh
+    from refresh_task import ManualRefresh, RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)

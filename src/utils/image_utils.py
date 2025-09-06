@@ -1,13 +1,14 @@
 import requests
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
-from io import BytesIO
-import os
-import logging
 import hashlib
-import tempfile
+import logging
+import os
 import subprocess
+import tempfile
+from io import BytesIO
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 

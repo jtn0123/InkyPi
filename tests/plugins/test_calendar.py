@@ -1,8 +1,9 @@
 # pyright: reportMissingImports=false
+from datetime import date, datetime, timedelta
+from unittest.mock import patch
+
 import pytest
-from datetime import datetime, date, timedelta
 import pytz
-from unittest.mock import patch, MagicMock
 
 
 def _make_calendar_settings(
@@ -153,8 +154,9 @@ def test_parse_data_points_date_all_day_and_duration():
 
 
 def test_fetch_calendar_timeout_raises(monkeypatch):
-    from plugins.calendar.calendar import Calendar
     import requests
+
+    from plugins.calendar.calendar import Calendar
 
     def raise_timeout(url, **kwargs):
         raise requests.exceptions.Timeout("timeout")
@@ -167,8 +169,9 @@ def test_fetch_calendar_timeout_raises(monkeypatch):
 
 
 def test_fetch_calendar_http_error_raises(monkeypatch):
-    from plugins.calendar.calendar import Calendar
     import requests
+
+    from plugins.calendar.calendar import Calendar
 
     class Resp:
         def raise_for_status(self):
@@ -377,8 +380,9 @@ def test_generate_settings_template():
 
 def test_fetch_calendar_connection_error(monkeypatch):
     """Test fetch_calendar with connection errors."""
-    from plugins.calendar.calendar import Calendar
     import requests
+
+    from plugins.calendar.calendar import Calendar
 
     def raise_connection_error(url, **kwargs):
         raise requests.exceptions.ConnectionError("connection failed")

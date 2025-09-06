@@ -1,11 +1,20 @@
-from flask import Blueprint, request, jsonify, current_app, render_template, send_from_directory, send_file, abort
-from utils.http_utils import json_error, json_success, APIError
-from plugins.plugin_registry import get_plugin_instance
-from utils.app_utils import resolve_path, handle_request_files, parse_form
-from refresh_task import ManualRefresh, PlaylistRefresh
-import json
-import os
 import logging
+import os
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+)
+
+from plugins.plugin_registry import get_plugin_instance
+from refresh_task import ManualRefresh, PlaylistRefresh
+from utils.app_utils import handle_request_files, parse_form, resolve_path
+from utils.http_utils import APIError, json_error
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -124,7 +133,7 @@ def update_plugin_instance(instance_name):
         device_config.write_config()
     except APIError as e:
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": f"Updated plugin instance {instance_name}."})
 
@@ -152,7 +161,7 @@ def display_plugin_instance():
             return json_error(f"Plugin instance '{plugin_instance_name}' not found", status=400)
 
         refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200

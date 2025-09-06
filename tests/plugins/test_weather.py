@@ -1,7 +1,8 @@
 # pyright: reportMissingImports=false
+from typing import cast
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from typing import cast, List
 
 
 def test_weather_openweathermap_success(client, monkeypatch):
@@ -108,10 +109,9 @@ def test_weather_timezone_parsing():
 
 def test_weather_vertical_orientation():
     """Test vertical orientation handling."""
-    from plugins.weather.weather import Weather
     from unittest.mock import MagicMock
 
-    weather = Weather({"id": "weather"})
+
     device_config = MagicMock()
     device_config.get_resolution.return_value = (400, 300)
     device_config.get_config.side_effect = lambda key: "vertical" if key == "orientation" else None
@@ -126,8 +126,9 @@ def test_weather_vertical_orientation():
 
 def test_weather_error_handling():
     """Test weather error handling."""
-    from plugins.weather.weather import Weather
     from unittest.mock import MagicMock, patch
+
+    from plugins.weather.weather import Weather
 
     weather = Weather({"id": "weather"})
 
@@ -167,9 +168,6 @@ def test_weather_code_mapping_openmeteo():
 
 def test_moon_phase_parsing():
     """Test moon phase parsing logic."""
-    from plugins.weather.weather import Weather
-
-    weather = Weather({"id": "weather"})
 
     # Test moon phase parsing with different phases
     test_phases = [0.0, 0.1, 0.3, 0.4, 0.6, 0.7, 0.9]
@@ -211,6 +209,7 @@ def test_moon_phase_name_handling():
 def test_openmeteo_forecast_parsing():
     """Test OpenMeteo forecast parsing."""
     import pytz
+
     from plugins.weather.weather import Weather
 
     _weather = Weather({"id": "weather"})
@@ -240,19 +239,16 @@ def test_openmeteo_forecast_parsing():
 
 def test_visibility_parsing():
     """Test visibility parsing logic."""
-    from plugins.weather.weather import Weather
-
-    weather = Weather({"id": "weather"})
 
     # Test visibility parsing with different values
     test_visibilities = [5000, 10000, 15000, None, "unknown"]
 
     for visibility_raw in test_visibilities:
         try:
-            visibility = visibility_raw / 1000 if isinstance(visibility_raw, (int, float)) else visibility_raw
+            visibility = visibility_raw / 1000 if isinstance(visibility_raw, int | float) else visibility_raw
         except Exception:
             visibility = visibility_raw
-        visibility_str = f">{visibility}" if isinstance(visibility, (int, float)) and visibility >= 10 else visibility
+        visibility_str = f">{visibility}" if isinstance(visibility, int | float) and visibility >= 10 else visibility
 
         # Just verify the logic runs without error
         # visibility_str can be None for None input, which is valid
@@ -261,11 +257,7 @@ def test_visibility_parsing():
 
 def test_openmeteo_hourly_parsing():
     """Test OpenMeteo hourly data parsing."""
-    from plugins.weather.weather import Weather
-    import pytz
 
-    weather = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
 
     # Mock hourly data
     hourly_data = {
@@ -559,8 +551,9 @@ def test_weather_unknown_provider(device_config_dev, monkeypatch):
 
 def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
     """Test weather plugin with OpenWeatherMap API failure."""
-    from plugins.weather.weather import Weather
     import requests
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
 
@@ -585,8 +578,9 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
 
 def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
     """Test weather plugin with OpenMeteo API failure."""
-    from plugins.weather.weather import Weather
     import requests
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
 
@@ -716,8 +710,9 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
 
 def test_weather_parse_weather_data_missing_current():
     """Test parsing weather data with missing current weather info."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -732,8 +727,9 @@ def test_weather_parse_weather_data_missing_current():
 
 def test_weather_parse_open_meteo_data_missing_current():
     """Test parsing OpenMeteo data with missing current weather info."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -764,8 +760,9 @@ def test_weather_map_weather_code_to_icon():
 
 def test_weather_parse_forecast_empty_data():
     """Test parsing forecast with empty data."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -776,8 +773,9 @@ def test_weather_parse_forecast_empty_data():
 
 def test_weather_parse_hourly_empty_data():
     """Test parsing hourly data with empty data."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -788,8 +786,9 @@ def test_weather_parse_hourly_empty_data():
 
 def test_weather_parse_data_points_openweathermap():
     """Test parsing data points for OpenWeatherMap."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -812,8 +811,9 @@ def test_weather_parse_data_points_openweathermap():
 
 def test_weather_parse_data_points_openmeteo():
     """Test parsing data points for OpenMeteo."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
@@ -844,8 +844,9 @@ def test_weather_parse_timezone():
 
 def test_weather_parse_timezone_invalid():
     """Test timezone parsing with invalid timezone."""
-    from plugins.weather.weather import Weather
     import pytz
+
+    from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
 

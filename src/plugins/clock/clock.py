@@ -1,13 +1,13 @@
-import os
-from utils.app_utils import resolve_path, get_font
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image, ImageColor, ImageDraw, ImageFont
-from io import BytesIO
 import logging
-import numpy as np
 import math
 from datetime import datetime
+
+import numpy as np
 import pytz
+from PIL import Image, ImageColor, ImageDraw
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from utils.app_utils import get_font
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ class Clock(BasePlugin):
             if value is None or value == "":
                 return default_rgb
             # If already a sequence of numbers, coerce to ints and clamp
-            if isinstance(value, (list, tuple)):
+            if isinstance(value, list | tuple):
                 nums = []
                 for x in value:
                     try:

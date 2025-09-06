@@ -21,17 +21,18 @@ Flow:
 6. Optionally resize the image to fit the device dimensions. (_shrink_to_fit))
 """
 
-from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image, UnidentifiedImageError
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
-from io import BytesIO
-import requests
 import logging
+from datetime import date, datetime, timedelta
+from io import BytesIO
 from random import randint
-from datetime import datetime, timedelta, date
-from functools import lru_cache
-from typing import Dict, Any, Optional
+from typing import Any
+import requests
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,12 @@ class Wpotd(BasePlugin):
     HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
     API_URL = "https://en.wikipedia.org/w/api.php"
 
-    def generate_settings_template(self) -> Dict[str, Any]:
-        template_params: Dict[str, Any] = super().generate_settings_template()
+    def generate_settings_template(self) -> dict[str, Any]:
+        template_params: dict[str, Any] = super().generate_settings_template()
         template_params['style_settings'] = False
         return template_params
 
-    def generate_image(self, settings: Dict[str, Any], device_config: Any) -> Image.Image:
+    def generate_image(self, settings: dict[str, Any], device_config: Any) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -65,7 +66,7 @@ class Wpotd(BasePlugin):
 
         return image
 
-    def _determine_date(self, settings: Dict[str, Any]) -> date:
+    def _determine_date(self, settings: dict[str, Any]) -> date:
         if settings.get("randomizeWpotd") == "true":
             start = datetime(2015, 1, 1)
             delta_days = (datetime.today() - start).days
@@ -75,7 +76,7 @@ class Wpotd(BasePlugin):
         else:
             return datetime.today().date()
 
-    def _download_image(self, url: str) -> Optional[Image.Image]:
+    def _download_image(self, url: str) -> Image.Image | None:
         try:
             if url.lower().endswith(".svg"):
                 logger.warning("SVG format is not supported by Pillow. Skipping image download.")
@@ -93,7 +94,7 @@ class Wpotd(BasePlugin):
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
             raise RuntimeError("Failed to load WPOTD image.")
 
-    def _fetch_potd(self, cur_date: date) -> Dict[str, Any]:
+    def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
         title = f"Template:POTD/{cur_date.isoformat()}"
         params = {
             "action": "query",
@@ -138,7 +139,7 @@ class Wpotd(BasePlugin):
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
             raise RuntimeError("Failed to retrieve image URL.")
 
-    def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
         try:
             response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
             response.raise_for_status()

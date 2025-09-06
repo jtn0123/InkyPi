@@ -1,14 +1,9 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from utils.app_utils import resolve_path
-from openai import OpenAI
-from PIL import Image, ImageDraw, ImageFont
-from utils.image_utils import resize_image
-from io import BytesIO
-from datetime import datetime
-import requests
 import logging
-import textwrap
-import os
+from datetime import datetime
+
+from openai import OpenAI
+
+from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 

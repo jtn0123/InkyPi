@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
 
 # set up logging
-import os, logging.config
+import logging.config
+import os
+
 logging.config.fileConfig(os.path.join(os.path.dirname(__file__), 'config', 'logging.conf'))
 
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 import warnings
+
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 
+import argparse
+import logging
 import os
 import random
-import time
-import sys
-import json
-import logging
-import threading
-import argparse
-from utils.app_utils import generate_startup_image
-from flask import Flask, request, jsonify
+
+from flask import Flask, request
+from jinja2 import ChoiceLoader, FileSystemLoader
+from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
+
+from blueprints.main import main_bp
+from blueprints.playlist import playlist_bp
+from blueprints.plugin import plugin_bp
+from blueprints.settings import settings_bp
 from config import Config
 from display.display_manager import DisplayManager
-from refresh_task import RefreshTask
-from blueprints.main import main_bp
-from blueprints.settings import settings_bp
-from blueprints.plugin import plugin_bp
-from blueprints.playlist import playlist_bp
-from jinja2 import ChoiceLoader, FileSystemLoader
 from plugins.plugin_registry import load_plugins
-from waitress import serve  # type: ignore
+from refresh_task import RefreshTask
+from utils.app_utils import generate_startup_image
 from utils.http_utils import APIError, json_error, wants_json
-
 
 logger = logging.getLogger(__name__)
 

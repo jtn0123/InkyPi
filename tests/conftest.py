@@ -1,10 +1,10 @@
 # pyright: reportMissingImports=false
-import os
 import json
-import types
+import os
+import sys
+
 import pytest
 from PIL import Image
-import sys
 
 # Ensure both project root (for `src.*` imports) and src/ (for top-level `utils`, `display`) are on sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -69,18 +69,19 @@ def device_config_dev(tmp_path, monkeypatch):
 @pytest.fixture()
 def flask_app(device_config_dev, monkeypatch):
     # Build a Flask app instance similar to inkypi.py but without CLI parsing/threads
-    from flask import Flask
     import os
+
+    from flask import Flask
     from jinja2 import ChoiceLoader, FileSystemLoader
 
-    from display.display_manager import DisplayManager
-    from refresh_task import RefreshTask
-    from blueprints.main import main_bp
-    from blueprints.settings import settings_bp
-    from blueprints.plugin import plugin_bp
-    from blueprints.playlist import playlist_bp
     from blueprints.history import history_bp
+    from blueprints.main import main_bp
+    from blueprints.playlist import playlist_bp
+    from blueprints.plugin import plugin_bp
+    from blueprints.settings import settings_bp
+    from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
+    from refresh_task import RefreshTask
 
     app = Flask(__name__)
 

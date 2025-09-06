@@ -1,9 +1,11 @@
-from plugins.base_plugin.base_plugin import BasePlugin
+import logging
+from io import BytesIO
+
+import requests
 from openai import OpenAI
 from PIL import Image
-from io import BytesIO
-import requests
-import logging
+
+from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +116,7 @@ class AIImage(BasePlugin):
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):
-        logger.info(f"Getting random image prompt...")
+        logger.info("Getting random image prompt...")
 
         system_content = (
             "You are a creative assistant generating extremely random and unique image prompts. "

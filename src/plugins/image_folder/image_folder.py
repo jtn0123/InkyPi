@@ -1,17 +1,17 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image, ImageOps, ImageFilter
-from typing import List, Optional, Tuple
+
+from PIL import Image, ImageFilter, ImageOps
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
-from io import BytesIO
 import logging
 import os
-import requests
 import random
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
-def list_files_in_folder(folder_path: str) -> List[str]:
+def list_files_in_folder(folder_path: str) -> list[str]:
     """Return a list of image file paths in the given folder, excluding hidden files."""
     image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
     return [
@@ -24,7 +24,7 @@ def list_files_in_folder(folder_path: str) -> List[str]:
         )
     ]
 
-def grab_image(image_path: str, dimensions: Tuple[int, int], pad_image: bool) -> Optional[Image.Image]:
+def grab_image(image_path: str, dimensions: tuple[int, int], pad_image: bool) -> Image.Image | None:
     """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
     try:
         # Use context manager and copy to ensure file handle is released

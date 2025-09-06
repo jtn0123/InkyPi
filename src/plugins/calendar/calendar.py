@@ -1,15 +1,14 @@
-import os
-from utils.app_utils import resolve_path, get_font
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.calendar.constants import LOCALE_MAP, FONT_SIZES
-from PIL import Image, ImageColor, ImageDraw, ImageFont
-import icalendar  # type: ignore
-import recurring_ical_events  # type: ignore
-from io import BytesIO
 import logging
-import requests
 from datetime import datetime, timedelta
+
+import icalendar  # type: ignore
 import pytz
+import recurring_ical_events  # type: ignore
+import requests
+from PIL import ImageColor
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.calendar.constants import FONT_SIZES, LOCALE_MAP
 
 logger = logging.getLogger(__name__)
 

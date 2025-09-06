@@ -1,4 +1,5 @@
 import os
+
 from PIL import Image
 
 
@@ -24,7 +25,7 @@ def test_mock_display_writes_latest_and_timestamp(monkeypatch, device_config_dev
 
 def test_mock_display_initialize_display_logging(device_config_dev):
     """Test that mock display logs initialization message."""
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import MagicMock, patch
 
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("resolution", [200, 100])

@@ -2,10 +2,10 @@ import logging
 import os
 import socket
 import subprocess
-
-from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 logger = logging.getLogger(__name__)
 

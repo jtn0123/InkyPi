@@ -1,5 +1,4 @@
 # pyright: reportMissingImports=false
-from PIL import Image
 
 
 def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):

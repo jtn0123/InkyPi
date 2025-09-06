@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from flask import Flask
 
 from src.utils.http_utils import APIError, json_error, json_success, wants_json

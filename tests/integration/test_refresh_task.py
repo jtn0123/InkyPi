@@ -1,10 +1,11 @@
 # pyright: reportMissingImports=false
 import os
 from pathlib import Path
+
 from PIL import Image
-from plugins.plugin_registry import load_plugins
 
 from display.display_manager import DisplayManager
+from plugins.plugin_registry import load_plugins
 from refresh_task import ManualRefresh, RefreshTask
 
 
@@ -45,8 +46,8 @@ def test_manual_update_triggers_display_and_refresh_info(device_config_dev, monk
 
 def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     """Test system stats logging functionality."""
-    from refresh_task import RefreshTask
     from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -76,8 +77,8 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
 def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
     """Test handling when plugin config is not found."""
-    from refresh_task import RefreshTask, PlaylistRefresh
     from display.display_manager import DisplayManager
+    from refresh_task import PlaylistRefresh, RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -99,8 +100,8 @@ def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
 
 def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
     """Test handling when plugin returns None image."""
-    from refresh_task import RefreshTask
     from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -113,9 +114,9 @@ def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
 
 def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
     """Test handling when image is already displayed."""
-    from refresh_task import RefreshTask
     from display.display_manager import DisplayManager
     from model import RefreshInfo
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -138,8 +139,8 @@ def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
 
 def test_refresh_task_manual_update_exception_handling(device_config_dev, monkeypatch):
     """Test exception handling in manual update."""
-    from refresh_task import RefreshTask, ManualRefresh
     from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -156,8 +157,8 @@ def test_refresh_task_manual_update_exception_handling(device_config_dev, monkey
 
 def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
     """Test signal config change functionality."""
-    from refresh_task import RefreshTask
     from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -173,10 +174,11 @@ def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
 
 def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monkeypatch):
     """Test determine next plugin when no playlist is active."""
-    from refresh_task import RefreshTask
-    from display.display_manager import DisplayManager
-    from model import PlaylistManager, RefreshInfo
     import pytz
+
+    from display.display_manager import DisplayManager
+    from model import RefreshInfo
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -204,10 +206,11 @@ def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monke
 
 def test_refresh_task_determine_next_plugin_empty_playlist(device_config_dev, monkeypatch):
     """Test determine next plugin when playlist has no plugins."""
-    from refresh_task import RefreshTask
-    from display.display_manager import DisplayManager
-    from model import PlaylistManager, RefreshInfo, Playlist
     import pytz
+
+    from display.display_manager import DisplayManager
+    from model import Playlist, RefreshInfo
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -238,10 +241,11 @@ def test_refresh_task_determine_next_plugin_empty_playlist(device_config_dev, mo
 
 def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
     """Test handling when it's not time to update."""
-    from refresh_task import RefreshTask
+    import pytz
+
     from display.display_manager import DisplayManager
     from model import RefreshInfo
-    import pytz
+    from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
@@ -297,7 +301,6 @@ def test_refresh_action_base_class():
 def test_playlist_refresh_info():
     """Test PlaylistRefresh get_refresh_info method."""
     from refresh_task import PlaylistRefresh
-    from model import Playlist, PluginInstance
 
     # Mock playlist and plugin instance
     playlist = type('MockPlaylist', (), {'name': 'TestPlaylist'})()
@@ -315,11 +318,11 @@ def test_playlist_refresh_info():
 
 def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
     """Test PlaylistRefresh execute with force refresh."""
-    from refresh_task import PlaylistRefresh
-    from model import PluginInstance
-    from plugins.plugin_registry import get_plugin_instance
     import pytz
     from PIL import Image
+
+    from model import PluginInstance
+    from refresh_task import PlaylistRefresh
 
     # Mock plugin instance
     plugin_instance = PluginInstance(
@@ -350,13 +353,13 @@ def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
 
 def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatch):
     """Test PlaylistRefresh execute using cached image."""
-    from refresh_task import PlaylistRefresh
-    from model import PluginInstance
-    from plugins.plugin_registry import get_plugin_instance
+    import os
+
     import pytz
     from PIL import Image
-    import tempfile
-    import os
+
+    from model import PluginInstance
+    from refresh_task import PlaylistRefresh
 
     # Mock plugin instance
     plugin_instance = PluginInstance(

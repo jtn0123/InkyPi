@@ -1,8 +1,9 @@
 # pyright: reportMissingImports=false
-import pytest
-from unittest.mock import patch, MagicMock
-from PIL import Image
 from io import BytesIO
+from unittest.mock import MagicMock, patch
+
+import pytest
+from PIL import Image
 
 
 def test_unsplash_search_success(monkeypatch, device_config_dev):

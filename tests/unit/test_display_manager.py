@@ -1,5 +1,6 @@
 import builtins
 import types
+
 import pytest
 from PIL import Image
 
@@ -21,8 +22,8 @@ def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path)
     # Spy on image utils
     called = {"change_orientation": False, "resize_image": False, "apply_image_enhancement": False}
 
-    import utils.image_utils as image_utils
     import display.display_manager as dm_mod
+    import utils.image_utils as image_utils
     original_change = image_utils.change_orientation
     original_resize = image_utils.resize_image
     original_apply = image_utils.apply_image_enhancement

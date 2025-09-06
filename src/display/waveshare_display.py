@@ -1,12 +1,12 @@
-import inspect
 import importlib
+import inspect
 import logging
 import sys
+from pathlib import Path
+
+from PIL import Image
 
 from display.abstract_display import AbstractDisplay
-from PIL import Image
-from pathlib import Path
-from plugins.plugin_registry import get_plugin_instance
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class WaveshareDisplay(AbstractDisplay):
 
         logger.info("Displaying image to Waveshare display.")
         if not image:
-            raise ValueError(f"No image provided.")
+            raise ValueError("No image provided.")
 
         # Assume device was in sleep mode. Only call init if available and callable.
         if hasattr(self, 'epd_display_init') and callable(self.epd_display_init):

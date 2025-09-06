@@ -1,7 +1,8 @@
 from io import BytesIO
+from unittest.mock import MagicMock, patch
+
 import pytest
 from PIL import Image
-from unittest.mock import patch, MagicMock
 
 
 def _png_bytes(size=(10, 6), color="white"):
@@ -199,8 +200,9 @@ def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
 
 def test_determine_date_today():
     """Test _determine_date with no special settings (uses today)."""
-    from plugins.wpotd.wpotd import Wpotd
     from datetime import datetime
+
+    from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
     result = p._determine_date({})
@@ -210,8 +212,9 @@ def test_determine_date_today():
 
 def test_determine_date_random(monkeypatch):
     """Test _determine_date with random date enabled."""
-    from plugins.wpotd.wpotd import Wpotd
     from datetime import datetime, timedelta
+
+    from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 
@@ -274,8 +277,9 @@ def test_download_image_network_error():
 
 def test_download_image_invalid_format():
     """Test _download_image with invalid image format."""
-    from plugins.wpotd.wpotd import Wpotd
     from PIL import UnidentifiedImageError
+
+    from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 
@@ -447,8 +451,9 @@ def test_make_request_api_error():
 
 def test_fetch_potd_api_error():
     """Test _fetch_potd with API error."""
-    from plugins.wpotd.wpotd import Wpotd
     from datetime import date
+
+    from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 
@@ -462,8 +467,9 @@ def test_fetch_potd_api_error():
 
 def test_fetch_potd_missing_images():
     """Test _fetch_potd with missing images in response."""
-    from plugins.wpotd.wpotd import Wpotd
     from datetime import date
+
+    from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 

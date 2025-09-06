@@ -1,7 +1,4 @@
 # pyright: reportMissingImports=false
-import io
-import json
-from typing import cast
 
 
 def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
@@ -250,10 +247,12 @@ def test_api_logs_exception_handling(client, monkeypatch):
 
 def test_settings_time_format_12h():
     """Test 12-hour time format handling."""
-    from blueprints.settings import settings_bp
-    from flask import Flask
-    import pytz
     from datetime import datetime
+
+    import pytz
+    from flask import Flask
+
+    from blueprints.settings import settings_bp
 
     app = Flask(__name__)
     app.register_blueprint(settings_bp)
@@ -286,9 +285,8 @@ def test_settings_journal_availability():
 
 def test_settings_rate_limit_edge_cases():
     """Test rate limiting edge cases."""
+
     from blueprints.settings import _rate_limit_ok
-    from collections import deque
-    import time
 
     # Test with None remote_addr
     result = _rate_limit_ok(None)

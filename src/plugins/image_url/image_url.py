@@ -1,10 +1,12 @@
-from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
+import logging
 from io import BytesIO
 import requests
-import logging
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,7 @@
-import os
 import logging
+import os
 from datetime import datetime
+
 from .abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)

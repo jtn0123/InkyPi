@@ -1,4 +1,4 @@
-from io import BytesIO
+
 from PIL import Image
 
 
@@ -7,10 +7,9 @@ def _png_image(size=(600, 800), color="white"):
 
 
 def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
-    from plugins.newspaper.newspaper import Newspaper, FREEDOM_FORUM_URL
+    from plugins.newspaper.newspaper import Newspaper
 
     # Mock utils.image_utils.get_image to return a portrait image on first try
-    import plugins.newspaper.newspaper as newsp_mod
     def fake_get_image(url):
         return _png_image((400, 800))
 

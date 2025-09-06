@@ -1,5 +1,6 @@
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 import pytz
 
 from src.plugins.weather.weather import Weather
@@ -46,7 +47,7 @@ def test_map_weather_code_to_icon_various_codes(weather_plugin):
 
 
 def test_format_time_24h_and_12h():
-	dt = datetime(2020, 1, 1, 5, 30, tzinfo=timezone.utc)
+	dt = datetime(2020, 1, 1, 5, 30, tzinfo=UTC)
 	w = Weather({"id": "weather"})
 	# 24h
 	assert w.format_time(dt, '24h', hour_only=False).startswith('05:')
@@ -58,7 +59,7 @@ def test_format_time_24h_and_12h():
 def test_parse_forecast_basic(weather_plugin):
 	w = weather_plugin
 	# create two-day daily forecast
-	now = int(datetime(2020,1,1,tzinfo=timezone.utc).timestamp())
+	now = int(datetime(2020,1,1,tzinfo=UTC).timestamp())
 	daily = [
 		{
 			"dt": now,
@@ -105,7 +106,7 @@ def test_parse_open_meteo_forecast_handles_api_and_fallback(monkeypatch, weather
 
 def test_parse_hourly_and_unit_conversion(weather_plugin):
 	w = weather_plugin
-	now = int(datetime(2020,1,1,tzinfo=timezone.utc).timestamp())
+	now = int(datetime(2020,1,1,tzinfo=UTC).timestamp())
 	hourly = [
 		{"dt": now + i*3600, "temp": 10 + i, "pop": 0.1*i, "rain": {"1h": 10*(i+1)}}
 		for i in range(3)
@@ -129,7 +130,7 @@ def test_parse_timezone_and_errors():
 def test_parse_data_points_and_open_meteo_points(weather_plugin):
 	w = weather_plugin
 	# prepare simple weather and air_quality for OpenWeatherMap style
-	now = int(datetime(2020,1,1,tzinfo=timezone.utc).timestamp())
+	now = int(datetime(2020,1,1,tzinfo=UTC).timestamp())
 	weather = {
 		"current": {
 			"dt": now,

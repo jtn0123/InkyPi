@@ -1,4 +1,5 @@
 import os
+
 from PIL import Image
 
 
@@ -166,6 +167,7 @@ def test_history_delete_errors(client):
 
 def test_history_sorting_and_size_formatting(client, device_config_dev):
     import time
+
     from PIL import Image
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -219,7 +221,6 @@ def test_history_server_handles_disk_usage_failure(client, monkeypatch):
 
 
 def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
-    import builtins
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
 
@@ -298,8 +299,8 @@ def test_history_redisplay_exception_handling(client, flask_app, monkeypatch):
 
 
 def test_history_delete_exception_handling(client, flask_app, monkeypatch):
-    import blueprints.history as history_mod
     import os.path
+
     monkeypatch.setattr(os.path, 'normpath', lambda p: (_ for _ in ()).throw(Exception("test")))
 
     resp = client.post("/history/delete", json={"filename": "test.png"})
@@ -317,8 +318,8 @@ def test_history_clear_exception_handling(client, flask_app, monkeypatch):
 
 
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
-    import blueprints.history as history_mod
     import shutil as _shutil
+
     monkeypatch.setattr(_shutil, 'disk_usage', lambda p: (_ for _ in ()).throw(Exception("test")))
 
     resp = client.get("/history/storage")

@@ -1,8 +1,8 @@
 # pyright: reportMissingImports=false
 from io import BytesIO
-from PIL import Image
-import types
+
 import pytest
+from PIL import Image
 
 
 @pytest.fixture()
@@ -17,7 +17,7 @@ def _png_bytes(size=(30, 20), color="black"):
 
 
 def test_generate_settings_template_contains_comics(plugin_config):
-    from plugins.comic.comic import Comic, COMICS
+    from plugins.comic.comic import COMICS, Comic
     p = Comic(plugin_config)
     t = p.generate_settings_template()
     assert "comics" in t

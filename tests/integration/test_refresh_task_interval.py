@@ -35,10 +35,10 @@ def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
     monkeypatch.setattr(dm, 'display_image', fake_display_image, raising=True)
 
     # Load plugins and simulate one interval cycle
-    from plugins.plugin_registry import load_plugins, get_plugin_instance
+    from plugins.plugin_registry import get_plugin_instance, load_plugins
     load_plugins(device_config_dev.get_plugins())
 
-    from refresh_task import RefreshTask, PlaylistRefresh
+    from refresh_task import PlaylistRefresh, RefreshTask
     task = RefreshTask(device_config_dev, dm)
 
     # Force current time to 12:30 so P1 is active and has higher priority than Default

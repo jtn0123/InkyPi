@@ -4,6 +4,7 @@ import pytest
 from PIL import Image
 
 import utils.image_utils as image_utils
+from utils.image_utils import change_orientation, compute_image_hash, resize_image
 
 
 class FakeResp:
@@ -92,8 +93,6 @@ def test_take_screenshot_html(tmp_path):
     assert img.size == dims
 
 # pyright: reportMissingImports=false
-from PIL import Image
-from utils.image_utils import change_orientation, resize_image, compute_image_hash
 
 
 def test_change_orientation_vertical():

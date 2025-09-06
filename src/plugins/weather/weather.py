@@ -1,10 +1,11 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-import requests
 import logging
-from datetime import datetime, timezone
-import pytz
 import math
-from typing import Optional
+from datetime import UTC, datetime
+
+import pytz
+import requests
+
+from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +124,7 @@ class Weather(BasePlugin):
         current = weather_data.get("current")
         if current is None:
             raise KeyError("current")
-        dt = datetime.fromtimestamp(current.get('dt'), tz=timezone.utc).astimezone(tz)
+        dt = datetime.fromtimestamp(current.get('dt'), tz=UTC).astimezone(tz)
         current_icon = current.get("weather")[0].get("icon").replace("n", "d")
         data = {
             "current_date": dt.strftime("%A, %B %d"),
@@ -244,7 +245,7 @@ class Weather(BasePlugin):
             moon_pct = f"{illum_fraction * 100:.0f}"
 
             # --- date & temps ---
-            dt = datetime.fromtimestamp(day["dt"], tz=timezone.utc).astimezone(tz)
+            dt = datetime.fromtimestamp(day["dt"], tz=UTC).astimezone(tz)
             day_label = dt.strftime("%a")
 
             forecast.append(
@@ -272,7 +273,7 @@ class Weather(BasePlugin):
         forecast = []
 
         for i in range(0, len(times)): 
-            dt = datetime.fromisoformat(times[i]).replace(tzinfo=timezone.utc).astimezone(tz)
+            dt = datetime.fromisoformat(times[i]).replace(tzinfo=UTC).astimezone(tz)
             day_label = dt.strftime("%a")
 
             code = weather_codes[i] if i < len(weather_codes) else 0
@@ -314,7 +315,7 @@ class Weather(BasePlugin):
     def parse_hourly(self, hourly_forecast, tz, time_format, units):
         hourly = []
         for hour in hourly_forecast[:24]:
-            dt = datetime.fromtimestamp(hour.get('dt'), tz=timezone.utc).astimezone(tz)
+            dt = datetime.fromtimestamp(hour.get('dt'), tz=UTC).astimezone(tz)
             rain_mm = hour.get("rain", {}).get("1h", 0.0)
             if units == "imperial":
                 rain = rain_mm / 25.4
@@ -370,7 +371,7 @@ class Weather(BasePlugin):
         sunrise_epoch = weather.get('current', {}).get("sunrise")
 
         if sunrise_epoch:
-            sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=timezone.utc).astimezone(tz)
+            sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=UTC).astimezone(tz)
             data_points.append({
                 "label": "Sunrise",
                 "measurement": self.format_time(sunrise_dt, time_format, include_am_pm=False),
@@ -378,11 +379,11 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunrise.png')
             })
         else:
-            logging.error(f"Sunrise not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
+            logging.error("Sunrise not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
 
         sunset_epoch = weather.get('current', {}).get("sunset")
         if sunset_epoch:
-            sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=timezone.utc).astimezone(tz)
+            sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=UTC).astimezone(tz)
             data_points.append({
                 "label": "Sunset",
                 "measurement": self.format_time(sunset_dt, time_format, include_am_pm=False),
@@ -390,7 +391,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunset.png')
             })
         else:
-            logging.error(f"Sunset not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
+            logging.error("Sunset not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
 
         data_points.append({
             "label": "Wind",
@@ -422,10 +423,10 @@ class Weather(BasePlugin):
 
         visibility_raw = weather.get('current', {}).get("visibility")
         try:
-            visibility = visibility_raw / 1000 if isinstance(visibility_raw, (int, float)) else visibility_raw
+            visibility = visibility_raw / 1000 if isinstance(visibility_raw, int | float) else visibility_raw
         except Exception:
             visibility = visibility_raw
-        visibility_str = f">{visibility}" if isinstance(visibility, (int, float)) and visibility >= 10 else visibility
+        visibility_str = f">{visibility}" if isinstance(visibility, int | float) and visibility >= 10 else visibility
         data_points.append({
             "label": "Visibility",
             "measurement": visibility_str,
@@ -468,7 +469,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunrise.png')
             })
         else:
-            logging.error(f"Sunrise not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
+            logging.error("Sunrise not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
 
         # Sunset
         sunset_times = daily_data.get('sunset', [])
@@ -481,7 +482,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunset.png')
             })
         else:
-            logging.error(f"Sunset not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
+            logging.error("Sunset not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
 
         # Wind
         wind_speed = current_data.get("windspeed", 0)
@@ -545,7 +546,7 @@ class Weather(BasePlugin):
         # Visibility
         # Visibility: keep numeric value separately to avoid mixing types
         current_visibility_str = "N/A"
-        current_visibility_val: Optional[float] = None
+        current_visibility_val: float | None = None
         unit_label = "ft" if units == "imperial" else "km"
         visibility_hourly_times = hourly_data.get('time', [])
         visibility_values = hourly_data.get('visibility', [])
@@ -553,7 +554,7 @@ class Weather(BasePlugin):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
                     visibility = visibility_values[i]
-                    if isinstance(visibility, (int, float)):
+                    if isinstance(visibility, int | float):
                         if units == "imperial":
                             current_visibility_val = int(round(visibility, 0))
                             current_visibility_str = str(current_visibility_val)
@@ -568,7 +569,7 @@ class Weather(BasePlugin):
                 continue
 
         # If we have a numeric visibility, apply threshold logic; otherwise use the string value
-        if isinstance(current_visibility_val, (int, float)):
+        if isinstance(current_visibility_val, int | float):
             if (units == "imperial" and current_visibility_val >= 32808) or (
                 units != "imperial" and current_visibility_val >= 10
             ):
@@ -586,7 +587,7 @@ class Weather(BasePlugin):
         # Air Quality
         aqi_hourly_times = aqi_data.get('hourly', {}).get('time', [])
         aqi_values = aqi_data.get('hourly', {}).get('european_aqi', [])
-        current_aqi_val: Optional[float] = None
+        current_aqi_val: float | None = None
         for i, time_str in enumerate(aqi_hourly_times):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
@@ -621,7 +622,7 @@ class Weather(BasePlugin):
         except TypeError:
             response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, bytes | bytearray) else str(response.content)
             logging.error(f"Failed to retrieve weather data: {content_str}")
             raise RuntimeError("Failed to retrieve weather data.")
 
@@ -635,7 +636,7 @@ class Weather(BasePlugin):
             response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, bytes | bytearray) else str(response.content)
             logging.error(f"Failed to get air quality data: {content_str}")
             raise RuntimeError("Failed to retrieve air quality data.")
 
@@ -649,7 +650,7 @@ class Weather(BasePlugin):
             response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, bytes | bytearray) else str(response.content)
             logging.error(f"Failed to get location: {content_str}")
             raise RuntimeError("Failed to retrieve location.")
 
@@ -667,7 +668,7 @@ class Weather(BasePlugin):
             response = requests.get(url)
         
         if not 200 <= response.status_code < 300:
-            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, bytes | bytearray) else str(response.content)
             logging.error(f"Failed to retrieve Open-Meteo weather data: {content_str}")
             raise RuntimeError("Failed to retrieve Open-Meteo weather data.")
         
@@ -680,7 +681,7 @@ class Weather(BasePlugin):
         except TypeError:
             response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, bytes | bytearray) else str(response.content)
             logging.error(f"Failed to retrieve Open-Meteo air quality data: {content_str}")
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
         

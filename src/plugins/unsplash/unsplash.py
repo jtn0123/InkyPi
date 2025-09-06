@@ -1,11 +1,13 @@
-from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image
 from PIL.Image import Resampling
-LANCZOS = Resampling.LANCZOS
-from io import BytesIO
-import requests
 import logging
 import random
+from io import BytesIO
+import requests
+
+from plugins.base_plugin.base_plugin import BasePlugin
+
+LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +43,10 @@ class Unsplash(BasePlugin):
         }
 
         if search_query:
-            url = f"https://api.unsplash.com/search/photos"
+            url = "https://api.unsplash.com/search/photos"
             params['query'] = search_query
         else:
-            url = f"https://api.unsplash.com/photos/random"
+            url = "https://api.unsplash.com/photos/random"
 
         if collections:
             params['collections'] = collections

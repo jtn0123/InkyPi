@@ -1,7 +1,7 @@
 # pyright: reportMissingImports=false
-from io import BytesIO
 import importlib
-import types
+from io import BytesIO
+
 from PIL import Image
 
 

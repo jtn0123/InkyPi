@@ -1,12 +1,12 @@
-from flask import Blueprint, request, jsonify, current_app, render_template
+import json
+import logging
+from datetime import datetime, timedelta
+
+from flask import Blueprint, current_app, jsonify, render_template, request
+
+from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error
 from utils.time_utils import calculate_seconds
-import json
-from datetime import datetime, timedelta
-import os
-import logging
-from utils.app_utils import resolve_path, handle_request_files, parse_form
-
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
@@ -64,7 +64,7 @@ def add_plugin():
             return json_error("Failed to add to playlist", status=500)
 
         device_config.write_config()
-    except Exception as e:
+    except Exception:
         return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Scheduled refresh configured."})
 

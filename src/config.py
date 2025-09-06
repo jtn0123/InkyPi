@@ -1,8 +1,10 @@
-import os
 import json
 import logging
+import os
 import shutil
+
 from dotenv import load_dotenv, set_key, unset_key
+
 from model import PlaylistManager, RefreshInfo
 
 logger = logging.getLogger(__name__)
@@ -211,7 +213,7 @@ class Config:
             # Read existing lines and replace or append
             lines = []
             if os.path.exists(env_path):
-                with open(env_path, "r") as f:
+                with open(env_path) as f:
                     lines = f.read().splitlines()
             key_prefix = f"{key}="
             updated = False

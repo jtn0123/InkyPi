@@ -1,8 +1,9 @@
 # pyright: reportMissingImports=false
 from datetime import datetime
+
 import pytz
 
-from model import PlaylistManager, Playlist, PluginInstance, RefreshInfo
+from model import Playlist, PlaylistManager, PluginInstance, RefreshInfo
 
 
 def test_playlist_manager_serialization_roundtrip():

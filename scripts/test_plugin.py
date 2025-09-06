@@ -1,8 +1,10 @@
 import json
-from src.plugins.plugin_registry import load_plugins, get_plugin_instance
-from src.utils.image_utils import resize_image, change_orientation
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+
 from PIL import Image
+
+from src.plugins.plugin_registry import get_plugin_instance, load_plugins
+from src.utils.image_utils import change_orientation, resize_image
 
 PLUGIN_CONFIG_FILE = "install/config_base/plugins.json"
 RESOLUTIONS = [

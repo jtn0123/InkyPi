@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-from plugins.plugin_registry import get_plugin_instance, load_plugins, PLUGIN_CLASSES
+from plugins.plugin_registry import PLUGIN_CLASSES, get_plugin_instance, load_plugins
 
 
 def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):

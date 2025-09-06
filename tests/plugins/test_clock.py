@@ -1,6 +1,5 @@
 # pyright: reportMissingImports=false
 import math
-import types
 from datetime import datetime
 
 import pytest
@@ -52,7 +51,7 @@ def test_static_calculate_clock_angles():
 
 def test_generate_settings_template():
     """Test generate_settings_template method."""
-    from plugins.clock.clock import Clock, CLOCK_FACES
+    from plugins.clock.clock import CLOCK_FACES, Clock
 
     clock = Clock({"id": "clock"})
     template = clock.generate_settings_template()
@@ -65,8 +64,9 @@ def test_generate_settings_template():
 
 def test_generate_image_exception_handling():
     """Test exception handling in generate_image method."""
+    from unittest.mock import MagicMock
+
     from plugins.clock.clock import Clock
-    from unittest.mock import MagicMock, patch
 
     clock = Clock({"id": "clock"})
     settings = {'selectedClockFace': 'Invalid Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
@@ -142,8 +142,9 @@ def test_conic_clock_full_circle():
 
 def test_timezone_handling():
     """Test timezone handling in generate_image."""
-    from plugins.clock.clock import Clock
     from unittest.mock import MagicMock
+
+    from plugins.clock.clock import Clock
 
     clock = Clock({"id": "clock"})
     settings = {'selectedClockFace': 'Digital Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
@@ -160,8 +161,9 @@ def test_timezone_handling():
 
 def test_invalid_clock_face_fallback():
     """Test fallback to default clock face for invalid selection."""
-    from plugins.clock.clock import Clock, DEFAULT_CLOCK_FACE
     from unittest.mock import MagicMock
+
+    from plugins.clock.clock import Clock
 
     clock = Clock({"id": "clock"})
     settings = {'selectedClockFace': 'Nonexistent Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
@@ -232,7 +234,7 @@ def test_generate_image_face_selection_and_orientation(device_config_dev, monkey
 
 
 def test_generate_image_default_face_when_invalid(device_config_dev):
-    from plugins.clock.clock import Clock, DEFAULT_CLOCK_FACE
+    from plugins.clock.clock import Clock
 
     cfg = device_config_dev
     cfg.update_value("timezone", "UTC", write=False)
