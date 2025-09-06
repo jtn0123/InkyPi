@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 import io
 import json
+from typing import cast
 
 
 def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
@@ -196,7 +197,8 @@ def test_shutdown_route_reboot(client, monkeypatch):
 
     resp = client.post('/shutdown', json={"reboot": True})
     assert resp.status_code == 200
-    assert 'reboot' in calls["cmd"]
+    assert isinstance(calls["cmd"], str)
+    assert 'reboot' in calls["cmd"]  # type: ignore[unreachable]
 
 
 def test_download_logs_with_parameters(client, monkeypatch):

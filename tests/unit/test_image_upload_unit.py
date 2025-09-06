@@ -48,7 +48,7 @@ def test_open_image_bad_path():
 
 def test_generate_image_no_images():
     u = image_upload_mod.ImageUpload({'id': 'image_upload'})
-    settings = {}
+    settings: dict = {}
     with pytest.raises(RuntimeError):
         u.generate_image(settings, DummyDeviceConfig())
 
