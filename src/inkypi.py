@@ -32,7 +32,7 @@ from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins
 from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image
-from utils.http_utils import APIError, json_error, wants_json
+from utils.http_utils import APIError, json_error, wants_json, json_internal_error
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,12 @@ def create_app():
         except Exception:
             pass
         if wants_json():
-            return json_error("An internal error occurred", status=500)
+            return json_internal_error(
+                "unhandled application error",
+                details={
+                    "hint": "Check server logs for stack trace; enable DEV mode for more diagnostics.",
+                },
+            )
         return ("Internal Server Error", 500)
 
     @app.after_request

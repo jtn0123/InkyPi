@@ -62,6 +62,27 @@ def json_success(message: str | None = None, status: int = 200, **payload: Any):
     return jsonify(body), status
 
 
+def json_internal_error(
+    context: str,
+    *,
+    status: int = 500,
+    code: int | str | None = "internal_error",
+    details: dict[str, Any] | None = None,
+):
+    """Return a standardized internal error JSON while preserving existing error strings.
+
+    - Keeps top-level error as a generic string for backward compatibility/tests
+    - Adds structured details including a required context and optional hint
+    """
+    ctx: dict[str, Any] = {"context": context}
+    if details:
+        try:
+            ctx.update(details)
+        except Exception:
+            pass
+    return json_error("An internal error occurred", status=status, code=code, details=ctx)
+
+
 def wants_json(req: Request | None = None) -> bool:
     """Heuristic to decide if the current request expects JSON.
 

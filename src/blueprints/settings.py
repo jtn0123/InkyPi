@@ -10,7 +10,7 @@ import time
 import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
 
-from utils.http_utils import json_error
+from utils.http_utils import json_error, json_internal_error
 from utils.time_utils import calculate_seconds, now_device_tz, get_timezone
 
 # Try to import cysystemd for journal reading (Linux only)
@@ -174,7 +174,12 @@ def save_api_keys():
         )
     except Exception:
         logger.exception("Error saving API keys")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "saving API keys",
+            details={
+                "hint": "Ensure .env is writable and values are valid; check disk space/permissions.",
+            },
+        )
 
 
 @settings_bp.route("/settings/delete_api_key", methods=["POST"])
@@ -194,7 +199,10 @@ def delete_api_key():
         return jsonify({"success": True, "message": f"Deleted {key}."})
     except Exception:
         logger.exception("Error deleting API key")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "deleting API key",
+            details={"hint": "Verify .env file permissions and key exists."},
+        )
 
 
 @settings_bp.route("/save_settings", methods=["POST"])
@@ -252,7 +260,10 @@ def save_settings():
         return json_error(str(e), status=500)
     except Exception:
         logger.exception("Error saving device settings")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "saving device settings",
+            details={"hint": "Check numeric values and config file permissions."},
+        )
     return jsonify({"success": True, "message": "Saved settings."})
 
 

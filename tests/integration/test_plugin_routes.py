@@ -232,3 +232,21 @@ def test_save_plugin_settings_creates_then_updates(client, monkeypatch):
     body = page.get_data(as_text=True)
     # The saved title value should appear in HTML (template uses settings to fill form)
     assert ("T2" in body) or ("Hi again" in body)
+
+
+def test_plugin_instance_image_404(client):
+    resp = client.get("/instance_image/ai_text/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_plugin_instance_image_serves_png(client, device_config_dev):
+    import os
+    from PIL import Image
+
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Image.new("RGB", (10, 10), "white").save(path)
+
+    resp = client.get("/instance_image/ai_text/Inst One")
+    assert resp.status_code == 200
+    assert resp.headers.get("Content-Type", "").startswith("image/")

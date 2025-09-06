@@ -11,7 +11,7 @@ from flask import (
     send_from_directory,
 )
 
-from utils.http_utils import json_error
+from utils.http_utils import json_error, json_internal_error
 from utils.time_utils import now_device_tz, get_timezone
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,10 @@ def history_redisplay():
         return jsonify({"success": True, "message": "Display updated"}), 200
     except Exception:
         logger.exception("Error redisplaying history image")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "redisplay history image",
+            details={"hint": "Verify filename exists in history and is readable."},
+        )
 
 
 @history_bp.route("/history/delete", methods=["POST"])
@@ -170,7 +173,12 @@ def history_delete():
         return jsonify({"success": True, "message": "Deleted"}), 200
     except Exception:
         logger.exception("Error deleting history image")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "delete history image",
+            details={
+                "hint": "Confirm filename is within history directory and file permissions allow deletion.",
+            },
+        )
 
 
 @history_bp.route("/history/clear", methods=["POST"])

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, current_app, jsonify, render_template, request, has_app_context
 
 from utils.app_utils import handle_request_files, parse_form
-from utils.http_utils import json_error
+from utils.http_utils import json_error, json_internal_error
 from utils.time_utils import calculate_seconds, now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,12 @@ def add_plugin():
 
         device_config.write_config()
     except Exception:
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "add plugin to playlist",
+            details={
+                "hint": "Validate inputs; ensure playlist exists and instance name isn’t duplicated.",
+            },
+        )
     return jsonify({"success": True, "message": "Scheduled refresh configured."})
 
 
@@ -127,7 +132,12 @@ def create_playlist():
 
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: " + str(e))
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "create playlist",
+            details={
+                "hint": "Ensure unique name and valid time range; check config write permissions.",
+            },
+        )
 
     return jsonify({"success": True, "message": "Created new Playlist!"})
 

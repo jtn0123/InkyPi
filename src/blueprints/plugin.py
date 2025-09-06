@@ -14,7 +14,7 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
-from utils.http_utils import APIError, json_error
+from utils.http_utils import APIError, json_error, json_internal_error
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -65,7 +65,13 @@ def plugin_page(plugin_id):
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:
             logger.exception("EXCEPTION CAUGHT: " + str(e))
-            return json_error("An internal error occurred", status=500)
+            return json_internal_error(
+                "render plugin settings page",
+                details={
+                    "plugin_id": plugin_id,
+                    "hint": "Verify plugin class and settings template load correctly.",
+                },
+            )
         return render_template(
             "plugin.html",
             plugin=plugin_config,
@@ -88,6 +94,28 @@ def image(plugin_id, filename):
     if not os.path.exists(full_path):
         return abort(404)
     return send_file(full_path)
+
+
+@plugin_bp.route("/instance_image/<string:plugin_id>/<string:instance_name>")
+def plugin_instance_image(plugin_id, instance_name):
+    device_config = current_app.config["DEVICE_CONFIG"]
+    try:
+        from model import PluginInstance
+
+        # Compute expected filename for this instance
+        filename = PluginInstance(plugin_id, instance_name, {}, {}).get_image_path()
+
+        base_dir = os.path.abspath(device_config.plugin_image_dir)
+        path = os.path.abspath(os.path.join(base_dir, filename))
+
+        # Prevent path traversal and ensure file exists
+        if not path.startswith(base_dir + os.sep) or not os.path.exists(path):
+            return abort(404)
+
+        return send_file(path, mimetype="image/png", conditional=True)
+    except Exception:
+        logger.exception("Error serving plugin instance image")
+        return abort(404)
 
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST"])
@@ -117,7 +145,10 @@ def delete_plugin_instance():
 
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: " + str(e))
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "delete plugin instance",
+            details={"hint": "Check playlist exists and instance name is correct."},
+        )
 
     return jsonify({"success": True, "message": "Deleted plugin instance."})
 
@@ -148,7 +179,10 @@ def update_plugin_instance(instance_name):
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception:
         logger.exception("Error updating plugin instance")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "update plugin instance",
+            details={"hint": "Ensure instance exists; check config file write permissions."},
+        )
     return jsonify(
         {"success": True, "message": f"Updated plugin instance {instance_name}."}
     )
@@ -184,7 +218,10 @@ def display_plugin_instance():
         )
     except Exception:
         logger.exception("Error displaying plugin instance")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "display plugin instance",
+            details={"hint": "Ensure playlist and instance exist and are valid."},
+        )
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
@@ -218,7 +255,11 @@ def update_now():
 
     except Exception as e:
         logger.exception(f"Error in update_now: {str(e)}")
-        return json_error(f"An error occurred: {str(e)}", status=500)
+        return json_error(
+            f"An error occurred: {str(e)}",
+            status=500,
+            details={"context": "update_now"},
+        )
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
@@ -273,4 +314,9 @@ def save_plugin_settings():
 
     except Exception as e:
         logger.exception(f"Error saving plugin settings: {str(e)}")
-        return json_error("An internal error occurred", status=500)
+        return json_internal_error(
+            "save plugin settings",
+            details={
+                "hint": "Check Default playlist creation and config file permissions.",
+            },
+        )

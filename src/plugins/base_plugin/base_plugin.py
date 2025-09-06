@@ -28,17 +28,21 @@ class BasePlugin:
         self.config = config
 
         self.render_dir = self.get_plugin_dir("render")
+        # Always initialize Jinja environment so plugins without their own
+        # render/ directory can still render using the base plugin templates.
+        search_paths = [BASE_PLUGIN_RENDER_DIR]
         if os.path.exists(self.render_dir):
-            # instantiate jinja2 env with base plugin and current plugin render directories
-            loader = FileSystemLoader([self.render_dir, BASE_PLUGIN_RENDER_DIR])
-            self.env = Environment(
-                loader=loader, autoescape=select_autoescape(["html", "xml"])
-            )
-            # Enable template auto-reload for development convenience
-            try:
-                self.env.auto_reload = True
-            except Exception:
-                pass
+            # If the plugin provides its own templates, prioritize those first.
+            search_paths.insert(0, self.render_dir)
+        loader = FileSystemLoader(search_paths)
+        self.env = Environment(
+            loader=loader, autoescape=select_autoescape(["html", "xml"])
+        )
+        # Enable template auto-reload for development convenience
+        try:
+            self.env.auto_reload = True
+        except Exception:
+            pass
 
     def generate_image(self, settings, device_config):
         raise NotImplementedError("generate_image must be implemented by subclasses")

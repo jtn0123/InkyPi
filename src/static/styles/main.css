@@ -640,6 +640,21 @@ body {
     color: #333;
 }
 
+/* Playlist plugin thumbnails */
+.plugin-thumb {
+    width: 120px;
+    height: 90px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.plugin-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
 /* Edit & Delete Buttons */
 .edit-button, .delete-button {
     background: none;

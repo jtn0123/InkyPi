@@ -251,6 +251,9 @@
                                 <div id="loadingIndicator" class="loading-indicator small left-align"></div>
 
                             </div>
+                            <div class="plugin-thumb">
+                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview" onerror="this.style.display='none';">
+                            </div>
                             <div class="plugin-actions">
                                 {% if plugin_instance.latest_refresh_time %}
                                     {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
