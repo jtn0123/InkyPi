@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportMissingModuleSource=false, reportRedeclaration=false
 from flask import Blueprint, request, jsonify, current_app, render_template, Response
+from utils.http_utils import json_error
 from utils.time_utils import calculate_seconds
 from datetime import datetime, timedelta
 import os
@@ -138,7 +139,7 @@ def save_api_keys():
                 updated.append(key)
         return jsonify({"success": True, "message": "API keys saved.", "updated": updated})
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
 @settings_bp.route('/settings/delete_api_key', methods=['POST'])
 def delete_api_key():
@@ -146,12 +147,12 @@ def delete_api_key():
     key = request.form.get("key")
     valid_keys = {"OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"}
     if key not in valid_keys:
-        return jsonify({"error": "Invalid key name"}), 400
+        return json_error("Invalid key name", status=400)
     try:
         device_config.unset_env_key(key)
         return jsonify({"success": True, "message": f"Deleted {key}."})
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
 @settings_bp.route('/save_settings', methods=['POST'])
 def save_settings():
@@ -162,17 +163,17 @@ def save_settings():
 
         unit, interval, time_format = form_data.get('unit'), form_data.get("interval"), form_data.get("timeFormat")
         if not unit or unit not in ["minute", "hour"]:
-            return jsonify({"error": "Plugin cycle interval unit is required"}), 400
+            return json_error("Plugin cycle interval unit is required", status=400)
         if not interval or not interval.isnumeric():
-            return jsonify({"error": "Refresh interval is required"}), 400
+            return json_error("Refresh interval is required", status=400)
         if not form_data.get("timezoneName"):
-            return jsonify({"error": "Time Zone is required"}), 400
+            return json_error("Time Zone is required", status=400)
         if not time_format or time_format not in ["12h", "24h"]:
-            return jsonify({"error": "Time format is required"}), 400
+            return json_error("Time format is required", status=400)
         previous_interval_seconds = device_config.get_config("plugin_cycle_interval_seconds")
         plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
         if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
-            return jsonify({"error": "Plugin cycle interval must be less than 24 hours"}), 400
+            return json_error("Plugin cycle interval must be less than 24 hours", status=400)
 
         settings = {
             "name": form_data.get("deviceName"),
@@ -197,9 +198,9 @@ def save_settings():
             refresh_task = current_app.config['REFRESH_TASK']
             refresh_task.signal_config_change()
     except RuntimeError as e:
-        return jsonify({"error": str(e)}), 500
+        return json_error(str(e), status=500)
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Saved settings."})
 
 @settings_bp.route('/shutdown', methods=['POST'])
@@ -240,7 +241,7 @@ def api_logs():
     """JSON logs API with server-side filter, level selection and limits."""
     try:
         if not _rate_limit_ok(request.remote_addr):
-            return jsonify({"error": "Too many requests"}), 429
+            return json_error("Too many requests", status=429)
 
         # Capture raw inputs and determine if clamped/trimmed
         raw_hours = request.args.get('hours')
@@ -302,5 +303,5 @@ def api_logs():
         })
     except Exception as e:
         logger.error(f"/api/logs error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return json_error(str(e), status=500)
 

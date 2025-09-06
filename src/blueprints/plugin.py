@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, render_template, send_from_directory, send_file, abort
+from utils.http_utils import json_error, json_success, APIError
 from plugins.plugin_registry import get_plugin_instance
 from utils.app_utils import resolve_path, handle_request_files, parse_form
 from refresh_task import ManualRefresh, PlaylistRefresh
@@ -28,7 +29,7 @@ def plugin_page(plugin_id):
             if plugin_instance_name:
                 plugin_instance = playlist_manager.find_plugin(plugin_id, plugin_instance_name)
                 if not plugin_instance:
-                    return jsonify({"error": f"Plugin instance: {plugin_instance_name} does not exist"}), 500
+                    return json_error(f"Plugin instance: {plugin_instance_name} does not exist", status=500)
 
                 # add plugin instance settings to the template to prepopulate
                 template_params["plugin_settings"] = plugin_instance.settings
@@ -47,7 +48,7 @@ def plugin_page(plugin_id):
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:
             logger.exception("EXCEPTION CAUGHT: " + str(e))
-            return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+            return json_error("An internal error occurred", status=500)
         return render_template(
             'plugin.html',
             plugin=plugin_config,
@@ -77,7 +78,7 @@ def delete_plugin_instance():
 
     data = request.json
     if not data:
-        return jsonify({"success": False, "message": "Invalid JSON data"}), 400
+        return json_error("Invalid JSON data", status=400)
 
     playlist_name = data.get("playlist_name")
     plugin_id = data.get("plugin_id")
@@ -86,18 +87,18 @@ def delete_plugin_instance():
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return jsonify({"success": False, "message": "Playlist not found"}), 400
+            return json_error("Playlist not found", status=400)
 
         result = playlist.delete_plugin(plugin_id, plugin_instance)
         if not result:
-            return jsonify({"success": False, "message": "Plugin instance not found"}), 400
+            return json_error("Plugin instance not found", status=400)
 
         # save changes to device config file
         device_config.write_config()
 
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: " + str(e))
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Deleted plugin instance."})
 
@@ -110,19 +111,21 @@ def update_plugin_instance(instance_name):
         form_data = parse_form(request.form)
 
         if not instance_name:
-            raise RuntimeError("Instance name is required")
+            raise APIError("Instance name is required", status=400)
         plugin_settings = form_data
         plugin_settings.update(handle_request_files(request.files, request.form))
 
         plugin_id = plugin_settings.pop("plugin_id")
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
-            return jsonify({"error": f"Plugin instance: {instance_name} does not exist"}), 500
+            return json_error(f"Plugin instance: {instance_name} does not exist", status=500)
 
         plugin_instance.settings = plugin_settings
         device_config.write_config()
+    except APIError as e:
+        return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": f"Updated plugin instance {instance_name}."})
 
 @plugin_bp.route('/display_plugin_instance', methods=['POST'])
@@ -133,7 +136,7 @@ def display_plugin_instance():
 
     data = request.json
     if not data:
-        return jsonify({"success": False, "message": "Invalid JSON data"}), 400
+        return json_error("Invalid JSON data", status=400)
 
     playlist_name = data.get("playlist_name")
     plugin_id = data.get("plugin_id")
@@ -142,15 +145,15 @@ def display_plugin_instance():
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return jsonify({"success": False, "message": f"Playlist {playlist_name} not found"}), 400
+            return json_error(f"Playlist {playlist_name} not found", status=400)
 
         plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
         if not plugin_instance:
-            return jsonify({"success": False, "message": f"Plugin instance '{plugin_instance_name}' not found"}), 400
+            return json_error(f"Plugin instance '{plugin_instance_name}' not found", status=400)
 
         refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
@@ -173,7 +176,7 @@ def update_now():
             logger.info("Refresh task not running, updating display directly")
             plugin_config = device_config.get_plugin(plugin_id)
             if not plugin_config:
-                return jsonify({"error": f"Plugin '{plugin_id}' not found"}), 404
+                return json_error(f"Plugin '{plugin_id}' not found", status=404)
                 
             plugin = get_plugin_instance(plugin_config)
             image = plugin.generate_image(plugin_settings, device_config)
@@ -181,7 +184,7 @@ def update_now():
             
     except Exception as e:
         logger.exception(f"Error in update_now: {str(e)}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
@@ -230,4 +233,4 @@ def save_plugin_settings():
 
     except Exception as e:
         logger.exception(f"Error saving plugin settings: {str(e)}")
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)

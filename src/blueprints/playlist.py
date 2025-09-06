@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app, render_template
+from utils.http_utils import json_error
 from utils.time_utils import calculate_seconds
 import json
 from datetime import datetime, timedelta
@@ -24,31 +25,31 @@ def add_plugin():
         playlist = refresh_settings.get('playlist')
         instance_name = refresh_settings.get('instance_name')
         if not playlist:
-            return jsonify({"error": "Playlist name is required"}), 400
+            return json_error("Playlist name is required", status=400)
         if not instance_name or not instance_name.strip():
-            return jsonify({"error": "Instance name is required"}), 400
+            return json_error("Instance name is required", status=400)
         if not all(char.isalpha() or char.isspace() or char.isnumeric() for char in instance_name):
-            return jsonify({"error": "Instance name can only contain alphanumeric characters and spaces"}), 400
+            return json_error("Instance name can only contain alphanumeric characters and spaces", status=400)
         refresh_type = refresh_settings.get('refreshType')
         if not refresh_type or refresh_type not in ["interval", "scheduled"]:
-            return jsonify({"error": "Refresh type is required"}), 400
+            return json_error("Refresh type is required", status=400)
 
         existing = playlist_manager.find_plugin(plugin_id, instance_name)
         if existing:
-            return jsonify({"error": f"Plugin instance '{instance_name}' already exists"}), 400
+            return json_error(f"Plugin instance '{instance_name}' already exists", status=400)
 
         if refresh_type == "interval":
             unit, interval = refresh_settings.get('unit'), refresh_settings.get("interval")
             if not unit or unit not in ["minute", "hour", "day"]:
-                return jsonify({"error": "Refresh interval unit is required"}), 400
+                return json_error("Refresh interval unit is required", status=400)
             if not interval:
-                return jsonify({"error": "Refresh interval is required"}), 400
+                return json_error("Refresh interval is required", status=400)
             refresh_interval_seconds = calculate_seconds(int(interval), unit)
             refresh_config = {"interval": refresh_interval_seconds}
         else:
             refresh_time = refresh_settings.get('refreshTime')
             if not refresh_settings.get('refreshTime'):
-                return jsonify({"error": "Refresh time is required"}), 400
+                return json_error("Refresh time is required", status=400)
             refresh_config = {"scheduled": refresh_time}
 
         plugin_settings.update(handle_request_files(request.files))
@@ -60,11 +61,11 @@ def add_plugin():
         }
         result = playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
         if not result:
-            return jsonify({"error": "Failed to add to playlist"}), 500
+            return json_error("Failed to add to playlist", status=500)
 
         device_config.write_config()
     except Exception as e:
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Scheduled refresh configured."})
 
 @playlist_bp.route('/playlist')
@@ -86,33 +87,33 @@ def create_playlist():
 
     data = request.json
     if data is None:
-        return jsonify({"error": "Invalid JSON data"}), 400
+        return json_error("Invalid JSON data", status=400)
     playlist_name = data.get("playlist_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
 
     if not playlist_name or not playlist_name.strip():
-        return jsonify({"error": "Playlist name is required"}), 400
+        return json_error("Playlist name is required", status=400)
     if not start_time or not end_time:
-        return jsonify({"error": "Start time and End time are required"}), 400
+        return json_error("Start time and End time are required", status=400)
     if end_time <= start_time:
-        return jsonify({"error": "End time must be greater than start time"}), 400
+        return json_error("End time must be greater than start time", status=400)
 
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if playlist:
-            return jsonify({"error": f"Playlist with name '{playlist_name}' already exists"}), 400
+            return json_error(f"Playlist with name '{playlist_name}' already exists", status=400)
 
         result = playlist_manager.add_playlist(playlist_name, start_time, end_time)
         if not result:
-            return jsonify({"error": "Failed to create playlist"}), 500
+            return json_error("Failed to create playlist", status=500)
 
         # save changes to device config file
         device_config.write_config()
 
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: " + str(e))
-        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+        return json_error("An internal error occurred", status=500)
 
     return jsonify({"success": True, "message": "Created new Playlist!"})
 
@@ -128,17 +129,17 @@ def update_playlist(playlist_name):
     start_time = data.get("start_time")
     end_time = data.get("end_time")
     if not new_name or not start_time or not end_time:
-        return jsonify({"success": False, "error": "Missing required fields"}), 400
+        return json_error("Missing required fields", status=400)
     if end_time <= start_time:
-        return jsonify({"error": "End time must be greater than start time"}), 400
+        return json_error("End time must be greater than start time", status=400)
     
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return jsonify({"error": f"Playlist '{playlist_name}' does not exist"}), 400
+        return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
 
     result = playlist_manager.update_playlist(playlist_name, new_name, start_time, end_time)
     if not result:
-        return jsonify({"error": "Failed to delete playlist"}), 500
+        return json_error("Failed to delete playlist", status=500)
     device_config.write_config()
 
     return jsonify({"success": True, "message": f"Updated playlist '{playlist_name}'!"})
@@ -149,11 +150,11 @@ def delete_playlist(playlist_name):
     playlist_manager = device_config.get_playlist_manager()
 
     if not playlist_name:
-        return jsonify({"error": f"Playlist name is required"}), 400
+        return json_error("Playlist name is required", status=400)
     
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return jsonify({"error": f"Playlist '{playlist_name}' does not exist"}), 400
+        return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
 
     playlist_manager.delete_playlist(playlist_name)
     device_config.write_config()
