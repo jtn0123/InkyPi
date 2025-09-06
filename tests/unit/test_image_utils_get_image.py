@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
-from PIL import Image
 from io import BytesIO
+from PIL import Image
 
 from utils.image_utils import get_image
 

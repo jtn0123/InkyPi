@@ -1,7 +1,7 @@
-import types
 import sys
-from PIL import Image
+import types
 import pytest
+from PIL import Image
 
 
 class FakeMonoEPD:
