@@ -47,7 +47,9 @@ class RefreshTask:
             self.condition.notify_all()  # Wake the thread to let it exit
         if self.thread:
             logger.info("Stopping refresh task")
-            self.thread.join()
+            self.thread.join(timeout=5)
+            if self.thread.is_alive():
+                logger.warning("Refresh task thread did not stop within timeout")
 
     def _run(self):
         """Background task that manages the periodic refresh of the display.

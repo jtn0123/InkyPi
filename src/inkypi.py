@@ -145,6 +145,7 @@ def create_app():
     app.config["DEVICE_CONFIG"] = device_config
     app.config["DISPLAY_MANAGER"] = display_manager
     app.config["REFRESH_TASK"] = refresh_task
+    app.config["WEB_ONLY"] = WEB_ONLY
 
     # Configure Flask SECRET_KEY: prefer env/.env; persist a dev fallback for stability
     secret = os.getenv("SECRET_KEY")
@@ -192,6 +193,24 @@ def create_app():
     from blueprints.history import history_bp
 
     app.register_blueprint(history_bp)
+
+    # Lightweight health endpoints for probes/CI
+    @app.route("/healthz")
+    def healthz():
+        return ("OK", 200)
+
+    @app.route("/readyz")
+    def readyz():
+        try:
+            rt = app.config.get("REFRESH_TASK")
+            web_only = bool(app.config.get("WEB_ONLY"))
+            if web_only:
+                return ("ready:web-only", 200)
+            if rt and getattr(rt, "running", False):
+                return ("ready", 200)
+            return ("not-ready", 503)
+        except Exception:
+            return ("not-ready", 503)
 
     # If running via Flask dev server, lazily start refresh task on first request
     @app.before_request
@@ -258,6 +277,15 @@ def create_app():
                 response.headers.setdefault(
                     "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
                 )
+        except Exception:
+            pass
+        # Content Security Policy (Report-Only by default)
+        try:
+            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in ("1", "true", "yes")
+            header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
+            if header_name not in response.headers:
+                response.headers[header_name] = csp_value
         except Exception:
             pass
         return response

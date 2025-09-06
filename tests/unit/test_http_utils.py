@@ -1,3 +1,87 @@
+import types
+
+import requests
+
+
+def test_http_get_user_agent_and_default_timeout(monkeypatch):
+    import utils.http_utils as http_utils
+
+    http_utils._reset_shared_session_for_tests()
+
+    captured = {}
+
+    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+        captured["headers"] = kwargs.get("headers")
+        captured["timeout"] = kwargs.get("timeout")
+
+        class R:
+            status_code = 200
+
+            def json(self):
+                return {}
+
+            content = b""
+
+        return R()
+
+    monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
+
+    http_utils.http_get("https://example.com")
+
+    assert isinstance(captured.get("headers"), dict)
+    assert captured["headers"].get("User-Agent", "").startswith("InkyPi/")
+    assert captured.get("timeout") == http_utils.DEFAULT_TIMEOUT_SECONDS
+
+
+def test_http_get_timeout_override(monkeypatch):
+    import utils.http_utils as http_utils
+
+    http_utils._reset_shared_session_for_tests()
+
+    captured = {}
+
+    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+        captured["timeout"] = kwargs.get("timeout")
+
+        class R:
+            status_code = 200
+
+            def json(self):
+                return {}
+
+            content = b""
+
+        return R()
+
+    monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
+
+    http_utils.http_get("https://example.com", timeout=5)
+    assert captured.get("timeout") == 5
+
+
+def test_shared_session_retry_configuration(monkeypatch):
+    import utils.http_utils as http_utils
+    from urllib3.util.retry import Retry
+
+    http_utils._reset_shared_session_for_tests()
+    session = http_utils.get_shared_session()
+    https_adapter = session.adapters.get("https://")
+    assert https_adapter is not None
+    assert isinstance(getattr(https_adapter, "max_retries", None), Retry)
+    retry: Retry = https_adapter.max_retries  # type: ignore[assignment]
+    assert retry.backoff_factor == 0.0
+    assert "GET" in (retry.allowed_methods or set())
+    assert 503 in (retry.status_forcelist or set())
+
+
+def test_shared_session_singleton():
+    import utils.http_utils as http_utils
+
+    http_utils._reset_shared_session_for_tests()
+    s1 = http_utils.get_shared_session()
+    s2 = http_utils.get_shared_session()
+    assert s1 is s2
+
 from unittest.mock import Mock, patch
 
 import pytest
