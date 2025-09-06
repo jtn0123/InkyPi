@@ -17,7 +17,7 @@ import logging
 import threading
 import argparse
 from utils.app_utils import generate_startup_image
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from werkzeug.serving import is_running_from_reloader
 from config import Config
 from display.display_manager import DisplayManager
@@ -29,6 +29,7 @@ from blueprints.playlist import playlist_bp
 from jinja2 import ChoiceLoader, FileSystemLoader
 from plugins.plugin_registry import load_plugins
 from waitress import serve  # type: ignore
+from utils.http_utils import APIError, json_error, wants_json
 
 
 logger = logging.getLogger(__name__)
@@ -149,6 +150,39 @@ def create_app():
             if rt and not rt.running:
                 logger.info("Starting refresh task (flask dev server lazy start)")
                 rt.start()
+
+    # Consistent JSON error handling
+    @app.errorhandler(APIError)
+    def _handle_api_error(err: APIError):
+        return json_error(err.message, status=err.status, code=err.code, details=err.details)
+
+    @app.errorhandler(400)
+    def _handle_bad_request(err):
+        if wants_json():
+            return json_error("Bad request", status=400)
+        return ("Bad request", 400)
+
+    @app.errorhandler(404)
+    def _handle_not_found(err):
+        if wants_json():
+            return json_error("Not found", status=404)
+        return ("Not found", 404)
+
+    @app.errorhandler(415)
+    def _handle_unsupported_media_type(err):
+        if wants_json():
+            return json_error("Unsupported media type", status=415)
+        return ("Unsupported media type", 415)
+
+    @app.errorhandler(Exception)
+    def _handle_unexpected_error(err: Exception):
+        try:
+            logger.exception("Unhandled exception: %s", err)
+        except Exception:
+            pass
+        if wants_json():
+            return json_error("An internal error occurred", status=500)
+        return ("Internal Server Error", 500)
 
     @app.after_request
     def _set_security_headers(response):

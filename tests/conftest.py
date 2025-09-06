@@ -6,8 +6,11 @@ import pytest
 from PIL import Image
 import sys
 
-# Ensure src/ is on sys.path for module imports like `utils` and `inkypi`
-SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+# Ensure both project root (for `src.*` imports) and src/ (for top-level `utils`, `display`) are on sys.path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+SRC_ABS = os.path.abspath(os.path.join(PROJECT_ROOT, "src"))
 if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
