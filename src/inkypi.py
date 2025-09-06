@@ -46,15 +46,25 @@ parser = argparse.ArgumentParser(description='InkyPi Display Server')
 parser.add_argument('--dev', action='store_true', help='Run in development mode')
 parser.add_argument('--config', type=str, default=None, help='Path to device config JSON file')
 parser.add_argument('--port', type=int, default=None, help='Port to listen on')
+parser.add_argument('--web-only', '--no-refresh', dest='web_only', action='store_true', help='Run web UI only (disable background refresh task)')
+parser.add_argument('--fast-dev', action='store_true', help='Use faster refresh intervals and skip startup image in dev')
 args = parser.parse_args()
 
 # Infer DEV_MODE from CLI or environment
 env_mode = (os.getenv('INKYPI_ENV', '').strip() or os.getenv('FLASK_ENV', '').strip()).lower()
 DEV_MODE = bool(args.dev or env_mode in ('dev', 'development'))
 
+# Toggle for disabling background refresh thread
+WEB_ONLY = bool(
+    args.web_only or (os.getenv('INKYPI_NO_REFRESH', '').strip().lower() in ('1', 'true', 'yes'))
+)
+
 # If --dev explicitly passed, set env var for downstream logic and logs
 if args.dev:
     os.environ['INKYPI_ENV'] = 'dev'
+    # If explicitly opting for web-only via CLI, mirror it in the environment for downstream logic
+    if args.web_only:
+        os.environ['INKYPI_NO_REFRESH'] = '1'
 
 # Config file selection via CLI has highest priority; otherwise resolver will decide
 if args.config:
@@ -90,6 +100,17 @@ device_config = Config()
 display_manager = DisplayManager(device_config)
 refresh_task = RefreshTask(device_config, display_manager)
 
+# Fast dev tuning: reduce intervals and disable startup image without persisting to disk
+FAST_DEV = bool(args.fast_dev or (os.getenv('INKYPI_FAST_DEV', '').strip().lower() in ('1', 'true', 'yes')))
+if FAST_DEV:
+    try:
+        device_config.update_value('plugin_cycle_interval_seconds', 30)
+        device_config.update_value('startup', False)
+        logger.info('Fast dev mode enabled: plugin cycle set to 30s; startup image disabled')
+    except Exception:
+        # Best-effort; continue if config lacks these keys
+        pass
+
 load_plugins(device_config.get_plugins())
 
 # Store dependencies
@@ -108,11 +129,14 @@ app.register_blueprint(playlist_bp)
 
 if __name__ == '__main__':
 
-    # start the background refresh task
-    refresh_task.start()
+    # start the background refresh task (unless running web-only)
+    if not WEB_ONLY:
+        refresh_task.start()
+    else:
+        logger.info('Web-only mode enabled: background refresh task will not start')
 
-    # display default inkypi image on startup
-    if device_config.get_config("startup") is True:
+    # display default inkypi image on startup (skip if web-only)
+    if not WEB_ONLY and device_config.get_config("startup") is True:
         logger.info("Startup flag is set, displaying startup image")
         img = generate_startup_image(device_config.get_resolution())
         display_manager.display_image(img)

@@ -17,6 +17,9 @@ class Config:
     # File path for storing the current image being displayed
     current_image_file = os.path.join(BASE_DIR, "static", "images", "current_image.png")
 
+    # File path for storing the processed image actually sent to the device
+    processed_image_file = os.path.join(BASE_DIR, "static", "images", "processed_image.png")
+
     # Directory path for storing plugin instance images
     plugin_image_dir = os.path.join(BASE_DIR, "static", "images", "plugins")
 
@@ -26,6 +29,7 @@ class Config:
 
         # Ensure output directories exist
         os.makedirs(os.path.dirname(self.current_image_file), exist_ok=True)
+        os.makedirs(os.path.dirname(self.processed_image_file), exist_ok=True)
         os.makedirs(self.plugin_image_dir, exist_ok=True)
 
         self.config = self.read_config()
