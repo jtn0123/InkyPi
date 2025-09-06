@@ -26,12 +26,11 @@ from datetime import date, datetime, timedelta
 from io import BytesIO
 from random import randint
 from typing import Any
-
-import requests
 from PIL import Image, UnidentifiedImageError
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_utils import DEFAULT_HEADERS, get_shared_session
 from utils.image_utils import load_image_from_bytes
 
 LANCZOS = Resampling.LANCZOS
@@ -40,8 +39,9 @@ logger = logging.getLogger(__name__)
 
 
 class Wpotd(BasePlugin):
-    SESSION = requests.Session()
-    HEADERS = {"User-Agent": "InkyPi/0.0 (https://github.com/fatihak/InkyPi/)"}
+    # Reuse global default headers and shared session for consistency
+    SESSION = get_shared_session()
+    HEADERS = dict(DEFAULT_HEADERS)
     API_URL = "https://en.wikipedia.org/w/api.php"
 
     def generate_settings_template(self) -> dict[str, Any]:
