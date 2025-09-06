@@ -6,7 +6,7 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from src.utils import app_utils
+import utils.app_utils as app_utils
 
 
 class FakeForm:

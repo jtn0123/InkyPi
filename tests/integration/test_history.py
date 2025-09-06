@@ -244,3 +244,18 @@ def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
     # Page should still render; either show no entries or skip the raced file
     assert "History" in body
 
+
+def test_history_template_scripts_closed_and_grid_renders(client):
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Basic sanity: we have a closing script tag
+    first_script_open = body.find("<script")
+    first_script_close = body.find("</script>")
+    assert first_script_open != -1
+    assert first_script_close != -1
+    # If a grid is present, it should appear after a closing script tag
+    grid_idx = body.find('class="history-grid"')
+    if grid_idx != -1:
+        assert first_script_close < grid_idx
+
