@@ -48,7 +48,7 @@ parser.add_argument('--config', type=str, default=None, help='Path to device con
 parser.add_argument('--port', type=int, default=None, help='Port to listen on')
 parser.add_argument('--web-only', '--no-refresh', dest='web_only', action='store_true', help='Run web UI only (disable background refresh task)')
 parser.add_argument('--fast-dev', action='store_true', help='Use faster refresh intervals and skip startup image in dev')
-args = parser.parse_args()
+args, _unknown = parser.parse_known_args()
 
 # Infer DEV_MODE from CLI or environment
 env_mode = (os.getenv('INKYPI_ENV', '').strip() or os.getenv('FLASK_ENV', '').strip()).lower()
@@ -89,55 +89,77 @@ if DEV_MODE:
 else:
     logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
 logging.getLogger('waitress.queue').setLevel(logging.ERROR)
-app = Flask(__name__)
-template_dirs = [
-   os.path.join(os.path.dirname(__file__), "templates"),    # Default template folder
-   os.path.join(os.path.dirname(__file__), "plugins"),      # Plugin templates
-]
-app.jinja_loader = ChoiceLoader([FileSystemLoader(directory) for directory in template_dirs])
-
-device_config = Config()
-display_manager = DisplayManager(device_config)
-refresh_task = RefreshTask(device_config, display_manager)
-
-# Fast dev tuning: reduce intervals and disable startup image without persisting to disk
 FAST_DEV = bool(args.fast_dev or (os.getenv('INKYPI_FAST_DEV', '').strip().lower() in ('1', 'true', 'yes')))
-if FAST_DEV:
-    try:
-        device_config.update_value('plugin_cycle_interval_seconds', 30)
-        device_config.update_value('startup', False)
-        logger.info('Fast dev mode enabled: plugin cycle set to 30s; startup image disabled')
-    except Exception:
-        # Best-effort; continue if config lacks these keys
-        pass
 
-load_plugins(device_config.get_plugins())
+def create_app():
+    app = Flask(__name__)
+    template_dirs = [
+       os.path.join(os.path.dirname(__file__), "templates"),    # Default template folder
+       os.path.join(os.path.dirname(__file__), "plugins"),      # Plugin templates
+    ]
+    app.jinja_loader = ChoiceLoader([FileSystemLoader(directory) for directory in template_dirs])
 
-# Store dependencies
-app.config['DEVICE_CONFIG'] = device_config
-app.config['DISPLAY_MANAGER'] = display_manager
-app.config['REFRESH_TASK'] = refresh_task
+    device_config = Config()
+    display_manager = DisplayManager(device_config)
+    refresh_task = RefreshTask(device_config, display_manager)
 
-# Set additional parameters
-app.config['MAX_FORM_PARTS'] = 10_000
+    # Fast dev tuning: reduce intervals and disable startup image without persisting to disk
+    if FAST_DEV:
+        try:
+            device_config.update_value('plugin_cycle_interval_seconds', 30)
+            device_config.update_value('startup', False)
+            logger.info('Fast dev mode enabled: plugin cycle set to 30s; startup image disabled')
+        except Exception:
+            # Best-effort; continue if config lacks these keys
+            pass
 
-# Register Blueprints
-app.register_blueprint(main_bp)
-app.register_blueprint(settings_bp)
-app.register_blueprint(plugin_bp)
-app.register_blueprint(playlist_bp)
+    load_plugins(device_config.get_plugins())
+
+    # Store dependencies
+    app.config['DEVICE_CONFIG'] = device_config
+    app.config['DISPLAY_MANAGER'] = display_manager
+    app.config['REFRESH_TASK'] = refresh_task
+
+    # Set additional parameters
+    app.config['MAX_FORM_PARTS'] = 10_000
+
+    # Register Blueprints
+    app.register_blueprint(main_bp)
+    app.register_blueprint(settings_bp)
+    app.register_blueprint(plugin_bp)
+    app.register_blueprint(playlist_bp)
+
+    # If running via Flask dev server, lazily start refresh task on first request
+    @app.before_request
+    def _ensure_refresh_task_started():
+        if WEB_ONLY:
+            return
+        # Only start in the reloader's main process to avoid double-starts
+        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+            rt = app.config.get('REFRESH_TASK')
+            if rt and not rt.running:
+                logger.info("Starting refresh task (flask dev server lazy start)")
+                rt.start()
+
+    return app
+
+# Module-level app instance for direct execution and tests
+app = create_app()
 
 if __name__ == '__main__':
 
     # start the background refresh task (unless running web-only)
-    if not WEB_ONLY:
+    refresh_task = app.config['REFRESH_TASK']
+    if not WEB_ONLY and not is_running_from_reloader():
         refresh_task.start()
     else:
         logger.info('Web-only mode enabled: background refresh task will not start')
 
     # display default inkypi image on startup (skip if web-only)
-    if not WEB_ONLY and device_config.get_config("startup") is True:
+    if not WEB_ONLY and app.config['DEVICE_CONFIG'].get_config("startup") is True:
         logger.info("Startup flag is set, displaying startup image")
+        device_config = app.config['DEVICE_CONFIG']
+        display_manager = app.config['DISPLAY_MANAGER']
         img = generate_startup_image(device_config.get_resolution())
         display_manager.display_image(img)
         device_config.update_value("startup", False, write=True)
@@ -160,4 +182,5 @@ if __name__ == '__main__':
             
         serve(app, host="0.0.0.0", port=PORT, threads=1)
     finally:
+        refresh_task = app.config['REFRESH_TASK']
         refresh_task.stop()

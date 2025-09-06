@@ -18,6 +18,7 @@
         const pluginInstanceName ='{{ plugin_instance }}';
         const loadPluginSettings = pluginInstanceName != '';
         const styleSettings = {{ style_settings | default(false) | tojson }};
+        const previewUrl = '{{ url_for("main.preview_image") }}';
 
         let uploadedFiles = {};
 
@@ -64,6 +65,8 @@
                 // Handle the response
                 if (response.ok) {
                     showResponseModal('success', `Success! ${result.message}`);
+                    // Trigger preview refresh shortly after success
+                    setTimeout(() => { refreshPreviewImage(); }, 250);
                 } else {
                     showResponseModal('failure', `Error!  ${result.error}`);
                 }
@@ -89,6 +92,12 @@
             } finally {
                 // Hide loading indicator after the action is complete
                 loadingIndicator.style.display = 'none';
+            }
+        }
+        function refreshPreviewImage(){
+            const img = document.getElementById('previewImage');
+            if (img){
+                img.src = previewUrl + '?t=' + Date.now();
             }
         }
 
@@ -253,6 +262,11 @@
             <div id="loadingIndicator" class="loading-indicator"></div>
         </div>
         <div class="separator"></div>
+
+        <!-- Live preview of what will be displayed -->
+        <div class="image-container">
+            <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image">
+        </div>
 
         <!-- Include plugin settings -->
         <form id = "settingsForm" class="settings-form" onsubmit="return false;">

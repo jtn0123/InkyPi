@@ -20,9 +20,9 @@
             </a>
         </header>
 
-        <!-- Display the current image -->
+        <!-- Display the current image (auto-refreshing preview) -->
         <div class="image-container">
-            <img src="{{ url_for('static', filename='images/current_image.png') }}" alt="Current Image">
+            <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image">
         </div>
 
         <!-- Separator -->
@@ -36,5 +36,15 @@
             {% endfor %}
         </div>
     </div>
+<script>
+    // Periodically refresh the preview image by cache-busting the URL
+    const previewImg = document.getElementById('previewImage');
+    function refreshPreview(){
+        const base = '{{ url_for('main.preview_image') }}';
+        previewImg.src = base + '?t=' + Date.now();
+    }
+    // Refresh every 5 seconds
+    setInterval(refreshPreview, 5000);
+</script>
 <body>
 </html>

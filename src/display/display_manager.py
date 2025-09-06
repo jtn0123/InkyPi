@@ -4,6 +4,7 @@ import logging
 
 from utils.image_utils import resize_image, change_orientation, apply_image_enhancement
 from display.mock_display import MockDisplay
+from display.abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,9 @@ class DisplayManager:
         self.device_config = device_config
      
         display_type = device_config.get_config("display_type", default="inky")
+
+        # Type of display device selected at runtime
+        self.display: AbstractDisplay
 
         if display_type == "mock":
             self.display = MockDisplay(device_config)
@@ -79,6 +83,12 @@ class DisplayManager:
         image = resize_image(image, self.device_config.get_resolution(), image_settings)
         if self.device_config.get_config("inverted_image"): image = image.rotate(180)
         image = apply_image_enhancement(image, self.device_config.get_config("image_settings"))
+
+        # Save the processed image for web preview
+        try:
+            image.save(self.device_config.processed_image_file)
+        except Exception:
+            logger.exception("Failed to save processed image preview")
 
         # Pass to the concrete instance to render to the device.
         self.display.display_image(image, image_settings)

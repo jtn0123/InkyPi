@@ -111,7 +111,7 @@ class Config:
     def read_plugins_list(self):
         """Reads the plugin-info.json config JSON from each plugin folder. Excludes the base plugin."""
         # Iterate over all plugin folders
-        plugins_list = []
+        plugins_list: list[dict] = []
         plugins_root = os.path.join(self.BASE_DIR, "plugins")
         if not os.path.isdir(plugins_root):
             return plugins_list
