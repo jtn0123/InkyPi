@@ -101,9 +101,9 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_url = response.data[0].url
         response = requests.get(image_url)
-        img = Image.open(BytesIO(response.content))
-
-        return img
+        # Open in context and copy to close underlying file handle
+        with Image.open(BytesIO(response.content)) as _img:
+            return _img.copy()
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):

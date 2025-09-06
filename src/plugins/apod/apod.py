@@ -59,7 +59,9 @@ class Apod(BasePlugin):
 
         try:
             img_data = requests.get(image_url)
-            image = Image.open(BytesIO(img_data.content))
+            # Open image in a context and copy to fully load/close handle
+            with Image.open(BytesIO(img_data.content)) as _img:
+                image = _img.copy()
         except Exception as e:
             logger.error(f"Failed to load APOD image: {str(e)}")
             raise RuntimeError("Failed to load APOD image.")

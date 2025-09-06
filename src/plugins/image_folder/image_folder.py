@@ -24,9 +24,10 @@ def list_files_in_folder(folder_path):
 def grab_image(image_path, dimensions, pad_image):
     """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
     try:
-        img = Image.open(image_path)
-        img = ImageOps.exif_transpose(img)  # Correct orientation using EXIF
-        img = ImageOps.contain(img, dimensions, Image.LANCZOS)
+        # Use context manager and copy to ensure file handle is released
+        with Image.open(image_path) as _img:
+            img = ImageOps.exif_transpose(_img)  # Correct orientation using EXIF
+            img = ImageOps.contain(img, dimensions, Image.LANCZOS)
 
         if pad_image:
             bkg = ImageOps.fit(img, dimensions)

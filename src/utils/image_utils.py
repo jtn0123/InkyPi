@@ -13,7 +13,12 @@ def get_image(image_url):
     response = requests.get(image_url)
     img = None
     if 200 <= response.status_code < 300 or response.status_code == 304:
-        img = Image.open(BytesIO(response.content))
+        # Ensure PIL image file resources are cleaned up by copying from a context-managed open
+        try:
+            with Image.open(BytesIO(response.content)) as _img:
+                img = _img.copy()
+        except Exception:
+            img = None
     else:
         logger.error(f"Received non-200 response from {image_url}: status_code: {response.status_code}")
     return img

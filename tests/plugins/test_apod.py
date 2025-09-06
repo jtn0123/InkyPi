@@ -1,4 +1,49 @@
 # pyright: reportMissingImports=false
+from PIL import Image
+from io import BytesIO
+
+
+def test_apod_success(monkeypatch, device_config_dev):
+    from plugins.apod.apod import Apod
+
+    # Mock env key
+    monkeypatch.setenv('NASA_SECRET', 'k')
+
+    class RespApi:
+        status_code = 200
+        def json(self):
+            return {"media_type": "image", "url": "http://img"}
+
+    class RespImg:
+        status_code = 200
+        def __init__(self):
+            buf = BytesIO()
+            Image.new('RGB', (5, 5), 'white').save(buf, format='PNG')
+            self.content = buf.getvalue()
+
+    calls = {"url": None}
+
+    def fake_get(url, params=None):
+        calls["url"] = url
+        if 'apod' in url:
+            return RespApi()
+        return RespImg()
+
+    monkeypatch.setattr('plugins.apod.apod.requests.get', fake_get)
+
+    img = Apod({"id": "apod"}).generate_image({}, device_config_dev)
+    assert img.size[0] > 0
+
+
+def test_apod_requires_key(monkeypatch, device_config_dev):
+    from plugins.apod.apod import Apod
+    monkeypatch.delenv('NASA_SECRET', raising=False)
+    try:
+        Apod({"id": "apod"}).generate_image({}, device_config_dev)
+        assert False, "Expected missing key error"
+    except RuntimeError:
+        pass
+# pyright: reportMissingImports=false
 
 
 def test_apod_missing_key(client):
