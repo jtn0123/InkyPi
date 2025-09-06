@@ -19,8 +19,8 @@ def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):
     # Dynamically import config.py
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    config_mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
     assert cfg.load_env_key('NASA_SECRET') == 'route-test-123'
@@ -31,8 +31,8 @@ def test_delete_api_key(client, monkeypatch, tmp_path):
     # Prime .env
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    config_mod = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
+    config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
     cfg.set_env_key('NASA_SECRET', 'to-delete')

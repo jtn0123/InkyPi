@@ -171,7 +171,7 @@ jobs:
           curl -fsS ${SERVER_URL}/playlist >/dev/null
           curl -sS -o /dev/null -w "%{http_code}\n" ${SERVER_URL}/preview | tee preview_code.txt
           curl -fsS ${SERVER_URL}/plugin/clock >/dev/null
-          curl -fsS ${SERVER_URL}/plugin/images/clock/faces/digital.png >/dev/null
+          curl -fsS ${SERVER_URL}/images/clock/faces/digital.png >/dev/null
           curl -fsS "${SERVER_URL}/download-logs?hours=2" >/dev/null
           curl -fsS "${SERVER_URL}/api/logs?hours=2&limit=200" >/dev/null
           curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/save_plugin_settings >/dev/null
