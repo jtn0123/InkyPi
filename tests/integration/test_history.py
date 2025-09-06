@@ -104,23 +104,22 @@ def test_history_security_blocks_path_traversal_on_delete(client):
 
 
 def test_history_storage_endpoint_values(client, monkeypatch):
-    # Monkeypatch statvfs to return known numbers for precise assertions
-    class FakeStat:
-        f_frsize = 4096
-        f_bavail = 250_000
-        f_blocks = 1_000_000
+    # Monkeypatch shutil.disk_usage to return known numbers for precise assertions
+    class Usage:
+        total = 4 * (1024 ** 3)  # 4 GB
+        used = 3 * (1024 ** 3)   # 3 GB
+        free = 1 * (1024 ** 3)   # 1 GB
 
-    import os as _os
-    monkeypatch.setattr(_os, "statvfs", lambda p: FakeStat())
+    import shutil as _shutil
+    monkeypatch.setattr(_shutil, "disk_usage", lambda p: Usage)
 
     resp = client.get("/history/storage")
     assert resp.status_code == 200
     data = resp.get_json()
     assert set(["free_gb", "total_gb", "used_gb", "pct_free"]).issubset(data.keys())
-    # With values above, totals should be deterministic with 2-decimal rounding
-    assert data["total_gb"] == 3.81
-    assert data["free_gb"] == 0.95
-    assert data["used_gb"] == 2.86
+    assert data["total_gb"] == 4.0
+    assert data["free_gb"] == 1.0
+    assert data["used_gb"] == 3.0
     assert data["pct_free"] == 25.0
 
 
@@ -193,14 +192,14 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     assert "100 B" in body or "0.1 KB" in body or "KB" in body
 
 
-def test_history_server_renders_storage_when_statvfs_ok(client, monkeypatch):
-    class FakeStat:
-        f_frsize = 4096
-        f_bavail = 250_000
-        f_blocks = 1_000_000
+def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
+    class Usage:
+        total = 4 * (1024 ** 3)
+        used = 3 * (1024 ** 3)
+        free = 1 * (1024 ** 3)
 
-    import os as _os
-    monkeypatch.setattr(_os, "statvfs", lambda p: FakeStat())
+    import shutil as _shutil
+    monkeypatch.setattr(_shutil, "disk_usage", lambda p: Usage)
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -208,12 +207,39 @@ def test_history_server_renders_storage_when_statvfs_ok(client, monkeypatch):
     assert "GB free of" in body
 
 
-def test_history_server_handles_statvfs_failure(client, monkeypatch):
-    import os as _os
-    monkeypatch.setattr(_os, "statvfs", lambda p: (_ for _ in ()).throw(OSError("fail")))
+def test_history_server_handles_disk_usage_failure(client, monkeypatch):
+    import shutil as _shutil
+    monkeypatch.setattr(_shutil, "disk_usage", lambda p: (_ for _ in ()).throw(OSError("fail")))
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     # Storage block may be hidden; ensure page still renders with header
+    assert "History" in body
+
+
+def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
+    import builtins
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+
+    # Create a file then remove it just before getmtime/getsize is called
+    path = os.path.join(d, "race.png")
+    from PIL import Image
+    Image.new("RGB", (10, 10), "white").save(path)
+
+    # Monkeypatch os.path.getmtime to raise for this file
+    import os as _os
+    real_getmtime = _os.path.getmtime
+    def flaky_getmtime(p):
+        if p == path:
+            raise FileNotFoundError("race gone")
+        return real_getmtime(p)
+
+    monkeypatch.setattr(_os.path, "getmtime", flaky_getmtime)
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Page should still render; either show no entries or skip the raced file
     assert "History" in body
 

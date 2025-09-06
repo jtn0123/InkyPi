@@ -32,12 +32,23 @@ def _list_history_images(history_dir: str) -> List[Dict]:
         logger.exception("Failed to list history directory")
         files = []
 
-    files.sort(key=lambda f: os.path.getmtime(os.path.join(history_dir, f)), reverse=True)
+    # Sort by modification time descending; skip files that disappear or are inaccessible
+    def _safe_mtime(path: str) -> float:
+        try:
+            return os.path.getmtime(path)
+        except Exception:
+            return 0.0
+
+    files.sort(key=lambda f: _safe_mtime(os.path.join(history_dir, f)), reverse=True)
     result: List[Dict] = []
     for f in files:
         full_path = os.path.join(history_dir, f)
-        mtime = os.path.getmtime(full_path)
-        size = os.path.getsize(full_path)
+        try:
+            mtime = os.path.getmtime(full_path)
+            size = os.path.getsize(full_path)
+        except Exception:
+            # Skip files that were deleted or cannot be accessed
+            continue
         dt = datetime.fromtimestamp(mtime)
         result.append({
             "filename": f,
@@ -60,10 +71,11 @@ def history_page():
     used_bytes = None
     pct_free = None
     try:
-        stat = os.statvfs(history_dir)
-        free_bytes = stat.f_frsize * stat.f_bavail
-        total_bytes = stat.f_frsize * stat.f_blocks
-        used_bytes = total_bytes - free_bytes if (total_bytes is not None and free_bytes is not None) else None
+        import shutil
+        usage = shutil.disk_usage(history_dir)
+        total_bytes = int(usage.total)
+        free_bytes = int(usage.free)
+        used_bytes = int(usage.used)
         pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
@@ -161,17 +173,18 @@ def history_storage():
     device_config = current_app.config['DEVICE_CONFIG']
     history_dir = device_config.history_image_dir
     try:
-        stat = os.statvfs(history_dir)
-        free_bytes = stat.f_frsize * stat.f_bavail
-        total_bytes = stat.f_frsize * stat.f_blocks
-        used_bytes = total_bytes - free_bytes if (total_bytes is not None and free_bytes is not None) else None
+        import shutil
+        usage = shutil.disk_usage(history_dir)
+        total_bytes = int(usage.total)
+        free_bytes = int(usage.free)
+        used_bytes = int(usage.used)
         pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
 
         gb = 1024 ** 3
         return jsonify({
-            'free_gb': round(free_bytes / gb, 2) if free_bytes is not None else None,
-            'total_gb': round(total_bytes / gb, 2) if total_bytes is not None else None,
-            'used_gb': round(used_bytes / gb, 2) if used_bytes is not None else None,
+            'free_gb': round(free_bytes / gb, 2),
+            'total_gb': round(total_bytes / gb, 2),
+            'used_gb': round(used_bytes / gb, 2),
             'pct_free': round(pct_free, 2) if pct_free is not None else None,
         }), 200
     except Exception:
