@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inkypi.dev/schemas/plugin-info.schema.json",
+  "title": "InkyPi Plugin Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "class", "display_name"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "class": { "type": "string" },
+    "display_name": { "type": "string" },
+    "image_settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  }
+}
+
+

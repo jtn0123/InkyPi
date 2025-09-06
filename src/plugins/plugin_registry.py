@@ -2,6 +2,8 @@
 
 import importlib
 import logging
+import os
+import sys
 from pathlib import Path
 
 from utils.app_utils import resolve_path
@@ -9,6 +11,32 @@ from utils.app_utils import resolve_path
 logger = logging.getLogger(__name__)
 PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
+
+
+def _is_dev_mode() -> bool:
+    env_mode = (
+        os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
+    ).lower()
+    return env_mode in ("dev", "development")
+
+
+def _load_single_plugin_instance(plugin_config):
+    plugin_id = plugin_config.get("id")
+    module_name = f"plugins.{plugin_id}.{plugin_id}"
+    try:
+        if _is_dev_mode() and module_name in sys.modules:
+            module = importlib.reload(sys.modules[module_name])
+        else:
+            module = importlib.import_module(module_name)
+        plugin_cls = getattr(module, plugin_config.get("class"), None)
+        if not plugin_cls:
+            raise ImportError(
+                f"Class '{plugin_config.get('class')}' not found in module {module_name}"
+            )
+        return plugin_cls(plugin_config)
+    except ImportError as e:
+        logging.error(f"Failed to import plugin module {module_name}: {e}")
+        raise
 
 
 def load_plugins(plugins_config):
@@ -33,26 +61,29 @@ def load_plugins(plugins_config):
             )
             continue
 
-        module_name = f"plugins.{plugin_id}.{plugin_id}"
-        try:
-            module = importlib.import_module(module_name)
-            plugin_class = getattr(module, plugin.get("class"), None)
-
-            if plugin_class:
-                # Create an instance of the plugin class and add it to the plugin_classes dictionary
-                PLUGIN_CLASSES[plugin_id] = plugin_class(plugin)
-
-        except ImportError as e:
-            logging.error(f"Failed to import plugin module {module_name}: {e}")
+        # In dev mode, instances will be re-created on demand to enable hot reload.
+        # In non-dev, pre-load and cache instances for performance.
+        if not _is_dev_mode():
+            try:
+                PLUGIN_CLASSES[plugin_id] = _load_single_plugin_instance(plugin)
+            except Exception:
+                # Error already logged by loader; continue to next plugin
+                continue
 
 
 def get_plugin_instance(plugin_config):
     plugin_id = plugin_config.get("id")
-    # Retrieve the plugin class factory function
-    plugin_class = PLUGIN_CLASSES.get(plugin_id)
 
-    if plugin_class:
-        # Initialize the plugin with its configuration
-        return plugin_class
-    else:
-        raise ValueError(f"Plugin '{plugin_id}' is not registered.")
+    # In dev mode, always (re)load and re-instantiate to pick up code changes.
+    if _is_dev_mode():
+        return _load_single_plugin_instance(plugin_config)
+
+    # Retrieve cached instance if available
+    instance = PLUGIN_CLASSES.get(plugin_id)
+    if instance:
+        return instance
+
+    # Fallback: attempt to load a single plugin on demand
+    instance = _load_single_plugin_instance(plugin_config)
+    PLUGIN_CLASSES[plugin_id] = instance
+    return instance

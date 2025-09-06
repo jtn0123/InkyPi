@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inkypi.dev/schemas/device_config.schema.json",
+  "title": "InkyPi Device Configuration",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "name": { "type": "string" },
+    "display_type": { "type": "string", "enum": ["mock", "inky", "waveshare"] },
+    "resolution": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer" }
+    },
+    "orientation": { "type": "string", "enum": ["horizontal", "vertical"] },
+    "plugin_cycle_interval_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "preview_size_mode": { "type": "string", "enum": ["native", "scaled"] },
+    "image_settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "saturation": { "type": "number" },
+        "brightness": { "type": "number" },
+        "sharpness": { "type": "number" },
+        "contrast": { "type": "number" }
+      }
+    },
+    "playlist_config": {
+      "type": "object",
+      "properties": {
+        "playlists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "plugins"],
+            "properties": {
+              "name": { "type": "string" },
+              "start_time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+              "end_time": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+              "plugins": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["plugin_id", "plugin_settings"],
+                  "properties": {
+                    "plugin_id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "plugin_settings": { "type": "object" },
+                    "refresh": {
+                      "type": "object",
+                      "properties": {
+                        "interval": { "type": "integer", "minimum": 1 },
+                        "schedule": { "type": "string" }
+                      }
+                    },
+                    "latest_refresh_time": { "type": "string" }
+                  }
+                }
+              },
+              "current_plugin_index": { "type": "integer" }
+            }
+          }
+        },
+        "active_playlist": { "type": "string" }
+      }
+    },
+    "refresh_info": { "type": "object" }
+  }
+}
+
+

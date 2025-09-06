@@ -141,6 +141,20 @@ Behavior in dev:
 - The background refresh thread is disabled in web-only mode, but UI operations like "Update Now" still render images immediately.
 - The refresh thread is lazily and safely started when running under `flask --debug` to avoid double-starts.
 
+### Development Tools
+
+- Hot reload for plugins: When `INKYPI_ENV=dev` or `--dev`, plugin code is reloaded on each request, so changes to `plugins/<id>/<id>.py` take effect immediately.
+- Plugin validator: Validate plugin folders quickly.
+
+```bash
+python scripts/plugin_validator.py                 # validate all plugins
+python scripts/plugin_validator.py weather         # validate a single plugin
+```
+
+- Configuration schemas: JSON Schemas for editor integration and CI validation are in `src/config/schemas/`:
+  - `device_config.schema.json`
+  - `plugin-info.schema.json`
+
 ## Waveshare Display Support
 
 Waveshare offers a range of e-Paper displays, similar to the Inky screens from Pimoroni, but with slightly different requirements. While Inky displays auto-configure via the inky Python library, Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd).

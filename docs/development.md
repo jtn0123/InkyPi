@@ -74,13 +74,27 @@ Notes:
 1. **Check rendered output**: Images are saved to `mock_display_output/`
 2. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
 3. **Configuration**: Edit `src/config/device_dev.json` for display settings
-4. **Hot reload**: You can run via Flask dev server for code reload
+4. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
 
 ```bash
 export FLASK_APP=src.inkypi:create_app
 export INKYPI_ENV=dev
 flask --debug run -p 8080
 ```
+
+## Development Tools
+
+- Plugin validator
+
+```bash
+python scripts/plugin_validator.py         # validate all plugins
+python scripts/plugin_validator.py clock   # validate a single plugin
+```
+
+- JSON Schemas (for IDE/CI)
+  - `src/config/schemas/device_config.schema.json`
+  - `src/config/schemas/plugin-info.schema.json`
+
 
 ## Testing Your Changes
 
