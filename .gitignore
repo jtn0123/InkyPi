@@ -169,6 +169,8 @@ mock_display_output/
 src/static/images/current_image.png
 src/static/images/processed_image.png
 src/static/images/history/
+src/static/images/plugins/
+src/static/images/saved/
 
 # But keep static asset PNGs (icons, plugin assets) tracked
 !src/static/icons/*.png

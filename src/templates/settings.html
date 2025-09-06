@@ -93,6 +93,18 @@
         let logsWrap = true;
         let lastLogsRaw = "";
 
+        // Preference helpers
+        const prefKey = (k) => `logs_${k}`;
+        function savePref(key, value) {
+            try { localStorage.setItem(prefKey(key), String(value)); } catch (e) {}
+        }
+        function loadPref(key, defaultValue) {
+            try {
+                const v = localStorage.getItem(prefKey(key));
+                return v === null ? defaultValue : v;
+            } catch (e) { return defaultValue; }
+        }
+
         function isErrorLine(line) {
             return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
         }
@@ -188,19 +200,32 @@
             if (!logsPaused) {
                 fetchAndRenderLogs();
             }
+            savePref('paused', logsPaused);
         }
 
         function toggleLogsAutoScroll() {
             logsAutoScroll = !logsAutoScroll;
             const btn = document.getElementById('logsAutoScrollBtn');
             if (btn) btn.textContent = logsAutoScroll ? 'Auto-Scroll: On' : 'Auto-Scroll: Off';
+            savePref('autoScroll', logsAutoScroll);
         }
 
         function onLogsControlsChanged() {
+            // Persist controls
+            const hours = document.getElementById('logsHours');
+            const interval = document.getElementById('logsInterval');
+            const maxLines = document.getElementById('logsMaxLines');
+            if (hours) savePref('hours', hours.value);
+            if (interval) savePref('interval', interval.value);
+            if (maxLines) savePref('maxLines', maxLines.value);
             startLogsPolling();
         }
 
         function onLogsFilterChanged() {
+            const filterInput = document.getElementById('logsFilter');
+            const levelSelect = document.getElementById('logsLevel');
+            if (filterInput) savePref('filter', filterInput.value || '');
+            if (levelSelect) savePref('level', levelSelect.value || 'all');
             applyLogFiltersAndRender();
         }
 
@@ -227,6 +252,7 @@
             const btn = document.getElementById('logsWrapBtn');
             if (viewer) viewer.style.whiteSpace = logsWrap ? 'pre-wrap' : 'pre';
             if (btn) btn.textContent = logsWrap ? 'Wrap: On' : 'Wrap: Off';
+            savePref('wrap', logsWrap);
         }
 
         function debounce(fn, wait) {
@@ -250,6 +276,25 @@
             const copyBtn = document.getElementById('logsCopyBtn');
             const clearBtn = document.getElementById('logsClearBtn');
             const wrapBtn = document.getElementById('logsWrapBtn');
+
+            // Load persisted preferences
+            if (filterInput) filterInput.value = loadPref('filter', '');
+            if (levelSelect) levelSelect.value = loadPref('level', 'all');
+            if (hours) hours.value = loadPref('hours', '2');
+            if (maxLinesInput) maxLinesInput.value = loadPref('maxLines', '500');
+            if (interval) interval.value = loadPref('interval', '5');
+            const storedAuto = loadPref('autoScroll', 'true') === 'true';
+            const storedWrap = loadPref('wrap', 'true') === 'true';
+            const storedPaused = loadPref('paused', 'false') === 'true';
+            logsAutoScroll = storedAuto;
+            logsWrap = storedWrap;
+            logsPaused = storedPaused;
+            if (autoBtn) autoBtn.textContent = logsAutoScroll ? 'Auto-Scroll: On' : 'Auto-Scroll: Off';
+            if (wrapBtn) wrapBtn.textContent = logsWrap ? 'Wrap: On' : 'Wrap: Off';
+            if (pauseBtn) pauseBtn.textContent = logsPaused ? 'Resume' : 'Pause';
+            const viewer = document.getElementById('logsViewer');
+            if (viewer) viewer.style.whiteSpace = logsWrap ? 'pre-wrap' : 'pre';
+
             if (hours) hours.addEventListener('change', onLogsControlsChanged);
             if (interval) interval.addEventListener('change', onLogsControlsChanged);
             if (pauseBtn) pauseBtn.addEventListener('click', toggleLogsPause);
@@ -266,7 +311,8 @@
     </script>
 </head>
 <body>
-    <div class="frame">
+    <div class="settings-grid">
+    <div class="frame settings-panel">
         <!-- Back Button -->
         <button onclick="history.back()" class="back-button">← Back</button>
         <!-- Settings Header -->
@@ -441,10 +487,9 @@
             <button type="button" onclick="handleAction()" class="action-button">Save</button>
         </div>
     </div>
-    <div class="separator" style="margin-top: 16px; margin-bottom: 16px;"></div>
     <!-- Live Logs Section -->
-    <div class="frame">
-        <div class="app-header">
+    <div class="frame settings-panel logs-panel">
+        <div class="app-header logs-toolbar">
             <div class="header-content">
                 <div class="title-container">
                     <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="logs icon" class="app-icon">
@@ -484,6 +529,7 @@
             <span id="logsUpdated" style="font-size: 12px; color: #666;">Updated --:--:--</span>
         </div>
         <pre id="logsViewer" style="white-space: pre-wrap; word-wrap: break-word; background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 8px; height: 320px; overflow: auto; margin: 0;"></pre>
+    </div>
     </div>
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}

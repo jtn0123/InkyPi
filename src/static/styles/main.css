@@ -837,3 +837,34 @@ body {
 .font-weight-normal {
   font-weight: normal; /* or 400 */
 }
+
+/* Settings page responsive two-column layout */
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 480px) 1fr;
+  gap: 24px;
+  width: 95vw;
+  max-width: 1400px;
+  align-items: start;
+}
+
+.frame.settings-panel {
+  width: 100%;
+  max-width: none;
+  min-height: auto;
+}
+
+/* Sticky toolbar for logs controls */
+.logs-panel .logs-toolbar {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 5;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 1024px) {
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
