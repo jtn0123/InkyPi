@@ -99,23 +99,19 @@ def image(plugin_id, filename):
 @plugin_bp.route("/instance_image/<string:plugin_id>/<string:instance_name>")
 def plugin_instance_image(plugin_id, instance_name):
     device_config = current_app.config["DEVICE_CONFIG"]
-    try:
-        from model import PluginInstance
+    from model import PluginInstance
 
-        # Compute expected filename for this instance
-        filename = PluginInstance(plugin_id, instance_name, {}, {}).get_image_path()
+    # Compute expected filename for this instance
+    filename = PluginInstance(plugin_id, instance_name, {}, {}).get_image_path()
 
-        base_dir = os.path.abspath(device_config.plugin_image_dir)
-        path = os.path.abspath(os.path.join(base_dir, filename))
+    base_dir = os.path.abspath(device_config.plugin_image_dir)
+    path = os.path.abspath(os.path.join(base_dir, filename))
 
-        # Prevent path traversal and ensure file exists
-        if not path.startswith(base_dir + os.sep) or not os.path.exists(path):
-            return abort(404)
-
-        return send_file(path, mimetype="image/png", conditional=True)
-    except Exception:
-        logger.exception("Error serving plugin instance image")
+    # Prevent path traversal and ensure file exists
+    if not path.startswith(base_dir + os.sep) or not os.path.exists(path):
         return abort(404)
+
+    return send_file(path, mimetype="image/png", conditional=True)
 
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST"])
