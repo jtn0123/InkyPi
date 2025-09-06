@@ -187,11 +187,14 @@ def test_weather_settings_persistence(client, monkeypatch):
     assert '-122.4194' in response_text  # longitude
 
 
-def test_weather_missing_api_key(device_config_dev):
+def test_weather_missing_api_key(device_config_dev, monkeypatch):
     """Test weather plugin with missing API key."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
+    # Mock load_env_key to return None to simulate missing API key
+    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: None)
+
     settings = {
         'latitude': '40.7128',
         'longitude': '-74.0060',
@@ -368,8 +371,10 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
     monkeypatch.setattr(device_config_dev, 'get_config', lambda key, default=None: {
         'timezone': 'UTC',
-        'time_format': '24h'
+        'time_format': '24h',
+        'resolution': [400, 300]
     }.get(key, default))
+    monkeypatch.setattr(device_config_dev, 'get_resolution', lambda: (400, 300))
 
     # Mock successful API response
     mock_response_data = {

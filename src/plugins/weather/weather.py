@@ -1,11 +1,8 @@
 from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image
-import os
 import requests
 import logging
 from datetime import datetime, timezone
 import pytz
-from io import BytesIO
 import math
 from typing import Optional
 
@@ -67,11 +64,19 @@ class Weather(BasePlugin):
         time_format = device_config.get_config("time_format", default="12h")
         tz = pytz.timezone(timezone)
 
+        # Validate API key for OpenWeatherMap before making network calls
+        if weather_provider == "OpenWeatherMap":
+            api_key = device_config.load_env_key("OPEN_WEATHER_MAP_SECRET")
+            if not api_key:
+                raise RuntimeError("Open Weather Map API Key not configured.")
+
+        # Validate provider
+        if weather_provider not in ["OpenWeatherMap", "OpenMeteo"]:
+            raise RuntimeError(f"Unknown weather provider: {weather_provider}")
+
         try:
             if weather_provider == "OpenWeatherMap":
                 api_key = device_config.load_env_key("OPEN_WEATHER_MAP_SECRET")
-                if not api_key:
-                    raise RuntimeError("Open Weather Map API Key not configured.")
                 weather_data = self.get_weather_data(api_key, units, lat, long)
                 aqi_data = self.get_air_quality(api_key, lat, long)
                 if settings.get('titleSelection', 'location') == 'location':
@@ -88,8 +93,6 @@ class Weather(BasePlugin):
                 weather_data = self.get_open_meteo_data(lat, long, units, forecast_days + 1)
                 aqi_data = self.get_open_meteo_air_quality(lat, long)
                 template_params = self.parse_open_meteo_data(weather_data, aqi_data, tz, units, time_format)
-            else:
-                raise RuntimeError(f"Unknown weather provider: {weather_provider}")
 
             template_params['title'] = title
         except Exception as e:
@@ -118,6 +121,8 @@ class Weather(BasePlugin):
 
     def parse_weather_data(self, weather_data, aqi_data, tz, units, time_format):
         current = weather_data.get("current")
+        if current is None:
+            raise KeyError("current")
         dt = datetime.fromtimestamp(current.get('dt'), tz=timezone.utc).astimezone(tz)
         current_icon = current.get("weather")[0].get("icon").replace("n", "d")
         data = {
@@ -136,7 +141,9 @@ class Weather(BasePlugin):
         return data
 
     def parse_open_meteo_data(self, weather_data, aqi_data, tz, units, time_format):
-        current = weather_data.get("current_weather", {})
+        current = weather_data.get("current_weather")
+        if current is None:
+            raise KeyError("current_weather")
         dt = datetime.fromisoformat(current.get('time')).astimezone(tz) if current.get('time') else datetime.now(tz)
         weather_code = current.get("weathercode", 0)
         current_icon = self.map_weather_code_to_icon(weather_code, dt.hour)
