@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 import pytest
+from unittest.mock import patch
 
 
 def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
@@ -47,18 +48,14 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
     assert b"Text Prompt is required" in resp.data
 
 
-def test_ai_text_generate_image_openai_error(client, flask_app, monkeypatch):
+@patch('plugins.ai_text.ai_text.OpenAI')
+def test_ai_text_generate_image_openai_error(mock_openai, client, flask_app, monkeypatch):
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
 
     # Mock OpenAI to raise an exception
-    class FakeOpenAI:
-        def __init__(self, api_key=None):
-            raise Exception("OpenAI API Error")
-
-    import plugins.ai_text.ai_text as ai_text_mod
-    monkeypatch.setattr(ai_text_mod, "OpenAI", FakeOpenAI, raising=True)
+    mock_openai.side_effect = Exception("OpenAI API Error")
 
     data = {
         "plugin_id": "ai_text",
@@ -71,7 +68,9 @@ def test_ai_text_generate_image_openai_error(client, flask_app, monkeypatch):
     assert b"Open AI request failure" in resp.data
 
 
-def test_ai_text_generate_image_vertical_orientation(client, flask_app, monkeypatch):
+@pytest.mark.parametrize("orientation,resolution", [("vertical", (400, 300)), ("horizontal", (800, 480))])
+@patch('plugins.ai_text.ai_text.OpenAI')
+def test_ai_text_generate_image_orientation(mock_openai, client, flask_app, monkeypatch, orientation, resolution):
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -99,15 +98,14 @@ def test_ai_text_generate_image_vertical_orientation(client, flask_app, monkeypa
         def __init__(self, api_key=None):
             self.chat = FakeChat()
 
-    import plugins.ai_text.ai_text as ai_text_mod
-    monkeypatch.setattr(ai_text_mod, "OpenAI", FakeOpenAI, raising=True)
+    mock_openai.return_value = FakeOpenAI()
 
-    # Mock vertical orientation and resolution
+    # Mock orientation and resolution
     def mock_get_config(key):
         if key == "orientation":
-            return "vertical"
+            return orientation
         elif key == "resolution":
-            return (400, 300)  # width, height
+            return resolution
         return None
 
     monkeypatch.setattr(flask_app.config["DEVICE_CONFIG"], "get_config", mock_get_config)
@@ -140,7 +138,8 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
     assert b"API Key not configured" in resp.data or b"Open AI" in resp.data
 
 
-def test_ai_text_generate_image_success(client, flask_app, monkeypatch):
+@patch('plugins.ai_text.ai_text.OpenAI')
+def test_ai_text_generate_image_success(mock_openai, client, flask_app, monkeypatch):
     # Mock env key
     import os
 
@@ -169,9 +168,7 @@ def test_ai_text_generate_image_success(client, flask_app, monkeypatch):
         def __init__(self, api_key=None):
             self.chat = FakeChat()
 
-    import plugins.ai_text.ai_text as ai_text_mod
-
-    monkeypatch.setattr(ai_text_mod, "OpenAI", FakeOpenAI, raising=True)
+    mock_openai.return_value = FakeOpenAI()
 
     # Post valid form
     data = {

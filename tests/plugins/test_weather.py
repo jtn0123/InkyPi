@@ -5,13 +5,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
-def test_weather_openweathermap_success(client, monkeypatch):
+@patch('plugins.weather.weather.http_get')
+def test_weather_openweathermap_success(mock_http_get, client, monkeypatch):
     import os
 
     os.environ["OPEN_WEATHER_MAP_SECRET"] = "key"
 
     # Mock OWM endpoints
-    def fake_get(url, *args, **kwargs):
+    def fake_get(url, params=None, **kwargs):
         class R:
             status_code = 200
 
@@ -49,7 +50,7 @@ def test_weather_openweathermap_success(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr("plugins.weather.weather.http_get", fake_get, raising=True)
+    mock_http_get.side_effect = fake_get
 
     data = {
         "plugin_id": "weather",

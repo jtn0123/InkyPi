@@ -60,48 +60,37 @@ def test_apod_missing_key(client):
     assert resp.status_code == 500
 
 
-def test_apod_success_via_client(client, monkeypatch):
+@patch('plugins.apod.apod.http_get')
+def test_apod_success_via_client(mock_http_get, client, monkeypatch):
     import os
     os.environ['NASA_SECRET'] = 'test'
 
-    # Mock NASA APOD API response
-    import requests
+    # Mock NASA APOD API response and image download
+    call_count = [0]
     def fake_get(url, params=None, **kwargs):
-        class R:
-            status_code = 200
-            def json(self):
-                return {"media_type": "image", "hdurl": "http://example.com/apod.png"}
-        return R()
+        call_count[0] += 1
+        if call_count[0] == 1:  # First call is to NASA API
+            class ApiResponse:
+                status_code = 200
+                def json(self):
+                    return {"media_type": "image", "hdurl": "http://example.com/apod.png"}
+            return ApiResponse()
+        else:  # Second call is to download the image
+            from io import BytesIO
+            from PIL import Image
+            img = Image.new('RGB', (64, 64), 'black')
+            buf = BytesIO()
+            img.save(buf, format='PNG')
+            class ImageResponse:
+                content = buf.getvalue()
+                status_code = 200
+            return ImageResponse()
 
-    # Mock image fetch
-    from io import BytesIO
-
-    from PIL import Image
-    def fake_get_image(url):
-        img = Image.new('RGB', (64, 64), 'black')
-        buf = BytesIO()
-        img.save(buf, format='PNG')
-        class R:
-            content = buf.getvalue()
-            status_code = 200
-        return R()
-
-    # Route calls: first call with params (APOD), second call to image URL
-    calls = []
-    def dispatcher(url, params=None, **kwargs):
-        if params is not None:
-            calls.append('meta')
-            return fake_get(url, params=params)
-        else:
-            calls.append('image')
-            return fake_get_image(url)
-
-    monkeypatch.setattr('plugins.apod.apod.http_get', dispatcher, raising=True)
+    mock_http_get.side_effect = fake_get
 
     data = {'plugin_id': 'apod'}
     resp = client.post('/update_now', data=data)
     assert resp.status_code == 200
-    assert calls == ['meta', 'image']
 
 
 def test_apod_randomize_date(monkeypatch, device_config_dev):

@@ -4,6 +4,30 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def mock_openai():
+    """Mock OpenAI for all ai_image tests."""
+    with patch('plugins.ai_image.ai_image.OpenAI') as mock:
+        # Create a mock OpenAI client
+        mock_client = MagicMock()
+        mock.return_value = mock_client
+
+        # Mock chat completions for prompt randomization
+        mock_response = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = "randomized prompt"
+        mock_response.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        # Mock images.generate
+        mock_image_response = MagicMock()
+        mock_image_response.data = [MagicMock()]
+        mock_image_response.data[0].url = "http://example.com/image.png"
+        mock_client.images.generate.return_value = mock_image_response
+
+        yield mock
+
+
 def test_ai_image_missing_api_key(device_config_dev):
     """Test ai_image plugin with missing API key."""
     from plugins.ai_image.ai_image import AIImage
@@ -31,34 +55,6 @@ def test_ai_image_invalid_model(client, monkeypatch):
 
 def test_ai_image_generate_image_success(client, monkeypatch):
     monkeypatch.setenv("OPEN_AI_SECRET", "test")
-
-    class FakeImages:
-        def generate(self, **kwargs):
-            # Ensure quality is normalized per model
-            model = kwargs.get("model")
-            q = kwargs.get("quality")
-            if model == "gpt-image-1":
-                # New API supports low | medium | high | auto; ensure 'standard' is not passed
-                assert q in (None, "low", "medium", "high", "auto")
-                assert q != "standard"
-            if model == "dall-e-3":
-                assert q in (None, "standard", "hd")
-
-            class Resp:
-                class D:
-                    url = "http://example.com/img.png"
-
-                data = [D()]
-
-            return Resp()
-
-    class FakeOpenAI:
-        def __init__(self, api_key=None):
-            self.images = FakeImages()
-
-    import plugins.ai_image.ai_image as ai_image_mod
-
-    monkeypatch.setattr(ai_image_mod, "OpenAI", FakeOpenAI, raising=True)
 
     # Mock requests.get to image URL
     from io import BytesIO

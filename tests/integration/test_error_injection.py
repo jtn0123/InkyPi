@@ -4,17 +4,44 @@ import os
 
 import pytest
 from PIL import Image
+from unittest.mock import patch, MagicMock
 
 
 def _valid_ai_text_settings():
     return {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
 
 
-def test_manual_update_propagates_plugin_exception(device_config_dev, monkeypatch):
+@patch('plugins.ai_text.ai_text.OpenAI')
+def test_manual_update_propagates_plugin_exception(mock_openai, device_config_dev, monkeypatch):
     # Ensure plugin registry is loaded
     from plugins.plugin_registry import load_plugins
 
     load_plugins(device_config_dev.get_plugins())
+
+    # Mock OpenAI to avoid API calls
+    class FakeMsg:
+        def __init__(self, content):
+            self.content = content
+
+    class Choice:
+        def __init__(self, content):
+            self.message = FakeMsg(content)
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = self
+
+        def create(self, *args, **kwargs):
+            class Resp:
+                choices = [Choice("Hello World")]
+
+            return Resp()
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None):
+            self.chat = FakeChat()
+
+    mock_openai.return_value = FakeOpenAI()
 
     # Force AI Text plugin to raise on generate_image
     import plugins.ai_text.ai_text as ai_text_mod
@@ -40,7 +67,33 @@ def test_manual_update_propagates_plugin_exception(device_config_dev, monkeypatc
         task.stop()
 
 
-def test_update_now_returns_500_when_display_raises(client, monkeypatch):
+@patch('plugins.ai_text.ai_text.OpenAI')
+def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeypatch):
+    # Mock OpenAI to avoid API calls
+    class FakeMsg:
+        def __init__(self, content):
+            self.content = content
+
+    class Choice:
+        def __init__(self, content):
+            self.message = FakeMsg(content)
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = self
+
+        def create(self, *args, **kwargs):
+            class Resp:
+                choices = [Choice("Hello World")]
+
+            return Resp()
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None):
+            self.chat = FakeChat()
+
+    mock_openai.return_value = FakeOpenAI()
+
     # Return a simple image from plugin
     import plugins.ai_text.ai_text as ai_text_mod
 
@@ -69,9 +122,35 @@ def test_update_now_returns_500_when_display_raises(client, monkeypatch):
     assert resp.status_code == 500
 
 
+@patch('plugins.ai_text.ai_text.OpenAI')
 def test_display_plugin_instance_returns_500_on_plugin_error(
-    client, device_config_dev, monkeypatch
+    mock_openai, client, device_config_dev, monkeypatch
 ):
+    # Mock OpenAI to avoid API calls
+    class FakeMsg:
+        def __init__(self, content):
+            self.content = content
+
+    class Choice:
+        def __init__(self, content):
+            self.message = FakeMsg(content)
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = self
+
+        def create(self, *args, **kwargs):
+            class Resp:
+                choices = [Choice("Hello World")]
+
+            return Resp()
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None):
+            self.chat = FakeChat()
+
+    mock_openai.return_value = FakeOpenAI()
+
     # Prepare a playlist with an ai_text instance
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("P1", "00:00", "24:00")
@@ -118,23 +197,47 @@ def test_display_plugin_instance_returns_500_on_plugin_error(
 
 
 def test_plugin_settings_page_returns_500_on_template_error(client, monkeypatch):
-    # Make generate_settings_template raise
+    # Mock the plugin's generate_settings_template method
     import plugins.ai_text.ai_text as ai_text_mod
 
     def raise_settings(self):
         raise RuntimeError("template error")
 
-    monkeypatch.setattr(
-        ai_text_mod.AIText, "generate_settings_template", raise_settings, raising=True
-    )
+    monkeypatch.setattr(ai_text_mod.AIText, "generate_settings_template", raise_settings, raising=True)
 
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 500
 
 
+@patch('plugins.ai_text.ai_text.OpenAI')
 def test_add_plugin_returns_500_when_write_config_fails(
-    client, device_config_dev, monkeypatch
+    mock_openai, client, device_config_dev, monkeypatch
 ):
+    # Mock OpenAI to avoid API calls
+    class FakeMsg:
+        def __init__(self, content):
+            self.content = content
+
+    class Choice:
+        def __init__(self, content):
+            self.message = FakeMsg(content)
+
+    class FakeChat:
+        def __init__(self):
+            self.completions = self
+
+        def create(self, *args, **kwargs):
+            class Resp:
+                choices = [Choice("Hello World")]
+
+            return Resp()
+
+    class FakeOpenAI:
+        def __init__(self, api_key=None):
+            self.chat = FakeChat()
+
+    mock_openai.return_value = FakeOpenAI()
+
     # Existing playlist
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("P1", "00:00", "24:00")
