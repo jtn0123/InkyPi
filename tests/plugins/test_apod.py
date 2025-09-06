@@ -60,7 +60,7 @@ def test_apod_missing_key(client):
     assert resp.status_code == 500
 
 
-def test_apod_success(client, monkeypatch):
+def test_apod_success_via_client(client, monkeypatch):
     import os
     os.environ['NASA_SECRET'] = 'test'
 

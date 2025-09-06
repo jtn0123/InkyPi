@@ -61,6 +61,7 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
     if "display" not in sys.modules:
         try:
             import importlib.util
+
             if importlib.util.find_spec("display"):
                 __import__("display")
         except ImportError:
@@ -73,7 +74,7 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
     if display_pkg is None:
         display_pkg = types.ModuleType("display")
         sys.modules["display"] = display_pkg
-    elif hasattr(display_pkg, '__path__'):
+    elif hasattr(display_pkg, "__path__"):
         # If display is already a proper package, don't override it
         pass
     else:
@@ -86,6 +87,7 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
 
     class EPD(epd_class):
         pass
+
     # Assign EPD attribute via setattr to avoid static analyzer complaints
     setattr(epd_mod, "EPD", EPD)
 
@@ -99,6 +101,7 @@ def test_waveshare_initialize_sets_resolution(monkeypatch, device_config_dev):
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
 
     from display.waveshare_display import WaveshareDisplay
+
     _driver = WaveshareDisplay(device_config_dev)
 
     # Resolution stored in config (width >= height order)
@@ -110,6 +113,7 @@ def test_waveshare_display_image_mono(monkeypatch, device_config_dev):
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
 
     from display.waveshare_display import WaveshareDisplay
+
     driver = WaveshareDisplay(device_config_dev)
 
     img = Image.new("1", (200, 100), 255)
@@ -129,6 +133,7 @@ def test_waveshare_display_image_bicolor(monkeypatch, device_config_dev):
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeBiColorEPD)
 
     from display.waveshare_display import WaveshareDisplay
+
     driver = WaveshareDisplay(device_config_dev)
 
     img = Image.new("1", (200, 100), 255)
@@ -149,6 +154,7 @@ def test_waveshare_init_unsupported_module(monkeypatch, device_config_dev):
     # Do not install fake module; expect ValueError
     device_config_dev.update_value("display_type", "epdXunknown")
     from display.waveshare_display import WaveshareDisplay
+
     with pytest.raises(ValueError):
         WaveshareDisplay(device_config_dev)
 
@@ -157,7 +163,9 @@ def test_waveshare_init_missing_display_type(device_config_dev):
     """Test that WaveshareDisplay raises ValueError when display_type is missing."""
     device_config_dev.update_value("display_type", None)
     from display.waveshare_display import WaveshareDisplay
-    with pytest.raises(ValueError, match="Waveshare driver but 'display_type' not specified in configuration"):
+
+    with pytest.raises(
+        ValueError,
+        match="Waveshare driver but 'display_type' not specified in configuration",
+    ):
         WaveshareDisplay(device_config_dev)
-
-

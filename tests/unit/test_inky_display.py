@@ -40,6 +40,7 @@ def test_inky_initialize_sets_resolution_and_border(monkeypatch, device_config_d
     device_config_dev.update_value("resolution", None)
 
     fake_disp = FakeAutoDisplay(width=296, height=128)
+
     def fake_auto():
         return fake_disp
 
@@ -47,6 +48,7 @@ def test_inky_initialize_sets_resolution_and_border(monkeypatch, device_config_d
     _install_fake_inky(monkeypatch, fake_disp)
 
     from display.inky_display import InkyDisplay
+
     _driver = InkyDisplay(device_config_dev)
 
     # Resolution saved as list [w, h]
@@ -60,6 +62,7 @@ def test_inky_display_image_calls_set_image_and_show(monkeypatch, device_config_
     _install_fake_inky(monkeypatch, fake_disp)
 
     from display.inky_display import InkyDisplay
+
     driver = InkyDisplay(device_config_dev)
 
     image = Image.new("RGB", (100, 50), "white")
@@ -74,9 +77,8 @@ def test_inky_display_image_raises_on_none(monkeypatch, device_config_dev):
     _install_fake_inky(monkeypatch, fake_disp)
 
     from display.inky_display import InkyDisplay
+
     driver = InkyDisplay(device_config_dev)
 
     with pytest.raises(ValueError):
         driver.display_image(None)
-
-

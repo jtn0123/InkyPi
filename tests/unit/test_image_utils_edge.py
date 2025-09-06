@@ -57,13 +57,16 @@ def test_get_image_decode_error(monkeypatch):
         status_code = 200
         content = b"not an image"
 
-    monkeypatch.setattr("utils.image_utils.requests.get", lambda url, timeout=None: Resp())
+    monkeypatch.setattr(
+        "utils.image_utils.requests.get", lambda url, timeout=None: Resp()
+    )
     img = image_utils.get_image("http://example/img.png")
     assert img is None
 
 
 def test_take_screenshot_html_success(monkeypatch):
     import utils.image_utils as image_utils
+
     # Reload to restore real functions after autouse fixture monkeypatch
     image_utils = importlib.reload(image_utils)
 
@@ -78,8 +81,10 @@ def test_take_screenshot_html_success(monkeypatch):
     class _Ctx:
         def __init__(self, size=(10, 6)):
             self._img = Image.new("RGB", size, "white")
+
         def __enter__(self):
             return self._img
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -92,6 +97,7 @@ def test_take_screenshot_html_success(monkeypatch):
 
 def test_take_screenshot_html_failure(monkeypatch):
     import utils.image_utils as image_utils
+
     # Reload to restore real functions after autouse fixture monkeypatch
     image_utils = importlib.reload(image_utils)
 
@@ -104,5 +110,3 @@ def test_take_screenshot_html_failure(monkeypatch):
 
     out = image_utils.take_screenshot_html("<html></html>", (8, 4))
     assert out is None
-
-

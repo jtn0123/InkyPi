@@ -37,17 +37,20 @@ LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
+
 class Wpotd(BasePlugin):
     SESSION = requests.Session()
-    HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
+    HEADERS = {"User-Agent": "InkyPi/0.0 (https://github.com/fatihak/InkyPi/)"}
     API_URL = "https://en.wikipedia.org/w/api.php"
 
     def generate_settings_template(self) -> dict[str, Any]:
         template_params: dict[str, Any] = super().generate_settings_template()
-        template_params['style_settings'] = False
+        template_params["style_settings"] = False
         return template_params
 
-    def generate_image(self, settings: dict[str, Any], device_config: Any) -> Image.Image:
+    def generate_image(
+        self, settings: dict[str, Any], device_config: Any
+    ) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -63,7 +66,9 @@ class Wpotd(BasePlugin):
         if settings.get("shrinkToFitWpotd") == "true":
             max_width, max_height = device_config.get_resolution()
             image = self._shrink_to_fit(image, max_width, max_height)
-            logger.info(f"Image resized to fit device dimensions: {max_width},{max_height}")
+            logger.info(
+                f"Image resized to fit device dimensions: {max_width},{max_height}"
+            )
 
         return image
 
@@ -80,7 +85,9 @@ class Wpotd(BasePlugin):
     def _download_image(self, url: str) -> Image.Image | None:
         try:
             if url.lower().endswith(".svg"):
-                logger.warning("SVG format is not supported by Pillow. Skipping image download.")
+                logger.warning(
+                    "SVG format is not supported by Pillow. Skipping image download."
+                )
                 raise RuntimeError("Unsupported image format: SVG.")
 
             response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
@@ -103,7 +110,7 @@ class Wpotd(BasePlugin):
             "format": "json",
             "formatversion": "2",
             "prop": "images",
-            "titles": title
+            "titles": title,
         }
 
         data = self._make_request(params)
@@ -119,7 +126,7 @@ class Wpotd(BasePlugin):
             "filename": filename,
             "image_src": image_src,
             "image_page_url": f"https://en.wikipedia.org/wiki/{title}",
-            "date": cur_date
+            "date": cur_date,
         }
 
     def _fetch_image_src(self, filename: str) -> str:
@@ -128,7 +135,7 @@ class Wpotd(BasePlugin):
             "format": "json",
             "prop": "imageinfo",
             "iiprop": "url",
-            "titles": filename
+            "titles": filename,
         }
         data = self._make_request(params)
         try:
@@ -143,15 +150,19 @@ class Wpotd(BasePlugin):
 
     def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
+            response = self.SESSION.get(
+                self.API_URL, params=params, headers=self.HEADERS, timeout=10
+            )
             response.raise_for_status()
             data: dict[str, Any] = response.json()
             return data
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
             raise RuntimeError("Wikipedia API request failed.")
-        
-    def _shrink_to_fit(self, image: Image.Image, max_width: int, max_height: int) -> Image.Image:
+
+    def _shrink_to_fit(
+        self, image: Image.Image, max_width: int, max_height: int
+    ) -> Image.Image:
         """
         Resize the image to fit within max_width and max_height while maintaining aspect ratio.
         Uses high-quality resampling.
@@ -178,7 +189,9 @@ class Wpotd(BasePlugin):
             image = image.resize((new_width, new_height), LANCZOS)
             # Create a new image with white background and paste the resized image in the center
             new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
-            new_image.paste(image, ((max_width - new_width) // 2, (max_height - new_height) // 2))
+            new_image.paste(
+                image, ((max_width - new_width) // 2, (max_height - new_height) // 2)
+            )
             return new_image
         else:
             # If the image is already within bounds, return it as is

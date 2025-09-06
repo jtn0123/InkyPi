@@ -8,7 +8,12 @@ from model import Playlist, PlaylistManager, PluginInstance
 
 def test_refresh_info_to_from_dict_and_datetime():
     now_iso = datetime.utcnow().isoformat()
-    ri = model.RefreshInfo(refresh_type="Manual Update", plugin_id="p1", refresh_time=now_iso, image_hash=123)
+    ri = model.RefreshInfo(
+        refresh_type="Manual Update",
+        plugin_id="p1",
+        refresh_time=now_iso,
+        image_hash=123,
+    )
     d = ri.to_dict()
     assert d["refresh_time"] == now_iso
     assert d["image_hash"] == 123
@@ -20,7 +25,12 @@ def test_refresh_info_to_from_dict_and_datetime():
 
 def test_playlist_and_plugininstance_basic_operations():
     # Create plugin instances
-    pdata = {"plugin_id": "weather", "name": "main", "plugin_settings": {"k": "v"}, "refresh": {}}
+    pdata = {
+        "plugin_id": "weather",
+        "name": "main",
+        "plugin_settings": {"k": "v"},
+        "refresh": {},
+    }
     plugin = model.PluginInstance.from_dict(pdata)
     assert plugin.plugin_id == "weather"
     assert plugin.get_image_path().endswith("weather_main.png")
@@ -89,8 +99,15 @@ def test_playlist_manager_operations():
     # should_refresh utility
     assert model.PlaylistManager.should_refresh(None, 10, datetime.utcnow()) is True
     latest = datetime.utcnow()
-    assert model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=11)) is True
-    assert model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=5)) is False
+    assert (
+        model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=11))
+        is True
+    )
+    assert (
+        model.PlaylistManager.should_refresh(latest, 10, latest + timedelta(seconds=5))
+        is False
+    )
+
 
 # pyright: reportMissingImports=false
 
@@ -110,8 +127,32 @@ def test_should_refresh_interval_false():
 def test_determine_active_playlist_priority():
     tz = pytz.UTC
     now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
-    p1 = Playlist("All Day", "00:00", "24:00", plugins=[{"plugin_id": "x", "name": "a", "plugin_settings": {}, "refresh": {"interval": 300}}])
-    p2 = Playlist("Lunch", "11:30", "13:30", plugins=[{"plugin_id": "x", "name": "b", "plugin_settings": {}, "refresh": {"interval": 300}}])
+    p1 = Playlist(
+        "All Day",
+        "00:00",
+        "24:00",
+        plugins=[
+            {
+                "plugin_id": "x",
+                "name": "a",
+                "plugin_settings": {},
+                "refresh": {"interval": 300},
+            }
+        ],
+    )
+    p2 = Playlist(
+        "Lunch",
+        "11:30",
+        "13:30",
+        plugins=[
+            {
+                "plugin_id": "x",
+                "name": "b",
+                "plugin_settings": {},
+                "refresh": {"interval": 300},
+            }
+        ],
+    )
     pm = PlaylistManager([p1, p2])
     active = pm.determine_active_playlist(now)
     assert active.name == "Lunch"
@@ -120,16 +161,26 @@ def test_determine_active_playlist_priority():
 def test_plugin_instance_should_refresh_interval_and_scheduled():
     tz = pytz.UTC
     now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
-    pi = PluginInstance("x", "inst", {}, {"interval": 300}, latest_refresh_time=(now - timedelta(seconds=301)).isoformat())
+    pi = PluginInstance(
+        "x",
+        "inst",
+        {},
+        {"interval": 300},
+        latest_refresh_time=(now - timedelta(seconds=301)).isoformat(),
+    )
     assert pi.should_refresh(now) is True
 
     # With scheduled in the past today -> True if not refreshed yet after schedule
-    pi = PluginInstance("x", "inst", {}, {"scheduled": "12:00"}, latest_refresh_time=(now - timedelta(hours=2)).isoformat())
+    pi = PluginInstance(
+        "x",
+        "inst",
+        {},
+        {"scheduled": "12:00"},
+        latest_refresh_time=(now - timedelta(hours=2)).isoformat(),
+    )
     assert pi.should_refresh(now) is True
 
 
 def test_get_time_range_minutes():
     p = Playlist("Morning", "06:00", "09:30")
     assert p.get_time_range_minutes() == 210
-
-

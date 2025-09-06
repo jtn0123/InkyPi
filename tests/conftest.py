@@ -19,14 +19,20 @@ if SRC_ABS not in sys.path:
 def mock_screenshot(monkeypatch):
     # Return a simple in-memory image instead of invoking chromium
     def _fake_screenshot(*args, **kwargs):
-        dims = (args[1] if len(args) > 1 else kwargs.get("dimensions", (800, 480)))
+        dims = args[1] if len(args) > 1 else kwargs.get("dimensions", (800, 480))
         width, height = dims
         img = Image.new("RGB", (width, height), "white")
         return img
 
     import utils.image_utils as image_utils
+
     monkeypatch.setattr(image_utils, "take_screenshot", _fake_screenshot, raising=True)
-    monkeypatch.setattr(image_utils, "take_screenshot_html", lambda html, dimensions, timeout_ms=None: _fake_screenshot(None, dimensions), raising=True)
+    monkeypatch.setattr(
+        image_utils,
+        "take_screenshot_html",
+        lambda html, dimensions, timeout_ms=None: _fake_screenshot(None, dimensions),
+        raising=True,
+    )
 
 
 @pytest.fixture()
@@ -41,9 +47,19 @@ def device_config_dev(tmp_path, monkeypatch):
         "timezone": "UTC",
         "time_format": "24h",
         "plugin_cycle_interval_seconds": 300,
-        "image_settings": {"saturation": 1.0, "brightness": 1.0, "sharpness": 1.0, "contrast": 1.0},
+        "image_settings": {
+            "saturation": 1.0,
+            "brightness": 1.0,
+            "sharpness": 1.0,
+            "contrast": 1.0,
+        },
         "playlist_config": {"playlists": [], "active_playlist": None},
-        "refresh_info": {"refresh_time": None, "image_hash": None, "refresh_type": "Manual Update", "plugin_id": ""}
+        "refresh_info": {
+            "refresh_time": None,
+            "image_hash": None,
+            "refresh_type": "Manual Update",
+            "plugin_id": "",
+        },
     }
     config_file = tmp_path / "device.json"
     config_file.write_text(json.dumps(cfg))
@@ -53,11 +69,20 @@ def device_config_dev(tmp_path, monkeypatch):
 
     # Patch Config paths to use tmp dir
     import config as config_mod
+
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_file))
-    monkeypatch.setattr(config_mod.Config, "current_image_file", str(tmp_path / "current_image.png"))
-    monkeypatch.setattr(config_mod.Config, "processed_image_file", str(tmp_path / "processed_image.png"))
-    monkeypatch.setattr(config_mod.Config, "plugin_image_dir", str(tmp_path / "plugins"))
-    monkeypatch.setattr(config_mod.Config, "history_image_dir", str(tmp_path / "history"))
+    monkeypatch.setattr(
+        config_mod.Config, "current_image_file", str(tmp_path / "current_image.png")
+    )
+    monkeypatch.setattr(
+        config_mod.Config, "processed_image_file", str(tmp_path / "processed_image.png")
+    )
+    monkeypatch.setattr(
+        config_mod.Config, "plugin_image_dir", str(tmp_path / "plugins")
+    )
+    monkeypatch.setattr(
+        config_mod.Config, "history_image_dir", str(tmp_path / "history")
+    )
 
     # Ensure plugin image dir exists
     os.makedirs(str(tmp_path / "plugins"), exist_ok=True)
@@ -91,7 +116,9 @@ def flask_app(device_config_dev, monkeypatch):
         os.path.join(SRC_ABS, "templates"),
         os.path.join(SRC_ABS, "plugins"),
     ]
-    app.jinja_loader = ChoiceLoader([FileSystemLoader(directory) for directory in template_dirs])
+    app.jinja_loader = ChoiceLoader(
+        [FileSystemLoader(directory) for directory in template_dirs]
+    )
 
     # Core services
     display_manager = DisplayManager(device_config_dev)
@@ -101,17 +128,17 @@ def flask_app(device_config_dev, monkeypatch):
     load_plugins(device_config_dev.get_plugins())
 
     # Store dependencies
-    app.config['DEVICE_CONFIG'] = device_config_dev
-    app.config['DISPLAY_MANAGER'] = display_manager
-    app.config['REFRESH_TASK'] = refresh_task
-    app.config['MAX_FORM_PARTS'] = 10_000
+    app.config["DEVICE_CONFIG"] = device_config_dev
+    app.config["DISPLAY_MANAGER"] = display_manager
+    app.config["REFRESH_TASK"] = refresh_task
+    app.config["MAX_FORM_PARTS"] = 10_000
     # Mirror request size limit from app
     try:
-        _max_len_env = os.getenv('MAX_CONTENT_LENGTH') or os.getenv('MAX_UPLOAD_BYTES')
+        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
         _max_len = int(_max_len_env) if _max_len_env else 10 * 1024 * 1024
     except Exception:
         _max_len = 10 * 1024 * 1024
-    app.config['MAX_CONTENT_LENGTH'] = _max_len
+    app.config["MAX_CONTENT_LENGTH"] = _max_len
 
     # Register routes
     app.register_blueprint(main_bp)
@@ -125,5 +152,3 @@ def flask_app(device_config_dev, monkeypatch):
 @pytest.fixture()
 def client(flask_app):
     return flask_app.test_client()
-
-

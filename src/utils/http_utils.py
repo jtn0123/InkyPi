@@ -23,7 +23,13 @@ class APIError(Exception):
         Optional structured details to aid clients
     """
 
-    def __init__(self, message: str, status: int = 400, code: int | str | None = None, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        status: int = 400,
+        code: int | str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.status = status
@@ -31,7 +37,12 @@ class APIError(Exception):
         self.details = details
 
 
-def json_error(message: str, status: int = 400, code: int | str | None = None, details: dict[str, Any] | None = None):
+def json_error(
+    message: str,
+    status: int = 400,
+    code: int | str | None = None,
+    details: dict[str, Any] | None = None,
+):
     payload: dict[str, Any] = {"error": message}
     if code is not None:
         payload["code"] = code
@@ -55,7 +66,9 @@ def wants_json(req: Request | None = None) -> bool:
     """
     try:
         r = req or request
-        accept_json = r.accept_mimetypes.accept_json and not r.accept_mimetypes.accept_html
+        accept_json = (
+            r.accept_mimetypes.accept_json and not r.accept_mimetypes.accept_html
+        )
         is_api_path = r.path.startswith("/api/")
         has_json = False
         try:
@@ -65,5 +78,3 @@ def wants_json(req: Request | None = None) -> bool:
         return bool(accept_json or is_api_path or has_json)
     except Exception:
         return False
-
-

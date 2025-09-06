@@ -17,5 +17,3 @@ def test_load_and_get_plugin_instance():
 
     inst = get_plugin_instance(plugins[0])
     assert inst.get_plugin_id() == "ai_text"
-
-

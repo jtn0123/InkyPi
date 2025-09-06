@@ -28,7 +28,7 @@ def test_history_redisplay_succeeds(client, device_config_dev, monkeypatch):
     # Spy on display_preprocessed_image
     call_count = [0]
     last_path = [""]
-    display_manager = client.application.config['DISPLAY_MANAGER']
+    display_manager = client.application.config["DISPLAY_MANAGER"]
     original = display_manager.display_preprocessed_image
 
     def _spy(p):
@@ -36,7 +36,9 @@ def test_history_redisplay_succeeds(client, device_config_dev, monkeypatch):
         last_path[0] = str(p)
         return original(p)
 
-    monkeypatch.setattr(display_manager, "display_preprocessed_image", _spy, raising=True)
+    monkeypatch.setattr(
+        display_manager, "display_preprocessed_image", _spy, raising=True
+    )
 
     resp = client.post("/history/redisplay", json={"filename": filename})
     assert resp.status_code == 200
@@ -83,7 +85,7 @@ def test_history_page_contains_storage_block(client):
     body = resp.data.decode("utf-8")
     assert 'id="storage-block"' in body
     # Should include server-rendered text placeholders or values
-    assert 'Storage available' in body
+    assert "Storage available" in body
 
 
 def test_history_image_route_serves_png(client, device_config_dev):
@@ -91,6 +93,7 @@ def test_history_image_route_serves_png(client, device_config_dev):
     os.makedirs(d, exist_ok=True)
     name = "display_20250101_000500.png"
     from PIL import Image
+
     Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
 
     resp = client.get(f"/history/image/{name}")
@@ -107,11 +110,12 @@ def test_history_security_blocks_path_traversal_on_delete(client):
 def test_history_storage_endpoint_values(client, monkeypatch):
     # Monkeypatch shutil.disk_usage to return known numbers for precise assertions
     class Usage:
-        total = 4 * (1024 ** 3)  # 4 GB
-        used = 3 * (1024 ** 3)   # 3 GB
-        free = 1 * (1024 ** 3)   # 1 GB
+        total = 4 * (1024**3)  # 4 GB
+        used = 3 * (1024**3)  # 3 GB
+        free = 1 * (1024**3)  # 1 GB
 
     import shutil as _shutil
+
     monkeypatch.setattr(_shutil, "disk_usage", lambda p: Usage)
 
     resp = client.get("/history/storage")
@@ -128,17 +132,22 @@ def test_history_clear_then_storage_endpoint_ok(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     from PIL import Image
+
     for i in range(3):
-        Image.new("RGB", (10, 10), "white").save(os.path.join(d, f"display_20250101_00060{i}.png"))
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_20250101_00060{i}.png")
+        )
 
     resp = client.post("/history/clear")
     assert resp.status_code == 200
-    assert len([f for f in os.listdir(d) if f.endswith('.png')]) == 0
+    assert len([f for f in os.listdir(d) if f.endswith(".png")]) == 0
 
     resp2 = client.get("/history/storage")
     assert resp2.status_code == 200
     data2 = resp2.get_json()
-    assert data2.get("pct_free") is None or (0.0 <= float(data2.get("pct_free")) <= 100.0)
+    assert data2.get("pct_free") is None or (
+        0.0 <= float(data2.get("pct_free")) <= 100.0
+    )
 
 
 def test_history_redisplay_errors(client):
@@ -169,6 +178,7 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     import time
 
     from PIL import Image
+
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     a = os.path.join(d, "a.png")
@@ -196,11 +206,12 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
 
 def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     class Usage:
-        total = 4 * (1024 ** 3)
-        used = 3 * (1024 ** 3)
-        free = 1 * (1024 ** 3)
+        total = 4 * (1024**3)
+        used = 3 * (1024**3)
+        free = 1 * (1024**3)
 
     import shutil as _shutil
+
     monkeypatch.setattr(_shutil, "disk_usage", lambda p: Usage)
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -212,7 +223,10 @@ def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
 
 def test_history_server_handles_disk_usage_failure(client, monkeypatch):
     import shutil as _shutil
-    monkeypatch.setattr(_shutil, "disk_usage", lambda p: (_ for _ in ()).throw(OSError("fail")))
+
+    monkeypatch.setattr(
+        _shutil, "disk_usage", lambda p: (_ for _ in ()).throw(OSError("fail"))
+    )
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
@@ -227,11 +241,14 @@ def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
     # Create a file then remove it just before getmtime/getsize is called
     path = os.path.join(d, "race.png")
     from PIL import Image
+
     Image.new("RGB", (10, 10), "white").save(path)
 
     # Monkeypatch os.path.getmtime to raise for this file
     import os as _os
+
     real_getmtime = _os.path.getmtime
+
     def flaky_getmtime(p):
         if p == path:
             raise FileNotFoundError("race gone")
@@ -275,7 +292,9 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
     import blueprints.history as history_mod
 
     # Mock os.listdir to raise exception
-    monkeypatch.setattr(history_mod.os, 'listdir', lambda p: (_ for _ in ()).throw(Exception("test")))
+    monkeypatch.setattr(
+        history_mod.os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
+    )
 
     result = history_mod._list_history_images(device_config_dev.history_image_dir)
     assert result == []
@@ -283,46 +302,58 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
 
 def test_history_redisplay_exception_handling(client, flask_app, monkeypatch):
     # Mock display manager to raise exception
-    dm = flask_app.config['DISPLAY_MANAGER']
-    monkeypatch.setattr(dm, 'display_preprocessed_image', lambda x: (_ for _ in ()).throw(Exception("test")))
+    dm = flask_app.config["DISPLAY_MANAGER"]
+    monkeypatch.setattr(
+        dm,
+        "display_preprocessed_image",
+        lambda x: (_ for _ in ()).throw(Exception("test")),
+    )
 
     # Create a test image first
-    d = flask_app.config['DEVICE_CONFIG'].history_image_dir
+    d = flask_app.config["DEVICE_CONFIG"].history_image_dir
     import os
+
     os.makedirs(d, exist_ok=True)
     from PIL import Image
+
     Image.new("RGB", (10, 10), "white").save(os.path.join(d, "test.png"))
 
     resp = client.post("/history/redisplay", json={"filename": "test.png"})
     assert resp.status_code == 500
-    assert 'An internal error occurred' in resp.get_json().get('error', '')
+    assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
 def test_history_delete_exception_handling(client, flask_app, monkeypatch):
     import os.path
 
-    monkeypatch.setattr(os.path, 'normpath', lambda p: (_ for _ in ()).throw(Exception("test")))
+    monkeypatch.setattr(
+        os.path, "normpath", lambda p: (_ for _ in ()).throw(Exception("test"))
+    )
 
     resp = client.post("/history/delete", json={"filename": "test.png"})
     assert resp.status_code == 500
-    assert 'An internal error occurred' in resp.get_json().get('error', '')
+    assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
 def test_history_clear_exception_handling(client, flask_app, monkeypatch):
     import blueprints.history as history_mod
-    monkeypatch.setattr(history_mod.os, 'listdir', lambda p: (_ for _ in ()).throw(Exception("test")))
+
+    monkeypatch.setattr(
+        history_mod.os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
+    )
 
     resp = client.post("/history/clear")
     assert resp.status_code == 500
-    assert 'An error occurred' in resp.get_json().get('error', '')
+    assert "An error occurred" in resp.get_json().get("error", "")
 
 
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     import shutil as _shutil
 
-    monkeypatch.setattr(_shutil, 'disk_usage', lambda p: (_ for _ in ()).throw(Exception("test")))
+    monkeypatch.setattr(
+        _shutil, "disk_usage", lambda p: (_ for _ in ()).throw(Exception("test"))
+    )
 
     resp = client.get("/history/storage")
     assert resp.status_code == 500
-    assert 'failed to get storage info' in resp.get_json().get('error', '')
-
+    assert "failed to get storage info" in resp.get_json().get("error", "")

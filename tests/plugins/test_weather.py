@@ -7,57 +7,82 @@ import pytest
 
 def test_weather_openweathermap_success(client, monkeypatch):
     import os
-    os.environ['OPEN_WEATHER_MAP_SECRET'] = 'key'
+
+    os.environ["OPEN_WEATHER_MAP_SECRET"] = "key"
 
     # Mock OWM endpoints
     import requests
+
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
+
             def json(self_inner):
-                if 'air_pollution' in url:
+                if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
-                if 'geo/1.0/reverse' in url:
+                if "geo/1.0/reverse" in url:
                     return [{"name": "City", "state": "ST", "country": "US"}]
                 # weather one-call
                 return {
                     "timezone": "UTC",
-                    "current": {"dt": 1700000000, "temp": 20, "feels_like": 20, "weather": [{"icon": "01d"}], "humidity": 50, "pressure": 1010, "uvi": 1, "visibility": 5000, "wind_speed": 3},
+                    "current": {
+                        "dt": 1700000000,
+                        "temp": 20,
+                        "feels_like": 20,
+                        "weather": [{"icon": "01d"}],
+                        "humidity": 50,
+                        "pressure": 1010,
+                        "uvi": 1,
+                        "visibility": 5000,
+                        "wind_speed": 3,
+                    },
                     "daily": [
-                        {"dt": 1700000000, "weather": [{"icon": "01d"}], "temp": {"max": 22, "min": 10}, "moon_phase": 0.1}
+                        {
+                            "dt": 1700000000,
+                            "weather": [{"icon": "01d"}],
+                            "temp": {"max": 22, "min": 10},
+                            "moon_phase": 0.1,
+                        }
                     ],
                     "hourly": [
                         {"dt": 1700000000, "temp": 20, "pop": 0.1, "rain": {"1h": 0.0}}
-                    ]
+                    ],
                 }
+
         return R()
 
-    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+    monkeypatch.setattr(requests, "get", fake_get, raising=True)
 
     data = {
-        'plugin_id': 'weather',
-        'latitude': '0',
-        'longitude': '0',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap',
-        'titleSelection': 'location',
-        'weatherTimeZone': 'configuredTimeZone',
+        "plugin_id": "weather",
+        "latitude": "0",
+        "longitude": "0",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
+        "titleSelection": "location",
+        "weatherTimeZone": "configuredTimeZone",
     }
-    resp = client.post('/update_now', data=data)
+    resp = client.post("/update_now", data=data)
     assert resp.status_code == 200
 
 
 def test_weather_openmeteo_success(client, monkeypatch):
     import requests
+
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
+
             def json(self_inner):
-                if 'air-quality' in url:
+                if "air-quality" in url:
                     return {"hourly": {"time": ["2025-01-01T12:00"], "uv_index": [3.5]}}
                 # forecast
                 return {
-                    "current_weather": {"time": "2025-01-01T12:00", "temperature": 21, "weathercode": 1},
+                    "current_weather": {
+                        "time": "2025-01-01T12:00",
+                        "temperature": 21,
+                        "weathercode": 1,
+                    },
                     "daily": {
                         "time": ["2025-01-01"],
                         "temperature_2m_max": [25],
@@ -73,22 +98,23 @@ def test_weather_openmeteo_success(client, monkeypatch):
                         "precipitation": [0.0],
                         "relative_humidity_2m": [50],
                         "surface_pressure": [1010],
-                        "visibility": [10000]
-                    }
+                        "visibility": [10000],
+                    },
                 }
+
         return R()
 
-    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+    monkeypatch.setattr(requests, "get", fake_get, raising=True)
 
     data = {
-        'plugin_id': 'weather',
-        'latitude': '0',
-        'longitude': '0',
-        'units': 'metric',
-        'weatherProvider': 'OpenMeteo',
-        'customTitle': 'My Weather',
+        "plugin_id": "weather",
+        "latitude": "0",
+        "longitude": "0",
+        "units": "metric",
+        "weatherProvider": "OpenMeteo",
+        "customTitle": "My Weather",
     }
-    resp = client.post('/update_now', data=data)
+    resp = client.post("/update_now", data=data)
     assert resp.status_code == 200
 
 
@@ -97,10 +123,7 @@ def test_weather_timezone_parsing():
     from plugins.weather.weather import Weather
 
     weather = Weather({"id": "weather"})
-    weather_data = {
-        "timezone": "America/New_York",
-        "current": {"dt": 1700000000}
-    }
+    weather_data = {"timezone": "America/New_York", "current": {"dt": 1700000000}}
 
     # Test timezone parsing
     tz = weather.parse_timezone(weather_data)
@@ -111,10 +134,11 @@ def test_weather_vertical_orientation():
     """Test vertical orientation handling."""
     from unittest.mock import MagicMock
 
-
     device_config = MagicMock()
     device_config.get_resolution.return_value = (400, 300)
-    device_config.get_config.side_effect = lambda key: "vertical" if key == "orientation" else None
+    device_config.get_config.side_effect = lambda key: (
+        "vertical" if key == "orientation" else None
+    )
 
     # This should trigger the vertical orientation logic
     dimensions = device_config.get_resolution()
@@ -133,12 +157,12 @@ def test_weather_error_handling():
     weather = Weather({"id": "weather"})
 
     # Test exception handling in generate_image
-    with patch.object(weather, 'get_weather_data', side_effect=Exception("API Error")):
+    with patch.object(weather, "get_weather_data", side_effect=Exception("API Error")):
         settings = {
-            'latitude': '40.0',
-            'longitude': '-74.0',
-            'units': 'metric',
-            'weatherProvider': 'OpenWeatherMap'
+            "latitude": "40.0",
+            "longitude": "-74.0",
+            "units": "metric",
+            "weatherProvider": "OpenWeatherMap",
         }
         device_config = MagicMock()
         device_config.get_config.return_value = "UTC"
@@ -158,10 +182,35 @@ def test_weather_code_mapping_openmeteo():
     weather = Weather({"id": "weather"})
 
     # Test various weather codes that are missing coverage
-    test_codes = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 71, 73, 75, 77, 80, 81, 82, 85, 86, 95, 96, 99]
+    test_codes = [
+        51,
+        53,
+        55,
+        56,
+        57,
+        61,
+        63,
+        65,
+        66,
+        67,
+        71,
+        73,
+        75,
+        77,
+        80,
+        81,
+        82,
+        85,
+        86,
+        95,
+        96,
+        99,
+    ]
 
     for code in test_codes:
-        icon = weather.map_weather_code_to_icon(code, 12)  # hour doesn't matter for the mapping
+        icon = weather.map_weather_code_to_icon(
+            code, 12
+        )  # hour doesn't matter for the mapping
         assert icon is not None
         assert isinstance(icon, str)
 
@@ -182,7 +231,13 @@ def test_moon_phase_parsing():
             phase_name = "waninggibbous"
         else:
             phase_name = "waningcrescent"
-        assert phase_name in ["newmoon", "waxingcrescent", "waxinggibbous", "waninggibbous", "waningcrescent"]
+        assert phase_name in [
+            "newmoon",
+            "waxingcrescent",
+            "waxinggibbous",
+            "waninggibbous",
+            "waningcrescent",
+        ]
 
 
 def test_moon_phase_name_handling():
@@ -192,7 +247,13 @@ def test_moon_phase_name_handling():
     _weather = Weather({"id": "weather"})
 
     # Test different moon phase name variations
-    test_phases = ["dark moon", "3rd quarter", "third quarter", "1st quarter", "first quarter"]
+    test_phases = [
+        "dark moon",
+        "3rd quarter",
+        "third quarter",
+        "1st quarter",
+        "first quarter",
+    ]
 
     for phase_raw in test_phases:
         phase_name = phase_raw.lower().replace(" ", "")
@@ -220,7 +281,7 @@ def test_openmeteo_forecast_parsing():
         "time": ["2025-01-01"],
         "temperature_2m_max": [25.0],
         "temperature_2m_min": [10.0],
-        "weathercode": [1]
+        "weathercode": [1],
     }
 
     # This should trigger the forecast parsing logic
@@ -245,10 +306,18 @@ def test_visibility_parsing():
 
     for visibility_raw in test_visibilities:
         try:
-            visibility = visibility_raw / 1000 if isinstance(visibility_raw, int | float) else visibility_raw
+            visibility = (
+                visibility_raw / 1000
+                if isinstance(visibility_raw, int | float)
+                else visibility_raw
+            )
         except Exception:
             visibility = visibility_raw
-        visibility_str = f">{visibility}" if isinstance(visibility, int | float) and visibility >= 10 else visibility
+        visibility_str = (
+            f">{visibility}"
+            if isinstance(visibility, int | float) and visibility >= 10
+            else visibility
+        )
 
         # Just verify the logic runs without error
         # visibility_str can be None for None input, which is valid
@@ -258,17 +327,16 @@ def test_visibility_parsing():
 def test_openmeteo_hourly_parsing():
     """Test OpenMeteo hourly data parsing."""
 
-
     # Mock hourly data
     hourly_data = {
         "time": ["2025-01-01T12:00"],
         "relative_humidity_2m": [50],
-        "surface_pressure": [1010]
+        "surface_pressure": [1010],
     }
 
     # Test the parsing logic for humidity and pressure
-    humidity_hourly_times = cast(list[str], hourly_data.get('time', []))
-    humidity_values = cast(list[int], hourly_data.get('relative_humidity_2m', []))
+    humidity_hourly_times = cast(list[str], hourly_data.get("time", []))
+    humidity_values = cast(list[int], hourly_data.get("relative_humidity_2m", []))
 
     for i, time_str in enumerate(humidity_hourly_times):
         try:
@@ -279,7 +347,7 @@ def test_openmeteo_hourly_parsing():
             continue
 
     # Test pressure parsing
-    pressure_values = cast(list[int], hourly_data.get('surface_pressure', []))
+    pressure_values = cast(list[int], hourly_data.get("surface_pressure", []))
     for i, time_str in enumerate(humidity_hourly_times):
         try:
             # This covers the pressure parsing logic
@@ -297,10 +365,10 @@ def test_weather_provider_validation():
 
     # Test invalid provider
     settings = {
-        'latitude': '40.0',
-        'longitude': '-74.0',
-        'units': 'metric',
-        'weatherProvider': 'InvalidProvider'
+        "latitude": "40.0",
+        "longitude": "-74.0",
+        "units": "metric",
+        "weatherProvider": "InvalidProvider",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
@@ -321,10 +389,10 @@ def test_weather_units_validation():
 
     # Test invalid units
     settings = {
-        'latitude': '40.0',
-        'longitude': '-74.0',
-        'units': 'invalid_units',
-        'weatherProvider': 'OpenWeatherMap'
+        "latitude": "40.0",
+        "longitude": "-74.0",
+        "units": "invalid_units",
+        "weatherProvider": "OpenWeatherMap",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
@@ -345,9 +413,9 @@ def test_weather_location_validation():
 
     # Test missing latitude
     settings = {
-        'longitude': '-74.0',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap'
+        "longitude": "-74.0",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
@@ -367,10 +435,10 @@ def test_weather_api_key_validation():
 
     # Test missing API key
     settings = {
-        'latitude': '40.0',
-        'longitude': '-74.0',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap'
+        "latitude": "40.0",
+        "longitude": "-74.0",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
@@ -387,97 +455,133 @@ def test_weather_save_settings(client, monkeypatch):
     """Test saving weather settings to default playlist from main plugin page."""
     # Mock the weather API calls
     import requests
+
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
+
             def json(self_inner):
-                if 'air_pollution' in url:
+                if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
-                if 'geo/1.0/reverse' in url:
+                if "geo/1.0/reverse" in url:
                     return [{"name": "City", "state": "ST", "country": "US"}]
                 # weather one-call
                 return {
                     "timezone": "UTC",
-                    "current": {"dt": 1700000000, "temp": 20, "feels_like": 20, "weather": [{"icon": "01d"}], "humidity": 50, "pressure": 1010, "uvi": 1, "visibility": 5000, "wind_speed": 3},
+                    "current": {
+                        "dt": 1700000000,
+                        "temp": 20,
+                        "feels_like": 20,
+                        "weather": [{"icon": "01d"}],
+                        "humidity": 50,
+                        "pressure": 1010,
+                        "uvi": 1,
+                        "visibility": 5000,
+                        "wind_speed": 3,
+                    },
                     "daily": [
-                        {"dt": 1700000000, "weather": [{"icon": "01d"}], "temp": {"max": 22, "min": 10}, "moon_phase": 0.1}
+                        {
+                            "dt": 1700000000,
+                            "weather": [{"icon": "01d"}],
+                            "temp": {"max": 22, "min": 10},
+                            "moon_phase": 0.1,
+                        }
                     ],
                     "hourly": [
                         {"dt": 1700000000, "temp": 20, "pop": 0.1, "rain": {"1h": 0.0}}
-                    ]
+                    ],
                 }
+
         return R()
 
-    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+    monkeypatch.setattr(requests, "get", fake_get, raising=True)
 
     data = {
-        'plugin_id': 'weather',
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap',
-        'titleSelection': 'location',
-        'weatherTimeZone': 'configuredTimeZone',
+        "plugin_id": "weather",
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
+        "titleSelection": "location",
+        "weatherTimeZone": "configuredTimeZone",
     }
 
     # Test saving settings
-    resp = client.post('/save_plugin_settings', data=data)
+    resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == 200
     result = resp.get_json()
-    assert result['success'] is True
-    assert 'weather_saved_settings' in result['instance_name']
+    assert result["success"] is True
+    assert "weather_saved_settings" in result["instance_name"]
 
 
 def test_weather_settings_persistence(client, monkeypatch):
     """Test that saved weather settings persist when navigating back to plugin page."""
     # Mock the weather API calls
     import requests
+
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
+
             def json(self_inner):
-                if 'air_pollution' in url:
+                if "air_pollution" in url:
                     return {"list": [{"main": {"aqi": 3}}]}
-                if 'geo/1.0/reverse' in url:
+                if "geo/1.0/reverse" in url:
                     return [{"name": "City", "state": "ST", "country": "US"}]
                 # weather one-call
                 return {
                     "timezone": "UTC",
-                    "current": {"dt": 1700000000, "temp": 20, "feels_like": 20, "weather": [{"icon": "01d"}], "humidity": 50, "pressure": 1010, "uvi": 1, "visibility": 5000, "wind_speed": 3},
+                    "current": {
+                        "dt": 1700000000,
+                        "temp": 20,
+                        "feels_like": 20,
+                        "weather": [{"icon": "01d"}],
+                        "humidity": 50,
+                        "pressure": 1010,
+                        "uvi": 1,
+                        "visibility": 5000,
+                        "wind_speed": 3,
+                    },
                     "daily": [
-                        {"dt": 1700000000, "weather": [{"icon": "01d"}], "temp": {"max": 22, "min": 10}, "moon_phase": 0.1}
+                        {
+                            "dt": 1700000000,
+                            "weather": [{"icon": "01d"}],
+                            "temp": {"max": 22, "min": 10},
+                            "moon_phase": 0.1,
+                        }
                     ],
                     "hourly": [
                         {"dt": 1700000000, "temp": 20, "pop": 0.1, "rain": {"1h": 0.0}}
-                    ]
+                    ],
                 }
+
         return R()
 
-    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+    monkeypatch.setattr(requests, "get", fake_get, raising=True)
 
     data = {
-        'plugin_id': 'weather',
-        'latitude': '37.7749',
-        'longitude': '-122.4194',
-        'units': 'imperial',
-        'weatherProvider': 'OpenWeatherMap',
-        'titleSelection': 'location',
-        'weatherTimeZone': 'configuredTimeZone',
+        "plugin_id": "weather",
+        "latitude": "37.7749",
+        "longitude": "-122.4194",
+        "units": "imperial",
+        "weatherProvider": "OpenWeatherMap",
+        "titleSelection": "location",
+        "weatherTimeZone": "configuredTimeZone",
     }
 
     # Save settings first
-    resp = client.post('/save_plugin_settings', data=data)
+    resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == 200
 
     # Now navigate to the plugin page without instance parameter
     # This should automatically load the saved settings
-    resp = client.get('/plugin/weather')
+    resp = client.get("/plugin/weather")
     assert resp.status_code == 200
 
     # Check that the saved latitude and longitude are in the response
     response_text = resp.get_data(as_text=True)
-    assert '37.7749' in response_text  # latitude
-    assert '-122.4194' in response_text  # longitude
+    assert "37.7749" in response_text  # latitude
+    assert "-122.4194" in response_text  # longitude
 
 
 def test_weather_missing_api_key(device_config_dev, monkeypatch):
@@ -486,13 +590,13 @@ def test_weather_missing_api_key(device_config_dev, monkeypatch):
 
     p = Weather({"id": "weather"})
     # Mock load_env_key to return None to simulate missing API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: None)
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: None)
 
     settings = {
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap'
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
     }
 
     with pytest.raises(RuntimeError, match="Open Weather Map API Key not configured"):
@@ -504,10 +608,7 @@ def test_weather_missing_coordinates(device_config_dev):
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    settings = {
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap'
-    }
+    settings = {"units": "metric", "weatherProvider": "OpenWeatherMap"}
 
     with pytest.raises(RuntimeError, match="Latitude and Longitude are required"):
         p.generate_image(settings, device_config_dev)
@@ -519,10 +620,10 @@ def test_weather_invalid_units(device_config_dev):
 
     p = Weather({"id": "weather"})
     settings = {
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'invalid',
-        'weatherProvider': 'OpenWeatherMap'
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "invalid",
+        "weatherProvider": "OpenWeatherMap",
     }
 
     with pytest.raises(RuntimeError, match="Units are required"):
@@ -536,13 +637,13 @@ def test_weather_unknown_provider(device_config_dev, monkeypatch):
     p = Weather({"id": "weather"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     settings = {
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'metric',
-        'weatherProvider': 'UnknownProvider'
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "metric",
+        "weatherProvider": "UnknownProvider",
     }
 
     with pytest.raises(RuntimeError, match="Unknown weather provider"):
@@ -558,18 +659,18 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
     p = Weather({"id": "weather"})
 
     # Mock API key and API failure
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     def raise_timeout(*args, **kwargs):
         raise requests.exceptions.Timeout("Connection timeout")
 
-    monkeypatch.setattr('plugins.weather.weather.requests.get', raise_timeout)
+    monkeypatch.setattr("plugins.weather.weather.requests.get", raise_timeout)
 
     settings = {
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'metric',
-        'weatherProvider': 'OpenWeatherMap'
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
     }
 
     with pytest.raises(RuntimeError, match="OpenWeatherMap request failure"):
@@ -587,13 +688,13 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
     def raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("Connection failed")
 
-    monkeypatch.setattr('plugins.weather.weather.requests.get', raise_connection_error)
+    monkeypatch.setattr("plugins.weather.weather.requests.get", raise_connection_error)
 
     settings = {
-        'latitude': '40.7128',
-        'longitude': '-74.0060',
-        'units': 'metric',
-        'weatherProvider': 'OpenMeteo'
+        "latitude": "40.7128",
+        "longitude": "-74.0060",
+        "units": "metric",
+        "weatherProvider": "OpenMeteo",
     }
 
     with pytest.raises(RuntimeError, match="OpenMeteo request failure"):
@@ -607,16 +708,24 @@ def test_weather_vertical_orientation_openmeteo(device_config_dev, monkeypatch):
     p = Weather({"id": "weather"})
 
     # Mock API key and device config for vertical orientation
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
-    monkeypatch.setattr(device_config_dev, 'get_config', lambda key, default=None: {
-        'orientation': 'vertical',
-        'timezone': 'UTC',
-        'time_format': '12h'
-    }.get(key, default))
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+    monkeypatch.setattr(
+        device_config_dev,
+        "get_config",
+        lambda key, default=None: {
+            "orientation": "vertical",
+            "timezone": "UTC",
+            "time_format": "12h",
+        }.get(key, default),
+    )
 
     # Mock successful API response
     mock_response_data = {
-        "current_weather": {"time": "2025-01-01T12:00", "temperature": 21, "weathercode": 1},
+        "current_weather": {
+            "time": "2025-01-01T12:00",
+            "temperature": 21,
+            "weathercode": 1,
+        },
         "daily": {
             "time": ["2025-01-01"],
             "temperature_2m_max": [25],
@@ -632,21 +741,23 @@ def test_weather_vertical_orientation_openmeteo(device_config_dev, monkeypatch):
             "precipitation": [0.0],
             "relative_humidity_2m": [50],
             "surface_pressure": [1010],
-            "visibility": [10000]
-        }
+            "visibility": [10000],
+        },
     }
 
     mock_aqi_data = {"hourly": {"time": ["2025-01-01T12:00"], "uv_index": [3.5]}}
 
-    with patch.object(p, 'get_open_meteo_data', return_value=mock_response_data), \
-         patch.object(p, 'get_open_meteo_air_quality', return_value=mock_aqi_data), \
-         patch.object(p, 'render_image', return_value=MagicMock()):
+    with (
+        patch.object(p, "get_open_meteo_data", return_value=mock_response_data),
+        patch.object(p, "get_open_meteo_air_quality", return_value=mock_aqi_data),
+        patch.object(p, "render_image", return_value=MagicMock()),
+    ):
 
         settings = {
-            'latitude': '40.7128',
-            'longitude': '-74.0060',
-            'units': 'metric',
-            'weatherProvider': 'OpenMeteo'
+            "latitude": "40.7128",
+            "longitude": "-74.0060",
+            "units": "metric",
+            "weatherProvider": "OpenMeteo",
         }
 
         # Should not raise an exception due to orientation
@@ -663,17 +774,25 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
     p = Weather({"id": "weather"})
 
     # Mock API key and 24h time format
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
-    monkeypatch.setattr(device_config_dev, 'get_config', lambda key, default=None: {
-        'timezone': 'UTC',
-        'time_format': '24h',
-        'resolution': [400, 300]
-    }.get(key, default))
-    monkeypatch.setattr(device_config_dev, 'get_resolution', lambda: (400, 300))
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+    monkeypatch.setattr(
+        device_config_dev,
+        "get_config",
+        lambda key, default=None: {
+            "timezone": "UTC",
+            "time_format": "24h",
+            "resolution": [400, 300],
+        }.get(key, default),
+    )
+    monkeypatch.setattr(device_config_dev, "get_resolution", lambda: (400, 300))
 
     # Mock successful API response
     mock_response_data = {
-        "current_weather": {"time": "2025-01-01T12:00", "temperature": 21, "weathercode": 1},
+        "current_weather": {
+            "time": "2025-01-01T12:00",
+            "temperature": 21,
+            "weathercode": 1,
+        },
         "daily": {
             "time": ["2025-01-01"],
             "temperature_2m_max": [25],
@@ -689,19 +808,21 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
             "precipitation": [0.0],
             "relative_humidity_2m": [50],
             "surface_pressure": [1010],
-            "visibility": [10000]
-        }
+            "visibility": [10000],
+        },
     }
 
-    with patch.object(p, 'get_open_meteo_data', return_value=mock_response_data), \
-         patch.object(p, 'get_open_meteo_air_quality', return_value={}), \
-         patch.object(p, 'render_image', return_value=MagicMock()):
+    with (
+        patch.object(p, "get_open_meteo_data", return_value=mock_response_data),
+        patch.object(p, "get_open_meteo_air_quality", return_value={}),
+        patch.object(p, "render_image", return_value=MagicMock()),
+    ):
 
         settings = {
-            'latitude': '40.7128',
-            'longitude': '-74.0060',
-            'units': 'metric',
-            'weatherProvider': 'OpenMeteo'
+            "latitude": "40.7128",
+            "longitude": "-74.0060",
+            "units": "metric",
+            "weatherProvider": "OpenMeteo",
         }
 
         result = p.generate_image(settings, device_config_dev)
@@ -755,7 +876,7 @@ def test_weather_map_weather_code_to_icon():
 
     result2 = p.map_weather_code_to_icon(61, 12)  # Rain
     assert isinstance(result2, str)
-    assert result2.endswith('d')  # Daytime
+    assert result2.endswith("d")  # Daytime
 
 
 def test_weather_parse_forecast_empty_data():
@@ -799,7 +920,7 @@ def test_weather_parse_data_points_openweathermap():
             "pressure": 1013,
             "uvi": 5.2,
             "visibility": 10000,
-            "wind_speed": 3.5
+            "wind_speed": 3.5,
         }
     }
     aqi_data = {"list": [{"main": {"aqi": 2}}]}
@@ -822,7 +943,7 @@ def test_weather_parse_data_points_openmeteo():
         "hourly": {
             "relative_humidity_2m": [65],
             "surface_pressure": [1013],
-            "visibility": [10000]
+            "visibility": [10000],
         }
     }
     aqi_data = {"hourly": {"uv_index": [5.2], "european_aqi": [2]}}
@@ -866,6 +987,3 @@ def test_weather_generate_settings_template():
     assert "api_key" in template
     assert template["api_key"]["service"] == "OpenWeatherMap"
     assert template["style_settings"] is True
-
-
-

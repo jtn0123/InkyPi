@@ -13,6 +13,7 @@ LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
+
 def get_image(image_url, timeout_seconds: float = 10.0):
     try:
         response = requests.get(image_url, timeout=timeout_seconds)
@@ -37,19 +38,23 @@ def get_image(image_url, timeout_seconds: float = 10.0):
             logger.error(f"Failed to decode image from {image_url}: {str(e)}")
             img = None
     else:
-        logger.error(f"Received non-200 response from {image_url}: status_code: {response.status_code}")
+        logger.error(
+            f"Received non-200 response from {image_url}: status_code: {response.status_code}"
+        )
     return img
 
+
 def change_orientation(image, orientation, inverted=False):
-    if orientation == 'horizontal':
+    if orientation == "horizontal":
         angle = 0
-    elif orientation == 'vertical':
+    elif orientation == "vertical":
         angle = 90
 
     if inverted:
         angle = (angle + 180) % 360
 
     return image.rotate(angle, expand=1)
+
 
 def resize_image(image, desired_size, image_settings=None):
     img_width, img_height = image.size
@@ -63,8 +68,8 @@ def resize_image(image, desired_size, image_settings=None):
         image_settings = []
     keep_width = "keep-width" in image_settings
 
-    x_offset, y_offset = 0,0
-    new_width, new_height = img_width,img_height
+    x_offset, y_offset = 0, 0
+    new_width, new_height = img_width, img_height
     # Step 1: Determine crop dimensions
     desired_ratio = desired_width / desired_height
     if img_ratio > desired_ratio:
@@ -79,10 +84,13 @@ def resize_image(image, desired_size, image_settings=None):
             y_offset = (img_height - new_height) // 2
 
     # Step 2: Crop the image
-    image = image.crop((x_offset, y_offset, x_offset + new_width, y_offset + new_height))
+    image = image.crop(
+        (x_offset, y_offset, x_offset + new_width, y_offset + new_height)
+    )
 
     # Step 3: Resize to the exact desired dimensions (if necessary)
     return image.resize((desired_width, desired_height), LANCZOS)
+
 
 def apply_image_enhancement(img, image_settings=None):
 
@@ -103,6 +111,7 @@ def apply_image_enhancement(img, image_settings=None):
 
     return img
 
+
 def compute_image_hash(image):
     """Compute SHA-256 hash of an image.
 
@@ -114,6 +123,7 @@ def compute_image_hash(image):
     image = image.convert("RGB")
     img_bytes = image.tobytes()
     return hashlib.sha256(img_bytes).hexdigest()
+
 
 def take_screenshot_html(html_str, dimensions, timeout_ms=None):
     image = None
@@ -136,6 +146,7 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
 
     return image
 
+
 def take_screenshot(target, dimensions, timeout_ms=None):
     image = None
     img_file_path = None
@@ -150,12 +161,16 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             "/Applications/Chromium.app/Contents/MacOS/Chromium",
             "chromium",
             "chromium-headless-shell",
-            "google-chrome"
+            "google-chrome",
         ]
 
         command = None
         for browser in browsers:
-            if os.path.exists(browser) or (browser in ["chromium", "chromium-headless-shell", "google-chrome"] and subprocess.run(["which", browser], capture_output=True).returncode == 0):
+            if os.path.exists(browser) or (
+                browser in ["chromium", "chromium-headless-shell", "google-chrome"]
+                and subprocess.run(["which", browser], capture_output=True).returncode
+                == 0
+            ):
                 command = [
                     browser,
                     target,
@@ -173,14 +188,16 @@ def take_screenshot(target, dimensions, timeout_ms=None):
                     "--disable-extensions",
                     "--disable-plugins",
                     "--mute-audio",
-                    "--no-sandbox"
+                    "--no-sandbox",
                 ]
                 if timeout_ms:
                     command.append(f"--timeout={timeout_ms}")
                 break
 
         if command is None:
-            logger.error("Failed to take screenshot: No supported browser found. Install Chromium or Google Chrome.")
+            logger.error(
+                "Failed to take screenshot: No supported browser found. Install Chromium or Google Chrome."
+            )
             return None
 
         try:
@@ -190,10 +207,12 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             return None
 
         # Check if the process failed or the output file is missing
-        if result.returncode != 0 or not (img_file_path and os.path.exists(img_file_path)):
+        if result.returncode != 0 or not (
+            img_file_path and os.path.exists(img_file_path)
+        ):
             logger.error("Failed to take screenshot:")
             try:
-                logger.error(result.stderr.decode('utf-8'))
+                logger.error(result.stderr.decode("utf-8"))
             except Exception:
                 pass
             return None

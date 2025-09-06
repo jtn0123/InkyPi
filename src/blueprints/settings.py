@@ -19,6 +19,7 @@ try:
         JournalReader,
         Rule,
     )
+
     JOURNAL_AVAILABLE = True
 except ImportError:
     JOURNAL_AVAILABLE = False
@@ -78,8 +79,12 @@ def _read_log_lines(hours: int) -> list[str]:
     lines: list[str] = []
     if not JOURNAL_AVAILABLE:
         # Development mode message when systemd journal is not accessible
-        lines.append("Log download not available in development mode (cysystemd not installed).")
-        lines.append(f"Logs would normally show InkyPi service logs from the last {hours} hours.")
+        lines.append(
+            "Log download not available in development mode (cysystemd not installed)."
+        )
+        lines.append(
+            f"Logs would normally show InkyPi service logs from the last {hours} hours."
+        )
         lines.append("")
         lines.append("To see Flask development logs, check your terminal output.")
         return lines
@@ -105,15 +110,19 @@ def _read_log_lines(hours: int) -> list[str]:
         lines.append(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}")
     return lines
 
-@settings_bp.route('/settings')
-def settings_page():
-    device_config = current_app.config['DEVICE_CONFIG']
-    timezones = sorted(pytz.all_timezones_set)
-    return render_template('settings.html', device_settings=device_config.get_config(), timezones = timezones)
 
-@settings_bp.route('/settings/api-keys')
+@settings_bp.route("/settings")
+def settings_page():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    timezones = sorted(pytz.all_timezones_set)
+    return render_template(
+        "settings.html", device_settings=device_config.get_config(), timezones=timezones
+    )
+
+
+@settings_bp.route("/settings/api-keys")
 def api_keys_page():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
 
     def mask(value):
         if not value:
@@ -125,33 +134,49 @@ def api_keys_page():
 
     keys = {
         "OPEN_AI_SECRET": device_config.load_env_key("OPEN_AI_SECRET"),
-        "OPEN_WEATHER_MAP_SECRET": device_config.load_env_key("OPEN_WEATHER_MAP_SECRET"),
+        "OPEN_WEATHER_MAP_SECRET": device_config.load_env_key(
+            "OPEN_WEATHER_MAP_SECRET"
+        ),
         "NASA_SECRET": device_config.load_env_key("NASA_SECRET"),
         "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
     }
     masked = {k: mask(v) for k, v in keys.items()}
-    return render_template('api_keys.html', masked=masked)
+    return render_template("api_keys.html", masked=masked)
 
-@settings_bp.route('/settings/save_api_keys', methods=['POST'])
+
+@settings_bp.route("/settings/save_api_keys", methods=["POST"])
 def save_api_keys():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     try:
         form_data = request.form.to_dict()
         updated = []
-        for key in ("OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"):
+        for key in (
+            "OPEN_AI_SECRET",
+            "OPEN_WEATHER_MAP_SECRET",
+            "NASA_SECRET",
+            "UNSPLASH_ACCESS_KEY",
+        ):
             value = form_data.get(key)
             if value:
                 device_config.set_env_key(key, value)
                 updated.append(key)
-        return jsonify({"success": True, "message": "API keys saved.", "updated": updated})
+        return jsonify(
+            {"success": True, "message": "API keys saved.", "updated": updated}
+        )
     except Exception:
         return json_error("An internal error occurred", status=500)
 
-@settings_bp.route('/settings/delete_api_key', methods=['POST'])
+
+@settings_bp.route("/settings/delete_api_key", methods=["POST"])
 def delete_api_key():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     key = request.form.get("key")
-    valid_keys = {"OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"}
+    valid_keys = {
+        "OPEN_AI_SECRET",
+        "OPEN_WEATHER_MAP_SECRET",
+        "NASA_SECRET",
+        "UNSPLASH_ACCESS_KEY",
+    }
     if key not in valid_keys:
         return json_error("Invalid key name", status=400)
     try:
@@ -160,14 +185,19 @@ def delete_api_key():
     except Exception:
         return json_error("An internal error occurred", status=500)
 
-@settings_bp.route('/save_settings', methods=['POST'])
+
+@settings_bp.route("/save_settings", methods=["POST"])
 def save_settings():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
 
     try:
         form_data = request.form.to_dict()
 
-        unit, interval, time_format = form_data.get('unit'), form_data.get("interval"), form_data.get("timeFormat")
+        unit, interval, time_format = (
+            form_data.get("unit"),
+            form_data.get("interval"),
+            form_data.get("timeFormat"),
+        )
         if not unit or unit not in ["minute", "hour"]:
             return json_error("Plugin cycle interval unit is required", status=400)
         if not interval or not interval.isnumeric():
@@ -176,10 +206,14 @@ def save_settings():
             return json_error("Time Zone is required", status=400)
         if not time_format or time_format not in ["12h", "24h"]:
             return json_error("Time format is required", status=400)
-        previous_interval_seconds = device_config.get_config("plugin_cycle_interval_seconds")
+        previous_interval_seconds = device_config.get_config(
+            "plugin_cycle_interval_seconds"
+        )
         plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
         if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
-            return json_error("Plugin cycle interval must be less than 24 hours", status=400)
+            return json_error(
+                "Plugin cycle interval must be less than 24 hours", status=400
+            )
 
         settings = {
             "name": form_data.get("deviceName"),
@@ -193,15 +227,15 @@ def save_settings():
                 "saturation": float(form_data.get("saturation", "1.0")),
                 "brightness": float(form_data.get("brightness", "1.0")),
                 "sharpness": float(form_data.get("sharpness", "1.0")),
-                "contrast": float(form_data.get("contrast", "1.0"))
+                "contrast": float(form_data.get("contrast", "1.0")),
             },
-            "preview_size_mode": form_data.get("previewSizeMode", "native")
+            "preview_size_mode": form_data.get("previewSizeMode", "native"),
         }
         device_config.update_config(settings)
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:
             # wake the background thread up to signal interval config change
-            refresh_task = current_app.config['REFRESH_TASK']
+            refresh_task = current_app.config["REFRESH_TASK"]
             refresh_task.signal_config_change()
     except RuntimeError as e:
         return json_error(str(e), status=500)
@@ -209,7 +243,8 @@ def save_settings():
         return json_error("An internal error occurred", status=500)
     return jsonify({"success": True, "message": "Saved settings."})
 
-@settings_bp.route('/shutdown', methods=['POST'])
+
+@settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
     data = request.get_json() or {}
     if data.get("reboot"):
@@ -220,11 +255,12 @@ def shutdown():
         os.system("sudo shutdown -h now")
     return jsonify({"success": True})
 
-@settings_bp.route('/download-logs')
+
+@settings_bp.route("/download-logs")
 def download_logs():
     try:
         # Guardrail hours clamp
-        hours = _clamp_int(request.args.get('hours'), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+        hours = _clamp_int(request.args.get("hours"), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
         lines = _read_log_lines(hours)
         buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)
@@ -234,7 +270,7 @@ def download_logs():
         return Response(
             buffer.read(),
             mimetype="text/plain",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
     except Exception as e:
@@ -242,7 +278,7 @@ def download_logs():
         return Response(f"Error reading logs: {e}", status=500, mimetype="text/plain")
 
 
-@settings_bp.route('/api/logs')
+@settings_bp.route("/api/logs")
 def api_logs():
     """JSON logs API with server-side filter, level selection and limits."""
     try:
@@ -250,9 +286,9 @@ def api_logs():
             return json_error("Too many requests", status=429)
 
         # Capture raw inputs and determine if clamped/trimmed
-        raw_hours = request.args.get('hours')
-        raw_limit = request.args.get('limit')
-        raw_contains_full = (request.args.get('contains') or '')
+        raw_hours = request.args.get("hours")
+        raw_limit = request.args.get("limit")
+        raw_contains_full = request.args.get("contains") or ""
 
         try:
             pre_hours = int(raw_hours) if raw_hours is not None else 2
@@ -272,7 +308,7 @@ def api_logs():
             contains = contains[:200]
             contains_trimmed = True
 
-        level = (request.args.get('level') or 'all').lower()
+        level = (request.args.get("level") or "all").lower()
 
         # Read raw lines then apply filtering server-side
         lines = _read_log_lines(hours)
@@ -281,11 +317,15 @@ def api_logs():
             lc = contains.lower()
             lines = [ln for ln in lines if lc in ln.lower()]
 
-        if level == 'errors':
-            err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+        if level == "errors":
+            err_re = re.compile(
+                r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE
+            )
             lines = [ln for ln in lines if err_re.search(ln)]
-        elif level in ('warn', 'warnings', 'warn_errors'):
-            err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+        elif level in ("warn", "warnings", "warn_errors"):
+            err_re = re.compile(
+                r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE
+            )
             warn_re = re.compile(r"\bWARNING\b", re.IGNORECASE)
             lines = [ln for ln in lines if err_re.search(ln) or warn_re.search(ln)]
 
@@ -296,18 +336,27 @@ def api_logs():
 
         # Response size guardrail
         joined = "\n".join(lines)
-        while len(joined.encode('utf-8', errors='ignore')) > MAX_RESPONSE_BYTES and len(lines) > 100:
+        while (
+            len(joined.encode("utf-8", errors="ignore")) > MAX_RESPONSE_BYTES
+            and len(lines) > 100
+        ):
             truncated = True
-            lines = lines[len(lines)//4:]
+            lines = lines[len(lines) // 4 :]
             joined = "\n".join(lines)
 
-        return jsonify({
-            "lines": lines,
-            "count": len(lines),
-            "truncated": truncated,
-            "meta": {"hours": hours, "limit": limit, "level": level, "contains": contains}
-        })
+        return jsonify(
+            {
+                "lines": lines,
+                "count": len(lines),
+                "truncated": truncated,
+                "meta": {
+                    "hours": hours,
+                    "limit": limit,
+                    "level": level,
+                    "contains": contains,
+                },
+            }
+        )
     except Exception as e:
         logger.error(f"/api/logs error: {e}")
         return json_error(str(e), status=500)
-

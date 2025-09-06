@@ -1,4 +1,3 @@
-
 import logging
 import os
 import random
@@ -12,20 +11,24 @@ LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
+
 def list_files_in_folder(folder_path: str) -> list[str]:
     """Return a list of image file paths in the given folder, excluding hidden files."""
-    image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
+    image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp")
     return [
         os.path.join(folder_path, f)
         for f in os.listdir(folder_path)
         if (
             os.path.isfile(os.path.join(folder_path, f))
             and f.lower().endswith(image_extensions)
-            and not f.startswith('.')
+            and not f.startswith(".")
         )
     ]
 
-def grab_image(image_path: str, dimensions: tuple[int, int], pad_image: bool) -> Image.Image | None:
+
+def grab_image(
+    image_path: str, dimensions: tuple[int, int], pad_image: bool
+) -> Image.Image | None:
     """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
     try:
         # Use context manager and copy to ensure file handle is released
@@ -43,23 +46,30 @@ def grab_image(image_path: str, dimensions: tuple[int, int], pad_image: bool) ->
             bkg = ImageOps.fit(img, dimensions)
             bkg = bkg.filter(ImageFilter.BoxBlur(8))
             img_size = img.size
-            bkg.paste(img, ((dimensions[0] - img_size[0]) // 2, (dimensions[1] - img_size[1]) // 2))
+            bkg.paste(
+                img,
+                (
+                    (dimensions[0] - img_size[0]) // 2,
+                    (dimensions[1] - img_size[1]) // 2,
+                ),
+            )
             img = bkg
         return img
     except Exception as e:
         logger.error(f"Error loading image from {image_path}: {e}")
         return None
 
+
 class ImageFolder(BasePlugin):
     def generate_image(self, settings, device_config):
-        folder_path = settings.get('folder_path')
-        pad_image = settings.get('padImage', False)
+        folder_path = settings.get("folder_path")
+        pad_image = settings.get("padImage", False)
         if not folder_path:
             raise RuntimeError("Folder path is required.")
-        
+
         if not os.path.exists(folder_path):
             raise RuntimeError(f"Folder does not exist: {folder_path}")
-        
+
         if not os.path.isdir(folder_path):
             raise RuntimeError(f"Path is not a directory: {folder_path}")
 

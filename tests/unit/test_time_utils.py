@@ -15,5 +15,3 @@ def test_calculate_seconds_day():
 
 def test_calculate_seconds_default_value_for_unrecognized_unit():
     assert calculate_seconds(99, "weeks") == 300
-
-

@@ -12,16 +12,17 @@ from plugins.calendar.constants import FONT_SIZES, LOCALE_MAP
 
 logger = logging.getLogger(__name__)
 
+
 class Calendar(BasePlugin):
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['style_settings'] = True
-        template_params['locale_map'] = LOCALE_MAP
+        template_params["style_settings"] = True
+        template_params["locale_map"] = LOCALE_MAP
         return template_params
 
     def generate_image(self, settings, device_config):
-        calendar_urls = settings.get('calendarURLs[]')
-        calendar_colors = settings.get('calendarColors[]')
+        calendar_urls = settings.get("calendarURLs[]")
+        calendar_colors = settings.get("calendarColors[]")
         view = settings.get("viewMode")
 
         if not view:
@@ -38,7 +39,7 @@ class Calendar(BasePlugin):
         dimensions = device_config.get_resolution()
         if device_config.get_config("orientation") == "vertical":
             dimensions = dimensions[::-1]
-        
+
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
         tz = pytz.timezone(timezone)
@@ -49,25 +50,29 @@ class Calendar(BasePlugin):
         if not events:
             logger.warning("No events found for ics url")
 
-        if view == 'timeGridWeek' and settings.get("displayPreviousDays") != "true":
-            view = 'timeGrid'
+        if view == "timeGridWeek" and settings.get("displayPreviousDays") != "true":
+            view = "timeGrid"
 
         template_params = {
             "view": view,
             "events": events,
-            "current_dt": current_dt.replace(minute=0, second=0, microsecond=0).isoformat(),
+            "current_dt": current_dt.replace(
+                minute=0, second=0, microsecond=0
+            ).isoformat(),
             "timezone": timezone,
             "plugin_settings": settings,
             "time_format": time_format,
-            "font_scale": FONT_SIZES.get(settings.get("fontSize", "normal"))
+            "font_scale": FONT_SIZES.get(settings.get("fontSize", "normal")),
         }
 
-        image = self.render_image(dimensions, "calendar.html", "calendar.css", template_params)
+        image = self.render_image(
+            dimensions, "calendar.html", "calendar.css", template_params
+        )
 
         if not image:
             raise RuntimeError("Failed to take screenshot, please check logs.")
         return image
-    
+
     def fetch_ics_events(self, calendar_urls, colors, tz, start_range, end_range):
         parsed_events = []
 
@@ -83,15 +88,15 @@ class Calendar(BasePlugin):
                     "start": start,
                     "backgroundColor": color,
                     "textColor": contrast_color,
-                    "allDay": all_day
+                    "allDay": all_day,
                 }
                 if end:
-                    parsed_event['end'] = end
+                    parsed_event["end"] = end
 
                 parsed_events.append(parsed_event)
 
         return parsed_events
-    
+
     def get_view_range(self, view, current_dt, settings):
         start = datetime(current_dt.year, current_dt.month, current_dt.day)
         if view == "timeGridDay":
@@ -107,7 +112,7 @@ class Calendar(BasePlugin):
         elif view == "listMonth":
             end = start + timedelta(weeks=5)
         return start, end
-        
+
     def parse_data_points(self, event, tz):
         all_day = False
         dtstart = event.decoded("dtstart")
@@ -151,4 +156,4 @@ class Calendar(BasePlugin):
         # YIQ formula to estimate brightness
         yiq = (r * 299 + g * 587 + b * 114) / 1000
 
-        return '#000000' if yiq >= 150 else '#ffffff'
+        return "#000000" if yiq >= 150 else "#ffffff"

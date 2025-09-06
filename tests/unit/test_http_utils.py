@@ -130,7 +130,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
     def test_wants_json_accept_header(self):
@@ -142,7 +142,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
     def test_wants_json_content_type(self):
@@ -154,7 +154,7 @@ class TestWantsJson:
         mock_request.is_json = True
         mock_request.get_json.return_value = {"test": "data"}
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is True
 
     def test_wants_json_false_for_html(self):
@@ -166,7 +166,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
     def test_wants_json_false_for_unknown_path(self):
@@ -178,7 +178,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
     def test_wants_json_exception_handling(self):
@@ -190,7 +190,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
     def test_wants_json_with_provided_request(self):
@@ -213,7 +213,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.return_value = None
 
-        with patch('src.utils.http_utils.request', None):
+        with patch("src.utils.http_utils.request", None):
             assert wants_json(mock_request) is True
 
     def test_wants_json_get_json_exception_handling(self):
@@ -225,7 +225,7 @@ class TestWantsJson:
         mock_request.is_json = False
         mock_request.get_json.side_effect = Exception("Test exception")
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
     def test_wants_json_general_exception_handling(self):
@@ -238,13 +238,20 @@ class TestWantsJson:
         mock_request.get_json.return_value = None
 
         # Simulate a general exception in the request object
-        mock_request.configure_mock(**{'accept_mimetypes.accept_json': Mock(side_effect=Exception("Test exception"))})
+        mock_request.configure_mock(
+            **{
+                "accept_mimetypes.accept_json": Mock(
+                    side_effect=Exception("Test exception")
+                )
+            }
+        )
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False
 
     def test_wants_json_outer_exception_handling(self):
         """Test wants_json with exception that triggers outer catch block."""
+
         # Create a mock request that raises an exception when accessing any attribute
         class ExceptionRequest:
             def __getattr__(self, name):
@@ -252,5 +259,5 @@ class TestWantsJson:
 
         mock_request = ExceptionRequest()
 
-        with patch('src.utils.http_utils.request', mock_request):
+        with patch("src.utils.http_utils.request", mock_request):
             assert wants_json() is False

@@ -15,7 +15,7 @@ from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
 
-history_bp = Blueprint('history', __name__)
+history_bp = Blueprint("history", __name__)
 
 
 def _format_size(num_bytes: int) -> str:
@@ -33,8 +33,10 @@ def _format_size(num_bytes: int) -> str:
 def _list_history_images(history_dir: str) -> list[dict]:
     try:
         files = [
-            f for f in os.listdir(history_dir)
-            if os.path.isfile(os.path.join(history_dir, f)) and f.lower().endswith('.png')
+            f
+            for f in os.listdir(history_dir)
+            if os.path.isfile(os.path.join(history_dir, f))
+            and f.lower().endswith(".png")
         ]
     except Exception:
         logger.exception("Failed to list history directory")
@@ -58,19 +60,23 @@ def _list_history_images(history_dir: str) -> list[dict]:
             # Skip files that were deleted or cannot be accessed
             continue
         dt = datetime.fromtimestamp(mtime)
-        result.append({
-            "filename": f,
-            "mtime": mtime,
-            "mtime_str": dt.strftime("%b %d, %Y %I:%M %p").lstrip('0').replace(' 0', ' '),
-            "size": size,
-            "size_str": _format_size(size),
-        })
+        result.append(
+            {
+                "filename": f,
+                "mtime": mtime,
+                "mtime_str": dt.strftime("%b %d, %Y %I:%M %p")
+                .lstrip("0")
+                .replace(" 0", " "),
+                "size": size,
+                "size_str": _format_size(size),
+            }
+        )
     return result
 
 
-@history_bp.route('/history')
+@history_bp.route("/history")
 def history_page():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     images = _list_history_images(history_dir)
     # Compute storage usage for the history directory's filesystem
@@ -80,44 +86,49 @@ def history_page():
     pct_free = None
     try:
         import shutil
+
         usage = shutil.disk_usage(history_dir)
         total_bytes = int(usage.total)
         free_bytes = int(usage.free)
         used_bytes = int(usage.used)
-        pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
+        pct_free = (
+            (free_bytes / total_bytes * 100.0)
+            if (total_bytes and total_bytes > 0)
+            else None
+        )
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
 
-    gb = 1024 ** 3
+    gb = 1024**3
     storage_ctx = {
-        'free_bytes': free_bytes,
-        'total_bytes': total_bytes,
-        'used_bytes': used_bytes,
-        'pct_free': pct_free,
-        'free_gb': round(free_bytes / gb, 2) if free_bytes is not None else None,
-        'total_gb': round(total_bytes / gb, 2) if total_bytes is not None else None,
-        'used_gb': round(used_bytes / gb, 2) if used_bytes is not None else None,
+        "free_bytes": free_bytes,
+        "total_bytes": total_bytes,
+        "used_bytes": used_bytes,
+        "pct_free": pct_free,
+        "free_gb": round(free_bytes / gb, 2) if free_bytes is not None else None,
+        "total_gb": round(total_bytes / gb, 2) if total_bytes is not None else None,
+        "used_gb": round(used_bytes / gb, 2) if used_bytes is not None else None,
     }
 
-    return render_template('history.html', images=images, storage=storage_ctx)
+    return render_template("history.html", images=images, storage=storage_ctx)
 
 
-@history_bp.route('/history/image/<path:filename>')
+@history_bp.route("/history/image/<path:filename>")
 def history_image(filename: str):
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     return send_from_directory(history_dir, filename)
 
 
-@history_bp.route('/history/redisplay', methods=['POST'])
+@history_bp.route("/history/redisplay", methods=["POST"])
 def history_redisplay():
-    device_config = current_app.config['DEVICE_CONFIG']
-    display_manager = current_app.config['DISPLAY_MANAGER']
+    device_config = current_app.config["DEVICE_CONFIG"]
+    display_manager = current_app.config["DISPLAY_MANAGER"]
     history_dir = device_config.history_image_dir
 
     try:
         data = request.get_json(force=True)
-        filename = (data or {}).get('filename')
+        filename = (data or {}).get("filename")
         if not filename:
             return json_error("filename is required", status=400)
 
@@ -135,13 +146,13 @@ def history_redisplay():
         return json_error("An internal error occurred", status=500)
 
 
-@history_bp.route('/history/delete', methods=['POST'])
+@history_bp.route("/history/delete", methods=["POST"])
 def history_delete():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
         data = request.get_json(force=True) or {}
-        filename = data.get('filename')
+        filename = data.get("filename")
         if not filename:
             return json_error("filename is required", status=400)
         safe_path = os.path.normpath(os.path.join(history_dir, filename))
@@ -155,15 +166,15 @@ def history_delete():
         return json_error("An internal error occurred", status=500)
 
 
-@history_bp.route('/history/clear', methods=['POST'])
+@history_bp.route("/history/clear", methods=["POST"])
 def history_clear():
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
         count = 0
         for f in os.listdir(history_dir):
             p = os.path.join(history_dir, f)
-            if os.path.isfile(p) and f.lower().endswith('.png'):
+            if os.path.isfile(p) and f.lower().endswith(".png"):
                 os.remove(p)
                 count += 1
         return jsonify({"success": True, "message": f"Cleared {count} images"}), 200
@@ -172,31 +183,39 @@ def history_clear():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
-@history_bp.route('/history/storage')
+@history_bp.route("/history/storage")
 def history_storage():
     """Return storage stats for the filesystem containing the history directory.
 
     Values returned: free_gb, total_gb, used_gb, pct_free
     """
-    device_config = current_app.config['DEVICE_CONFIG']
+    device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
         import shutil
+
         usage = shutil.disk_usage(history_dir)
         total_bytes = int(usage.total)
         free_bytes = int(usage.free)
         used_bytes = int(usage.used)
-        pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
+        pct_free = (
+            (free_bytes / total_bytes * 100.0)
+            if (total_bytes and total_bytes > 0)
+            else None
+        )
 
-        gb = 1024 ** 3
-        return jsonify({
-            'free_gb': round(free_bytes / gb, 2),
-            'total_gb': round(total_bytes / gb, 2),
-            'used_gb': round(used_bytes / gb, 2),
-            'pct_free': round(pct_free, 2) if pct_free is not None else None,
-        }), 200
+        gb = 1024**3
+        return (
+            jsonify(
+                {
+                    "free_gb": round(free_bytes / gb, 2),
+                    "total_gb": round(total_bytes / gb, 2),
+                    "used_gb": round(used_bytes / gb, 2),
+                    "pct_free": round(pct_free, 2) if pct_free is not None else None,
+                }
+            ),
+            200,
+        )
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
-        return json_error('failed to get storage info', status=500)
-
-
+        return json_error("failed to get storage info", status=500)

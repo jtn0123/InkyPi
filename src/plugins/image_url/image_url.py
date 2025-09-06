@@ -11,6 +11,7 @@ LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
+
 def grab_image(image_url, dimensions, timeout_ms=40000):
     """Grab an image from a URL and resize it to the specified dimensions."""
     try:
@@ -23,9 +24,10 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None
 
+
 class ImageURL(BasePlugin):
     def generate_image(self, settings, device_config):
-        url = settings.get('url')
+        url = settings.get("url")
         if not url:
             raise RuntimeError("URL is required.")
 

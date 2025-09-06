@@ -50,4 +50,6 @@ else
     echo "✅ All checks passed!"
 fi
 
+# Add your post-run actions here - they will execute regardless of lint failures
+
 

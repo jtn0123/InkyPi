@@ -8,17 +8,22 @@ import pytest
 
 def make_fake_gpio_module():
     m = types.ModuleType("gpiozero")
+
     class LED:
         def __init__(self, pin):
             self.pin = pin
             self._value = False
+
         def on(self):
             self._value = True
+
         def off(self):
             self._value = False
+
         @property
         def value(self):
             return self._value
+
         def close(self):
             pass
 
@@ -26,9 +31,11 @@ def make_fake_gpio_module():
         def __init__(self, pin, pull_up=False):
             self.pin = pin
             self._value = False
+
         @property
         def value(self):
             return self._value
+
         def close(self):
             pass
 
@@ -39,29 +46,35 @@ def make_fake_gpio_module():
 
 def make_fake_spidev_module():
     m = types.ModuleType("spidev")
+
     class SpiDev:
         def __init__(self):
             self.opened = False
             self.max_speed_hz = None
             self.mode = None
+
         def open(self, bus, device):
             self.opened = True
+
         def writebytes(self, data):
             pass
+
         def writebytes2(self, data):
             pass
+
         def close(self):
             self.opened = False
+
     m.SpiDev = SpiDev  # type: ignore[attr-defined]
     return m
 
 
 def install_fake_modules(monkeypatch):
     # install spidev and gpiozero
-    sys.modules['spidev'] = make_fake_spidev_module()
+    sys.modules["spidev"] = make_fake_spidev_module()
     gpio_mod = make_fake_gpio_module()
     # also provide top-level attributes expected by tests (LED, Button)
-    sys.modules['gpiozero'] = gpio_mod
+    sys.modules["gpiozero"] = gpio_mod
 
     # Also mock Hobot.GPIO for Sunrise X3
     mock_hobot_gpio = types.ModuleType("Hobot.GPIO")
@@ -74,26 +87,30 @@ def install_fake_modules(monkeypatch):
     mock_hobot_gpio.output = MagicMock()  # type: ignore[attr-defined]
     mock_hobot_gpio.input = MagicMock(return_value=1)  # type: ignore[attr-defined]
     mock_hobot_gpio.cleanup = MagicMock()  # type: ignore[attr-defined]
-    sys.modules['Hobot.GPIO'] = mock_hobot_gpio
+    sys.modules["Hobot.GPIO"] = mock_hobot_gpio
 
 
 def test_raspberry_selection_and_methods(monkeypatch, monkeypatching=None):
     install_fake_modules(monkeypatch)
+
     # monkeypatch cpuinfo output to include Raspberry
     # Create a fake subprocess.Popen that returns 'Raspberry' in output
     class FakePopen:
         def __init__(self, *args, **kwargs):
             pass
+
         def communicate(self):
-            return ("Raspberry Pi" , None)
+            return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # ensure implementation has expected attributes
-    assert hasattr(epdconfig, 'module_init')
-    assert hasattr(epdconfig, 'spi_writebyte')
+    assert hasattr(epdconfig, "module_init")
+    assert hasattr(epdconfig, "spi_writebyte")
 
     # call module_init (non-cleanup path) to exercise SPI open
     epdconfig.module_init(cleanup=False)
@@ -101,24 +118,27 @@ def test_raspberry_selection_and_methods(monkeypatch, monkeypatching=None):
 
 def test_jetson_imports_guarded(monkeypatch):
     # Ensure Jetson.GPIO is not present and module still loads
-    if 'Jetson' in sys.modules:
-        del sys.modules['Jetson']
-    if 'Jetson.GPIO' in sys.modules:
-        del sys.modules['Jetson.GPIO']
+    if "Jetson" in sys.modules:
+        del sys.modules["Jetson"]
+    if "Jetson.GPIO" in sys.modules:
+        del sys.modules["Jetson.GPIO"]
 
     # Simulate cpuinfo without Raspberry to force Jetson selection path
     class FakePopen2:
         def __init__(self, *args, **kwargs):
             pass
+
         def communicate(self):
             return ("", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen2())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen2())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
     # module should expose functions even without Jetson.GPIO present
-    assert hasattr(epdconfig, 'module_init')
-    assert hasattr(epdconfig, 'spi_writebyte')
+    assert hasattr(epdconfig, "module_init")
+    assert hasattr(epdconfig, "spi_writebyte")
 
 
 def test_gpio_operations_raspberry_pi(monkeypatch):
@@ -130,9 +150,11 @@ def test_gpio_operations_raspberry_pi(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Test GPIO operations
     epdconfig.digital_write(17, 1)  # RST_PIN on
@@ -153,9 +175,11 @@ def test_gpio_operations_without_hardware(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Should not crash when hardware libraries are missing
     epdconfig.digital_write(17, 1)  # RST_PIN on
@@ -175,9 +199,11 @@ def test_spi_operations_raspberry_pi(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Initialize module to set up SPI
     result = epdconfig.module_init(cleanup=False)
@@ -201,15 +227,17 @@ def test_module_init_cleanup_mode(monkeypatch):
             return ("Raspberry Pi", None)
 
     # Mock DEV_Config library loading
-    with patch('ctypes.CDLL') as mock_cdll:
+    with patch("ctypes.CDLL") as mock_cdll:
         mock_dev_spi = MagicMock()
         mock_cdll.return_value = mock_dev_spi
 
-        monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-        monkeypatch.setattr('os.path.exists', lambda path: True)
-        monkeypatch.setattr('os.popen', lambda cmd: MagicMock())
+        monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+        monkeypatch.setattr("os.path.exists", lambda path: True)
+        monkeypatch.setattr("os.popen", lambda cmd: MagicMock())
 
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         result = epdconfig.module_init(cleanup=True)
         assert result == 0
@@ -227,10 +255,12 @@ def test_module_init_cleanup_mode_library_not_found(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: False)  # Library not found
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr("os.path.exists", lambda path: False)  # Library not found
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     with pytest.raises(RuntimeError, match="Cannot find DEV_Config.so"):
         epdconfig.module_init(cleanup=True)
@@ -245,9 +275,11 @@ def test_dev_spi_operations(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Get the implementation object by accessing the bound method's __self__
     impl = epdconfig.module_init.__self__
@@ -278,9 +310,11 @@ def test_dev_spi_operations_no_library(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # DEV_SPI should be None initially (not set by module loading)
     # The actual check happens in the function calls
@@ -298,27 +332,28 @@ def test_dev_spi_operations_no_library(monkeypatch):
 
 def test_jetson_platform_operations(monkeypatch):
     """Test operations on Jetson platform."""
+
     # Mock Jetson detection (no Raspberry in cpuinfo)
     class FakePopen:
         def communicate(self):
             return ("", None)  # No Raspberry detected
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
     # Mock sysfs library loading
-    with patch('ctypes.cdll.LoadLibrary') as mock_load_lib:
+    with patch("ctypes.cdll.LoadLibrary") as mock_load_lib:
         mock_spi = MagicMock()
         mock_load_lib.return_value = mock_spi
 
         # Mock os.path.exists to return True only for sysfs library, not gpio-x3
         def mock_exists(path):
-            if 'sysfs_software_spi.so' in path:
+            if "sysfs_software_spi.so" in path:
                 return True
-            elif '/sys/bus/platform/drivers/gpio-x3' in path:
+            elif "/sys/bus/platform/drivers/gpio-x3" in path:
                 return False
             return True
 
-        monkeypatch.setattr('os.path.exists', mock_exists)
+        monkeypatch.setattr("os.path.exists", mock_exists)
 
         # Mock Jetson.GPIO import
         mock_jetson_gpio = MagicMock()
@@ -332,14 +367,17 @@ def test_jetson_platform_operations(monkeypatch):
         mock_jetson_gpio.cleanup = MagicMock()
 
         original_import = importlib.import_module
+
         def mock_import_module(name):
-            if name == 'Jetson.GPIO':
+            if name == "Jetson.GPIO":
                 return mock_jetson_gpio
             return original_import(name)
 
-        monkeypatch.setattr('importlib.import_module', mock_import_module)
+        monkeypatch.setattr("importlib.import_module", mock_import_module)
 
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         # Test Jetson-specific operations
         result = epdconfig.module_init()
@@ -356,15 +394,18 @@ def test_jetson_platform_operations(monkeypatch):
 
 def test_jetson_platform_no_library(monkeypatch):
     """Test Jetson platform when sysfs library is not available."""
+
     # Mock Jetson detection (no Raspberry in cpuinfo)
     class FakePopen:
         def communicate(self):
             return ("", None)  # No Raspberry detected
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: False)  # No library found
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr("os.path.exists", lambda path: False)  # No library found
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Should use mock SPI implementation
     result = epdconfig.module_init()
@@ -377,12 +418,13 @@ def test_jetson_platform_no_library(monkeypatch):
 
 def test_sunrise_x3_platform(monkeypatch):
     """Test Sunrise X3 platform detection and operations."""
+
     # Mock Sunrise X3 detection
     class FakePopen:
         def communicate(self):
             return ("", None)  # No Raspberry detected
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
     # Mock GPIO library for Sunrise X3
     install_fake_modules(monkeypatch)
@@ -401,22 +443,25 @@ def test_sunrise_x3_platform(monkeypatch):
 
     # Mock the import
     original_import = importlib.import_module
+
     def mock_import_module(name):
-        if name == 'Hobot.GPIO':
+        if name == "Hobot.GPIO":
             return mock_hobot_gpio
         return original_import(name)
 
-    monkeypatch.setattr('importlib.import_module', mock_import_module)
+    monkeypatch.setattr("importlib.import_module", mock_import_module)
 
     # Mock os.path.exists to return True for gpio-x3 path
     def mock_exists(path):
-        if '/sys/bus/platform/drivers/gpio-x3' in path:
+        if "/sys/bus/platform/drivers/gpio-x3" in path:
             return True
         return False
 
-    monkeypatch.setattr('os.path.exists', mock_exists)
+    monkeypatch.setattr("os.path.exists", mock_exists)
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Test Sunrise X3 operations
     result = epdconfig.module_init()
@@ -441,10 +486,12 @@ def test_delay_ms_functionality(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    with patch('time.sleep') as mock_sleep:
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    with patch("time.sleep") as mock_sleep:
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         epdconfig.delay_ms(100)
 
@@ -460,9 +507,11 @@ def test_module_exit_cleanup_operations(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Initialize first
     epdconfig.module_init(cleanup=False)
@@ -484,19 +533,22 @@ def test_platform_detection_edge_cases(monkeypatch):
     ]
 
     for cpuinfo_output, expected_platform in test_cases:
+
         class FakePopen:
             def communicate(self):
                 return (cpuinfo_output, None)
 
-        monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+        monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         # Verify platform-specific attributes exist
-        assert hasattr(epdconfig, 'module_init')
-        assert hasattr(epdconfig, 'digital_write')
-        assert hasattr(epdconfig, 'digital_read')
-        assert hasattr(epdconfig, 'spi_writebyte')
+        assert hasattr(epdconfig, "module_init")
+        assert hasattr(epdconfig, "digital_write")
+        assert hasattr(epdconfig, "digital_read")
+        assert hasattr(epdconfig, "spi_writebyte")
 
 
 def test_gpio_pin_constants():
@@ -530,20 +582,23 @@ def test_gpio_pin_constants():
 
 def test_hardware_import_error_handling(monkeypatch):
     """Test graceful handling when hardware libraries fail to import."""
+
     # Mock Raspberry Pi detection
     class FakePopen:
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
     # Test without installing fake modules - should handle missing libraries gracefully
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Should still have basic functionality even with missing libraries
-    assert hasattr(epdconfig, 'module_init')
-    assert hasattr(epdconfig, 'digital_write')
-    assert hasattr(epdconfig, 'digital_read')
+    assert hasattr(epdconfig, "module_init")
+    assert hasattr(epdconfig, "digital_write")
+    assert hasattr(epdconfig, "digital_read")
 
     # Test operations when libraries are missing
     epdconfig.digital_write(17, 1)  # Should not crash
@@ -560,9 +615,11 @@ def test_pin_mapping_comprehensive(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Test all pin operations
     pins_to_test = [17, 25, 18, 24]  # RST, DC, PWR, BUSY
@@ -579,15 +636,18 @@ def test_pin_mapping_comprehensive(monkeypatch):
 
 def test_jetson_platform_mock_spi_fallback(monkeypatch):
     """Test Jetson platform when sysfs library is not available (uses mock SPI)."""
+
     # Mock Jetson detection (no Raspberry in cpuinfo)
     class FakePopen:
         def communicate(self):
             return ("", None)  # No Raspberry detected
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: False)  # No sysfs library
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr("os.path.exists", lambda path: False)  # No sysfs library
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Should use mock SPI implementation
     result = epdconfig.module_init()
@@ -600,20 +660,21 @@ def test_jetson_platform_mock_spi_fallback(monkeypatch):
 
 def test_jetson_platform_with_hardware_libraries(monkeypatch):
     """Test Jetson platform with full hardware library support."""
+
     # Mock Jetson detection
     class FakePopen:
         def communicate(self):
             return ("", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
     # Mock os.path.exists for sysfs library
     def mock_exists(path):
-        if 'sysfs_software_spi.so' in path:
+        if "sysfs_software_spi.so" in path:
             return True
         return False
 
-    monkeypatch.setattr('os.path.exists', mock_exists)
+    monkeypatch.setattr("os.path.exists", mock_exists)
 
     # Mock ctypes.cdll.LoadLibrary to return a mock library
     mock_spi_lib = MagicMock()
@@ -621,7 +682,7 @@ def test_jetson_platform_with_hardware_libraries(monkeypatch):
     mock_spi_lib.SYSFS_software_spi_begin = MagicMock()
     mock_spi_lib.SYSFS_software_spi_end = MagicMock()
 
-    with patch('ctypes.cdll.LoadLibrary', return_value=mock_spi_lib):
+    with patch("ctypes.cdll.LoadLibrary", return_value=mock_spi_lib):
         # Mock Jetson.GPIO
         mock_jetson_gpio = types.ModuleType("Jetson.GPIO")
         mock_jetson_gpio.BCM = "BCM"  # type: ignore[attr-defined]
@@ -635,14 +696,17 @@ def test_jetson_platform_with_hardware_libraries(monkeypatch):
         mock_jetson_gpio.cleanup = MagicMock()  # type: ignore[attr-defined]
 
         original_import = importlib.import_module
+
         def mock_import_module(name):
-            if name == 'Jetson.GPIO':
+            if name == "Jetson.GPIO":
                 return mock_jetson_gpio
             return original_import(name)
 
-        monkeypatch.setattr('importlib.import_module', mock_import_module)
+        monkeypatch.setattr("importlib.import_module", mock_import_module)
 
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         # Test module operations
         result = epdconfig.module_init()
@@ -657,25 +721,28 @@ def test_jetson_platform_with_hardware_libraries(monkeypatch):
 
 def test_sunrise_x3_platform_operations(monkeypatch):
     """Test Sunrise X3 platform operations."""
+
     # Mock Sunrise X3 detection
     class FakePopen:
         def communicate(self):
             return ("", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
     # Mock GPIO libraries for Sunrise X3
     install_fake_modules(monkeypatch)
 
     # Mock os.path.exists for gpio-x3
     def mock_exists(path):
-        if '/sys/bus/platform/drivers/gpio-x3' in path:
+        if "/sys/bus/platform/drivers/gpio-x3" in path:
             return True
         return False
 
-    monkeypatch.setattr('os.path.exists', mock_exists)
+    monkeypatch.setattr("os.path.exists", mock_exists)
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Test module operations
     result = epdconfig.module_init()
@@ -690,17 +757,22 @@ def test_sunrise_x3_platform_operations(monkeypatch):
 
 def test_sunrise_x3_module_exit_flag_handling(monkeypatch):
     """Test Sunrise X3 module exit flag handling."""
+
     # Mock Sunrise X3 detection
     class FakePopen:
         def communicate(self):
             return ("", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: '/sys/bus/platform/drivers/gpio-x3' in path)
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr(
+        "os.path.exists", lambda path: "/sys/bus/platform/drivers/gpio-x3" in path
+    )
 
     install_fake_modules(monkeypatch)
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # First init should set flag and initialize
     result1 = epdconfig.module_init()
@@ -724,16 +796,18 @@ def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: True)
-    monkeypatch.setattr('os.popen', lambda cmd: MagicMock())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr("os.path.exists", lambda path: True)
+    monkeypatch.setattr("os.popen", lambda cmd: MagicMock())
 
     # Mock DEV_Config library
-    with patch('ctypes.CDLL') as mock_cdll:
+    with patch("ctypes.CDLL") as mock_cdll:
         mock_dev_config = MagicMock()
         mock_cdll.return_value = mock_dev_config
 
-        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        epdconfig = importlib.reload(
+            importlib.import_module("display.waveshare_epd.epdconfig")
+        )
 
         result = epdconfig.module_init(cleanup=True)
         assert result == 0
@@ -744,15 +818,18 @@ def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
 
 def test_jetson_digital_operations_without_gpio(monkeypatch):
     """Test Jetson digital operations when GPIO library is not available."""
+
     # Mock Jetson detection
     class FakePopen:
         def communicate(self):
             return ("", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
-    monkeypatch.setattr('os.path.exists', lambda path: False)
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
+    monkeypatch.setattr("os.path.exists", lambda path: False)
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Should not crash when GPIO is None
     epdconfig.digital_write(17, 1)
@@ -769,15 +846,14 @@ def test_spi_configuration(monkeypatch):
         def communicate(self):
             return ("Raspberry Pi", None)
 
-    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr("subprocess.Popen", lambda *a, **k: FakePopen())
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+    epdconfig = importlib.reload(
+        importlib.import_module("display.waveshare_epd.epdconfig")
+    )
 
     # Initialize to configure SPI
     epdconfig.module_init(cleanup=False)
 
     # Verify SPI configuration would be set (mock objects track this)
     # This tests the configuration path even if hardware isn't present
-
-
-

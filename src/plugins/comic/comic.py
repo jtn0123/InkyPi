@@ -17,13 +17,14 @@ COMICS = [
     "The Perry Bible Fellowship",
     "Questionable Content",
     "Poorly Drawn Lines",
-    "Dinosaur Comics"
+    "Dinosaur Comics",
 ]
+
 
 class Comic(BasePlugin):
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['comics'] = COMICS
+        template_params["comics"] = COMICS
         return template_params
 
     def generate_image(self, settings, device_config):
@@ -34,12 +35,12 @@ class Comic(BasePlugin):
         image_url = self.get_image_url(comic)
         if not image_url:
             raise RuntimeError("Failed to retrieve latest comic url.")
-        
+
         dimensions = device_config.get_resolution()
         if device_config.get_config("orientation") == "vertical":
             dimensions = dimensions[::-1]
         width, height = dimensions
-        
+
         try:
             response = requests.get(image_url, stream=True, timeout=20)
         except TypeError:
@@ -49,7 +50,9 @@ class Comic(BasePlugin):
         with Image.open(BytesIO(response.content)) as img:
             img.thumbnail((width, height), LANCZOS)
             background = Image.new("RGB", (width, height), "white")
-            background.paste(img, ((width - img.width) // 2, (height - img.height) // 2))
+            background.paste(
+                img, ((width - img.width) // 2, (height - img.height) // 2)
+            )
             return background
 
     def get_image_url(self, comic) -> str:
@@ -67,7 +70,7 @@ class Comic(BasePlugin):
             element = feed.entries[0].description
         elif comic == "Poorly Drawn Lines":
             feed = feedparser.parse("https://poorlydrawnlines.com/feed/")
-            element = feed.entries[0].get('content', [{}])[0].get('value', '')
+            element = feed.entries[0].get("content", [{}])[0].get("value", "")
         elif comic == "Dinosaur Comics":
             feed = feedparser.parse("https://www.qwantz.com/rssfeed.php")
             element = feed.entries[0].summary

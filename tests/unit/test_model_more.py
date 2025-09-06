@@ -7,9 +7,19 @@ from model import Playlist, PlaylistManager, PluginInstance, RefreshInfo
 
 
 def test_playlist_manager_serialization_roundtrip():
-    p1 = Playlist("Morning", "06:00", "09:00", plugins=[
-        {"plugin_id": "x", "name": "inst", "plugin_settings": {"a": 1}, "refresh": {"interval": 60}}
-    ])
+    p1 = Playlist(
+        "Morning",
+        "06:00",
+        "09:00",
+        plugins=[
+            {
+                "plugin_id": "x",
+                "name": "inst",
+                "plugin_settings": {"a": 1},
+                "refresh": {"interval": 60},
+            }
+        ],
+    )
     pm = PlaylistManager([p1], active_playlist="Morning")
 
     data = pm.to_dict()
@@ -43,5 +53,3 @@ def test_refresh_info_helpers():
     d = ri.to_dict()
     ri2 = RefreshInfo.from_dict(d)
     assert ri2.plugin_id == "ai_text"
-
-

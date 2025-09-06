@@ -27,10 +27,9 @@ class ImageUpload(BasePlugin):
         if not isinstance(image, Image.Image):
             raise RuntimeError("Invalid image type loaded.")
         return image
-        
 
     def generate_image(self, settings, device_config) -> Image.Image:
-        
+
         # Get the current index from the device json
         img_index = settings.get("image_index", 0)
         image_locations = settings.get("imageFiles[]") or []
@@ -42,7 +41,7 @@ class ImageUpload(BasePlugin):
             # Prevent Index out of range issues when file list has changed
             img_index = 0
 
-        if settings.get('randomize') == "true":
+        if settings.get("randomize") == "true":
             img_index = random.randrange(0, len(image_locations))
             image = self.open_image(img_index, image_locations)
         else:
@@ -50,20 +49,26 @@ class ImageUpload(BasePlugin):
             img_index = (img_index + 1) % len(image_locations)
 
         # Write the new index back ot the device json
-        settings['image_index'] = img_index
+        settings["image_index"] = img_index
 
         ###
         dimensions = device_config.get_resolution()
         if device_config.get_config("orientation") == "vertical":
             dimensions = dimensions[::-1]
 
-        if settings.get('padImage') == "true":
+        if settings.get("padImage") == "true":
             frame_ratio = dimensions[0] / dimensions[1]
             img_width, img_height = image.size
-            padded_img_size = (int(img_height * frame_ratio) if img_width >= img_height else img_width,
-                              img_height if img_width >= img_height else int(img_width / frame_ratio))
-            background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
-            return ImageOps.pad(image, padded_img_size, color=background_color, method=LANCZOS)
+            padded_img_size = (
+                int(img_height * frame_ratio) if img_width >= img_height else img_width,
+                img_height if img_width >= img_height else int(img_width / frame_ratio),
+            )
+            background_color = ImageColor.getcolor(
+                settings.get("backgroundColor") or (255, 255, 255), "RGB"
+            )
+            return ImageOps.pad(
+                image, padded_img_size, color=background_color, method=LANCZOS
+            )
         else:
             # Contain within target dimensions without padding
             contained = ImageOps.contain(image, dimensions, LANCZOS)

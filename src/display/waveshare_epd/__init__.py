@@ -4,6 +4,7 @@ This module provides an `EPD` base class so tests that dynamically
 install fake modules can subclass it without mypy complaining about
 `display` attribute existence.
 """
+
 from typing import Any
 
 
@@ -30,5 +31,3 @@ class EPD:
 
     def sleep(self) -> None:  # pragma: no cover - stub
         raise NotImplementedError
-
-

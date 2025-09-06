@@ -9,6 +9,7 @@ from model import PlaylistManager, RefreshInfo
 
 logger = logging.getLogger(__name__)
 
+
 class Config:
     # Base path for the project directory
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +21,9 @@ class Config:
     current_image_file = os.path.join(BASE_DIR, "static", "images", "current_image.png")
 
     # File path for storing the processed image actually sent to the device
-    processed_image_file = os.path.join(BASE_DIR, "static", "images", "processed_image.png")
+    processed_image_file = os.path.join(
+        BASE_DIR, "static", "images", "processed_image.png"
+    )
 
     # Directory path for storing plugin instance images
     plugin_image_dir = os.path.join(BASE_DIR, "static", "images", "plugins")
@@ -72,7 +75,9 @@ class Config:
             return class_override
 
         # 3) INKYPI_ENV hint
-        env_mode = (os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()).lower()
+        env_mode = (
+            os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
+        ).lower()
         if env_mode in ("dev", "development") and os.path.isfile(dev_path):
             logger.info(f"Using dev config due to INKYPI_ENV: {dev_path}")
             return dev_path
@@ -88,7 +93,9 @@ class Config:
             return dev_path
 
         # 6) Bootstrap from template if neither exists
-        template_path = os.path.abspath(os.path.join(base_dir, "..", "install", "config_base", "device.json"))
+        template_path = os.path.abspath(
+            os.path.join(base_dir, "..", "install", "config_base", "device.json")
+        )
         try:
             os.makedirs(config_dir, exist_ok=True)
             shutil.copyfile(template_path, prod_path)
@@ -139,7 +146,7 @@ class Config:
         logger.debug(f"Writing device config to {self.config_file}")
         self.update_value("playlist_config", self.playlist_manager.to_dict())
         self.update_value("refresh_info", self.refresh_info.to_dict())
-        with open(self.config_file, 'w') as outfile:
+        with open(self.config_file, "w") as outfile:
             json.dump(self.config, outfile, indent=4)
 
     def get_config(self, key=None, default=None):
@@ -156,7 +163,9 @@ class Config:
 
     def get_plugin(self, plugin_id):
         """Finds and returns a plugin config by its ID."""
-        return next((plugin for plugin in self.plugins_list if plugin['id'] == plugin_id), None)
+        return next(
+            (plugin for plugin in self.plugins_list if plugin["id"] == plugin_id), None
+        )
 
     def get_resolution(self):
         """Returns the display resolution as a tuple (width, height) from the configuration."""
@@ -263,6 +272,7 @@ class Config:
     def get_plugin_image_path(self, plugin_id, instance_name):
         """Returns the full path for a plugin instance's image file."""
         from model import PluginInstance
+
         # Create a temporary plugin instance to get the image path
         plugin_instance = PluginInstance(plugin_id, instance_name, {}, {})
         return os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())

@@ -5,6 +5,7 @@ from PIL import Image
 
 def test_take_screenshot_success(monkeypatch):
     import utils.image_utils as image_utils
+
     # Reload to restore real functions (autouse fixture monkeypatches by default)
     image_utils = importlib.reload(image_utils)
 
@@ -19,8 +20,10 @@ def test_take_screenshot_success(monkeypatch):
     class _Ctx:
         def __init__(self, size=(10, 6)):
             self._img = Image.new("RGB", size, "white")
+
         def __enter__(self):
             return self._img
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -33,6 +36,7 @@ def test_take_screenshot_success(monkeypatch):
 
 def test_take_screenshot_failure_nonzero(monkeypatch):
     import utils.image_utils as image_utils
+
     image_utils = importlib.reload(image_utils)
 
     class Result:
@@ -48,6 +52,7 @@ def test_take_screenshot_failure_nonzero(monkeypatch):
 
 def test_take_screenshot_passes_timeout_flag(monkeypatch):
     import utils.image_utils as image_utils
+
     image_utils = importlib.reload(image_utils)
 
     recorded: dict = {"cmd": []}
@@ -67,8 +72,10 @@ def test_take_screenshot_passes_timeout_flag(monkeypatch):
     class _Ctx:
         def __init__(self, size=(10, 6)):
             self._img = Image.new("RGB", size, "white")
+
         def __enter__(self):
             return self._img
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -77,12 +84,15 @@ def test_take_screenshot_passes_timeout_flag(monkeypatch):
     out = image_utils.take_screenshot("http://example.com", (8, 4), timeout_ms=5678)
     assert out is not None
     # Ensure flag was added
-    assert any(str(x).startswith("--timeout=") and "5678" in str(x) for x in recorded["cmd"])
+    assert any(
+        str(x).startswith("--timeout=") and "5678" in str(x) for x in recorded["cmd"]
+    )
 
 
 def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
     """Test that Google Chrome is tried first when available"""
     import utils.image_utils as image_utils
+
     image_utils = importlib.reload(image_utils)
 
     recorded: dict[str, list[list[str]]] = {"cmds": []}
@@ -92,7 +102,7 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
         stderr = b""
 
     def fake_run(*args, **kwargs):
-        cmd = args[0] if args else kwargs.get('cmd', [])
+        cmd = args[0] if args else kwargs.get("cmd", [])
         recorded["cmds"].append(cmd)
 
         # Handle "which" commands - only return success for browsers that should exist in this test
@@ -107,11 +117,12 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
         return Result()
 
     monkeypatch.setattr("utils.image_utils.subprocess.run", fake_run)
+
     def mock_exists(p):
         if p == "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":
             return True
         # Also return True for the temporary screenshot file
-        if p and p.endswith('.png') and ('/tmp/' in p or '/T/' in p):
+        if p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p):
             return True
         return False
 
@@ -121,8 +132,10 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
     class _Ctx:
         def __init__(self, size=(10, 6)):
             self._img = Image.new("RGB", size, "white")
+
         def __enter__(self):
             return self._img
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -138,6 +151,7 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
 def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
     """Test fallback to chromium when Chrome is not available"""
     import utils.image_utils as image_utils
+
     image_utils = importlib.reload(image_utils)
 
     recorded: dict[str, list[list[str]]] = {"cmds": []}
@@ -152,7 +166,7 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
 
     def mock_exists(p):
         # Return True for temporary screenshot files
-        if p and p.endswith('.png') and ('/tmp/' in p or '/T/' in p):
+        if p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p):
             return True
         return False
 
@@ -163,8 +177,10 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
     class _Ctx:
         def __init__(self, size=(10, 6)):
             self._img = Image.new("RGB", size, "white")
+
         def __enter__(self):
             return self._img
+
         def __exit__(self, exc_type, exc, tb):
             return False
 
@@ -174,21 +190,26 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
     assert out is not None
     # Should have tried one of the fallback browsers
     cmd_str = str(recorded["cmds"][0])
-    assert any(browser in cmd_str for browser in ["chromium", "chromium-headless-shell", "google-chrome"])
+    assert any(
+        browser in cmd_str
+        for browser in ["chromium", "chromium-headless-shell", "google-chrome"]
+    )
 
 
 def test_take_screenshot_no_browser_available(monkeypatch):
     """Test error handling when no browsers are available"""
     import utils.image_utils as image_utils
+
     image_utils = importlib.reload(image_utils)
 
     def fake_which(cmd):
         return False
 
     monkeypatch.setattr("utils.image_utils.os.path.exists", lambda p: False)
-    monkeypatch.setattr("utils.image_utils.subprocess.run", lambda cmd, **kwargs: type('Result', (), {'returncode': 1})())
+    monkeypatch.setattr(
+        "utils.image_utils.subprocess.run",
+        lambda cmd, **kwargs: type("Result", (), {"returncode": 1})(),
+    )
 
     out = image_utils.take_screenshot("http://example.com", (8, 4))
     assert out is None
-
-

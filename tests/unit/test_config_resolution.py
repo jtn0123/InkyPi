@@ -14,8 +14,8 @@ def _write_min_config(path, name="TestCfg"):
             "refresh_time": None,
             "image_hash": None,
             "refresh_type": "Manual Update",
-            "plugin_id": ""
-        }
+            "plugin_id": "",
+        },
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
@@ -31,7 +31,9 @@ def test_env_config_file_takes_precedence(monkeypatch, tmp_path):
 
     # Ensure class override points elsewhere to verify env wins
     monkeypatch.setenv("INKYPI_CONFIG_FILE", str(env_cfg_path))
-    monkeypatch.setattr(config_mod.Config, "config_file", str(tmp_path / "class_device.json"))
+    monkeypatch.setattr(
+        config_mod.Config, "config_file", str(tmp_path / "class_device.json")
+    )
 
     # Act
     cfg = config_mod.Config()
@@ -99,5 +101,3 @@ def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
     # Assert
     assert cfg.get_config("name") == "Bootstrapped"
     assert os.path.isfile(os.path.join(str(tmp_src), "config", "device.json"))
-
-

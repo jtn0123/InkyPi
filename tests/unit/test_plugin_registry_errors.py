@@ -4,8 +4,8 @@ from plugins.plugin_registry import PLUGIN_CLASSES, get_plugin_instance, load_pl
 
 def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
     # Force resolve_path to use tmp dir with no plugin subdirs
-    monkeypatch.setenv('SRC_DIR', str(tmp_path))
-    (tmp_path / 'plugins').mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
 
     PLUGIN_CLASSES.clear()
     plugins = [
@@ -14,8 +14,8 @@ def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
     ]
     load_plugins(plugins)
 
-    assert 'nonexistent' not in PLUGIN_CLASSES
-    assert 'skipme' not in PLUGIN_CLASSES
+    assert "nonexistent" not in PLUGIN_CLASSES
+    assert "skipme" not in PLUGIN_CLASSES
 
 
 def test_get_plugin_instance_raises_for_unregistered():
@@ -25,5 +25,3 @@ def test_get_plugin_instance_raises_for_unregistered():
         assert False, "Expected ValueError"
     except ValueError:
         pass
-
-

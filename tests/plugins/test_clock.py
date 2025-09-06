@@ -56,10 +56,10 @@ def test_generate_settings_template():
     clock = Clock({"id": "clock"})
     template = clock.generate_settings_template()
 
-    assert 'clock_faces' in template
-    assert template['clock_faces'] == CLOCK_FACES
-    assert len(template['clock_faces']) == 4
-    assert template['clock_faces'][0]['name'] == 'Gradient Clock'
+    assert "clock_faces" in template
+    assert template["clock_faces"] == CLOCK_FACES
+    assert len(template["clock_faces"]) == 4
+    assert template["clock_faces"][0]["name"] == "Gradient Clock"
 
 
 def test_generate_image_exception_handling():
@@ -69,7 +69,11 @@ def test_generate_image_exception_handling():
     from plugins.clock.clock import Clock
 
     clock = Clock({"id": "clock"})
-    settings = {'selectedClockFace': 'Invalid Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
+    settings = {
+        "selectedClockFace": "Invalid Clock",
+        "primaryColor": "#ffffff",
+        "secondaryColor": "#000000",
+    }
     device_config = MagicMock()
     device_config.get_resolution.return_value = (400, 300)
     device_config.get_config.return_value = None
@@ -114,7 +118,7 @@ def test_draw_word_clock_minute_logic():
 
     # Test different minute ranges to cover lines 409-418, 421, 423
     test_times = [
-        _fixed_dt(3, 5, 0),   # 5 minutes - should show "FIVE PAST"
+        _fixed_dt(3, 5, 0),  # 5 minutes - should show "FIVE PAST"
         _fixed_dt(3, 15, 0),  # 15 minutes - should show "A QUARTER PAST"
         _fixed_dt(3, 25, 0),  # 25 minutes - should show "TWENTYFIVE PAST"
         _fixed_dt(3, 35, 0),  # 35 minutes - should show "TWENTYFIVE TO"
@@ -147,12 +151,16 @@ def test_timezone_handling():
     from plugins.clock.clock import Clock
 
     clock = Clock({"id": "clock"})
-    settings = {'selectedClockFace': 'Digital Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
+    settings = {
+        "selectedClockFace": "Digital Clock",
+        "primaryColor": "#ffffff",
+        "secondaryColor": "#000000",
+    }
     device_config = MagicMock()
     device_config.get_resolution.return_value = (400, 300)
     device_config.get_config.side_effect = lambda key: {
-        'timezone': 'UTC',
-        'orientation': 'horizontal'
+        "timezone": "UTC",
+        "orientation": "horizontal",
     }.get(key)
 
     img = clock.generate_image(settings, device_config)
@@ -166,7 +174,11 @@ def test_invalid_clock_face_fallback():
     from plugins.clock.clock import Clock
 
     clock = Clock({"id": "clock"})
-    settings = {'selectedClockFace': 'Nonexistent Clock', 'primaryColor': '#ffffff', 'secondaryColor': '#000000'}
+    settings = {
+        "selectedClockFace": "Nonexistent Clock",
+        "primaryColor": "#ffffff",
+        "secondaryColor": "#000000",
+    }
     device_config = MagicMock()
     device_config.get_resolution.return_value = (400, 300)
     device_config.get_config.return_value = None
@@ -189,7 +201,9 @@ def test_static_translate_word_grid_positions_edges():
 def test_draw_gradient_image_mode_and_size():
     from plugins.clock.clock import Clock
 
-    img = Clock.draw_gradient_image(120, 80, 0.0, math.pi, (0, 0, 0, 0), (255, 0, 0, 255))
+    img = Clock.draw_gradient_image(
+        120, 80, 0.0, math.pi, (0, 0, 0, 0), (255, 0, 0, 255)
+    )
     assert isinstance(img, Image.Image)
     assert img.mode == "RGBA"
     assert img.size == (120, 80)
@@ -208,7 +222,13 @@ def test_draw_clock_hand_image_unchanged_size_and_mode():
     from plugins.clock.clock import Clock
 
     base = Image.new("RGBA", (300, 200), (0, 0, 0, 0))
-    out = Clock.draw_clock_hand(base, length=60, angle=math.radians(0), hand_color=(255, 0, 0), border_color=(255, 255, 255))
+    out = Clock.draw_clock_hand(
+        base,
+        length=60,
+        angle=math.radians(0),
+        hand_color=(255, 0, 0),
+        border_color=(255, 255, 255),
+    )
     assert out.size == (300, 200)
     assert out.mode == "RGBA"
 
@@ -222,13 +242,27 @@ def test_generate_image_face_selection_and_orientation(device_config_dev, monkey
     cfg.update_value("orientation", "horizontal", write=False)
 
     clock = Clock({"id": "clock"})
-    img = clock.generate_image({"selectedClockFace": "Digital Clock", "primaryColor": "#ffffff", "secondaryColor": "#000000"}, cfg)
+    img = clock.generate_image(
+        {
+            "selectedClockFace": "Digital Clock",
+            "primaryColor": "#ffffff",
+            "secondaryColor": "#000000",
+        },
+        cfg,
+    )
     assert isinstance(img, Image.Image)
     assert img.size == tuple(cfg.get_resolution())
 
     # Vertical orientation should flip width/height
     cfg.update_value("orientation", "vertical", write=False)
-    img_v = clock.generate_image({"selectedClockFace": "Digital Clock", "primaryColor": "#ffffff", "secondaryColor": "#000000"}, cfg)
+    img_v = clock.generate_image(
+        {
+            "selectedClockFace": "Digital Clock",
+            "primaryColor": "#ffffff",
+            "secondaryColor": "#000000",
+        },
+        cfg,
+    )
     w, h = cfg.get_resolution()
     assert img_v.size == (h, w)
 
@@ -240,7 +274,14 @@ def test_generate_image_default_face_when_invalid(device_config_dev):
     cfg.update_value("timezone", "UTC", write=False)
 
     clock = Clock({"id": "clock"})
-    img = clock.generate_image({"selectedClockFace": "Not A Face", "primaryColor": "#ffffff", "secondaryColor": "#000000"}, cfg)
+    img = clock.generate_image(
+        {
+            "selectedClockFace": "Not A Face",
+            "primaryColor": "#ffffff",
+            "secondaryColor": "#000000",
+        },
+        cfg,
+    )
     assert isinstance(img, Image.Image)
     assert img.size[0] > 0
 
@@ -256,6 +297,7 @@ def test_generate_image_error_path(device_config_dev, monkeypatch):
         raise Boom("boom")
 
     import plugins.clock.clock as clock_mod
+
     monkeypatch.setattr(clock_mod.Clock, "draw_digital_clock", boom, raising=True)
 
     cfg = device_config_dev
@@ -263,6 +305,11 @@ def test_generate_image_error_path(device_config_dev, monkeypatch):
 
     clock = Clock({"id": "clock"})
     with pytest.raises(RuntimeError):
-        clock.generate_image({"selectedClockFace": "Digital Clock", "primaryColor": "#ffffff", "secondaryColor": "#000000"}, cfg)
-
-
+        clock.generate_image(
+            {
+                "selectedClockFace": "Digital Clock",
+                "primaryColor": "#ffffff",
+                "secondaryColor": "#000000",
+            },
+            cfg,
+        )

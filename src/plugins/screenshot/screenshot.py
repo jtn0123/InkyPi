@@ -5,10 +5,11 @@ from utils.image_utils import take_screenshot
 
 logger = logging.getLogger(__name__)
 
+
 class Screenshot(BasePlugin):
     def generate_image(self, settings, device_config):
 
-        url = settings.get('url')
+        url = settings.get("url")
         if not url:
             raise RuntimeError("URL is required.")
 

@@ -62,8 +62,12 @@ def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
     # make random deterministic
     monkeypatch.setattr(random, "choice", lambda seq: seq[0], raising=True)
 
-    plugin = ImageFolder({"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"})
-    img = plugin.generate_image({"folder_path": str(folder), "padImage": False}, device_config_dev)
+    plugin = ImageFolder(
+        {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
+    )
+    img = plugin.generate_image(
+        {"folder_path": str(folder), "padImage": False}, device_config_dev
+    )
     assert img is not None
     assert isinstance(img, Image.Image)
 
@@ -71,7 +75,9 @@ def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
 def test_generate_image_errors(tmp_path, device_config_dev):
     from plugins.image_folder.image_folder import ImageFolder
 
-    plugin = ImageFolder({"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"})
+    plugin = ImageFolder(
+        {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
+    )
 
     # missing path
     try:
@@ -82,7 +88,9 @@ def test_generate_image_errors(tmp_path, device_config_dev):
 
     # missing folder
     try:
-        plugin.generate_image({"folder_path": str(tmp_path / "nope")}, device_config_dev)
+        plugin.generate_image(
+            {"folder_path": str(tmp_path / "nope")}, device_config_dev
+        )
         assert False
     except RuntimeError as e:
         assert "Folder does not exist" in str(e)
@@ -104,5 +112,3 @@ def test_generate_image_errors(tmp_path, device_config_dev):
         assert False
     except RuntimeError as e:
         assert "No image files found" in str(e)
-
-

@@ -27,7 +27,10 @@ def test_generate_image_missing_view_raises(device_config_dev):
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError):
-        p.generate_image({"calendarURLs[]": ["http://x"], "calendarColors[]": ["#000"]}, device_config_dev)
+        p.generate_image(
+            {"calendarURLs[]": ["http://x"], "calendarColors[]": ["#000"]},
+            device_config_dev,
+        )
 
 
 def test_generate_image_invalid_view_raises(device_config_dev):
@@ -91,7 +94,7 @@ def test_get_view_range_dayGridMonth():
     now = datetime(2025, 1, 15, 10, 30)
     start, end = p.get_view_range("dayGridMonth", now, {})
     assert start == datetime(2024, 12, 25, 0, 0)  # 2025-01-01 minus 7 days
-    assert end == datetime(2025, 2, 12, 0, 0)     # 2025-01-01 plus 6 weeks
+    assert end == datetime(2025, 2, 12, 0, 0)  # 2025-01-01 plus 6 weeks
 
 
 def test_get_view_range_listMonth():
@@ -126,10 +129,12 @@ def test_parse_data_points_datetime_with_dtend():
 
     dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
     dt_end = datetime(2025, 1, 1, 13, 0, tzinfo=pytz.UTC)
-    event = FakeEvent({
-        "dtstart": dt_start,
-        "dtend": dt_end,
-    })
+    event = FakeEvent(
+        {
+            "dtstart": dt_start,
+            "dtend": dt_end,
+        }
+    )
     start, end, all_day = p.parse_data_points(event, tz)
     assert start.endswith("-05:00") or start.endswith("-04:00")  # timezone adjusted
     assert end.endswith("-05:00") or end.endswith("-04:00")
@@ -143,10 +148,12 @@ def test_parse_data_points_date_all_day_and_duration():
     tz = pytz.UTC
 
     d = date(2025, 1, 1)
-    event = FakeEvent({
-        "dtstart": d,
-        "duration": timedelta(days=1),
-    })
+    event = FakeEvent(
+        {
+            "dtstart": d,
+            "duration": timedelta(days=1),
+        }
+    )
     start, end, all_day = p.parse_data_points(event, tz)
     assert start == d.isoformat()
     assert end == (d + timedelta(days=1)).isoformat()
@@ -161,7 +168,9 @@ def test_fetch_calendar_timeout_raises(monkeypatch):
     def raise_timeout(url, **kwargs):
         raise requests.exceptions.Timeout("timeout")
 
-    monkeypatch.setattr("plugins.calendar.calendar.requests.get", raise_timeout, raising=True)
+    monkeypatch.setattr(
+        "plugins.calendar.calendar.requests.get", raise_timeout, raising=True
+    )
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError):
@@ -177,7 +186,11 @@ def test_fetch_calendar_http_error_raises(monkeypatch):
         def raise_for_status(self):
             raise requests.HTTPError("bad status")
 
-    monkeypatch.setattr("plugins.calendar.calendar.requests.get", lambda url, **kwargs: Resp(), raising=True)
+    monkeypatch.setattr(
+        "plugins.calendar.calendar.requests.get",
+        lambda url, **kwargs: Resp(),
+        raising=True,
+    )
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError):
@@ -189,11 +202,16 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch):
 
     class Resp:
         text = "not an ical"
+
         def raise_for_status(self):
             return None
 
     # Return a 200 OK but break ical parsing
-    monkeypatch.setattr("plugins.calendar.calendar.requests.get", lambda url, **kwargs: Resp(), raising=True)
+    monkeypatch.setattr(
+        "plugins.calendar.calendar.requests.get",
+        lambda url, **kwargs: Resp(),
+        raising=True,
+    )
 
     class FakeCal:
         @staticmethod
@@ -201,7 +219,13 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch):
             raise ValueError("parse error")
 
     import plugins.calendar.calendar as cal_mod
-    monkeypatch.setattr(cal_mod.icalendar.Calendar, "from_ical", staticmethod(FakeCal.from_ical), raising=True)
+
+    monkeypatch.setattr(
+        cal_mod.icalendar.Calendar,
+        "from_ical",
+        staticmethod(FakeCal.from_ical),
+        raising=True,
+    )
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError):
@@ -223,11 +247,15 @@ def test_generate_image_vertical_orientation(device_config_dev, monkeypatch):
     from plugins.calendar.calendar import Calendar
 
     # Mock device config to return vertical orientation
-    monkeypatch.setattr(device_config_dev, "get_config", lambda key, default=None: {
-        "orientation": "vertical",
-        "timezone": "UTC",
-        "time_format": "12h"
-    }.get(key, default))
+    monkeypatch.setattr(
+        device_config_dev,
+        "get_config",
+        lambda key, default=None: {
+            "orientation": "vertical",
+            "timezone": "UTC",
+            "time_format": "12h",
+        }.get(key, default),
+    )
 
     p = Calendar({"id": "calendar"})
     # This should not raise an exception
@@ -246,9 +274,11 @@ def test_parse_data_points_datetime_without_dtend():
     tz = pytz.timezone("US/Eastern")
 
     dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
-    event = FakeEvent({
-        "dtstart": dt_start,
-    })
+    event = FakeEvent(
+        {
+            "dtstart": dt_start,
+        }
+    )
     start, end, all_day = p.parse_data_points(event, tz)
     assert end is None
     assert all_day is False
@@ -263,10 +293,12 @@ def test_parse_data_points_datetime_with_duration():
 
     dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
     duration = timedelta(hours=2)
-    event = FakeEvent({
-        "dtstart": dt_start,
-        "duration": duration,
-    })
+    event = FakeEvent(
+        {
+            "dtstart": dt_start,
+            "duration": duration,
+        }
+    )
     start, end, all_day = p.parse_data_points(event, tz)
     assert end is not None
     assert all_day is False
@@ -280,9 +312,11 @@ def test_parse_data_points_date_all_day():
     tz = pytz.timezone("US/Eastern")
 
     d = date(2025, 1, 1)
-    event = FakeEvent({
-        "dtstart": d,
-    })
+    event = FakeEvent(
+        {
+            "dtstart": d,
+        }
+    )
     start, end, all_day = p.parse_data_points(event, tz)
     assert start == d.isoformat()
     assert end is None
@@ -326,11 +360,16 @@ def test_fetch_ics_events_empty_calendar():
         def __init__(self):
             pass
 
-    with patch.object(p, 'fetch_calendar', return_value=MockCal()):
-        with patch('recurring_ical_events.of') as mock_rie:
+    with patch.object(p, "fetch_calendar", return_value=MockCal()):
+        with patch("recurring_ical_events.of") as mock_rie:
             mock_rie.return_value.between.return_value = []
-            events = p.fetch_ics_events(["http://example.com"], ["#000"], pytz.UTC,
-                                      datetime.now(), datetime.now() + timedelta(days=1))
+            events = p.fetch_ics_events(
+                ["http://example.com"],
+                ["#000"],
+                pytz.UTC,
+                datetime.now(),
+                datetime.now() + timedelta(days=1),
+            )
             assert events == []
 
 
@@ -345,13 +384,15 @@ def test_fetch_ics_events_multiple_calendars():
         def __init__(self, event_count=1):
             self.event_count = event_count
 
-    mock_event = FakeEvent({
-        "summary": "Test Event",
-        "dtstart": datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC),
-    })
+    mock_event = FakeEvent(
+        {
+            "summary": "Test Event",
+            "dtstart": datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC),
+        }
+    )
 
-    with patch.object(p, 'fetch_calendar') as mock_fetch:
-        with patch('recurring_ical_events.of') as mock_rie:
+    with patch.object(p, "fetch_calendar") as mock_fetch:
+        with patch("recurring_ical_events.of") as mock_rie:
             mock_fetch.return_value = MockCal()
             mock_rie.return_value.between.return_value = [mock_event]
 
@@ -359,7 +400,8 @@ def test_fetch_ics_events_multiple_calendars():
                 ["http://example1.com", "http://example2.com"],
                 ["#FF0000", "#00FF00"],
                 pytz.UTC,
-                datetime(2025, 1, 1), datetime(2025, 1, 2)
+                datetime(2025, 1, 1),
+                datetime(2025, 1, 2),
             )
             assert len(events) == 2  # One event from each calendar
             assert events[0]["backgroundColor"] == "#FF0000"
@@ -387,7 +429,9 @@ def test_fetch_calendar_connection_error(monkeypatch):
     def raise_connection_error(url, **kwargs):
         raise requests.exceptions.ConnectionError("connection failed")
 
-    monkeypatch.setattr("plugins.calendar.calendar.requests.get", raise_connection_error)
+    monkeypatch.setattr(
+        "plugins.calendar.calendar.requests.get", raise_connection_error
+    )
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError, match="Failed to fetch iCalendar url"):
@@ -400,11 +444,13 @@ def test_fetch_calendar_decode_error(monkeypatch):
 
     class BadResponse:
         text = "invalid utf-8: \xff\xfe"
+
         def raise_for_status(self):
             return None
 
-    monkeypatch.setattr("plugins.calendar.calendar.requests.get",
-                       lambda url, **kwargs: BadResponse())
+    monkeypatch.setattr(
+        "plugins.calendar.calendar.requests.get", lambda url, **kwargs: BadResponse()
+    )
 
     p = Calendar({"id": "calendar"})
     with pytest.raises(RuntimeError, match="Failed to fetch iCalendar url"):
@@ -425,5 +471,3 @@ def test_get_contrast_color_edge_cases():
 
     # Test exact threshold
     assert p.get_contrast_color("#969696") == "#000000"  # yiq = 150
-
-

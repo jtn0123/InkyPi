@@ -65,5 +65,3 @@ def test_unset_env_key(tmp_path, monkeypatch):
     # And should not be present when loading from file
     value = cfg.load_env_key("NASA_SECRET")
     assert value is None
-
-

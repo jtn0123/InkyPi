@@ -17,26 +17,48 @@ def test_wpotd_happy_path(monkeypatch, device_config_dev):
     def fake_session_get(self, url, params=None, headers=None, timeout=None):
         class R:
             status_code = 200
+
             def raise_for_status(self):
                 return None
+
             def json(self_inner):
                 if params and params.get("prop") == "images":
-                    return {"query": {"pages": [{"images": [{"title": "File:Example.png"}]}]}}
+                    return {
+                        "query": {
+                            "pages": [{"images": [{"title": "File:Example.png"}]}]
+                        }
+                    }
                 if params and params.get("prop") == "imageinfo":
-                    return {"query": {"pages": {"1": {"imageinfo": [{"url": "http://example.com/img.png"}]}}}}
+                    return {
+                        "query": {
+                            "pages": {
+                                "1": {
+                                    "imageinfo": [{"url": "http://example.com/img.png"}]
+                                }
+                            }
+                        }
+                    }
                 return {}
 
         return R()
 
     # Patch requests.Session.get so Wpotd.SESSION.get uses our fake
     import requests
+
     monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
 
     # Patch download step to avoid PIL open complexities
     import plugins.wpotd.wpotd as wpotd_mod
-    monkeypatch.setattr(wpotd_mod.Wpotd, "_download_image", lambda self, u: Image.open(BytesIO(_png_bytes())).copy())
 
-    img = Wpotd({"id": "wpotd"}).generate_image({"shrinkToFitWpotd": "false"}, device_config_dev)
+    monkeypatch.setattr(
+        wpotd_mod.Wpotd,
+        "_download_image",
+        lambda self, u: Image.open(BytesIO(_png_bytes())).copy(),
+    )
+
+    img = Wpotd({"id": "wpotd"}).generate_image(
+        {"shrinkToFitWpotd": "false"}, device_config_dev
+    )
     assert img is not None
     assert img.size[0] > 0
 
@@ -46,8 +68,10 @@ def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
 
     class BadResp:
         status_code = 500
+
         def raise_for_status(self):
             raise RuntimeError("boom")
+
         def json(self):
             return {}
 
@@ -55,6 +79,7 @@ def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
         return BadResp()
 
     import requests
+
     monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
 
     try:
@@ -70,14 +95,18 @@ def test_wpotd_missing_fields_raises(monkeypatch, device_config_dev):
     def fake_session_get(self, url, params=None, headers=None, timeout=None):
         class R:
             status_code = 200
+
             def raise_for_status(self):
                 return None
+
             def json(self_inner):
                 # Missing images array content
                 return {"query": {"pages": [{"images": []}]}}
+
         return R()
 
     import requests
+
     monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
 
     try:
@@ -92,16 +121,18 @@ def test_wpotd_randomize_date(monkeypatch, device_config_dev):
     from plugins.wpotd.wpotd import Wpotd
 
     # Mock the date determination to return a specific date
-    with patch.object(Wpotd, '_determine_date') as mock_determine_date, \
-         patch.object(Wpotd, '_fetch_potd') as mock_fetch_potd, \
-         patch.object(Wpotd, '_download_image') as mock_download:
+    with (
+        patch.object(Wpotd, "_determine_date") as mock_determine_date,
+        patch.object(Wpotd, "_fetch_potd") as mock_fetch_potd,
+        patch.object(Wpotd, "_download_image") as mock_download,
+    ):
 
         mock_determine_date.return_value = MagicMock()  # Mock date object
         mock_fetch_potd.return_value = {"image_src": "http://example.com/image.png"}
         mock_download.return_value = Image.new("RGB", (100, 100), "white")
 
         p = Wpotd({"id": "wpotd"})
-        settings = {'randomizeWpotd': 'true'}
+        settings = {"randomizeWpotd": "true"}
 
         result = p.generate_image(settings, device_config_dev)
 
@@ -115,9 +146,11 @@ def test_wpotd_custom_date(monkeypatch, device_config_dev):
     from plugins.wpotd.wpotd import Wpotd
 
     # Mock the date determination
-    with patch.object(Wpotd, '_determine_date') as mock_determine_date, \
-         patch.object(Wpotd, '_fetch_potd') as mock_fetch_potd, \
-         patch.object(Wpotd, '_download_image') as mock_download:
+    with (
+        patch.object(Wpotd, "_determine_date") as mock_determine_date,
+        patch.object(Wpotd, "_fetch_potd") as mock_fetch_potd,
+        patch.object(Wpotd, "_download_image") as mock_download,
+    ):
 
         mock_determine_date.return_value = MagicMock()
         mock_fetch_potd.return_value = {"image_src": "http://example.com/image.png"}
@@ -125,7 +158,7 @@ def test_wpotd_custom_date(monkeypatch, device_config_dev):
 
         p = Wpotd({"id": "wpotd"})
         custom_date = "2023-12-25"
-        settings = {'customDate': custom_date}
+        settings = {"customDate": custom_date}
 
         result = p.generate_image(settings, device_config_dev)
 
@@ -150,21 +183,27 @@ def test_wpotd_shrink_to_fit_enabled(device_config_dev, monkeypatch):
     from plugins.wpotd.wpotd import Wpotd
 
     # Mock device resolution
-    monkeypatch.setattr(device_config_dev, 'get_resolution', lambda: (800, 480))
+    monkeypatch.setattr(device_config_dev, "get_resolution", lambda: (800, 480))
 
     # Mock the plugin methods
-    with patch.object(Wpotd, '_determine_date') as mock_determine_date, \
-         patch.object(Wpotd, '_fetch_potd') as mock_fetch_potd, \
-         patch.object(Wpotd, '_download_image') as mock_download, \
-         patch.object(Wpotd, '_shrink_to_fit') as mock_shrink:
+    with (
+        patch.object(Wpotd, "_determine_date") as mock_determine_date,
+        patch.object(Wpotd, "_fetch_potd") as mock_fetch_potd,
+        patch.object(Wpotd, "_download_image") as mock_download,
+        patch.object(Wpotd, "_shrink_to_fit") as mock_shrink,
+    ):
 
         mock_determine_date.return_value = MagicMock()
         mock_fetch_potd.return_value = {"image_src": "http://example.com/image.png"}
-        mock_download.return_value = Image.new("RGB", (1000, 600), "white")  # Large image
-        mock_shrink.return_value = Image.new("RGB", (800, 480), "white")  # Resized image
+        mock_download.return_value = Image.new(
+            "RGB", (1000, 600), "white"
+        )  # Large image
+        mock_shrink.return_value = Image.new(
+            "RGB", (800, 480), "white"
+        )  # Resized image
 
         p = Wpotd({"id": "wpotd"})
-        settings = {'shrinkToFitWpotd': 'true'}
+        settings = {"shrinkToFitWpotd": "true"}
 
         result = p.generate_image(settings, device_config_dev)
 
@@ -178,10 +217,12 @@ def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
     from plugins.wpotd.wpotd import Wpotd
 
     # Mock the plugin methods
-    with patch.object(Wpotd, '_determine_date') as mock_determine_date, \
-         patch.object(Wpotd, '_fetch_potd') as mock_fetch_potd, \
-         patch.object(Wpotd, '_download_image') as mock_download, \
-         patch.object(Wpotd, '_shrink_to_fit') as mock_shrink:
+    with (
+        patch.object(Wpotd, "_determine_date") as mock_determine_date,
+        patch.object(Wpotd, "_fetch_potd") as mock_fetch_potd,
+        patch.object(Wpotd, "_download_image") as mock_download,
+        patch.object(Wpotd, "_shrink_to_fit") as mock_shrink,
+    ):
 
         mock_determine_date.return_value = MagicMock()
         mock_fetch_potd.return_value = {"image_src": "http://example.com/image.png"}
@@ -189,7 +230,7 @@ def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
         mock_download.return_value = original_image
 
         p = Wpotd({"id": "wpotd"})
-        settings = {'shrinkToFitWpotd': 'false'}
+        settings = {"shrinkToFitWpotd": "false"}
 
         result = p.generate_image(settings, device_config_dev)
 
@@ -219,10 +260,10 @@ def test_determine_date_random(monkeypatch):
     p = Wpotd({"id": "wpotd"})
 
     # Mock randint to return a predictable value
-    with patch('plugins.wpotd.wpotd.randint') as mock_randint:
+    with patch("plugins.wpotd.wpotd.randint") as mock_randint:
         mock_randint.return_value = 100  # 100 days from start
 
-        result = p._determine_date({'randomizeWpotd': 'true'})
+        result = p._determine_date({"randomizeWpotd": "true"})
 
         expected_date = datetime(2015, 1, 1).date() + timedelta(days=100)
         assert result == expected_date
@@ -233,9 +274,9 @@ def test_determine_date_custom():
     from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
-    result = p._determine_date({'customDate': '2023-12-25'})
+    result = p._determine_date({"customDate": "2023-12-25"})
 
-    assert str(result) == '2023-12-25'
+    assert str(result) == "2023-12-25"
 
 
 def test_download_image_success():
@@ -245,15 +286,17 @@ def test_download_image_success():
     p = Wpotd({"id": "wpotd"})
 
     # Mock the session get
-    with patch.object(p.SESSION, 'get') as mock_get:
+    with patch.object(p.SESSION, "get") as mock_get:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.content = _png_bytes()
         mock_get.return_value = mock_response
 
         # Mock PIL Image
-        with patch('plugins.wpotd.wpotd.Image') as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = MagicMock()
+        with patch("plugins.wpotd.wpotd.Image") as mock_image:
+            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                MagicMock()
+            )
 
             result = p._download_image("http://example.com/image.png")
 
@@ -268,7 +311,7 @@ def test_download_image_network_error():
     p = Wpotd({"id": "wpotd"})
 
     # Mock the session get to raise exception
-    with patch.object(p.SESSION, 'get') as mock_get:
+    with patch.object(p.SESSION, "get") as mock_get:
         mock_get.side_effect = Exception("Network error")
 
         with pytest.raises(RuntimeError, match="Failed to load WPOTD image"):
@@ -284,15 +327,17 @@ def test_download_image_invalid_format():
     p = Wpotd({"id": "wpotd"})
 
     # Mock the session get
-    with patch.object(p.SESSION, 'get') as mock_get:
+    with patch.object(p.SESSION, "get") as mock_get:
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.content = b'invalid_image_data'
+        mock_response.content = b"invalid_image_data"
         mock_get.return_value = mock_response
 
         # Mock PIL Image to raise UnidentifiedImageError
-        with patch('plugins.wpotd.wpotd.Image') as mock_image:
-            mock_image.open.side_effect = UnidentifiedImageError("Cannot identify image")
+        with patch("plugins.wpotd.wpotd.Image") as mock_image:
+            mock_image.open.side_effect = UnidentifiedImageError(
+                "Cannot identify image"
+            )
 
             with pytest.raises(RuntimeError, match="Unsupported image format"):
                 p._download_image("http://example.com/image.png")
@@ -305,13 +350,11 @@ def test_fetch_image_src_success():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request
-    with patch.object(p, '_make_request') as mock_make_request:
+    with patch.object(p, "_make_request") as mock_make_request:
         mock_make_request.return_value = {
             "query": {
                 "pages": {
-                    "123": {
-                        "imageinfo": [{"url": "http://example.com/full_image.png"}]
-                    }
+                    "123": {"imageinfo": [{"url": "http://example.com/full_image.png"}]}
                 }
             }
         }
@@ -329,15 +372,9 @@ def test_fetch_image_src_missing_url():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request with missing URL
-    with patch.object(p, '_make_request') as mock_make_request:
+    with patch.object(p, "_make_request") as mock_make_request:
         mock_make_request.return_value = {
-            "query": {
-                "pages": {
-                    "123": {
-                        "imageinfo": [{}]  # Empty imageinfo
-                    }
-                }
-            }
+            "query": {"pages": {"123": {"imageinfo": [{}]}}}  # Empty imageinfo
         }
 
         with pytest.raises(RuntimeError, match="Image URL missing in response"):
@@ -351,7 +388,7 @@ def test_fetch_image_src_api_error():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request to raise RuntimeError (as the method does)
-    with patch.object(p, '_make_request') as mock_make_request:
+    with patch.object(p, "_make_request") as mock_make_request:
         mock_make_request.side_effect = RuntimeError("Wikipedia API request failed")
 
         with pytest.raises(RuntimeError, match="Wikipedia API request failed"):
@@ -423,7 +460,7 @@ def test_make_request_success():
     p = Wpotd({"id": "wpotd"})
 
     # Mock session get
-    with patch.object(p.SESSION, 'get') as mock_get:
+    with patch.object(p.SESSION, "get") as mock_get:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"query": {"pages": []}}
@@ -442,7 +479,7 @@ def test_make_request_api_error():
     p = Wpotd({"id": "wpotd"})
 
     # Mock session get to raise exception
-    with patch.object(p.SESSION, 'get') as mock_get:
+    with patch.object(p.SESSION, "get") as mock_get:
         mock_get.side_effect = Exception("API Error")
 
         with pytest.raises(RuntimeError, match="Wikipedia API request failed"):
@@ -458,7 +495,7 @@ def test_fetch_potd_api_error():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request to raise RuntimeError (as the method does)
-    with patch.object(p, '_make_request') as mock_make_request:
+    with patch.object(p, "_make_request") as mock_make_request:
         mock_make_request.side_effect = RuntimeError("Wikipedia API request failed")
 
         with pytest.raises(RuntimeError, match="Wikipedia API request failed"):
@@ -474,15 +511,11 @@ def test_fetch_potd_missing_images():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request with malformed response
-    with patch.object(p, '_make_request') as mock_make_request:
+    with patch.object(p, "_make_request") as mock_make_request:
 
         mock_make_request.return_value = {
-            "query": {
-                "pages": [{"images": []}]  # Empty images array
-            }
+            "query": {"pages": [{"images": []}]}  # Empty images array
         }
 
         with pytest.raises(RuntimeError, match="Failed to retrieve POTD filename"):
             p._fetch_potd(date.today())
-
- 

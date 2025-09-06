@@ -9,48 +9,47 @@ def test_ai_image_missing_api_key(device_config_dev):
     from plugins.ai_image.ai_image import AIImage
 
     p = AIImage({"id": "ai_image"})
-    settings = {
-        'textPrompt': 'a cat',
-        'imageModel': 'dall-e-3',
-        'quality': 'standard'
-    }
+    settings = {"textPrompt": "a cat", "imageModel": "dall-e-3", "quality": "standard"}
 
     # Mock API key to return None (missing key)
-    with patch.object(device_config_dev, 'load_env_key', lambda key: None):
+    with patch.object(device_config_dev, "load_env_key", lambda key: None):
         with pytest.raises(RuntimeError, match="OPEN AI API Key not configured"):
             p.generate_image(settings, device_config_dev)
 
 
 def test_ai_image_invalid_model(client, monkeypatch):
-    monkeypatch.setenv('OPEN_AI_SECRET', 'test')
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
     data = {
-        'plugin_id': 'ai_image',
-        'textPrompt': 'a cat',
-        'imageModel': 'invalid-model',
-        'quality': 'standard',
+        "plugin_id": "ai_image",
+        "textPrompt": "a cat",
+        "imageModel": "invalid-model",
+        "quality": "standard",
     }
-    resp = client.post('/update_now', data=data)
+    resp = client.post("/update_now", data=data)
     assert resp.status_code == 500
 
 
 def test_ai_image_generate_image_success(client, monkeypatch):
-    monkeypatch.setenv('OPEN_AI_SECRET', 'test')
+    monkeypatch.setenv("OPEN_AI_SECRET", "test")
 
     class FakeImages:
         def generate(self, **kwargs):
             # Ensure quality is normalized per model
-            model = kwargs.get('model')
-            q = kwargs.get('quality')
-            if model == 'gpt-image-1':
+            model = kwargs.get("model")
+            q = kwargs.get("quality")
+            if model == "gpt-image-1":
                 # New API supports low | medium | high | auto; ensure 'standard' is not passed
-                assert q in (None, 'low', 'medium', 'high', 'auto')
-                assert q != 'standard'
-            if model == 'dall-e-3':
-                assert q in (None, 'standard', 'hd')
+                assert q in (None, "low", "medium", "high", "auto")
+                assert q != "standard"
+            if model == "dall-e-3":
+                assert q in (None, "standard", "hd")
+
             class Resp:
                 class D:
-                    url = 'http://example.com/img.png'
+                    url = "http://example.com/img.png"
+
                 data = [D()]
+
             return Resp()
 
     class FakeOpenAI:
@@ -58,39 +57,44 @@ def test_ai_image_generate_image_success(client, monkeypatch):
             self.images = FakeImages()
 
     import plugins.ai_image.ai_image as ai_image_mod
-    monkeypatch.setattr(ai_image_mod, 'OpenAI', FakeOpenAI, raising=True)
+
+    monkeypatch.setattr(ai_image_mod, "OpenAI", FakeOpenAI, raising=True)
 
     # Mock requests.get to image URL
     from io import BytesIO
 
     import requests
     from PIL import Image
+
     def fake_get(url):
-        img = Image.new('RGB', (64, 64), 'black')
+        img = Image.new("RGB", (64, 64), "black")
         buf = BytesIO()
-        img.save(buf, format='PNG')
+        img.save(buf, format="PNG")
+
         class R:
             content = buf.getvalue()
             status_code = 200
+
         return R()
-    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+
+    monkeypatch.setattr(requests, "get", fake_get, raising=True)
 
     for model, quality in [
-        ('dall-e-3','standard'),
-        ('dall-e-3','hd'),
-        ('gpt-image-1','high'),
-        ('gpt-image-1','standard'),  # should normalize to 'medium'
-        ('gpt-image-1','low'),
-        ('gpt-image-1','medium'),
-        ('gpt-image-1','auto'),
+        ("dall-e-3", "standard"),
+        ("dall-e-3", "hd"),
+        ("gpt-image-1", "high"),
+        ("gpt-image-1", "standard"),  # should normalize to 'medium'
+        ("gpt-image-1", "low"),
+        ("gpt-image-1", "medium"),
+        ("gpt-image-1", "auto"),
     ]:
         data = {
-            'plugin_id': 'ai_image',
-            'textPrompt': 'a cat',
-            'imageModel': model,
-            'quality': quality,
+            "plugin_id": "ai_image",
+            "textPrompt": "a cat",
+            "imageModel": model,
+            "quality": quality,
         }
-        resp = client.post('/update_now', data=data)
+        resp = client.post("/update_now", data=data)
         assert resp.status_code == 200
 
 
@@ -101,18 +105,18 @@ def test_ai_image_openai_api_failure(device_config_dev, monkeypatch):
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Mock OpenAI to raise exception
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai:
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
         mock_client = MagicMock()
         mock_openai.return_value = mock_client
         mock_client.images.generate.side_effect = Exception("API Error")
 
         settings = {
-            'textPrompt': 'a cat',
-            'imageModel': 'dall-e-3',
-            'quality': 'standard'
+            "textPrompt": "a cat",
+            "imageModel": "dall-e-3",
+            "quality": "standard",
         }
 
         with pytest.raises(RuntimeError, match="Open AI request failure"):
@@ -126,11 +130,13 @@ def test_ai_image_image_download_failure(device_config_dev, monkeypatch):
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Mock OpenAI response
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai, \
-         patch('plugins.ai_image.ai_image.requests.get') as mock_requests:
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+    ):
 
         mock_client = MagicMock()
         mock_openai.return_value = mock_client
@@ -138,16 +144,16 @@ def test_ai_image_image_download_failure(device_config_dev, monkeypatch):
         # Mock OpenAI response
         mock_response = MagicMock()
         mock_response.data = [MagicMock()]
-        mock_response.data[0].url = 'http://example.com/image.png'
+        mock_response.data[0].url = "http://example.com/image.png"
         mock_client.images.generate.return_value = mock_response
 
         # Mock requests to fail
         mock_requests.side_effect = Exception("Download failed")
 
         settings = {
-            'textPrompt': 'a cat',
-            'imageModel': 'dall-e-3',
-            'quality': 'standard'
+            "textPrompt": "a cat",
+            "imageModel": "dall-e-3",
+            "quality": "standard",
         }
 
         with pytest.raises(RuntimeError, match="Open AI request failure"):
@@ -161,12 +167,16 @@ def test_ai_image_randomize_prompt_enabled(device_config_dev, monkeypatch):
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Mock OpenAI client
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai, \
-         patch('plugins.ai_image.ai_image.requests.get') as mock_requests, \
-         patch('plugins.ai_image.ai_image.AIImage.fetch_image_prompt') as mock_fetch_prompt:
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch(
+            "plugins.ai_image.ai_image.AIImage.fetch_image_prompt"
+        ) as mock_fetch_prompt,
+    ):
 
         mock_client = MagicMock()
         mock_openai.return_value = mock_client
@@ -174,31 +184,33 @@ def test_ai_image_randomize_prompt_enabled(device_config_dev, monkeypatch):
         # Mock OpenAI image generation
         mock_response = MagicMock()
         mock_response.data = [MagicMock()]
-        mock_response.data[0].url = 'http://example.com/image.png'
+        mock_response.data[0].url = "http://example.com/image.png"
         mock_client.images.generate.return_value = mock_response
 
         # Mock requests for image download
         mock_img_response = MagicMock()
-        mock_img_response.content = b'fake_image_data'
+        mock_img_response.content = b"fake_image_data"
         mock_requests.return_value = mock_img_response
 
         # Mock PIL Image
-        with patch('plugins.ai_image.ai_image.Image') as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = MagicMock()
+        with patch("plugins.ai_image.ai_image.Image") as mock_image:
+            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                MagicMock()
+            )
 
             mock_fetch_prompt.return_value = "randomized creative prompt"
 
             settings = {
-                'textPrompt': 'a cat',
-                'imageModel': 'dall-e-3',
-                'quality': 'standard',
-                'randomizePrompt': 'true'
+                "textPrompt": "a cat",
+                "imageModel": "dall-e-3",
+                "quality": "standard",
+                "randomizePrompt": "true",
             }
 
             result = p.generate_image(settings, device_config_dev)
 
             # Verify prompt randomization was called
-            mock_fetch_prompt.assert_called_once_with(mock_client, 'a cat')
+            mock_fetch_prompt.assert_called_once_with(mock_client, "a cat")
             assert result is not None
 
 
@@ -209,12 +221,16 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Mock OpenAI client
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai, \
-         patch('plugins.ai_image.ai_image.requests.get') as mock_requests, \
-         patch('plugins.ai_image.ai_image.AIImage.fetch_image_prompt') as mock_fetch_prompt:
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch(
+            "plugins.ai_image.ai_image.AIImage.fetch_image_prompt"
+        ) as mock_fetch_prompt,
+    ):
 
         mock_client = MagicMock()
         mock_openai.return_value = mock_client
@@ -222,31 +238,33 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
         # Mock OpenAI image generation
         mock_response = MagicMock()
         mock_response.data = [MagicMock()]
-        mock_response.data[0].url = 'http://example.com/image.png'
+        mock_response.data[0].url = "http://example.com/image.png"
         mock_client.images.generate.return_value = mock_response
 
         # Mock requests for image download
         mock_img_response = MagicMock()
-        mock_img_response.content = b'fake_image_data'
+        mock_img_response.content = b"fake_image_data"
         mock_requests.return_value = mock_img_response
 
         # Mock PIL Image
-        with patch('plugins.ai_image.ai_image.Image') as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = MagicMock()
+        with patch("plugins.ai_image.ai_image.Image") as mock_image:
+            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                MagicMock()
+            )
 
             mock_fetch_prompt.return_value = "completely random prompt"
 
             settings = {
-                'textPrompt': '',  # Blank prompt
-                'imageModel': 'dall-e-3',
-                'quality': 'standard',
-                'randomizePrompt': 'true'
+                "textPrompt": "",  # Blank prompt
+                "imageModel": "dall-e-3",
+                "quality": "standard",
+                "randomizePrompt": "true",
             }
 
             result = p.generate_image(settings, device_config_dev)
 
             # Verify prompt randomization was called with None/empty
-            mock_fetch_prompt.assert_called_once_with(mock_client, '')
+            mock_fetch_prompt.assert_called_once_with(mock_client, "")
             assert result is not None
 
 
@@ -269,10 +287,10 @@ def test_fetch_image_prompt_basic(monkeypatch):
 
     # Verify the call arguments
     call_args = mock_client.chat.completions.create.call_args
-    assert call_args[1]['model'] == 'gpt-4o'
-    assert len(call_args[1]['messages']) == 2
-    assert 'system' in call_args[1]['messages'][0]['role']
-    assert 'user' in call_args[1]['messages'][1]['role']
+    assert call_args[1]["model"] == "gpt-4o"
+    assert len(call_args[1]["messages"]) == 2
+    assert "system" in call_args[1]["messages"][0]["role"]
+    assert "user" in call_args[1]["messages"][1]["role"]
 
 
 def test_fetch_image_prompt_blank_input(monkeypatch):
@@ -330,16 +348,20 @@ def test_ai_image_orientation_handling(device_config_dev, monkeypatch):
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Mock device config for vertical orientation
-    monkeypatch.setattr(device_config_dev, 'get_config', lambda key, default=None: {
-        'orientation': 'vertical'
-    }.get(key, default))
+    monkeypatch.setattr(
+        device_config_dev,
+        "get_config",
+        lambda key, default=None: {"orientation": "vertical"}.get(key, default),
+    )
 
     # Mock OpenAI and requests
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai, \
-         patch('plugins.ai_image.ai_image.requests.get') as mock_requests:
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+    ):
 
         mock_client = MagicMock()
         mock_openai.return_value = mock_client
@@ -347,21 +369,23 @@ def test_ai_image_orientation_handling(device_config_dev, monkeypatch):
         # Mock OpenAI response
         mock_response = MagicMock()
         mock_response.data = [MagicMock()]
-        mock_response.data[0].url = 'http://example.com/image.png'
+        mock_response.data[0].url = "http://example.com/image.png"
         mock_client.images.generate.return_value = mock_response
 
         # Mock image download
         mock_img_response = MagicMock()
-        mock_img_response.content = b'fake_image_data'
+        mock_img_response.content = b"fake_image_data"
         mock_requests.return_value = mock_img_response
 
-        with patch('plugins.ai_image.ai_image.Image') as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = MagicMock()
+        with patch("plugins.ai_image.ai_image.Image") as mock_image:
+            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                MagicMock()
+            )
 
             settings = {
-                'textPrompt': 'a cat',
-                'imageModel': 'dall-e-3',
-                'quality': 'standard'
+                "textPrompt": "a cat",
+                "imageModel": "dall-e-3",
+                "quality": "standard",
             }
 
             p.generate_image(settings, device_config_dev)
@@ -369,7 +393,7 @@ def test_ai_image_orientation_handling(device_config_dev, monkeypatch):
             # Verify vertical orientation was passed to fetch_image
             mock_client.images.generate.assert_called_once()
             call_kwargs = mock_client.images.generate.call_args[1]
-            assert call_kwargs['size'] == '1024x1792'  # Vertical size for dall-e-3
+            assert call_kwargs["size"] == "1024x1792"  # Vertical size for dall-e-3
 
 
 def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatch):
@@ -379,24 +403,26 @@ def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatc
     p = AIImage({"id": "ai_image"})
 
     # Mock API key
-    monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'fake_key')
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
 
     # Test various quality inputs
     test_cases = [
-        ('dall-e-3', 'HD', 'hd'),
-        ('dall-e-3', 'high', 'hd'),
-        ('dall-e-3', 'standard', 'standard'),
-        ('dall-e-3', '', 'standard'),
-        ('gpt-image-1', 'LOW', 'low'),
-        ('gpt-image-1', 'High', 'high'),
-        ('gpt-image-1', 'auto', 'auto'),
-        ('gpt-image-1', 'invalid', 'medium'),  # Should fallback
-        ('dall-e-2', 'hd', None),  # No quality for dall-e-2
+        ("dall-e-3", "HD", "hd"),
+        ("dall-e-3", "high", "hd"),
+        ("dall-e-3", "standard", "standard"),
+        ("dall-e-3", "", "standard"),
+        ("gpt-image-1", "LOW", "low"),
+        ("gpt-image-1", "High", "high"),
+        ("gpt-image-1", "auto", "auto"),
+        ("gpt-image-1", "invalid", "medium"),  # Should fallback
+        ("dall-e-2", "hd", None),  # No quality for dall-e-2
     ]
 
     for model, input_quality, expected_quality in test_cases:
-        with patch('plugins.ai_image.ai_image.OpenAI') as mock_openai, \
-             patch('plugins.ai_image.ai_image.requests.get') as mock_requests:
+        with (
+            patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+            patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        ):
 
             mock_client = MagicMock()
             mock_openai.return_value = mock_client
@@ -404,21 +430,23 @@ def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatc
             # Mock OpenAI response
             mock_response = MagicMock()
             mock_response.data = [MagicMock()]
-            mock_response.data[0].url = 'http://example.com/image.png'
+            mock_response.data[0].url = "http://example.com/image.png"
             mock_client.images.generate.return_value = mock_response
 
             # Mock image download
             mock_img_response = MagicMock()
-            mock_img_response.content = b'fake_image_data'
+            mock_img_response.content = b"fake_image_data"
             mock_requests.return_value = mock_img_response
 
-            with patch('plugins.ai_image.ai_image.Image') as mock_image:
-                mock_image.open.return_value.__enter__.return_value.copy.return_value = MagicMock()
+            with patch("plugins.ai_image.ai_image.Image") as mock_image:
+                mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                    MagicMock()
+                )
 
                 settings = {
-                    'textPrompt': 'a cat',
-                    'imageModel': model,
-                    'quality': input_quality
+                    "textPrompt": "a cat",
+                    "imageModel": model,
+                    "quality": input_quality,
                 }
 
                 p.generate_image(settings, device_config_dev)
@@ -426,9 +454,9 @@ def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatc
                 # Verify quality was normalized correctly
                 call_kwargs = mock_client.images.generate.call_args[1]
                 if expected_quality is None:
-                    assert 'quality' not in call_kwargs
+                    assert "quality" not in call_kwargs
                 else:
-                    assert call_kwargs.get('quality') == expected_quality
+                    assert call_kwargs.get("quality") == expected_quality
 
 
 def test_ai_image_generate_settings_template():
@@ -480,5 +508,3 @@ def test_fetch_image_prompt_content_parsing():
         result = AIImage.fetch_image_prompt(mock_client, "test")
 
         assert result == expected_output
-
-
