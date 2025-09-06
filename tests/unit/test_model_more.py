@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 
 from model import PlaylistManager, Playlist, PluginInstance, RefreshInfo

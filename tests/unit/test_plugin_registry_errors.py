@@ -1,6 +1,4 @@
 # pyright: reportMissingImports=false
-import os
-
 from plugins.plugin_registry import load_plugins, get_plugin_instance, PLUGIN_CLASSES
 
 

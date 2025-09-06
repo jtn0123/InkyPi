@@ -1,4 +1,3 @@
-import io
 
 
 def test_delete_api_key_invalid(client):

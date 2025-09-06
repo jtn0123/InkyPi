@@ -1,5 +1,4 @@
 import importlib
-import os
 import sys
 from flask import Flask
 from unittest.mock import patch, MagicMock
@@ -67,7 +66,7 @@ def test_inkypi_fast_dev(monkeypatch):
 
 def test_inkypi_config_file_cli(monkeypatch):
     """Test that --config CLI flag sets the config file path."""
-    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--config", "/path/to/config.json"], env={})
+    _mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--config", "/path/to/config.json"], env={})
     from config import Config
     assert Config.config_file == "/path/to/config.json"
 

@@ -1,8 +1,8 @@
 import pytest
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pytz
 
-from src.plugins.weather.weather import Weather, UNITS
+from src.plugins.weather.weather import Weather
 
 
 class DummyConfig(dict):

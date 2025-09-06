@@ -1,5 +1,4 @@
 # pyright: reportMissingImports=false
-from PIL import Image
 
 
 def test_signal_config_change_noop_when_not_running(device_config_dev, monkeypatch):
