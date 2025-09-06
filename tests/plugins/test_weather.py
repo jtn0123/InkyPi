@@ -422,8 +422,8 @@ def test_weather_parse_weather_data_missing_current():
     tz = pytz.timezone("UTC")
 
     # Weather data missing current section
-    weather_data = {"daily": [], "hourly": []}
-    aqi_data = {}
+    weather_data: dict[str, list] = {"daily": [], "hourly": []}
+    aqi_data: dict = {}
 
     with pytest.raises(KeyError):
         p.parse_weather_data(weather_data, aqi_data, tz, "metric", "12h")
@@ -438,8 +438,8 @@ def test_weather_parse_open_meteo_data_missing_current():
     tz = pytz.timezone("UTC")
 
     # Weather data missing current_weather section
-    weather_data = {"daily": {}, "hourly": {}}
-    aqi_data = {}
+    weather_data: dict[str, dict] = {"daily": {}, "hourly": {}}
+    aqi_data: dict = {}
 
     with pytest.raises(KeyError):
         p.parse_open_meteo_data(weather_data, aqi_data, tz, "metric", "12h")
