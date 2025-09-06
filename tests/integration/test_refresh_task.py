@@ -83,7 +83,6 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
 def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
     """Test handling when plugin config is not found."""
-    from display.display_manager import DisplayManager
     from refresh_task import PlaylistRefresh
 
     # Mock plugin config to return None
@@ -105,7 +104,6 @@ def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
 
 def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
     """Test handling when plugin returns None image."""
-    from display.display_manager import DisplayManager
 
     # This should trigger the None image error check
     image = None
@@ -115,7 +113,6 @@ def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
 
 def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
     """Test handling when image is already displayed."""
-    from display.display_manager import DisplayManager
     from model import RefreshInfo
 
     # Mock refresh info with same image hash
@@ -245,7 +242,6 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
 def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
     """Test handling when it's not time to update."""
 
-    from display.display_manager import DisplayManager
 
     # Mock should_refresh to return False
     monkeypatch.setattr("model.PlaylistManager.should_refresh", lambda *args: False)
