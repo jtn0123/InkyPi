@@ -83,7 +83,5 @@ def get_plugin_instance(plugin_config):
     if instance:
         return instance
 
-    # Fallback: attempt to load a single plugin on demand
-    instance = _load_single_plugin_instance(plugin_config)
-    PLUGIN_CLASSES[plugin_id] = instance
-    return instance
+    # Match legacy behavior: if a plugin wasn't preloaded, treat as unregistered
+    raise ValueError(f"Plugin '{plugin_id}' is not registered.")

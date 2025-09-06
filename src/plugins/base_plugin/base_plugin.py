@@ -34,6 +34,11 @@ class BasePlugin:
             self.env = Environment(
                 loader=loader, autoescape=select_autoescape(["html", "xml"])
             )
+            # Enable template auto-reload for development convenience
+            try:
+                self.env.auto_reload = True
+            except Exception:
+                pass
 
     def generate_image(self, settings, device_config):
         raise NotImplementedError("generate_image must be implemented by subclasses")
