@@ -131,3 +131,169 @@ def test_format_relative_time_filter_cases():
     # Expect like "Jan 02 at 3:04 PM"; check month abbrev presence by split space
     assert ' at ' in out4
 
+
+def test_add_plugin_missing_playlist_name(client):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'instance_name': 'My Clock',
+            'refreshType': 'interval',
+            'unit': 'minute',
+            'interval': 10,
+        }),
+    }
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 400
+    assert 'Playlist name is required' in resp.get_json().get('error', '')
+
+
+def test_add_plugin_missing_instance_name(client):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'playlist': 'Default',
+            'refreshType': 'interval',
+            'unit': 'minute',
+            'interval': 10,
+        }),
+    }
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 400
+    assert 'Instance name is required' in resp.get_json().get('error', '')
+
+
+def test_add_plugin_missing_refresh_unit(client):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'playlist': 'Default',
+            'instance_name': 'My Clock',
+            'refreshType': 'interval',
+            'interval': 10,
+        }),
+    }
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 400
+    assert 'Refresh interval unit is required' in resp.get_json().get('error', '')
+
+
+def test_add_plugin_missing_refresh_interval(client):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'playlist': 'Default',
+            'instance_name': 'My Clock',
+            'refreshType': 'interval',
+            'unit': 'minute',
+        }),
+    }
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 400
+    assert 'Refresh interval is required' in resp.get_json().get('error', '')
+
+
+def test_add_plugin_missing_refresh_time_scheduled(client):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'playlist': 'Default',
+            'instance_name': 'My Clock',
+            'refreshType': 'scheduled',
+        }),
+    }
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 400
+    assert 'Refresh time is required' in resp.get_json().get('error', '')
+
+
+def test_add_plugin_playlist_manager_failure(client, flask_app, monkeypatch):
+    payload = {
+        'plugin_id': 'clock',
+        'refresh_settings': json.dumps({
+            'playlist': 'Default',
+            'instance_name': 'My Clock',
+            'refreshType': 'interval',
+            'unit': 'minute',
+            'interval': 10,
+        }),
+    }
+
+    pm = flask_app.config['DEVICE_CONFIG'].get_playlist_manager()
+    monkeypatch.setattr(pm, 'add_plugin_to_playlist', lambda *args, **kwargs: False)
+
+    resp = client.post('/add_plugin', data=payload)
+    assert resp.status_code == 500
+    assert 'Failed to add to playlist' in resp.get_json().get('error', '')
+
+
+def test_create_playlist_invalid_json(client):
+    resp = client.post('/create_playlist', data='not json')
+    assert resp.status_code == 415  # Flask returns 415 for unsupported media type
+    # The actual validation happens later, so we test that the endpoint handles it
+
+
+def test_create_playlist_missing_name(client):
+    resp = client.post('/create_playlist', json={
+        'start_time': '06:00',
+        'end_time': '09:00'
+    })
+    assert resp.status_code == 400
+    assert 'Playlist name is required' in resp.get_json().get('error', '')
+
+
+def test_create_playlist_missing_times(client):
+    resp = client.post('/create_playlist', json={
+        'playlist_name': 'Test'
+    })
+    assert resp.status_code == 400
+    assert 'Start time and End time are required' in resp.get_json().get('error', '')
+
+
+def test_create_playlist_playlist_manager_failure(client, flask_app, monkeypatch):
+    pm = flask_app.config['DEVICE_CONFIG'].get_playlist_manager()
+    monkeypatch.setattr(pm, 'add_playlist', lambda *args, **kwargs: False)
+
+    resp = client.post('/create_playlist', json={
+        'playlist_name': 'Test',
+        'start_time': '06:00',
+        'end_time': '09:00'
+    })
+    assert resp.status_code == 500
+    assert 'Failed to create playlist' in resp.get_json().get('error', '')
+
+
+def test_create_playlist_exception_handling(client, flask_app, monkeypatch):
+    pm = flask_app.config['DEVICE_CONFIG'].get_playlist_manager()
+    monkeypatch.setattr(pm, 'add_playlist', lambda *args, **kwargs: (_ for _ in ()).throw(Exception("test")))
+
+    resp = client.post('/create_playlist', json={
+        'playlist_name': 'Test',
+        'start_time': '06:00',
+        'end_time': '09:00'
+    })
+    assert resp.status_code == 500
+    assert 'An internal error occurred' in resp.get_json().get('error', '')
+
+
+def test_update_playlist_end_before_start(client):
+    # First create a playlist
+    client.post('/create_playlist', json={
+        'playlist_name': 'Test',
+        'start_time': '06:00',
+        'end_time': '09:00'
+    })
+
+    resp = client.put('/update_playlist/Test', json={
+        'new_name': 'Updated',
+        'start_time': '10:00',
+        'end_time': '09:00'
+    })
+    assert resp.status_code == 400
+    assert 'End time must be greater than start time' in resp.get_json().get('error', '')
+
+
+def test_delete_playlist_missing_name(client):
+    resp = client.delete('/delete_playlist/')
+    assert resp.status_code == 404  # Flask routing gives 404 for missing path parameter
+    # The validation happens at the route level
+

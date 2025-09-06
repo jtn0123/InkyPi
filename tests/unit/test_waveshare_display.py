@@ -150,3 +150,11 @@ def test_waveshare_init_unsupported_module(monkeypatch, device_config_dev):
         WaveshareDisplay(device_config_dev)
 
 
+def test_waveshare_init_missing_display_type(device_config_dev):
+    """Test that WaveshareDisplay raises ValueError when display_type is missing."""
+    device_config_dev.update_value("display_type", None)
+    from display.waveshare_display import WaveshareDisplay
+    with pytest.raises(ValueError, match="Waveshare driver but 'display_type' not specified in configuration"):
+        WaveshareDisplay(device_config_dev)
+
+

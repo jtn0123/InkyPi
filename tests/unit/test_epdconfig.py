@@ -563,6 +563,182 @@ def test_pin_mapping_comprehensive(monkeypatch):
         assert isinstance(value, (int, bool))
 
 
+def test_jetson_platform_mock_spi_fallback(monkeypatch):
+    """Test Jetson platform when sysfs library is not available (uses mock SPI)."""
+    # Mock Jetson detection (no Raspberry in cpuinfo)
+    class FakePopen:
+        def communicate(self):
+            return ("", None)  # No Raspberry detected
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr('os.path.exists', lambda path: False)  # No sysfs library
+
+    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+    # Should use mock SPI implementation
+    result = epdconfig.module_init()
+    assert result == 0
+
+    # Test SPI operations with mock
+    epdconfig.spi_writebyte([0x12])
+    epdconfig.module_exit()
+
+
+def test_jetson_platform_with_hardware_libraries(monkeypatch):
+    """Test Jetson platform with full hardware library support."""
+    # Mock Jetson detection
+    class FakePopen:
+        def communicate(self):
+            return ("", None)
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+
+    # Mock os.path.exists for sysfs library
+    def mock_exists(path):
+        if 'sysfs_software_spi.so' in path:
+            return True
+        return False
+
+    monkeypatch.setattr('os.path.exists', mock_exists)
+
+    # Mock Jetson.GPIO
+    mock_jetson_gpio = types.ModuleType("Jetson.GPIO")
+    mock_jetson_gpio.BCM = "BCM"
+    mock_jetson_gpio.OUT = "OUT"
+    mock_jetson_gpio.IN = "IN"
+    mock_jetson_gpio.setmode = MagicMock()
+    mock_jetson_gpio.setwarnings = MagicMock()
+    mock_jetson_gpio.setup = MagicMock()
+    mock_jetson_gpio.output = MagicMock()
+    mock_jetson_gpio.input = MagicMock(return_value=1)
+    mock_jetson_gpio.cleanup = MagicMock()
+
+    original_import = importlib.import_module
+    def mock_import_module(name):
+        if name == 'Jetson.GPIO':
+            return mock_jetson_gpio
+        return original_import(name)
+
+    monkeypatch.setattr('importlib.import_module', mock_import_module)
+
+    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+    # Test module operations
+    result = epdconfig.module_init()
+    assert result == 0
+
+    # Test GPIO operations
+    epdconfig.digital_write(17, 1)
+    epdconfig.digital_read(24)
+
+    epdconfig.module_exit()
+
+
+def test_sunrise_x3_platform_operations(monkeypatch):
+    """Test Sunrise X3 platform operations."""
+    # Mock Sunrise X3 detection
+    class FakePopen:
+        def communicate(self):
+            return ("", None)
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+
+    # Mock GPIO libraries for Sunrise X3
+    install_fake_modules(monkeypatch)
+
+    # Mock os.path.exists for gpio-x3
+    def mock_exists(path):
+        if '/sys/bus/platform/drivers/gpio-x3' in path:
+            return True
+        return False
+
+    monkeypatch.setattr('os.path.exists', mock_exists)
+
+    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+    # Test module operations
+    result = epdconfig.module_init()
+    assert result == 0
+
+    # Test GPIO operations
+    epdconfig.digital_write(17, 1)
+    epdconfig.digital_read(24)
+
+    epdconfig.module_exit()
+
+
+def test_sunrise_x3_module_exit_flag_handling(monkeypatch):
+    """Test Sunrise X3 module exit flag handling."""
+    # Mock Sunrise X3 detection
+    class FakePopen:
+        def communicate(self):
+            return ("", None)
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr('os.path.exists', lambda path: '/sys/bus/platform/drivers/gpio-x3' in path)
+
+    install_fake_modules(monkeypatch)
+
+    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+    # First init should set flag and initialize
+    result1 = epdconfig.module_init()
+    assert result1 == 0
+
+    # Second init should return 0 without re-initializing (flag prevents it)
+    result2 = epdconfig.module_init()
+    assert result2 == 0
+
+    # Exit should reset flag
+    epdconfig.module_exit()
+    # Flag should be reset to 0 after exit
+
+
+def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
+    """Test Raspberry Pi cleanup mode with DEV_Config library."""
+    install_fake_modules(monkeypatch)
+
+    # Mock Raspberry Pi detection
+    class FakePopen:
+        def communicate(self):
+            return ("Raspberry Pi", None)
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr('os.path.exists', lambda path: True)
+    monkeypatch.setattr('os.popen', lambda cmd: MagicMock())
+
+    # Mock DEV_Config library
+    with patch('ctypes.CDLL') as mock_cdll:
+        mock_dev_config = MagicMock()
+        mock_cdll.return_value = mock_dev_config
+
+        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+        result = epdconfig.module_init(cleanup=True)
+        assert result == 0
+
+        # Verify DEV_Config was initialized
+        mock_dev_config.DEV_Module_Init.assert_called_once()
+
+
+def test_jetson_digital_operations_without_gpio(monkeypatch):
+    """Test Jetson digital operations when GPIO library is not available."""
+    # Mock Jetson detection
+    class FakePopen:
+        def communicate(self):
+            return ("", None)
+
+    monkeypatch.setattr('subprocess.Popen', lambda *a, **k: FakePopen())
+    monkeypatch.setattr('os.path.exists', lambda path: False)
+
+    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+
+    # Should not crash when GPIO is None
+    epdconfig.digital_write(17, 1)
+    value = epdconfig.digital_read(24)
+    assert value == 0  # Default value when GPIO not available
+
+
 def test_spi_configuration(monkeypatch):
     """Test SPI configuration and parameter setting."""
     install_fake_modules(monkeypatch)

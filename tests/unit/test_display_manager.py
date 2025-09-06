@@ -118,3 +118,5 @@ def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
     assert dm.display.__class__.__name__ == "FakeWS"
 
 
+
+

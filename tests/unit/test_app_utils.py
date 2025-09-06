@@ -172,3 +172,214 @@ def test_handle_request_files_saves_images(tmp_path, monkeypatch):
     assert 'file' in out
     assert out['file'].endswith('test.png')
 
+
+def test_get_ip_address(monkeypatch):
+    """Test get_ip_address function."""
+    import socket
+    mock_socket = type('MockSocket', (), {
+        'AF_INET': socket.AF_INET,
+        'SOCK_DGRAM': socket.SOCK_DGRAM,
+        'connect': lambda self, addr: None,
+        'getsockname': lambda self: ('192.168.1.100', 12345),
+        '__enter__': lambda self: self,
+        '__exit__': lambda self, *args: None
+    })()
+
+    def mock_socket_constructor(*args, **kwargs):
+        return mock_socket
+
+    monkeypatch.setattr(socket, 'socket', mock_socket_constructor)
+    result = app_utils.get_ip_address()
+    assert result == '192.168.1.100'
+
+
+def test_get_font_valid(monkeypatch, tmp_path):
+    """Test get_font with valid font family."""
+    from PIL import ImageFont
+
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    # Create a mock font file
+    fonts_dir = tmp_path / 'static' / 'fonts'
+    fonts_dir.mkdir(parents=True)
+    font_file = fonts_dir / 'Jost.ttf'
+    font_file.write_bytes(b'mock font data')
+
+    # Mock ImageFont.truetype to return a mock font object
+    mock_font = type('MockFont', (), {})()
+    monkeypatch.setattr(ImageFont, 'truetype', lambda *args, **kwargs: mock_font)
+
+    result = app_utils.get_font('Jost', 24, 'normal')
+    assert result is mock_font
+
+
+def test_get_font_invalid_family():
+    """Test get_font with invalid font family."""
+    result = app_utils.get_font('InvalidFont', 24, 'normal')
+    assert result is None
+
+
+def test_get_font_invalid_weight(monkeypatch, tmp_path):
+    """Test get_font with invalid weight for valid family."""
+    from PIL import ImageFont
+
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    fonts_dir = tmp_path / 'static' / 'fonts'
+    fonts_dir.mkdir(parents=True)
+    font_file = fonts_dir / 'Jost.ttf'
+    font_file.write_bytes(b'mock font data')
+
+    # Mock ImageFont.truetype to return a mock font object
+    mock_font = type('MockFont', (), {})()
+    monkeypatch.setattr(ImageFont, 'truetype', lambda *args, **kwargs: mock_font)
+
+    result = app_utils.get_font('Jost', 24, 'invalid_weight')
+    # Should fall back to first available variant
+    assert result is mock_font
+
+
+def test_get_fonts(monkeypatch, tmp_path):
+    """Test get_fonts function."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    fonts_dir = tmp_path / 'static' / 'fonts'
+    fonts_dir.mkdir(parents=True)
+
+    # Create mock font files
+    for font_name, variants in app_utils.FONT_FAMILIES.items():
+        for variant in variants:
+            font_file = fonts_dir / variant['file']
+            font_file.write_bytes(b'mock font data')
+
+    result = app_utils.get_fonts()
+    assert isinstance(result, list)
+    assert len(result) > 0
+
+    # Check structure of first item
+    item = result[0]
+    assert 'font_family' in item
+    assert 'url' in item
+    assert 'font_weight' in item
+    assert 'font_style' in item
+
+
+def test_get_font_path(monkeypatch, tmp_path):
+    """Test get_font_path function."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    result = app_utils.get_font_path('jost')
+    expected = str(tmp_path / 'static' / 'fonts' / 'Jost.ttf')
+    assert result == expected
+
+
+def test_generate_startup_image(monkeypatch, tmp_path):
+    """Test generate_startup_image function."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    fonts_dir = tmp_path / 'static' / 'fonts'
+    fonts_dir.mkdir(parents=True)
+
+    # Create mock font file
+    font_file = fonts_dir / 'Jost.ttf'
+    font_file.write_bytes(b'mock font data')
+
+    # Mock socket functions
+    import socket
+    monkeypatch.setattr(socket, 'gethostname', lambda: 'test-host')
+    mock_socket = type('MockSocket', (), {
+        'AF_INET': socket.AF_INET,
+        'SOCK_DGRAM': socket.SOCK_DGRAM,
+        'connect': lambda self, addr: None,
+        'getsockname': lambda self: ('192.168.1.100', 12345),
+        '__enter__': lambda self: self,
+        '__exit__': lambda self, *args: None
+    })()
+
+    def mock_socket_constructor(*args, **kwargs):
+        return mock_socket
+
+    monkeypatch.setattr(socket, 'socket', mock_socket_constructor)
+
+    result = app_utils.generate_startup_image((400, 300))
+    assert isinstance(result, Image.Image)
+    assert result.size == (400, 300)
+    assert result.mode == 'RGBA'
+
+
+def test_handle_request_files_form_data_fallback(monkeypatch, tmp_path):
+    """Test handle_request_files with form data fallback."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+
+    # Create a mock files object that doesn't support .keys()
+    class MockFiles:
+        def __init__(self, items):
+            self._items = items
+
+        def items(self, multi=True):
+            return iter(self._items)
+
+    # Test the fallback code path
+    files = MockFiles([('file', FakeFile('test.png', make_png_bytes()))])
+    form_data = {'existing_key': 'existing_value'}
+
+    result = app_utils.handle_request_files(files, form_data)
+    assert isinstance(result, dict)
+
+
+def test_handle_request_files_getlist_fallback(monkeypatch, tmp_path):
+    """Test handle_request_files with getlist fallback."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    (tmp_path / 'static' / 'images' / 'saved').mkdir(parents=True, exist_ok=True)
+
+    # Mock form_data without getlist method
+    class MockFormData(dict):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def get(self, key, default=None):
+            return super().get(key, default)
+
+    form_data = MockFormData({'file[]': ['existing_path1', 'existing_path2']})
+    files = FakeFiles([])  # Empty files
+
+    result = app_utils.handle_request_files(files, form_data)
+    assert 'file[]' in result
+    assert result['file[]'] == ['existing_path1', 'existing_path2']
+
+
+def test_handle_request_files_max_upload_env(monkeypatch, tmp_path):
+    """Test handle_request_files with MAX_UPLOAD_BYTES environment variable."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    monkeypatch.setenv('MAX_UPLOAD_BYTES', '100')
+
+    content = make_png_bytes()
+    f = FakeFile('test.png', content)
+    files = FakeFiles([('file', f)])
+
+    # This should work since our test image is small
+    result = app_utils.handle_request_files(files)
+    assert 'file' in result
+
+
+def test_handle_request_files_empty_content(monkeypatch, tmp_path):
+    """Test handle_request_files with empty file content."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+
+    # Create a fake file with empty content
+    f = FakeFile('empty.png', b'')
+    files = FakeFiles([('file', f)])
+
+    with pytest.raises(RuntimeError, match="Empty upload content"):
+        app_utils.handle_request_files(files)
+
+
+def test_handle_request_files_list_mode(monkeypatch, tmp_path):
+    """Test handle_request_files with list mode (key ending with [])."""
+    monkeypatch.setenv('SRC_DIR', str(tmp_path))
+    (tmp_path / 'static' / 'images' / 'saved').mkdir(parents=True, exist_ok=True)
+
+    content = make_png_bytes()
+    f = FakeFile('test.png', content)
+    files = FakeFiles([('files[]', f)])
+
+    result = app_utils.handle_request_files(files)
+    assert 'files[]' in result
+    assert isinstance(result['files[]'], list)
+    assert len(result['files[]']) == 1
+

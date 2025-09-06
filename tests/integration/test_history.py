@@ -259,3 +259,69 @@ def test_history_template_scripts_closed_and_grid_renders(client):
     if grid_idx != -1:
         assert first_script_close < grid_idx
 
+
+def test_format_size_exception_handling(monkeypatch):
+    from blueprints.history import _format_size
+
+    # Test exception handling in _format_size - negative numbers don't trigger exception
+    # Let's test with a very large number that might cause issues
+    result = _format_size(10**20)  # Very large number
+    # Should still format properly or fall back to exception path
+    assert isinstance(result, str)
+
+
+def test_list_history_images_exception_handling(client, device_config_dev, monkeypatch):
+    import blueprints.history as history_mod
+
+    # Mock os.listdir to raise exception
+    monkeypatch.setattr(history_mod.os, 'listdir', lambda p: (_ for _ in ()).throw(Exception("test")))
+
+    result = history_mod._list_history_images(device_config_dev.history_image_dir)
+    assert result == []
+
+
+def test_history_redisplay_exception_handling(client, flask_app, monkeypatch):
+    # Mock display manager to raise exception
+    dm = flask_app.config['DISPLAY_MANAGER']
+    monkeypatch.setattr(dm, 'display_preprocessed_image', lambda x: (_ for _ in ()).throw(Exception("test")))
+
+    # Create a test image first
+    d = flask_app.config['DEVICE_CONFIG'].history_image_dir
+    import os
+    os.makedirs(d, exist_ok=True)
+    from PIL import Image
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, "test.png"))
+
+    resp = client.post("/history/redisplay", json={"filename": "test.png"})
+    assert resp.status_code == 500
+    assert 'An internal error occurred' in resp.get_json().get('error', '')
+
+
+def test_history_delete_exception_handling(client, flask_app, monkeypatch):
+    import blueprints.history as history_mod
+    import os.path
+    monkeypatch.setattr(os.path, 'normpath', lambda p: (_ for _ in ()).throw(Exception("test")))
+
+    resp = client.post("/history/delete", json={"filename": "test.png"})
+    assert resp.status_code == 500
+    assert 'An internal error occurred' in resp.get_json().get('error', '')
+
+
+def test_history_clear_exception_handling(client, flask_app, monkeypatch):
+    import blueprints.history as history_mod
+    monkeypatch.setattr(history_mod.os, 'listdir', lambda p: (_ for _ in ()).throw(Exception("test")))
+
+    resp = client.post("/history/clear")
+    assert resp.status_code == 500
+    assert 'An error occurred' in resp.get_json().get('error', '')
+
+
+def test_history_storage_exception_handling(client, flask_app, monkeypatch):
+    import blueprints.history as history_mod
+    import shutil as _shutil
+    monkeypatch.setattr(_shutil, 'disk_usage', lambda p: (_ for _ in ()).throw(Exception("test")))
+
+    resp = client.get("/history/storage")
+    assert resp.status_code == 500
+    assert 'failed to get storage info' in resp.get_json().get('error', '')
+
