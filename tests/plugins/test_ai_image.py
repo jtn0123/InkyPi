@@ -1,9 +1,8 @@
 # pyright: reportMissingImports=false
 
 
-def test_ai_image_invalid_model(client):
-    import os
-    os.environ['OPEN_AI_SECRET'] = 'test'
+def test_ai_image_invalid_model(client, monkeypatch):
+    monkeypatch.setenv('OPEN_AI_SECRET', 'test')
     data = {
         'plugin_id': 'ai_image',
         'textPrompt': 'a cat',
@@ -15,8 +14,7 @@ def test_ai_image_invalid_model(client):
 
 
 def test_ai_image_generate_image_success(client, monkeypatch):
-    import os
-    os.environ['OPEN_AI_SECRET'] = 'test'
+    monkeypatch.setenv('OPEN_AI_SECRET', 'test')
 
     class FakeImages:
         def generate(self, **kwargs):
@@ -24,7 +22,9 @@ def test_ai_image_generate_image_success(client, monkeypatch):
             model = kwargs.get('model')
             q = kwargs.get('quality')
             if model == 'gpt-image-1':
-                assert q in (None, 'standard', 'high')
+                # New API supports low | medium | high | auto; ensure 'standard' is not passed
+                assert q in (None, 'low', 'medium', 'high', 'auto')
+                assert q != 'standard'
             if model == 'dall-e-3':
                 assert q in (None, 'standard', 'hd')
             class Resp:
@@ -54,8 +54,15 @@ def test_ai_image_generate_image_success(client, monkeypatch):
         return R()
     monkeypatch.setattr(requests, 'get', fake_get, raising=True)
 
-    for model, quality in [('dall-e-3','standard'), ('dall-e-3','hd'), ('gpt-image-1','high'), ('gpt-image-1','standard'), ('gpt-image-1','low')]:
-        # 'low' should normalize to 'standard' for gpt-image-1
+    for model, quality in [
+        ('dall-e-3','standard'),
+        ('dall-e-3','hd'),
+        ('gpt-image-1','high'),
+        ('gpt-image-1','standard'),  # should normalize to 'medium'
+        ('gpt-image-1','low'),
+        ('gpt-image-1','medium'),
+        ('gpt-image-1','auto'),
+    ]:
         data = {
             'plugin_id': 'ai_image',
             'textPrompt': 'a cat',

@@ -45,6 +45,9 @@ def device_config_dev(tmp_path, monkeypatch):
     config_file = tmp_path / "device.json"
     config_file.write_text(json.dumps(cfg))
 
+    # Ensure the app reads .env from the temp directory to avoid leaking real secrets
+    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+
     # Patch Config paths to use tmp dir
     import config as config_mod
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_file))

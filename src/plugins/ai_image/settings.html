@@ -52,9 +52,11 @@
             qualityDropdown.add(new Option("Standard", "standard"));
         } 
         else if (selectedModel === "gpt-image-1") {
-            // API supports: standard, high
+            // API supports: low, medium, high, auto
+            qualityDropdown.add(new Option("Auto", "auto"));
             qualityDropdown.add(new Option("High", "high"));
-            qualityDropdown.add(new Option("Standard", "standard"));
+            qualityDropdown.add(new Option("Medium", "medium"));
+            qualityDropdown.add(new Option("Low", "low"));
         }
 
         if (quality != "") {
@@ -77,6 +79,9 @@
         }
 
         document.getElementById('imageModel').value = imageModel;
-        toggleQualityDropdown(quality)
+        // If historical setting used 'standard' for gpt-image-1, map to 'medium' in UI
+        const modelEl = document.getElementById('imageModel');
+        const mappedQuality = (modelEl.value === 'gpt-image-1' && quality === 'standard') ? 'medium' : quality;
+        toggleQualityDropdown(mappedQuality)
     });
 </script>

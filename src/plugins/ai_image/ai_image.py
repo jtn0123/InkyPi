@@ -75,10 +75,14 @@ class AIImage(BasePlugin):
                     return "hd"
                 return "standard"
             if model == "gpt-image-1":
-                # Allowed: 'standard' | 'high'
-                if req in ("high", "hd"):
-                    return "high"
-                return "standard"
+                # Allowed: 'low' | 'medium' | 'high' | 'auto'
+                if req in ("low", "medium", "high", "auto"):
+                    return req
+                # Back-compat: map 'standard' (old value) to 'medium'
+                if req in ("standard", ""):
+                    return "medium"
+                # Fallback to a sensible default
+                return "medium"
             # dall-e-2: no quality parameter
             return None
 
