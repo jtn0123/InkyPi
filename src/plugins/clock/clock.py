@@ -49,8 +49,9 @@ class Clock(BasePlugin):
 
     def generate_image(self, settings, device_config):
         clock_face = settings.get('selectedClockFace')
-        primary_color = ImageColor.getcolor(settings.get('primaryColor') or (255,255,255), "RGB")
-        secondary_color = ImageColor.getcolor(settings.get('secondaryColor') or (0,0,0), "RGB")
+        # Coerce colors to 3-tuple RGB; tolerate tuples, lists, ints, or color strings
+        primary_color = Clock._parse_rgb_color(settings.get('primaryColor'), (255, 255, 255))
+        secondary_color = Clock._parse_rgb_color(settings.get('secondaryColor'), (0, 0, 0))
         if not clock_face or clock_face not in [face['name'] for face in CLOCK_FACES]:
             clock_face = DEFAULT_CLOCK_FACE
 
@@ -76,6 +77,41 @@ class Clock(BasePlugin):
             logger.error(f"Failed to draw clock image: {str(e)}")
             raise RuntimeError("Failed to display clock.")
         return img
+
+    @staticmethod
+    def _parse_rgb_color(value, default_rgb=(0, 0, 0)):
+        """Return a safe RGB 3-tuple from diverse inputs.
+        Accepts: None/empty -> default; string (hex/name/rgb()) -> parsed; tuple/list -> first 3 ints; int -> grayscale.
+        """
+        try:
+            if value is None or value == "":
+                return default_rgb
+            # If already a sequence of numbers, coerce to ints and clamp
+            if isinstance(value, (list, tuple)):
+                nums = []
+                for x in value:
+                    try:
+                        n = int(x)
+                    except Exception:
+                        # If any element is not numeric, fall back to default
+                        return default_rgb
+                    nums.append(max(0, min(255, n)))
+                if len(nums) >= 3:
+                    return (nums[0], nums[1], nums[2])
+                if len(nums) == 1:
+                    v = nums[0]
+                    return (v, v, v)
+                return default_rgb
+            # If provided as a CSS/hex color string, use PIL to parse
+            if isinstance(value, str):
+                return ImageColor.getrgb(value)
+            # If single integer, interpret as grayscale
+            if isinstance(value, int):
+                v = max(0, min(255, int(value)))
+                return (v, v, v)
+            return default_rgb
+        except Exception:
+            return default_rgb
     
     def draw_digital_clock(self, dimensions, time, primary_color=(255,255,255), secondary_color=(0,0,0)):
         w,h = dimensions
