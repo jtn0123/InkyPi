@@ -2,7 +2,6 @@ import threading
 import time
 import os
 import logging
-import psutil
 import pytz
 from datetime import datetime, timezone
 from plugins.plugin_registry import get_plugin_instance
@@ -23,7 +22,8 @@ class RefreshTask:
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
         self.running = False
-        self.manual_update_request = ()
+        # None until a manual refresh is requested; then set to a RefreshAction
+        self.manual_update_request = None
 
         self.refresh_event = threading.Event()
         self.refresh_event.set()
@@ -88,11 +88,11 @@ class RefreshTask:
                     current_dt = self._get_current_datetime()
 
                     refresh_action = None
-                    if self.manual_update_request:
+                    if self.manual_update_request is not None:
                         # handle immediate update request
                         logger.info("Manual update requested")
                         refresh_action = self.manual_update_request
-                        self.manual_update_request = ()
+                        self.manual_update_request = None
                     else:
                         if self.device_config.get_config("log_system_stats"):
                             self.log_system_stats()
@@ -149,8 +149,11 @@ class RefreshTask:
                 self.condition.notify_all()  # Wake the thread to process manual update
 
             self.refresh_event.wait()
-            if self.refresh_result.get("exception"):
-                raise self.refresh_result.get("exception")
+            exc = self.refresh_result.get("exception")
+            if exc is not None:
+                if isinstance(exc, BaseException):
+                    raise exc
+                raise RuntimeError(str(exc))
         else:
             logger.warn("Background refresh task is not running, unable to do a manual update")
 
@@ -193,6 +196,12 @@ class RefreshTask:
         return playlist, plugin
     
     def log_system_stats(self):
+        try:
+            import psutil  # type: ignore
+        except Exception:
+            logger.info("System Stats: psutil not available")
+            return
+
         metrics = {
             'cpu_percent': psutil.cpu_percent(interval=1),
             'memory_percent': psutil.virtual_memory().percent,
