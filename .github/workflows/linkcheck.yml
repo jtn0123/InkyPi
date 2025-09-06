@@ -2,10 +2,18 @@ name: Docs link check
 
 on:
   pull_request:
-  push:
-    branches: [ main ]
+    paths:
+      - 'README.md'
+      - 'docs/**'
   schedule:
     - cron: '0 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   linkcheck:

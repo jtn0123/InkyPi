@@ -1,5 +1,6 @@
 from datetime import date
 from io import BytesIO
+from typing import Any, Dict
 
 import pytest
 from PIL import Image
@@ -96,7 +97,7 @@ def test_fetch_image_src_success_and_missing(monkeypatch):
     assert url == 'http://x.png'
 
     # missing url
-    data2 = {'query': {'pages': {'123': {'imageinfo': [{}]}}}}
+    data2: Dict[str, Any] = {'query': {'pages': {'123': {'imageinfo': [{}]}}}}
     monkeypatch.setattr(wpotd_mod.Wpotd, '_make_request', staticmethod(lambda params: data2))
     with pytest.raises(RuntimeError):
         p._fetch_image_src('File:NoUrl.png')
