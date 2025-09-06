@@ -381,11 +381,11 @@
             <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
 
             <div class="buttons-container">
+                <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
+                <button type="button" onclick="handleAction('save_settings')" class="action-button center">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" onclick="handleAction('update_instance')" class="action-button">Save</button>
+                    <button type="button" onclick="handleAction('update_instance')" class="action-button right">Update Instance</button>
                 {% else %}
-                    <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
-                    <button type="button" onclick="handleAction('save_settings')" class="action-button center">Save Settings</button>
                     <button type="button" onclick="openModal('scheduleModal')" class="action-button right">Add to Playlist</button>
                 {% endif %}
             </div>
