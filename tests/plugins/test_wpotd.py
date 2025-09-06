@@ -1,7 +1,7 @@
 from io import BytesIO
-from unittest.mock import patch, MagicMock
-from PIL import Image
 import pytest
+from PIL import Image
+from unittest.mock import patch, MagicMock
 
 
 def _png_bytes(size=(10, 6), color="white"):
@@ -468,8 +468,7 @@ def test_fetch_potd_missing_images():
     p = Wpotd({"id": "wpotd"})
 
     # Mock _make_request with malformed response
-    with patch.object(p, '_make_request') as mock_make_request, \
-         patch.object(p, '_fetch_image_src') as mock_fetch_src:
+    with patch.object(p, '_make_request') as mock_make_request:
 
         mock_make_request.return_value = {
             "query": {

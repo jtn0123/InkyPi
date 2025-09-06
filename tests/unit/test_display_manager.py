@@ -1,7 +1,7 @@
 import builtins
 import types
-from PIL import Image
 import pytest
+from PIL import Image
 
 
 def make_image(w=320, h=240, color="white"):

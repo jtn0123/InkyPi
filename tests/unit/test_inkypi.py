@@ -1,7 +1,7 @@
 import importlib
 import sys
-from flask import Flask
 from unittest.mock import patch, MagicMock
+from flask import Flask
 
 
 def _reload_inkypi(monkeypatch, argv=None, env=None):

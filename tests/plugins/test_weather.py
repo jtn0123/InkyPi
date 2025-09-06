@@ -191,7 +191,7 @@ def test_moon_phase_name_handling():
     """Test moon phase name handling edge cases."""
     from plugins.weather.weather import Weather
 
-    weather = Weather({"id": "weather"})
+    _weather = Weather({"id": "weather"})
 
     # Test different moon phase name variations
     test_phases = ["dark moon", "3rd quarter", "third quarter", "1st quarter", "first quarter"]
@@ -210,11 +210,11 @@ def test_moon_phase_name_handling():
 
 def test_openmeteo_forecast_parsing():
     """Test OpenMeteo forecast parsing."""
-    from plugins.weather.weather import Weather
     import pytz
+    from plugins.weather.weather import Weather
 
-    weather = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    _weather = Weather({"id": "weather"})
+    _tz = pytz.timezone("UTC")
 
     # Mock OpenMeteo forecast data
     forecast_data = {

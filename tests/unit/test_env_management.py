@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false, reportMissingModuleSource=false
-import os
 import importlib.util
+import os
 from pathlib import Path
 
 # Dynamically import src/config.py as module name 'config' for tests and linters
