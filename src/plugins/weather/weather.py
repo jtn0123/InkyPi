@@ -310,6 +310,11 @@ class Weather(BasePlugin):
 
             try:
                 resp = http_get(api_url, timeout=10)
+                # Ensure HTTP errors surface; keep tests compatible if mock lacks method
+                if hasattr(resp, "raise_for_status"):
+                    resp.raise_for_status()
+                elif getattr(resp, "status_code", 200) not in (200, 201, 204):
+                    raise requests.exceptions.HTTPError(str(resp.status_code))
                 moon = resp.json()[0]
                 phase_raw = moon.get("Phase", "New Moon")
                 illum_pct = float(moon.get("Illumination", 0)) * 100
