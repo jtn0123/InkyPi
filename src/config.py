@@ -6,15 +6,13 @@ import functools
 
 from dotenv import load_dotenv, set_key, unset_key
 from typing import Any, cast
+import importlib
 
-# Optional dependency: jsonschema for validating device.json
+# Optional dependency: jsonschema for validating device.json (loaded dynamically to avoid typing issues)
 try:
-    from jsonschema import Draft202012Validator
-    from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
+    jsonschema = importlib.import_module("jsonschema")
 except Exception:  # pragma: no cover
-    Draft202012Validator = None
-    class JSONSchemaValidationError(Exception):
-        pass
+    jsonschema = None  # type: ignore
 
 from model import PlaylistManager, RefreshInfo
 
@@ -321,10 +319,10 @@ class Config:
         If the validator or schema is unavailable, validation is skipped.
         """
         try:
-            if Draft202012Validator is None:
+            if jsonschema is None:
                 # Minimal fallback validation when jsonschema isn't available
                 # Only validate fields that tests rely upon (e.g., orientation enum)
-                orientation = None
+                orientation = None  # type: ignore
                 try:
                     orientation = config.get("orientation")
                 except Exception:
@@ -334,30 +332,40 @@ class Config:
                         f"device.json failed schema validation: orientation: invalid value (got: {repr(orientation)})"
                     )
                 return
+
+            # jsonschema is available, proceed with full validation
             schema_path = os.path.join(self._schema_dir(), "device_config.schema.json")
             if not os.path.isfile(schema_path):
                 logger.warning("Device config schema not found at %s; skipping validation", schema_path)
                 return
             schema = _load_json_schema(schema_path)
-            Draft202012Validator(schema).validate(config)
-        except JSONSchemaValidationError as ve:
-            # Build a clear message: include path and invalid value when safe
-            msg = ve.message
-            try:
-                if getattr(ve, "path", None):
-                    path = ".".join(str(p) for p in ve.path)
-                    msg = f"{path}: {msg}"
-                # Append a shortened repr of the invalid instance for context
-                bad = getattr(ve, "instance", None)
-                bad_repr = repr(bad)
-                if len(bad_repr) > 200:
-                    bad_repr = bad_repr[:197] + "..."
-                msg = f"{msg} (got: {bad_repr})"
-            except Exception:
-                pass
-            raise ValueError(f"device.json failed schema validation: {msg}") from ve
+            if jsonschema:
+                jsonschema.Draft202012Validator(schema).validate(config)
         except Exception as ex:
-            # Do not block startup on schema loader errors; log and continue
+            # If this is a jsonschema ValidationError, wrap with user-friendly ValueError; else warn
+            try:
+                is_validation_error = (
+                    jsonschema is not None
+                    and hasattr(jsonschema, "exceptions")
+                    and isinstance(ex, jsonschema.exceptions.ValidationError)
+                )
+            except Exception:
+                is_validation_error = False
+            if is_validation_error:
+                ve = ex
+                msg = getattr(ve, "message", str(ve))
+                try:
+                    if hasattr(ve, "path") and ve.path:
+                        path = ".".join(str(p) for p in ve.path)
+                        msg = f"{path}: {msg}"
+                    bad = getattr(ve, "instance", None)
+                    bad_repr = repr(bad)
+                    if len(bad_repr) > 200:
+                        bad_repr = bad_repr[:197] + "..."
+                    msg = f"{msg} (got: {bad_repr})"
+                except Exception:
+                    pass
+                raise ValueError(f"device.json failed schema validation: {msg}") from ex
             logger.warning("device.json validation encountered a non-fatal error: %s", ex)
 
     @staticmethod
