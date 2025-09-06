@@ -22,3 +22,17 @@ def test_plugin_page_apod(client):
     assert b"/preview" in resp.data
 
 
+def test_preview_size_mode_native_on_plugin(client, device_config_dev):
+    device_config_dev.update_value("preview_size_mode", "native", write=True)
+    resp = client.get('/plugin/ai_text')
+    assert resp.status_code == 200
+    assert b"style=\"width: " in resp.data and b"height: " in resp.data
+
+
+def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
+    device_config_dev.update_value("preview_size_mode", "fit", write=True)
+    resp = client.get('/plugin/ai_text')
+    assert resp.status_code == 200
+    assert b"style=\"width:" not in resp.data
+
+

@@ -38,7 +38,13 @@ def plugin_page(plugin_id):
         except Exception as e:
             logger.exception("EXCEPTION CAUGHT: " + str(e))
             return jsonify({"error": f"An error occurred: {str(e)}"}), 500
-        return render_template('plugin.html', plugin=plugin_config, resolution=device_config.get_resolution(), **template_params)
+        return render_template(
+            'plugin.html',
+            plugin=plugin_config,
+            resolution=device_config.get_resolution(),
+            config=device_config.get_config(),
+            **template_params
+        )
     else:
         return "Plugin not found", 404
 

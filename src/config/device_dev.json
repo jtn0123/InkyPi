@@ -19,9 +19,9 @@
         "active_playlist": null
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T10:09:07.583779+00:00",
-        "image_hash": "8e9cd881507004db40840a0397d608b60aae55ba9ece6d6d75c6c13cfe0cdc66",
+        "refresh_time": "2025-09-06T10:13:05.483365+00:00",
+        "image_hash": "8a27334cdafa78acb73a54aac835dd28557dcb18851f242a2d785327b92c8154",
         "refresh_type": "Manual Update",
-        "plugin_id": "comic"
+        "plugin_id": "clock"
     }
 }

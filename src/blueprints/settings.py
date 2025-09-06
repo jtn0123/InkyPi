@@ -111,7 +111,8 @@ def save_settings():
                 "brightness": float(form_data.get("brightness", "1.0")),
                 "sharpness": float(form_data.get("sharpness", "1.0")),
                 "contrast": float(form_data.get("contrast", "1.0"))
-            }
+            },
+            "preview_size_mode": form_data.get("previewSizeMode", "native")
         }
         device_config.update_config(settings)
 

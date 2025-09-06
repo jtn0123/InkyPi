@@ -130,6 +130,13 @@
                             <option value="vertical" {% if device_settings.orientation == "vertical" %}selected{% endif %}>Vertical</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label for="previewSizeMode" class="form-label">Preview Size:</label>
+                        <select id="previewSizeMode" name="previewSizeMode" class="form-input">
+                            <option value="fit" {% if device_settings.preview_size_mode == "fit" %}selected{% endif %}>Fit to container</option>
+                            <option value="native" {% if device_settings.preview_size_mode != "fit" %}selected{% endif %}>Native pixels</option>
+                        </select>
+                    </div>
                     <div class="form-group nowrap">
                         <!-- Invert Image Checkbox -->
                         <label class="form-label" for="invertImage">Invert Image</label>
