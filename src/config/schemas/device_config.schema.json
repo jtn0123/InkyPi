@@ -54,7 +54,7 @@
                         "schedule": { "type": "string" }
                       }
                     },
-                    "latest_refresh_time": { "type": "string" }
+                    "latest_refresh_time": { "type": ["string", "null"] }
                   }
                 }
               },
