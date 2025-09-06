@@ -1,6 +1,8 @@
 import fnmatch
 import json
 import logging
+import os
+from datetime import datetime
 
 from utils.image_utils import resize_image, change_orientation, apply_image_enhancement
 from display.mock_display import MockDisplay
@@ -90,5 +92,39 @@ class DisplayManager:
         except Exception:
             logger.exception("Failed to save processed image preview")
 
+        # Also persist a timestamped copy in history for browsing/reload
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            history_filename = f"display_{timestamp}.png"
+            history_path = os.path.join(self.device_config.history_image_dir, history_filename)
+            image.save(history_path)
+        except Exception:
+            logger.exception("Failed to save history copy of processed image")
+
         # Pass to the concrete instance to render to the device.
         self.display.display_image(image, image_settings)
+
+    def display_preprocessed_image(self, image_path: str):
+        """
+        Display a previously processed image without re-processing.
+
+        Updates the preview/current images for the web UI and delegates
+        directly to the underlying display driver.
+        """
+        if not hasattr(self, "display"):
+            raise ValueError("No valid display instance initialized.")
+
+        from PIL import Image
+        # Load image and copy to detach from file handle
+        with Image.open(image_path) as img:
+            image = img.copy()
+
+        # Update preview/current files for the UI
+        try:
+            image.save(self.device_config.processed_image_file)
+            image.save(self.device_config.current_image_file)
+        except Exception:
+            logger.exception("Failed to update preview/current image files for redisplay")
+
+        # Send directly to hardware without further processing
+        self.display.display_image(image, image_settings=[])

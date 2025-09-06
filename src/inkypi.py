@@ -128,6 +128,8 @@ def create_app():
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)
+    from blueprints.history import history_bp
+    app.register_blueprint(history_bp)
 
     # If running via Flask dev server, lazily start refresh task on first request
     @app.before_request

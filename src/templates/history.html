@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History</title>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script>
+        async function redisplay(filename) {
+            const btn = document.getElementById('btn-' + filename);
+            if (btn) btn.disabled = true;
+            try {
+                const resp = await fetch("{{ url_for('history.history_redisplay') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                } else {
+                    showResponseModal('success', `Success! ${result.message}`);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to redisplay image');
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="frame">
+        <button onclick="history.back()" class="back-button">← Back</button>
+        <div class="app-header">
+            <div class="header-content">
+                <div class="title-container">
+                    <img src="{{ url_for('static', filename='icons/display.png') }}" alt="history icon" class="app-icon">
+                    <h1 class="app-title">History</h1>
+                </div>
+            </div>
+        </div>
+        <div class="separator"></div>
+
+        {% if images|length == 0 %}
+            <p>No history yet.</p>
+        {% else %}
+        <div class="button-grid">
+            {% for img in images %}
+            <div class="icon-button" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <a href="{{ url_for('history.history_image', filename=img.filename) }}" target="_blank">
+                    <img src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" class="icon-image" style="object-fit:cover;">
+                </a>
+                <div style="display:flex;gap:8px;">
+                    <button id="btn-{{ img.filename }}" class="header-button" onclick="redisplay('{{ img.filename }}')">Display</button>
+                    <a class="header-button" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
+                </div>
+                <small>{{ img.filename }}</small>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% include 'response_modal.html' %}
+</body>
+</html>
+
+

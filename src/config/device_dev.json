@@ -19,9 +19,9 @@
         "active_playlist": null
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T10:42:21.441269+00:00",
-        "image_hash": "eaf5ced2382b3cdd777a59630c38cf88de780c7fd45f039a3112c900d9380966",
+        "refresh_time": "2025-09-06T10:53:27.612848+00:00",
+        "image_hash": "a06372a5d0a5ac674b50f53e71ce59acd37d7df4b291caa79631f5ef7aa06d4d",
         "refresh_type": "Manual Update",
-        "plugin_id": "ai_image"
+        "plugin_id": "apod"
     }
 }

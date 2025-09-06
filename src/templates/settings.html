@@ -90,6 +90,62 @@
         let logsPollingHandle = null;
         let logsPaused = false;
         let logsAutoScroll = true;
+        let logsWrap = true;
+        let lastLogsRaw = "";
+
+        function isErrorLine(line) {
+            return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
+        }
+
+        function isWarnLine(line) {
+            return /\bWARNING\b/i.test(line);
+        }
+
+        function updateLastUpdated() {
+            const el = document.getElementById('logsUpdated');
+            if (!el) return;
+            const now = new Date();
+            el.textContent = `Updated ${now.toLocaleTimeString()}`;
+        }
+
+        function isViewerAtBottom(viewer) {
+            return (viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight) < 8;
+        }
+
+        function applyLogFiltersAndRender() {
+            const viewer = document.getElementById('logsViewer');
+            if (!viewer) return;
+
+            const filterInput = document.getElementById('logsFilter');
+            const levelSelect = document.getElementById('logsLevel');
+            const maxLinesInput = document.getElementById('logsMaxLines');
+
+            const filterText = (filterInput?.value || '').toLowerCase();
+            const level = (levelSelect?.value || 'all');
+            const maxLines = Math.max(50, parseInt(maxLinesInput?.value || '500', 10));
+
+            const atBottom = isViewerAtBottom(viewer);
+
+            let lines = (lastLogsRaw || '').split('\n');
+            if (filterText) {
+                lines = lines.filter(l => l.toLowerCase().includes(filterText));
+            }
+            if (level === 'errors') {
+                lines = lines.filter(isErrorLine);
+            } else if (level === 'warn_errors') {
+                lines = lines.filter(l => isErrorLine(l) || isWarnLine(l));
+            }
+
+            if (lines.length > maxLines) {
+                lines = lines.slice(-maxLines);
+            }
+
+            viewer.textContent = lines.join('\n');
+
+            if (logsAutoScroll || atBottom) {
+                viewer.scrollTop = viewer.scrollHeight;
+            }
+        }
 
         async function fetchAndRenderLogs() {
             if (logsPaused) {
@@ -101,11 +157,9 @@
             if (!viewer) return;
             try {
                 const resp = await fetch(`{{ url_for('settings.download_logs') }}?hours=${encodeURIComponent(hours)}`, { cache: 'no-store' });
-                const text = await resp.text();
-                viewer.textContent = text;
-                if (logsAutoScroll) {
-                    viewer.scrollTop = viewer.scrollHeight;
-                }
+                lastLogsRaw = await resp.text();
+                updateLastUpdated();
+                applyLogFiltersAndRender();
             } catch (e) {
                 console.error('Failed to fetch logs', e);
             }
@@ -146,16 +200,67 @@
             startLogsPolling();
         }
 
+        function onLogsFilterChanged() {
+            applyLogFiltersAndRender();
+        }
+
+        function manualLogsRefresh() {
+            fetchAndRenderLogs();
+        }
+
+        function copyLogsToClipboard() {
+            const viewer = document.getElementById('logsViewer');
+            if (!viewer) return;
+            const text = viewer.textContent || '';
+            navigator.clipboard?.writeText(text).catch(() => {});
+        }
+
+        function clearLogsView() {
+            const viewer = document.getElementById('logsViewer');
+            if (!viewer) return;
+            viewer.textContent = '';
+        }
+
+        function toggleLogsWrap() {
+            logsWrap = !logsWrap;
+            const viewer = document.getElementById('logsViewer');
+            const btn = document.getElementById('logsWrapBtn');
+            if (viewer) viewer.style.whiteSpace = logsWrap ? 'pre-wrap' : 'pre';
+            if (btn) btn.textContent = logsWrap ? 'Wrap: On' : 'Wrap: Off';
+        }
+
+        function debounce(fn, wait) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn.apply(null, args), wait);
+            };
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize logs controls
             const hours = document.getElementById('logsHours');
             const interval = document.getElementById('logsInterval');
             const pauseBtn = document.getElementById('logsPauseBtn');
             const autoBtn = document.getElementById('logsAutoScrollBtn');
+            const filterInput = document.getElementById('logsFilter');
+            const levelSelect = document.getElementById('logsLevel');
+            const maxLinesInput = document.getElementById('logsMaxLines');
+            const refreshBtn = document.getElementById('logsRefreshBtn');
+            const copyBtn = document.getElementById('logsCopyBtn');
+            const clearBtn = document.getElementById('logsClearBtn');
+            const wrapBtn = document.getElementById('logsWrapBtn');
             if (hours) hours.addEventListener('change', onLogsControlsChanged);
             if (interval) interval.addEventListener('change', onLogsControlsChanged);
             if (pauseBtn) pauseBtn.addEventListener('click', toggleLogsPause);
             if (autoBtn) autoBtn.addEventListener('click', toggleLogsAutoScroll);
+            if (filterInput) filterInput.addEventListener('input', debounce(onLogsFilterChanged, 200));
+            if (levelSelect) levelSelect.addEventListener('change', onLogsFilterChanged);
+            if (maxLinesInput) maxLinesInput.addEventListener('change', onLogsFilterChanged);
+            if (refreshBtn) refreshBtn.addEventListener('click', manualLogsRefresh);
+            if (copyBtn) copyBtn.addEventListener('click', copyLogsToClipboard);
+            if (clearBtn) clearBtn.addEventListener('click', clearLogsView);
+            if (wrapBtn) wrapBtn.addEventListener('click', toggleLogsWrap);
             startLogsPolling();
         });
     </script>
@@ -346,6 +451,13 @@
                     <h1 class="app-title">Logs</h1>
                 </div>
                 <div>
+                    <input id="logsFilter" type="text" placeholder="Filter" class="form-input" style="width: 180px; margin-right: 8px;" />
+                    <label for="logsLevel" class="form-label" style="margin-right: 8px;">Show:</label>
+                    <select id="logsLevel" class="form-input" style="width: auto; margin-right: 8px;">
+                        <option value="all" selected>All</option>
+                        <option value="errors">Errors</option>
+                        <option value="warn_errors">Warnings + Errors</option>
+                    </select>
                     <label for="logsHours" class="form-label" style="margin-right: 8px;">Since:</label>
                     <select id="logsHours" class="form-input" style="width: auto; margin-right: 8px;">
                         <option value="1">1 hour</option>
@@ -354,14 +466,23 @@
                         <option value="12">12 hours</option>
                         <option value="24">24 hours</option>
                     </select>
+                    <label for="logsMaxLines" class="form-label" style="margin-right: 8px;">Max lines:</label>
+                    <input id="logsMaxLines" type="number" min="50" value="500" class="form-input" style="width: 90px; margin-right: 8px;" />
                     <label for="logsInterval" class="form-label" style="margin-right: 8px;">Refresh(s):</label>
                     <input id="logsInterval" type="number" min="3" value="5" class="form-input" style="width: 80px; margin-right: 8px;" />
                     <button id="logsPauseBtn" class="header-button" type="button" style="background-color: #5a5a5a; color: #fff; margin-right: 8px;">Pause</button>
-                    <button id="logsAutoScrollBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff;">Auto-Scroll: On</button>
+                    <button id="logsAutoScrollBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff; margin-right: 8px;">Auto-Scroll: On</button>
+                    <button id="logsWrapBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff; margin-right: 8px;">Wrap: On</button>
+                    <button id="logsRefreshBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff; margin-right: 8px;">Refresh</button>
+                    <button id="logsCopyBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff; margin-right: 8px;">Copy</button>
+                    <button id="logsClearBtn" class="header-button" type="button" style="background-color: #5a5a5a; color: #fff;">Clear</button>
                 </div>
             </div>
         </div>
         <div class="separator"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span id="logsUpdated" style="font-size: 12px; color: #666;">Updated --:--:--</span>
+        </div>
         <pre id="logsViewer" style="white-space: pre-wrap; word-wrap: break-word; background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 8px; height: 320px; overflow: auto; margin: 0;"></pre>
     </div>
     <!-- Success/Error Modal -->

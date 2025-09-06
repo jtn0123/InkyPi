@@ -54,9 +54,11 @@ def device_config_dev(tmp_path, monkeypatch):
     monkeypatch.setattr(config_mod.Config, "current_image_file", str(tmp_path / "current_image.png"))
     monkeypatch.setattr(config_mod.Config, "processed_image_file", str(tmp_path / "processed_image.png"))
     monkeypatch.setattr(config_mod.Config, "plugin_image_dir", str(tmp_path / "plugins"))
+    monkeypatch.setattr(config_mod.Config, "history_image_dir", str(tmp_path / "history"))
 
     # Ensure plugin image dir exists
     os.makedirs(str(tmp_path / "plugins"), exist_ok=True)
+    os.makedirs(str(tmp_path / "history"), exist_ok=True)
 
     return config_mod.Config()
 
@@ -74,6 +76,7 @@ def flask_app(device_config_dev, monkeypatch):
     from blueprints.settings import settings_bp
     from blueprints.plugin import plugin_bp
     from blueprints.playlist import playlist_bp
+    from blueprints.history import history_bp
     from plugins.plugin_registry import load_plugins
 
     app = Flask(__name__)
@@ -104,6 +107,7 @@ def flask_app(device_config_dev, monkeypatch):
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)
+    app.register_blueprint(history_bp)
     return app
 
 
