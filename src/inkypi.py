@@ -1,12 +1,47 @@
 #!/usr/bin/env python3
 
 # set up logging
+import logging
 import logging.config
 import os
 
-logging.config.fileConfig(
-    os.path.join(os.path.dirname(__file__), "config", "logging.conf")
-)
+def _use_json_logging():
+    fmt = (os.getenv("INKYPI_LOG_FORMAT") or "").strip().lower()
+    return fmt == "json"
+
+
+def _setup_logging():
+    if _use_json_logging():
+        logging.config.dictConfig(
+            {
+                "version": 1,
+                "disable_existing_loggers": False,
+                "formatters": {
+                    "json": {
+                        "()": "utils.logging_utils.JsonFormatter",
+                    }
+                },
+                "handlers": {
+                    "console": {
+                        "class": "logging.StreamHandler",
+                        "level": os.getenv("INKYPI_LOG_LEVEL", "INFO").upper(),
+                        "formatter": "json",
+                        "stream": "ext://sys.stdout",
+                    }
+                },
+                "root": {
+                    "level": os.getenv("INKYPI_LOG_LEVEL", "INFO").upper(),
+                    "handlers": ["console"],
+                },
+            }
+        )
+    else:
+        logging.config.fileConfig(
+            os.path.join(os.path.dirname(__file__), "config", "logging.conf")
+        )
+
+
+_setup_logging()
 
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 import warnings
