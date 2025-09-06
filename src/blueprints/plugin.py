@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, render_template, send_from_directory
+from flask import Blueprint, request, jsonify, current_app, render_template, send_from_directory, send_file, abort
 from plugins.plugin_registry import get_plugin_instance
 from utils.app_utils import resolve_path, handle_request_files, parse_form
 from refresh_task import ManualRefresh, PlaylistRefresh
@@ -60,9 +60,15 @@ def plugin_page(plugin_id):
 
 @plugin_bp.route('/images/<plugin_id>/<path:filename>')
 def image(plugin_id, filename):
-    # Serve files from the specific plugin subdirectory to satisfy safe joins
-    plugin_dir = os.path.join(PLUGINS_DIR, plugin_id)
-    return send_from_directory(plugin_dir, filename)
+    # Serve files from the specific plugin subdirectory
+    plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
+    full_path = os.path.abspath(os.path.join(plugin_dir, filename))
+    # Prevent path traversal
+    if not full_path.startswith(plugin_dir + os.sep):
+        return abort(404)
+    if not os.path.exists(full_path):
+        return abort(404)
+    return send_file(full_path)
 
 @plugin_bp.route('/delete_plugin_instance', methods=['POST'])
 def delete_plugin_instance():

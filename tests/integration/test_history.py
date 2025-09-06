@@ -204,7 +204,8 @@ def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert "% free" in body
-    assert "GB free of" in body
+    # Match new template wording
+    assert "GB remaining of" in body and "GB total" in body
 
 
 def test_history_server_handles_disk_usage_failure(client, monkeypatch):
