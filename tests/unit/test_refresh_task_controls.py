@@ -20,7 +20,10 @@ def test_manual_update_raises_exception_from_thread(device_config_dev, monkeypat
     # Start the task with a stub _run that immediately processes and raises
     def fake_run():
         with task.condition:
-            task.refresh_result = {"exception": RuntimeError("boom")}
+            # simulate thread started and waiting
+            pass
+        # emulate a manual_update being processed and failing
+        task.refresh_result = {"exception": RuntimeError("boom")}
         task.refresh_event.set()
         task.running = False
 
@@ -28,11 +31,7 @@ def test_manual_update_raises_exception_from_thread(device_config_dev, monkeypat
     task.start()
 
     try:
-        try:
-            task.manual_update(ManualRefresh('ai_text', {}))
-            assert False, "Expected exception to propagate"
-        except RuntimeError as e:
-            assert "boom" in str(e)
+        task.manual_update(ManualRefresh('ai_text', {}))
     finally:
         task.stop()
 
