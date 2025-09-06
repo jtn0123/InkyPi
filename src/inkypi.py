@@ -29,7 +29,7 @@ from blueprints.plugin import plugin_bp
 from blueprints.settings import settings_bp
 from config import Config
 from display.display_manager import DisplayManager
-from plugins.plugin_registry import load_plugins
+from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image
 from utils.http_utils import APIError, json_error, wants_json, json_internal_error
@@ -291,6 +291,15 @@ def create_app():
             header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
             if header_name not in response.headers:
                 response.headers[header_name] = csp_value
+        except Exception:
+            pass
+        try:
+            # Surface dev hot-reload info via a response header for visibility
+            info = pop_hot_reload_info()
+            if info and DEV_MODE:
+                response.headers.setdefault(
+                    "X-InkyPi-Hot-Reload", f"{info['plugin_id']}:{int(info['reloaded'])}"
+                )
         except Exception:
             pass
         return response

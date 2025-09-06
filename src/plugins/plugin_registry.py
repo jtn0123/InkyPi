@@ -11,6 +11,7 @@ from utils.app_utils import resolve_path
 logger = logging.getLogger(__name__)
 PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
+_LAST_HOT_RELOAD: dict | None = None
 
 
 def _is_dev_mode() -> bool:
@@ -24,8 +25,11 @@ def _load_single_plugin_instance(plugin_config):
     plugin_id = plugin_config.get("id")
     module_name = f"plugins.{plugin_id}.{plugin_id}"
     try:
+        reloaded = False
         if _is_dev_mode() and module_name in sys.modules:
+            logger.info(f"Hot reloading plugin module {module_name}")
             module = importlib.reload(sys.modules[module_name])
+            reloaded = True
         else:
             module = importlib.import_module(module_name)
         plugin_cls = getattr(module, plugin_config.get("class"), None)
@@ -33,7 +37,11 @@ def _load_single_plugin_instance(plugin_config):
             raise ImportError(
                 f"Class '{plugin_config.get('class')}' not found in module {module_name}"
             )
-        return plugin_cls(plugin_config)
+        instance = plugin_cls(plugin_config)
+        # record hot reload info for request/response hooks to surface
+        global _LAST_HOT_RELOAD
+        _LAST_HOT_RELOAD = {"plugin_id": plugin_id, "reloaded": reloaded}
+        return instance
     except ImportError as e:
         logging.error(f"Failed to import plugin module {module_name}: {e}")
         raise
@@ -85,3 +93,14 @@ def get_plugin_instance(plugin_config):
 
     # Match legacy behavior: if a plugin wasn't preloaded, treat as unregistered
     raise ValueError(f"Plugin '{plugin_id}' is not registered.")
+
+
+def pop_hot_reload_info():
+    """Return and clear the last hot reload info recorded by the loader.
+
+    Returns a dict like {"plugin_id": str, "reloaded": bool} or None.
+    """
+    global _LAST_HOT_RELOAD
+    info = _LAST_HOT_RELOAD
+    _LAST_HOT_RELOAD = None
+    return info
