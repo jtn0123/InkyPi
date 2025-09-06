@@ -43,7 +43,7 @@ def test_set_and_load_env_key(tmp_path, monkeypatch):
     # Ensure file was written
     env_file = cfg.get_env_file_path()
     assert os.path.exists(env_file)
-    with open(env_file, "r") as f:
+    with open(env_file) as f:
         content = f.read()
     # dotenv may write quoted or unquoted values; validate key presence and value occurrence
     assert "NASA_SECRET=" in content
