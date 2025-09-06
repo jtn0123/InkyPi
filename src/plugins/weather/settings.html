@@ -232,4 +232,51 @@
         document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
         updateTitleOptions(weatherProvider)
     });
+
+    // Client-side validation specific to Weather plugin
+    // Ensures latitude and longitude are present before Update Now or Add to Playlist
+    window.validatePluginSettings = function(action){
+        try {
+            const provider = (document.getElementById('weatherProvider') || {}).value || 'OpenWeatherMap';
+            // Only enforce for providers that need coordinates (both do)
+            const latEl = document.getElementById('latitude');
+            const lonEl = document.getElementById('longitude');
+            const lat = latEl && latEl.value ? String(latEl.value).trim() : '';
+            const lon = lonEl && lonEl.value ? String(lonEl.value).trim() : '';
+
+            const hasLat = lat !== '' && !isNaN(Number(lat));
+            const hasLon = lon !== '' && !isNaN(Number(lon));
+
+            if (!hasLat || !hasLon){
+                const message = 'Please select a location first (Latitude and Longitude are required).';
+                if (typeof window.showResponseModal === 'function'){
+                    window.showResponseModal('failure', message);
+                } else {
+                    alert(message);
+                }
+                // Focus the Select Location button to guide the user
+                const openMapBtn = document.getElementById('openMap');
+                if (openMapBtn){ openMapBtn.focus(); }
+                return false;
+            }
+
+            // Optional: basic range validation
+            const latNum = Number(lat);
+            const lonNum = Number(lon);
+            if (latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180){
+                const message = 'Latitude must be between -90 and 90, Longitude between -180 and 180.';
+                if (typeof window.showResponseModal === 'function'){
+                    window.showResponseModal('failure', message);
+                } else {
+                    alert(message);
+                }
+                return false;
+            }
+
+            return true;
+        } catch (e) {
+            console.warn('Validation error:', e);
+            return true; // do not block if validator fails unexpectedly
+        }
+    }
 </script>

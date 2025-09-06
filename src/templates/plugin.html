@@ -26,6 +26,19 @@
             const loadingIndicator = document.getElementById('loadingIndicator');
             loadingIndicator.style.display = 'block';
 
+            // Allow plugin-specific client-side validation (e.g., require lat/long for Weather)
+            try {
+                if (typeof window.validatePluginSettings === 'function') {
+                    const isValid = window.validatePluginSettings(action);
+                    if (!isValid) {
+                        loadingIndicator.style.display = 'none';
+                        return; // abort submission
+                    }
+                }
+            } catch (e) {
+                console.warn('Plugin validation threw an error:', e);
+            }
+
             // Gather plugin settings form data
             const form = document.getElementById('settingsForm');
             const scheduleForm = document.getElementById('scheduleForm');
