@@ -3,6 +3,112 @@ import os
 import sys
 
 
+def _write_min_device_config(path):
+    import json
+
+    cfg = {
+        "name": "InkyPi Test",
+        "display_type": "mock",
+        "resolution": [800, 480],
+        "orientation": "horizontal",
+        "timezone": "UTC",
+        "time_format": "24h",
+        "plugin_cycle_interval_seconds": 300,
+        "image_settings": {
+            "saturation": 1.0,
+            "brightness": 1.0,
+            "sharpness": 1.0,
+            "contrast": 1.0,
+        },
+        "playlist_config": {"playlists": [], "active_playlist": None},
+        "refresh_info": {
+            "refresh_time": None,
+            "image_hash": None,
+            "refresh_type": "Manual Update",
+            "plugin_id": "",
+        },
+    }
+    path.write_text(json.dumps(cfg))
+
+
+def _nop_load_plugins(_conf):
+    return None
+
+
+def test_secret_key_dev_persisted(tmp_path, monkeypatch):
+    # Prepare minimal device config and environment
+    cfg_path = tmp_path / "device.json"
+    _write_min_device_config(cfg_path)
+    monkeypatch.setenv("INKYPI_CONFIG_FILE", str(cfg_path))
+    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    # Avoid plugin imports during create_app
+    import plugins.plugin_registry as pr
+
+    monkeypatch.setattr(pr, "load_plugins", _nop_load_plugins, raising=True)
+
+    # Force fresh import with current env
+    sys.modules.pop("inkypi", None)
+    inkypi = importlib.import_module("inkypi")
+
+    # SECRET_KEY should be generated and persisted in .env under PROJECT_DIR
+    secret = inkypi.app.secret_key
+    assert isinstance(secret, str) and len(secret) >= 32
+
+    # Verify persisted
+    env_file = tmp_path / ".env"
+    assert env_file.exists()
+    env_text = env_file.read_text()
+    assert "SECRET_KEY=" in env_text
+    assert env_text.strip().split("SECRET_KEY=")[-1].strip() != ""
+
+
+def test_secret_key_prod_ephemeral(tmp_path, monkeypatch):
+    # Prepare minimal device config and environment
+    cfg_path = tmp_path / "device.json"
+    _write_min_device_config(cfg_path)
+    monkeypatch.setenv("INKYPI_CONFIG_FILE", str(cfg_path))
+    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+    # Ensure not dev
+    monkeypatch.delenv("INKYPI_ENV", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    # Mock sys.argv to ensure no --dev flag is present
+    monkeypatch.setattr("sys.argv", ["inkypi.py"])
+
+    # Avoid plugin imports during create_app
+    import plugins.plugin_registry as pr
+
+    monkeypatch.setattr(pr, "load_plugins", _nop_load_plugins, raising=True)
+
+    # Fresh import
+    sys.modules.pop("inkypi", None)
+    inkypi = importlib.import_module("inkypi")
+
+    # Verify we're actually in production mode
+    assert not inkypi.DEV_MODE, f"DEV_MODE should be False but is {inkypi.DEV_MODE}"
+    assert not inkypi.args.dev, f"args.dev should be False but is {inkypi.args.dev}"
+
+    # SECRET_KEY should exist but not be persisted to .env in prod
+    secret = inkypi.app.secret_key
+    assert isinstance(secret, str) and len(secret) >= 32
+
+    env_file = tmp_path / ".env"
+    if env_file.exists():
+        env_text = env_file.read_text()
+        assert "SECRET_KEY=" not in env_text
+    else:
+        # .env may not be created at all
+        assert True
+
+import importlib
+import os
+import sys
+
+
 def _reload_inkypi(monkeypatch, argv=None, env=None):
     if argv is None:
         argv = ["inkypi.py"]

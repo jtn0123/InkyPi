@@ -2,6 +2,7 @@
 from io import BytesIO
 
 from PIL import Image
+import pytest
 
 
 def build_upload(name: str, content: bytes, content_type: str = "image/png"):
@@ -168,3 +169,137 @@ def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev
         assert img is not None
         w, h = device_config_dev.get_resolution()
         assert img.size[0] <= w and img.size[1] <= h
+
+
+def test_image_upload_open_image_no_images():
+    from plugins.image_upload.image_upload import ImageUpload
+
+    plugin = ImageUpload({"id": "image_upload"})
+    with pytest.raises(RuntimeError, match="No images provided"):
+        plugin.open_image(0, [])
+
+
+def test_image_upload_open_image_invalid_file(monkeypatch):
+    from plugins.image_upload.image_upload import ImageUpload
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    def mock_load_image_from_path(path):
+        return None  # Simulate failed load
+
+    monkeypatch.setattr("plugins.image_upload.image_upload.load_image_from_path", mock_load_image_from_path)
+
+    with pytest.raises(RuntimeError, match="Failed to read image file"):
+        plugin.open_image(0, ["/fake/path.png"])
+
+
+def test_image_upload_open_image_invalid_type(monkeypatch):
+    from plugins.image_upload.image_upload import ImageUpload
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    def mock_load_image_from_path(path):
+        return "not_an_image"  # Simulate invalid type
+
+    monkeypatch.setattr("plugins.image_upload.image_upload.load_image_from_path", mock_load_image_from_path)
+
+    with pytest.raises(RuntimeError, match="Invalid image type loaded"):
+        plugin.open_image(0, ["/fake/path.png"])
+
+
+def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_config_dev):
+    from plugins.image_upload.image_upload import ImageUpload
+    import tempfile
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    # Create a test image
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+        tf.write(content)
+        tf.flush()
+
+        # Test with index out of range - should reset to 0
+        result = plugin.generate_image(
+            {"imageFiles[]": [tf.name], "image_index": 5}, device_config_dev
+        )
+        assert result is not None
+
+
+def test_image_upload_generate_image_randomize(monkeypatch, device_config_dev):
+    from plugins.image_upload.image_upload import ImageUpload
+    import tempfile
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    # Create test images
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf1:
+        tf1.write(content)
+        tf1.flush()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf2:
+        tf2.write(content)
+        tf2.flush()
+
+        # Test randomize functionality
+        result = plugin.generate_image(
+            {"imageFiles[]": [tf1.name, tf2.name], "randomize": "true"}, device_config_dev
+        )
+        assert result is not None
+
+
+def test_image_upload_generate_image_vertical_orientation(monkeypatch, device_config_dev):
+    from plugins.image_upload.image_upload import ImageUpload
+    import tempfile
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    # Mock vertical orientation and resolution
+    def mock_get_config(key):
+        if key == "orientation":
+            return "vertical"
+        elif key == "resolution":
+            return (400, 300)  # width, height
+        return None
+
+    monkeypatch.setattr(device_config_dev, "get_config", mock_get_config)
+
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+        tf.write(content)
+        tf.flush()
+
+        result = plugin.generate_image(
+            {"imageFiles[]": [tf.name], "padImage": "false"}, device_config_dev
+        )
+        assert result is not None
+
+
+def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev):
+    from plugins.image_upload.image_upload import ImageUpload
+    import tempfile
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+        tf.write(content)
+        tf.flush()
+
+        result = plugin.generate_image(
+            {"imageFiles[]": [tf.name], "padImage": "true", "backgroundColor": "#FF0000"}, device_config_dev
+        )
+        assert result is not None
