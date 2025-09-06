@@ -3,6 +3,7 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 
 @patch('plugins.weather.weather.http_get')
