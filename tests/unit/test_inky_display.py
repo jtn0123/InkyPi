@@ -46,7 +46,7 @@ def test_inky_initialize_sets_resolution_and_border(monkeypatch, device_config_d
     _install_fake_inky(monkeypatch, fake_disp)
 
     from display.inky_display import InkyDisplay
-    driver = InkyDisplay(device_config_dev)
+    _driver = InkyDisplay(device_config_dev)
 
     # Resolution saved as list [w, h]
     assert device_config_dev.get_config("resolution") == [296, 128]

@@ -1,5 +1,5 @@
-import types
 import builtins
+import types
 from PIL import Image
 import pytest
 
@@ -86,8 +86,7 @@ def test_display_manager_selects_inky(monkeypatch, device_config_dev):
         def display_image(self, img, image_settings=None):
             self.last = (img.size, tuple(image_settings or []))
 
-    import display
-    fake_mod = types.SimpleNamespace(InkyDisplay=FakeInky)
+    _fake_mod = types.SimpleNamespace(InkyDisplay=FakeInky)
     monkeypatch.setitem(builtins.__dict__, "__cached__", None)  # noop to appease import system
     monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
 

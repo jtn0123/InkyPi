@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
-import os
 import json
+import os
 
 
 def _write_min_config(path, name="TestCfg"):

@@ -1,5 +1,5 @@
-from PIL import Image
 import os
+from PIL import Image
 
 
 def test_mock_display_writes_latest_and_timestamp(monkeypatch, device_config_dev, tmp_path):

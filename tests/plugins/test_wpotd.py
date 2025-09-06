@@ -1,7 +1,7 @@
-import pytest
-from unittest.mock import patch, MagicMock
 from io import BytesIO
+from unittest.mock import patch, MagicMock
 from PIL import Image
+import pytest
 
 
 def _png_bytes(size=(10, 6), color="white"):

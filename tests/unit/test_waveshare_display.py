@@ -96,7 +96,7 @@ def test_waveshare_initialize_sets_resolution(monkeypatch, device_config_dev):
     install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
 
     from display.waveshare_display import WaveshareDisplay
-    driver = WaveshareDisplay(device_config_dev)
+    _driver = WaveshareDisplay(device_config_dev)
 
     # Resolution stored in config (width >= height order)
     assert device_config_dev.get_config("resolution") == [800, 480]
