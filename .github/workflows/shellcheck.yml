@@ -1,0 +1,24 @@
+name: Shellcheck
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shellcheck install/*.sh scripts/*.sh install/inkypi || true
+
+

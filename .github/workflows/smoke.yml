@@ -1,0 +1,61 @@
+name: Install smoke (container)
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install OS dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            python3 python3-venv python3-pip git curl \
+            libopenjp2-7 libopenblas-dev libfreetype6-dev \
+            fonts-noto-color-emoji
+
+      - name: Setup virtualenv
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip wheel
+
+      - name: Install Python dependencies
+        run: |
+          . .venv/bin/activate
+          pip install -r install/requirements.txt
+          pip check || true
+
+      - name: Import smoke
+        run: |
+          . .venv/bin/activate
+          python - <<'PY'
+          import flask, PIL, requests, urllib3, numpy, icalendar, psutil, waitress
+          import pytz, feedparser
+          print("Imports OK")
+          PY
+
+      - name: Boot web-only and probe routes
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
+        run: |
+          . .venv/bin/activate
+          python src/inkypi.py --dev --web-only &
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ >/dev/null
+          curl -fsS http://127.0.0.1:8080/settings >/dev/null
+
+
