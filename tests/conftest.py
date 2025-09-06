@@ -56,7 +56,7 @@ def device_config_dev(tmp_path, monkeypatch):
             "sharpness": 1.0,
             "contrast": 1.0,
         },
-        "playlist_config": {"playlists": [], "active_playlist": None},
+        "playlist_config": {"playlists": [], "active_playlist": ""},
         "refresh_info": {
             "refresh_time": None,
             "image_hash": None,

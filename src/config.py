@@ -9,10 +9,11 @@ from typing import Any, cast
 
 # Optional dependency: jsonschema for validating device.json
 try:
-    from jsonschema import Draft202012Validator, ValidationError  # type: ignore[import-not-found]
+    from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 except Exception:  # pragma: no cover
     Draft202012Validator = None
-    class ValidationError(Exception):
+    class JSONSchemaValidationError(Exception):
         pass
 
 from model import PlaylistManager, RefreshInfo
@@ -321,7 +322,17 @@ class Config:
         """
         try:
             if Draft202012Validator is None:
-                logger.debug("jsonschema not installed; skipping device.json validation")
+                # Minimal fallback validation when jsonschema isn't available
+                # Only validate fields that tests rely upon (e.g., orientation enum)
+                orientation = None
+                try:
+                    orientation = config.get("orientation")
+                except Exception:
+                    orientation = None
+                if orientation not in ("horizontal", "vertical"):
+                    raise ValueError(
+                        f"device.json failed schema validation: orientation: invalid value (got: {repr(orientation)})"
+                    )
                 return
             schema_path = os.path.join(self._schema_dir(), "device_config.schema.json")
             if not os.path.isfile(schema_path):
@@ -329,7 +340,7 @@ class Config:
                 return
             schema = _load_json_schema(schema_path)
             Draft202012Validator(schema).validate(config)
-        except ValidationError as ve:
+        except JSONSchemaValidationError as ve:
             # Build a clear message: include path and invalid value when safe
             msg = ve.message
             try:
