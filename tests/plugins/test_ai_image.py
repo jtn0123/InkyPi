@@ -14,8 +14,10 @@ def test_ai_image_missing_api_key(device_config_dev):
         'quality': 'standard'
     }
 
-    with pytest.raises(RuntimeError, match="OPEN AI API Key not configured"):
-        p.generate_image(settings, device_config_dev)
+    # Mock API key to return None (missing key)
+    with patch.object(device_config_dev, 'load_env_key', lambda key: None):
+        with pytest.raises(RuntimeError, match="OPEN AI API Key not configured"):
+            p.generate_image(settings, device_config_dev)
 
 
 def test_ai_image_invalid_model(client, monkeypatch):
