@@ -84,7 +84,8 @@ class DisplayManager:
             image_settings = []
         image = change_orientation(image, self.device_config.get_config("orientation"))
         image = resize_image(image, self.device_config.get_resolution(), image_settings)
-        if self.device_config.get_config("inverted_image"): image = image.rotate(180)
+        if self.device_config.get_config("inverted_image"):
+            image = image.rotate(180)
         image = apply_image_enhancement(image, self.device_config.get_config("image_settings"))
 
         # Save the processed image for web preview

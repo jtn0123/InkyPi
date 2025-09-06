@@ -1,9 +1,10 @@
 
-from PIL import Image, ImageFilter, ImageOps
-from PIL.Image import Resampling
 import logging
 import os
 import random
+
+from PIL import Image, ImageFilter, ImageOps
+from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 

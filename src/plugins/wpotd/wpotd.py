@@ -21,14 +21,15 @@ Flow:
 6. Optionally resize the image to fit the device dimensions. (_shrink_to_fit))
 """
 
-from PIL import Image, UnidentifiedImageError
-from PIL.Image import Resampling
 import logging
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from random import randint
 from typing import Any
+
 import requests
+from PIL import Image, UnidentifiedImageError
+from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -86,7 +87,8 @@ class Wpotd(BasePlugin):
             response.raise_for_status()
             # Open in context and copy to ensure resources are released
             with Image.open(BytesIO(response.content)) as _img:
-                return _img.copy()
+                img: Image.Image = _img
+                return img.copy()
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
             raise RuntimeError("Unsupported image format.")
@@ -131,7 +133,7 @@ class Wpotd(BasePlugin):
         data = self._make_request(params)
         try:
             page = next(iter(data["query"]["pages"].values()))
-            url = page["imageinfo"][0].get("url")
+            url: str = page["imageinfo"][0].get("url")
             if not url:
                 raise RuntimeError("Image URL missing in response")
             return url
@@ -143,7 +145,8 @@ class Wpotd(BasePlugin):
         try:
             response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
-            return response.json()
+            data: dict[str, Any] = response.json()
+            return data
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
             raise RuntimeError("Wikipedia API request failed.")

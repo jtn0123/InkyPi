@@ -1,8 +1,9 @@
-from PIL import Image
-from PIL.Image import Resampling
 import logging
 from io import BytesIO
+
 import requests
+from PIL import Image
+from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 

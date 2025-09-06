@@ -1,7 +1,8 @@
-from PIL import Image, ImageColor, ImageOps
-from PIL.Image import Resampling
 import logging
 import random
+
+from PIL import Image, ImageColor, ImageOps
+from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 

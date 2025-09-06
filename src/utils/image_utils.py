@@ -1,12 +1,13 @@
-import requests
-from PIL import Image, ImageEnhance
-from PIL.Image import Resampling
 import hashlib
 import logging
 import os
 import subprocess
 import tempfile
 from io import BytesIO
+
+import requests
+from PIL import Image, ImageEnhance
+from PIL.Image import Resampling
 
 LANCZOS = Resampling.LANCZOS
 
@@ -183,7 +184,7 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             return None
 
         try:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            result = subprocess.run(command, capture_output=True)
         except FileNotFoundError:
             logger.error("Failed to take screenshot: Browser binary not found.")
             return None

@@ -1,9 +1,10 @@
-from io import BytesIO
-from PIL import Image
-from PIL.Image import Resampling
 import re
+from io import BytesIO
+
 import feedparser  # type: ignore[import-untyped]
 import requests
+from PIL import Image
+from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 
