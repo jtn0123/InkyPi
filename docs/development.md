@@ -28,7 +28,7 @@ pip install -r install/requirements-dev.txt
 python src/inkypi.py --dev
 ```
 
-**That's it!** Open http://localhost:8080 and start developing.
+**That's it!** Open `http://localhost:8080` and start developing.
 
 ## What You Can Do
 

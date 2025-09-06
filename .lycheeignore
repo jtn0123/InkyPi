@@ -1,0 +1,8 @@
+# Exclude localhost which is not reachable in CI
+http://localhost:8080/
+
+# Sites that often return 403 to bots/CI
+https://www.flaticon.com/
+https://platform.openai.com/
+https://www.raspberrypi.com/software/
+https://www.patreon.com/
