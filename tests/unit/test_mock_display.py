@@ -22,20 +22,26 @@ def test_mock_display_writes_latest_and_timestamp(monkeypatch, device_config_dev
     assert len(files) >= 1
 
 
-def test_mock_display_initialize_display_logging(caplog, device_config_dev):
+def test_mock_display_initialize_display_logging(device_config_dev):
     """Test that mock display logs initialization message."""
     import logging
-    caplog.set_level(logging.INFO)
+    from unittest.mock import patch, MagicMock
 
     device_config_dev.update_value("display_type", "mock")
     device_config_dev.update_value("resolution", [200, 100])
 
-    from display.mock_display import MockDisplay
-    display = MockDisplay(device_config_dev)
+    # Mock the logger to capture log calls
+    with patch('display.mock_display.logger') as mock_logger:
+        mock_logger.info = MagicMock()
 
-    # Check that initialization logging occurred
-    display.initialize_display()  # Explicitly call to trigger logging
-    assert "Mock display initialized: 200x100" in caplog.text
+        from display.mock_display import MockDisplay
+        display = MockDisplay(device_config_dev)
+
+        # Check that initialization logging occurred
+        display.initialize_display()  # Explicitly call to trigger logging
+
+        # Verify the log message was called
+        mock_logger.info.assert_called_once_with("Mock display initialized: 200x100")
 
 
 def test_mock_display_display_image_with_none_image_settings(device_config_dev, tmp_path):

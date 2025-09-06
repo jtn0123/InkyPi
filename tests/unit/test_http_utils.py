@@ -214,3 +214,42 @@ class TestWantsJson:
 
         with patch('src.utils.http_utils.request', None):
             assert wants_json(mock_request) is True
+
+    def test_wants_json_get_json_exception_handling(self):
+        """Test wants_json with exception in get_json."""
+        mock_request = Mock()
+        mock_request.path = "/test"
+        mock_request.accept_mimetypes.accept_json = False
+        mock_request.accept_mimetypes.accept_html = True
+        mock_request.is_json = False
+        mock_request.get_json.side_effect = Exception("Test exception")
+
+        with patch('src.utils.http_utils.request', mock_request):
+            assert wants_json() is False
+
+    def test_wants_json_general_exception_handling(self):
+        """Test wants_json with general exception in request processing."""
+        mock_request = Mock()
+        mock_request.path = "/test"
+        mock_request.accept_mimetypes.accept_json = False
+        mock_request.accept_mimetypes.accept_html = True
+        mock_request.is_json = False
+        mock_request.get_json.return_value = None
+
+        # Simulate a general exception in the request object
+        mock_request.configure_mock(**{'accept_mimetypes.accept_json': Mock(side_effect=Exception("Test exception"))})
+
+        with patch('src.utils.http_utils.request', mock_request):
+            assert wants_json() is False
+
+    def test_wants_json_outer_exception_handling(self):
+        """Test wants_json with exception that triggers outer catch block."""
+        # Create a mock request that raises an exception when accessing any attribute
+        class ExceptionRequest:
+            def __getattr__(self, name):
+                raise Exception("Test outer exception")
+
+        mock_request = ExceptionRequest()
+
+        with patch('src.utils.http_utils.request', mock_request):
+            assert wants_json() is False

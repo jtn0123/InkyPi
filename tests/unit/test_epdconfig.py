@@ -62,6 +62,19 @@ def install_fake_modules(monkeypatch):
     # also provide top-level attributes expected by tests (LED, Button)
     sys.modules['gpiozero'] = gpio_mod
 
+    # Also mock Hobot.GPIO for Sunrise X3
+    mock_hobot_gpio = types.ModuleType("Hobot.GPIO")
+    mock_hobot_gpio.BCM = "BCM"  # type: ignore[attr-defined]
+    mock_hobot_gpio.OUT = "OUT"  # type: ignore[attr-defined]
+    mock_hobot_gpio.IN = "IN"  # type: ignore[attr-defined]
+    mock_hobot_gpio.setmode = MagicMock()  # type: ignore[attr-defined]
+    mock_hobot_gpio.setwarnings = MagicMock()  # type: ignore[attr-defined]
+    mock_hobot_gpio.setup = MagicMock()  # type: ignore[attr-defined]
+    mock_hobot_gpio.output = MagicMock()  # type: ignore[attr-defined]
+    mock_hobot_gpio.input = MagicMock(return_value=1)  # type: ignore[attr-defined]
+    mock_hobot_gpio.cleanup = MagicMock()  # type: ignore[attr-defined]
+    sys.modules['Hobot.GPIO'] = mock_hobot_gpio
+
 
 def test_raspberry_selection_and_methods(monkeypatch, monkeypatching=None):
     install_fake_modules(monkeypatch)
@@ -601,37 +614,44 @@ def test_jetson_platform_with_hardware_libraries(monkeypatch):
 
     monkeypatch.setattr('os.path.exists', mock_exists)
 
-    # Mock Jetson.GPIO
-    mock_jetson_gpio = types.ModuleType("Jetson.GPIO")
-    mock_jetson_gpio.BCM = "BCM"
-    mock_jetson_gpio.OUT = "OUT"
-    mock_jetson_gpio.IN = "IN"
-    mock_jetson_gpio.setmode = MagicMock()
-    mock_jetson_gpio.setwarnings = MagicMock()
-    mock_jetson_gpio.setup = MagicMock()
-    mock_jetson_gpio.output = MagicMock()
-    mock_jetson_gpio.input = MagicMock(return_value=1)
-    mock_jetson_gpio.cleanup = MagicMock()
+    # Mock ctypes.cdll.LoadLibrary to return a mock library
+    mock_spi_lib = MagicMock()
+    mock_spi_lib.SYSFS_software_spi_transfer = MagicMock()
+    mock_spi_lib.SYSFS_software_spi_begin = MagicMock()
+    mock_spi_lib.SYSFS_software_spi_end = MagicMock()
 
-    original_import = importlib.import_module
-    def mock_import_module(name):
-        if name == 'Jetson.GPIO':
-            return mock_jetson_gpio
-        return original_import(name)
+    with patch('ctypes.cdll.LoadLibrary', return_value=mock_spi_lib):
+        # Mock Jetson.GPIO
+        mock_jetson_gpio = types.ModuleType("Jetson.GPIO")
+        mock_jetson_gpio.BCM = "BCM"  # type: ignore[attr-defined]
+        mock_jetson_gpio.OUT = "OUT"  # type: ignore[attr-defined]
+        mock_jetson_gpio.IN = "IN"  # type: ignore[attr-defined]
+        mock_jetson_gpio.setmode = MagicMock()  # type: ignore[attr-defined]
+        mock_jetson_gpio.setwarnings = MagicMock()  # type: ignore[attr-defined]
+        mock_jetson_gpio.setup = MagicMock()  # type: ignore[attr-defined]
+        mock_jetson_gpio.output = MagicMock()  # type: ignore[attr-defined]
+        mock_jetson_gpio.input = MagicMock(return_value=1)  # type: ignore[attr-defined]
+        mock_jetson_gpio.cleanup = MagicMock()  # type: ignore[attr-defined]
 
-    monkeypatch.setattr('importlib.import_module', mock_import_module)
+        original_import = importlib.import_module
+        def mock_import_module(name):
+            if name == 'Jetson.GPIO':
+                return mock_jetson_gpio
+            return original_import(name)
 
-    epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
+        monkeypatch.setattr('importlib.import_module', mock_import_module)
 
-    # Test module operations
-    result = epdconfig.module_init()
-    assert result == 0
+        epdconfig = importlib.reload(importlib.import_module('display.waveshare_epd.epdconfig'))
 
-    # Test GPIO operations
-    epdconfig.digital_write(17, 1)
-    epdconfig.digital_read(24)
+        # Test module operations
+        result = epdconfig.module_init()
+        assert result == 0
 
-    epdconfig.module_exit()
+        # Test GPIO operations
+        epdconfig.digital_write(17, 1)
+        epdconfig.digital_read(24)
+
+        epdconfig.module_exit()
 
 
 def test_sunrise_x3_platform_operations(monkeypatch):

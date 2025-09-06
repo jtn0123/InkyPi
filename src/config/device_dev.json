@@ -41,18 +41,20 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": null
+                        "latest_refresh_time": "2025-09-06T18:29:34.879962+00:00"
                     }
                 ],
-                "current_plugin_index": null
+                "current_plugin_index": 0
             }
         ],
-        "active_playlist": null
+        "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T16:29:13.048934+00:00",
-        "image_hash": "ba3d9c400f87555e4a3c38a4f39b3029e98cd7794c851c4c4c7c4850dd3f9ab3",
-        "refresh_type": "Manual Update",
-        "plugin_id": "apod"
+        "refresh_time": "2025-09-06T18:29:34.879962+00:00",
+        "image_hash": "f750a9199db566ee7d56402db34e28917afc9160d6ffdf393015f9c4304040e2",
+        "refresh_type": "Playlist",
+        "plugin_id": "weather",
+        "playlist": "Default",
+        "plugin_instance": "weather_saved_settings"
     }
 }
