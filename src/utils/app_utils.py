@@ -136,10 +136,27 @@ def handle_request_files(request_files, form_data={}):
     allowed_file_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     file_location_map = {}
     # handle existing file locations being provided as part of the form data
-    for key in set(request_files.keys()):
+    # Some request file objects (e.g., test doubles) may not implement .keys().
+    try:
+        rf_keys = set(request_files.keys())
+    except Exception:
+        # Derive keys from items() as a fallback
+        try:
+            rf_keys = {k for (k, _v) in request_files.items(multi=True)}
+        except Exception:
+            try:
+                rf_keys = {k for (k, _v) in request_files.items()}
+            except Exception:
+                rf_keys = set()
+
+    for key in rf_keys:
         is_list = key.endswith('[]')
         if key in form_data:
-            file_location_map[key] = form_data.getlist(key) if is_list else form_data.get(key)
+            # Prefer getlist if available; otherwise fall back to standard dict access
+            if is_list and hasattr(form_data, 'getlist'):
+                file_location_map[key] = form_data.getlist(key)
+            else:
+                file_location_map[key] = form_data.get(key)
     # add new files in the request
     for key, file in request_files.items(multi=True):
         is_list = key.endswith('[]')

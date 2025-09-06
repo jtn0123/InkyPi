@@ -117,6 +117,30 @@ The InkyPi project is constantly evolving, with many exciting features and impro
 
 Check out the public [trello board](https://trello.com/b/SWJYWqe4/inkypi) to explore upcoming features and vote on what you'd like to see next!
 
+## Hot Reload (Local Development)
+
+You can run InkyPi locally with automatic code reload using Flask's dev server. This is ideal for rapid UI and plugin iteration without deploying to a Pi.
+
+```bash
+# Option A: Quick start scripts
+./scripts/dev.sh              # full program with mock display
+./scripts/web_only.sh         # web UI only (no background refresh thread)
+
+# Option B: Flask dev server with hot reload
+export FLASK_APP=src.inkypi:create_app
+export INKYPI_ENV=dev
+flask --debug run -p 8080
+
+# Optional flags via the python entrypoint
+python src/inkypi.py --dev --web-only   # disable background refresh thread
+python src/inkypi.py --dev --fast-dev   # short plugin cycle, skip startup image
+```
+
+Behavior in dev:
+- A mock display writes images to `mock_display_output/latest.png` and updates `static/images/current_image.png`.
+- The background refresh thread is disabled in web-only mode, but UI operations like "Update Now" still render images immediately.
+- The refresh thread is lazily and safely started when running under `flask --debug` to avoid double-starts.
+
 ## Waveshare Display Support
 
 Waveshare offers a range of e-Paper displays, similar to the Inky screens from Pimoroni, but with slightly different requirements. While Inky displays auto-configure via the inky Python library, Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd).

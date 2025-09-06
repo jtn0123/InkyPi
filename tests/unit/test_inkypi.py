@@ -1,6 +1,7 @@
 import importlib
 import os
 import sys
+from flask import Flask
 
 
 def _reload_inkypi(monkeypatch, argv=None, env=None):
@@ -43,5 +44,23 @@ def test_inkypi_prod_mode_port_from_env(monkeypatch):
 
     assert getattr(mod, "DEV_MODE", True) is False
     assert getattr(mod, "PORT", None) == 1234
+
+
+def test_inkypi_web_only_flag(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--web-only"], env={})
+    app = getattr(mod, "app", None)
+    assert isinstance(app, Flask)
+    # Ensure refresh task does not start in web-only when running as __main__ is simulated by test harness
+    rt = app.config['REFRESH_TASK']
+    assert rt is not None
+    assert rt.running is False
+
+
+def test_inkypi_fast_dev(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev", "--fast-dev"], env={})
+    app = getattr(mod, "app", None)
+    assert isinstance(app, Flask)
+    cfg = app.config['DEVICE_CONFIG']
+    assert cfg.get_config("plugin_cycle_interval_seconds") == 30
 
 
