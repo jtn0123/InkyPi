@@ -263,11 +263,9 @@ def test_settings_time_format_12h():
         now = datetime.now(tz)
 
         if 0 <= now.hour < 12:
-            hour_12 = now.hour if now.hour != 0 else 12
-            am_pm = "AM"
+            pass  # AM case
         else:
-            hour_12 = now.hour - 12 if now.hour != 12 else 12
-            am_pm = "PM"
+            pass  # PM case
 
         time_str = "02:30 PM"  # Example 12-hour format
         assert "AM" in time_str or "PM" in time_str

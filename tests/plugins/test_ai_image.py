@@ -364,7 +364,7 @@ def test_ai_image_orientation_handling(device_config_dev, monkeypatch):
                 'quality': 'standard'
             }
 
-            result = p.generate_image(settings, device_config_dev)
+            p.generate_image(settings, device_config_dev)
 
             # Verify vertical orientation was passed to fetch_image
             mock_client.images.generate.assert_called_once()
@@ -421,7 +421,7 @@ def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatc
                     'quality': input_quality
                 }
 
-                result = p.generate_image(settings, device_config_dev)
+                p.generate_image(settings, device_config_dev)
 
                 # Verify quality was normalized correctly
                 call_kwargs = mock_client.images.generate.call_args[1]

@@ -235,7 +235,7 @@ if __name__ == '__main__':
                 local_ip = s.getsockname()[0]
                 s.close()
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
-            except:
+            except (OSError, socket.error):
                 pass  # Ignore if we can't get the IP
             
         serve(app, host="0.0.0.0", port=PORT, threads=1)

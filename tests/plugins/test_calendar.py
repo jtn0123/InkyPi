@@ -311,7 +311,7 @@ def test_get_view_range_invalid_view():
     try:
         start, end = p.get_view_range("invalid", now, {})
         # If it doesn't crash, that's fine - the validation happens elsewhere
-    except:
+    except Exception:
         pass  # Expected to potentially raise
 
 

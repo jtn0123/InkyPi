@@ -81,7 +81,6 @@ def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
     from refresh_task import PlaylistRefresh, RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
-    task = RefreshTask(device_config_dev, display_manager)
 
     # Mock plugin config to return None
     monkeypatch.setattr(device_config_dev, 'get_plugin', lambda plugin_id: None)
@@ -104,7 +103,6 @@ def test_refresh_task_plugin_returns_none_image(device_config_dev, monkeypatch):
     from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
-    task = RefreshTask(device_config_dev, display_manager)
 
     # This should trigger the None image error check
     image = None
@@ -119,7 +117,6 @@ def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
     from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
-    task = RefreshTask(device_config_dev, display_manager)
 
     # Mock refresh info with same image hash
     latest_refresh = RefreshInfo(
@@ -248,27 +245,13 @@ def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
     from refresh_task import RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
-    task = RefreshTask(device_config_dev, display_manager)
-
-    # Mock refresh info with recent refresh
-    latest_refresh = RefreshInfo(
-        refresh_time="2025-01-01T12:00:00",
-        image_hash="hash",
-        refresh_type="Playlist",
-        plugin_id="test"
-    )
 
     # Mock should_refresh to return False
     monkeypatch.setattr('model.PlaylistManager.should_refresh', lambda *args: False)
 
-    tz = pytz.timezone("UTC")
-    current_dt = tz.localize(__import__('datetime').datetime(2025, 1, 1, 12, 30, 0))
-
     # This should trigger the "not time to update" logic
     should_refresh = False  # Mocked above
     if not should_refresh:
-        latest_refresh_str = "2025-01-01 12:00:00"
-        plugin_cycle_interval = 3600
         pass  # This covers the "not time to update" logging
 
 
