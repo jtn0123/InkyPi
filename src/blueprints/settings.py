@@ -11,7 +11,7 @@ import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
 
 from utils.http_utils import json_error
-from utils.time_utils import calculate_seconds, now_device_tz
+from utils.time_utils import calculate_seconds, now_device_tz, get_timezone
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
@@ -83,7 +83,8 @@ def _read_log_lines(hours: int) -> list[str]:
         device_config = current_app.config["DEVICE_CONFIG"]
         since = now_device_tz(device_config) - timedelta(hours=hours)
     except Exception:
-        since = datetime.now() - timedelta(hours=hours)
+        # Fallback to timezone-aware UTC for consistency
+        since = datetime.now(tz=get_timezone("UTC")) - timedelta(hours=hours)
     lines: list[str] = []
     if not JOURNAL_AVAILABLE:
         # Development mode message when systemd journal is not accessible

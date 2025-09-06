@@ -12,6 +12,7 @@ from flask import (
 )
 
 from utils.http_utils import json_error
+from utils.time_utils import now_device_tz, get_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,13 @@ def _list_history_images(history_dir: str) -> list[dict]:
         except Exception:
             # Skip files that were deleted or cannot be accessed
             continue
-        dt = datetime.fromtimestamp(mtime)
+        try:
+            # Use device timezone for display
+            device_config = current_app.config.get("DEVICE_CONFIG")
+            now = now_device_tz(device_config) if device_config else datetime.now(tz=get_timezone("UTC"))
+            dt = datetime.fromtimestamp(mtime, tz=now.tzinfo)
+        except Exception:
+            dt = datetime.fromtimestamp(mtime)
         result.append(
             {
                 "filename": f,

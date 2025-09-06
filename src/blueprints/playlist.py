@@ -2,11 +2,11 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import Blueprint, current_app, jsonify, render_template, request
+from flask import Blueprint, current_app, jsonify, render_template, request, has_app_context
 
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error
-from utils.time_utils import calculate_seconds
+from utils.time_utils import calculate_seconds, now_device_tz
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
@@ -188,10 +188,18 @@ def format_relative_time(iso_date_string):
     if dt.tzinfo is None:
         raise ValueError("Input datetime doesn't have a timezone.")
 
-    # Get the current time in the same timezone as the input datetime
-    # Use timezone-aware now matching dt's tzinfo
-    now = datetime.now(dt.tzinfo)
-    delta = now - dt
+    # Get the current time using the device's configured timezone, if available
+    if has_app_context():
+        try:
+            now = now_device_tz(current_app.config["DEVICE_CONFIG"])  # timezone-aware
+        except Exception:
+            now = datetime.now(dt.tzinfo)
+    else:
+        now = datetime.now(dt.tzinfo)
+
+    # Align the input datetime to the device timezone for consistent comparisons
+    dt_local = dt.astimezone(now.tzinfo)
+    delta = now - dt_local
 
     # Compute time difference
     diff_seconds = delta.total_seconds()
@@ -206,11 +214,11 @@ def format_relative_time(iso_date_string):
         return "just now"
     elif diff_minutes < 60:
         return f"{int(diff_minutes)} minutes ago"
-    elif dt.date() == now.date():
-        return "today at " + dt.strftime(time_format).lstrip("0")
-    elif dt.date() == (now.date() - timedelta(days=1)):
-        return "yesterday at " + dt.strftime(time_format).lstrip("0")
+    elif dt_local.date() == now.date():
+        return "today at " + dt_local.strftime(time_format).lstrip("0")
+    elif dt_local.date() == (now.date() - timedelta(days=1)):
+        return "yesterday at " + dt_local.strftime(time_format).lstrip("0")
     else:
-        return dt.strftime(month_day_format).replace(
+        return dt_local.strftime(month_day_format).replace(
             " 0", " "
         )  # Removes leading zero in day
