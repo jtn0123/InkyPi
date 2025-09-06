@@ -14,6 +14,7 @@ import requests
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import load_image_from_bytes
 from utils.http_utils import http_get
 
 logger = logging.getLogger(__name__)
@@ -71,9 +72,13 @@ class Apod(BasePlugin):
             except TypeError:
                 img_data = http_get(image_url)
             if getattr(img_data, "status_code", 200) not in (200, 201, 204):
-                raise requests.exceptions.HTTPError(str(getattr(img_data, "status_code", 0)))
-            with Image.open(BytesIO(img_data.content)) as _img:
-                image = _img.copy()
+                raise requests.exceptions.HTTPError(
+                    str(getattr(img_data, "status_code", 0))
+                )
+            # Primary path: centralized loader
+            image = load_image_from_bytes(img_data.content, image_open=Image.open)
+            if image is None:
+                raise RuntimeError("Failed to decode APOD image bytes")
         except Exception as e:
             logger.error(f"Failed to load APOD image: {str(e)}")
             raise RuntimeError("Failed to load APOD image.")

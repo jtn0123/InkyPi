@@ -5,6 +5,7 @@ from PIL import Image, ImageColor, ImageOps
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import load_image_from_path
 
 LANCZOS = Resampling.LANCZOS
 
@@ -17,9 +18,10 @@ class ImageUpload(BasePlugin):
             raise RuntimeError("No images provided.")
         # Open the image using Pillow
         try:
-            # Use context manager and copy to release file handle
-            with Image.open(image_locations[img_index]) as _img:
-                image = _img.copy()
+            # Use standardized helper to release file handle
+            image = load_image_from_path(image_locations[img_index])
+            if image is None:
+                raise RuntimeError("Failed to read image file")
         except Exception as e:
             logger.error(f"Failed to read image file: {str(e)}")
             raise RuntimeError("Failed to read image file.")

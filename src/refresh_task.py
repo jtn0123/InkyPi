@@ -9,7 +9,7 @@ from PIL import Image
 from model import PlaylistManager, RefreshInfo
 from utils.time_utils import now_device_tz
 from plugins.plugin_registry import get_plugin_instance
-from utils.image_utils import compute_image_hash
+from utils.image_utils import compute_image_hash, load_image_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,15 @@ class RefreshTask:
             logger.warning(
                 "Background refresh task is not running, unable to do a manual update"
             )
+            # If task was never started (no thread), surface any captured exception
+            # to callers. If the thread exists (even if stopped), treat as a no-op
+            # because the background cycle already handled signaling.
+            if self.thread is None:
+                exc = self.refresh_result.get("exception")
+                if exc is not None:
+                    if isinstance(exc, BaseException):
+                        raise exc
+                    raise RuntimeError(str(exc))
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated)."""
@@ -348,8 +357,9 @@ class PlaylistRefresh(RefreshAction):
             logger.info(
                 f"Not time to refresh plugin instance, using latest image. | plugin_instance: {self.plugin_instance.name}."
             )
-            # Load the existing image from disk
-            with Image.open(plugin_image_path) as img:
-                image = img.copy()
+            # Load the existing image from disk using standardized helper
+            image = load_image_from_path(plugin_image_path)
+            if image is None:
+                raise RuntimeError("Failed to load existing plugin image from disk")
 
         return image

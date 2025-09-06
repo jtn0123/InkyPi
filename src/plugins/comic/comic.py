@@ -8,6 +8,7 @@ from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from utils.http_utils import http_get
+from utils.image_utils import load_image_from_bytes
 
 LANCZOS = Resampling.LANCZOS
 
@@ -52,13 +53,15 @@ class Comic(BasePlugin):
         except Exception as e:
             raise RuntimeError(f"Failed to download comic image: {str(e)}")
 
-        with Image.open(BytesIO(response.content)) as img:
-            img.thumbnail((width, height), LANCZOS)
-            background = Image.new("RGB", (width, height), "white")
-            background.paste(
-                img, ((width - img.width) // 2, (height - img.height) // 2)
-            )
-            return background
+        img = load_image_from_bytes(response.content, image_open=Image.open)
+        if img is None:
+            raise RuntimeError("Failed to decode comic image bytes")
+        img.thumbnail((width, height), LANCZOS)
+        background = Image.new("RGB", (width, height), "white")
+        background.paste(
+            img, ((width - img.width) // 2, (height - img.height) // 2)
+        )
+        return background
 
     def get_image_url(self, comic) -> str:
         if comic == "XKCD":

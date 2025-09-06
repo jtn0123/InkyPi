@@ -6,6 +6,7 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import process_image_from_bytes
 from utils.http_utils import http_get
 
 LANCZOS = Resampling.LANCZOS
@@ -18,9 +19,12 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
     try:
         response = http_get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
-        with Image.open(BytesIO(response.content)) as _img:
-            img = _img.resize(dimensions, LANCZOS)
-            return img
+        def _resize(im: Image.Image):
+            return im.resize(dimensions, LANCZOS)
+
+        return process_image_from_bytes(
+            response.content, processor=_resize, image_open=Image.open
+        )
     except Exception as e:
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None

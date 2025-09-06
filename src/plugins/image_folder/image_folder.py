@@ -6,6 +6,7 @@ from PIL import Image, ImageFilter, ImageOps
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import load_image_from_path
 
 LANCZOS = Resampling.LANCZOS
 
@@ -31,16 +32,19 @@ def grab_image(
 ) -> Image.Image | None:
     """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
     try:
-        # Use context manager and copy to ensure file handle is released
-        with Image.open(image_path) as _img:
-            img = ImageOps.exif_transpose(_img)  # Correct orientation using EXIF
-            if img is None:
-                raise RuntimeError("Failed to process image orientation")
-            # ImageOps.contain can return None for some modes; ensure non-None for mypy
-            contained = ImageOps.contain(img, dimensions, LANCZOS)
-            if contained is None:
-                raise RuntimeError("Failed to process image")
-            img = contained
+        loaded = load_image_from_path(image_path)
+        if loaded is None:
+            raise RuntimeError("Failed to load image from path")
+        assert isinstance(loaded, Image.Image)
+        transposed = ImageOps.exif_transpose(loaded)  # Correct orientation using EXIF
+        if transposed is None:
+            raise RuntimeError("Failed to transpose image orientation")
+        img: Image.Image = transposed
+        # ImageOps.contain can return None for some modes; ensure non-None for mypy
+        contained = ImageOps.contain(img, dimensions, LANCZOS)
+        if contained is None:
+            raise RuntimeError("Failed to process image")
+        img = contained
 
         if pad_image:
             bkg = ImageOps.fit(img, dimensions)

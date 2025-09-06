@@ -123,8 +123,11 @@ class AIImage(BasePlugin):
         raise_for_status = getattr(resp, "raise_for_status", None)
         if callable(raise_for_status):
             raise_for_status()
-        with Image.open(BytesIO(resp.content)) as _img:
-            return _img.copy()
+        from utils.image_utils import load_image_from_bytes
+        img = load_image_from_bytes(resp.content, image_open=Image.open)
+        if img is None:
+            raise RuntimeError("Failed to decode AI image bytes")
+        return img
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):

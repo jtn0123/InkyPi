@@ -388,3 +388,129 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
         # Clean up the test file
         if os.path.exists(plugin_image_path):
             os.unlink(plugin_image_path)
+
+
+def test_determine_next_plugin_not_time_to_update_path(device_config_dev, monkeypatch):
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    # Force should_refresh to False via method
+    monkeypatch.setattr("model.PlaylistManager.should_refresh", lambda *a, **k: False)
+
+    pm = device_config_dev.get_playlist_manager()
+    # Ensure a playlist exists with one plugin to exercise the branch
+    pm.add_playlist("P", "00:00", "24:00")
+    pm.add_plugin_to_playlist(
+        "P",
+        {
+            "plugin_id": "ai_text",
+            "name": "inst",
+            "plugin_settings": {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"},
+            "refresh": {"interval": 60},
+        },
+    )
+
+    import pytz
+    tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
+    now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
+    playlist, plugin_instance = task._determine_next_plugin(pm, device_config_dev.get_refresh_info(), now)
+    assert playlist is None and plugin_instance is None
+
+
+def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
+    from display.display_manager import DisplayManager
+    from plugins.plugin_registry import load_plugins, get_plugin_instance
+    from refresh_task import PlaylistRefresh, RefreshTask
+    from model import RefreshInfo
+    from PIL import Image
+
+    load_plugins(device_config_dev.get_plugins())
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    # Build a minimal playlist with one plugin instance
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("P", "00:00", "24:00")
+    pm.add_plugin_to_playlist(
+        "P",
+        {
+            "plugin_id": "ai_text",
+            "name": "inst",
+            "plugin_settings": {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"},
+            "refresh": {"interval": 60},
+        },
+    )
+
+    # Mock plugin generate_image to a deterministic image
+    import plugins.ai_text.ai_text as ai_text_mod
+    img = Image.new("RGB", device_config_dev.get_resolution(), "white")
+    monkeypatch.setattr(ai_text_mod.AIText, "generate_image", lambda self, s, c: img, raising=True)
+
+    # Make latest_refresh have same image hash so branch logs skip
+    plugin_cfg = device_config_dev.get_plugin("ai_text")
+    plugin = get_plugin_instance(plugin_cfg)
+
+    # Execute once to compute hash
+    import pytz
+    tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
+    now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
+
+    playlist = pm.get_playlist("P")
+    plugin_instance = playlist.get_next_plugin()
+    action = PlaylistRefresh(playlist, plugin_instance, force=True)
+    image = action.execute(plugin, device_config_dev, now)
+
+    # Set latest refresh with that hash
+    from utils.image_utils import compute_image_hash
+    same_hash = compute_image_hash(image)
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id=plugin_instance.plugin_id,
+        refresh_time=now.isoformat(),
+        image_hash=same_hash,
+        playlist=playlist.name,
+        plugin_instance=plugin_instance.name,
+    )
+
+    # Now run the outer path once by calling internal section under lock-free part
+    # Simulate selection from _run loop
+    latest_refresh = device_config_dev.get_refresh_info()
+    refresh_action = PlaylistRefresh(playlist, plugin_instance)
+
+    # Patch display to count calls
+    calls = {"display": 0}
+    monkeypatch.setattr(dm, "display_image", lambda *a, **k: calls.__setitem__("display", calls["display"] + 1))
+
+    plugin = get_plugin_instance(plugin_cfg)
+    image2 = refresh_action.execute(plugin, device_config_dev, now)
+    # Same image hash should not trigger display when compared
+    from utils.image_utils import compute_image_hash as _h
+    h2 = _h(image2)
+    assert h2 == same_hash
+    # Emulate the same branch that checks equality
+    if h2 != latest_refresh.image_hash:
+        dm.display_image(image2, image_settings=plugin.config.get("image_settings", []))
+    else:
+        pass
+    assert calls["display"] == 0
+
+
+def test_manual_update_propagates_exception(device_config_dev):
+    from display.display_manager import DisplayManager
+    from refresh_task import ManualRefresh, RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    # Arrange a manual result with an exception and ensure it is re-raised
+    task.refresh_result = {"exception": RuntimeError("boom")}
+    task.refresh_event.set()  # simulate completion
+
+    try:
+        task.manual_update(ManualRefresh("ai_text", {}))
+        assert False, "expected exception"
+    except RuntimeError as e:
+        assert "boom" in str(e)

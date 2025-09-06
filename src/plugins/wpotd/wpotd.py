@@ -94,7 +94,7 @@ class Wpotd(BasePlugin):
             response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
             # Use standardized helper to ensure resources are released
-            img = load_image_from_bytes(response.content)
+            img = load_image_from_bytes(response.content, image_open=Image.open)
             if img is None:
                 # Raise as UnidentifiedImageError to map to specific error handling
                 raise UnidentifiedImageError("Failed to decode image bytes")

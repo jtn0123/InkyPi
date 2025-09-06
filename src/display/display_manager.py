@@ -5,7 +5,12 @@ from datetime import datetime
 
 from display.abstract_display import AbstractDisplay
 from display.mock_display import MockDisplay
-from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
+from utils.image_utils import (
+    apply_image_enhancement,
+    change_orientation,
+    resize_image,
+    load_image_from_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,11 +125,10 @@ class DisplayManager:
         if not hasattr(self, "display"):
             raise ValueError("No valid display instance initialized.")
 
-        from PIL import Image
-
-        # Load image and copy to detach from file handle
-        with Image.open(image_path) as img:
-            image = img.copy()
+        # Load image using standardized helper
+        image = load_image_from_path(image_path)
+        if image is None:
+            raise RuntimeError("Failed to load preprocessed image from path")
 
         # Update preview/current files for the UI
         try:

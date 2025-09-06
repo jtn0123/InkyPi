@@ -193,3 +193,27 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
     )
     labels2 = [p["label"] for p in points2]
     assert "Visibility" in labels2 and "Air Quality" in labels2
+
+
+def test_open_meteo_moon_phase_fetch_failure(monkeypatch, weather_plugin):
+    w = weather_plugin
+    tz = pytz.timezone("UTC")
+    daily = {
+        "time": ["2025-01-01T00:00"],
+        "weathercode": [0],
+        "temperature_2m_max": [20],
+        "temperature_2m_min": [10],
+    }
+
+    # Make farmsense call raise to hit fallback path (illum_pct=0, newmoon)
+    import requests
+    monkeypatch.setattr("requests.get", lambda *a, **k: (_ for _ in ()).throw(requests.exceptions.ConnectionError()))
+    res = w.parse_open_meteo_forecast(daily, tz)
+    assert res and res[0]["moon_phase_pct"] == "0"
+    assert res[0]["moon_phase_icon"].endswith("newmoon.png")
+
+
+def test_open_meteo_unknown_code_maps_default(weather_plugin):
+    w = weather_plugin
+    # Code not in mapping should return default "01d"
+    assert w.map_weather_code_to_icon(12345, 12) == "01d"

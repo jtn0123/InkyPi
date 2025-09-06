@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from utils.image_utils import load_image_from_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -244,13 +245,14 @@ def handle_request_files(request_files, form_data=None):
             except Exception as e:
                 raise RuntimeError(f"Invalid image upload: {e}")
 
-            # Re-open to apply orientation and save
-            bio2 = BytesIO(content)
-            with Image.open(bio2) as img:
-                if img is None:
-                    raise RuntimeError("Failed to open image for processing")
-                img = ImageOps.exif_transpose(img)
-                img.save(file_path)
+            # Re-open with standardized helper to apply orientation and save
+            img = load_image_from_bytes(content, image_open=Image.open)
+            if img is None:
+                raise RuntimeError("Failed to open image for processing")
+            img = ImageOps.exif_transpose(img)
+            if img is None:
+                raise RuntimeError("Failed to transpose image for processing")
+            img.save(file_path)
         except Exception as e:
             # Fail hard on invalid image data
             logger.error(f"Failed to process uploaded file '{file_name}': {e}")
