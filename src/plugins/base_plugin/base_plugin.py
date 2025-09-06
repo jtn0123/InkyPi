@@ -84,4 +84,8 @@ class BasePlugin:
         template = self.env.get_template(html_file)
         rendered_html = template.render(template_params)
 
-        return take_screenshot_html(rendered_html, dimensions)
+        image = take_screenshot_html(rendered_html, dimensions)
+        if image is None:
+            logger.error("Rendering HTML to image returned None. Check screenshot backend.")
+            raise RuntimeError("Failed to render plugin image. See logs for details.")
+        return image

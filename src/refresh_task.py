@@ -115,6 +115,8 @@ class RefreshTask:
                     else:
                         plugin = get_plugin_instance(plugin_config)
                         image = refresh_action.execute(plugin, self.device_config, current_dt)
+                        if image is None:
+                            raise RuntimeError("Plugin returned None image; cannot refresh display.")
                         image_hash = compute_image_hash(image)
 
                         refresh_info = refresh_action.get_refresh_info()

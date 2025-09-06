@@ -19,8 +19,8 @@
         "active_playlist": null
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T10:32:22.989520+00:00",
-        "image_hash": "91287d144cf06db43b53e0380963ea59910f4271d28d64516688d58967778104",
+        "refresh_time": "2025-09-06T10:42:21.441269+00:00",
+        "image_hash": "eaf5ced2382b3cdd777a59630c38cf88de780c7fd45f039a3112c900d9380966",
         "refresh_type": "Manual Update",
         "plugin_id": "ai_image"
     }

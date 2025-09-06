@@ -85,6 +85,79 @@
             valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
         }
         document.addEventListener('DOMContentLoaded', populateIntervalFields);
+
+        // Logs viewer state
+        let logsPollingHandle = null;
+        let logsPaused = false;
+        let logsAutoScroll = true;
+
+        async function fetchAndRenderLogs() {
+            if (logsPaused) {
+                return;
+            }
+            const hoursSelect = document.getElementById('logsHours');
+            const hours = hoursSelect ? hoursSelect.value : '2';
+            const viewer = document.getElementById('logsViewer');
+            if (!viewer) return;
+            try {
+                const resp = await fetch(`{{ url_for('settings.download_logs') }}?hours=${encodeURIComponent(hours)}`, { cache: 'no-store' });
+                const text = await resp.text();
+                viewer.textContent = text;
+                if (logsAutoScroll) {
+                    viewer.scrollTop = viewer.scrollHeight;
+                }
+            } catch (e) {
+                console.error('Failed to fetch logs', e);
+            }
+        }
+
+        function startLogsPolling() {
+            const intervalInput = document.getElementById('logsInterval');
+            const intervalMs = Math.max(3, parseInt(intervalInput?.value || '5', 10)) * 1000;
+            stopLogsPolling();
+            // initial fetch immediately
+            fetchAndRenderLogs();
+            logsPollingHandle = setInterval(fetchAndRenderLogs, intervalMs);
+        }
+
+        function stopLogsPolling() {
+            if (logsPollingHandle) {
+                clearInterval(logsPollingHandle);
+                logsPollingHandle = null;
+            }
+        }
+
+        function toggleLogsPause() {
+            logsPaused = !logsPaused;
+            const btn = document.getElementById('logsPauseBtn');
+            if (btn) btn.textContent = logsPaused ? 'Resume' : 'Pause';
+            if (!logsPaused) {
+                fetchAndRenderLogs();
+            }
+        }
+
+        function toggleLogsAutoScroll() {
+            logsAutoScroll = !logsAutoScroll;
+            const btn = document.getElementById('logsAutoScrollBtn');
+            if (btn) btn.textContent = logsAutoScroll ? 'Auto-Scroll: On' : 'Auto-Scroll: Off';
+        }
+
+        function onLogsControlsChanged() {
+            startLogsPolling();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize logs controls
+            const hours = document.getElementById('logsHours');
+            const interval = document.getElementById('logsInterval');
+            const pauseBtn = document.getElementById('logsPauseBtn');
+            const autoBtn = document.getElementById('logsAutoScrollBtn');
+            if (hours) hours.addEventListener('change', onLogsControlsChanged);
+            if (interval) interval.addEventListener('change', onLogsControlsChanged);
+            if (pauseBtn) pauseBtn.addEventListener('click', toggleLogsPause);
+            if (autoBtn) autoBtn.addEventListener('click', toggleLogsAutoScroll);
+            startLogsPolling();
+        });
     </script>
 </head>
 <body>
@@ -262,6 +335,34 @@
         <div class="buttons-container">
             <button type="button" onclick="handleAction()" class="action-button">Save</button>
         </div>
+    </div>
+    <div class="separator" style="margin-top: 16px; margin-bottom: 16px;"></div>
+    <!-- Live Logs Section -->
+    <div class="frame">
+        <div class="app-header">
+            <div class="header-content">
+                <div class="title-container">
+                    <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="logs icon" class="app-icon">
+                    <h1 class="app-title">Logs</h1>
+                </div>
+                <div>
+                    <label for="logsHours" class="form-label" style="margin-right: 8px;">Since:</label>
+                    <select id="logsHours" class="form-input" style="width: auto; margin-right: 8px;">
+                        <option value="1">1 hour</option>
+                        <option value="2" selected>2 hours</option>
+                        <option value="6">6 hours</option>
+                        <option value="12">12 hours</option>
+                        <option value="24">24 hours</option>
+                    </select>
+                    <label for="logsInterval" class="form-label" style="margin-right: 8px;">Refresh(s):</label>
+                    <input id="logsInterval" type="number" min="3" value="5" class="form-input" style="width: 80px; margin-right: 8px;" />
+                    <button id="logsPauseBtn" class="header-button" type="button" style="background-color: #5a5a5a; color: #fff; margin-right: 8px;">Pause</button>
+                    <button id="logsAutoScrollBtn" class="header-button" type="button" style="background-color: #2c66b1; color: #fff;">Auto-Scroll: On</button>
+                </div>
+            </div>
+        </div>
+        <div class="separator"></div>
+        <pre id="logsViewer" style="white-space: pre-wrap; word-wrap: break-word; background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 8px; height: 320px; overflow: auto; margin: 0;"></pre>
     </div>
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}

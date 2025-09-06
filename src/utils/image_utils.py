@@ -97,13 +97,20 @@ def apply_image_enhancement(img, image_settings={}):
     return img
 
 def compute_image_hash(image):
-    """Compute SHA-256 hash of an image."""
+    """Compute SHA-256 hash of an image.
+
+    Raises:
+        ValueError: If image is None.
+    """
+    if image is None:
+        raise ValueError("compute_image_hash called with None image")
     image = image.convert("RGB")
     img_bytes = image.tobytes()
     return hashlib.sha256(img_bytes).hexdigest()
 
 def take_screenshot_html(html_str, dimensions, timeout_ms=None):
     image = None
+    html_file_path = None
     try:
         # Create a temporary HTML file
         with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as html_file:
@@ -111,17 +118,20 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
             html_file_path = html_file.name
 
         image = take_screenshot(html_file_path, dimensions, timeout_ms)
-
-        # Remove html file
-        os.remove(html_file_path)
-
     except Exception as e:
         logger.error(f"Failed to take screenshot: {str(e)}")
+    finally:
+        if html_file_path and os.path.exists(html_file_path):
+            try:
+                os.remove(html_file_path)
+            except Exception:
+                pass
 
     return image
 
 def take_screenshot(target, dimensions, timeout_ms=None):
     image = None
+    img_file_path = None
     try:
         # Create a temporary output file for the screenshot
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
@@ -148,22 +158,33 @@ def take_screenshot(target, dimensions, timeout_ms=None):
         ]
         if timeout_ms:
             command.append(f"--timeout={timeout_ms}")
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        try:
+            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except FileNotFoundError:
+            logger.error("Failed to take screenshot: 'chromium-headless-shell' not found. Install Chromium or set PATH.")
+            return None
 
         # Check if the process failed or the output file is missing
-        if result.returncode != 0 or not os.path.exists(img_file_path):
+        if result.returncode != 0 or not (img_file_path and os.path.exists(img_file_path)):
             logger.error("Failed to take screenshot:")
-            logger.error(result.stderr.decode('utf-8'))
+            try:
+                logger.error(result.stderr.decode('utf-8'))
+            except Exception:
+                pass
             return None
 
         # Load the image using PIL
         with Image.open(img_file_path) as img:
             image = img.copy()
 
-        # Remove image files
-        os.remove(img_file_path)
-
     except Exception as e:
         logger.error(f"Failed to take screenshot: {str(e)}")
+    finally:
+        if img_file_path and os.path.exists(img_file_path):
+            try:
+                os.remove(img_file_path)
+            except Exception:
+                pass
 
     return image
