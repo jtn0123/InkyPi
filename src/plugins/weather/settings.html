@@ -148,9 +148,13 @@
         const $mapModal = document.querySelector('#mapModal');
         const $closeMap = document.querySelector('#closeMap');
 
-        let latitude = +$latitude.value;
-        let longitude = +$longitude.value;
-        let zoom = latitude && longitude ? 4.5 : 2.5;
+        let latitude = +$latitude.value || 0;
+        let longitude = +$longitude.value || 0;
+        let zoom = (latitude && longitude) ? 4.5 : 2.5;
+
+        function updateZoom() {
+            zoom = (latitude && longitude && latitude !== 0 && longitude !== 0) ? 4.5 : 2.5;
+        }
         let selectedTitle = 'location';
         let weatherProvider = 'OpenWeatherMap';
 
@@ -167,6 +171,10 @@
                     map.on('click', event => {
                         marker.setLatLng(event.latlng);
                     });
+                } else {
+                    // Update existing map view and marker position
+                    map.setView([latitude, longitude], zoom);
+                    marker.setLatLng([latitude, longitude]);
                 }
             }, 100);
         });
@@ -175,12 +183,18 @@
             const position = marker.getLatLng().wrap();
             $latitude.value = position.lat;
             $longitude.value = position.lng;
+            latitude = position.lat;
+            longitude = position.lng;
+            updateZoom();
             closeModal('mapModal');
         });
 
         if (loadPluginSettings) {
             document.getElementById('latitude').value = pluginSettings.latitude;
             document.getElementById('longitude').value = pluginSettings.longitude;
+            latitude = pluginSettings.latitude;
+            longitude = pluginSettings.longitude;
+            updateZoom();
 
             document.getElementById('units').value = pluginSettings.units;
 
