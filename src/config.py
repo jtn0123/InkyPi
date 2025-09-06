@@ -9,10 +9,11 @@ from typing import Any, cast
 from dotenv import load_dotenv, set_key, unset_key
 
 # Optional dependency: jsonschema for validating device.json (loaded dynamically to avoid typing issues)
+jsonschema: Any = None
 try:
     jsonschema = importlib.import_module("jsonschema")
 except Exception:  # pragma: no cover
-    jsonschema = None  # type: ignore
+    jsonschema = None
 
 from model import PlaylistManager, RefreshInfo
 
@@ -322,10 +323,7 @@ class Config:
         if jsonschema is None:
             # Only validate orientation if provided; schema does not require it
             if "orientation" in config:
-                try:
-                    orientation = config.get("orientation")
-                except Exception:
-                    orientation = None
+                orientation = config.get("orientation")
                 if orientation not in ("horizontal", "vertical"):
                     raise ValueError(
                         f"device.json failed schema validation: orientation: invalid value (got: {repr(orientation)})"
