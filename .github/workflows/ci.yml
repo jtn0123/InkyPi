@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: install/requirements-dev.txt
+      - name: Install dev dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r install/requirements-dev.txt
+      - name: Ruff + Black
+        run: scripts/lint.sh
+      - name: Type check (mypy)
+        run: mypy src
+
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+      - name: Run shellcheck
+        run: |
+          shellcheck install/*.sh scripts/*.sh install/inkypi || true
+
+  tests:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.11', '3.12', '3.13' ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+          pip check
+      - name: Run tests
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
+        run: |
+          pytest --cov=src --cov-report=xml -q
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: error
+
+  smoke:
+    name: Install smoke (container)
+    needs: tests
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install OS dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            python3 python3-venv python3-pip git curl \
+            libopenjp2-7 libopenblas-dev libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Setup virtualenv
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip wheel
+      - name: Install Python dependencies
+        run: |
+          . .venv/bin/activate
+          pip install -r install/requirements.txt
+          pip check || true
+      - name: Import smoke
+        run: |
+          . .venv/bin/activate
+          python - <<'PY'
+          import flask, PIL, requests, urllib3, numpy, icalendar, psutil, waitress
+          import pytz, feedparser
+          print("Imports OK")
+          PY
+      - name: Boot web-only and probe routes
+        env:
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
+        run: |
+          . .venv/bin/activate
+          python src/inkypi.py --dev --web-only &
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8080/ >/dev/null
+          curl -fsS http://127.0.0.1:8080/settings >/dev/null
+          curl -fsS http://127.0.0.1:8080/playlist >/dev/null
+          curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/preview | tee preview_code.txt
+          curl -fsS http://127.0.0.1:8080/plugin/clock >/dev/null
+          curl -fsS http://127.0.0.1:8080/plugin/images/clock/faces/digital.png >/dev/null
+          curl -fsS "http://127.0.0.1:8080/download-logs?hours=2" >/dev/null
+          curl -fsS "http://127.0.0.1:8080/api/logs?hours=2&limit=200" >/dev/null
+          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
+          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/update_now >/dev/null
+          if [ ! -f src/static/images/processed_image.png ] && [ ! -f mock_display_output/latest.png ]; then
+            echo "Expected preview image not found" >&2; exit 1; fi
+          curl -fsS http://127.0.0.1:8080/preview >/dev/null
+
+
