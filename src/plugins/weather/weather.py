@@ -527,6 +527,7 @@ class Weather(BasePlugin):
 
         # Visibility
         current_visibility = "N/A"
+        unit_label = "ft" if units == "imperial" else "km"
         visibility_hourly_times = hourly_data.get('time', [])
         visibility_values = hourly_data.get('visibility', [])
         for i, time_str in enumerate(visibility_hourly_times):
@@ -535,10 +536,8 @@ class Weather(BasePlugin):
                     visibility = visibility_values[i]
                     if units == "imperial":
                         current_visibility = int(round(visibility, 0))
-                        unit_label = "ft"
                     else:
                         current_visibility = round(visibility / 1000, 1)
-                        unit_label = "km"
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for visibility.")
@@ -567,8 +566,12 @@ class Weather(BasePlugin):
                 logger.warning(f"Could not parse time string {time_str} for AQI.")
                 continue
         scale = ""
-        if current_aqi:
-            scale = ["Good","Fair","Moderate","Poor","Very Poor","Ext Poor"][min(current_aqi//20,5)]
+        if isinstance(current_aqi, (int, float)):
+            try:
+                idx = min(int(current_aqi // 20), 5)
+                scale = ["Good","Fair","Moderate","Poor","Very Poor","Ext Poor"][idx]
+            except Exception:
+                scale = ""
         data_points.append({
             "label": "Air Quality", "measurement": current_aqi,
             "unit": scale, "icon": self.get_plugin_dir('icons/aqi.png')
