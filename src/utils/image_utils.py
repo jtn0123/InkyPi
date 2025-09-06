@@ -137,32 +137,49 @@ def take_screenshot(target, dimensions, timeout_ms=None):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
             img_file_path = img_file.name
 
-        command = [
+        # Try different browser binaries in order of preference
+        browsers = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "chromium",
             "chromium-headless-shell",
-            target,
-            "--headless",
-            f"--screenshot={img_file_path}",
-            f"--window-size={dimensions[0]},{dimensions[1]}",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
-            "--use-gl=swiftshader",
-            "--hide-scrollbars",
-            "--in-process-gpu",
-            "--js-flags=--jitless",
-            "--disable-zero-copy",
-            "--disable-gpu-memory-buffer-compositor-resources",
-            "--disable-extensions",
-            "--disable-plugins",
-            "--mute-audio",
-            "--no-sandbox"
+            "google-chrome"
         ]
-        if timeout_ms:
-            command.append(f"--timeout={timeout_ms}")
+
+        command = None
+        for browser in browsers:
+            if os.path.exists(browser) or (browser in ["chromium", "chromium-headless-shell", "google-chrome"] and subprocess.run(["which", browser], capture_output=True).returncode == 0):
+                command = [
+                    browser,
+                    target,
+                    "--headless",
+                    f"--screenshot={img_file_path}",
+                    f"--window-size={dimensions[0]},{dimensions[1]}",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--use-gl=swiftshader",
+                    "--hide-scrollbars",
+                    "--in-process-gpu",
+                    "--js-flags=--jitless",
+                    "--disable-zero-copy",
+                    "--disable-gpu-memory-buffer-compositor-resources",
+                    "--disable-extensions",
+                    "--disable-plugins",
+                    "--mute-audio",
+                    "--no-sandbox"
+                ]
+                if timeout_ms:
+                    command.append(f"--timeout={timeout_ms}")
+                break
+
+        if command is None:
+            logger.error("Failed to take screenshot: No supported browser found. Install Chromium or Google Chrome.")
+            return None
 
         try:
             result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         except FileNotFoundError:
-            logger.error("Failed to take screenshot: 'chromium-headless-shell' not found. Install Chromium or set PATH.")
+            logger.error("Failed to take screenshot: Browser binary not found.")
             return None
 
         # Check if the process failed or the output file is missing

@@ -126,7 +126,7 @@ def test_weather_save_settings(client, monkeypatch):
     }
 
     # Test saving settings
-    resp = client.post('/plugin/save_plugin_settings', data=data)
+    resp = client.post('/save_plugin_settings', data=data)
     assert resp.status_code == 200
     result = resp.get_json()
     assert result['success'] is True

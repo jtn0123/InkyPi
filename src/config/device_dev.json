@@ -19,9 +19,9 @@
         "active_playlist": null
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T11:27:11.831758+00:00",
-        "image_hash": "3d9dbc9c386a4ee83babc7ed4a85eb110082ba994ba913d88af86ea855faa1bf",
+        "refresh_time": "2025-09-06T11:32:17.461908+00:00",
+        "image_hash": "9396f8205585bc72b126e00020cee2303ab5892b485ae7f410d5e539cecb65ae",
         "refresh_type": "Manual Update",
-        "plugin_id": "comic"
+        "plugin_id": "weather"
     }
 }
