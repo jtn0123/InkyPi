@@ -23,6 +23,9 @@ class Config:
     # Directory path for storing plugin instance images
     plugin_image_dir = os.path.join(BASE_DIR, "static", "images", "plugins")
 
+    # Directory path for storing historical processed images
+    history_image_dir = os.path.join(BASE_DIR, "static", "images", "history")
+
     def __init__(self):
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
@@ -31,6 +34,7 @@ class Config:
         os.makedirs(os.path.dirname(self.current_image_file), exist_ok=True)
         os.makedirs(os.path.dirname(self.processed_image_file), exist_ok=True)
         os.makedirs(self.plugin_image_dir, exist_ok=True)
+        os.makedirs(self.history_image_dir, exist_ok=True)
 
         self.config = self.read_config()
         self.plugins_list = self.read_plugins_list()
