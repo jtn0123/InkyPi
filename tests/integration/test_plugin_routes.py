@@ -1,5 +1,4 @@
 # pyright: reportMissingImports=false
-from io import BytesIO
 
 
 def test_plugin_page_not_found(client):
