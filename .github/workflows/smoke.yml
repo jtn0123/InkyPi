@@ -57,5 +57,36 @@ jobs:
           done
           curl -fsS http://127.0.0.1:8080/ >/dev/null
           curl -fsS http://127.0.0.1:8080/settings >/dev/null
+          curl -fsS http://127.0.0.1:8080/playlist >/dev/null
+          # preview may 404 before any render; tolerate but don't fail yet
+          curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/preview | tee preview_code.txt
+          # plugin page and static asset
+          curl -fsS http://127.0.0.1:8080/plugin/clock >/dev/null
+          curl -fsS http://127.0.0.1:8080/plugin/images/clock/faces/digital.png >/dev/null
+          # logs endpoints (work without cysystemd in dev)
+          curl -fsS "http://127.0.0.1:8080/download-logs?hours=2" >/dev/null
+          curl -fsS "http://127.0.0.1:8080/api/logs?hours=2&limit=200" >/dev/null
+
+      - name: Exercise JSON APIs and manual update
+        run: |
+          . .venv/bin/activate
+          # create -> update -> delete playlist
+          curl -fsS -H 'Content-Type: application/json' \
+            -d '{"playlist_name":"CI","start_time":"00:00","end_time":"23:59"}' \
+            http://127.0.0.1:8080/create_playlist >/dev/null
+          curl -fsS -X PUT -H 'Content-Type: application/json' \
+            -d '{"new_name":"CI2","start_time":"00:00","end_time":"23:59"}' \
+            http://127.0.0.1:8080/update_playlist/CI >/dev/null
+          curl -fsS -X DELETE http://127.0.0.1:8080/delete_playlist/CI2 >/dev/null
+
+          # save minimal plugin settings (clock) and trigger manual update
+          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
+          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/update_now >/dev/null
+
+          # verify a preview image now exists (either processed or mock latest)
+          if [ ! -f src/static/images/processed_image.png ] && [ ! -f mock_display_output/latest.png ]; then
+            echo "Expected preview image not found" >&2; exit 1; fi
+          # preview should now be available
+          curl -fsS http://127.0.0.1:8080/preview >/dev/null
 
 
