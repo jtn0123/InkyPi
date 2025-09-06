@@ -122,6 +122,13 @@ def create_app():
 
     # Set additional parameters
     app.config['MAX_FORM_PARTS'] = 10_000
+    # Enforce maximum request payload size (bytes)
+    try:
+        _max_len_env = os.getenv('MAX_CONTENT_LENGTH') or os.getenv('MAX_UPLOAD_BYTES')
+        _max_len = int(_max_len_env) if _max_len_env else 10 * 1024 * 1024
+    except Exception:
+        _max_len = 10 * 1024 * 1024
+    app.config['MAX_CONTENT_LENGTH'] = _max_len
 
     # Register Blueprints
     app.register_blueprint(main_bp)
@@ -142,6 +149,21 @@ def create_app():
             if rt and not rt.running:
                 logger.info("Starting refresh task (flask dev server lazy start)")
                 rt.start()
+
+    @app.after_request
+    def _set_security_headers(response):
+        # Basic hardening headers
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+        response.headers.setdefault('Referrer-Policy', 'no-referrer')
+        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        # Enable HSTS only when under HTTPS/behind a proxy forwarding HTTPS
+        try:
+            if request.is_secure or request.headers.get('X-Forwarded-Proto', '').lower() == 'https':
+                response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        except Exception:
+            pass
+        return response
 
     return app
 

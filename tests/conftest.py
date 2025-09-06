@@ -101,6 +101,13 @@ def flask_app(device_config_dev, monkeypatch):
     app.config['DISPLAY_MANAGER'] = display_manager
     app.config['REFRESH_TASK'] = refresh_task
     app.config['MAX_FORM_PARTS'] = 10_000
+    # Mirror request size limit from app
+    try:
+        _max_len_env = os.getenv('MAX_CONTENT_LENGTH') or os.getenv('MAX_UPLOAD_BYTES')
+        _max_len = int(_max_len_env) if _max_len_env else 10 * 1024 * 1024
+    except Exception:
+        _max_len = 10 * 1024 * 1024
+    app.config['MAX_CONTENT_LENGTH'] = _max_len
 
     # Register routes
     app.register_blueprint(main_bp)

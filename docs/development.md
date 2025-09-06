@@ -49,6 +49,26 @@ source venv/bin/activate             # Activate virtual environment
 deactivate                           # Exit virtual environment
 ```
 
+## Linting & Formatting
+
+Ruff and Black are configured via `pyproject.toml`.
+
+```bash
+# Install dev dependencies (first time)
+pip install -r install/requirements-dev.txt
+
+# Check lint and formatting (no changes)
+./scripts/lint.sh
+
+# Auto-fix imports and format code
+./scripts/format.sh
+```
+
+Notes:
+
+- Ruff runs checks for pyflakes/pycodestyle/pyupgrade and sorts imports.
+- Black enforces consistent formatting. Line length is 88.
+
 ## Development Tips
 
 1. **Check rendered output**: Images are saved to `mock_display_output/`

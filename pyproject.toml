@@ -1,0 +1,39 @@
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+extend-exclude = """
+(
+  mock_display_output
+)
+"""
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+exclude = [
+  ".git",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "mock_display_output",
+  "src/display/waveshare_epd"
+]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle
+  "F",   # pyflakes
+  "I",   # isort (imports)
+  "UP"   # pyupgrade
+]
+ignore = [
+  "E501" # line length handled by Black
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["src"]
+
+
