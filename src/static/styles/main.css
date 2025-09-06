@@ -711,6 +711,8 @@ body {
     justify-content: space-between;
     align-items: center;
     width: 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
 }
 
 .title-container {
@@ -1053,6 +1055,44 @@ body {
 .logs-controls #logsMaxLines { width: 90px; }
 .logs-controls #logsInterval { width: 80px; }
 .logs-controls .header-button { margin-right: 8px; }
+
+/* Header actions: keep buttons tidy and wrapping nicely */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Logs header layout: split filters and actions */
+.logs-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+@media (min-width: 980px) {
+  .logs-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.logs-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.logs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
 .logs-updated-row {
   display: flex;

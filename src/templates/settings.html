@@ -322,7 +322,7 @@
                     <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="settings icon" class="app-icon">
                     <h1 class="app-title">Settings</h1>
                 </div>
-                <div>
+                <div class="header-actions">
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                     <button class="header-button is-warning" onclick="handleShutdown(true)">Reboot</button>
@@ -449,12 +449,17 @@
     <!-- Live Logs Section -->
     <div class="frame settings-panel logs-panel">
         <div class="app-header logs-toolbar">
-            <div class="header-content">
+            <div class="header-content logs-header">
                 <div class="title-container">
-                    <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="logs icon" class="app-icon">
+                    <!-- Inline SVG log icon (document-like) to differentiate from gear -->
+                    <svg class="app-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="#333" stroke-width="1.6" fill="#fff"/>
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="#333" stroke-width="1.6"/>
+                        <path d="M8 12h8M8 16h8M8 20h8" stroke="#2c66b1" stroke-width="1.6"/>
+                    </svg>
                     <h1 class="app-title">Logs</h1>
                 </div>
-                <div class="logs-controls">
+                <div class="logs-filters">
                     <input id="logsFilter" type="text" placeholder="Filter" class="form-input" />
                     <label for="logsLevel" class="form-label">Show:</label>
                     <select id="logsLevel" class="form-input">
@@ -474,6 +479,8 @@
                     <input id="logsMaxLines" type="number" min="50" value="500" class="form-input" />
                     <label for="logsInterval" class="form-label">Refresh(s):</label>
                     <input id="logsInterval" type="number" min="3" value="5" class="form-input" />
+                </div>
+                <div class="logs-actions">
                     <button id="logsPauseBtn" class="header-button is-dark" type="button">Pause</button>
                     <button id="logsAutoScrollBtn" class="header-button is-secondary" type="button">Auto-Scroll: On</button>
                     <button id="logsWrapBtn" class="header-button is-secondary" type="button">Wrap: On</button>
