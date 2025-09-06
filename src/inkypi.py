@@ -28,26 +28,56 @@ from blueprints.plugin import plugin_bp
 from blueprints.playlist import playlist_bp
 from jinja2 import ChoiceLoader, FileSystemLoader
 from plugins.plugin_registry import load_plugins
-from waitress import serve
+from waitress import serve  # type: ignore
 
 
 logger = logging.getLogger(__name__)
 
+"""CLI and runtime configuration
+
+Options precedence:
+1. CLI flags
+2. Environment variables (INKYPI_*, PORT)
+3. Defaults
+"""
+
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='InkyPi Display Server')
 parser.add_argument('--dev', action='store_true', help='Run in development mode')
+parser.add_argument('--config', type=str, default=None, help='Path to device config JSON file')
+parser.add_argument('--port', type=int, default=None, help='Port to listen on')
 args = parser.parse_args()
 
-# Set development mode settings
+# Infer DEV_MODE from CLI or environment
+env_mode = (os.getenv('INKYPI_ENV', '').strip() or os.getenv('FLASK_ENV', '').strip()).lower()
+DEV_MODE = bool(args.dev or env_mode in ('dev', 'development'))
+
+# If --dev explicitly passed, set env var for downstream logic and logs
 if args.dev:
-    Config.config_file = os.path.join(Config.BASE_DIR, "config", "device_dev.json")
-    DEV_MODE = True
-    PORT = 8080
-    logger.info("Starting InkyPi in DEVELOPMENT mode on port 8080")
+    os.environ['INKYPI_ENV'] = 'dev'
+
+# Config file selection via CLI has highest priority; otherwise resolver will decide
+if args.config:
+    Config.config_file = args.config
+
+# Determine port
+if args.port is not None:
+    PORT = args.port
 else:
-    DEV_MODE = False
-    PORT = 80
-    logger.info("Starting InkyPi in PRODUCTION mode on port 80")
+    # Prefer env INKYPI_PORT then PORT; default by mode
+    env_port = os.getenv('INKYPI_PORT') or os.getenv('PORT')
+    if env_port:
+        try:
+            PORT = int(env_port)
+        except ValueError:
+            PORT = 8080 if DEV_MODE else 80
+    else:
+        PORT = 8080 if DEV_MODE else 80
+
+if DEV_MODE:
+    logger.info(f"Starting InkyPi in DEVELOPMENT mode on port {PORT}")
+else:
+    logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
 logging.getLogger('waitress.queue').setLevel(logging.ERROR)
 app = Flask(__name__)
 template_dirs = [

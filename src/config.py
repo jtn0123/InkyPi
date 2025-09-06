@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import shutil
 from dotenv import load_dotenv
 from model import PlaylistManager, RefreshInfo
 
@@ -10,7 +11,7 @@ class Config:
     # Base path for the project directory
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    # File paths relative to the script's directory
+    # File paths relative to the script's directory (default; can be overridden)
     config_file = os.path.join(BASE_DIR, "config", "device.json")
 
     # File path for storing the current image being displayed
@@ -20,10 +21,78 @@ class Config:
     plugin_image_dir = os.path.join(BASE_DIR, "static", "images", "plugins")
 
     def __init__(self):
+        # Resolve which config file to use (env/CLI overrides with safe fallbacks)
+        self.config_file = self._determine_config_path()
+
+        # Ensure output directories exist
+        os.makedirs(os.path.dirname(self.current_image_file), exist_ok=True)
+        os.makedirs(self.plugin_image_dir, exist_ok=True)
+
         self.config = self.read_config()
         self.plugins_list = self.read_plugins_list()
         self.playlist_manager = self.load_playlist_manager()
         self.refresh_info = self.load_refresh_info()
+
+    def _determine_config_path(self):
+        """Determine which device config file to load.
+
+        Precedence:
+        1. INKYPI_CONFIG_FILE env var if it exists
+        2. Explicit class attribute override (e.g., set by CLI) if it exists
+        3. INKYPI_ENV=dev implies device_dev.json if present
+        4. device.json if present
+        5. device_dev.json if present
+        6. Bootstrap device.json from install/config_base/device.json
+        """
+        base_dir = self.BASE_DIR
+        config_dir = os.path.join(base_dir, "config")
+        prod_path = os.path.join(config_dir, "device.json")
+        dev_path = os.path.join(config_dir, "device_dev.json")
+
+        # 1) Explicit file from environment
+        env_file = os.getenv("INKYPI_CONFIG_FILE")
+        if env_file and os.path.isfile(env_file):
+            logger.info(f"Using config file from INKYPI_CONFIG_FILE: {env_file}")
+            return env_file
+
+        # 2) Respect class attribute override (possibly set by CLI)
+        class_override = getattr(type(self), "config_file", None)
+        if class_override and os.path.isfile(class_override):
+            logger.info(f"Using config file from class override: {class_override}")
+            return class_override
+
+        # 3) INKYPI_ENV hint
+        env_mode = (os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()).lower()
+        if env_mode in ("dev", "development") and os.path.isfile(dev_path):
+            logger.info(f"Using dev config due to INKYPI_ENV: {dev_path}")
+            return dev_path
+
+        # 4) Prefer prod if it exists
+        if os.path.isfile(prod_path):
+            logger.info(f"Using prod config: {prod_path}")
+            return prod_path
+
+        # 5) Fallback to dev if it exists
+        if os.path.isfile(dev_path):
+            logger.info(f"Using dev config (fallback): {dev_path}")
+            return dev_path
+
+        # 6) Bootstrap from template if neither exists
+        template_path = os.path.abspath(os.path.join(base_dir, "..", "install", "config_base", "device.json"))
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+            shutil.copyfile(template_path, prod_path)
+            logger.warning(
+                "No config found. Bootstrapped a new device.json from template: %s",
+                template_path,
+            )
+            return prod_path
+        except Exception as ex:
+            raise RuntimeError(
+                f"Unable to locate or create a device configuration file. Checked: "
+                f"env INKYPI_CONFIG_FILE, class override, {prod_path}, {dev_path}. "
+                f"Also attempted bootstrap from {template_path} and failed: {ex}"
+            )
 
     def read_config(self):
         """Reads the device config JSON file and returns it as a dictionary."""
@@ -39,8 +108,11 @@ class Config:
         """Reads the plugin-info.json config JSON from each plugin folder. Excludes the base plugin."""
         # Iterate over all plugin folders
         plugins_list = []
-        for plugin in sorted(os.listdir(os.path.join(self.BASE_DIR, "plugins"))):
-            plugin_path = os.path.join(self.BASE_DIR, "plugins", plugin)
+        plugins_root = os.path.join(self.BASE_DIR, "plugins")
+        if not os.path.isdir(plugins_root):
+            return plugins_list
+        for plugin in sorted(os.listdir(plugins_root)):
+            plugin_path = os.path.join(plugins_root, plugin)
             if os.path.isdir(plugin_path) and plugin != "__pycache__":
                 # Check if the plugin-info.json file exists
                 plugin_info_file = os.path.join(plugin_path, "plugin-info.json")

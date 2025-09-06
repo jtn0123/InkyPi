@@ -6,6 +6,11 @@ import pytest
 from PIL import Image
 import sys
 
+# Ensure src/ is on sys.path for module imports like `utils` and `inkypi`
+SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+if SRC_ABS not in sys.path:
+    sys.path.insert(0, SRC_ABS)
+
 
 @pytest.fixture(autouse=True)
 def mock_screenshot(monkeypatch):
@@ -15,11 +20,6 @@ def mock_screenshot(monkeypatch):
         width, height = dims
         img = Image.new("RGB", (width, height), "white")
         return img
-
-    # Ensure src/ is on sys.path for module imports like `utils` and `inkypi`
-    SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
-    if SRC_ABS not in sys.path:
-        sys.path.insert(0, SRC_ABS)
 
     import utils.image_utils as image_utils
     monkeypatch.setattr(image_utils, "take_screenshot", _fake_screenshot, raising=True)
