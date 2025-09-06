@@ -102,3 +102,6 @@ python scripts/plugin_validator.py clock   # validate a single plugin
 2. Click "Display" button
 3. Check `mock_display_output/latest.png` for result
 4. Iterate quickly without deployment
+5. BasePlugin notes:
+   - Jinja environment is initialized even if a plugin lacks its own `render/` directory. Base templates under `plugins/base_plugin/render/` are always available.
+   - If a plugin does not provide `settings.html`, the UI will include `base_plugin/settings.html` by default.
