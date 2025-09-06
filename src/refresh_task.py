@@ -72,13 +72,12 @@ class RefreshTask:
         """
         while True:
             try:
+                # Step 1: Wait for interval or notification and decide next action while holding the lock
                 with self.condition:
                     sleep_time = self.device_config.get_config("plugin_cycle_interval_seconds", default=60*60)
 
                     # Wait for sleep_time or until notified
                     self.condition.wait(timeout=sleep_time)
-                    self.refresh_result = {}
-                    self.refresh_event.clear()
 
                     # Exit if `stop()` is called
                     if not self.running:
@@ -95,7 +94,6 @@ class RefreshTask:
                         refresh_action = self.manual_update_request
                         self.manual_update_request = ()
                     else:
-
                         if self.device_config.get_config("log_system_stats"):
                             self.log_system_stats()
 
@@ -105,11 +103,16 @@ class RefreshTask:
                         if plugin_instance:
                             refresh_action = PlaylistRefresh(playlist, plugin_instance)
 
-                    if refresh_action:
-                        plugin_config = self.device_config.get_plugin(refresh_action.get_plugin_id())
-                        if plugin_config is None:
-                            logger.error(f"Plugin config not found for '{refresh_action.get_plugin_id()}'.")
-                            continue
+                # Step 2: Perform work outside the lock to avoid blocking other signals
+                if refresh_action:
+                    # Prepare signaling state for any waiter (e.g., manual_update)
+                    self.refresh_result = {}
+                    self.refresh_event.clear()
+
+                    plugin_config = self.device_config.get_plugin(refresh_action.get_plugin_id())
+                    if plugin_config is None:
+                        logger.error(f"Plugin config not found for '{refresh_action.get_plugin_id()}'.")
+                    else:
                         plugin = get_plugin_instance(plugin_config)
                         image = refresh_action.execute(plugin, self.device_config, current_dt)
                         image_hash = compute_image_hash(image)
