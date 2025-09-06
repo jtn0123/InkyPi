@@ -1006,3 +1006,74 @@ body {
     background-color: #f0f0f0;
     color: #666;
 }
+
+/* --- Settings sections & headings --- */
+.section {
+  border: 1px solid #eee;
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #444;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Header button color variants */
+.header-button.is-secondary {
+  background-color: #2c66b1;
+}
+
+.header-button.is-dark {
+  background-color: #5a5a5a;
+}
+
+.header-button.is-warning {
+  background-color: #FFD600;
+  color: #333;
+}
+
+.header-button.is-danger {
+  background-color: #E53935;
+}
+
+/* Logs toolbar and viewer tidy styles */
+.logs-controls .form-input {
+  width: auto;
+  margin-right: 8px;
+}
+
+.logs-controls #logsFilter { width: 180px; }
+.logs-controls #logsMaxLines { width: 90px; }
+.logs-controls #logsInterval { width: 80px; }
+.logs-controls .header-button { margin-right: 8px; }
+
+.logs-updated-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.logs-updated {
+  font-size: 12px;
+  color: #666;
+}
+
+.logs-viewer {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 12px;
+  border-radius: 8px;
+  height: 320px;
+  overflow: auto;
+  margin: 0;
+}
