@@ -167,6 +167,7 @@ def test_secret_key_persisted_in_dev_env_file(monkeypatch, tmp_path):
     # Reload; should reuse same key from file
     mod2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     app2 = getattr(mod2, "app", None)
+    assert app2 is not None
     assert app2.secret_key == generated
 
 
@@ -175,11 +176,13 @@ def test_secret_key_ephemeral_in_prod_when_missing(monkeypatch, tmp_path):
     env = {"INKYPI_ENV": "production", "PROJECT_DIR": str(tmp_path)}
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     app = getattr(mod, "app", None)
+    assert app is not None
     first = app.secret_key
 
     # Reload without setting SECRET_KEY; likely different each time
     mod2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     app2 = getattr(mod2, "app", None)
+    assert app2 is not None
     second = app2.secret_key
 
     assert isinstance(first, str) and isinstance(second, str)
