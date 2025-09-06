@@ -12,15 +12,46 @@
                 "name": "Default",
                 "start_time": "00:00",
                 "end_time": "24:00",
-                "plugins": [],
+                "plugins": [
+                    {
+                        "plugin_id": "weather",
+                        "name": "weather_saved_settings",
+                        "plugin_settings": {
+                            "latitude": "32.796798706017064",
+                            "longitude": "-116.95907592773438",
+                            "weatherProvider": "OpenWeatherMap",
+                            "units": "imperial",
+                            "titleSelection": "location",
+                            "customTitle": "",
+                            "displayRefreshTime": "true",
+                            "displayMetrics": "true",
+                            "displayGraph": "true",
+                            "displayForecast": "true",
+                            "forecastDays": "7",
+                            "weatherTimeZone": "locationTimeZone",
+                            "selectedFrame": "None",
+                            "topMargin": "",
+                            "bottomMargin": "",
+                            "leftMargin": "",
+                            "rightMargin": "",
+                            "backgroundOption": "color",
+                            "backgroundColor": "#ffffff",
+                            "textColor": "#000000"
+                        },
+                        "refresh": {
+                            "interval": 3600
+                        },
+                        "latest_refresh_time": null
+                    }
+                ],
                 "current_plugin_index": null
             }
         ],
         "active_playlist": null
     },
     "refresh_info": {
-        "refresh_time": "2025-09-06T11:32:17.461908+00:00",
-        "image_hash": "9396f8205585bc72b126e00020cee2303ab5892b485ae7f410d5e539cecb65ae",
+        "refresh_time": "2025-09-06T11:37:51.801899+00:00",
+        "image_hash": "e3eef272de3dee8c10cc3a600e226abc89e17f2fe75660c6647862bf66caffce",
         "refresh_type": "Manual Update",
         "plugin_id": "weather"
     }

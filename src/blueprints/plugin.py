@@ -33,6 +33,16 @@ def plugin_page(plugin_id):
                 # add plugin instance settings to the template to prepopulate
                 template_params["plugin_settings"] = plugin_instance.settings
                 template_params["plugin_instance"] = plugin_instance_name
+            else:
+                # Try to find a saved settings instance for this plugin
+                default_playlist = playlist_manager.get_playlist("Default")
+                if default_playlist:
+                    saved_instance_name = f"{plugin_id}_saved_settings"
+                    saved_instance = default_playlist.find_plugin(plugin_id, saved_instance_name)
+                    if saved_instance:
+                        # Load the saved settings
+                        template_params["plugin_settings"] = saved_instance.settings
+                        template_params["plugin_instance"] = saved_instance_name
 
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:

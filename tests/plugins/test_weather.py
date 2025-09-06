@@ -133,3 +133,55 @@ def test_weather_save_settings(client, monkeypatch):
     assert 'weather_saved_settings' in result['instance_name']
 
 
+def test_weather_settings_persistence(client, monkeypatch):
+    """Test that saved weather settings persist when navigating back to plugin page."""
+    # Mock the weather API calls
+    import requests
+    def fake_get(url, *args, **kwargs):
+        class R:
+            status_code = 200
+            def json(self_inner):
+                if 'air_pollution' in url:
+                    return {"list": [{"main": {"aqi": 3}}]}
+                if 'geo/1.0/reverse' in url:
+                    return [{"name": "City", "state": "ST", "country": "US"}]
+                # weather one-call
+                return {
+                    "timezone": "UTC",
+                    "current": {"dt": 1700000000, "temp": 20, "feels_like": 20, "weather": [{"icon": "01d"}], "humidity": 50, "pressure": 1010, "uvi": 1, "visibility": 5000, "wind_speed": 3},
+                    "daily": [
+                        {"dt": 1700000000, "weather": [{"icon": "01d"}], "temp": {"max": 22, "min": 10}, "moon_phase": 0.1}
+                    ],
+                    "hourly": [
+                        {"dt": 1700000000, "temp": 20, "pop": 0.1, "rain": {"1h": 0.0}}
+                    ]
+                }
+        return R()
+
+    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+
+    data = {
+        'plugin_id': 'weather',
+        'latitude': '37.7749',
+        'longitude': '-122.4194',
+        'units': 'imperial',
+        'weatherProvider': 'OpenWeatherMap',
+        'titleSelection': 'location',
+        'weatherTimeZone': 'configuredTimeZone',
+    }
+
+    # Save settings first
+    resp = client.post('/save_plugin_settings', data=data)
+    assert resp.status_code == 200
+
+    # Now navigate to the plugin page without instance parameter
+    # This should automatically load the saved settings
+    resp = client.get('/plugin/weather')
+    assert resp.status_code == 200
+
+    # Check that the saved latitude and longitude are in the response
+    response_text = resp.get_data(as_text=True)
+    assert '37.7749' in response_text  # latitude
+    assert '-122.4194' in response_text  # longitude
+
+
