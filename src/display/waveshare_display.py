@@ -67,7 +67,6 @@ class WaveshareDisplay(AbstractDisplay):
                 raise AttributeError("No Init/init method found")
 
             display_args_spec = inspect.getfullargspec(self.epd_display.display)
-            display_args = display_args_spec.args
         except ModuleNotFoundError:
             raise ValueError(f"Unsupported Waveshare display type: {display_type}")
         except AttributeError:

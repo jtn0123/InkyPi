@@ -14,7 +14,6 @@ playlist_bp = Blueprint("playlist", __name__)
 @playlist_bp.route('/add_plugin', methods=['POST'])
 def add_plugin():
     device_config = current_app.config['DEVICE_CONFIG']
-    refresh_task = current_app.config['REFRESH_TASK']
     playlist_manager = device_config.get_playlist_manager()
 
     try:

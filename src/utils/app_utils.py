@@ -111,7 +111,6 @@ def generate_startup_image(dimensions=(800,480)):
     width,height = dimensions
 
     hostname = socket.gethostname()
-    ip = get_ip_address()
 
     image = Image.new("RGBA", dimensions, bg_color)
     image_draw = ImageDraw.Draw(image)
