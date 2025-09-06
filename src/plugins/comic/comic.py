@@ -34,7 +34,10 @@ class Comic(BasePlugin):
             dimensions = dimensions[::-1]
         width, height = dimensions
         
-        response = requests.get(image_url, stream=True)
+        try:
+            response = requests.get(image_url, stream=True, timeout=20)
+        except TypeError:
+            response = requests.get(image_url, stream=True)
         response.raise_for_status()
 
         with Image.open(response.raw) as img:

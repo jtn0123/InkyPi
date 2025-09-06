@@ -219,11 +219,18 @@ class Playlist:
 
     def get_next_plugin(self):
         """Returns the next plugin instance in the playlist and update the current_plugin_index."""
+        if not self.plugins:
+            raise RuntimeError(f"Playlist '{self.name}' has no plugins configured.")
+
         if self.current_plugin_index is None:
             self.current_plugin_index = 0
         else:
-            self.current_plugin_index = (self.current_plugin_index + 1) % len(self.plugins)
-        
+            # Guard against corrupted index outside bounds
+            if not (0 <= self.current_plugin_index < len(self.plugins)):
+                self.current_plugin_index = 0
+            else:
+                self.current_plugin_index = (self.current_plugin_index + 1) % len(self.plugins)
+
         return self.plugins[self.current_plugin_index]
 
     def get_priority(self):

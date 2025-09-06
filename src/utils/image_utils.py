@@ -9,15 +9,28 @@ import subprocess
 
 logger = logging.getLogger(__name__)
 
-def get_image(image_url):
-    response = requests.get(image_url)
+def get_image(image_url, timeout_seconds: float = 10.0):
+    try:
+        response = requests.get(image_url, timeout=timeout_seconds)
+    except TypeError:
+        # Some tests monkeypatch requests.get without supporting timeout
+        try:
+            response = requests.get(image_url)
+        except Exception as e:
+            logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
+            return None
+    except Exception as e:
+        logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
+        return None
+
     img = None
     if 200 <= response.status_code < 300 or response.status_code == 304:
         # Ensure PIL image file resources are cleaned up by copying from a context-managed open
         try:
             with Image.open(BytesIO(response.content)) as _img:
                 img = _img.copy()
-        except Exception:
+        except Exception as e:
+            logger.error(f"Failed to decode image from {image_url}: {str(e)}")
             img = None
     else:
         logger.error(f"Received non-200 response from {image_url}: status_code: {response.status_code}")

@@ -44,7 +44,10 @@ class Apod(BasePlugin):
         elif settings.get("customDate"):
             params["date"] = settings["customDate"]
 
-        response = requests.get("https://api.nasa.gov/planetary/apod", params=params)
+        try:
+            response = requests.get("https://api.nasa.gov/planetary/apod", params=params, timeout=15)
+        except TypeError:
+            response = requests.get("https://api.nasa.gov/planetary/apod", params=params)
 
         if response.status_code != 200:
             logger.error(f"NASA API error: {response.text}")
@@ -58,7 +61,10 @@ class Apod(BasePlugin):
         image_url = data.get("hdurl") or data.get("url")
 
         try:
-            img_data = requests.get(image_url)
+            try:
+                img_data = requests.get(image_url, timeout=30)
+            except TypeError:
+                img_data = requests.get(image_url)
             # Open image in a context and copy to fully load/close handle
             with Image.open(BytesIO(img_data.content)) as _img:
                 image = _img.copy()

@@ -100,7 +100,10 @@ class AIImage(BasePlugin):
 
         response = ai_client.images.generate(**args)
         image_url = response.data[0].url
-        response = requests.get(image_url)
+        try:
+            response = requests.get(image_url, timeout=30)
+        except TypeError:
+            response = requests.get(image_url)
         # Open in context and copy to close underlying file handle
         with Image.open(BytesIO(response.content)) as _img:
             return _img.copy()
