@@ -6,13 +6,39 @@ import tempfile
 from io import BytesIO
 
 import requests
-from utils.http_utils import http_get
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
+from utils.http_utils import http_get
 
 LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
+
+
+def load_image_from_bytes(content: bytes) -> Image.Image | None:
+    """Safely load an image from raw bytes and return a detached copy.
+
+    Uses a context-managed open to ensure decoder resources are released,
+    returning a fully materialized copy of the image.
+    """
+    try:
+        with Image.open(BytesIO(content)) as _img:
+            img: Image.Image = _img
+            return img.copy()
+    except Exception as e:
+        logger.error(f"Failed to decode image from bytes: {e}")
+        return None
+
+
+def load_image_from_path(path: str) -> Image.Image | None:
+    """Safely load an image from a filesystem path and return a detached copy."""
+    try:
+        with Image.open(path) as _img:
+            img: Image.Image = _img
+            return img.copy()
+    except Exception as e:
+        logger.error(f"Failed to open image file '{path}': {e}")
+        return None
 
 
 def get_image(image_url, timeout_seconds: float = 10.0):
@@ -24,13 +50,10 @@ def get_image(image_url, timeout_seconds: float = 10.0):
 
     img = None
     if 200 <= response.status_code < 300 or response.status_code == 304:
-        # Ensure PIL image file resources are cleaned up by copying from a context-managed open
-        try:
-            with Image.open(BytesIO(response.content)) as _img:
-                img = _img.copy()
-        except Exception as e:
-            logger.error(f"Failed to decode image from {image_url}: {str(e)}")
-            img = None
+        # Use standardized loader
+        img = load_image_from_bytes(response.content)
+        if img is None:
+            logger.error(f"Failed to decode image from {image_url}")
     else:
         logger.error(
             f"Received non-200 response from {image_url}: status_code: {response.status_code}"
@@ -211,9 +234,11 @@ def take_screenshot(target, dimensions, timeout_ms=None):
                 pass
             return None
 
-        # Load the image using PIL
-        with Image.open(img_file_path) as img:
-            image = img.copy()
+        # Load the image using standardized helper
+        image = load_image_from_path(img_file_path)
+        if image is None:
+            logger.error("Failed to load screenshot image from temp file")
+            return None
 
     except Exception as e:
         logger.error(f"Failed to take screenshot: {str(e)}")

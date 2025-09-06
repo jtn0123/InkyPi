@@ -45,7 +45,7 @@ def test_generate_image_valid_flow_horizontal(
             return None
 
     monkeypatch.setattr(
-        "plugins.comic.comic.requests.get", lambda url, stream=True, timeout=20: Resp()
+        "utils.http_utils.http_get", lambda url, stream=True, timeout=20: Resp()
     )
 
     p = Comic(plugin_config)
@@ -75,7 +75,7 @@ def test_generate_image_vertical_orientation(
             return None
 
     monkeypatch.setattr(
-        "plugins.comic.comic.requests.get", lambda url, stream=True, timeout=20: Resp()
+        "utils.http_utils.http_get", lambda url, stream=True, timeout=20: Resp()
     )
 
     p = Comic(plugin_config)
@@ -205,7 +205,7 @@ def test_generate_image_retries_without_timeout_arg(
             raise TypeError("timeout not supported")
         return Resp()
 
-    monkeypatch.setattr("plugins.comic.comic.requests.get", fake_get)
+    monkeypatch.setattr("utils.http_utils.http_get", fake_get)
 
     p = Comic(plugin_config)
     img = p.generate_image({"comic": "XKCD"}, device_config_dev)

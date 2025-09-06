@@ -16,7 +16,7 @@ def test_get_image_success(monkeypatch):
         status_code = 200
         content = png_bytes
 
-    monkeypatch.setattr("utils.image_utils.requests.get", lambda url: Resp())
+    monkeypatch.setattr("utils.http_utils.http_get", lambda url, timeout=None: Resp())
     img = get_image("http://example/img.png")
     assert img is not None
     assert img.size == (5, 5)
@@ -27,6 +27,6 @@ def test_get_image_error(monkeypatch):
         status_code = 500
         content = b""
 
-    monkeypatch.setattr("utils.image_utils.requests.get", lambda url: Resp())
+    monkeypatch.setattr("utils.http_utils.http_get", lambda url, timeout=None: Resp())
     img = get_image("http://example/img.png")
     assert img is None

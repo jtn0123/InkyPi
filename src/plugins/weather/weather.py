@@ -747,7 +747,8 @@ class Weather(BasePlugin):
         url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
         try:
             response = http_get(url, timeout=20)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logging.error(f"Failed to retrieve weather data: {str(e)}")
             raise RuntimeError("Failed to retrieve weather data.")
@@ -758,7 +759,8 @@ class Weather(BasePlugin):
         url = AIR_QUALITY_URL.format(lat=lat, long=long, api_key=api_key)
         try:
             response = http_get(url, timeout=20)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logging.error(f"Failed to get air quality data: {str(e)}")
             raise RuntimeError("Failed to retrieve air quality data.")
@@ -769,7 +771,8 @@ class Weather(BasePlugin):
         url = GEOCODING_URL.format(lat=lat, long=long, api_key=api_key)
         try:
             response = http_get(url, timeout=20)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logging.error(f"Failed to get location: {str(e)}")
             raise RuntimeError("Failed to retrieve location.")
@@ -789,7 +792,8 @@ class Weather(BasePlugin):
         )
         try:
             response = http_get(url, timeout=20)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logging.error(
                 f"Failed to retrieve Open-Meteo weather data: {str(e)}"
@@ -802,7 +806,8 @@ class Weather(BasePlugin):
         url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
         try:
             response = http_get(url, timeout=20)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logging.error(
                 f"Failed to retrieve Open-Meteo air quality data: {str(e)}"

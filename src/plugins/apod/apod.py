@@ -52,7 +52,8 @@ class Apod(BasePlugin):
             response = http_get(
                 "https://api.nasa.gov/planetary/apod", params=params, timeout=15
             )
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             logger.error(f"NASA API error: {str(e)}")
             raise RuntimeError("Failed to retrieve NASA APOD.")
@@ -66,7 +67,8 @@ class Apod(BasePlugin):
 
         try:
             img_data = http_get(image_url, timeout=30)
-            img_data.raise_for_status()
+            if getattr(img_data, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(img_data.status_code))
             with Image.open(BytesIO(img_data.content)) as _img:
                 image = _img.copy()
         except Exception as e:

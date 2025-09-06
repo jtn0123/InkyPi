@@ -63,10 +63,9 @@ def test_ai_image_generate_image_success(client, monkeypatch):
     # Mock requests.get to image URL
     from io import BytesIO
 
-    import requests
     from PIL import Image
 
-    def fake_get(url):
+    def fake_get(url, timeout=None):
         img = Image.new("RGB", (64, 64), "black")
         buf = BytesIO()
         img.save(buf, format="PNG")
@@ -77,7 +76,7 @@ def test_ai_image_generate_image_success(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr(requests, "get", fake_get, raising=True)
+    monkeypatch.setattr("utils.http_utils.http_get", fake_get, raising=True)
 
     for model, quality in [
         ("dall-e-3", "standard"),
@@ -135,7 +134,7 @@ def test_ai_image_image_download_failure(device_config_dev, monkeypatch):
     # Mock OpenAI response
     with (
         patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch("utils.http_utils.http_get") as mock_requests,
     ):
 
         mock_client = MagicMock()
@@ -172,7 +171,7 @@ def test_ai_image_randomize_prompt_enabled(device_config_dev, monkeypatch):
     # Mock OpenAI client
     with (
         patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch("utils.http_utils.http_get") as mock_requests,
         patch(
             "plugins.ai_image.ai_image.AIImage.fetch_image_prompt"
         ) as mock_fetch_prompt,
@@ -226,7 +225,7 @@ def test_ai_image_randomize_prompt_blank_input(device_config_dev, monkeypatch):
     # Mock OpenAI client
     with (
         patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch("utils.http_utils.http_get") as mock_requests,
         patch(
             "plugins.ai_image.ai_image.AIImage.fetch_image_prompt"
         ) as mock_fetch_prompt,
@@ -360,7 +359,7 @@ def test_ai_image_orientation_handling(device_config_dev, monkeypatch):
     # Mock OpenAI and requests
     with (
         patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-        patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+        patch("utils.http_utils.http_get") as mock_requests,
     ):
 
         mock_client = MagicMock()
@@ -421,7 +420,7 @@ def test_ai_image_quality_normalization_edge_cases(device_config_dev, monkeypatc
     for model, input_quality, expected_quality in test_cases:
         with (
             patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
-            patch("plugins.ai_image.ai_image.requests.get") as mock_requests,
+            patch("utils.http_utils.http_get") as mock_requests,
         ):
 
             mock_client = MagicMock()

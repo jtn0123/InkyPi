@@ -70,15 +70,20 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     monkeypatch.setattr("os.getloadavg", lambda: (1.0, 1.5, 2.0))
 
     # Mock psutil import
+    import builtins as _builtins
+    _orig_import = _builtins.__import__
+
     def mock_import(name, *args, **kwargs):
         if name == "psutil":
             return mock_psutil
-        raise ImportError(name)
+        return _orig_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", mock_import)
 
     # This should trigger the system stats logging
     task.log_system_stats()
+    # Restore import early to avoid interfering with pytest internals during teardown
+    monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
 
 def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):

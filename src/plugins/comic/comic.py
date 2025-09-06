@@ -44,7 +44,8 @@ class Comic(BasePlugin):
 
         try:
             response = http_get(image_url, timeout=20, stream=True)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
             raise RuntimeError(f"Failed to download comic image: {str(e)}")
 

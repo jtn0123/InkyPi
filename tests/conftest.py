@@ -35,24 +35,7 @@ def mock_screenshot(monkeypatch):
     )
 
 
-@pytest.fixture(autouse=True)
-def stub_requests_get_default(monkeypatch):
-    # Provide a default requests.get stub that returns a small valid PNG.
-    # Individual tests can override this with their own monkeypatch where needed.
-    from io import BytesIO
-
-    import requests
-    from PIL import Image
-
-    bio = BytesIO()
-    Image.new("RGB", (4, 4), "white").save(bio, format="PNG")
-    _png = bio.getvalue()
-
-    class _Resp:
-        status_code = 200
-        content = _png
-
-    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp(), raising=True)
+# (Removed) Autouse requests.get stub to avoid interfering with tests that patch requests explicitly.
 
 
 @pytest.fixture()

@@ -32,6 +32,7 @@ from PIL import Image, UnidentifiedImageError
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.image_utils import load_image_from_bytes
 
 LANCZOS = Resampling.LANCZOS
 
@@ -92,10 +93,11 @@ class Wpotd(BasePlugin):
 
             response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
-            # Open in context and copy to ensure resources are released
-            with Image.open(BytesIO(response.content)) as _img:
-                img: Image.Image = _img
-                return img.copy()
+            # Use standardized helper to ensure resources are released
+            img = load_image_from_bytes(response.content)
+            if img is None:
+                raise RuntimeError("Failed to decode image bytes")
+            return img
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
             raise RuntimeError("Unsupported image format.")

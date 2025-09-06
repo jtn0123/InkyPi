@@ -32,7 +32,7 @@ def test_apod_success(monkeypatch, device_config_dev):
             return RespApi()
         return RespImg()
 
-    monkeypatch.setattr('plugins.apod.apod.requests.get', fake_get)
+    monkeypatch.setattr('utils.http_utils.http_get', fake_get)
 
     img = Apod({"id": "apod"}).generate_image({}, device_config_dev)
     assert img.size[0] > 0
@@ -96,7 +96,7 @@ def test_apod_success_via_client(client, monkeypatch):
             calls.append('image')
             return fake_get_image(url)
 
-    monkeypatch.setattr(requests, 'get', dispatcher, raising=True)
+    monkeypatch.setattr('utils.http_utils.http_get', dispatcher, raising=True)
 
     data = {'plugin_id': 'apod'}
     resp = client.post('/update_now', data=data)
@@ -112,7 +112,7 @@ def test_apod_randomize_date(monkeypatch, device_config_dev):
     monkeypatch.setenv('NASA_SECRET', 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('utils.http_utils.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -154,7 +154,7 @@ def test_apod_custom_date(monkeypatch, device_config_dev):
     monkeypatch.setenv('NASA_SECRET', 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('utils.http_utils.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -194,7 +194,7 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests to return error status
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('utils.http_utils.http_get') as mock_requests:
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.text = "Internal Server Error"
@@ -214,7 +214,7 @@ def test_apod_non_image_media_type(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests to return video media type
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('utils.http_utils.http_get') as mock_requests:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {

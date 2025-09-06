@@ -61,7 +61,10 @@ class Unsplash(BasePlugin):
 
         try:
             response = http_get(url, params=params)
-            response.raise_for_status()
+            if getattr(response, "status_code", 200) not in (200, 201, 204):
+                raise requests.exceptions.HTTPError(
+                    f"{response.status_code} Client Error"
+                )
             data = response.json()
             if search_query:
                 results = data.get("results")

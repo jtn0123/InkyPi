@@ -106,7 +106,7 @@ def test_parse_open_meteo_forecast_handles_api_and_fallback(
             return self._json
 
     monkeypatch.setattr(
-        "requests.get",
+        "utils.http_utils.http_get",
         lambda *args, **kwargs: DummyResp(
             [{"Phase": "Full Moon", "Illumination": 0.5}]
         ),

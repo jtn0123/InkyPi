@@ -12,10 +12,6 @@ class FakeResp:
         self.content = content
         self.status_code = status_code
 
-    def raise_for_status(self):
-        if not (200 <= self.status_code < 300 or self.status_code == 304):
-            raise Exception("HTTP error")
-
 
 def make_png_bytes(size=(10, 10), color=(1, 2, 3)):
     bio = BytesIO()
@@ -29,9 +25,7 @@ def test_get_image_success(monkeypatch):
     def fake_get(url, timeout=None):
         return FakeResp(content, 200)
 
-    monkeypatch.setattr(
-        image_utils, "requests", type("R", (), {"get": staticmethod(fake_get)})
-    )
+    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
     img = image_utils.get_image("http://example.com/img.png")
     assert isinstance(img, Image.Image)
 
@@ -44,9 +38,7 @@ def test_get_image_typeerror_fallback(monkeypatch):
             raise TypeError("no timeout support")
         return FakeResp(content, 200)
 
-    monkeypatch.setattr(
-        image_utils, "requests", type("R", (), {"get": staticmethod(fake_get)})
-    )
+    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
     img = image_utils.get_image("http://example.com/img.png")
     assert isinstance(img, Image.Image)
 
@@ -55,9 +47,7 @@ def test_get_image_non200(monkeypatch):
     def fake_get(url, timeout=None):
         return FakeResp(b"", 404)
 
-    monkeypatch.setattr(
-        image_utils, "requests", type("R", (), {"get": staticmethod(fake_get)})
-    )
+    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
     assert image_utils.get_image("http://example.com/notfound") is None
 
 
@@ -131,9 +121,7 @@ def test_get_image_exception_handling(monkeypatch):
         # This should trigger the exception handling path
         raise Exception("Network error")
 
-    monkeypatch.setattr(
-        image_utils, "requests", type("R", (), {"get": staticmethod(fake_get)})
-    )
+    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
     result = image_utils.get_image("http://example.com/img.png")
     assert result is None
 
