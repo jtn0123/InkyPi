@@ -18,11 +18,12 @@ Works on **macOS**, **Linux**, and **Windows** - no hardware needed!
 git clone https://github.com/mudmin/InkyPi.git
 cd InkyPi
 
-# 2. Create virtual environment
+# 2. Quick start (recommended)
+./scripts/dev.sh
+
+# Or manual setup
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 3. Install dependencies and run
 pip install -r install/requirements-dev.txt
 python src/inkypi.py --dev
 ```
@@ -40,7 +41,10 @@ python src/inkypi.py --dev
 ## Essential Commands
 
 ```bash
-python src/inkypi.py --dev           # Start development server
+python src/inkypi.py --dev           # Start development server (full program)
+python src/inkypi.py --dev --web-only# Start web UI only (no background thread)
+python src/inkypi.py --dev --fast-dev# Fast cycle, skip startup image
+./scripts/web_only.sh                # Scripted web-only startup
 source venv/bin/activate             # Activate virtual environment
 deactivate                           # Exit virtual environment
 ```
@@ -50,7 +54,13 @@ deactivate                           # Exit virtual environment
 1. **Check rendered output**: Images are saved to `mock_display_output/`
 2. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
 3. **Configuration**: Edit `src/config/device_dev.json` for display settings
-4. **Hot reload**: Restart server to see code changes
+4. **Hot reload**: You can run via Flask dev server for code reload
+
+```bash
+export FLASK_APP=src.inkypi:create_app
+export INKYPI_ENV=dev
+flask --debug run -p 8080
+```
 
 ## Testing Your Changes
 

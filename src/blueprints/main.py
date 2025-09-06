@@ -15,4 +15,6 @@ def preview_image():
     path = device_config.processed_image_file
     if not os.path.exists(path):
         path = device_config.current_image_file
+    if not os.path.exists(path):
+        return ("Preview not available", 404)
     return send_file(path, mimetype='image/png', conditional=True)

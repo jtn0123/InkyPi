@@ -10,9 +10,8 @@ def test_screenshot_success(monkeypatch, device_config_dev):
 def test_screenshot_failure(monkeypatch, device_config_dev):
     from plugins.screenshot.screenshot import Screenshot
 
-    # Force take_screenshot to return None
-    import utils.image_utils as image_utils
-    monkeypatch.setattr(image_utils, "take_screenshot", lambda *a, **k: None, raising=True)
+    # Force take_screenshot to return None at the import location used by plugin
+    monkeypatch.setattr("plugins.screenshot.screenshot.take_screenshot", lambda *a, **k: None, raising=True)
 
     try:
         Screenshot({"id": "screenshot"}).generate_image({"url": "http://example.com"}, device_config_dev)

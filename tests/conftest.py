@@ -49,6 +49,7 @@ def device_config_dev(tmp_path, monkeypatch):
     import config as config_mod
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_file))
     monkeypatch.setattr(config_mod.Config, "current_image_file", str(tmp_path / "current_image.png"))
+    monkeypatch.setattr(config_mod.Config, "processed_image_file", str(tmp_path / "processed_image.png"))
     monkeypatch.setattr(config_mod.Config, "plugin_image_dir", str(tmp_path / "plugins"))
 
     # Ensure plugin image dir exists

@@ -18,8 +18,9 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
 
     img = Newspaper({"id": "newspaper"}).generate_image({"newspaperSlug": "NYT"}, device_config_dev)
     assert img is not None
-    # When portrait ratio < desired ratio, height is expanded
-    assert img.size[1] > 800 or img.size[1] == 800
+    # Expected height based on plugin formula: new_height = int((img_width * desired_width) / desired_height)
+    expected_height = int((400 * device_config_dev.get_resolution()[0]) / device_config_dev.get_resolution()[1])
+    assert img.size == (400, expected_height)
 
 
 def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev):

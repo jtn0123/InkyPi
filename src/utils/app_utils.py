@@ -5,6 +5,7 @@ import subprocess
 
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,7 @@ def parse_form(request_form):
     return request_dict
 
 def handle_request_files(request_files, form_data={}):
-    allowed_file_extensions = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    allowed_file_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     file_location_map = {}
     # handle existing file locations being provided as part of the form data
     for key in set(request_files.keys()):
@@ -148,26 +149,65 @@ def handle_request_files(request_files, form_data={}):
 
         extension = os.path.splitext(file_name)[1].replace('.', '')
         if not extension or extension.lower() not in allowed_file_extensions:
+            # Skip non-image uploads
             continue
 
         file_name = os.path.basename(file_name)
 
         file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
+        # Ensure the output directory exists
+        os.makedirs(file_save_dir, exist_ok=True)
         file_path = os.path.join(file_save_dir, file_name)
 
-        # Open the image and apply EXIF transformation before saving
-        if extension in {'jpg', 'jpeg'}:
+        # Enforce maximum upload size (bytes). Default 10 MB; override with env MAX_UPLOAD_BYTES
+        try:
+            max_upload_bytes_env = os.getenv('MAX_UPLOAD_BYTES')
+            max_upload_bytes = int(max_upload_bytes_env) if max_upload_bytes_env else 10 * 1024 * 1024
+        except Exception:
+            max_upload_bytes = 10 * 1024 * 1024
+
+        # Read file content to validate type and size safely
+        try:
+            # Read all bytes and reset pointer if needed
+            file_stream_pos = None
             try:
-                with Image.open(file) as img:
-                    if img is not None:
-                        img = ImageOps.exif_transpose(img)
-                        img.save(file_path)
+                file_stream_pos = file.stream.tell()
+            except Exception:
+                pass
+
+            content = file.read()
+            # Reset stream so Flask/Werkzeug isn't confused later
+            try:
+                if file_stream_pos is not None:
+                    file.stream.seek(file_stream_pos)
+                else:
+                    file.seek(0)
+            except Exception:
+                pass
+
+            if content is None:
+                raise RuntimeError("Empty upload content")
+
+            if len(content) > max_upload_bytes:
+                raise RuntimeError(f"Uploaded file exceeds size limit of {max_upload_bytes} bytes")
+
+            # Validate that the file is a decodable image
+            bio = BytesIO(content)
+            try:
+                with Image.open(bio) as img_verify:
+                    img_verify.verify()  # Verify header/decoder
             except Exception as e:
-                logger.warn(f"EXIF processing error for {file_name}: {e}")
-                file.save(file_path)
-        else:
-            # Directly save non-JPEG files
-            file.save(file_path)
+                raise RuntimeError(f"Invalid image upload: {e}")
+
+            # Re-open to apply orientation and save
+            bio2 = BytesIO(content)
+            with Image.open(bio2) as img:
+                img = ImageOps.exif_transpose(img)
+                img.save(file_path)
+        except Exception as e:
+            # Fail hard on invalid image data
+            logger.error(f"Failed to process uploaded file '{file_name}': {e}")
+            raise
 
         if is_list:
             file_location_map.setdefault(key, [])

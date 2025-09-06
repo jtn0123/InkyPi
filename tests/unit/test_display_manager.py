@@ -56,6 +56,9 @@ def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path)
     from pathlib import Path
     assert Path(device_config_dev.current_image_file).exists()
 
+    # processed preview image saved
+    assert Path(device_config_dev.processed_image_file).exists()
+
 
 def test_display_manager_selects_display_type_mock(device_config_dev):
     device_config_dev.update_value("display_type", "mock")

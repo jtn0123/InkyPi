@@ -1,5 +1,7 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image, ImageOps, ImageColor
+from PIL.Image import Resampling
+LANCZOS = Resampling.LANCZOS
 from typing import List, Optional
 from io import BytesIO
 import logging
@@ -50,14 +52,18 @@ class ImageUpload(BasePlugin):
         settings['image_index'] = img_index
 
         ###
+        dimensions = device_config.get_resolution()
+        if device_config.get_config("orientation") == "vertical":
+            dimensions = dimensions[::-1]
+
         if settings.get('padImage') == "true":
-            dimensions = device_config.get_resolution()
-            if device_config.get_config("orientation") == "vertical":
-                dimensions = dimensions[::-1]
             frame_ratio = dimensions[0] / dimensions[1]
             img_width, img_height = image.size
             padded_img_size = (int(img_height * frame_ratio) if img_width >= img_height else img_width,
                               img_height if img_width >= img_height else int(img_width / frame_ratio))
             background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
-            return ImageOps.pad(image, padded_img_size, color=background_color, method=Image.Resampling.LANCZOS)
-        return image
+            return ImageOps.pad(image, padded_img_size, color=background_color, method=LANCZOS)
+        else:
+            # Contain within target dimensions without padding
+            contained = ImageOps.contain(image, dimensions, LANCZOS)
+            return contained if contained is not None else image

@@ -1,5 +1,4 @@
 import logging
-from inky.auto import auto
 from display.abstract_display import AbstractDisplay
 
 
@@ -27,7 +26,10 @@ class InkyDisplay(AbstractDisplay):
             ValueError: If the resolution cannot be retrieved or stored.
         """
         
-        self.inky_display = auto()
+        # Import here so tests can monkeypatch `inky.auto` before this resolves
+        from inky.auto import auto as detect_display  # type: ignore[import-not-found]
+
+        self.inky_display = detect_display()
         self.inky_display.set_border(self.inky_display.BLACK)
 
         # store display resolution in device config
