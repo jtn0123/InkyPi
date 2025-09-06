@@ -1,8 +1,8 @@
 # pyright: reportMissingImports=false
-import pytest
+from io import BytesIO
 from unittest.mock import patch, MagicMock
 from PIL import Image
-from io import BytesIO
+import pytest
 
 
 def test_apod_success(monkeypatch, device_config_dev):

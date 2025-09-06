@@ -5,7 +5,6 @@ from io import BytesIO
 
 import pytest
 from PIL import Image
-
 import utils.app_utils as app_utils
 
 
