@@ -1,5 +1,7 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image
+from PIL.Image import Resampling
+LANCZOS = Resampling.LANCZOS
 from io import BytesIO
 import requests
 import logging
@@ -14,7 +16,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         response.raise_for_status()
         # Open within context and copy to detach from underlying stream
         with Image.open(BytesIO(response.content)) as _img:
-            img = _img.resize(dimensions, Image.LANCZOS)
+            img = _img.resize(dimensions, LANCZOS)
             return img
     except Exception as e:
         logger.error(f"Error grabbing image from {image_url}: {e}")

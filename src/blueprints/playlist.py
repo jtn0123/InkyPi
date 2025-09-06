@@ -85,6 +85,8 @@ def create_playlist():
     playlist_manager = device_config.get_playlist_manager()
 
     data = request.json
+    if data is None:
+        return jsonify({"error": "Invalid JSON data"}), 400
     playlist_name = data.get("playlist_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")

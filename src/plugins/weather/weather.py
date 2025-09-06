@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import pytz
 from io import BytesIO
 import math
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -412,8 +413,12 @@ class Weather(BasePlugin):
             "icon": self.get_plugin_dir('icons/uvi.png')
         })
 
-        visibility = weather.get('current', {}).get("visibility")/1000
-        visibility_str = f">{visibility}" if visibility >= 10 else visibility
+        visibility_raw = weather.get('current', {}).get("visibility")
+        try:
+            visibility = visibility_raw / 1000 if isinstance(visibility_raw, (int, float)) else visibility_raw
+        except Exception:
+            visibility = visibility_raw
+        visibility_str = f">{visibility}" if isinstance(visibility, (int, float)) and visibility >= 10 else visibility
         data_points.append({
             "label": "Visibility",
             "measurement": visibility_str,
@@ -421,11 +426,16 @@ class Weather(BasePlugin):
             "icon": self.get_plugin_dir('icons/visibility.png')
         })
 
-        aqi = air_quality.get('list', [])[0].get("main", {}).get("aqi")
+        try:
+            aqi = air_quality.get('list', [])[0].get("main", {}).get("aqi")
+            aqi_label = ["Good", "Fair", "Moderate", "Poor", "Very Poor"][int(aqi)-1]
+        except Exception:
+            aqi = "N/A"
+            aqi_label = "N/A"
         data_points.append({
             "label": "Air Quality",
             "measurement": aqi,
-            "unit": ["Good", "Fair", "Moderate", "Poor", "Very Poor"][int(aqi)-1],
+            "unit": aqi_label,
             "icon": self.get_plugin_dir('icons/aqi.png')
         })
 
@@ -481,7 +491,7 @@ class Weather(BasePlugin):
         for i, time_str in enumerate(humidity_hourly_times):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
-                    current_humidity = int(humidity_values[i])
+                    current_humidity = str(int(humidity_values[i]))
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for humidity.")
@@ -498,7 +508,7 @@ class Weather(BasePlugin):
         for i, time_str in enumerate(pressure_hourly_times):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
-                    current_pressure = int(pressure_values[i])
+                    current_pressure = str(int(pressure_values[i]))
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for pressure.")
@@ -526,7 +536,9 @@ class Weather(BasePlugin):
         })
 
         # Visibility
-        current_visibility = "N/A"
+        # Visibility: keep numeric value separately to avoid mixing types
+        current_visibility_str = "N/A"
+        current_visibility_val: Optional[float] = None
         unit_label = "ft" if units == "imperial" else "km"
         visibility_hourly_times = hourly_data.get('time', [])
         visibility_values = hourly_data.get('visibility', [])
@@ -534,19 +546,30 @@ class Weather(BasePlugin):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
                     visibility = visibility_values[i]
-                    if units == "imperial":
-                        current_visibility = int(round(visibility, 0))
+                    if isinstance(visibility, (int, float)):
+                        if units == "imperial":
+                            current_visibility_val = int(round(visibility, 0))
+                            current_visibility_str = str(current_visibility_val)
+                        else:
+                            current_visibility_val = round(visibility / 1000, 1)
+                            current_visibility_str = str(current_visibility_val)
                     else:
-                        current_visibility = round(visibility / 1000, 1)
+                        current_visibility_str = str(visibility)
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for visibility.")
                 continue
 
-        visibility_str = f">{current_visibility}" if isinstance(current_visibility, (int, float)) and (
-            (units == "imperial" and current_visibility >= 32808) or 
-            (units != "imperial" and current_visibility >= 10)
-        ) else current_visibility
+        # If we have a numeric visibility, apply threshold logic; otherwise use the string value
+        if isinstance(current_visibility_val, (int, float)):
+            if (units == "imperial" and current_visibility_val >= 32808) or (
+                units != "imperial" and current_visibility_val >= 10
+            ):
+                visibility_str = f">{current_visibility_val}"
+            else:
+                visibility_str = str(current_visibility_val)
+        else:
+            visibility_str = current_visibility_str
 
         data_points.append({
             "label": "Visibility", "measurement": visibility_str, "unit": unit_label,
@@ -556,24 +579,29 @@ class Weather(BasePlugin):
         # Air Quality
         aqi_hourly_times = aqi_data.get('hourly', {}).get('time', [])
         aqi_values = aqi_data.get('hourly', {}).get('european_aqi', [])
-        current_aqi = "N/A"
+        current_aqi_val: Optional[float] = None
         for i, time_str in enumerate(aqi_hourly_times):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
-                    current_aqi = round(aqi_values[i], 1)
+                    # aqi_values may contain numeric values
+                    try:
+                        current_aqi_val = round(float(aqi_values[i]), 1)
+                    except Exception:
+                        current_aqi_val = None
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for AQI.")
                 continue
         scale = ""
-        if isinstance(current_aqi, (int, float)):
+        if current_aqi_val is not None:
             try:
-                idx = min(int(current_aqi // 20), 5)
+                idx = min(int(current_aqi_val // 20), 5)
                 scale = ["Good","Fair","Moderate","Poor","Very Poor","Ext Poor"][idx]
             except Exception:
                 scale = ""
+        measurement_value = current_aqi_val if current_aqi_val is not None else "N/A"
         data_points.append({
-            "label": "Air Quality", "measurement": current_aqi,
+            "label": "Air Quality", "measurement": measurement_value,
             "unit": scale, "icon": self.get_plugin_dir('icons/aqi.png')
         })
 
@@ -586,7 +614,8 @@ class Weather(BasePlugin):
         except TypeError:
             response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve weather data: {response.content}")
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            logging.error(f"Failed to retrieve weather data: {content_str}")
             raise RuntimeError("Failed to retrieve weather data.")
 
         return response.json()
@@ -599,7 +628,8 @@ class Weather(BasePlugin):
             response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to get air quality data: {response.content}")
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            logging.error(f"Failed to get air quality data: {content_str}")
             raise RuntimeError("Failed to retrieve air quality data.")
 
         return response.json()
@@ -612,7 +642,8 @@ class Weather(BasePlugin):
             response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to get location: {response.content}")
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            logging.error(f"Failed to get location: {content_str}")
             raise RuntimeError("Failed to retrieve location.")
 
         location_data = response.json()[0]
@@ -629,7 +660,8 @@ class Weather(BasePlugin):
             response = requests.get(url)
         
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve Open-Meteo weather data: {response.content}")
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            logging.error(f"Failed to retrieve Open-Meteo weather data: {content_str}")
             raise RuntimeError("Failed to retrieve Open-Meteo weather data.")
         
         return response.json()
@@ -641,7 +673,8 @@ class Weather(BasePlugin):
         except TypeError:
             response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve Open-Meteo air quality data: {response.content}")
+            content_str = response.content.decode("utf-8", errors="replace") if isinstance(response.content, (bytes, bytearray)) else str(response.content)
+            logging.error(f"Failed to retrieve Open-Meteo air quality data: {content_str}")
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
         
         return response.json()

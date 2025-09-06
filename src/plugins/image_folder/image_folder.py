@@ -1,5 +1,8 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image, ImageOps, ImageFilter
+from typing import List, Optional, Tuple
+from PIL.Image import Resampling
+LANCZOS = Resampling.LANCZOS
 from io import BytesIO
 import logging
 import os
@@ -8,7 +11,7 @@ import random
 
 logger = logging.getLogger(__name__)
 
-def list_files_in_folder(folder_path):
+def list_files_in_folder(folder_path: str) -> List[str]:
     """Return a list of image file paths in the given folder, excluding hidden files."""
     image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')
     return [
@@ -21,13 +24,19 @@ def list_files_in_folder(folder_path):
         )
     ]
 
-def grab_image(image_path, dimensions, pad_image):
+def grab_image(image_path: str, dimensions: Tuple[int, int], pad_image: bool) -> Optional[Image.Image]:
     """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
     try:
         # Use context manager and copy to ensure file handle is released
         with Image.open(image_path) as _img:
             img = ImageOps.exif_transpose(_img)  # Correct orientation using EXIF
-            img = ImageOps.contain(img, dimensions, Image.LANCZOS)
+            if img is None:
+                raise RuntimeError("Failed to process image orientation")
+            # ImageOps.contain can return None for some modes; ensure non-None for mypy
+            contained = ImageOps.contain(img, dimensions, LANCZOS)
+            if contained is None:
+                raise RuntimeError("Failed to process image")
+            img = contained
 
         if pad_image:
             bkg = ImageOps.fit(img, dimensions)

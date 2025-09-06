@@ -65,7 +65,7 @@ class BasePlugin:
         if Path(settings_path).is_file():
             template_params["settings_template"] = f"{self.get_plugin_id()}/settings.html"
         
-        template_params['frame_styles'] = FRAME_STYLES
+        template_params['frame_styles'] = FRAME_STYLES  # type: ignore[assignment]
         return template_params
 
     def render_image(self, dimensions, html_file, css_file=None, template_params={}):

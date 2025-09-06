@@ -1,5 +1,6 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image, ImageOps, ImageColor
+from typing import List, Optional
 from io import BytesIO
 import logging
 import random
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImageUpload(BasePlugin):
-    def open_image(self, img_index: int, image_locations: list) -> Image:
+    def open_image(self, img_index: int, image_locations: List[str]) -> Image.Image:
         if not image_locations:
             raise RuntimeError("No images provided.")
         # Open the image using Pillow
@@ -19,14 +20,20 @@ class ImageUpload(BasePlugin):
         except Exception as e:
             logger.error(f"Failed to read image file: {str(e)}")
             raise RuntimeError("Failed to read image file.")
+        # mypy may infer Any from Image.open; assert Image.Image for clarity
+        if not isinstance(image, Image.Image):
+            raise RuntimeError("Invalid image type loaded.")
         return image
         
 
-    def generate_image(self, settings, device_config) -> Image:
+    def generate_image(self, settings, device_config) -> Image.Image:
         
         # Get the current index from the device json
         img_index = settings.get("image_index", 0)
-        image_locations = settings.get("imageFiles[]")
+        image_locations = settings.get("imageFiles[]") or []
+
+        if not image_locations:
+            raise RuntimeError("No images provided.")
 
         if img_index >= len(image_locations):
             # Prevent Index out of range issues when file list has changed

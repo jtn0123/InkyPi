@@ -1,6 +1,9 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image
-import feedparser
+from PIL.Image import Resampling
+from io import BytesIO
+LANCZOS = Resampling.LANCZOS
+import feedparser  # type: ignore[import]
 import re
 import requests
 
@@ -40,13 +43,13 @@ class Comic(BasePlugin):
             response = requests.get(image_url, stream=True)
         response.raise_for_status()
 
-        with Image.open(response.raw) as img:
-            img.thumbnail((width, height), Image.LANCZOS)
+        with Image.open(BytesIO(response.content)) as img:
+            img.thumbnail((width, height), LANCZOS)
             background = Image.new("RGB", (width, height), "white")
             background.paste(img, ((width - img.width) // 2, (height - img.height) // 2))
             return background
 
-    def get_image_url(self, comic):
+    def get_image_url(self, comic) -> str:
         if comic == "XKCD":
             feed = feedparser.parse("https://xkcd.com/atom.xml")
             element = feed.entries[0].summary
@@ -68,5 +71,8 @@ class Comic(BasePlugin):
         elif comic == "Cyanide & Happiness":
             feed = feedparser.parse("https://explosm-1311.appspot.com/")
             element = feed.entries[0].summary
-        src = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', element).group(1)
+        match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', element)
+        if match is None:
+            raise RuntimeError("Could not find image URL in comic feed")
+        src = match.group(1)
         return src

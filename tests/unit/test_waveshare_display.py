@@ -31,8 +31,14 @@ class FakeMonoEPD:
 
 class FakeBiColorEPD(FakeMonoEPD):
     # Simulate display with signature that accepts two buffers
-    def display(self, buf1, buf2=None):
-        self.displayed.append((buf1, buf2))
+    # Make signature compatible with FakeMonoEPD: accept primary buf and *args
+    def display(self, buf, *args):
+        # Mirror behavior used by tests: store two buffers when provided
+        if args:
+            # tests expect (buf1, buf2)
+            self.displayed.append((buf, args[0]))
+        else:
+            self.displayed.append((buf, None))
 
 
 def install_fake_epd_module(monkeypatch, module_name: str, epd_class):

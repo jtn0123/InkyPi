@@ -23,13 +23,15 @@ Flow:
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image, UnidentifiedImageError
+from PIL.Image import Resampling
+LANCZOS = Resampling.LANCZOS
 from io import BytesIO
 import requests
 import logging
 from random import randint
 from datetime import datetime, timedelta, date
 from functools import lru_cache
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +41,11 @@ class Wpotd(BasePlugin):
     API_URL = "https://en.wikipedia.org/w/api.php"
 
     def generate_settings_template(self) -> Dict[str, Any]:
-        template_params = super().generate_settings_template()
+        template_params: Dict[str, Any] = super().generate_settings_template()
         template_params['style_settings'] = False
         return template_params
 
-    def generate_image(self, settings: Dict[str, Any], device_config: Dict[str, Any]) -> Image.Image:
+    def generate_image(self, settings: Dict[str, Any], device_config: Any) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -73,7 +75,7 @@ class Wpotd(BasePlugin):
         else:
             return datetime.today().date()
 
-    def _download_image(self, url: str) -> Image.Image:
+    def _download_image(self, url: str) -> Optional[Image.Image]:
         try:
             if url.lower().endswith(".svg"):
                 logger.warning("SVG format is not supported by Pillow. Skipping image download.")
@@ -128,7 +130,10 @@ class Wpotd(BasePlugin):
         data = self._make_request(params)
         try:
             page = next(iter(data["query"]["pages"].values()))
-            return page["imageinfo"][0]["url"]
+            url = page["imageinfo"][0].get("url")
+            if not url:
+                raise RuntimeError("Image URL missing in response")
+            return url
         except (KeyError, IndexError, StopIteration) as e:
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
             raise RuntimeError("Failed to retrieve image URL.")
@@ -166,7 +171,7 @@ class Wpotd(BasePlugin):
                 else:
                     new_width, new_height = orig_width, orig_height
             # Resize using high-quality resampling
-            image = image.resize((new_width, new_height), Image.LANCZOS)
+            image = image.resize((new_width, new_height), LANCZOS)
             # Create a new image with white background and paste the resized image in the center
             new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
             new_image.paste(image, ((max_width - new_width) // 2, (max_height - new_height) // 2))

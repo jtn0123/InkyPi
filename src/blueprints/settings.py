@@ -14,9 +14,9 @@ try:
 except ImportError:
     JOURNAL_AVAILABLE = False
     # Define dummy classes for when cysystemd is not available
-    JournalReader = None  # type: ignore[misc,assignment]
-    JournalOpenMode = None  # type: ignore[misc,assignment]
-    Rule = None  # type: ignore[misc,assignment]
+    JournalReader = None
+    JournalOpenMode = None
+    Rule = None
 
 
 logger = logging.getLogger(__name__)

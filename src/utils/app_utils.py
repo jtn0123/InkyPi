@@ -159,8 +159,9 @@ def handle_request_files(request_files, form_data={}):
         if extension in {'jpg', 'jpeg'}:
             try:
                 with Image.open(file) as img:
-                    img = ImageOps.exif_transpose(img)
-                    img.save(file_path)
+                    if img is not None:
+                        img = ImageOps.exif_transpose(img)
+                        img.save(file_path)
             except Exception as e:
                 logger.warn(f"EXIF processing error for {file_name}: {e}")
                 file.save(file_path)

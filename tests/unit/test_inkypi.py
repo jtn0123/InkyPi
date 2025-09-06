@@ -22,7 +22,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
-    return importlib.reload(sys.modules["inkypi"])  # type: ignore
+    return importlib.reload(sys.modules["inkypi"])
 
 
 def test_inkypi_dev_mode_and_blueprints(monkeypatch):
