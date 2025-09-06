@@ -91,7 +91,7 @@
                 <div style="font-size:14px;color:#333;font-weight:600;">Storage available</div>
                 <div id="storage-text" style="font-size:13px;color:#666;">
                     {% if storage and storage.pct_free is not none %}
-                        {{ storage.pct_free|round(2) }}% free • {{ storage.free_gb }} GB free of {{ storage.total_gb }} GB
+                        {{ storage.pct_free|round(2) }}% free • {{ storage.free_gb }} GB remaining of {{ storage.total_gb }} GB total
                     {% else %}
                         --
                     {% endif %}
@@ -113,7 +113,7 @@
                     const inner = document.getElementById('storage-bar-inner');
                     block.style.display = '';
                     const pct = (data.pct_free !== null && data.pct_free !== undefined) ? data.pct_free : 0;
-                    text.textContent = `${pct}% free • ${data.free_gb} GB free of ${data.total_gb} GB`;
+                    text.textContent = `${pct}% free • ${data.free_gb} GB remaining of ${data.total_gb} GB total`;
                     inner.style.width = `${pct}%`;
                 } catch (e) {
                     console.error('Failed to update storage', e);
