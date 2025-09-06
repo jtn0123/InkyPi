@@ -88,3 +88,48 @@ def test_weather_openmeteo_success(client, monkeypatch):
     assert resp.status_code == 200
 
 
+def test_weather_save_settings(client, monkeypatch):
+    """Test saving weather settings to default playlist from main plugin page."""
+    # Mock the weather API calls
+    import requests
+    def fake_get(url, *args, **kwargs):
+        class R:
+            status_code = 200
+            def json(self_inner):
+                if 'air_pollution' in url:
+                    return {"list": [{"main": {"aqi": 3}}]}
+                if 'geo/1.0/reverse' in url:
+                    return [{"name": "City", "state": "ST", "country": "US"}]
+                # weather one-call
+                return {
+                    "timezone": "UTC",
+                    "current": {"dt": 1700000000, "temp": 20, "feels_like": 20, "weather": [{"icon": "01d"}], "humidity": 50, "pressure": 1010, "uvi": 1, "visibility": 5000, "wind_speed": 3},
+                    "daily": [
+                        {"dt": 1700000000, "weather": [{"icon": "01d"}], "temp": {"max": 22, "min": 10}, "moon_phase": 0.1}
+                    ],
+                    "hourly": [
+                        {"dt": 1700000000, "temp": 20, "pop": 0.1, "rain": {"1h": 0.0}}
+                    ]
+                }
+        return R()
+
+    monkeypatch.setattr(requests, 'get', fake_get, raising=True)
+
+    data = {
+        'plugin_id': 'weather',
+        'latitude': '40.7128',
+        'longitude': '-74.0060',
+        'units': 'metric',
+        'weatherProvider': 'OpenWeatherMap',
+        'titleSelection': 'location',
+        'weatherTimeZone': 'configuredTimeZone',
+    }
+
+    # Test saving settings
+    resp = client.post('/plugin/save_plugin_settings', data=data)
+    assert resp.status_code == 200
+    result = resp.get_json()
+    assert result['success'] is True
+    assert 'weather_saved_settings' in result['instance_name']
+
+

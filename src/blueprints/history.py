@@ -54,7 +54,27 @@ def history_page():
     device_config = current_app.config['DEVICE_CONFIG']
     history_dir = device_config.history_image_dir
     images = _list_history_images(history_dir)
-    return render_template('history.html', images=images)
+    # Compute storage usage for the history directory's filesystem
+    free_bytes = None
+    total_bytes = None
+    used_bytes = None
+    pct_free = None
+    try:
+        stat = os.statvfs(history_dir)
+        # f_frsize is fragment size; f_bavail is blocks available to unprivileged user
+        free_bytes = stat.f_frsize * stat.f_bavail
+        total_bytes = stat.f_frsize * stat.f_blocks
+        used_bytes = total_bytes - free_bytes if (total_bytes is not None and free_bytes is not None) else None
+        pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
+    except Exception:
+        logger.exception("Failed to stat filesystem for history directory")
+
+    return render_template('history.html', images=images, storage={
+        'free_bytes': free_bytes,
+        'total_bytes': total_bytes,
+        'used_bytes': used_bytes,
+        'pct_free': pct_free,
+    })
 
 
 @history_bp.route('/history/image/<path:filename>')
@@ -125,5 +145,32 @@ def history_clear():
     except Exception as e:
         logger.exception("Error clearing history images")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@history_bp.route('/history/storage')
+def history_storage():
+    """Return storage stats for the filesystem containing the history directory.
+
+    Values returned: free_gb, total_gb, used_gb, pct_free
+    """
+    device_config = current_app.config['DEVICE_CONFIG']
+    history_dir = device_config.history_image_dir
+    try:
+        stat = os.statvfs(history_dir)
+        free_bytes = stat.f_frsize * stat.f_bavail
+        total_bytes = stat.f_frsize * stat.f_blocks
+        used_bytes = total_bytes - free_bytes if (total_bytes is not None and free_bytes is not None) else None
+        pct_free = (free_bytes / total_bytes * 100.0) if (total_bytes and total_bytes > 0) else None
+
+        gb = 1024 ** 3
+        return jsonify({
+            'free_gb': round(free_bytes / gb, 2) if free_bytes is not None else None,
+            'total_gb': round(total_bytes / gb, 2) if total_bytes is not None else None,
+            'used_gb': round(used_bytes / gb, 2) if used_bytes is not None else None,
+            'pct_free': round(pct_free, 2) if pct_free is not None else None,
+        }), 200
+    except Exception:
+        logger.exception("Failed to stat filesystem for history directory")
+        return jsonify({'error': 'failed to get storage info'}), 500
 
 

@@ -166,3 +166,50 @@ def update_now():
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
     return jsonify({"success": True, "message": "Display updated"}), 200
+
+@plugin_bp.route('/save_plugin_settings', methods=['POST'])
+def save_plugin_settings():
+    device_config = current_app.config['DEVICE_CONFIG']
+    playlist_manager = device_config.get_playlist_manager()
+
+    try:
+        plugin_settings = parse_form(request.form)
+        plugin_settings.update(handle_request_files(request.files))
+        plugin_id = plugin_settings.pop("plugin_id")
+
+        # Use "Default" playlist, create it if it doesn't exist
+        default_playlist_name = "Default"
+        playlist = playlist_manager.get_playlist(default_playlist_name)
+        if not playlist:
+            playlist_manager.add_playlist(default_playlist_name)
+            playlist = playlist_manager.get_playlist(default_playlist_name)
+
+        # Create a default instance name for this plugin
+        instance_name = f"{plugin_id}_saved_settings"
+
+        # Check if instance already exists
+        existing_instance = playlist.find_plugin(plugin_id, instance_name)
+        if existing_instance:
+            # Update existing instance
+            existing_instance.settings = plugin_settings
+        else:
+            # Create new instance
+            plugin_dict = {
+                "plugin_id": plugin_id,
+                "refresh": {"interval": 3600},  # Default to 1 hour
+                "plugin_settings": plugin_settings,
+                "name": instance_name
+            }
+            playlist.add_plugin(plugin_dict)
+
+        device_config.write_config()
+
+        return jsonify({
+            "success": True,
+            "message": f"Settings saved to {default_playlist_name} playlist",
+            "instance_name": instance_name
+        }), 200
+
+    except Exception as e:
+        logger.exception(f"Error saving plugin settings: {str(e)}")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500

@@ -69,6 +69,9 @@
                 url = "{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName,
                 method = 'PUT'
                 clearFormOnSubmit = false
+            } else if (action == "save_settings") {
+                url = '{{ url_for("plugin.save_plugin_settings") }}';
+                clearFormOnSubmit = false
             }
 
             // Send data to the server
@@ -382,6 +385,7 @@
                     <button type="button" onclick="handleAction('update_instance')" class="action-button">Save</button>
                 {% else %}
                     <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
+                    <button type="button" onclick="handleAction('save_settings')" class="action-button center">Save Settings</button>
                     <button type="button" onclick="openModal('scheduleModal')" class="action-button right">Add to Playlist</button>
                 {% endif %}
             </div>

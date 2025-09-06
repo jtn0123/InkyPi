@@ -60,6 +60,7 @@
                     showResponseModal('failure', `Error!  ${result.error}`);
                 } else {
                     sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    // reload the page to refresh the list and then update storage after reload
                     location.reload();
                 }
             } catch (e) {
@@ -85,6 +86,51 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div id="storage-block" style="padding: 12px 16px; display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-size:14px;color:#333;font-weight:600;">Storage available</div>
+                <div id="storage-text" style="font-size:13px;color:#666;">--</div>
+            </div>
+            <div style="background:#e6e6e6;border-radius:8px;height:14px;overflow:hidden;">
+                <div id="storage-bar-inner" style="background:linear-gradient(90deg,#5bd07a,#3aa35a);height:100%;width:0%"></div>
+            </div>
+        </div>
+
+        <script>
+            async function updateStorage() {
+                try {
+                    const resp = await fetch("{{ url_for('history.history_storage') }}");
+                    const data = await resp.json();
+                    if (!resp.ok) return;
+                    const block = document.getElementById('storage-block');
+                    const text = document.getElementById('storage-text');
+                    const inner = document.getElementById('storage-bar-inner');
+                    block.style.display = '';
+                    const pct = (data.pct_free !== null && data.pct_free !== undefined) ? data.pct_free : 0;
+                    text.textContent = `${pct}% free • ${data.free_gb} GB free of ${data.total_gb} GB`;
+                    inner.style.width = `${pct}%`;
+                } catch (e) {
+                    console.error('Failed to update storage', e);
+                }
+            }
+
+            // Update storage on initial load
+            document.addEventListener('DOMContentLoaded', function() {
+                updateStorage();
+                // If we have a stored message (from a delete/clear action), show it
+                const stored = sessionStorage.getItem('storedMessage');
+                if (stored) {
+                    try {
+                        const m = JSON.parse(stored);
+                        if (m && m.type && m.text) showResponseModal(m.type, m.text);
+                    } catch (e) {}
+                    sessionStorage.removeItem('storedMessage');
+                }
+            });
+
+            // Expose function for other actions to refresh storage after operations
+            window.updateHistoryStorage = updateStorage;
+
 
         {% if images|length == 0 %}
             <p>No history yet.</p>
