@@ -40,7 +40,8 @@ def test_config_logging_is_sanitized(monkeypatch, tmp_path, caplog):
 
     monkeypatch.setattr(config_mod.Config, "config_file", str(cfg_path))
 
-    caplog.set_level(logging.DEBUG, logger="config")
+    # Capture debug logs by lowering the root logger level for the duration of this test
+    caplog.set_level(logging.DEBUG)
     _cfg = config_mod.Config()
 
     # Ensure debug log contains sanitized markers and not raw secrets
