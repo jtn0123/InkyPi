@@ -62,7 +62,6 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
         try:
             import importlib.util
             if importlib.util.find_spec("display"):
-                import sys
                 __import__("display")
         except ImportError:
             pass

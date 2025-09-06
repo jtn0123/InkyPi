@@ -56,7 +56,7 @@ def test_take_screenshot_passes_timeout_flag(monkeypatch):
         returncode = 0
         stderr = b""
 
-    def fake_run(cmd, stdout=None, stderr=None):
+    def fake_run(cmd, **kwargs):
         recorded["cmd"] = cmd
         return Result()
 
