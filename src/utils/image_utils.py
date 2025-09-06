@@ -49,7 +49,7 @@ def change_orientation(image, orientation, inverted=False):
 
     return image.rotate(angle, expand=1)
 
-def resize_image(image, desired_size, image_settings=[]):
+def resize_image(image, desired_size, image_settings=None):
     img_width, img_height = image.size
     desired_width, desired_height = desired_size
     desired_width, desired_height = int(desired_width), int(desired_height)
@@ -57,6 +57,8 @@ def resize_image(image, desired_size, image_settings=[]):
     img_ratio = img_width / img_height
     desired_ratio = desired_width / desired_height
 
+    if image_settings is None:
+        image_settings = []
     keep_width = "keep-width" in image_settings
 
     x_offset, y_offset = 0,0
@@ -80,7 +82,10 @@ def resize_image(image, desired_size, image_settings=[]):
     # Step 3: Resize to the exact desired dimensions (if necessary)
     return image.resize((desired_width, desired_height), LANCZOS)
 
-def apply_image_enhancement(img, image_settings={}):
+def apply_image_enhancement(img, image_settings=None):
+
+    if image_settings is None:
+        image_settings = {}
 
     # Apply Brightness
     img = ImageEnhance.Brightness(img).enhance(image_settings.get("brightness", 1.0))

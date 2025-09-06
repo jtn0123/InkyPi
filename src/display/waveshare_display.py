@@ -82,7 +82,7 @@ class WaveshareDisplay(AbstractDisplay):
                 write=True)
 
 
-    def display_image(self, image, image_settings=[]):
+    def display_image(self, image, image_settings=None):
         
         """
         Displays an image on the Waveshare display.
@@ -121,3 +121,4 @@ class WaveshareDisplay(AbstractDisplay):
         # Put device into low power mode (EPD displays maintain image when powered off)
         logger.info("Putting Waveshare display into sleep mode for power saving.")
         self.epd_display.sleep()
+        _ = image_settings  # acknowledge optional parameter for API compatibility

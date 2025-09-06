@@ -48,7 +48,7 @@ class Calendar(BasePlugin):
         start, end = self.get_view_range(view, current_dt, settings)
         events = self.fetch_ics_events(calendar_urls, calendar_colors, tz, start, end)
         if not events:
-            logger.warn("No events found for ics url")
+            logger.warning("No events found for ics url")
 
         if view == 'timeGridWeek' and settings.get("displayPreviousDays") != "true":
             view = 'timeGrid'

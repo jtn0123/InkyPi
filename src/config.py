@@ -140,7 +140,9 @@ class Config:
         with open(self.config_file, 'w') as outfile:
             json.dump(self.config, outfile, indent=4)
 
-    def get_config(self, key=None, default={}):
+    def get_config(self, key=None, default=None):
+        if default is None:
+            default = {}
         """Gets the value of a specific configuration key or returns the entire config if none provided."""
         if key is not None:
             return self.config.get(key, default)

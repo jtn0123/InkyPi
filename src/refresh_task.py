@@ -155,7 +155,7 @@ class RefreshTask:
                     raise exc
                 raise RuntimeError(str(exc))
         else:
-            logger.warn("Background refresh task is not running, unable to do a manual update")
+            logger.warning("Background refresh task is not running, unable to do a manual update")
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated)."""

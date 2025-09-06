@@ -67,8 +67,10 @@ class PlaylistManager:
     DEFAULT_PLAYLIST_START = "00:00"
     DEFAULT_PLAYLIST_END = "24:00"
 
-    def __init__(self, playlists=[], active_playlist=None):
+    def __init__(self, playlists=None, active_playlist=None):
         """Initialize PlaylistManager with a list of playlists."""
+        if playlists is None:
+            playlists = []
         self.playlists = playlists
         self.active_playlist = active_playlist
 

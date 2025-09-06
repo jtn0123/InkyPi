@@ -60,7 +60,7 @@ class DisplayManager:
         else:
             raise ValueError(f"Unsupported display type: {display_type}")
 
-    def display_image(self, image, image_settings=[]):
+    def display_image(self, image, image_settings=None):
         
         """
         Delegates image rendering to the appropriate display instance.
@@ -81,6 +81,8 @@ class DisplayManager:
         image.save(self.device_config.current_image_file)
 
         # Resize and adjust orientation
+        if image_settings is None:
+            image_settings = []
         image = change_orientation(image, self.device_config.get_config("orientation"))
         image = resize_image(image, self.device_config.get_resolution(), image_settings)
         if self.device_config.get_config("inverted_image"): image = image.rotate(180)
@@ -102,7 +104,7 @@ class DisplayManager:
             logger.exception("Failed to save history copy of processed image")
 
         # Pass to the concrete instance to render to the device.
-        self.display.display_image(image, image_settings)
+        self.display.display_image(image, image_settings=image_settings)
 
     def display_preprocessed_image(self, image_path: str):
         """

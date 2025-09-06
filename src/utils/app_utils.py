@@ -84,9 +84,9 @@ def get_font(font_name, font_size=50, font_weight="normal"):
             font_path = resolve_path(os.path.join("static", "fonts", font_entry["file"]))
             return ImageFont.truetype(font_path, font_size)
         else:
-            logger.warn(f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}")
+            logger.warning(f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}")
     else:
-        logger.warn(f"Requested font not found: font_name={font_name}")
+        logger.warning(f"Requested font not found: font_name={font_name}")
 
     return None
 
@@ -132,7 +132,9 @@ def parse_form(request_form):
             request_dict[key] = request_form.getlist(key)
     return request_dict
 
-def handle_request_files(request_files, form_data={}):
+def handle_request_files(request_files, form_data=None):
+    if form_data is None:
+        form_data = {}
     allowed_file_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     file_location_map = {}
     # handle existing file locations being provided as part of the form data
