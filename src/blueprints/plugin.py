@@ -60,7 +60,9 @@ def plugin_page(plugin_id):
 
 @plugin_bp.route('/images/<plugin_id>/<path:filename>')
 def image(plugin_id, filename):
-    return send_from_directory(PLUGINS_DIR, os.path.join(plugin_id, filename))
+    # Serve files from the specific plugin subdirectory to satisfy safe joins
+    plugin_dir = os.path.join(PLUGINS_DIR, plugin_id)
+    return send_from_directory(plugin_dir, filename)
 
 @plugin_bp.route('/delete_plugin_instance', methods=['POST'])
 def delete_plugin_instance():

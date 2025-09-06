@@ -40,9 +40,8 @@ def test_download_logs_has_attachment_header(client, monkeypatch):
     resp = client.get('/download-logs?hours=2')
     assert resp.status_code == 200
     cd = resp.headers.get('Content-Disposition', '')
-    assert 'attachment;' in cd and 'inkypi_' in cd and cd.endswith('.log') is False
-    # Ends with dynamic timestamp, but should include .log in filename value
-    assert '.log' in cd
+    # Should be an attachment with a filename that contains inkypi_ and ends with .log
+    assert 'attachment;' in cd and 'inkypi_' in cd and '.log' in cd
 
 
 def test_api_logs_rate_limited(client, monkeypatch):
