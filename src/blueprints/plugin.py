@@ -58,6 +58,9 @@ def delete_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "Invalid JSON data"}), 400
+
     playlist_name = data.get("playlist_name")
     plugin_id = data.get("plugin_id")
     plugin_instance = data.get("plugin_instance")
@@ -111,6 +114,9 @@ def display_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     data = request.json
+    if not data:
+        return jsonify({"success": False, "message": "Invalid JSON data"}), 400
+
     playlist_name = data.get("playlist_name")
     plugin_id = data.get("plugin_id")
     plugin_instance_name = data.get("plugin_instance")

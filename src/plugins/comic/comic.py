@@ -3,7 +3,7 @@ from PIL import Image
 from PIL.Image import Resampling
 from io import BytesIO
 LANCZOS = Resampling.LANCZOS
-import feedparser  # type: ignore[import]
+import feedparser  # type: ignore[import-untyped]
 import re
 import requests
 
