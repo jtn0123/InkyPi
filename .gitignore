@@ -164,4 +164,14 @@ cython_debug/
 .DS_Store
 
 # Development artifacts
+# Generated previews and history should not be committed
 mock_display_output/
+src/static/images/current_image.png
+src/static/images/processed_image.png
+src/static/images/history/
+
+# But keep static asset PNGs (icons, plugin assets) tracked
+!src/static/icons/*.png
+!src/plugins/**/icon.png
+!src/plugins/**/render/*.png
+!src/plugins/**/frames/*.png

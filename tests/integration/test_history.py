@@ -42,3 +42,23 @@ def test_history_redisplay_succeeds(client, device_config_dev, monkeypatch):
     assert call_count[0] == 1
     assert last_path[0].endswith(filename)
 
+
+def test_history_delete_and_clear(client, device_config_dev):
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    a = os.path.join(d, "display_20250101_000300.png")
+    b = os.path.join(d, "display_20250101_000400.png")
+    Image.new("RGB", (10, 10), "white").save(a)
+    Image.new("RGB", (10, 10), "white").save(b)
+
+    # Delete one
+    resp = client.post("/history/delete", json={"filename": os.path.basename(a)})
+    assert resp.status_code == 200
+    assert not os.path.exists(a)
+    assert os.path.exists(b)
+
+    # Clear the rest
+    resp = client.post("/history/clear")
+    assert resp.status_code == 200
+    assert not os.path.exists(b)
+

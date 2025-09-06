@@ -29,6 +29,44 @@
                 if (btn) btn.disabled = false;
             }
         }
+
+        async function deleteImage(filename) {
+            if (!confirm('Delete this image?')) return;
+            try {
+                const resp = await fetch("{{ url_for('history.history_delete') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filename })
+                });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                } else {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to delete image');
+            }
+        }
+
+        async function clearHistory() {
+            if (!confirm('Clear all history images?')) return;
+            try {
+                const resp = await fetch("{{ url_for('history.history_clear') }}", { method: 'POST' });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                } else {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to clear history');
+            }
+        }
     </script>
 </head>
 <body>
@@ -39,6 +77,10 @@
                 <div class="title-container">
                     <img src="{{ url_for('static', filename='icons/display.png') }}" alt="history icon" class="app-icon">
                     <h1 class="app-title">History</h1>
+                </div>
+                <div>
+                    <button class="header-button" onclick="location.reload()">Refresh</button>
+                    <button class="header-button" style="background-color: #c4515b;" onclick="clearHistory()">Clear All</button>
                 </div>
             </div>
         </div>
@@ -56,8 +98,9 @@
                 <div style="display:flex;gap:8px;">
                     <button id="btn-{{ img.filename }}" class="header-button" onclick="redisplay('{{ img.filename }}')">Display</button>
                     <a class="header-button" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
+                    <button class="header-button" style="background-color: #c4515b;" onclick="deleteImage('{{ img.filename }}')">Delete</button>
                 </div>
-                <small>{{ img.filename }}</small>
+                <small class="font-weight-normal">{{ img.filename }} • {{ (img.size / 1024) | round(1) }} KB</small>
             </div>
             {% endfor %}
         </div>

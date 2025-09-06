@@ -24,6 +24,7 @@ def _list_history_images(history_dir: str) -> List[Dict]:
         {
             "filename": f,
             "mtime": os.path.getmtime(os.path.join(history_dir, f)),
+            "size": os.path.getsize(os.path.join(history_dir, f)),
         }
         for f in files
     ]
@@ -67,6 +68,43 @@ def history_redisplay():
         return jsonify({"success": True, "message": "Display updated"}), 200
     except Exception as e:
         logger.exception("Error redisplaying history image")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@history_bp.route('/history/delete', methods=['POST'])
+def history_delete():
+    device_config = current_app.config['DEVICE_CONFIG']
+    history_dir = device_config.history_image_dir
+    try:
+        data = request.get_json(force=True) or {}
+        filename = data.get('filename')
+        if not filename:
+            return jsonify({"error": "filename is required"}), 400
+        safe_path = os.path.normpath(os.path.join(history_dir, filename))
+        if not safe_path.startswith(os.path.abspath(history_dir)):
+            return jsonify({"error": "invalid filename"}), 400
+        if os.path.exists(safe_path):
+            os.remove(safe_path)
+        return jsonify({"success": True, "message": "Deleted"}), 200
+    except Exception as e:
+        logger.exception("Error deleting history image")
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+
+@history_bp.route('/history/clear', methods=['POST'])
+def history_clear():
+    device_config = current_app.config['DEVICE_CONFIG']
+    history_dir = device_config.history_image_dir
+    try:
+        count = 0
+        for f in os.listdir(history_dir):
+            p = os.path.join(history_dir, f)
+            if os.path.isfile(p) and f.lower().endswith('.png'):
+                os.remove(p)
+                count += 1
+        return jsonify({"success": True, "message": f"Cleared {count} images"}), 200
+    except Exception as e:
+        logger.exception("Error clearing history images")
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 
