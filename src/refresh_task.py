@@ -36,7 +36,7 @@ class RefreshTask:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
-            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread = threading.Thread(target=self._run, daemon=True, name="RefreshTask")
             self.running = True
             self.thread.start()
 

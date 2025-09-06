@@ -134,6 +134,7 @@ def flask_app(device_config_dev, monkeypatch):
     app.config["DEVICE_CONFIG"] = device_config_dev
     app.config["DISPLAY_MANAGER"] = display_manager
     app.config["REFRESH_TASK"] = refresh_task
+    app.config["WEB_ONLY"] = False
     app.config["MAX_FORM_PARTS"] = 10_000
     # Mirror request size limit from app
     try:
@@ -149,6 +150,57 @@ def flask_app(device_config_dev, monkeypatch):
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)
     app.register_blueprint(history_bp)
+
+    # Lightweight health endpoints for probes/CI
+    @app.route("/healthz")
+    def healthz():
+        return ("OK", 200)
+
+    @app.route("/readyz")
+    def readyz():
+        try:
+            rt = app.config.get("REFRESH_TASK")
+            web_only = bool(app.config.get("WEB_ONLY"))
+            if web_only:
+                return ("ready:web-only", 200)
+            if rt and getattr(rt, "running", False):
+                return ("ready", 200)
+            return ("not-ready", 503)
+        except Exception:
+            return ("not-ready", 503)
+
+    @app.after_request
+    def _set_security_headers(response):
+        # Basic hardening headers
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault(
+            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+        )
+        # Enable HSTS only when under HTTPS/behind a proxy forwarding HTTPS
+        try:
+            from flask import request
+            if (
+                request.is_secure
+                or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+            ):
+                response.headers.setdefault(
+                    "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+                )
+        except Exception:
+            pass
+        # Content Security Policy (Report-Only by default)
+        try:
+            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in ("1", "true", "yes")
+            header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
+            if header_name not in response.headers:
+                response.headers[header_name] = csp_value
+        except Exception:
+            pass
+        return response
+
     return app
 
 
