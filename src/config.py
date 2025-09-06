@@ -257,3 +257,10 @@ class Config:
     def get_refresh_info(self):
         """Returns the refresh information."""
         return self.refresh_info
+
+    def get_plugin_image_path(self, plugin_id, instance_name):
+        """Returns the full path for a plugin instance's image file."""
+        from model import PluginInstance
+        # Create a temporary plugin instance to get the image path
+        plugin_instance = PluginInstance(plugin_id, instance_name, {}, {})
+        return os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())

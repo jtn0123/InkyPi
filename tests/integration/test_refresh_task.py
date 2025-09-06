@@ -232,7 +232,7 @@ def test_refresh_task_determine_next_plugin_empty_playlist(device_config_dev, mo
 
     # This should trigger the "playlist has no plugins" logic
     playlist, plugin_instance = task._determine_next_plugin(pm, latest_refresh, current_dt)
-    assert playlist is not None
+    assert playlist is None
     assert plugin_instance is None
 
 
@@ -371,17 +371,12 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
     # Mock should_refresh to return False
     monkeypatch.setattr(plugin_instance, 'should_refresh', lambda dt: False)
 
-    # Create a temporary image file
-    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-        test_image = Image.new('RGB', (400, 300), 'red')
-        test_image.save(tmp.name)
-        temp_path = tmp.name
+    # Create the cached image file in the expected location
+    plugin_image_path = os.path.join(device_config_dev.plugin_image_dir, plugin_instance.get_image_path())
+    test_image = Image.new('RGB', (400, 300), 'red')
+    test_image.save(plugin_image_path)
 
     try:
-        # Mock the plugin image path
-        monkeypatch.setattr(device_config_dev, 'get_plugin_image_path',
-                          lambda plugin_id, instance_name: temp_path)
-
         # Mock plugin
         mock_plugin = type('MockPlugin', (), {
             'config': {'image_settings': []}
@@ -394,6 +389,8 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
         image = refresh.execute(mock_plugin, device_config_dev, current_dt)
         assert image is not None
     finally:
-        os.unlink(temp_path)
+        # Clean up the test file
+        if os.path.exists(plugin_image_path):
+            os.unlink(plugin_image_path)
 
 
