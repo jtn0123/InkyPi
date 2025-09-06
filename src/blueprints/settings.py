@@ -9,18 +9,14 @@ import io
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
-    from cysystemd.reader import JournalReader, JournalOpenMode, Rule
+    from cysystemd.reader import JournalReader, JournalOpenMode, Rule  # type: ignore[import-not-found]
     JOURNAL_AVAILABLE = True
 except ImportError:
     JOURNAL_AVAILABLE = False
     # Define dummy classes for when cysystemd is not available
-    class JournalOpenMode:  # noqa: F811
-        SYSTEM = None
-    class Rule:  # noqa: F811
-        pass
-    class JournalReader:  # noqa: F811
-        def __init__(self, *args, **kwargs):
-            pass
+    JournalReader = None  # type: ignore[misc,assignment]
+    JournalOpenMode = None  # type: ignore[misc,assignment]
+    Rule = None  # type: ignore[misc,assignment]
 
 
 logger = logging.getLogger(__name__)
