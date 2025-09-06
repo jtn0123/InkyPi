@@ -62,6 +62,10 @@ body {
     max-height: 15rem;
 }
 
+.preview-link {
+    cursor: pointer;
+}
+
 /* When native (full-size) preview is enabled, allow scrolling to see full image */
 .image-container.native {
     width: auto;
