@@ -8,6 +8,7 @@ User=root
 RuntimeDirectory=inkypi
 WorkingDirectory=/run/inkypi
 ExecStart=/usr/local/bin/inkypi
+EnvironmentFile=/usr/local/inkypi/.env
 Restart=on-failure
 RestartSec=60
 KillSignal=SIGINT

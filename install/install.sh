@@ -302,6 +302,16 @@ copy_project() {
 
   ln -sf "$SRC_PATH" "$INSTALL_PATH/src"
   show_loader "\tCreating symlink from $SRC_PATH to $INSTALL_PATH/src"
+
+  # Ensure a protected .env exists at the project root used by the service
+  if [ ! -f "$INSTALL_PATH/.env" ]; then
+    touch "$INSTALL_PATH/.env"
+    chmod 600 "$INSTALL_PATH/.env"
+    echo_success "\tCreated $INSTALL_PATH/.env with 0600 permissions"
+  else
+    chmod 600 "$INSTALL_PATH/.env" 2>/dev/null || true
+    echo_success "\tVerified permissions on $INSTALL_PATH/.env"
+  fi
 }
 
 # Get Raspberry Pi hostname

@@ -1,3 +1,4 @@
+# pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportMissingModuleSource=false, reportRedeclaration=false
 from flask import Blueprint, request, jsonify, current_app, render_template, Response
 from utils.time_utils import calculate_seconds
 from datetime import datetime, timedelta
@@ -13,11 +14,11 @@ try:
 except ImportError:
     JOURNAL_AVAILABLE = False
     # Define dummy classes for when cysystemd is not available
-    class JournalOpenMode:
+    class JournalOpenMode:  # noqa: F811
         SYSTEM = None
-    class Rule:
+    class Rule:  # noqa: F811
         pass
-    class JournalReader:
+    class JournalReader:  # noqa: F811
         def __init__(self, *args, **kwargs):
             pass
 
@@ -30,6 +31,55 @@ def settings_page():
     device_config = current_app.config['DEVICE_CONFIG']
     timezones = sorted(pytz.all_timezones_set)
     return render_template('settings.html', device_settings=device_config.get_config(), timezones = timezones)
+
+@settings_bp.route('/settings/api-keys')
+def api_keys_page():
+    device_config = current_app.config['DEVICE_CONFIG']
+
+    def mask(value):
+        if not value:
+            return None
+        try:
+            return f"...{value[-4:]}" if len(value) >= 4 else "set"
+        except Exception:
+            return "set"
+
+    keys = {
+        "OPEN_AI_SECRET": device_config.load_env_key("OPEN_AI_SECRET"),
+        "OPEN_WEATHER_MAP_SECRET": device_config.load_env_key("OPEN_WEATHER_MAP_SECRET"),
+        "NASA_SECRET": device_config.load_env_key("NASA_SECRET"),
+        "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
+    }
+    masked = {k: mask(v) for k, v in keys.items()}
+    return render_template('api_keys.html', masked=masked)
+
+@settings_bp.route('/settings/save_api_keys', methods=['POST'])
+def save_api_keys():
+    device_config = current_app.config['DEVICE_CONFIG']
+    try:
+        form_data = request.form.to_dict()
+        updated = []
+        for key in ("OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"):
+            value = form_data.get(key)
+            if value:
+                device_config.set_env_key(key, value)
+                updated.append(key)
+        return jsonify({"success": True, "message": "API keys saved.", "updated": updated})
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
+@settings_bp.route('/settings/delete_api_key', methods=['POST'])
+def delete_api_key():
+    device_config = current_app.config['DEVICE_CONFIG']
+    key = request.form.get("key")
+    valid_keys = {"OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"}
+    if key not in valid_keys:
+        return jsonify({"error": "Invalid key name"}), 400
+    try:
+        device_config.unset_env_key(key)
+        return jsonify({"success": True, "message": f"Deleted {key}."})
+    except Exception as e:
+        return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
 @settings_bp.route('/save_settings', methods=['POST'])
 def save_settings():

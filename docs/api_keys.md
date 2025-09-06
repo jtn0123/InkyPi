@@ -17,6 +17,20 @@ Certain plugins, like the AI Image plugin, require API credentials to function. 
     ```
 4. Save the file and exit the editor
 
+## Manage API Keys from the Web UI
+
+You can now manage your API keys directly from the InkyPi web UI:
+
+- Open the Settings page and click "Manage API Keys".
+- The page shows whether each key is configured. Values are masked (only last 4 characters shown).
+- Enter a new value to create or update a key. Use the Delete button to remove a key.
+- Keys are written to the `.env` file on the device and loaded at runtime. They are never stored in `device.json` or other configs.
+
+Notes:
+- In development, `.env` is expected at the project root (repo root).
+- In production (installed via `install/install.sh`), `.env` is located at `/usr/local/inkypi/.env` and is created with `0600` permissions. The systemd service also references this file via `EnvironmentFile`.
+- `.env` is git-ignored to prevent accidental commits.
+
 ## Open AI Key
 
 Required for the AI Image and AI Text Plugins
