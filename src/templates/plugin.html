@@ -253,7 +253,17 @@
                 let selectedFrameOption = document.querySelector('.image-option');
                 selectedFrame(selectedFrameOption);
 
-                document.getElementById('margin').value = "5";
+                // Set default margins when creating a new instance
+                const defaultMargin = "5";
+                const topMarginInput = document.getElementById('topMargin');
+                const bottomMarginInput = document.getElementById('bottomMargin');
+                const leftMarginInput = document.getElementById('leftMargin');
+                const rightMarginInput = document.getElementById('rightMargin');
+
+                if (topMarginInput) topMarginInput.value = defaultMargin;
+                if (bottomMarginInput) bottomMarginInput.value = defaultMargin;
+                if (leftMarginInput) leftMarginInput.value = defaultMargin;
+                if (rightMarginInput) rightMarginInput.value = defaultMargin;
             }
         });
     </script>
