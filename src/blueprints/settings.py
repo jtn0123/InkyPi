@@ -242,11 +242,29 @@ def api_logs():
         if not _rate_limit_ok(request.remote_addr):
             return jsonify({"error": "Too many requests"}), 429
 
-        hours = _clamp_int(request.args.get('hours'), 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
-        limit = _clamp_int(request.args.get('limit'), 500, MIN_LOG_LINES, MAX_LOG_LINES)
-        contains = (request.args.get('contains') or '').strip()
+        # Capture raw inputs and determine if clamped/trimmed
+        raw_hours = request.args.get('hours')
+        raw_limit = request.args.get('limit')
+        raw_contains_full = (request.args.get('contains') or '')
+
+        try:
+            pre_hours = int(raw_hours) if raw_hours is not None else 2
+        except Exception:
+            pre_hours = 2
+        try:
+            pre_limit = int(raw_limit) if raw_limit is not None else 500
+        except Exception:
+            pre_limit = 500
+
+        hours = _clamp_int(raw_hours, 2, MIN_LOG_HOURS, MAX_LOG_HOURS)
+        limit = _clamp_int(raw_limit, 500, MIN_LOG_LINES, MAX_LOG_LINES)
+
+        contains = raw_contains_full.strip()
+        contains_trimmed = False
         if len(contains) > 200:
             contains = contains[:200]
+            contains_trimmed = True
+
         level = (request.args.get('level') or 'all').lower()
 
         # Read raw lines then apply filtering server-side
@@ -264,7 +282,7 @@ def api_logs():
             warn_re = re.compile(r"\bWARNING\b", re.IGNORECASE)
             lines = [ln for ln in lines if err_re.search(ln) or warn_re.search(ln)]
 
-        truncated = False
+        truncated = (pre_hours != hours) or (pre_limit != limit) or contains_trimmed
         if len(lines) > limit:
             truncated = True
             lines = lines[-limit:]
