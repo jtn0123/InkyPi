@@ -2,7 +2,7 @@ import os
 import json
 import logging
 import shutil
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key, unset_key
 from model import PlaylistManager, RefreshInfo
 
 logger = logging.getLogger(__name__)
@@ -163,10 +163,71 @@ class Config:
         if write:
             self.write_config()
 
+    def get_env_file_path(self):
+        """Return absolute path to the .env file used for secrets.
+
+        Precedence:
+        - PROJECT_DIR environment variable if provided (set in production by install script)
+        - Repository root inferred as parent of src directory
+        """
+        project_dir = os.getenv("PROJECT_DIR")
+        if not project_dir:
+            # default to repo root: parent of src
+            project_dir = os.path.abspath(os.path.join(self.BASE_DIR, ".."))
+        return os.path.join(project_dir, ".env")
+
     def load_env_key(self, key):
-        """Loads an environment variable using dotenv and returns its value."""
-        load_dotenv(override=True)
+        """Loads an environment variable from the managed .env and returns its value."""
+        load_dotenv(dotenv_path=self.get_env_file_path(), override=True)
         return os.getenv(key)
+
+    def set_env_key(self, key, value):
+        """Safely set/update a key in the managed .env file and current process env."""
+        env_path = self.get_env_file_path()
+        # Ensure directory exists and file is present with safe permissions
+        os.makedirs(os.path.dirname(env_path), exist_ok=True)
+        if not os.path.exists(env_path):
+            open(env_path, "a").close()
+            try:
+                os.chmod(env_path, 0o600)
+            except Exception:
+                # best effort on non-POSIX systems
+                pass
+        # Write without quotes to satisfy tests and common .env style
+        try:
+            set_key(env_path, key, value, quote_mode="never")
+        except TypeError:
+            # Older dotenv versions: fallback to manual append/update
+            # Read existing lines and replace or append
+            lines = []
+            if os.path.exists(env_path):
+                with open(env_path, "r") as f:
+                    lines = f.read().splitlines()
+            key_prefix = f"{key}="
+            updated = False
+            for i, line in enumerate(lines):
+                if line.startswith(key_prefix):
+                    lines[i] = f"{key}={value}"
+                    updated = True
+                    break
+            if not updated:
+                lines.append(f"{key}={value}")
+            with open(env_path, "w") as f:
+                f.write("\n".join(lines) + "\n")
+        os.environ[key] = value
+        return True
+
+    def unset_env_key(self, key):
+        """Remove a key from the managed .env file and current process env."""
+        env_path = self.get_env_file_path()
+        if os.path.exists(env_path):
+            try:
+                unset_key(env_path, key)
+            except Exception:
+                # ignore if key not present
+                pass
+        os.environ.pop(key, None)
+        return True
 
     def load_playlist_manager(self):
         """Loads the playlist manager object from the config."""
