@@ -247,6 +247,8 @@ def handle_request_files(request_files, form_data=None):
             # Re-open to apply orientation and save
             bio2 = BytesIO(content)
             with Image.open(bio2) as img:
+                if img is None:
+                    raise RuntimeError("Failed to open image for processing")
                 img = ImageOps.exif_transpose(img)
                 img.save(file_path)
         except Exception as e:

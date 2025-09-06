@@ -229,8 +229,7 @@ class Clock(BasePlugin):
         # used to calculate percentages of sizes
         dim = min(w, h)
 
-        corners = [(0, h / 2), (w, h)]
-        bg_draw.rectangle(corners, fill=secondary_color + (255,))
+        bg_draw.rectangle((0, h / 2, w, h), fill=secondary_color + (255,))
 
         canvas = Image.new("RGBA", dimensions, (0, 0, 0, 0))
         image_draw = ImageDraw.Draw(canvas)
@@ -239,25 +238,24 @@ class Clock(BasePlugin):
         face_size = int(dim * 0.45)
 
         # clock shadow
-        image_draw.circle(
-            (w / 2, h / 2 + shadow_offset), face_size + 2, fill=(0, 0, 0, 50)
+        image_draw.ellipse(
+            (w / 2 - face_size - 2, h / 2 + shadow_offset - face_size - 2, w / 2 + face_size + 2, h / 2 + shadow_offset + face_size + 2), fill=(0, 0, 0, 50)
         )
 
         # clock outline
-        image_draw.circle(
-            (w / 2, h / 2),
-            face_size,
+        image_draw.ellipse(
+            (w / 2 - face_size, h / 2 - face_size, w / 2 + face_size, h / 2 + face_size),
             fill=primary_color,
             outline=secondary_color,
             width=int(dim * 0.03125),
         )
 
-        Clock.draw_hour_marks(image_draw._image, face_size - int(w * 0.04375))
+        Clock.draw_hour_marks(canvas, face_size - int(w * 0.04375))
 
         hour_angle, minute_angle = Clock.calculate_clock_angles(time)
         hand_width = max(int(dim * 0.009), 1)
         Clock.draw_clock_hand(
-            image_draw._image,
+            canvas,
             int(dim * 0.3),
             minute_angle,
             secondary_color,
@@ -266,7 +264,7 @@ class Clock(BasePlugin):
             round_corners=False,
         )
         Clock.draw_clock_hand(
-            image_draw._image,
+            canvas,
             int(dim * 0.2),
             hour_angle,
             secondary_color,
@@ -276,7 +274,7 @@ class Clock(BasePlugin):
         )
 
         Clock.drew_clock_center(
-            image_draw._image,
+            canvas,
             max(int(dim * 0.014), 1),
             primary_color,
             secondary_color,
@@ -447,12 +445,12 @@ class Clock(BasePlugin):
 
         corners = Clock.calculate_rectangle_corners(start, end, hand_width)
         if round_corners:
-            draw.circle(start, hand_width - 0.6, fill=border_color)
-            draw.circle(end, hand_width - 0.8, fill=border_color)
+            draw.ellipse((start[0] - hand_width + 0.6, start[1] - hand_width + 0.6, start[0] + hand_width - 0.6, start[1] + hand_width - 0.6), fill=border_color)
+            draw.ellipse((end[0] - hand_width + 0.8, end[1] - hand_width + 0.8, end[0] + hand_width - 0.8, end[1] + hand_width - 0.8), fill=border_color)
         draw.polygon(corners, fill=hand_color, outline=border_color, width=border_width)
         if round_corners:
-            draw.circle(start, hand_width - 2, fill=hand_color)
-            draw.circle(end, hand_width - 2, fill=hand_color)
+            draw.ellipse((start[0] - hand_width + 2, start[1] - hand_width + 2, start[0] + hand_width - 2, start[1] + hand_width - 2), fill=hand_color)
+            draw.ellipse((end[0] - hand_width + 2, end[1] - hand_width + 2, end[0] + hand_width - 2, end[1] + hand_width - 2), fill=hand_color)
 
         return image
 
@@ -519,8 +517,8 @@ class Clock(BasePlugin):
 
         # center point
         center = (w / 2, h / 2)
-        draw.circle(
-            center, center_radius, fill=fill_color, outline=outline_color, width=width
+        draw.ellipse(
+            (center[0] - center_radius, center[1] - center_radius, center[0] + center_radius, center[1] + center_radius), fill=fill_color, outline=outline_color, width=width
         )
 
     @staticmethod
