@@ -32,7 +32,8 @@ class AIImage(BasePlugin):
         image_model = settings.get('imageModel', DEFAULT_IMAGE_MODEL)
         if image_model not in IMAGE_MODELS:
             raise RuntimeError("Invalid Image Model provided.")
-        image_quality = settings.get('quality', "medium" if image_model == "gpt-image-1" else "standard")
+        # Default to 'standard' for all models; mapping handled in fetch_image
+        image_quality = settings.get('quality', DEFAULT_IMAGE_QUALITY)
         randomize_prompt = settings.get('randomizePrompt') == 'true'
 
         image = None
@@ -65,6 +66,22 @@ class AIImage(BasePlugin):
             "and visual appeal. Avoid excessive detail or complex gradients, ensuring "
             "the design works well with flat, vibrant colors."
         )
+        def normalize_quality(model: str, requested: str):
+            # Map UI values to API-supported values per model
+            req = (requested or "").lower()
+            if model == "dall-e-3":
+                # Allowed: 'standard' | 'hd'
+                if req in ("hd", "high"):
+                    return "hd"
+                return "standard"
+            if model == "gpt-image-1":
+                # Allowed: 'standard' | 'high'
+                if req in ("high", "hd"):
+                    return "high"
+                return "standard"
+            # dall-e-2: no quality parameter
+            return None
+
         args = {
             "model": model,
             "prompt": prompt,
@@ -72,10 +89,14 @@ class AIImage(BasePlugin):
         }
         if model == "dall-e-3":
             args["size"] = "1792x1024" if orientation == "horizontal" else "1024x1792"
-            args["quality"] = quality
+            q = normalize_quality(model, quality)
+            if q:
+                args["quality"] = q
         elif model == "gpt-image-1":
             args["size"] = "1536x1024" if orientation == "horizontal" else "1024x1536"
-            args["quality"] = quality
+            q = normalize_quality(model, quality)
+            if q:
+                args["quality"] = q
 
         response = ai_client.images.generate(**args)
         image_url = response.data[0].url

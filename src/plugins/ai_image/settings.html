@@ -43,16 +43,18 @@
         qualityDropdown.innerHTML = "";
 
         if (selectedModel === "dall-e-3") {
+            // API supports: standard, hd
             qualityDropdown.add(new Option("HD", "hd"));
             qualityDropdown.add(new Option("Standard", "standard"));
         } 
         else if (selectedModel === "dall-e-2") {
+            // No quality parameter; keep a placeholder for UI consistency
             qualityDropdown.add(new Option("Standard", "standard"));
         } 
         else if (selectedModel === "gpt-image-1") {
+            // API supports: standard, high
             qualityDropdown.add(new Option("High", "high"));
-            qualityDropdown.add(new Option("Medium", "medium"));
-            qualityDropdown.add(new Option("Low", "low"));
+            qualityDropdown.add(new Option("Standard", "standard"));
         }
 
         if (quality != "") {

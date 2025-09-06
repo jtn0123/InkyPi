@@ -20,6 +20,13 @@ def test_ai_image_generate_image_success(client, monkeypatch):
 
     class FakeImages:
         def generate(self, **kwargs):
+            # Ensure quality is normalized per model
+            model = kwargs.get('model')
+            q = kwargs.get('quality')
+            if model == 'gpt-image-1':
+                assert q in (None, 'standard', 'high')
+            if model == 'dall-e-3':
+                assert q in (None, 'standard', 'hd')
             class Resp:
                 class D:
                     url = 'http://example.com/img.png'
@@ -47,13 +54,15 @@ def test_ai_image_generate_image_success(client, monkeypatch):
         return R()
     monkeypatch.setattr(requests, 'get', fake_get, raising=True)
 
-    data = {
-        'plugin_id': 'ai_image',
-        'textPrompt': 'a cat',
-        'imageModel': 'dall-e-3',
-        'quality': 'standard',
-    }
-    resp = client.post('/update_now', data=data)
-    assert resp.status_code == 200
+    for model, quality in [('dall-e-3','standard'), ('dall-e-3','hd'), ('gpt-image-1','high'), ('gpt-image-1','standard'), ('gpt-image-1','low')]:
+        # 'low' should normalize to 'standard' for gpt-image-1
+        data = {
+            'plugin_id': 'ai_image',
+            'textPrompt': 'a cat',
+            'imageModel': model,
+            'quality': quality,
+        }
+        resp = client.post('/update_now', data=data)
+        assert resp.status_code == 200
 
 
