@@ -61,7 +61,6 @@ def history_page():
     pct_free = None
     try:
         stat = os.statvfs(history_dir)
-        # f_frsize is fragment size; f_bavail is blocks available to unprivileged user
         free_bytes = stat.f_frsize * stat.f_bavail
         total_bytes = stat.f_frsize * stat.f_blocks
         used_bytes = total_bytes - free_bytes if (total_bytes is not None and free_bytes is not None) else None
@@ -69,12 +68,18 @@ def history_page():
     except Exception:
         logger.exception("Failed to stat filesystem for history directory")
 
-    return render_template('history.html', images=images, storage={
+    gb = 1024 ** 3
+    storage_ctx = {
         'free_bytes': free_bytes,
         'total_bytes': total_bytes,
         'used_bytes': used_bytes,
         'pct_free': pct_free,
-    })
+        'free_gb': round(free_bytes / gb, 2) if free_bytes is not None else None,
+        'total_gb': round(total_bytes / gb, 2) if total_bytes is not None else None,
+        'used_gb': round(used_bytes / gb, 2) if used_bytes is not None else None,
+    }
+
+    return render_template('history.html', images=images, storage=storage_ctx)
 
 
 @history_bp.route('/history/image/<path:filename>')

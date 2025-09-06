@@ -56,12 +56,15 @@ class WaveshareDisplay(AbstractDisplay):
             epd_module = importlib.import_module(module_name)  
             self.epd_display = epd_module.EPD()
             # Workaround for init functions with inconsistent casing
-            self.epd_display_init = getattr(self.epd_display, "Init", getattr(self.epd_display, "init", None))
+            self.epd_display_init = getattr(self.epd_display, "Init", None)
+            if self.epd_display_init is None:
+                self.epd_display_init = getattr(self.epd_display, "init", None)
 
-            if not callable(self.epd_display_init):
+            if callable(self.epd_display_init):
+                # Safe to call now that we've verified it's callable
+                self.epd_display_init()
+            else:
                 raise AttributeError("No Init/init method found")
-
-            self.epd_display_init()
 
             display_args_spec = inspect.getfullargspec(self.epd_display.display)
             display_args = display_args_spec.args
@@ -102,8 +105,9 @@ class WaveshareDisplay(AbstractDisplay):
         if not image:
             raise ValueError(f"No image provided.")
 
-        # Assume device was in sleep mode.
-        self.epd_display_init()
+        # Assume device was in sleep mode. Only call init if available and callable.
+        if hasattr(self, 'epd_display_init') and callable(self.epd_display_init):
+            self.epd_display_init()
 
         # Clear residual pixels before updating the image.
         self.epd_display.Clear()

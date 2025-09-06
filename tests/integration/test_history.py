@@ -81,6 +81,8 @@ def test_history_page_contains_storage_block(client):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert 'id="storage-block"' in body
+    # Should include server-rendered text placeholders or values
+    assert 'Storage available' in body
 
 
 def test_history_image_route_serves_png(client, device_config_dev):
@@ -189,4 +191,29 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
 
     # Size strings should include units like B or KB
     assert "100 B" in body or "0.1 KB" in body or "KB" in body
+
+
+def test_history_server_renders_storage_when_statvfs_ok(client, monkeypatch):
+    class FakeStat:
+        f_frsize = 4096
+        f_bavail = 250_000
+        f_blocks = 1_000_000
+
+    import os as _os
+    monkeypatch.setattr(_os, "statvfs", lambda p: FakeStat())
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "% free" in body
+    assert "GB free of" in body
+
+
+def test_history_server_handles_statvfs_failure(client, monkeypatch):
+    import os as _os
+    monkeypatch.setattr(_os, "statvfs", lambda p: (_ for _ in ()).throw(OSError("fail")))
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Storage block may be hidden; ensure page still renders with header
+    assert "History" in body
 

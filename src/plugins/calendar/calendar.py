@@ -3,8 +3,8 @@ from utils.app_utils import resolve_path, get_font
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.calendar.constants import LOCALE_MAP, FONT_SIZES
 from PIL import Image, ImageColor, ImageDraw, ImageFont
-import icalendar
-import recurring_ical_events
+import icalendar  # type: ignore
+import recurring_ical_events  # type: ignore
 from io import BytesIO
 import logging
 import requests
@@ -146,7 +146,9 @@ class Calendar(BasePlugin):
         Returns '#000000' (black) or '#ffffff' (white) depending on the contrast
         against the given color.
         """
-        r, g, b = ImageColor.getrgb(color)
+        rgb = ImageColor.getrgb(color)
+        # ImageColor.getrgb may return an RGBA tuple; take the first three components
+        r, g, b = rgb[:3]
         # YIQ formula to estimate brightness
         yiq = (r * 299 + g * 587 + b * 114) / 1000
 
