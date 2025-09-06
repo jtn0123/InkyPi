@@ -150,6 +150,7 @@ def test_inkypi_max_content_length_env(monkeypatch):
     """Test MAX_CONTENT_LENGTH environment variable handling."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "5242880"})  # 5MB
     app = getattr(mod, "app", None)
+    assert app is not None
     assert app.config['MAX_CONTENT_LENGTH'] == 5242880
 
 
@@ -157,6 +158,7 @@ def test_inkypi_max_content_length_invalid_env(monkeypatch):
     """Test invalid MAX_CONTENT_LENGTH falls back to default."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"MAX_CONTENT_LENGTH": "invalid"})
     app = getattr(mod, "app", None)
+    assert app is not None
     assert app.config['MAX_CONTENT_LENGTH'] == 10 * 1024 * 1024  # Default 10MB
 
 
@@ -164,6 +166,7 @@ def test_inkypi_max_upload_bytes_env(monkeypatch):
     """Test MAX_UPLOAD_BYTES environment variable as fallback."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={"MAX_UPLOAD_BYTES": "2097152"})  # 2MB
     app = getattr(mod, "app", None)
+    assert app is not None
     assert app.config['MAX_CONTENT_LENGTH'] == 2097152
 
 
@@ -219,6 +222,7 @@ def test_inkypi_error_handlers_exist(monkeypatch):
     """Test that error handlers are registered in the Flask app."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
+    assert app is not None
 
     # Check that error handlers are registered
     error_handlers = app.error_handler_spec[None]
@@ -230,6 +234,7 @@ def test_inkypi_security_headers(monkeypatch):
     """Test that security headers are set."""
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
+    assert app is not None
 
     # Test security headers middleware is registered
     assert len(app.after_request_funcs[None]) > 0
@@ -254,6 +259,7 @@ def test_inkypi_refresh_task_lazy_start(monkeypatch):
 
         mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
         app = getattr(mod, "app", None)
+        assert app is not None
 
         # Mock the refresh task
         mock_rt = MagicMock()
