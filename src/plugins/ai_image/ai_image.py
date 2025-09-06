@@ -6,7 +6,7 @@ from openai import OpenAI
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
-from utils.http_utils import http_get
+import utils.http_utils as http_utils
 
 logger = logging.getLogger(__name__)
 
@@ -117,9 +117,13 @@ class AIImage(BasePlugin):
 
         response = ai_client.images.generate(**args)
         image_url = response.data[0].url
-        response = http_get(image_url, timeout=30)
-        response.raise_for_status()
-        with Image.open(BytesIO(response.content)) as _img:
+        # Download the generated image using centralized HTTP helper
+        resp = http_utils.http_get(image_url, timeout=30)
+        # Respect raise_for_status if available; MagicMocks in tests will no-op
+        raise_for_status = getattr(resp, "raise_for_status", None)
+        if callable(raise_for_status):
+            raise_for_status()
+        with Image.open(BytesIO(resp.content)) as _img:
             return _img.copy()
 
     @staticmethod

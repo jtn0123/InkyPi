@@ -96,11 +96,12 @@ class Wpotd(BasePlugin):
             # Use standardized helper to ensure resources are released
             img = load_image_from_bytes(response.content)
             if img is None:
-                raise RuntimeError("Failed to decode image bytes")
+                # Raise as UnidentifiedImageError to map to specific error handling
+                raise UnidentifiedImageError("Failed to decode image bytes")
             return img
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
-            raise RuntimeError("Unsupported image format.")
+            raise RuntimeError("Unsupported image format")
         except Exception as e:
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
             raise RuntimeError("Failed to load WPOTD image.")

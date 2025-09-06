@@ -49,7 +49,7 @@ def test_weather_openweathermap_success(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr("utils.http_utils.http_get", fake_get, raising=True)
+    monkeypatch.setattr("plugins.weather.weather.http_get", fake_get, raising=True)
 
     data = {
         "plugin_id": "weather",
@@ -100,7 +100,7 @@ def test_weather_openmeteo_success(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr("utils.http_utils.http_get", fake_get, raising=True)
+    monkeypatch.setattr("plugins.weather.weather.http_get", fake_get, raising=True)
 
     data = {
         "plugin_id": "weather",
@@ -658,7 +658,7 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
     def raise_timeout(*args, **kwargs):
         raise requests.exceptions.Timeout("Connection timeout")
 
-    monkeypatch.setattr("utils.http_utils.http_get", raise_timeout)
+    monkeypatch.setattr("plugins.weather.weather.http_get", raise_timeout)
 
     settings = {
         "latitude": "40.7128",
@@ -680,7 +680,7 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
     def raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("Connection failed")
 
-    monkeypatch.setattr("utils.http_utils.http_get", raise_connection_error)
+    monkeypatch.setattr("plugins.weather.weather.http_get", raise_connection_error)
 
     settings = {
         "latitude": "40.7128",

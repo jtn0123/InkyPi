@@ -22,13 +22,13 @@ def test_get_image_timeout_fallback_success(monkeypatch):
         status_code = 200
         content = png
 
-    def fake_get(url, timeout=None, stream=False):
+    def fake_get(url, timeout=None, stream=False, **kwargs):
         if calls["n"] == 0:
             calls["n"] += 1
             raise TypeError("timeout arg not supported")
         return Resp()
 
-    monkeypatch.setattr("utils.http_utils.http_get", fake_get)
+    monkeypatch.setattr("utils.image_utils.http_get", fake_get)
     img = image_utils.get_image("http://example/img.png")
     assert img is not None
     assert img.size == (5, 5)
@@ -39,13 +39,13 @@ def test_get_image_timeout_fallback_failure(monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_get(url, timeout=None, stream=False):
+    def fake_get(url, timeout=None, stream=False, **kwargs):
         if calls["n"] == 0:
             calls["n"] += 1
             raise TypeError("timeout arg not supported")
         raise RuntimeError("network broke")
 
-    monkeypatch.setattr("utils.http_utils.http_get", fake_get)
+    monkeypatch.setattr("utils.image_utils.http_get", fake_get)
     img = image_utils.get_image("http://example/img.png")
     assert img is None
 
@@ -57,7 +57,7 @@ def test_get_image_decode_error(monkeypatch):
         status_code = 200
         content = b"not an image"
 
-    monkeypatch.setattr("utils.http_utils.http_get", lambda url, timeout=None: Resp())
+    monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
     img = image_utils.get_image("http://example/img.png")
     assert img is None
 

@@ -22,10 +22,10 @@ def make_png_bytes(size=(10, 10), color=(1, 2, 3)):
 def test_get_image_success(monkeypatch):
     content = make_png_bytes()
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, timeout=None, **kwargs):
         return FakeResp(content, 200)
 
-    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
+    monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
     img = image_utils.get_image("http://example.com/img.png")
     assert isinstance(img, Image.Image)
 
@@ -33,21 +33,21 @@ def test_get_image_success(monkeypatch):
 def test_get_image_typeerror_fallback(monkeypatch):
     content = make_png_bytes()
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, timeout=None, **kwargs):
         if timeout is not None:
             raise TypeError("no timeout support")
         return FakeResp(content, 200)
 
-    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
+    monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
     img = image_utils.get_image("http://example.com/img.png")
     assert isinstance(img, Image.Image)
 
 
 def test_get_image_non200(monkeypatch):
-    def fake_get(url, timeout=None):
+    def fake_get(url, timeout=None, **kwargs):
         return FakeResp(b"", 404)
 
-    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
+    monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
     assert image_utils.get_image("http://example.com/notfound") is None
 
 
@@ -115,13 +115,13 @@ def test_compute_image_hash_deterministic():
 def test_get_image_exception_handling(monkeypatch):
     """Test get_image with exception handling."""
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, timeout=None, **kwargs):
         if timeout is not None:
             raise TypeError("timeout not supported")
         # This should trigger the exception handling path
         raise Exception("Network error")
 
-    monkeypatch.setattr("utils.http_utils.http_get", staticmethod(fake_get))
+    monkeypatch.setattr("utils.image_utils.http_get", staticmethod(fake_get))
     result = image_utils.get_image("http://example.com/img.png")
     assert result is None
 

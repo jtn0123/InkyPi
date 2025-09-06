@@ -19,7 +19,7 @@ def test_image_url_happy(monkeypatch, device_config_dev):
         Image.new("RGB", (10, 10), "white").save(buf, format="PNG")
         return Resp(buf.getvalue())
 
-    monkeypatch.setattr("utils.http_utils.http_get", fake_get)
+    monkeypatch.setattr("plugins.image_url.image_url.http_get", fake_get)
 
     img = ImageURL({"id": "image_url"}).generate_image(
         {"url": "http://img"}, device_config_dev

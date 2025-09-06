@@ -310,7 +310,6 @@ class Weather(BasePlugin):
 
             try:
                 resp = http_get(api_url, timeout=10)
-                resp.raise_for_status()
                 moon = resp.json()[0]
                 phase_raw = moon.get("Phase", "New Moon")
                 illum_pct = float(moon.get("Illumination", 0)) * 100

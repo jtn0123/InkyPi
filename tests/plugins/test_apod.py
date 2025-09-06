@@ -26,13 +26,13 @@ def test_apod_success(monkeypatch, device_config_dev):
 
     calls = {"url": None}
 
-    def fake_get(url, params=None):
+    def fake_get(url, params=None, **kwargs):
         calls["url"] = url
         if 'apod' in url:
             return RespApi()
         return RespImg()
 
-    monkeypatch.setattr('utils.http_utils.http_get', fake_get)
+    monkeypatch.setattr('plugins.apod.apod.http_get', fake_get)
 
     img = Apod({"id": "apod"}).generate_image({}, device_config_dev)
     assert img.size[0] > 0
@@ -66,7 +66,7 @@ def test_apod_success_via_client(client, monkeypatch):
 
     # Mock NASA APOD API response
     import requests
-    def fake_get(url, params=None):
+    def fake_get(url, params=None, **kwargs):
         class R:
             status_code = 200
             def json(self):
@@ -88,7 +88,7 @@ def test_apod_success_via_client(client, monkeypatch):
 
     # Route calls: first call with params (APOD), second call to image URL
     calls = []
-    def dispatcher(url, params=None):
+    def dispatcher(url, params=None, **kwargs):
         if params is not None:
             calls.append('meta')
             return fake_get(url, params=params)
@@ -96,7 +96,7 @@ def test_apod_success_via_client(client, monkeypatch):
             calls.append('image')
             return fake_get_image(url)
 
-    monkeypatch.setattr('utils.http_utils.http_get', dispatcher, raising=True)
+    monkeypatch.setattr('plugins.apod.apod.http_get', dispatcher, raising=True)
 
     data = {'plugin_id': 'apod'}
     resp = client.post('/update_now', data=data)
@@ -112,7 +112,7 @@ def test_apod_randomize_date(monkeypatch, device_config_dev):
     monkeypatch.setenv('NASA_SECRET', 'test_key')
 
     # Mock requests
-    with patch('utils.http_utils.http_get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -154,7 +154,7 @@ def test_apod_custom_date(monkeypatch, device_config_dev):
     monkeypatch.setenv('NASA_SECRET', 'test_key')
 
     # Mock requests
-    with patch('utils.http_utils.http_get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -194,7 +194,7 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests to return error status
-    with patch('utils.http_utils.http_get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         mock_response = MagicMock()
         mock_response.status_code = 500
         mock_response.text = "Internal Server Error"
@@ -214,7 +214,7 @@ def test_apod_non_image_media_type(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests to return video media type
-    with patch('utils.http_utils.http_get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -237,7 +237,7 @@ def test_apod_hdurl_preference(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response with both URLs
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -275,7 +275,7 @@ def test_apod_image_download_failure(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -325,7 +325,7 @@ def test_apod_image_download_timeout(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200
@@ -350,7 +350,7 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
     # Mock requests
-    with patch('plugins.apod.apod.requests.get') as mock_requests:
+    with patch('plugins.apod.apod.http_get') as mock_requests:
         # Mock NASA API response with only regular URL
         mock_api_response = MagicMock()
         mock_api_response.status_code = 200

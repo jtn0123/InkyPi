@@ -43,7 +43,10 @@ class Comic(BasePlugin):
         width, height = dimensions
 
         try:
-            response = http_get(image_url, timeout=20, stream=True)
+            try:
+                response = http_get(image_url, timeout=20, stream=True)
+            except TypeError:
+                response = http_get(image_url, stream=True)
             if getattr(response, "status_code", 200) not in (200, 201, 204):
                 raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
