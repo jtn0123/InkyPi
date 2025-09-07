@@ -7,7 +7,7 @@
 
 body {
     font-family: 'Poppins', sans-serif;
-    background-color: #f4f4f9;
+    background-color: var(--bg);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -16,8 +16,8 @@ body {
 
 /* Subtle frame container */
 .frame {
-    background-color: #ffffff;
-    border: 2px solid #e0e0e0; /* Subtle boundary frame */
+    background-color: var(--surface);
+    border: 2px solid var(--surface-border); /* Subtle boundary frame */
     border-radius: 16px;
     padding: 20px;
     width: 90%;
@@ -38,7 +38,7 @@ body {
 .header h1 {
     font-size: 2rem;
     font-weight: 700;
-    color: #333333;
+    color: var(--text);
     text-transform: uppercase;
     letter-spacing: 2px;
     margin-bottom: 0;
@@ -84,14 +84,14 @@ body {
 .separator {
     width: 100%;
     height: 1px;
-    background-color: #dddddd;
+    background-color: var(--divider);
     margin: 10px 0 10px 0; /* Bottom margin reduced for spacing */
 }
 
 .plugins-title {
     font-size: 1.2rem;
     font-weight: 600;
-    color: #555555;
+    color: var(--muted);
     margin-bottom: 10px;
     text-align: left; /* Aligns the title to the left */
     margin-left: 5px
@@ -117,6 +117,7 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    background-color: var(--surface);
 }
 
 .icon-button:hover {
@@ -151,7 +152,7 @@ body {
 .app-title {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #333;
+    color: var(--text);
 }
 
 /* Ensure form and settings container expand */
@@ -191,17 +192,19 @@ body {
 .form-group label {
     white-space: nowrap; /* Prevent label wrapping */
     font-weight: 600;
-    color: #333;
+    color: var(--text);
 }
 
 .form-group input[type="text"] {
     flex-grow: 1; /* Expand the input field to fill the available space */
     padding: 0.5rem;
     font-size: 1rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--surface-border);
     border-radius: 6px;
     box-sizing: border-box;
     min-width: 50px;
+    background-color: var(--input-bg);
+    color: var(--text);
 }
 
 .form-group input[type="number"] {
@@ -223,9 +226,9 @@ body {
 
 /* Back button */
 .back-button {
-    background-color: #f4f4f9;
-    color: #333;
-    border: 1px solid #ddd;
+    background-color: var(--button-bg);
+    color: var(--text);
+    border: 1px solid var(--surface-border);
     border-radius: 5px;
     padding: 10px 20px;
     font-size: 1rem;
@@ -242,7 +245,7 @@ body {
 /* Action buttons styling */
 .action-button {
     flex: 1; /* Take up equal width for both buttons */
-    background-color: #1abc9c;
+    background-color: var(--accent);
     color: #fff;
     border: none;
     border-radius: 5px;
@@ -293,9 +296,11 @@ body {
     flex: auto;
     padding: 0.4rem;
     font-size: 1rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--surface-border);
     border-radius: 5px;
     box-sizing: border-box;
+    background-color: var(--input-bg);
+    color: var(--text);
 }
 
 .form-input:focus {
@@ -525,7 +530,31 @@ body {
 .progress-fill {
     height: 100%;
     width: 0%;
-    background-color: #1abc9c;
+    background-color: var(--accent);
+}
+
+/* Theme tokens */
+:root {
+    --bg: #f4f4f9;
+    --surface: #ffffff;
+    --surface-border: #e0e0e0;
+    --text: #333333;
+    --muted: #555555;
+    --divider: #dddddd;
+    --button-bg: #f4f4f9;
+    --input-bg: #ffffff;
+    --accent: #1abc9c;
+}
+[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #141821;
+    --surface-border: #222736;
+    --text: #e6e8ee;
+    --muted: #b0b4c0;
+    --divider: #2a2f3e;
+    --button-bg: #1a1f2b;
+    --input-bg: #0f1115;
+    --accent: #4fd1c5;
 }
 
 .success-failure-modal .response-modal-content {

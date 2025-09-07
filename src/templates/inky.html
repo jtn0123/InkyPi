@@ -6,12 +6,14 @@
     <title>{{ config.name }}</title>
 </head>
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+<script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
 <body>
     <!-- Subtle frame container -->
     <div class="frame">
         <!-- Page Title -->
         <header class="header">
             <h1>{{ config.name }}</h1>
+            <button id="themeToggle" class="header-button" type="button" style="float:right;">Dark Mode</button>
             <a href="{{ url_for('history.history_page') }}" class="settings-button">
                 <img src="{{ url_for('static', filename='icons/playlist.png') }}" title="History" alt="history icon" class="icon-image">
             </a>

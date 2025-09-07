@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playlists</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
         async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
@@ -223,7 +224,10 @@
                     <img src="{{ url_for('static', filename='icons/display.png') }}" alt="playlist icon" class="app-icon">
                     <h1 class="app-title">Playlists</h1>
                 </div>
-                <button class="header-button" onclick="openCreateModal()">New Playlist</button>
+                <div>
+                    <button id="themeToggle" class="header-button" type="button">Dark Mode</button>
+                    <button class="header-button" onclick="openCreateModal()">New Playlist</button>
+                </div>
             </div>
         </div>
         <div class="separator"></div>

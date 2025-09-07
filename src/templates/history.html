@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>History</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
         async function redisplay(filename) {
@@ -80,6 +81,7 @@
                     <h1 class="app-title">History</h1>
                 </div>
                 <div>
+                    <button id="themeToggle" class="header-button" type="button">Dark Mode</button>
                     <button class="header-button" onclick="location.reload()">Refresh</button>
                     <button class="header-button" style="background-color: #c4515b;" onclick="clearHistory()">Clear All</button>
                 </div>

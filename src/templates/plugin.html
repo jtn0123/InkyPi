@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ plugin.display_name }} Settings</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     
 
@@ -298,6 +299,7 @@
         <div class="app-header">
             <img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">
             <h1 class="app-title">{{ plugin.display_name }}</h1>
+            <button id="themeToggle" class="header-button" type="button">Dark Mode</button>
             {% if api_key and api_key.required %}
             <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
             {% endif %}

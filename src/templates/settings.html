@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
         async function handleAction() {
@@ -323,6 +324,7 @@
                     <h1 class="app-title">Settings</h1>
                 </div>
                 <div class="header-actions">
+                    <button id="themeToggle" class="header-button" type="button">Dark Mode</button>
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                     <button class="header-button" onclick="openBackupRestore()">Backup & Restore</button>
