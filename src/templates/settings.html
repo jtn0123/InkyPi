@@ -325,6 +325,7 @@
                 <div class="header-actions">
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
+                    <button class="header-button" onclick="openBackupRestore()">Backup & Restore</button>
                     <button class="header-button is-warning" onclick="handleShutdown(true)">Reboot</button>
                     <button class="header-button is-danger" onclick="handleShutdown(false)">Shutdown</button>
                 </div>
@@ -407,6 +408,25 @@
                             <input type="checkbox" id="logSystemStats" name="logSystemStats" class="toggle-checkbox" {% if device_settings.log_system_stats %}checked{% endif %}>
                             <span class="toggle-label"></span>
                         </label>
+                    </div>
+                </div>
+
+                <!-- Backup & Restore -->
+                <div class="section" id="backupRestoreSection" style="display:none;">
+                    <div class="section-title">Backup & Restore</div>
+                    <div class="form-group">
+                        <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup (includes API keys by default)</button>
+                    </div>
+                    <div class="form-group nowrap">
+                        <label class="form-label" for="excludeKeys">Exclude API keys</label>
+                        <label class="toggle-container">
+                            <input type="checkbox" id="excludeKeys" class="toggle-checkbox">
+                            <span class="toggle-label"></span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <input type="file" id="importFile" accept="application/json" class="form-input" />
+                        <button type="button" class="action-button compact warn" onclick="importConfig()">Restore from File</button>
                     </div>
                 </div>
 
@@ -499,5 +519,55 @@
     </div>
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
+    <script>
+        function openBackupRestore(){
+            const section = document.getElementById('backupRestoreSection');
+            if (section) {
+                section.style.display = section.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+        async function exportConfig(){
+            const exclude = document.getElementById('excludeKeys')?.checked;
+            const url = `{{ url_for('settings.export_settings') }}?include_keys=${exclude ? '0' : '1'}`;
+            try {
+                const resp = await fetch(url, { cache: 'no-store' });
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    showResponseModal('failure', 'Export failed');
+                    return;
+                }
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], {type: 'application/json'});
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `inkypi_backup_${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showResponseModal('success', 'Backup downloaded');
+            } catch (e) {
+                showResponseModal('failure', 'Export failed');
+            }
+        }
+        async function importConfig(){
+            const fileInput = document.getElementById('importFile');
+            const file = fileInput?.files?.[0];
+            if (!file) {
+                showResponseModal('failure', 'Choose a backup file first');
+                return;
+            }
+            const form = new FormData();
+            form.append('file', file);
+            try {
+                const resp = await fetch(`{{ url_for('settings.import_settings') }}`, { method: 'POST', body: form });
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    showResponseModal('failure', data.error || 'Import failed');
+                    return;
+                }
+                showResponseModal('success', data.message || 'Import complete');
+            } catch (e) {
+                showResponseModal('failure', 'Import failed');
+            }
+        }
+    </script>
 </body>
 </html>

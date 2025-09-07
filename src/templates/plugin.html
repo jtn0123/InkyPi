@@ -19,7 +19,16 @@
 
         async function handleAction(action) {
             const loadingIndicator = document.getElementById('loadingIndicator');
+            const progress = document.getElementById('requestProgress');
+            const progressText = document.getElementById('requestProgressText');
+            function setStep(text, pct){
+                if (progress) progress.style.display = 'block';
+                if (progressText) progressText.textContent = text;
+                const bar = document.getElementById('requestProgressBar');
+                if (bar && typeof pct === 'number') bar.style.width = pct + '%';
+            }
             loadingIndicator.style.display = 'block';
+            setStep('Preparing…', 10);
 
             // Allow plugin-specific client-side validation (e.g., require lat/long for Weather)
             try {
@@ -27,6 +36,7 @@
                     const isValid = window.validatePluginSettings(action);
                     if (!isValid) {
                         loadingIndicator.style.display = 'none';
+                        if (progress) progress.style.display = 'none';
                         return; // abort submission
                     }
                 }
@@ -53,7 +63,7 @@
             });
 
             if (action == "add_to_playlist"){
-                url = '{{ url_for("playlist.add_plugin") }}';
+                url = '{{ url_for('playlist.add_plugin') }}';
                 const scheduleFormData = new FormData(scheduleForm);
                 const scheduleData = {};
                 for (const [key, value] of scheduleFormData.entries()) {
@@ -71,10 +81,19 @@
 
             // Send data to the server
             try {
+                setStep('Sending…', 30);
                 const response = await fetch(url, {method: method, body: formData});
+                setStep('Waiting (device)…', 60);
                 const result = await response.json();
                 // Handle the response
                 if (response.ok) {
+                    // Show metrics if present
+                    if (result && result.metrics) {
+                        const m = result.metrics;
+                        const text = `Request ${m.request_ms} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
+                        if (progressText) progressText.textContent = text;
+                    }
+                    setStep('Display updating…', 90);
                     showResponseModal('success', `Success! ${result.message}`);
                     // Trigger preview refresh shortly after success
                     setTimeout(() => { refreshPreviewImage(); }, 250);
@@ -103,6 +122,8 @@
             } finally {
                 // Hide loading indicator after the action is complete
                 loadingIndicator.style.display = 'none';
+                setStep('Done', 100);
+                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
             }
         }
         function refreshPreviewImage(){
@@ -443,6 +464,12 @@
                 <button type="button" onclick="handleAction('add_to_playlist')" class="action-button">Save</button>
             </div>
         </div>
+    </div>
+    <div id="requestProgress" class="progress-block" style="display:none;">
+        <div class="progress-header">
+            <span id="requestProgressText">Preparing…</span>
+        </div>
+        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill" style="width: 10%;"></div></div>
     </div>
     <script>
         // Click to toggle between fit and native resolution on plugin page

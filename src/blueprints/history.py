@@ -86,6 +86,17 @@ def history_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     images = _list_history_images(history_dir)
+    # Pull latest timing metrics if available
+    try:
+        ri = device_config.get_refresh_info()
+        metrics = {
+            "request_ms": getattr(ri, "request_ms", None),
+            "generate_ms": getattr(ri, "generate_ms", None),
+            "preprocess_ms": getattr(ri, "preprocess_ms", None),
+            "display_ms": getattr(ri, "display_ms", None),
+        }
+    except Exception:
+        metrics = {"request_ms": None, "generate_ms": None, "preprocess_ms": None, "display_ms": None}
     # Compute storage usage for the history directory's filesystem
     free_bytes = None
     total_bytes = None
@@ -117,7 +128,7 @@ def history_page():
         "used_gb": round(used_bytes / gb, 2) if used_bytes is not None else None,
     }
 
-    return render_template("history.html", images=images, storage=storage_ctx)
+    return render_template("history.html", images=images, storage=storage_ctx, metrics=metrics)
 
 
 @history_bp.route("/history/image/<path:filename>")

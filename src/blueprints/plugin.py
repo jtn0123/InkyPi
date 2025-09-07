@@ -229,6 +229,9 @@ def update_now():
     display_manager = current_app.config["DISPLAY_MANAGER"]
 
     try:
+        # Start timing (request overall)
+        from time import perf_counter
+        _t_req_start = perf_counter()
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
         plugin_id = plugin_settings.pop("plugin_id")
@@ -244,7 +247,9 @@ def update_now():
                 return json_error(f"Plugin '{plugin_id}' not found", status=404)
 
             plugin = get_plugin_instance(plugin_config)
+            _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_settings, device_config)
+            generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             display_manager.display_image(
                 image, image_settings=plugin_config.get("image_settings", [])
             )
@@ -257,7 +262,34 @@ def update_now():
             details={"context": "update_now"},
         )
 
-    return jsonify({"success": True, "message": "Display updated"}), 200
+    # Build metrics payload from device_config.refresh_info (populated by task/display)
+    try:
+        ri = device_config.get_refresh_info()
+        request_ms = getattr(ri, "request_ms", None)
+        display_ms = getattr(ri, "display_ms", None)
+        generate_ms = getattr(ri, "generate_ms", None)
+        preprocess_ms = getattr(ri, "preprocess_ms", None)
+    except Exception:
+        request_ms = display_ms = generate_ms = preprocess_ms = None
+
+    # If timing wasn't captured by task path (e.g., direct dev path), compute minimal request_ms
+    try:
+        if request_ms is None:
+            from time import perf_counter
+            request_ms = int((perf_counter() - _t_req_start) * 1000)
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "message": "Display updated",
+        "metrics": {
+            "request_ms": request_ms,
+            "generate_ms": generate_ms,
+            "preprocess_ms": preprocess_ms,
+            "display_ms": display_ms,
+        }
+    }), 200
 
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])

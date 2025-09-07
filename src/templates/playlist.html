@@ -247,6 +247,11 @@
                                 <!-- Check if the current plugin is the one being displayed -->
                                 {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
                                 <span class="displayed-now">Displayed Now</span>
+                                {% if metrics and metrics.request_ms is not none %}
+                                <span class="latest-refresh" style="margin-left:8px;">
+                                    {{ metrics.request_ms }} ms
+                                </span>
+                                {% endif %}
                                 {% endif %}
                                 <div id="loadingIndicator" class="loading-indicator small left-align"></div>
 

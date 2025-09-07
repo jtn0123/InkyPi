@@ -506,6 +506,28 @@ body {
     text-align: center;
 }
 
+/* Request progress block */
+.progress-block {
+    margin: 10px;
+}
+.progress-header {
+    font-size: 0.9rem;
+    color: #333;
+    margin-bottom: 6px;
+}
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #eee;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background-color: #1abc9c;
+}
+
 .success-failure-modal .response-modal-content {
     border-radius: 8px;
     background: inherit;

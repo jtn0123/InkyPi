@@ -24,6 +24,12 @@ class RefreshInfo:
         image_hash,
         playlist=None,
         plugin_instance=None,
+        # Optional performance metrics
+        request_ms: int | None = None,
+        display_ms: int | None = None,
+        generate_ms: int | None = None,
+        preprocess_ms: int | None = None,
+        used_cached: bool | None = None,
     ):
         """Initialize RefreshInfo instance."""
         self.refresh_time = refresh_time
@@ -32,6 +38,12 @@ class RefreshInfo:
         self.plugin_id = plugin_id
         self.playlist = playlist
         self.plugin_instance = plugin_instance
+        # Optional metrics
+        self.request_ms = request_ms
+        self.display_ms = display_ms
+        self.generate_ms = generate_ms
+        self.preprocess_ms = preprocess_ms
+        self.used_cached = used_cached
 
     def get_refresh_datetime(self):
         """Returns the refresh time as a datetime object or None if not set."""
@@ -51,6 +63,17 @@ class RefreshInfo:
             refresh_dict["playlist"] = self.playlist
         if self.plugin_instance:
             refresh_dict["plugin_instance"] = self.plugin_instance
+        # Include optional metrics if available
+        if self.request_ms is not None:
+            refresh_dict["request_ms"] = self.request_ms
+        if self.display_ms is not None:
+            refresh_dict["display_ms"] = self.display_ms
+        if self.generate_ms is not None:
+            refresh_dict["generate_ms"] = self.generate_ms
+        if self.preprocess_ms is not None:
+            refresh_dict["preprocess_ms"] = self.preprocess_ms
+        if self.used_cached is not None:
+            refresh_dict["used_cached"] = self.used_cached
         return refresh_dict
 
     @classmethod
@@ -62,6 +85,11 @@ class RefreshInfo:
             plugin_id=data.get("plugin_id"),
             playlist=data.get("playlist"),
             plugin_instance=data.get("plugin_instance"),
+            request_ms=data.get("request_ms"),
+            display_ms=data.get("display_ms"),
+            generate_ms=data.get("generate_ms"),
+            preprocess_ms=data.get("preprocess_ms"),
+            used_cached=data.get("used_cached"),
         )
 
 

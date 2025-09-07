@@ -90,10 +90,26 @@ def playlists():
     playlist_manager = device_config.get_playlist_manager()
     refresh_info = device_config.get_refresh_info()
 
+    # Include latest metrics for badge rendering
+    metrics = None
+    try:
+        ri_obj = device_config.get_refresh_info()
+        metrics = {
+            "request_ms": getattr(ri_obj, "request_ms", None),
+            "generate_ms": getattr(ri_obj, "generate_ms", None),
+            "preprocess_ms": getattr(ri_obj, "preprocess_ms", None),
+            "display_ms": getattr(ri_obj, "display_ms", None),
+            "plugin_id": getattr(ri_obj, "plugin_id", None),
+            "playlist": getattr(ri_obj, "playlist", None),
+            "plugin_instance": getattr(ri_obj, "plugin_instance", None),
+        }
+    except Exception:
+        metrics = None
     return render_template(
         "playlist.html",
         playlist_config=playlist_manager.to_dict(),
         refresh_info=refresh_info.to_dict(),
+        metrics=metrics,
     )
 
 

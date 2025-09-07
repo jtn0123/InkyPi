@@ -129,6 +129,81 @@ def settings_page():
     )
 
 
+@settings_bp.route("/settings/backup")
+def backup_restore_page():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    # For now, reuse the main settings page and anchor to a section; separate template can be added later
+    return render_template(
+        "settings.html", device_settings=device_config.get_config(), timezones=sorted(pytz.all_timezones_set)
+    )
+
+
+@settings_bp.route("/settings/export", methods=["GET"])
+def export_settings():
+    try:
+        include_keys = (request.args.get("include_keys", "1").strip().lower() in ("1", "true", "yes"))
+        device_config = current_app.config["DEVICE_CONFIG"]
+
+        # Build export object with config plus env keys when requested
+        data = {
+            "config": device_config.get_config(),
+        }
+        if include_keys:
+            # Include known API keys and possibly other keys
+            keys = {}
+            for k in ("OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"):
+                try:
+                    v = device_config.load_env_key(k)
+                except Exception:
+                    v = None
+                if v:
+                    keys[k] = v
+            data["env_keys"] = keys
+
+        # JSON response for now; a file download route can be added if needed
+        return jsonify({"success": True, "data": data})
+    except Exception as e:
+        logger.exception("Error exporting settings")
+        return json_internal_error("export settings", details={"hint": "Check config readability.", "error": str(e)})
+
+
+@settings_bp.route("/settings/import", methods=["POST"])
+def import_settings():
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        # Accept JSON body or form upload with a JSON file
+        payload = None
+        if request.is_json:
+            payload = request.get_json(silent=True)
+        if payload is None:
+            file = request.files.get("file")
+            if file:
+                import json as _json
+                payload = _json.loads(file.stream.read().decode("utf-8"))
+        if not payload or not isinstance(payload, dict):
+            return json_error("Invalid import payload", status=400)
+
+        cfg = payload.get("config")
+        if isinstance(cfg, dict):
+            # Merge config and write
+            device_config.update_config(cfg)
+
+        env_keys = payload.get("env_keys") or {}
+        if isinstance(env_keys, dict):
+            for k, v in env_keys.items():
+                if v is None:
+                    continue
+                try:
+                    device_config.set_env_key(k, str(v))
+                except Exception:
+                    logger.exception("Failed setting env key during import: %s", k)
+
+        return jsonify({"success": True, "message": "Import completed"})
+    except Exception as e:
+        logger.exception("Error importing settings")
+        return json_internal_error("import settings", details={"hint": "Verify JSON structure and file permissions.", "error": str(e)})
+
+
 @settings_bp.route("/settings/api-keys")
 def api_keys_page():
     device_config = current_app.config["DEVICE_CONFIG"]

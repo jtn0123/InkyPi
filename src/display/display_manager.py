@@ -85,6 +85,9 @@ class DisplayManager:
         # Resize and adjust orientation
         if image_settings is None:
             image_settings = []
+        # Measure preprocessing time for metrics
+        from time import perf_counter
+        _t0 = perf_counter()
         image = change_orientation(image, self.device_config.get_config("orientation"))
         image = resize_image(image, self.device_config.get_resolution(), image_settings)
         if self.device_config.get_config("inverted_image"):
@@ -92,6 +95,7 @@ class DisplayManager:
         image = apply_image_enhancement(
             image, self.device_config.get_config("image_settings")
         )
+        preprocess_ms = int((perf_counter() - _t0) * 1000)
 
         # Save the processed image for web preview
         try:
@@ -113,7 +117,23 @@ class DisplayManager:
             logger.exception("Failed to save history copy of processed image")
 
         # Pass to the concrete instance to render to the device.
+        # Render to device and capture display time for metrics
+        _t1 = perf_counter()
         self.display.display_image(image, image_settings=image_settings)
+        display_ms = int((perf_counter() - _t1) * 1000)
+
+        # Persist lightweight metrics into device config's refresh_info if available
+        try:
+            ri = getattr(self.device_config, "refresh_info", None)
+            if ri is not None:
+                # Only set preprocess/display if not already present
+                if getattr(ri, "preprocess_ms", None) is None:
+                    ri.preprocess_ms = preprocess_ms
+                if getattr(ri, "display_ms", None) is None:
+                    ri.display_ms = display_ms
+                # Do not write config here; the refresh loop owns writes
+        except Exception:
+            logger.exception("Failed to record display metrics")
 
     def display_preprocessed_image(self, image_path: str):
         """

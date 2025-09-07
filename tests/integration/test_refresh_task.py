@@ -39,11 +39,13 @@ def test_manual_update_triggers_display_and_refresh_info(
         # Validate current image saved
         assert Path(device_config_dev.current_image_file).exists()
 
-        # Validate refresh info updated
+        # Validate refresh info updated with timing fields present
         info = device_config_dev.get_refresh_info()
         assert info.plugin_id == "ai_text"
         assert info.refresh_type == "Manual Update"
         assert info.image_hash is not None
+        # Request timings should be populated (request_ms at minimum)
+        assert getattr(info, "request_ms", None) is not None
     finally:
         task.stop()
 
@@ -490,7 +492,7 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
     from utils.image_utils import compute_image_hash as _h
     h2 = _h(image2)
     assert h2 == same_hash
-    # Emulate the same branch that checks equality
+    # Emulate the same branch that checks equality and ensure used_cached path doesn't break
     if h2 != latest_refresh.image_hash:
         dm.display_image(image2, image_settings=plugin.config.get("image_settings", []))
     else:

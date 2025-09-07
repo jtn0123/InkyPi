@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 from datetime import datetime
+from time import perf_counter
 
 import pytz
 from PIL import Image
@@ -129,9 +130,13 @@ class RefreshTask:
                         )
                     else:
                         plugin = get_plugin_instance(plugin_config)
+                        # Measure generate duration separately
+                        _t_req_start = perf_counter()
+                        _t_gen_start = perf_counter()
                         image = refresh_action.execute(
                             plugin, self.device_config, current_dt
                         )
+                        generate_ms = int((perf_counter() - _t_gen_start) * 1000)
                         if image is None:
                             raise RuntimeError(
                                 "Plugin returned None image; cannot refresh display."
@@ -146,7 +151,8 @@ class RefreshTask:
                             }
                         )
                         # check if image is the same as current image
-                        if image_hash != latest_refresh.image_hash:
+                        used_cached = image_hash == latest_refresh.image_hash
+                        if not used_cached:
                             logger.info(
                                 f"Updating display. | refresh_info: {refresh_info}"
                             )
@@ -160,7 +166,19 @@ class RefreshTask:
                             )
 
                         # update latest refresh data in the device config
-                        self.device_config.refresh_info = RefreshInfo(**refresh_info)
+                        request_ms = int((perf_counter() - _t_req_start) * 1000)
+                        # Merge metrics captured by display manager if any
+                        dm_info = getattr(self.device_config, "refresh_info", None)
+                        display_ms = getattr(dm_info, "display_ms", None) if dm_info else None
+                        preprocess_ms = getattr(dm_info, "preprocess_ms", None) if dm_info else None
+                        self.device_config.refresh_info = RefreshInfo(
+                            **refresh_info,
+                            request_ms=request_ms,
+                            display_ms=display_ms,
+                            generate_ms=generate_ms,
+                            preprocess_ms=preprocess_ms,
+                            used_cached=used_cached,
+                        )
                         self.device_config.write_config()
 
             except Exception as e:
