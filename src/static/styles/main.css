@@ -87,30 +87,31 @@ body {
 .status-bar {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 12px;
-    margin: 8px 0 0 0;
+    gap: 8px;
+    margin: 6px 0 0 0;
 }
 .status-card {
     border: 1px solid var(--surface-border);
     border-radius: 10px;
     background: var(--surface);
-    padding: 10px;
+    padding: 8px;
 }
 .status-title {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: var(--text);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 .status-body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 140px;
+    min-height: 56px;
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 8px;
     overflow: hidden;
+    padding: 6px 8px;
 }
 .status-body img {
     max-width: 100%;
@@ -748,12 +749,10 @@ body {
     flex-grow: 1;
 }
 
-.plugin-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    flex-grow: 1;
-}
+.plugin-actions { display:flex; justify-content:flex-end; gap:6px; align-items:center; }
+.plugin-actions .edit-button, .plugin-actions .delete-button { display:inline-flex; align-items:center; gap:4px; padding: 4px 6px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
+.plugin-actions .edit-button:hover, .plugin-actions .delete-button:hover { background: rgba(255,255,255,0.04); }
+.btn-label { font-size: 0.78em; }
 
 /* Plugin Icon */
 .plugin-icon {
@@ -774,12 +773,7 @@ body {
     border-radius: 4px;
     overflow: hidden;
 }
-.plugin-thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
+.plugin-thumb img { width: 100%; height: 100%; object-fit: contain; display:block; background: var(--panel-bg); }
 
 /* Edit & Delete Buttons */
 .edit-button, .delete-button {
@@ -892,14 +886,8 @@ body {
     box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
 }
 
-.latest-refresh {
-    background-color: lightslategray;
-    color: white;
-    font-style: italic;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8em;
-}
+.timing-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.latest-refresh { background-color: var(--panel-bg); color: var(--text); padding: 2px 6px; border-radius: 4px; font-size: 0.78em; border:1px solid var(--panel-border); }
 
 .api-key-label {
     background-color: lightslategray;
@@ -1279,7 +1267,7 @@ body {
   gap: 4px;
   border-radius: 10px;
 }
-.theme-icon { stroke: var(--text); }
+[data-theme] .theme-icon { stroke: var(--text); }
 :root .theme-icon.moon { display: none; }
 [data-theme="dark"] .theme-icon.sun { display: none; }
 [data-theme="dark"] .theme-icon.moon { display: inline; }

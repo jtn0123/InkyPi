@@ -153,12 +153,14 @@
         }
 
         // Open modal for **editing** an existing playlist
-        function openEditModal(playlistName, startTime, endTime) {
+        function openEditModal(playlistName, startTime, endTime, cycleMinutes) {
             document.getElementById("modalTitle").textContent = "Update Playlist";
             document.getElementById("playlist_name").value = playlistName;
             document.getElementById("editingPlaylistName").value = playlistName;
             document.getElementById("start_time").value = startTime;
             document.getElementById("end_time").value = endTime;
+            const cycleInput = document.getElementById('cycle_minutes');
+            if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
 
             document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()");
             document.getElementById("deleteButton").classList.remove("hidden"); // Show delete button
@@ -209,6 +211,7 @@
             let newName = document.getElementById("playlist_name").value;
             let startTime = document.getElementById("start_time").value;
             let endTime = document.getElementById("end_time").value;
+            let cycleMinutes = document.getElementById('cycle_minutes').value;
 
             try {
                 const response = await fetch("{{ url_for('playlist.update_playlist', playlist_name='') }}" + oldName, {
@@ -216,7 +219,7 @@
                     headers: {
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime })
+                    body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null })
                 });
 
                 const result = await response.json();
@@ -254,6 +257,33 @@
             }
         }
 
+        async function deletePlaylistQuick(name){
+            if (!confirm(`Delete playlist '${name}'?`)) return;
+            try {
+                const response = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, { method: "DELETE" });
+                const result = await response.json();
+                if (response.ok) {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (e){ alert('Failed to delete playlist'); }
+        }
+
+        async function displayNextInPlaylist(name){
+            try{
+                const resp = await fetch("{{ url_for('playlist.display_next_in_playlist') }}", { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
+                const j = await resp.json();
+                if (!resp.ok || !j.success){
+                    showResponseModal('failure', `Error!  ${j.error || 'Failed to display'}`);
+                } else {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
+                    setTimeout(() => { location.reload(); }, 500);
+                }
+            } catch(e){ showResponseModal('failure', 'Failed to trigger display'); }
+        }
+
         function populateTimeOptions() {
             let startSelect = document.getElementById("start_time");
             let endSelect = document.getElementById("end_time");
@@ -276,19 +306,58 @@
             populateTimeOptions();
             // Enable DnD for each playlist's plugin list
             document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
+            // Compute "Next in" countdowns client-side for interval-based instances
+            try {
+                const tzOffsetMin = {{ device_tz_offset_min | default(0) }};
+                function parseISO(s){ try { return s ? new Date(s) : null; } catch(e){ return null; } }
+                function renderNextIn(){
+                    document.querySelectorAll('.plugin-item').forEach(item => {
+                        const name = item.getAttribute('data-instance-name');
+                        const pluginId = item.getAttribute('data-plugin-id');
+                        const infoEl = item.querySelector('.plugin-info');
+                        if (!infoEl) return;
+                        const intervalSecAttr = item.getAttribute('data-interval-sec');
+                        const lastIsoAttr = item.getAttribute('data-latest-iso');
+                        const nextEl = item.querySelector('[id^="nextIn_"]');
+                        const nextAtEl = item.querySelector('[id^="nextAt_"]');
+                        if (!nextEl && !nextAtEl) return;
+                        const intervalSec = intervalSecAttr ? parseInt(intervalSecAttr, 10) : NaN;
+                        if (!intervalSec || isNaN(intervalSec)) return;
+                        const lastDate = parseISO(lastIsoAttr);
+                        if (!lastDate) return;
+                        const nextTs = lastDate.getTime() + (intervalSec * 1000);
+                        const deltaMs = nextTs - Date.now();
+                        if (nextEl){
+                            if (deltaMs <= 0){
+                                nextEl.textContent = ' • Next: soon';
+                            } else {
+                                const mins = Math.round(deltaMs / 60000);
+                                if (mins < 60){
+                                    nextEl.textContent = ` • Next in ${mins} min`;
+                                } else {
+                                    const hrs = Math.floor(mins / 60);
+                                    const rem = mins % 60;
+                                    nextEl.textContent = ` • Next in ${hrs}h ${rem}m`;
+                                }
+                            }
+                        }
+                        if (nextAtEl){
+                            const browserOffsetMin = -new Date().getTimezoneOffset();
+                            const deviceOffsetMin = {{ device_tz_offset_min | default(0) }};
+                            const adjustMs = (deviceOffsetMin - browserOffsetMin) * 60000;
+                            const deviceDate = new Date(nextTs + adjustMs);
+                            const hh = String(deviceDate.getHours()).padStart(2,'0');
+                            const mm = String(deviceDate.getMinutes()).padStart(2,'0');
+                            nextAtEl.textContent = ` • Next at ${hh}:${mm}`;
+                        }
+                    });
+                }
+                setInterval(renderNextIn, 60000);
+                renderNextIn();
+            } catch(e) { /* ignore */ }
         });
 
-        async function setSnooze(playlistName, pluginId, instanceName, isoStr){
-            try{
-                const resp = await fetch("{{ url_for('playlist.set_snooze') }}", {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName, snooze_until: isoStr})});
-                const j = await resp.json();
-                if (!resp.ok || !j.success){
-                    showResponseModal('failure', `Error!  ${j.error || 'Failed to snooze'}`);
-                } else {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
-                }
-            } catch(e){ showResponseModal('failure', 'Error setting snooze'); }
-        }
+        // snooze feature removed
 
         window.addEventListener("load", function () {
             let storedMessage = sessionStorage.getItem("storedMessage");
@@ -327,6 +396,16 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div class="status-bar" style="margin-bottom:8px;">
+            <div class="status-card">
+                <div class="status-title">Current time</div>
+                <div class="status-body">{{ device_now or '—' }}</div>
+            </div>
+            <div class="status-card">
+                <div class="status-title">Device refresh cadence</div>
+                <div class="status-body">Every {{ device_cycle_minutes }} min</div>
+            </div>
+        </div>
 
         {% set plugin_icon_map = {
             'ai_image': 'magic-wand',
@@ -350,13 +429,15 @@
             {% for playlist in playlist_config.playlists %}
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
                     <div class="playlist-header">
-                        <span class="playlist-title">{{ playlist.name }}</span>
-                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')">{{ icon('gear-six', 'action-icon') }}</button>
+                        <span class="playlist-title" title="Cycle: {{ (playlist_timing.get(playlist.name).cycle_minutes if (playlist_timing and playlist_timing.get(playlist.name)) else device_cycle_minutes) }} min{% if playlist_timing and playlist_timing.get(playlist.name) and playlist_timing.get(playlist.name).next_at %}\nNext at: {{ playlist_timing.get(playlist.name).next_at }}{% endif %}">{{ playlist.name }}</span>
+                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}', '{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}')">{{ icon('gear-six', 'action-icon') }}</button>
+                        <button class="edit-button" title="Display next in this playlist" onclick="displayNextInPlaylist('{{ playlist.name }}')">{{ icon('play', 'action-icon') }}</button>
+                        <button class="delete-button" title="Delete playlist" onclick="deletePlaylistQuick('{{ playlist.name }}')">{{ icon('trash', 'action-icon') }}</button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}">
+                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" {% if plugin_instance.refresh.interval is defined %}data-interval-sec="{{ plugin_instance.refresh.interval }}"{% endif %} {% if plugin_instance.latest_refresh_time %}data-latest-iso="{{ plugin_instance.latest_refresh_time }}"{% endif %}>
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 {% from 'macros/icons.html' import icon %}
                                 {{ icon(plugin_icon_map.get(plugin_instance.plugin_id, 'images-square'), 'plugin-icon') | safe }}
@@ -378,20 +459,25 @@
                                 <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview" onerror="this.style.display='none';">
                             </div>
                             <div class="plugin-actions">
-                                {% if plugin_instance.latest_refresh_time %}
-                                    {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
-                                    <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">
-                                        Refreshed {{ refresh_time }}
-                                    </span>
-                                {% endif %}
-
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') | safe }}</a>
-                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') | safe }}</button>
-                                <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') | safe }}</button>
-                                <div class="form-group nowrap" style="margin-left:8px;">
-                                    <label class="form-label" for="snooze_{{loop.index}}">Snooze</label>
-                                    <input id="snooze_{{loop.index}}" class="time-input" type="datetime-local" onchange="setSnooze('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this.value ? new Date(this.value).toISOString() : null)" {% if plugin_instance.snooze_until %}value="{{ plugin_instance.snooze_until[:16] }}"{% endif %}>
+                                <div class="timing-row">
+                                    {% if plugin_instance.refresh.interval is defined %}
+                                        {% if plugin_instance.latest_refresh_time %}
+                                            {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
+                                            <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">Refreshed {{ refresh_time }}</span>
+                                            <span class="latest-refresh" id="nextIn_{{ playlist.name | replace(' ', '_') }}_{{ plugin_instance.name | replace(' ', '_') }}"></span>
+                                            <span class="latest-refresh" id="nextAt_{{ playlist.name | replace(' ', '_') }}_{{ plugin_instance.name | replace(' ', '_') }}"></span>
+                                        {% else %}
+                                            <span class="latest-refresh">Pending first run</span>
+                                        {% endif %}
+                                    {% elif plugin_instance.refresh.scheduled is defined %}
+                                        <span class="latest-refresh">Scheduled {{ plugin_instance.refresh.scheduled }}</span>
+                                    {% endif %}
                                 </div>
+
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="btn-label">Edit</span></a>
+                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') | safe }}<span class="btn-label">Display</span></button>
+                                <button class="delete-button" title="Delete Plugin Instance" onclick="if(confirm('Delete {{ plugin_instance.name }}?')) deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') | safe }}<span class="btn-label">Delete</span></button>
+                                
                             </div>
                         </div>
                         {% endfor %}
@@ -426,6 +512,10 @@
                     <select id="start_time" name="start_time" class="form-input"></select>
                     <span> - </span>
                     <select id="end_time" name="end_time" class="form-input"></select>
+                </div>
+                <div class="form-group">
+                    <label for="cycle_minutes" class="form-label">Advance every (minutes):</label>
+                    <input type="number" id="cycle_minutes" name="cycle_minutes" class="form-input" min="0" placeholder="Leave empty to use device default">
                 </div>
             </form>
             <div class="buttons-container">

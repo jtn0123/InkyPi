@@ -233,13 +233,14 @@ class Playlist:
     """
 
     def __init__(
-        self, name, start_time, end_time, plugins=None, current_plugin_index=None
+        self, name, start_time, end_time, plugins=None, current_plugin_index=None, cycle_interval_seconds=None
     ):
         self.name = name
         self.start_time = start_time
         self.end_time = end_time
         self.plugins = [PluginInstance.from_dict(p) for p in (plugins or [])]
         self.current_plugin_index = current_plugin_index
+        self.cycle_interval_seconds = cycle_interval_seconds
 
     def is_active(self, current_time):
         """Check if the playlist is active at the given time."""
@@ -418,13 +419,16 @@ class Playlist:
         return int((end - start).total_seconds() // 60)
 
     def to_dict(self):
-        return {
+        data = {
             "name": self.name,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "plugins": [p.to_dict() for p in self.plugins],
             "current_plugin_index": self.current_plugin_index,
         }
+        if getattr(self, "cycle_interval_seconds", None) is not None:
+            data["cycle_interval_seconds"] = self.cycle_interval_seconds
+        return data
 
     @classmethod
     def from_dict(cls, data):
@@ -434,6 +438,7 @@ class Playlist:
             end_time=data["end_time"],
             plugins=data["plugins"],
             current_plugin_index=data.get("current_plugin_index", None),
+            cycle_interval_seconds=data.get("cycle_interval_seconds"),
         )
 
 

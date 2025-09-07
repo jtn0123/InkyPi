@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request, has
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error, json_internal_error
 from utils.time_utils import calculate_seconds, now_device_tz
+from refresh_task import PlaylistRefresh
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
@@ -105,11 +106,56 @@ def playlists():
         }
     except Exception:
         metrics = None
+    # compute device current time string and cycle info per playlist
+    try:
+        now = now_device_tz(device_config)
+        now_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
+        tz_off_min = int((now.utcoffset() or timedelta(0)).total_seconds() // 60)
+    except Exception:
+        now_str = ""
+        tz_off_min = 0
+    try:
+        device_cycle_minutes = int(device_config.get_config("plugin_cycle_interval_seconds", default=3600) // 60)
+    except Exception:
+        device_cycle_minutes = 60
+
+    # Build per-playlist timing metadata: cycle and next refresh (if active)
+    try:
+        ri_obj = device_config.get_refresh_info()
+        last_dt = ri_obj.get_refresh_datetime() if hasattr(ri_obj, "get_refresh_datetime") else None
+    except Exception:
+        last_dt = None
+    playlist_timing: dict[str, dict] = {}
+    try:
+        for pl in playlist_manager.playlists:
+            cycle_sec = getattr(pl, "cycle_interval_seconds", None)
+            cycle_min = int((cycle_sec or device_cycle_minutes * 60) // 60)
+            item: dict = {"cycle_minutes": cycle_min, "next_in_minutes": None, "next_at": None}
+            try:
+                if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
+                    # compute next time
+                    next_dt = last_dt + timedelta(minutes=cycle_min)
+                    delta_min = int(max(0, (next_dt - now).total_seconds() // 60))
+                    item["next_in_minutes"] = delta_min
+                    try:
+                        item["next_at"] = next_dt.strftime("%Y-%m-%d %H:%M")
+                    except Exception:
+                        item["next_at"] = None
+            except Exception:
+                pass
+            playlist_timing[pl.name] = item
+    except Exception:
+        playlist_timing = {}
+
     return render_template(
         "playlist.html",
         playlist_config=playlist_manager.to_dict(),
         refresh_info=refresh_info.to_dict(),
         metrics=metrics,
+        device_now=now_str,
+        device_tz_offset_min=tz_off_min,
+        device_cycle_minutes=device_cycle_minutes,
+        playlist_timing=playlist_timing,
     )
 
 
@@ -184,6 +230,7 @@ def update_playlist(playlist_name):
     new_name = data.get("new_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
+    cycle_minutes = data.get("cycle_minutes")  # optional override
     if not new_name or not start_time or not end_time:
         return json_error("Missing required fields", status=400)
     if end_time <= start_time:
@@ -214,6 +261,18 @@ def update_playlist(playlist_name):
     )
     if not result:
         return json_error("Failed to delete playlist", status=500)
+    # Apply cycle override if provided
+    try:
+        if cycle_minutes is not None:
+            try:
+                cm = int(cycle_minutes)
+                playlist = playlist_manager.get_playlist(new_name)
+                if playlist:
+                    playlist.cycle_interval_seconds = max(0, cm) * 60
+            except Exception:
+                pass
+    except Exception:
+        pass
     device_config.write_config()
 
     return jsonify({"success": True, "message": f"Updated playlist '{playlist_name}'!"})
@@ -265,30 +324,54 @@ def reorder_plugins():
         )
 
 
-@playlist_bp.route("/set_snooze", methods=["POST"])
-def set_snooze():
+## snooze endpoint removed
+
+
+# Trigger next eligible instance in a specific playlist immediately
+@playlist_bp.route("/display_next_in_playlist", methods=["POST"])
+def display_next_in_playlist():
     device_config = current_app.config["DEVICE_CONFIG"]
+    refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
+
     try:
         data = request.get_json(force=True, silent=False)
         playlist_name = data.get("playlist_name")
-        plugin_id = data.get("plugin_id")
-        instance_name = data.get("plugin_instance")
-        snooze_until = data.get("snooze_until")  # ISO string or null to clear
-        if not all([playlist_name, plugin_id, instance_name]):
-            return json_error("playlist_name, plugin_id, plugin_instance required", status=400)
+        if not playlist_name:
+            return json_error("playlist_name required", status=400)
+
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error("Playlist not found", status=400)
-        inst = playlist.find_plugin(plugin_id, instance_name)
-        if not inst:
-            return json_error("Plugin instance not found", status=400)
-        inst.snooze_until = snooze_until
-        device_config.write_config()
-        return jsonify({"success": True, "message": "Snooze updated"})
-    except Exception:
-        return json_internal_error("set snooze")
+            return json_error(f"Playlist '{playlist_name}' not found", status=400)
 
+        # Determine current time and next eligible
+        try:
+            current_dt = now_device_tz(device_config)
+        except Exception:
+            current_dt = datetime.now()
+
+        plugin_instance = playlist.get_next_eligible_plugin(current_dt)
+        if not plugin_instance:
+            return json_error("No eligible instance in playlist", status=400)
+
+        refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
+
+        # Include latest metrics from refresh info if available
+        metrics = {}
+        try:
+            ri = device_config.get_refresh_info()
+            metrics = {
+                "request_ms": getattr(ri, "request_ms", None),
+                "generate_ms": getattr(ri, "generate_ms", None),
+                "preprocess_ms": getattr(ri, "preprocess_ms", None),
+                "display_ms": getattr(ri, "display_ms", None),
+            }
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "message": "Displayed next instance", "metrics": metrics})
+    except Exception:
+        return json_internal_error("display next in playlist")
 
 # removed toggle_only_fresh endpoint per product decision
 

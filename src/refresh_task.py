@@ -266,7 +266,8 @@ class RefreshTask:
             return None, None
 
         latest_refresh_dt = latest_refresh_info.get_refresh_datetime()
-        plugin_cycle_interval = self.device_config.get_config(
+        # Allow per-playlist override; fallback to device-level interval
+        plugin_cycle_interval = getattr(playlist, "cycle_interval_seconds", None) or self.device_config.get_config(
             "plugin_cycle_interval_seconds", default=3600
         )
         should_refresh = PlaylistManager.should_refresh(
