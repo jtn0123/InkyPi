@@ -155,6 +155,62 @@ def test_ai_image_image_download_failure(device_config_dev, monkeypatch):
             p.generate_image(settings, device_config_dev)
 
 
+def test_ai_image_policy_violation_retry_success(device_config_dev, monkeypatch):
+    """If first call hits content policy, plugin retries with a safe prompt."""
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+
+    # Mock API key
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    # First call raises content policy violation; second succeeds
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch("utils.http_utils.http_get") as mock_requests,
+    ):
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+
+        class PolicyErr(Exception):
+            pass
+
+        # Simulate error message containing code on first call, success on second
+        mock_client.images.generate.side_effect = [
+            PolicyErr("content_policy_violation: rejected"),
+            MagicMock(data=[MagicMock(url="http://example.com/image.png")]),
+        ]
+
+        # Mock image download
+        mock_img_response = MagicMock()
+        mock_img_response.content = b"fake_image_data"
+        mock_requests.return_value = mock_img_response
+
+        with patch("plugins.ai_image.ai_image.Image") as mock_image:
+            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
+                MagicMock()
+            )
+
+            settings = {
+                "textPrompt": "unsafe prompt",
+                "imageModel": "dall-e-3",
+                "quality": "standard",
+            }
+
+            img = p.generate_image(settings, device_config_dev)
+            assert img is not None
+
+
+def test_ai_image_sanitize_prompt_basic():
+    from plugins.ai_image.ai_image import AIImage
+
+    dirty = "Portrait in the style of Famous Artist by John Doe with Apple logo"
+    cleaned = AIImage.sanitize_prompt(dirty)
+    assert "style of" not in cleaned.lower()
+    assert "by john doe" not in cleaned.lower()
+    assert "apple" not in cleaned.lower()
+
+
 def test_ai_image_randomize_prompt_enabled(device_config_dev, monkeypatch):
     """Test ai_image plugin with prompt randomization enabled."""
     from plugins.ai_image.ai_image import AIImage

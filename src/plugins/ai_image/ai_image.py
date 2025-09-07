@@ -46,6 +46,9 @@ class AIImage(BasePlugin):
             if randomize_prompt:
                 text_prompt = AIImage.fetch_image_prompt(ai_client, text_prompt)
 
+            # Sanitize prompt before sending to image generation
+            text_prompt = AIImage.sanitize_prompt(text_prompt)
+
             image = AIImage.fetch_image(
                 ai_client,
                 text_prompt,
@@ -115,7 +118,20 @@ class AIImage(BasePlugin):
             if q:
                 args["quality"] = q
 
-        response = ai_client.images.generate(**args)
+        # Try image generation; if policy violation occurs, retry once with a safe fallback prompt
+        try:
+            response = ai_client.images.generate(**args)
+        except Exception as e:
+            if "content_policy_violation" in str(e):
+                logger.warning(
+                    "OpenAI content policy violation detected; retrying with a safe fallback prompt."
+                )
+                safe_prompt = AIImage.build_safe_fallback_prompt()
+                # Preserve sizing/quality args but replace only the prompt
+                args["prompt"] = safe_prompt
+                response = ai_client.images.generate(**args)
+            else:
+                raise
         image_url = response.data[0].url
         # Download the generated image using centralized HTTP helper
         resp = http_utils.http_get(image_url, timeout=30)
@@ -136,10 +152,10 @@ class AIImage(BasePlugin):
         system_content = (
             "You are a creative assistant generating extremely random and unique image prompts. "
             "Avoid common themes. Focus on unexpected, unconventional, and bizarre combinations "
-            "of art style, medium, subjects, time periods, and moods. No repetition. Prompts "
-            "should be 20 words or less and specify random artist, movie, tv show or time period "
-            "for the theme. Do not provide any headers or repeat the request, just provide the "
-            "updated prompt in your response."
+            "of art style, medium, subjects, time periods, and moods. No repetition. Keep prompts "
+            "20 words or less. IMPORTANT: Do NOT reference living artists, copyrighted IP, brands, "
+            "logos, trademarks, or celebrities. Avoid phrases like 'in the style of' or 'by <name>'. "
+            "Do not include text to render. Provide only the prompt."
         )
         user_content = (
             "Give me a completely random image prompt, something unexpected and creative! "
@@ -148,16 +164,12 @@ class AIImage(BasePlugin):
         if from_prompt and from_prompt.strip():
             system_content = (
                 "You are a creative assistant specializing in generating highly descriptive "
-                "and unique prompts for creating images. When given a short or simple image "
-                "description, your job is to rewrite it into a more detailed, imaginative, "
-                "and descriptive version that captures the essence of the original while "
-                "making it unique and vivid. Avoid adding irrelevant details but feel free "
-                "to include creative and visual enhancements. Avoid common themes. Focus on "
-                "unexpected, unconventional, and bizarre combinations of art style, medium, "
-                "subjects, time periods, and moods. Do not provide any headers or repeat the "
-                "request, just provide your updated prompt in the response. Prompts "
-                "should be 20 words or less and specify random artist, movie, tv show or time "
-                "period for the theme."
+                "and unique prompts for creating images. Rewrite short prompts to make them more "
+                "imaginative while staying true to the original idea. Avoid irrelevant details. "
+                "Avoid common themes. Focus on unexpected, unconventional, and bizarre combinations "
+                "of art style, medium, subjects, time periods, and moods. Keep it 20 words or less. "
+                "IMPORTANT: Do NOT reference living artists, copyrighted IP, brands, logos, trademarks, "
+                "or celebrities. Avoid phrases like 'in the style of' or 'by <name>'. Do not include text."
             )
             user_content = (
                 f'Original prompt: "{from_prompt}"\n'
@@ -179,3 +191,56 @@ class AIImage(BasePlugin):
         prompt = response.choices[0].message.content.strip()
         logger.info(f"Generated random image prompt: {prompt}")
         return prompt
+
+    @staticmethod
+    def build_safe_fallback_prompt() -> str:
+        """Return a conservative, policy-safe prompt suitable for an e-ink display.
+
+        This is used when OpenAI rejects the original prompt due to content policy.
+        """
+        base = (
+            "Abstract high-contrast geometric composition with bold shapes and clean minimal lines, "
+            "no text, no logos, safe content."
+        )
+        base += (
+            " The image should fully occupy the entire canvas without any frames, borders, or cropped "
+            "areas. No blank spaces or artificial framing."
+        )
+        base += (
+            " Focus on simplicity, bold shapes, and strong contrast to enhance clarity and visual appeal. "
+            "Avoid excessive detail or complex gradients, ensuring the design works well with flat, vibrant colors."
+        )
+        return base
+
+    @staticmethod
+    def sanitize_prompt(prompt: str) -> str:
+        """Remove risky phrases and references that commonly trigger policy blocks.
+
+        - Drops 'in the style of' and 'by <name>' patterns
+        - Removes explicit brand/logo/trademark words
+        - Trims length to a reasonable limit for safety
+        """
+        try:
+            import re
+
+            cleaned = prompt or ""
+            # Remove common style-copy patterns
+            cleaned = re.sub(r"in\s+the\s+style\s+of\s+[^,.]+", "", cleaned, flags=re.I)
+            cleaned = re.sub(r"by\s+[A-Z][a-zA-Z\-\s]+", "", cleaned)
+
+            # Remove brand/logo/trademark words (lightweight and conservative)
+            banned = [
+                "logo", "trademark", "brand", "copyright", "celebrity",
+                "Disney", "Marvel", "DC Comics", "Nintendo", "Pokemon",
+                "Star Wars", "Harry Potter", "Pixar", "Coca-Cola", "Apple",
+            ]
+            pattern = re.compile(r"|".join(re.escape(w) for w in banned), re.I)
+            cleaned = pattern.sub("", cleaned)
+
+            # Normalize whitespace and limit length
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            if len(cleaned) > 200:
+                cleaned = cleaned[:200].rstrip()
+            return cleaned
+        except Exception:
+            return prompt
