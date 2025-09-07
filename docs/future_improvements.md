@@ -125,3 +125,79 @@ Note: We can later remove `'unsafe-inline'` from `style-src` once all inline sty
 - All tests pass
 
 
+## UI Progress Bars and Stability-Focused UI Enhancements
+
+### Overview
+Add non-breaking, additive UI progress indicators for long-running operations and a set of stability-first UI enhancements (dark mode, skeletons, subtle animations, search, breadcrumbs, quick actions). Preserve current behavior as a fallback, avoid schema changes, and maintain test stability.
+
+### Goals
+- Implement reliable, determinate progress bars for long-running operations (manual update, background refresh, uploads).
+- Keep all changes backward compatible; gracefully fall back to existing spinner behavior.
+- Add discoverability and UX polish: dark mode with system detection, skeleton loading, subtle transitions, plugin filtering, breadcrumbs, and a quick actions toolbar.
+
+### Assumptions & Current State
+- Manual updates: `POST /plugin/update_now` (in `src/blueprints/plugin.py`) returns JSON success; no progress reporting.
+- Background refresh runs in `src/refresh_task.py` via `RefreshTask`, `ManualRefresh`, `PlaylistRefresh`.
+- UI uses spinner styles in `src/static/styles/main.css`; there is no progress bar component yet. A progress-like pattern exists in `src/templates/history.html` for storage usage.
+
+### Design (Additive, Non-breaking)
+1) Backend job tracking (in-memory, thread-safe)
+   - Introduce a small job model (id, type, stage, percent, status, error, timestamps) guarded by a lock.
+   - Track jobs in `RefreshTask` or new `utils/job_progress.py` with TTL cleanup; no device config/schema changes.
+   - Instrument `ManualRefresh`/`PlaylistRefresh` with coarse milestones: 0% init → 20% prepare → 60% generate image → 80% save/display → 100% done.
+   - `update_now` returns the existing success payload plus an optional `job_id` when progress is available.
+
+2) Minimal API surface (read-only progress)
+   - `GET /progress/<job_id>` → `{ percent, stage, status, error? }`.
+   - Optional: `GET /progress/current` → latest background refresh job (for global banner).
+   - No auth/role changes; simple 404 for unknown/expired jobs; TTL cleanup to bound memory.
+
+3) Frontend progress UI (progressive enhancement)
+   - New CSS classes for a reusable progress bar (normal and small variants) with CSS variables and `prefers-reduced-motion` support.
+   - `plugin.html`: on submit, show upload progress (XHR) and, if a `job_id` is returned, poll `/progress/<job_id>` until completion. Fallback to existing spinner if no `job_id`.
+   - `playlist.html`: optionally render a tiny inline progress bar for the instance currently refreshing.
+   - `inky.html`: optional global, subtle progress banner when a background refresh is active.
+
+4) Progressive fallback
+   - If progress endpoints are unavailable or errors occur, retain current spinner-only behavior without breaking flows.
+
+### Additional UI Enhancements (Stability-First Scope)
+- Dark mode toggle with system preference detection (no breaking CSS changes; use variables).
+- Skeleton loading states for preview image and plugin thumbnails; remove on `onload`.
+- Subtle animations/transitions for state changes, gated by `prefers-reduced-motion`.
+- Plugin grid search/filter by name on `inky.html` (client-side only).
+- Breadcrumb navigation: “Home › Plugin › Instance” in `plugin.html` header.
+- Quick actions toolbar: refresh now, save settings, add to playlist, open history (wire to existing endpoints).
+- Hover previews for plugin grid thumbnails (non-blocking enhancement).
+
+### Testing & Validation (Cloud-only first)
+- Unit tests
+  - Job lifecycle: create/update/complete/error/TTL cleanup.
+  - Thread-safety under concurrent updates.
+- Integration tests
+  - `POST /plugin/update_now` preserves existing contract; includes `job_id` when available.
+  - `GET /progress/<job_id>` advances from 0→100% and returns 404 after TTL.
+  - Background refresh exposes `current` progress when enabled.
+- UI smoke (headless/browser-lite)
+  - Progress bar renders and completes; spinner fallback works when no `job_id`.
+  - Upload progress displayed via XHR events.
+- Regression
+  - Existing test suite remains green; no schema/config mutations; incremental lint only where touched.
+
+### Rollout & Safeguards
+- Feature flag to disable UI polling (default enabled).
+- Graceful degradation to spinner on any failure.
+- Small, incremental edits with clear commits; easy rollback per page/module.
+
+### Acceptance Criteria
+- Manual updates show determinate progress when `job_id` is returned; otherwise show spinner.
+- Background refresh progress can be surfaced without blocking the UI.
+- No breaking changes to endpoints, templates, or device config; existing flows keep working.
+- New progress endpoints covered by unit/integration tests; overall CI stays green.
+
+### Risks & Mitigations
+- Concurrency/races → guard with `threading.Lock`/`Condition`; test concurrent updates.
+- Memory growth → TTL cleanup and capped job map size.
+- Partial progress accuracy → use coarse, stable milestones to avoid fragile reporting.
+- Network variance → polling at ~300–500 ms with backoff; timeout per job (~60 s) to avoid hangs.
+
