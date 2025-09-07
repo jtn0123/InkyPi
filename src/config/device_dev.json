@@ -61,11 +61,14 @@
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-07T02:28:20.214363+00:00",
-        "image_hash": "3a35b0793cf0f414ed3d9194ce24c784319a0a687514fa750ce1c90b665494be",
-        "refresh_type": "Playlist",
+        "refresh_time": "2025-09-07T04:04:48.824309+00:00",
+        "image_hash": "22baecc9a23bf9dc8dfcb8f35e67394e1fab5112258882eaf2641d60a375429c",
+        "refresh_type": "Manual Update",
         "plugin_id": "weather",
-        "playlist": "Default",
-        "plugin_instance": "weather_saved_settings"
+        "request_ms": 2437,
+        "display_ms": 26,
+        "generate_ms": 2365,
+        "preprocess_ms": 3,
+        "used_cached": false
     }
 }

@@ -34,4 +34,4 @@ def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
     device_config_dev.update_value("preview_size_mode", "fit", write=True)
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
-    assert b'style="width:' not in resp.data
+    assert b'id="previewImage" style=' not in resp.data

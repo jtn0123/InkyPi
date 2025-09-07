@@ -415,12 +415,12 @@
                 <div class="section" id="backupRestoreSection" style="display:none;">
                     <div class="section-title">Backup & Restore</div>
                     <div class="form-group">
-                        <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup (includes API keys by default)</button>
+                        <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup</button>
                     </div>
                     <div class="form-group nowrap">
-                        <label class="form-label" for="excludeKeys">Exclude API keys</label>
+                        <label class="form-label" for="includeKeys">Include API keys</label>
                         <label class="toggle-container">
-                            <input type="checkbox" id="excludeKeys" class="toggle-checkbox">
+                            <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
                             <span class="toggle-label"></span>
                         </label>
                     </div>
@@ -527,8 +527,8 @@
             }
         }
         async function exportConfig(){
-            const exclude = document.getElementById('excludeKeys')?.checked;
-            const url = `{{ url_for('settings.export_settings') }}?include_keys=${exclude ? '0' : '1'}`;
+            const include = document.getElementById('includeKeys')?.checked;
+            const url = `{{ url_for('settings.export_settings') }}?include_keys=${include ? '1' : '0'}`;
             try {
                 const resp = await fetch(url, { cache: 'no-store' });
                 const data = await resp.json();

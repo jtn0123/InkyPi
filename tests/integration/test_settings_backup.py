@@ -1,3 +1,4 @@
+import io
 import json
 
 
@@ -38,7 +39,7 @@ def test_import_round_trip_updates_config_and_keys(client, device_config_dev):
 
     resp = client.post(
         "/settings/import",
-        data={"file": (json.dumps(payload), "backup.json")},
+        data={"file": (io.BytesIO(json.dumps(payload).encode('utf-8')), "backup.json")},
         content_type="multipart/form-data",
     )
     assert resp.status_code == 200

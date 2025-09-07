@@ -1,5 +1,6 @@
 import logging
 import os
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -228,6 +229,12 @@ def update_now():
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
 
+    # Initialize timing variables
+    request_ms: int | None = None
+    display_ms: int | None = None
+    generate_ms: int | None = None
+    preprocess_ms: int | None = None
+
     try:
         # Start timing (request overall)
         from time import perf_counter
@@ -265,12 +272,16 @@ def update_now():
     # Build metrics payload from device_config.refresh_info (populated by task/display)
     try:
         ri = device_config.get_refresh_info()
-        request_ms = getattr(ri, "request_ms", None)
-        display_ms = getattr(ri, "display_ms", None)
-        generate_ms = getattr(ri, "generate_ms", None)
-        preprocess_ms = getattr(ri, "preprocess_ms", None)
+        if request_ms is None:
+            request_ms = getattr(ri, "request_ms", None)
+        if display_ms is None:
+            display_ms = getattr(ri, "display_ms", None)
+        if generate_ms is None:
+            generate_ms = getattr(ri, "generate_ms", None)
+        if preprocess_ms is None:
+            preprocess_ms = getattr(ri, "preprocess_ms", None)
     except Exception:
-        request_ms = display_ms = generate_ms = preprocess_ms = None
+        pass
 
     # If timing wasn't captured by task path (e.g., direct dev path), compute minimal request_ms
     try:

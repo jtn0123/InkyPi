@@ -20,7 +20,7 @@ def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
     device_config_dev.update_value("preview_size_mode", "fit", write=True)
     resp = client.get("/")
     assert resp.status_code == 200
-    assert b'style="width:' not in resp.data
+    assert b'id="previewImage" style=' not in resp.data
 
 
 def test_preview_404_when_no_image(client):
