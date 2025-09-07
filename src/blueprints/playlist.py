@@ -224,9 +224,10 @@ def format_relative_time(iso_date_string):
         return "just now"
     elif diff_minutes < 60:
         return f"{int(diff_minutes)} minutes ago"
-    elif dt_local.date() == now.date():
+    # Use rolling windows to avoid midnight boundary flakiness across TZs
+    elif diff_seconds < 60 * 60 * 24:
         return "today at " + dt_local.strftime(time_format).lstrip("0")
-    elif dt_local.date() == (now.date() - timedelta(days=1)):
+    elif diff_seconds < 60 * 60 * 48:
         return "yesterday at " + dt_local.strftime(time_format).lstrip("0")
     else:
         return dt_local.strftime(month_day_format).replace(
