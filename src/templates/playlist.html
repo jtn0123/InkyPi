@@ -245,7 +245,7 @@
                     {{ icon('squares-four', 'app-icon') | safe }}
                     <h1 class="app-title">Playlists</h1>
                 </div>
-                <div>
+                <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
@@ -260,7 +260,24 @@
             </div>
         </div>
         <div class="separator"></div>
-        
+
+        {% set plugin_icon_map = {
+            'ai_image': 'magic-wand',
+            'ai_text': 'text-t',
+            'weather': 'cloud-sun',
+            'calendar': 'calendar-blank',
+            'clock': 'clock',
+            'newspaper': 'newspaper-clipping',
+            'apod': 'planet',
+            'unsplash': 'images-square',
+            'image_url': 'link-simple',
+            'image_upload': 'upload-simple',
+            'image_folder': 'folder-simple',
+            'screenshot': 'monitor',
+            'wpotd': 'book-open-text',
+            'comic': 'mask-happy'
+        } %}
+
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% for playlist in playlist_config.playlists %}
@@ -274,7 +291,8 @@
                         {% for plugin_instance in playlist.plugins %}
                         <div class="plugin-item">
                             <div class="plugin-info" id="{{plugin_instance.name}}">
-                                <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
+                                {% from 'macros/icons.html' import icon %}
+                                {{ icon(plugin_icon_map.get(plugin_instance.plugin_id, 'images-square'), 'plugin-icon') | safe }}
                                 <span class="plugin-instance">{{ plugin_instance.name }}</span>
 
                                 <!-- Check if the current plugin is the one being displayed -->

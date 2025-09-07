@@ -149,22 +149,15 @@ body {
     align-items: center;
     gap: 10px;
     margin-bottom: 10px;
+    justify-content: space-between;
 }
 
-/* App icon styling */
-.app-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 5px;
-    object-fit: contain;
+.app-header .app-title {
+    flex: 1 1 auto;
+    margin-left: 8px;
 }
 
-/* App title styling */
-.app-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: var(--text);
-}
+.app-header > .header-button.icon { margin-left: auto; }
 
 /* Ensure form and settings container expand */
 .settings-form {
@@ -715,8 +708,9 @@ body {
 
 /* Plugin Icon */
 .plugin-icon {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
+    display: inline-block;
 }
 
 .plugin-instance {
@@ -1059,6 +1053,27 @@ body {
   .settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Dark-mode UI-only overrides to eliminate white backgrounds in web UI */
+[data-theme="dark"] .modal-content {
+  background-color: var(--surface);
+  color: var(--text);
+}
+[data-theme="dark"] .logs-panel .logs-toolbar {
+  background: var(--surface);
+}
+[data-theme="dark"] .history-card {
+  background: var(--surface);
+  border-color: var(--surface-border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+[data-theme="dark"] .history-thumb {
+  border-color: var(--surface-border);
+}
+[data-theme="dark"] .color-picker {
+  background-color: var(--surface);
+  border-color: var(--surface-border);
 }
 
 /* API Keys input container styling */
