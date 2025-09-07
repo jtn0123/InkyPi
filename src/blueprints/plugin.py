@@ -284,6 +284,31 @@ def update_now():
             display_manager.display_image(
                 image, image_settings=plugin_config.get("image_settings", [])
             )
+            # In dev path (no background task), persist minimal refresh_info with plugin_meta
+            try:
+                from model import RefreshInfo
+                from utils.image_utils import compute_image_hash
+                from utils.time_utils import now_device_tz
+
+                meta = None
+                if hasattr(plugin, "get_latest_metadata"):
+                    meta = plugin.get_latest_metadata()
+                device_config.refresh_info = RefreshInfo(
+                    refresh_type="Manual Update",
+                    plugin_id=plugin_id,
+                    refresh_time=now_device_tz(device_config).isoformat(),
+                    image_hash=compute_image_hash(image),
+                    request_ms=None,
+                    display_ms=None,
+                    generate_ms=generate_ms,
+                    preprocess_ms=None,
+                    used_cached=False,
+                    plugin_meta=meta,
+                )
+                device_config.write_config()
+            except Exception:
+                # Best-effort; do not fail the update path
+                pass
 
     except Exception as e:
         logger.exception(f"Error in update_now: {str(e)}")

@@ -21,6 +21,13 @@
     </div>
 </div>
 
+<div id="wpotdMeta" class="image-meta" style="display:none; margin-top:8px;">
+    <div id="wpotdMetaContent"></div>
+    <div style="font-size: 12px; color: #666; margin-top: 6px;">
+        <em>Wikipedia requires attribution. Links provided above when available.</em>
+    </div>
+ </div>
+
 <script>
     function toggleDateField(toggle) {
         const $date = document.getElementById('customDate');
@@ -46,5 +53,27 @@
             $date.value = "";
             $toggleShrink.checked = true;
             $toggleShrink.value = "true";}
+
+        // Try to populate WPOTD metadata panel from latest refresh
+        try {
+            fetch('{{ url_for('main.refresh_info') }}').then(r => r.json()).then(info => {
+                const metaDiv = document.getElementById('wpotdMeta');
+                const metaContent = document.getElementById('wpotdMetaContent');
+                if (info && info.plugin_id === 'wpotd' && info.plugin_meta) {
+                    const m = info.plugin_meta;
+                    const date = m.date ? new Date(m.date).toISOString().slice(0,10) : '';
+                    const caption = m.caption || '';
+                    const link = m.description_url || m.page_url || '';
+                    let html = '';
+                    if (date) html += `<div><strong>Wikipedia Picture of the Day:</strong> ${date}</div>`;
+                    if (caption) html += `<div style="margin-top:4px;">${caption}</div>`;
+                    if (link) html += `<div style="margin-top:4px;"><a href="${link}" target="_blank" rel="noopener noreferrer">Learn more</a></div>`;
+                    if (html) {
+                        metaContent.innerHTML = html;
+                        metaDiv.style.display = 'block';
+                    }
+                }
+            }).catch(()=>{});
+        } catch (e) {}
     });
 </script>

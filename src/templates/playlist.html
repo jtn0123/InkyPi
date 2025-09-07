@@ -5,9 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playlists</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/style.css">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/icons_loader.js') }}"></script>
     <script>
         async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
             try {
@@ -240,7 +241,8 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="title-container">
-                    <i class="ph ph-squares-four ph-thin app-icon" aria-hidden="true"></i>
+                    {% from 'macros/icons.html' import icon %}
+                    {{ icon('squares-four', 'app-icon') }}
                     <h1 class="app-title">Playlists</h1>
                 </div>
                 <div>
@@ -265,7 +267,7 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}">
                     <div class="playlist-header">
                         <span class="playlist-title">{{ playlist.name }}</span>
-                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')"><i class="ph ph-gear-six ph-thin action-icon"></i></button>
+                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')">{{ icon('gear-six', 'action-icon') }}</button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
@@ -298,15 +300,9 @@
                                     </span>
                                 {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">
-                                    <i class="ph ph-pencil-simple ph-thin action-icon"></i>
-                                </a>
-                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
-                                    <i class="ph ph-monitor ph-thin action-icon"></i>
-                                </button>
-                                <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
-                                    <i class="ph ph-trash ph-thin action-icon"></i>
-                                </button>
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') }}</a>
+                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') }}</button>
+                                <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') }}</button>
                             </div>
                         </div>
                         {% endfor %}

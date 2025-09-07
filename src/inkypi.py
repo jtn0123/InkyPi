@@ -157,6 +157,7 @@ def create_app():
     app.jinja_loader = ChoiceLoader(
         [FileSystemLoader(directory) for directory in template_dirs]
     )
+    # No server-side helper required; icons via CDN classes
 
     device_config = Config()
     display_manager = DisplayManager(device_config)

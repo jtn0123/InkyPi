@@ -6,8 +6,9 @@
     <title>{{ config.name }}</title>
 </head>
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-<link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/style.css">
 <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='scripts/icons_loader.js') }}"></script>
 <body>
     <!-- Subtle frame container -->
     <div class="frame">
@@ -23,15 +24,10 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
                 </svg>
             </button>
-            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">
-                <i class="ph ph-clock-counter-clockwise ph-thin icon-image"></i>
-            </a>
-            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">
-                <i class="ph ph-squares-four ph-thin icon-image"></i>
-            </a>
-            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">
-                <i class="ph ph-gear-six ph-thin icon-image"></i>
-            </a>
+            {% from 'macros/icons.html' import icon %}
+            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') }}</a>
+            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') }}</a>
+            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') }}</a>
         </header>
 
         <!-- Display the current image (auto-refreshing preview) -->
@@ -39,6 +35,11 @@
         <div class="image-container {% if not fit %}native{% endif %}">
             <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image"
                  {% if not fit %}style="width: {{ config.resolution[0] }}px; height: {{ config.resolution[1] }}px;"{% endif %}>
+        </div>
+
+        <!-- Optional metadata about the current plugin/image (e.g., WPOTD) -->
+        <div id="imageMeta" class="image-meta" style="display:none; margin-top: 8px;">
+            <div id="imageMetaContent"></div>
         </div>
 
         <!-- Separator -->
@@ -72,9 +73,37 @@
 <script>
     // Periodically refresh the preview image by cache-busting the URL
     const previewImg = document.getElementById('previewImage');
-    function refreshPreview(){
+    async function refreshPreview(){
         const base = '{{ url_for('main.preview_image') }}';
         previewImg.src = base + '?t=' + Date.now();
+        try {
+            const res = await fetch('{{ url_for('main.refresh_info') }}');
+            const info = await res.json();
+            const metaDiv = document.getElementById('imageMeta');
+            const metaContent = document.getElementById('imageMetaContent');
+            if (info && info.plugin_id === 'wpotd' && info.plugin_meta) {
+                const m = info.plugin_meta;
+                const date = m.date ? new Date(m.date).toISOString().slice(0,10) : '';
+                const caption = m.caption || '';
+                const link = m.description_url || m.page_url || '';
+                let html = '';
+                if (date) html += `<div><strong>Wikipedia Picture of the Day:</strong> ${date}</div>`;
+                if (caption) html += `<div style="margin-top:4px;">${caption}</div>`;
+                if (link) html += `<div style="margin-top:4px;"><a href="${link}" target="_blank" rel="noopener noreferrer">Learn more</a></div>`;
+                if (html) {
+                    metaContent.innerHTML = html;
+                    metaDiv.style.display = 'block';
+                } else {
+                    metaDiv.style.display = 'none';
+                    metaContent.textContent = '';
+                }
+            } else {
+                metaDiv.style.display = 'none';
+                metaContent.textContent = '';
+            }
+        } catch (e) {
+            // Non-fatal if refresh-info endpoint fails
+        }
     }
     // Refresh every 5 seconds
     setInterval(refreshPreview, 5000);

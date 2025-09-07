@@ -1,0 +1,5 @@
+{% macro icon(name, class_name='icon-image', title=None) -%}
+    {# Render Phosphor icon using CSS classes; requires @phosphor-icons/web stylesheet #}
+    <i class="ph ph-{{ name }} ph-thin {{ class_name }}" aria-hidden="true"{% if title %} title="{{ title }}"{% endif %}></i>
+{%- endmacro %}
+
