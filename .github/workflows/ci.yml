@@ -44,6 +44,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
+      - name: Bash syntax check
+        run: |
+          bash -n install/install.sh
+          bash -n install/update.sh
+          bash -n install/uninstall.sh
+          bash -n install/inkypi
+          bash -n scripts/dev_update.sh
       - name: Run shellcheck
         run: |
           shellcheck install/*.sh scripts/*.sh install/inkypi || true

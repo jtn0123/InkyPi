@@ -1,0 +1,15 @@
+name: Deprecated - replaced by main CI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/shell-scripts.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/shell-scripts.yml'
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Shell checks now run under ci.yml (job: shellcheck)."
