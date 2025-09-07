@@ -100,7 +100,7 @@
         </div>
         <div class="separator"></div>
         {% if metrics %}
-        <div style="padding:8px 16px; font-size: 13px; color: #333;">
+        <div style="padding:8px 16px; font-size: 13px; color: var(--text);">
             <strong>Last Request:</strong>
             <span>Request {{ metrics.request_ms or '-' }} ms</span>
             <span>• Generate {{ metrics.generate_ms or '-' }} ms</span>
@@ -111,8 +111,8 @@
         {% endif %}
         <div id="storage-block" style="padding: 12px 16px; {% if not storage or storage.pct_free is none %}display:none;{% endif %}">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div style="font-size:14px;color:#333;font-weight:600;">Storage available</div>
-                <div id="storage-text" style="font-size:13px;color:#666;">
+                <div style="font-size:14px;color:var(--text);font-weight:600;">Storage available</div>
+                <div id="storage-text" style="font-size:13px;color:var(--muted);">
                     {% if storage and storage.pct_free is not none %}
                         {{ storage.pct_free|round(2) }}% free • {{ storage.free_gb }} GB remaining of {{ storage.total_gb }} GB total
                     {% else %}

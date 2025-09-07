@@ -243,7 +243,7 @@ body {
     width: fit-content; /* Button takes up only the width of the text */
 }
 .back-button:hover {
-    background-color: #e0e0e0;
+    background-color: rgba(255,255,255,0.06);
 }
 
 /* Action buttons styling */
@@ -270,7 +270,7 @@ body {
 }
 
 .action-button:hover {
-    background-color: #16a085;
+    background-color: #2fd1b6; /* lighten accent on hover */
 }
 
 .action-button.compact {
@@ -291,7 +291,7 @@ body {
 .form-label {
     font-size: 1rem;
     font-weight: 600;
-    color: #333;
+    color: var(--text);
     white-space: nowrap; /* Prevent the label from wrapping */
 }
 
@@ -309,8 +309,8 @@ body {
 
 .form-input:focus {
     outline: none;
-    border-color: #1abc9c;
-    box-shadow: 0 0 0 2px rgba(26, 188, 156, 0.3);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(52, 198, 166, 0.28);
 }
 
 /* Toggle Container */
@@ -332,7 +332,7 @@ body {
 .toggle-label {
     position: absolute;
     cursor: pointer;
-    background-color: #ccc;
+    background-color: #cfcfcf;
     border-radius: 15px;
     top: 0;
     left: 0;
@@ -356,7 +356,7 @@ body {
 
 /* When Checked */
 .toggle-checkbox:checked + .toggle-label {
-    background-color: #1abc9c;
+    background-color: var(--accent);
 }
 
 .toggle-checkbox:checked + .toggle-label::before {
@@ -367,7 +367,7 @@ body {
 .file-upload-label {
     display: inline-block;
     background-color: #f9fafb; /* Matching background color */
-    color: #333; /* Text color matching the input */
+    color: var(--text); /* Text color matching the input */
     padding: 10px 20px;
     border-radius: 6px;
     cursor: pointer;
@@ -392,7 +392,7 @@ body {
 /* File name display styling */
 .file-name {
     font-size: 1rem;
-    color: #333;
+    color: var(--text);
     word-wrap: break-word;
 }
 
@@ -484,7 +484,7 @@ body {
 .modal-content h2 {
     font-size: 1.2rem;
     margin-bottom: 15px;
-    color: #333;
+    color: var(--text);
     text-align: center;
 }
 
@@ -498,7 +498,7 @@ body {
 
 .close-button:hover,
 .close-button:focus {
-    color: #333;
+    color: var(--text);
     text-decoration: none;
 }
 
@@ -535,7 +535,7 @@ body {
 }
 .progress-header {
     font-size: 0.9rem;
-    color: #333;
+    color: var(--text);
     margin-bottom: 6px;
 }
 .progress-bar {
@@ -714,7 +714,7 @@ body {
 }
 
 .plugin-instance {
-    color: #333;
+    color: var(--text);
 }
 
 /* Playlist plugin thumbnails */
@@ -976,7 +976,7 @@ body {
 .history-name {
   font-size: 0.95rem;
   font-weight: 600;
-  color: #333;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -984,7 +984,7 @@ body {
 
 .history-sub {
   font-size: 0.85rem;
-  color: #666;
+  color: var(--muted);
 }
 
 .history-actions {
@@ -994,7 +994,7 @@ body {
 
 .btn {
   background-color: #e5e7eb;
-  color: #333;
+  color: var(--text);
   border: none;
   padding: 6px 10px;
   border-radius: 6px;
@@ -1060,6 +1060,9 @@ body {
   background-color: var(--surface);
   color: var(--text);
 }
+[data-theme="dark"] .form-label { color: var(--text); }
+[data-theme="dark"] .form-input { background-color: var(--input-bg); color: var(--text); border-color: var(--surface-border); }
+[data-theme="dark"] .btn, [data-theme="dark"] .action-button { color: #fff; }
 [data-theme="dark"] .logs-panel .logs-toolbar {
   background: var(--surface);
 }
@@ -1104,7 +1107,7 @@ body {
 
 .clear-button:hover {
     background-color: #f0f0f0;
-    color: #666;
+    color: var(--muted);
 }
 
 /* --- Settings sections & headings --- */
@@ -1136,7 +1139,7 @@ body {
 
 .header-button.is-warning {
   background-color: #FFD600;
-  color: #333;
+  color: var(--text);
 }
 
 .header-button.is-danger {
@@ -1201,7 +1204,7 @@ body {
 
 .logs-updated {
   font-size: 12px;
-  color: #666;
+  color: var(--muted);
 }
 
 .logs-viewer {
@@ -1260,3 +1263,10 @@ body {
 .history-thumb { border: 1px solid var(--surface-border); }
 .playlist-item { border: 2px solid var(--surface-border); }
 .logs-panel .logs-toolbar { background: var(--surface); }
+
+/* Base plugin container ensures text follows theme */
+.settings-container, .settings-form, .app-header, .frame { color: var(--text); }
+
+/* Links inherit text color with subtle emphasis */
+a { color: var(--text); }
+a:hover { color: var(--accent); }
