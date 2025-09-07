@@ -629,6 +629,7 @@ body {
     --panel-bg: #fafafa;
     --panel-border: #eeeeee;
     --subtext: #666666;
+    --frame-lining: #b5b5b5; /* neutral hairline for previews */
 }
 [data-theme="dark"] {
     /* Neutral, low-chroma dark theme */
@@ -644,6 +645,7 @@ body {
     --panel-bg: #1a1e25;      /* inner panels */
     --panel-border: #2a2f38;
     --subtext: #a6adbb;       /* tertiary text */
+    --frame-lining: #7a828e;
 }
 
 .success-failure-modal .response-modal-content {
@@ -752,7 +754,7 @@ body {
     flex-wrap: wrap;
     align-items: center;
     padding: 10px 25px 10px 40px;
-    border-top: 2px solid #e0e0e0;
+    border-top: 2px solid var(--surface-border);
     gap: 10px;
 }
 
@@ -788,11 +790,51 @@ body {
 .plugin-thumb {
     width: 120px;
     height: 90px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--surface-border);
     border-radius: 4px;
     overflow: hidden;
+    padding: 8px; /* Inner padding to avoid visual clipping on e-ink */
+    background: var(--surface);
+    position: relative;
 }
 .plugin-thumb img { width: 100%; height: 100%; object-fit: contain; display:block; background: var(--panel-bg); }
+
+/* Frame-lining preview overlay on thumbnails by selected frame style */
+.plugin-thumb[data-frame-style]::after {
+  content: "";
+  position: absolute;
+  inset: 6px; /* inner padding lining */
+  pointer-events: none;
+}
+.plugin-thumb[data-frame-style="Rectangle"]::after {
+  border: 1.5px solid var(--frame-lining);
+  border-radius: 2px;
+}
+.plugin-thumb[data-frame-style="Top and Bottom"]::after {
+  border-top: 1.5px solid var(--frame-lining);
+  border-bottom: 1.5px solid var(--frame-lining);
+}
+.plugin-thumb[data-frame-style="Corner"]::after {
+  content: "";
+  background:
+    linear-gradient(to right, var(--frame-lining) 0 100%) left top/12px 1.5px no-repeat,
+    linear-gradient(to bottom, var(--frame-lining) 0 100%) left top/1.5px 12px no-repeat,
+    linear-gradient(to right, var(--frame-lining) 0 100%) right bottom/12px 1.2px no-repeat,
+    linear-gradient(to bottom, var(--frame-lining) 0 100%) right bottom/1.2px 12px no-repeat;
+}
+
+/* Device frame overlay for playlist thumbnails */
+.device-frame-on .plugin-thumb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--device-frame-url);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.9;
+}
 
 /* Virtualize large lists with content-visibility */
 .playlist-list, .button-grid, .history-grid {
@@ -832,6 +874,11 @@ body {
     border-radius: 10px;
     flex-direction: column;
     width: 100%
+}
+
+/* Highlight the currently displayed instance */
+.plugin-item.is-current {
+  border-left: 4px solid var(--accent);
 }
 
 /* Active Playlist Item */
@@ -887,12 +934,54 @@ body {
 }
 
 .displayed-now {
-    background-color: #16a085;
-    color: white;
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 0.8rem;
+    background-color: #0f8e73; /* High-contrast teal */
+    color: #ffffff;
+    padding: 2px 8px;
+    border-radius: 999px; /* pill */
+    font-size: 0.78rem;
 }
+
+/* Device frame overlay for large preview */
+.image-container { position: relative; }
+.device-frame-overlay {
+  position: absolute;
+  inset: 0;
+  background: center / contain no-repeat;
+  pointer-events: none;
+  display: none;
+}
+.image-container.show-frame .device-frame-overlay { display: block; }
+
+/* Visually hidden helper for accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap; /* added line */
+  border: 0;
+}
+
+/* Snackbar for undo */
+#undoSnackbar {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 1100;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+  display: none;
+  padding: 10px 12px;
+  gap: 10px;
+  align-items: center;
+}
+#undoSnackbar .btn-link { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 700; }
 
 /* Time input styling */
 .time-input {

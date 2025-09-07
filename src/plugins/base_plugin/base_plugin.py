@@ -76,7 +76,7 @@ class BasePlugin:
         return plugin_dir
 
     def generate_settings_template(self):
-        template_params = {"settings_template": "base_plugin/settings.html"}
+        template_params = {"settings_template": "base_plugin/settings.html", "style_settings": True}
 
         settings_path = self.get_plugin_dir("settings.html")
         if Path(settings_path).is_file():
@@ -84,7 +84,7 @@ class BasePlugin:
                 f"{self.get_plugin_id()}/settings.html"
             )
 
-        template_params["frame_styles"] = FRAME_STYLES  # type: ignore[assignment]
+        template_params["frame_styles"] = FRAME_STYLES
         return template_params
 
     def render_image(self, dimensions, html_file, css_file=None, template_params=None):

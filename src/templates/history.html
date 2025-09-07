@@ -32,43 +32,51 @@
         }
 
         async function deleteImage(filename) {
-            if (!confirm('Delete this image?')) return;
-            try {
-                const resp = await fetch("{{ url_for('history.history_delete') }}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename })
-                });
-                const result = await resp.json();
-                if (!resp.ok) {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                } else {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                }
-            } catch (e) {
-                console.error(e);
-                alert('Failed to delete image');
-            }
+            openDeleteHistoryModal(filename);
         }
 
-        async function clearHistory() {
-            if (!confirm('Clear all history images?')) return;
-            try {
-                const resp = await fetch("{{ url_for('history.history_clear') }}", { method: 'POST' });
-                const result = await resp.json();
-                if (!resp.ok) {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                } else {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    // reload the page to refresh the list and then update storage after reload
-                    location.reload();
-                }
-            } catch (e) {
-                console.error(e);
-                alert('Failed to clear history');
+        async function clearHistory() { openClearAllHistoryModal(); }
+
+        // Delete modals for History page
+        function openDeleteHistoryModal(filename){
+            const text = document.getElementById('deleteHistoryText');
+            text.textContent = `Delete this image '${filename}'?`;
+            document.getElementById('deleteHistoryModal').style.display = 'block';
+            const btn = document.getElementById('confirmDeleteHistoryBtn');
+            btn.onclick = async function(){
+                try {
+                    const resp = await fetch("{{ url_for('history.history_delete') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename }) });
+                    const result = await resp.json();
+                    if (!resp.ok) {
+                        showResponseModal('failure', `Error!  ${result.error}`);
+                    } else {
+                        sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                        location.reload();
+                    }
+                } catch (e) { console.error(e); showResponseModal('failure', 'Failed to delete image'); }
+                closeDeleteHistoryModal();
             }
         }
+        function closeDeleteHistoryModal(){ document.getElementById('deleteHistoryModal').style.display = 'none'; }
+
+        function openClearAllHistoryModal(){
+            document.getElementById('clearHistoryModal').style.display = 'block';
+            const btn = document.getElementById('confirmClearHistoryBtn');
+            btn.onclick = async function(){
+                try {
+                    const resp = await fetch("{{ url_for('history.history_clear') }}", { method: 'POST' });
+                    const result = await resp.json();
+                    if (!resp.ok) {
+                        showResponseModal('failure', `Error!  ${result.error}`);
+                    } else {
+                        sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                        location.reload();
+                    }
+                } catch (e) { console.error(e); showResponseModal('failure', 'Failed to clear history'); }
+                closeClearHistoryModal();
+            }
+        }
+        function closeClearHistoryModal(){ document.getElementById('clearHistoryModal').style.display = 'none'; }
     </script>
 </head>
 <body>
@@ -82,7 +90,7 @@
                     <h1 class="app-title">History</h1>
                 </div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
+                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
                             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
@@ -195,6 +203,34 @@
             {% endfor %}
         </div>
         {% endif %}
+    </div>
+
+    <!-- Delete image modal -->
+    <div id="deleteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteHistoryTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeDeleteHistoryModal()" aria-label="Close">×</span>
+            <h2 id="deleteHistoryTitle">Delete Image</h2>
+            <div class="separator"></div>
+            <p id="deleteHistoryText">Are you sure you want to delete?</p>
+            <div class="buttons-container" style="margin-top:12px;">
+                <button type="button" class="action-button warn" id="confirmDeleteHistoryBtn">Delete</button>
+                <button type="button" class="action-button" onclick="closeDeleteHistoryModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear all history modal -->
+    <div id="clearHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clearHistoryTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeClearHistoryModal()" aria-label="Close">×</span>
+            <h2 id="clearHistoryTitle">Clear All History</h2>
+            <div class="separator"></div>
+            <p>Are you sure you want to clear all history images?</p>
+            <div class="buttons-container" style="margin-top:12px;">
+                <button type="button" class="action-button warn" id="confirmClearHistoryBtn">Clear</button>
+                <button type="button" class="action-button" onclick="closeClearHistoryModal()">Cancel</button>
+            </div>
+        </div>
     </div>
 
     {% include 'response_modal.html' %}

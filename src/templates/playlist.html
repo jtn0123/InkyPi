@@ -48,6 +48,32 @@
         }
         function handleDragEnd(){ this.classList.remove('dragging'); }
 
+        function handleKeyReorder(e){
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            const item = e.currentTarget;
+            const parent = item.parentElement;
+            if (!parent) return;
+            let target = (e.key === 'ArrowUp') ? item.previousElementSibling : item.nextElementSibling;
+            while (target && !target.classList.contains('plugin-item')){
+                target = (e.key === 'ArrowUp') ? target.previousElementSibling : target.nextElementSibling;
+            }
+            if (!target) return;
+            if (e.key === 'ArrowUp') parent.insertBefore(item, target); else parent.insertBefore(item, target.nextSibling);
+            const container = item.closest('.playlist-item');
+            const playlistName = container?.getAttribute('data-playlist-name');
+            const ordered = Array.from(container.querySelectorAll('.plugin-item'))
+                .map(el => ({ plugin_id: el.getAttribute('data-plugin-id'), name: el.getAttribute('data-instance-name') }));
+            if (playlistName && ordered.length){
+                fetch("{{ url_for('playlist.reorder_plugins') }}", {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlist_name: playlistName, ordered })
+                }).then(r => r.json()).then(j => {
+                    if (!j.success){ showResponseModal('failure', `Error!  ${j.error || 'Failed to reorder'}`); }
+                }).catch(() => showResponseModal('failure', 'Error saving new order'));
+            }
+            item.focus();
+        }
+
         function enableDrag(container){
             const items = container.querySelectorAll('.plugin-item');
             items.forEach((item) => {
@@ -57,6 +83,9 @@
                 item.addEventListener('dragover', handleDragOver);
                 item.addEventListener('drop', handleDrop);
                 item.addEventListener('dragend', handleDragEnd);
+                item.tabIndex = 0;
+                item.setAttribute('role', 'listitem');
+                item.addEventListener('keydown', handleKeyReorder);
             });
         }
         async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
@@ -258,17 +287,7 @@
         }
 
         async function deletePlaylistQuick(name){
-            if (!confirm(`Delete playlist '${name}'?`)) return;
-            try {
-                const response = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, { method: "DELETE" });
-                const result = await response.json();
-                if (response.ok) {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (e){ alert('Failed to delete playlist'); }
+            openDeletePlaylistModal(name);
         }
 
         async function displayNextInPlaylist(name){
@@ -306,6 +325,18 @@
             populateTimeOptions();
             // Enable DnD for each playlist's plugin list
             document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
+            // Device frame overlay for thumbnails
+            (function(){
+                const toggle = document.getElementById('toggleDeviceFrameList');
+                const list = document.querySelector('.playlist-list');
+                if (!toggle || !list) return;
+                const url = {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }};
+                list.style.setProperty('--device-frame-url', `url('${url}')`);
+                function update(){
+                    if (toggle.checked) list.classList.add('device-frame-on'); else list.classList.remove('device-frame-on');
+                }
+                toggle.addEventListener('change', update); update();
+            })();
             // Compute "Next in" countdowns client-side for interval-based instances
             try {
                 const tzOffsetMin = {{ device_tz_offset_min | default(0) }};
@@ -383,6 +414,55 @@
                 sessionStorage.removeItem("storedMessage"); // Clear stored message after displaying
             }
         });
+
+        // --- Delete confirm flows (replace confirm()) ---
+        let _pendingDelete = null;
+        function openDeletePlaylistModal(name){
+            _pendingDelete = { type: 'playlist', name };
+            document.getElementById('deletePlaylistText').textContent = `Delete playlist '${name}'?`;
+            document.getElementById('deletePlaylistModal').style.display = 'block';
+            const btn = document.getElementById('confirmDeletePlaylistBtn');
+            btn.onclick = async function(){
+                try {
+                    const resp = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, { method: 'DELETE' });
+                    const j = await resp.json();
+                    if (!resp.ok){ showResponseModal('failure', `Error!  ${j.error}`); return; }
+                    // Show undo snackbar (cannot truly undo server delete without archive; provide UX affordance)
+                    showUndo(`Playlist '${name}' deleted.`);
+                    setTimeout(() => location.reload(), 800);
+                } catch(e){ showResponseModal('failure', 'Failed to delete playlist'); }
+                closeDeletePlaylistModal();
+            };
+        }
+        function closeDeletePlaylistModal(){ document.getElementById('deletePlaylistModal').style.display = 'none'; }
+
+        function openDeleteInstanceModal(playlistName, pluginId, instanceName){
+            _pendingDelete = { type: 'instance', playlistName, pluginId, instanceName };
+            document.getElementById('deleteInstanceText').textContent = `Delete instance '${instanceName}'?`;
+            document.getElementById('deleteInstanceModal').style.display = 'block';
+            const btn = document.getElementById('confirmDeleteInstanceBtn');
+            btn.onclick = async function(){
+                try {
+                    const resp = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName }) });
+                    const j = await resp.json();
+                    if (!resp.ok){ showResponseModal('failure', `Error!  ${j.error}`); return; }
+                    showUndo(`Instance '${instanceName}' deleted.`);
+                    setTimeout(() => location.reload(), 800);
+                } catch(e){ showResponseModal('failure', 'Failed to delete instance'); }
+                closeDeleteInstanceModal();
+            };
+        }
+        function closeDeleteInstanceModal(){ document.getElementById('deleteInstanceModal').style.display = 'none'; }
+
+        function showUndo(text){
+            const sb = document.getElementById('undoSnackbar');
+            const txt = document.getElementById('undoText');
+            txt.textContent = text + ' Undo?';
+            sb.style.display = 'inline-flex';
+            const undo = document.getElementById('undoBtn');
+            undo.onclick = function(){ sb.style.display = 'none'; location.reload(); };
+            setTimeout(() => { sb.style.display = 'none'; }, 4000);
+        }
     </script>
 </head>
 <body>
@@ -398,7 +478,7 @@
                     <h1 class="app-title">Playlists</h1>
                 </div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
+                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
                             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
@@ -407,6 +487,9 @@
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
                         </svg>
                     </button>
+                    <label class="header-button is-dark" for="toggleDeviceFrameList" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                        <input id="toggleDeviceFrameList" type="checkbox" aria-label="Show device frame in thumbnails" style="margin-right:6px;">Show device frame
+                    </label>
                     <button class="header-button" onclick="openCreateModal()">New Playlist</button>
                 </div>
             </div>
@@ -446,14 +529,14 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
                     <div class="playlist-header">
                         <span class="playlist-title" title="Cycle: {{ (playlist_timing.get(playlist.name).cycle_minutes if (playlist_timing and playlist_timing.get(playlist.name)) else device_cycle_minutes) }} min{% if playlist_timing and playlist_timing.get(playlist.name) and playlist_timing.get(playlist.name).next_at %}\nNext at: {{ playlist_timing.get(playlist.name).next_at }}{% endif %}">{{ playlist.name }}</span>
-                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}', '{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}')">{{ icon('gear-six', 'action-icon') }}</button>
-                        <button class="header-button" title="Run next in this playlist" onclick="displayNextInPlaylist('{{ playlist.name }}')">Run Next</button>
-                        <button class="delete-button" title="Delete playlist" onclick="deletePlaylistQuick('{{ playlist.name }}')">{{ icon('trash', 'action-icon') }}</button>
+                        <button class="edit-button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}', '{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}')">{{ icon('gear-six', 'action-icon') }}</button>
+                        <button class="header-button" title="Run next in this playlist" aria-label="Run next in playlist {{ playlist.name }}" onclick="displayNextInPlaylist('{{ playlist.name }}')">Run Next</button>
+                        <button class="delete-button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" onclick="openDeletePlaylistModal('{{ playlist.name }}')">{{ icon('trash', 'action-icon') }}</button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" {% if plugin_instance.refresh.interval is defined %}data-interval-sec="{{ plugin_instance.refresh.interval }}"{% endif %} {% if plugin_instance.latest_refresh_time %}data-latest-iso="{{ plugin_instance.latest_refresh_time }}"{% endif %}>
+                        <div class="plugin-item {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}is-current{% endif %}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" {% if plugin_instance.refresh.interval is defined %}data-interval-sec="{{ plugin_instance.refresh.interval }}"{% endif %} {% if plugin_instance.latest_refresh_time %}data-latest-iso="{{ plugin_instance.latest_refresh_time }}"{% endif %}>
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 {% from 'macros/icons.html' import icon %}
                                 {{ icon(plugin_icon_map.get(plugin_instance.plugin_id, 'images-square'), 'plugin-icon') | safe }}
@@ -471,9 +554,9 @@
                                 <div id="loadingIndicator" class="loading-indicator small left-align"></div>
 
                             </div>
-                            <div class="plugin-thumb">
+                            <div class="plugin-thumb" data-frame-style="{{ plugin_instance.plugin_settings.selectedFrame if plugin_instance.plugin_settings and plugin_instance.plugin_settings.selectedFrame else '' }}">
                                 <div class="img-skeleton" aria-hidden="true"></div>
-                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview" width="120" height="90" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
+                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview of {{ plugin_instance.name }}" width="120" height="90" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
                             </div>
                             <div class="plugin-actions">
                                 <div class="timing-row">
@@ -500,9 +583,9 @@
                                     {% endif %}
                                 </div>
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="btn" title="Edit"><span class="btn-label">Edit</span></a>
-                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this)"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
-                                <button class="btn btn-danger" title="Delete Plugin Instance" onclick="if(confirm('Delete {{ plugin_instance.name }}?')) deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')"><span class="btn-label">Delete</span></button>
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="btn" title="Edit" aria-label="Edit {{ plugin_instance.name }}"><span class="btn-label">Edit</span></a>
+                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" aria-label="Display {{ plugin_instance.name }} now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this)"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
+                                <button class="btn btn-danger" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}" onclick="openDeleteInstanceModal('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')"><span class="btn-label">Delete</span></button>
                                 
                             </div>
                         </div>
@@ -518,6 +601,40 @@
             <span id="globalProgressText">Preparing…</span>
         </div>
         <div class="progress-bar"><div id="globalProgressBar" class="progress-fill" style="width: 10%;"></div></div>
+    </div>
+
+    <!-- Delete Confirmation Modal (Playlist) -->
+    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deletePlaylistTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeDeletePlaylistModal()" aria-label="Close">×</span>
+            <h2 id="deletePlaylistTitle">Delete Playlist</h2>
+            <div class="separator"></div>
+            <p id="deletePlaylistText">Are you sure you want to delete this playlist?</p>
+            <div class="buttons-container" style="margin-top:12px;">
+                <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
+                <button type="button" class="action-button" onclick="closeDeletePlaylistModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal (Instance) -->
+    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteInstanceTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeDeleteInstanceModal()" aria-label="Close">×</span>
+            <h2 id="deleteInstanceTitle">Delete Instance</h2>
+            <div class="separator"></div>
+            <p id="deleteInstanceText">Are you sure you want to delete this instance?</p>
+            <div class="buttons-container" style="margin-top:12px;">
+                <button type="button" class="action-button warn" id="confirmDeleteInstanceBtn">Delete</button>
+                <button type="button" class="action-button" onclick="closeDeleteInstanceModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Undo Snackbar -->
+    <div id="undoSnackbar" role="status" aria-live="polite">
+      <span id="undoText">Deleted.</span>
+      <button class="btn-link" id="undoBtn" aria-label="Undo delete">Undo</button>
     </div>
 
     <!-- Schedule Configuration Modal -->

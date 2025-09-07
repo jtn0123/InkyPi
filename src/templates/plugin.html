@@ -372,7 +372,7 @@
             {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
             {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
             <h1 class="app-title">{{ plugin.display_name }}</h1>
-            <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
+            <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                 <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
                     <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
@@ -394,10 +394,11 @@
             <div class="status-card">
                 <div class="status-title">Current display</div>
                 <div class="status-body">
-                    <div class="image-container {% if not fit %}native{% endif %}">
+                    <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
                         <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}"
                              {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
+                        <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>
                     </div>
                 </div>
                 <div class="status-meta">
@@ -414,7 +415,7 @@
                     <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
                         No saved image found for this instance yet.
                         {% if plugin_instance and plugin_instance_playlist %}
-                        <div style="margin-top:6px;"><button type="button" class="action-button compact" onclick="displayInstanceNow()">Display Instance</button></div>
+                        <div style="margin-top:6px;"><button type="button" class="action-button compact" aria-label="Display this instance now" onclick="displayInstanceNow()">Display Instance</button></div>
                         {% endif %}
                     </div>
                     {% else %}
@@ -529,6 +530,9 @@
             {% endif %}
 
             <div class="buttons-container">
+                <label class="form-label" for="toggleDeviceFrame" style="display:flex;align-items:center;gap:6px;">
+                    <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
+                </label>
                 <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
                 <button type="button" onclick="handleAction('save_settings')" class="action-button center">Save Settings</button>
                 {% if plugin_instance %}
@@ -614,6 +618,17 @@
                     previewImg.style.height = nativeHeight + 'px';
                 }
             });
+            // Device frame overlay toggle
+            const toggle = document.getElementById('toggleDeviceFrame');
+            const overlay = document.getElementById('deviceFrameOverlay');
+            if (toggle && overlay){
+                // Choose a frame asset; using neutral SVG/PNG path in base plugin assets if present
+                try { overlay.style.backgroundImage = "url('" + {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }} + "')"; } catch(e) {}
+                toggle.addEventListener('change', function(){
+                    const parent = document.getElementById('currentPreviewContainer');
+                    if (this.checked) parent.classList.add('show-frame'); else parent.classList.remove('show-frame');
+                });
+            }
         })();
     </script>
     <script>
