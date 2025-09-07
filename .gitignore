@@ -177,3 +177,6 @@ src/static/images/saved/
 !src/plugins/**/icon.png
 !src/plugins/**/render/*.png
 !src/plugins/**/frames/*.png
+
+# Ignore downloaded icon packs; we vendor only curated SVGs under templates
+phosphor-icons/
