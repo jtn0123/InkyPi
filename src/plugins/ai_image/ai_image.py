@@ -132,15 +132,34 @@ class AIImage(BasePlugin):
                 response = ai_client.images.generate(**args)
             else:
                 raise
-        image_url = response.data[0].url
-        # Download the generated image using centralized HTTP helper
-        resp = http_utils.http_get(image_url, timeout=30)
-        # Respect raise_for_status if available; MagicMocks in tests will no-op
-        raise_for_status = getattr(resp, "raise_for_status", None)
-        if callable(raise_for_status):
-            raise_for_status()
+        # The OpenAI image response may provide either a URL or a base64 payload
+        data0 = response.data[0]
+        image_url = getattr(data0, "url", None)
+        b64_payload = getattr(data0, "b64_json", None)
+
+        if image_url:
+            # Download the generated image using centralized HTTP helper
+            resp = http_utils.http_get(image_url, timeout=30)
+            # Respect raise_for_status if available; MagicMocks in tests will no-op
+            raise_for_status = getattr(resp, "raise_for_status", None)
+            if callable(raise_for_status):
+                raise_for_status()
+            content_bytes = resp.content
+        elif b64_payload:
+            # Decode inline base64 payload returned by some OpenAI clients
+            import base64
+
+            try:
+                content_bytes = base64.b64decode(b64_payload)
+            except Exception as e:
+                logger.exception("Failed to decode base64 image payload")
+                raise RuntimeError("Failed to decode AI image bytes") from e
+        else:
+            logger.error("AI image response did not contain 'url' or 'b64_json'")
+            raise RuntimeError("OpenAI image response missing image data")
+
         from utils.image_utils import load_image_from_bytes
-        img = load_image_from_bytes(resp.content, image_open=Image.open)
+        img = load_image_from_bytes(content_bytes, image_open=Image.open)
         if img is None:
             raise RuntimeError("Failed to decode AI image bytes")
         return img
