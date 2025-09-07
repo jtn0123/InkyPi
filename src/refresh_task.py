@@ -144,6 +144,16 @@ class RefreshTask:
                         image_hash = compute_image_hash(image)
 
                         refresh_info = refresh_action.get_refresh_info()
+                        # Attach plugin-provided metadata if available
+                        try:
+                            plugin_meta = None
+                            if hasattr(plugin, "get_latest_metadata"):
+                                plugin_meta = plugin.get_latest_metadata()
+                            if plugin_meta:
+                                refresh_info.update({"plugin_meta": plugin_meta})
+                        except Exception:
+                            # Non-fatal; continue without metadata
+                            pass
                         refresh_info.update(
                             {
                                 "refresh_time": current_dt.isoformat(),

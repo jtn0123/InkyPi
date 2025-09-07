@@ -1,6 +1,6 @@
 import os
 
-from flask import Blueprint, current_app, render_template, send_file
+from flask import Blueprint, current_app, jsonify, render_template, send_file
 
 main_bp = Blueprint("main", __name__)
 
@@ -12,6 +12,7 @@ def main_page():
         "inky.html",
         config=device_config.get_config(),
         plugins=device_config.get_plugins(),
+        refresh_info=device_config.get_refresh_info().to_dict(),
     )
 
 
@@ -25,3 +26,13 @@ def preview_image():
     if not os.path.exists(path):
         return ("Preview not available", 404)
     return send_file(path, mimetype="image/png", conditional=True)
+
+
+@main_bp.route("/refresh-info")
+def refresh_info():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    try:
+        info = device_config.get_refresh_info().to_dict()
+    except Exception:
+        info = {}
+    return jsonify(info)

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>History</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
@@ -77,7 +78,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="title-container">
-                    <img src="{{ url_for('static', filename='icons/playlist.png') }}" alt="history icon" class="app-icon">
+                    <i class="ph ph-clock-counter-clockwise ph-thin app-icon" aria-hidden="true"></i>
                     <h1 class="app-title">History</h1>
                 </div>
                 <div>

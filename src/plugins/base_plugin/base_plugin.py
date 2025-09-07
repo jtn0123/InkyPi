@@ -47,6 +47,25 @@ class BasePlugin:
     def generate_image(self, settings, device_config):
         raise NotImplementedError("generate_image must be implemented by subclasses")
 
+    # ---- Optional metadata hooks (for surfacing info in the web UI) ----
+    def set_latest_metadata(self, metadata: dict | None):
+        """Plugins may call this to provide supplemental metadata about
+        the most recent render (e.g., title, date, description, source URLs).
+
+        The refresh task can read this and persist into `RefreshInfo.plugin_meta`.
+        """
+        try:
+            setattr(self, "_latest_metadata", metadata or None)
+        except Exception:
+            # Never crash plugin flow due to metadata bookkeeping
+            pass
+
+    def get_latest_metadata(self) -> dict | None:
+        try:
+            return getattr(self, "_latest_metadata", None)
+        except Exception:
+            return None
+
     def get_plugin_id(self):
         return self.config.get("id")
 

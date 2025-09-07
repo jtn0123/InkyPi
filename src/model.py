@@ -14,6 +14,7 @@ class RefreshInfo:
         plugin_id (str): Plugin id of the refresh.
         playlist (str): Playlist name if refresh_type is 'Playlist'.
         plugin_instance (str): Plugin instance name if refresh_type is 'Playlist'.
+        plugin_meta (dict | None): Optional plugin-specific metadata for the latest refresh.
     """
 
     def __init__(
@@ -30,6 +31,8 @@ class RefreshInfo:
         generate_ms: int | None = None,
         preprocess_ms: int | None = None,
         used_cached: bool | None = None,
+        # Optional plugin-specific metadata
+        plugin_meta: dict | None = None,
     ):
         """Initialize RefreshInfo instance."""
         self.refresh_time = refresh_time
@@ -44,6 +47,8 @@ class RefreshInfo:
         self.generate_ms = generate_ms
         self.preprocess_ms = preprocess_ms
         self.used_cached = used_cached
+        # Optional plugin-specific metadata (e.g., WPOTD date/description)
+        self.plugin_meta = plugin_meta
 
     def get_refresh_datetime(self):
         """Returns the refresh time as a datetime object or None if not set."""
@@ -74,6 +79,9 @@ class RefreshInfo:
             refresh_dict["preprocess_ms"] = self.preprocess_ms
         if self.used_cached is not None:
             refresh_dict["used_cached"] = self.used_cached
+        # Include optional plugin metadata if available
+        if getattr(self, "plugin_meta", None) is not None:
+            refresh_dict["plugin_meta"] = self.plugin_meta
         return refresh_dict
 
     @classmethod
@@ -90,6 +98,7 @@ class RefreshInfo:
             generate_ms=data.get("generate_ms"),
             preprocess_ms=data.get("preprocess_ms"),
             used_cached=data.get("used_cached"),
+            plugin_meta=data.get("plugin_meta"),
         )
 
 

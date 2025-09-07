@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Keys</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
         async function saveKeys() {
@@ -173,7 +174,7 @@
         <button onclick="history.back()" class="back-button">← Back</button>
         <div class="app-header">
             <div class="title-container">
-                <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="settings icon" class="app-icon">
+                <i class="ph ph-gear-six ph-thin app-icon" aria-hidden="true"></i>
                 <h1 class="app-title">API Keys</h1>
             </div>
         </div>

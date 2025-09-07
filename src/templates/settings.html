@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script>
@@ -320,11 +321,19 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="title-container">
-                    <img src="{{ url_for('static', filename='icons/settings.png') }}" alt="settings icon" class="app-icon">
+                    <i class="ph ph-gear-six ph-thin app-icon" aria-hidden="true"></i>
                     <h1 class="app-title">Settings</h1>
                 </div>
                 <div class="header-actions">
-                    <button id="themeToggle" class="header-button" type="button">Dark Mode</button>
+                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
+                        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                        </svg>
+                        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                        </svg>
+                    </button>
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                     <button class="header-button" onclick="openBackupRestore()">Backup & Restore</button>

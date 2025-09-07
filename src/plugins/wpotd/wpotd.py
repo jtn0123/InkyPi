@@ -71,6 +71,23 @@ class Wpotd(BasePlugin):
                 f"Image resized to fit device dimensions: {max_width},{max_height}"
             )
 
+        # Attempt to gather and surface metadata for the web UI
+        try:
+            filename = data.get("filename")
+            meta = self._fetch_image_metadata(filename)
+            # Compose plugin-level metadata for UI display
+            plugin_meta = {
+                "date": datetofetch.isoformat(),
+                "filename": filename,
+                "image_url": data.get("image_src"),
+                "page_url": data.get("image_page_url"),
+                "caption": meta.get("caption"),
+                "description_url": meta.get("description_url"),
+            }
+            self.set_latest_metadata(plugin_meta)
+        except Exception as e:
+            logger.info(f"WPOTD metadata unavailable: {e}")
+
         return image
 
     def _determine_date(self, settings: dict[str, Any]) -> date:
@@ -162,6 +179,51 @@ class Wpotd(BasePlugin):
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
             raise RuntimeError("Wikipedia API request failed.")
+
+    def _fetch_image_metadata(self, filename: str | None) -> dict[str, Any]:
+        """Fetch extended metadata for the image file from MediaWiki.
+
+        Returns a dict with keys like caption and description_url when available.
+        """
+        result: dict[str, Any] = {}
+        if not filename:
+            return result
+        params = {
+            "action": "query",
+            "format": "json",
+            "prop": "imageinfo",
+            "iiprop": "url|extmetadata|descriptionurl",
+            "titles": filename,
+            "formatversion": "2",
+        }
+        data = self._make_request(params)
+        try:
+            page = data["query"]["pages"][0]
+            info = (page.get("imageinfo") or [{}])[0]
+            ext = info.get("extmetadata") or {}
+            caption_raw = None
+            # Prefer ImageDescription; fallback to ObjectName if present
+            if isinstance(ext.get("ImageDescription"), dict):
+                caption_raw = ext["ImageDescription"].get("value")
+            if not caption_raw and isinstance(ext.get("ObjectName"), dict):
+                caption_raw = ext["ObjectName"].get("value")
+            result["caption"] = self._strip_html(caption_raw) if caption_raw else None
+            # descriptionurl points to the Commons file page
+            result["description_url"] = info.get("descriptionurl")
+        except Exception as e:
+            logger.info(f"WPOTD extmetadata not available for {filename}: {e}")
+        return result
+
+    @staticmethod
+    def _strip_html(text: str | None) -> str | None:
+        if not text:
+            return text
+        try:
+            import re
+
+            return re.sub(r"<[^>]+>", "", text)
+        except Exception:
+            return text
 
     def _shrink_to_fit(
         self, image: Image.Image, max_width: int, max_height: int

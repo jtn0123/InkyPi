@@ -321,7 +321,7 @@ def create_app():
             pass
         # Content Security Policy (Report-Only by default)
         try:
-            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
             report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in ("1", "true", "yes")
             header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
             if header_name not in response.headers:
