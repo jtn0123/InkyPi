@@ -151,6 +151,10 @@ show_loader() {
   local pid=$!
   local delay=0.1
   local spinstr='|/-\'
+  if [[ -z "$pid" ]]; then
+    printf "%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$1"
+    return
+  fi
   printf "$1 [${spinstr:0:1}] "
   while ps a | awk '{print $1}' | grep -q "${pid}"; do
     local temp=${spinstr#?}
@@ -266,7 +270,7 @@ install_config() {
 
   # Check and copy device.config if it doesn't exist
   if [ ! -f "$CONFIG_DIR/device.json" ]; then
-    cp "$CONFIG_BASE_DIR/device.json" "$CONFIG_DIR/"
+    cp "$CONFIG_BASE_DIR/device.json" "$CONFIG_DIR/" > /dev/null &
     show_loader "\tCopying device.config to $CONFIG_DIR"
   else
     echo_success "\tdevice.json already exists in $CONFIG_DIR"
@@ -318,13 +322,13 @@ copy_project() {
   # Check if an existing installation is present
   echo "Installing $APPNAME to $INSTALL_PATH"
   if [[ -d $INSTALL_PATH ]]; then
-    rm -rf "$INSTALL_PATH" > /dev/null
+    rm -rf "$INSTALL_PATH" > /dev/null &
     show_loader "\tRemoving existing installation found at $INSTALL_PATH"
   fi
 
   mkdir -p "$INSTALL_PATH"
 
-  ln -sf "$SRC_PATH" "$INSTALL_PATH/src"
+  ln -sf "$SRC_PATH" "$INSTALL_PATH/src" > /dev/null &
   show_loader "\tCreating symlink from $SRC_PATH to $INSTALL_PATH/src"
 
   # Ensure a protected .env exists at the project root used by the service
