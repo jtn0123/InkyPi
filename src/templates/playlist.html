@@ -328,9 +328,7 @@
                         const nextTs = lastDate.getTime() + (intervalSec * 1000);
                         const deltaMs = nextTs - Date.now();
                         if (nextEl){
-                            if (deltaMs <= 0){
-                                nextEl.textContent = ' • Next: soon';
-                            } else {
+                            if (deltaMs > 0){
                                 const mins = Math.round(deltaMs / 60000);
                                 if (mins < 60){
                                     nextEl.textContent = ` • Next in ${mins} min`;
@@ -339,6 +337,8 @@
                                     const rem = mins % 60;
                                     nextEl.textContent = ` • Next in ${hrs}h ${rem}m`;
                                 }
+                            } else {
+                                nextEl.textContent = '';
                             }
                         }
                         if (nextAtEl){
