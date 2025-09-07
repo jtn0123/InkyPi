@@ -22,6 +22,7 @@
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}" defer></script>
 </head>
 <body>
+    <main id="main" role="main">
     <div class="frame">
         <!-- Back Button -->
         <button onclick="history.back()" class="back-button">← Back</button>
@@ -208,7 +209,7 @@
                     <label for="start_time" class="form-label">Display from </label>
                     <select id="start_time" name="start_time" class="form-input"></select>
                     <span> - </span>
-                    <select id="end_time" name="end_time" class="form-input"></select>
+                    <select id="end_time" name="end_time" class="form-input" aria-label="End time"></select>
                 </div>
                 <div class="form-group">
                     <label for="cycle_minutes" class="form-label">Advance every (minutes):</label>
@@ -224,5 +225,6 @@
 
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
+    </main>
 </body>
 </html>
