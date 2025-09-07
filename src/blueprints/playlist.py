@@ -126,6 +126,7 @@ def playlists():
     except Exception:
         last_dt = None
     playlist_timing: dict[str, dict] = {}
+    rotation_eta: dict[str, dict] = {}
     try:
         for pl in playlist_manager.playlists:
             cycle_sec = getattr(pl, "cycle_interval_seconds", None)
@@ -141,6 +142,43 @@ def playlists():
                         item["next_at"] = next_dt.strftime("%Y-%m-%d %H:%M")
                     except Exception:
                         item["next_at"] = None
+                # Also compute rotation ETA for each plugin in this playlist
+                try:
+                    eta_for_pl: dict[str, dict] = {}
+                    num = len(pl.plugins)
+                    if num > 0:
+                        # Determine the index that will be displayed on the next cycle
+                        if pl.current_plugin_index is None:
+                            next_index = 0
+                        else:
+                            try:
+                                if not (0 <= pl.current_plugin_index < num):
+                                    next_index = 0
+                                else:
+                                    next_index = (pl.current_plugin_index + 1) % num
+                            except Exception:
+                                next_index = 0
+                        # Time until the next cycle tick for this playlist
+                        try:
+                            # If this playlist produced the last image, use last_dt; otherwise assume next tick is cycle_min from now
+                            if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
+                                until_next_min = max(0, int((last_dt + timedelta(minutes=cycle_min) - now).total_seconds() // 60))
+                            else:
+                                until_next_min = cycle_min
+                        except Exception:
+                            until_next_min = cycle_min
+
+                        for idx, inst in enumerate(pl.plugins):
+                            steps = (idx - next_index + num) % num
+                            total_min = until_next_min + steps * cycle_min
+                            eta_dt = now + timedelta(minutes=total_min)
+                            eta_for_pl[inst.name] = {
+                                "minutes": total_min,
+                                "at": eta_dt.strftime("%H:%M"),
+                            }
+                    rotation_eta[pl.name] = eta_for_pl
+                except Exception:
+                    rotation_eta[pl.name] = {}
             except Exception:
                 pass
             playlist_timing[pl.name] = item
@@ -156,6 +194,7 @@ def playlists():
         device_tz_offset_min=tz_off_min,
         device_cycle_minutes=device_cycle_minutes,
         playlist_timing=playlist_timing,
+        rotation_eta=rotation_eta,
     )
 
 

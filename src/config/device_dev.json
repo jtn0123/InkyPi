@@ -41,7 +41,9 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": "2025-09-07T02:28:20.214363+00:00"
+                        "latest_refresh_time": "2025-09-07T21:16:12.152617+00:00",
+                        "only_show_when_fresh": false,
+                        "snooze_until": null
                     },
                     {
                         "plugin_id": "apod",
@@ -52,7 +54,9 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": null
+                        "latest_refresh_time": "2025-09-07T21:15:56.523448+00:00",
+                        "only_show_when_fresh": false,
+                        "snooze_until": null
                     },
                     {
                         "plugin_id": "wpotd",
@@ -61,7 +65,9 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": null
+                        "latest_refresh_time": "2025-09-07T21:16:23.571926+00:00",
+                        "only_show_when_fresh": false,
+                        "snooze_until": null
                     },
                     {
                         "plugin_id": "ai_image",
@@ -74,7 +80,9 @@
                         "refresh": {
                             "interval": 1800
                         },
-                        "latest_refresh_time": null
+                        "latest_refresh_time": null,
+                        "only_show_when_fresh": false,
+                        "snooze_until": null
                     },
                     {
                         "plugin_id": "ai_image",
@@ -88,7 +96,9 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": null
+                        "latest_refresh_time": null,
+                        "only_show_when_fresh": false,
+                        "snooze_until": null
                     }
                 ],
                 "current_plugin_index": 0
@@ -97,14 +107,24 @@
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-07T18:54:34.336512+00:00",
-        "image_hash": "6cda0b4262a06b9850a6bb12676f6b53629c9a8f68f23d64e16ed7248bc42604",
-        "refresh_type": "Manual Update",
-        "plugin_id": "apod",
-        "request_ms": 4061,
+        "refresh_time": "2025-09-07T21:16:23.571926+00:00",
+        "image_hash": "ba8379adc14c5609a3f4424b4b7f79c2b3eaceafe3d858cce27a4a0ccaf1843f",
+        "refresh_type": "Playlist",
+        "plugin_id": "wpotd",
+        "playlist": "Default",
+        "plugin_instance": "wpotd_saved_settings",
+        "request_ms": 10359,
         "display_ms": 26,
-        "generate_ms": 3108,
+        "generate_ms": 6034,
         "preprocess_ms": 3,
-        "used_cached": false
+        "used_cached": false,
+        "plugin_meta": {
+            "date": "2025-09-07",
+            "filename": "File:Arenal volcano (70785p) (cropped).jpg",
+            "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Arenal_volcano_%2870785p%29_%28cropped%29.jpg",
+            "page_url": "https://en.wikipedia.org/wiki/Template:POTD/2025-09-07",
+            "caption": "Arenal Volcano panorama",
+            "description_url": "https://commons.wikimedia.org/wiki/File:Arenal_volcano_(70785p)_(cropped).jpg"
+        }
     }
 }

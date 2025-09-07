@@ -818,7 +818,7 @@ body {
 .playlist-title {
     font-size: 1.2rem;
     font-weight: 600;
-    color: #333;
+    color: var(--text);
 }
 
 .action-icon {
@@ -888,6 +888,7 @@ body {
 
 .timing-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
 .latest-refresh { background-color: var(--panel-bg); color: var(--text); padding: 2px 6px; border-radius: 4px; font-size: 0.78em; border:1px solid var(--panel-border); }
+.latest-refresh.nextin:empty { display:none; }
 
 .api-key-label {
     background-color: lightslategray;

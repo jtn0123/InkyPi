@@ -464,13 +464,22 @@
                                         {% if plugin_instance.latest_refresh_time %}
                                             {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
                                             <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">Refreshed {{ refresh_time }}</span>
-                                            <span class="latest-refresh" id="nextIn_{{ playlist.name | replace(' ', '_') }}_{{ plugin_instance.name | replace(' ', '_') }}"></span>
-                                            <span class="latest-refresh" id="nextAt_{{ playlist.name | replace(' ', '_') }}_{{ plugin_instance.name | replace(' ', '_') }}"></span>
                                         {% else %}
                                             <span class="latest-refresh">Pending first run</span>
                                         {% endif %}
                                     {% elif plugin_instance.refresh.scheduled is defined %}
                                         <span class="latest-refresh">Scheduled {{ plugin_instance.refresh.scheduled }}</span>
+                                    {% endif %}
+                                    {% set eta = rotation_eta.get(playlist.name, {}).get(plugin_instance.name) if rotation_eta else None %}
+                                    {% if eta %}
+                                        {% set __h = (eta.minutes // 60) %}
+                                        {% set __m = (eta.minutes % 60) %}
+                                        <span class="latest-refresh">
+                                            Next in
+                                            {% if __h > 0 %} {{ __h }}h{% endif %}
+                                            {% if __m > 0 %} {{ __m }}m{% endif %}
+                                            • at {{ eta.at }}
+                                        </span>
                                     {% endif %}
                                 </div>
 
