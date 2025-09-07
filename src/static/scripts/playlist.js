@@ -286,6 +286,43 @@
     document.addEventListener("DOMContentLoaded", function(){
         populateTimeOptions();
         document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
+        // Bind header buttons
+        const newBtn = document.getElementById('newPlaylistBtn');
+        if (newBtn){ newBtn.addEventListener('click', () => openCreateModal()); }
+        document.querySelectorAll('.edit-playlist-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const el = e.currentTarget;
+                const name = el.getAttribute('data-playlist-name');
+                const st = el.getAttribute('data-start-time');
+                const et = el.getAttribute('data-end-time');
+                const cm = el.getAttribute('data-cycle-minutes');
+                openEditModal(name, st, et, cm);
+            });
+        });
+        document.querySelectorAll('.run-next-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const name = e.currentTarget.getAttribute('data-playlist');
+                displayNextInPlaylist(name);
+            });
+        });
+        document.querySelectorAll('.delete-playlist-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const name = e.currentTarget.getAttribute('data-playlist');
+                openDeletePlaylistModal(name);
+            });
+        });
+        document.querySelectorAll('.delete-instance-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const t = e.currentTarget;
+                openDeleteInstanceModal(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'));
+            });
+        });
+        document.querySelectorAll('.plugin-display-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const t = e.currentTarget;
+                displayPluginInstance(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
+            });
+        });
         try {
             initDeviceClock();
             setInterval(renderNextIn, 60000);

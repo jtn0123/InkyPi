@@ -20,274 +20,6 @@
         };
     </script>
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}" defer></script>
-    <script>
-        /* Inline script disabled; logic moved to static/scripts/playlist.js */
-        if (false) {
-        // Drag-and-drop reordering support (desktop/basic)
-        let dragSrcEl = null;
-        function handleDragStart(e){
-            dragSrcEl = this;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', this.id);
-            this.classList.add('dragging');
-        }
-        function handleDragOver(e){
-            if (e.preventDefault) e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            return false;
-        }
-        function handleDrop(e){
-            if (e.stopPropagation) e.stopPropagation();
-            const srcId = e.dataTransfer.getData('text/plain');
-            const srcEl = document.getElementById(srcId);
-            if (srcEl && srcEl !== this){
-                this.parentNode.insertBefore(srcEl, this.nextSibling);
-                // After drop, persist new order for this playlist
-                const container = this.closest('.playlist-item');
-                const playlistName = container?.getAttribute('data-playlist-name');
-                const ordered = Array.from(container.querySelectorAll('.plugin-item'))
-                    .map(el => ({ plugin_id: el.getAttribute('data-plugin-id'), name: el.getAttribute('data-instance-name') }));
-                if (playlistName && ordered.length){
-                    fetch("{{ url_for('playlist.reorder_plugins') }}", {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlist_name: playlistName, ordered })
-                    }).then(r => r.json()).then(j => {
-                        if (!j.success){
-                            showResponseModal('failure', `Error!  ${j.error || 'Failed to reorder'}`);
-                        } else {
-                            sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
-                        }
-                    }).catch(() => showResponseModal('failure', 'Error saving new order'));
-                }
-            }
-            return false;
-        }
-        function handleDragEnd(){ this.classList.remove('dragging'); }
-
-        function handleKeyReorder(e){
-            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-            e.preventDefault();
-            const item = e.currentTarget;
-            const parent = item.parentElement;
-            if (!parent) return;
-            let target = (e.key === 'ArrowUp') ? item.previousElementSibling : item.nextElementSibling;
-            while (target && !target.classList.contains('plugin-item')){
-                target = (e.key === 'ArrowUp') ? target.previousElementSibling : target.nextElementSibling;
-            }
-            if (!target) return;
-            if (e.key === 'ArrowUp') parent.insertBefore(item, target); else parent.insertBefore(item, target.nextSibling);
-            const container = item.closest('.playlist-item');
-            const playlistName = container?.getAttribute('data-playlist-name');
-            const ordered = Array.from(container.querySelectorAll('.plugin-item'))
-                .map(el => ({ plugin_id: el.getAttribute('data-plugin-id'), name: el.getAttribute('data-instance-name') }));
-            if (playlistName && ordered.length){
-                fetch("{{ url_for('playlist.reorder_plugins') }}", {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlist_name: playlistName, ordered })
-                }).then(r => r.json()).then(j => {
-                    if (!j.success){ showResponseModal('failure', `Error!  ${j.error || 'Failed to reorder'}`); }
-                }).catch(() => showResponseModal('failure', 'Error saving new order'));
-            }
-            item.focus();
-        }
-
-        function enableDrag(container){}
-        async function deletePluginInstance(){}
-
-        async function displayPluginInstance(){}
-
-        // Open modal for **creating** a new playlist
-        function openCreateModal(){}
-
-        // Open modal for **editing** an existing playlist
-        function openEditModal(){}
-
-        function openModal(){}
-        function closeModal(){}
-
-        async function createPlaylist(){}
-
-        async function updatePlaylist(){}
-
-        async function deletePlaylist(){}
-
-        async function deletePlaylistQuick(name){
-            openDeletePlaylistModal(name);
-        }
-
-        async function displayNextInPlaylist(name){
-            try{
-                const resp = await fetch("{{ url_for('playlist.display_next_in_playlist') }}", { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
-                const j = await resp.json();
-                if (!resp.ok || !j.success){
-                    showResponseModal('failure', `Error!  ${j.error || 'Failed to display'}`);
-                } else {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
-                    setTimeout(() => { location.reload(); }, 500);
-                }
-            } catch(e){ showResponseModal('failure', 'Failed to trigger display'); }
-        }
-
-        function populateTimeOptions() {
-            let startSelect = document.getElementById("start_time");
-            let endSelect = document.getElementById("end_time");
-
-            startSelect.innerHTML = "";
-            endSelect.innerHTML = "";
-
-            for (let hour = 0; hour < 24; hour++) { // 24-hour format (0-23)
-                for (let minutes of [0, 15, 30, 45]) {
-                    let time = hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
-                    startSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                    endSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                }
-            }
-            startSelect.innerHTML += `<option value="24:00">24:00</option>`;
-            endSelect.innerHTML += `<option value="24:00">24:00</option>`;
-        }
-
-        document.addEventListener("DOMContentLoaded", function(){
-            populateTimeOptions();
-            // Enable DnD for each playlist's plugin list
-            document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
-            // Device frame overlay for thumbnails
-            (function(){
-                const toggle = document.getElementById('toggleDeviceFrameList');
-                const list = document.querySelector('.playlist-list');
-                if (!toggle || !list) return;
-                const url = {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }};
-                list.style.setProperty('--device-frame-url', `url('${url}')`);
-                function update(){
-                    if (toggle.checked) list.classList.add('device-frame-on'); else list.classList.remove('device-frame-on');
-                }
-                toggle.addEventListener('change', update); update();
-            })();
-            // Compute "Next in" countdowns client-side for interval-based instances
-            try {
-                const tzOffsetMin = {{ device_tz_offset_min | default(0) }};
-                // Render device time continuously
-                (function initDeviceClock(){
-                    const val = document.getElementById('currentTimeValue');
-                    if (!val) return;
-                    function render(){
-                        try {
-                            const now = new Date();
-                            const browserOffsetMin = -now.getTimezoneOffset();
-                            const adjustMs = ({{ device_tz_offset_min | default(0) }} - browserOffsetMin) * 60000;
-                            const devNow = new Date(now.getTime() + adjustMs);
-                            val.textContent = devNow.toLocaleString(undefined, { hour12: false });
-                        } catch(e) {}
-                    }
-                    setInterval(render, 1000);
-                    render();
-                })();
-                function parseISO(s){ try { return s ? new Date(s) : null; } catch(e){ return null; } }
-                function renderNextIn(){
-                    document.querySelectorAll('.plugin-item').forEach(item => {
-                        const name = item.getAttribute('data-instance-name');
-                        const pluginId = item.getAttribute('data-plugin-id');
-                        const infoEl = item.querySelector('.plugin-info');
-                        if (!infoEl) return;
-                        const intervalSecAttr = item.getAttribute('data-interval-sec');
-                        const lastIsoAttr = item.getAttribute('data-latest-iso');
-                        const nextEl = item.querySelector('[id^="nextIn_"]');
-                        const nextAtEl = item.querySelector('[id^="nextAt_"]');
-                        if (!nextEl && !nextAtEl) return;
-                        const intervalSec = intervalSecAttr ? parseInt(intervalSecAttr, 10) : NaN;
-                        if (!intervalSec || isNaN(intervalSec)) return;
-                        const lastDate = parseISO(lastIsoAttr);
-                        if (!lastDate) return;
-                        const nextTs = lastDate.getTime() + (intervalSec * 1000);
-                        const deltaMs = nextTs - Date.now();
-                        if (nextEl){
-                            if (deltaMs > 0){
-                                const mins = Math.round(deltaMs / 60000);
-                                if (mins < 60){
-                                    nextEl.textContent = ` • Next in ${mins} min`;
-                                } else {
-                                    const hrs = Math.floor(mins / 60);
-                                    const rem = mins % 60;
-                                    nextEl.textContent = ` • Next in ${hrs}h ${rem}m`;
-                                }
-                            } else {
-                                nextEl.textContent = '';
-                            }
-                        }
-                        if (nextAtEl){
-                            const browserOffsetMin = -new Date().getTimezoneOffset();
-                            const deviceOffsetMin = {{ device_tz_offset_min | default(0) }};
-                            const adjustMs = (deviceOffsetMin - browserOffsetMin) * 60000;
-                            const deviceDate = new Date(nextTs + adjustMs);
-                            const hh = String(deviceDate.getHours()).padStart(2,'0');
-                            const mm = String(deviceDate.getMinutes()).padStart(2,'0');
-                            nextAtEl.textContent = ` • Next at ${hh}:${mm}`;
-                        }
-                    });
-                }
-                setInterval(renderNextIn, 60000);
-                renderNextIn();
-            } catch(e) { /* ignore */ }
-        });
-
-        // snooze feature removed
-
-        window.addEventListener("load", function () {
-            let storedMessage = sessionStorage.getItem("storedMessage");
-            if (storedMessage) {
-                let { type, text } = JSON.parse(storedMessage);
-                showResponseModal(type, text);
-                sessionStorage.removeItem("storedMessage"); // Clear stored message after displaying
-            }
-        });
-
-        // --- Delete confirm flows (replace confirm()) ---
-        let _pendingDelete = null;
-        function openDeletePlaylistModal(name){
-            _pendingDelete = { type: 'playlist', name };
-            document.getElementById('deletePlaylistText').textContent = `Delete playlist '${name}'?`;
-            document.getElementById('deletePlaylistModal').style.display = 'block';
-            const btn = document.getElementById('confirmDeletePlaylistBtn');
-            btn.onclick = async function(){
-                try {
-                    const resp = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, { method: 'DELETE' });
-                    const j = await resp.json();
-                    if (!resp.ok){ showResponseModal('failure', `Error!  ${j.error}`); return; }
-                    // Show undo snackbar (cannot truly undo server delete without archive; provide UX affordance)
-                    showUndo(`Playlist '${name}' deleted.`);
-                    setTimeout(() => location.reload(), 800);
-                } catch(e){ showResponseModal('failure', 'Failed to delete playlist'); }
-                closeDeletePlaylistModal();
-            };
-        }
-        function closeDeletePlaylistModal(){ document.getElementById('deletePlaylistModal').style.display = 'none'; }
-
-        function openDeleteInstanceModal(playlistName, pluginId, instanceName){
-            _pendingDelete = { type: 'instance', playlistName, pluginId, instanceName };
-            document.getElementById('deleteInstanceText').textContent = `Delete instance '${instanceName}'?`;
-            document.getElementById('deleteInstanceModal').style.display = 'block';
-            const btn = document.getElementById('confirmDeleteInstanceBtn');
-            btn.onclick = async function(){
-                try {
-                    const resp = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName }) });
-                    const j = await resp.json();
-                    if (!resp.ok){ showResponseModal('failure', `Error!  ${j.error}`); return; }
-                    showUndo(`Instance '${instanceName}' deleted.`);
-                    setTimeout(() => location.reload(), 800);
-                } catch(e){ showResponseModal('failure', 'Failed to delete instance'); }
-                closeDeleteInstanceModal();
-            };
-        }
-        function closeDeleteInstanceModal(){ document.getElementById('deleteInstanceModal').style.display = 'none'; }
-
-        function showUndo(text){
-            const sb = document.getElementById('undoSnackbar');
-            const txt = document.getElementById('undoText');
-            txt.textContent = text + ' Undo?';
-            sb.style.display = 'inline-flex';
-            const undo = document.getElementById('undoBtn');
-            undo.onclick = function(){ sb.style.display = 'none'; location.reload(); };
-            setTimeout(() => { sb.style.display = 'none'; }, 4000);
-        }
-        }
-    </script>
 </head>
 <body>
     <div class="frame">
@@ -314,7 +46,7 @@
                     <label class="header-button is-dark" for="toggleDeviceFrameList" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
                         <input id="toggleDeviceFrameList" type="checkbox" aria-label="Show device frame in thumbnails" style="margin-right:6px;">Show device frame
                     </label>
-                    <button class="header-button" onclick="openCreateModal()">New Playlist</button>
+                    <button class="header-button" id="newPlaylistBtn">New Playlist</button>
                 </div>
             </div>
         </div>
@@ -353,9 +85,9 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
                     <div class="playlist-header">
                         <span class="playlist-title" title="Cycle: {{ (playlist_timing.get(playlist.name).cycle_minutes if (playlist_timing and playlist_timing.get(playlist.name)) else device_cycle_minutes) }} min{% if playlist_timing and playlist_timing.get(playlist.name) and playlist_timing.get(playlist.name).next_at %}\nNext at: {{ playlist_timing.get(playlist.name).next_at }}{% endif %}">{{ playlist.name }}</span>
-                        <button class="edit-button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}', '{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}')">{{ icon('gear-six', 'action-icon') }}</button>
-                        <button class="header-button" title="Run next in this playlist" aria-label="Run next in playlist {{ playlist.name }}" onclick="displayNextInPlaylist('{{ playlist.name }}')">Run Next</button>
-                        <button class="delete-button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" onclick="openDeletePlaylistModal('{{ playlist.name }}')">{{ icon('trash', 'action-icon') }}</button>
+                        <button class="edit-button edit-playlist-btn" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}">{{ icon('gear-six', 'action-icon') }}</button>
+                        <button class="header-button run-next-btn" title="Run next in this playlist" aria-label="Run next in playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">Run Next</button>
+                        <button class="delete-button delete-playlist-btn" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') }}</button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
@@ -408,8 +140,8 @@
                                 </div>
 
                                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="btn" title="Edit" aria-label="Edit {{ plugin_instance.name }}"><span class="btn-label">Edit</span></a>
-                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" aria-label="Display {{ plugin_instance.name }} now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this)"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
-                                <button class="btn btn-danger" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}" onclick="openDeleteInstanceModal('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')"><span class="btn-label">Delete</span></button>
+                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" aria-label="Display {{ plugin_instance.name }} now"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
+                                <button class="btn btn-danger delete-instance-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}"><span class="btn-label">Delete</span></button>
                                 
                             </div>
                         </div>
