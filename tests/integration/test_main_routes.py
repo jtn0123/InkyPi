@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-
+from model import RefreshInfo
 
 def test_main_page(client):
     resp = client.get("/")
@@ -52,3 +52,24 @@ def test_preview_prefers_processed_over_current(client, device_config_dev):
     resp = client.get("/preview")
     assert resp.status_code == 200
     assert resp.mimetype == "image/png"
+
+
+def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
+    # Seed refresh_info in config
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Home Weather",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # Ensure the Now showing block exists and contains seeded values
+    assert b"Now showing:" in resp.data
+    assert b"weather" in resp.data
+    assert b"Home Weather" in resp.data
+    assert b"Default" in resp.data

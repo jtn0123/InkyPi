@@ -37,6 +37,11 @@ def plugin_page(plugin_id):
 
             # retrieve plugin instance from the query parameters if updating existing plugin instance
             plugin_instance_name = request.args.get("instance")
+            logger.info(
+                "Render plugin page | plugin_id=%s instance=%s",
+                plugin_id,
+                plugin_instance_name,
+            )
             if plugin_instance_name:
                 plugin_instance = playlist_manager.find_plugin(
                     plugin_id, plugin_instance_name
@@ -54,6 +59,24 @@ def plugin_page(plugin_id):
                 template_params["plugin_instance_last_refresh"] = (
                     plugin_instance.latest_refresh_time
                 )
+                # find and expose the playlist containing this instance for UI actions
+                try:
+                    playlist_name = None
+                    for name in playlist_manager.get_playlist_names():
+                        pl = playlist_manager.get_playlist(name)
+                        if pl and pl.find_plugin(plugin_id, plugin_instance_name):
+                            playlist_name = name
+                            break
+                    logger.info(
+                        "Resolved instance playlist | plugin_id=%s instance=%s playlist=%s",
+                        plugin_id,
+                        plugin_instance_name,
+                        playlist_name,
+                    )
+                    template_params["plugin_instance_playlist"] = playlist_name
+                except Exception:
+                    logger.exception("Failed resolving instance playlist")
+                    template_params["plugin_instance_playlist"] = None
             else:
                 # Try to find a saved settings instance for this plugin
                 default_playlist = playlist_manager.get_playlist("Default")
@@ -69,6 +92,12 @@ def plugin_page(plugin_id):
                         template_params["plugin_instance_last_refresh"] = (
                             saved_instance.latest_refresh_time
                         )
+                        logger.info(
+                            "Using saved settings instance | plugin_id=%s instance=%s",
+                            plugin_id,
+                            saved_instance_name,
+                        )
+                        template_params["plugin_instance_playlist"] = "Default"
 
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:
@@ -117,7 +146,80 @@ def plugin_instance_image(plugin_id, instance_name):
 
     # Prevent path traversal and ensure file exists
     if not path.startswith(base_dir + os.sep) or not os.path.exists(path):
-        return abort(404)
+        logger.info(
+            "Instance image missing, attempting dev fallback | plugin_id=%s instance=%s path=%s",
+            plugin_id,
+            instance_name,
+            path,
+        )
+        # Dev fallback: if instance image not yet created, try to generate from saved settings
+        try:
+            device_config = current_app.config["DEVICE_CONFIG"]
+            playlist_manager = device_config.get_playlist_manager()
+            plugin_config = device_config.get_plugin(plugin_id)
+            if plugin_config:
+                plugin = get_plugin_instance(plugin_config)
+                # Try to find instance in any playlist
+                inst = None
+                for name in playlist_manager.get_playlist_names():
+                    pl = playlist_manager.get_playlist(name)
+                    if pl:
+                        inst = pl.find_plugin(plugin_id, instance_name)
+                        if inst:
+                            logger.info(
+                                "Found instance in playlist | playlist=%s plugin_id=%s instance=%s",
+                                name,
+                                plugin_id,
+                                instance_name,
+                            )
+                            break
+                if inst:
+                    # Generate image and persist to plugin image dir
+                    image = plugin.generate_image(inst.settings, device_config)
+                    os.makedirs(base_dir, exist_ok=True)
+                    image.save(path)
+                    logger.info("Generated instance image | path=%s", path)
+        except Exception:
+            # Ignore failures; keep 404 behavior below if still missing
+            logger.exception("Failed to generate instance image in dev fallback")
+        if not os.path.exists(path):
+            # Second fallback: search history sidecars for latest matching plugin/instance and serve that PNG
+            try:
+                device_config = current_app.config["DEVICE_CONFIG"]
+                history_dir = device_config.history_image_dir
+                latest_match = None
+                latest_mtime: float = -1.0
+                for fname in os.listdir(history_dir):
+                    if not fname.endswith(".json"):
+                        continue
+                    import json, os as _os
+                    p = _os.path.join(history_dir, fname)
+                    try:
+                        with open(p, "r", encoding="utf-8") as fh:
+                            meta = json.load(fh) or {}
+                        if (
+                            meta.get("plugin_id") == plugin_id
+                            and meta.get("plugin_instance") == instance_name
+                        ):
+                            mtime = _os.path.getmtime(p)
+                            if mtime > latest_mtime:
+                                latest_mtime = mtime
+                                # sidecar base name matches PNG filename
+                                png_name = fname.replace(".json", ".png")
+                                latest_match = _os.path.join(history_dir, png_name)
+                    except Exception:
+                        continue
+                if latest_match and os.path.exists(latest_match):
+                    logger.info(
+                        "Serving instance image from history fallback | plugin_id=%s instance=%s history=%s",
+                        plugin_id,
+                        instance_name,
+                        latest_match,
+                    )
+                    return send_file(latest_match, mimetype="image/png", conditional=True)
+            except Exception:
+                logger.exception("Failed during history fallback for instance image")
+            return abort(404)
 
     return send_file(path, mimetype="image/png", conditional=True)
 
@@ -217,6 +319,12 @@ def display_plugin_instance():
                 f"Plugin instance '{plugin_instance_name}' not found", status=400
             )
 
+        logger.info(
+            "Display plugin instance requested | playlist=%s plugin_id=%s instance=%s",
+            playlist_name,
+            plugin_id,
+            plugin_instance_name,
+        )
         refresh_task.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
@@ -236,6 +344,14 @@ def display_plugin_instance():
         preprocess_ms = getattr(ri, "preprocess_ms", None)
     except Exception:
         pass
+
+    logger.info(
+        "Display plugin instance metrics | request_ms=%s generate_ms=%s preprocess_ms=%s display_ms=%s",
+        request_ms,
+        generate_ms,
+        preprocess_ms,
+        display_ms,
+    )
 
     return (
         jsonify(
@@ -273,6 +389,7 @@ def update_now():
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
         plugin_id = plugin_settings.pop("plugin_id")
+        instance_name = plugin_settings.get("instance_name")
 
         # Check if refresh task is running
         if refresh_task.running:
@@ -288,9 +405,25 @@ def update_now():
             _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_settings, device_config)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-            display_manager.display_image(
-                image, image_settings=plugin_config.get("image_settings", [])
-            )
+            # Pass history metadata even in direct dev path
+            history_meta = {
+                "refresh_type": "Manual Update",
+                "plugin_id": plugin_id,
+                "playlist": None,
+                "plugin_instance": instance_name,
+            }
+            try:
+                display_manager.display_image(
+                    image,
+                    image_settings=plugin_config.get("image_settings", []),
+                    history_meta=history_meta,
+                )
+            except TypeError:
+                # Back-compat for mocks/tests without history_meta param
+                display_manager.display_image(
+                    image,
+                    image_settings=plugin_config.get("image_settings", []),
+                )
             # In dev path (no background task), persist minimal refresh_info with plugin_meta
             try:
                 from model import RefreshInfo

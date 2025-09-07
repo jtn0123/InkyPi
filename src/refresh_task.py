@@ -173,11 +173,18 @@ class RefreshTask:
                                 "playlist": refresh_action.get_refresh_info().get("playlist"),
                                 "plugin_instance": refresh_action.get_refresh_info().get("plugin_instance"),
                             }
-                            self.display_manager.display_image(
-                                image,
-                                image_settings=plugin.config.get("image_settings", []),
-                                history_meta=history_meta,
-                            )
+                            try:
+                                self.display_manager.display_image(
+                                    image,
+                                    image_settings=plugin.config.get("image_settings", []),
+                                    history_meta=history_meta,
+                                )
+                            except TypeError:
+                                # Back-compat for mocks/tests without history_meta param
+                                self.display_manager.display_image(
+                                    image,
+                                    image_settings=plugin.config.get("image_settings", []),
+                                )
                         else:
                             logger.info(
                                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"

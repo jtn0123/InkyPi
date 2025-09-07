@@ -113,6 +113,7 @@ class DisplayManager:
                 self.device_config.history_image_dir, history_filename
             )
             image.save(history_path)
+            logger.info("Saved history image | path=%s", history_path)
             # Write sidecar metadata if available
             try:
                 if history_meta is not None:
@@ -126,6 +127,7 @@ class DisplayManager:
                     )
                     with open(json_path, "w", encoding="utf-8") as fh:
                         json.dump(sidecar, fh, ensure_ascii=False, indent=2)
+                    logger.info("Saved history sidecar | path=%s", json_path)
             except Exception:
                 logger.exception("Failed to write history sidecar metadata")
         except Exception:

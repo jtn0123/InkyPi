@@ -46,6 +46,24 @@
             <div id="imageMetaContent"></div>
         </div>
 
+        <!-- Now showing: current plugin/instance/playlist -->
+        <div id="nowShowing" class="image-meta" style="margin-top: 8px; {% if not refresh_info.plugin_id %}display:none;{% endif %}">
+            <div id="nowShowingContent">
+                <strong>Now showing:</strong>
+                <span id="nsPlugin">{{ refresh_info.plugin_id or '' }}</span>
+                {% if refresh_info.plugin_instance %}
+                (<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)
+                {% else %}
+                <span id="nsInstance" style="display:none;"></span>
+                {% endif %}
+                {% if refresh_info.playlist %}
+                • <span id="nsPlaylist">{{ refresh_info.playlist }}</span>
+                {% else %}
+                <span id="nsPlaylist" style="display:none;"></span>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Separator -->
         <div class="separator"></div>
         <h2 class="plugins-title">Plugins</h2>
@@ -105,6 +123,34 @@
             } else {
                 metaDiv.style.display = 'none';
                 metaContent.textContent = '';
+            }
+
+            // Update Now showing block
+            const ns = document.getElementById('nowShowing');
+            const nsPlugin = document.getElementById('nsPlugin');
+            const nsInst = document.getElementById('nsInstance');
+            const nsPl = document.getElementById('nsPlaylist');
+            if (ns && nsPlugin && nsInst && nsPl) {
+                if (info && info.plugin_id) {
+                    ns.style.display = 'block';
+                    nsPlugin.textContent = info.plugin_id || '';
+                    if (info.plugin_instance) {
+                        nsInst.style.display = '';
+                        nsInst.textContent = info.plugin_instance;
+                    } else {
+                        nsInst.style.display = 'none';
+                        nsInst.textContent = '';
+                    }
+                    if (info.playlist) {
+                        nsPl.style.display = '';
+                        nsPl.textContent = info.playlist;
+                    } else {
+                        nsPl.style.display = 'none';
+                        nsPl.textContent = '';
+                    }
+                } else {
+                    ns.style.display = 'none';
+                }
             }
         } catch (e) {
             // Non-fatal if refresh-info endpoint fails

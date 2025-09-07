@@ -409,7 +409,13 @@
                 <div class="status-title">This plugin instance</div>
                 <div class="status-body">
                     {% if plugin_instance %}
-                    <img id="instancePreviewImage" src="#" alt="Latest for this instance">
+                    <img id="instancePreviewImage" src="#" alt="Latest for this instance" onerror="this.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
+                    <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
+                        No saved image found for this instance yet.
+                        {% if plugin_instance and plugin_instance_playlist %}
+                        <div style="margin-top:6px;"><button type="button" class="action-button compact" onclick="displayInstanceNow()">Display Instance</button></div>
+                        {% endif %}
+                    </div>
                     {% else %}
                     <div class="status-placeholder">Save or select an instance to see its latest image.</div>
                     {% endif %}
@@ -517,6 +523,9 @@
 
             <!-- Hidden input to pass plugin id -->
             <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
+            {% if plugin_instance %}
+            <input type="hidden" name="instance_name" value="{{ plugin_instance }}">
+            {% endif %}
 
             <div class="buttons-container">
                 <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
@@ -602,6 +611,34 @@
                 }
             });
         })();
+    </script>
+    <script>
+        async function displayInstanceNow(){
+            try {
+                const payload = {
+                    playlist_name: '{{ plugin_instance_playlist or '' }}',
+                    plugin_id: '{{ plugin.id }}',
+                    plugin_instance: '{{ plugin_instance or '' }}'
+                };
+                const resp = await fetch('{{ url_for("plugin.display_plugin_instance") }}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await resp.json();
+                if (!resp.ok) {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                } else {
+                    showResponseModal('success', `Success! ${result.message}`);
+                    // give backend a moment, then refresh both previews
+                    setTimeout(() => { refreshPreviewImage(); }, 400);
+                    setTimeout(() => { const el = document.getElementById('instancePreviewImage'); if (el) el.src = el.src.split('?')[0] + '?t=' + Date.now(); }, 450);
+                }
+            } catch (e){
+                console.error(e);
+                showResponseModal('failure', 'Failed to display instance');
+            }
+        }
     </script>
 </body>
 </html>

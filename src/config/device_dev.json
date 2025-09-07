@@ -62,6 +62,33 @@
                             "interval": 3600
                         },
                         "latest_refresh_time": null
+                    },
+                    {
+                        "plugin_id": "ai_image",
+                        "name": "AI Image",
+                        "plugin_settings": {
+                            "textPrompt": "",
+                            "imageModel": "dall-e-3",
+                            "quality": "standard"
+                        },
+                        "refresh": {
+                            "interval": 1800
+                        },
+                        "latest_refresh_time": null
+                    },
+                    {
+                        "plugin_id": "ai_image",
+                        "name": "ai_image_saved_settings",
+                        "plugin_settings": {
+                            "textPrompt": "",
+                            "imageModel": "dall-e-3",
+                            "quality": "standard",
+                            "randomizePrompt": "true"
+                        },
+                        "refresh": {
+                            "interval": 3600
+                        },
+                        "latest_refresh_time": null
                     }
                 ],
                 "current_plugin_index": 0
@@ -70,22 +97,14 @@
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-07T17:32:41.399558+00:00",
-        "image_hash": "ba8379adc14c5609a3f4424b4b7f79c2b3eaceafe3d858cce27a4a0ccaf1843f",
+        "refresh_time": "2025-09-07T18:54:34.336512+00:00",
+        "image_hash": "6cda0b4262a06b9850a6bb12676f6b53629c9a8f68f23d64e16ed7248bc42604",
         "refresh_type": "Manual Update",
-        "plugin_id": "wpotd",
-        "request_ms": 5592,
+        "plugin_id": "apod",
+        "request_ms": 4061,
         "display_ms": 26,
-        "generate_ms": 1251,
+        "generate_ms": 3108,
         "preprocess_ms": 3,
-        "used_cached": false,
-        "plugin_meta": {
-            "date": "2025-09-07",
-            "filename": "File:Arenal volcano (70785p) (cropped).jpg",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Arenal_volcano_%2870785p%29_%28cropped%29.jpg",
-            "page_url": "https://en.wikipedia.org/wiki/Template:POTD/2025-09-07",
-            "caption": "Arenal Volcano panorama",
-            "description_url": "https://commons.wikimedia.org/wiki/File:Arenal_volcano_(70785p)_(cropped).jpg"
-        }
+        "used_cached": false
     }
 }
