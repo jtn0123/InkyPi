@@ -5,9 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playlists</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     <script>
+        window.PLAYLIST_CTX = {
+            reorder_url: "{{ url_for('playlist.reorder_plugins') }}",
+            delete_plugin_instance_url: "{{ url_for('plugin.delete_plugin_instance') }}",
+            display_plugin_instance_url: "{{ url_for('plugin.display_plugin_instance') }}",
+            create_playlist_url: "{{ url_for('playlist.create_playlist') }}",
+            update_playlist_base_url: "{{ url_for('playlist.update_playlist', playlist_name='') }}",
+            delete_playlist_base_url: "{{ url_for('playlist.delete_playlist', playlist_name='') }}",
+            display_next_url: "{{ url_for('playlist.display_next_in_playlist') }}",
+            device_tz_offset_min: {{ device_tz_offset_min | default(0) }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='scripts/playlist.js') }}" defer></script>
+    <script>
+        /* Inline script disabled; logic moved to static/scripts/playlist.js */
+        if (false) {
         // Drag-and-drop reordering support (desktop/basic)
         let dragSrcEl = null;
         function handleDragStart(e){
@@ -74,217 +89,25 @@
             item.focus();
         }
 
-        function enableDrag(container){
-            const items = container.querySelectorAll('.plugin-item');
-            items.forEach((item) => {
-                if (!item.id) item.id = `plg-${Math.random().toString(36).slice(2)}`;
-                item.draggable = true;
-                item.addEventListener('dragstart', handleDragStart);
-                item.addEventListener('dragover', handleDragOver);
-                item.addEventListener('drop', handleDrop);
-                item.addEventListener('dragend', handleDragEnd);
-                item.tabIndex = 0;
-                item.setAttribute('role', 'listitem');
-                item.addEventListener('keydown', handleKeyReorder);
-            });
-        }
-        async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
-            try {
-                const response = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        playlist_name: playlistName,
-                        plugin_id: pluginId,
-                        plugin_instance: pluginInstance
-                    })
-                });
-                
-                const result = await response.json();
-                if (response.ok) {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while processing your request.');
-            }
-        }
+        function enableDrag(container){}
+        async function deletePluginInstance(){}
 
-        async function displayPluginInstance(playlistName, pluginId, pluginInstance, btnEl) {
-            const loadingIndicator = document.getElementById(pluginInstance)?.querySelector('.loading-indicator');
-            const progress = document.getElementById('globalProgress');
-            const progressText = document.getElementById('globalProgressText');
-            const progressBar = document.getElementById('globalProgressBar');
-            function setStep(text, pct){
-                if (progress) progress.style.display = 'block';
-                if (progressText) progressText.textContent = text;
-                if (progressBar && typeof pct === 'number') progressBar.style.width = pct + '%';
-            }
-            if (loadingIndicator) loadingIndicator.style.display = 'block';
-            if (btnEl) { btnEl.disabled = true; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'inline-block'; }
-            setStep('Preparing…', 10);
-            try {
-                const response = await fetch("{{ url_for('plugin.display_plugin_instance') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        playlist_name: playlistName,
-                        plugin_id: pluginId,
-                        plugin_instance: pluginInstance
-                    })
-                });
-                
-                setStep('Waiting (device)…', 60);
-                const result = await response.json();
-                if (response.ok) {
-                    if (result && result.metrics){
-                        const m = result.metrics;
-                        const text = `Request ${m.request_ms ?? '-'} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
-                        if (progressText) progressText.textContent = text;
-                    }
-                    setStep('Display updating…', 90);
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while processing your request.');
-            } finally {
-                // Hide loading indicator after the action is complete
-                if (loadingIndicator) loadingIndicator.style.display = 'none';
-                if (btnEl) { btnEl.disabled = false; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'none'; }
-                setStep('Done', 100);
-                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
-            }
-        }
+        async function displayPluginInstance(){}
 
         // Open modal for **creating** a new playlist
-        function openCreateModal() {
-            document.getElementById("modalTitle").textContent = "New Playlist";
-            document.getElementById("playlist_name").value = "";
-            document.getElementById("editingPlaylistName").value = ""; // Empty value means it's new
-            document.getElementById("start_time").value = "00:00";
-            document.getElementById("end_time").value = "24:00";
-            
-            document.getElementById("saveButton").setAttribute("onclick", "createPlaylist()");
-            document.getElementById("deleteButton").classList.add("hidden"); // Hide delete button
-
-            document.getElementById("playlistModal").style.display = "block";
-        }
+        function openCreateModal(){}
 
         // Open modal for **editing** an existing playlist
-        function openEditModal(playlistName, startTime, endTime, cycleMinutes) {
-            document.getElementById("modalTitle").textContent = "Update Playlist";
-            document.getElementById("playlist_name").value = playlistName;
-            document.getElementById("editingPlaylistName").value = playlistName;
-            document.getElementById("start_time").value = startTime;
-            document.getElementById("end_time").value = endTime;
-            const cycleInput = document.getElementById('cycle_minutes');
-            if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
+        function openEditModal(){}
 
-            document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()");
-            document.getElementById("deleteButton").classList.remove("hidden"); // Show delete button
+        function openModal(){}
+        function closeModal(){}
 
-            document.getElementById("playlistModal").style.display = "block";
-        }
+        async function createPlaylist(){}
 
-        function openModal() {
-            const modal = document.getElementById('playlistModal');
-            modal.style.display = 'block';
-        }
-    
-        function closeModal() {
-            const modal = document.getElementById('playlistModal');
-            modal.style.display = 'none';
-        }
+        async function updatePlaylist(){}
 
-        async function createPlaylist() {
-            let playlistName = document.getElementById("playlist_name").value.trim();
-            let startTime = document.getElementById("start_time").value;
-            let endTime = document.getElementById("end_time").value;
-
-            try {
-                const response = await fetch("{{ url_for('playlist.create_playlist') }}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal on success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        async function updatePlaylist() {
-            let oldName = document.getElementById("editingPlaylistName").value;
-            let newName = document.getElementById("playlist_name").value;
-            let startTime = document.getElementById("start_time").value;
-            let endTime = document.getElementById("end_time").value;
-            let cycleMinutes = document.getElementById('cycle_minutes').value;
-
-            try {
-                const response = await fetch("{{ url_for('playlist.update_playlist', playlist_name='') }}" + oldName, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal after success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        async function deletePlaylist() {
-            let name = document.getElementById("editingPlaylistName").value;
-            try {
-                const response = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, {
-                    method: "DELETE",
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal after success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
+        async function deletePlaylist(){}
 
         async function deletePlaylistQuick(name){
             openDeletePlaylistModal(name);
@@ -462,6 +285,7 @@
             const undo = document.getElementById('undoBtn');
             undo.onclick = function(){ sb.style.display = 'none'; location.reload(); };
             setTimeout(() => { sb.style.display = 'none'; }, 4000);
+        }
         }
     </script>
 </head>

@@ -27,3 +27,30 @@ function closeResponseModal() {
     const modal = document.getElementById('responseModal');
     modal.style.display = 'none';
 }
+
+/**
+ * Parse a fetch Response and surface a uniform modal for success/error.
+ * Returns the parsed JSON object for further handling if needed.
+ */
+async function handleJsonResponse(response) {
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (e) {
+        // Non-JSON responses
+        if (!response.ok) {
+            showResponseModal('failure', 'Request failed');
+        }
+        return null;
+    }
+    if (!response.ok || (data && data.success === false) || data?.error) {
+        const rid = data && data.request_id ? ` (id: ${data.request_id})` : '';
+        const msg = (data && (data.error || data.message)) || 'Request failed';
+        showResponseModal('failure', `Error!  ${msg}${rid}`);
+    } else {
+        const rid = data && data.request_id ? ` (id: ${data.request_id})` : '';
+        const msg = (data && data.message) || 'Success';
+        showResponseModal('success', `Success! ${msg}${rid}`);
+    }
+    return data;
+}

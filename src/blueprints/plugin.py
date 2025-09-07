@@ -15,7 +15,7 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
-from utils.http_utils import APIError, json_error, json_internal_error
+from utils.http_utils import APIError, json_error, json_internal_error, json_success
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -253,7 +253,7 @@ def delete_plugin_instance():
             details={"hint": "Check playlist exists and instance name is correct."},
         )
 
-    return jsonify({"success": True, "message": "Deleted plugin instance."})
+    return json_success("Deleted plugin instance.")
 
 
 @plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
@@ -350,20 +350,14 @@ def display_plugin_instance():
         display_ms,
     )
 
-    return (
-        jsonify(
-            {
-                "success": True,
-                "message": "Display updated",
-                "metrics": {
-                    "request_ms": request_ms,
-                    "generate_ms": generate_ms,
-                    "preprocess_ms": preprocess_ms,
-                    "display_ms": display_ms,
-                },
-            }
-        ),
-        200,
+    return json_success(
+        "Display updated",
+        metrics={
+            "request_ms": request_ms,
+            "generate_ms": generate_ms,
+            "preprocess_ms": preprocess_ms,
+            "display_ms": display_ms,
+        },
     )
 
 
@@ -477,16 +471,15 @@ def update_now():
     except Exception:
         pass
 
-    return jsonify({
-        "success": True,
-        "message": "Display updated",
-        "metrics": {
+    return json_success(
+        "Display updated",
+        metrics={
             "request_ms": request_ms,
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
             "display_ms": display_ms,
-        }
-    }), 200
+        },
+    )
 
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
@@ -507,15 +500,7 @@ def save_plugin_settings():
         saved_all[plugin_id] = plugin_settings
         device_config.update_value("saved_settings", saved_all, write=True)
 
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Settings saved. Use 'Add to Playlist' to schedule recurrence.",
-                }
-            ),
-            200,
-        )
+        return json_success("Settings saved. Use 'Add to Playlist' to schedule recurrence.")
 
     except Exception as e:
         logger.exception(f"Error saving plugin settings: {str(e)}")

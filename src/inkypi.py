@@ -53,7 +53,7 @@ import logging
 import os
 import secrets
 
-from flask import Flask, request
+from flask import Flask, request, g
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -261,6 +261,16 @@ def create_app():
                 rt.start()
 
     # Consistent JSON error handling
+    @app.before_request
+    def _attach_request_id():
+        # Ensure each request has a request_id stored in g and echoed in responses
+        try:
+            from utils.http_utils import _get_or_set_request_id
+
+            _get_or_set_request_id()
+        except Exception:
+            pass
+
     @app.errorhandler(APIError)
     def _handle_api_error(err: APIError):
         return json_error(

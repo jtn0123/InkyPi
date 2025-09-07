@@ -5,12 +5,15 @@ from datetime import datetime, timedelta
 from flask import Blueprint, current_app, jsonify, render_template, request, has_app_context
 
 from utils.app_utils import handle_request_files, parse_form
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import calculate_seconds, now_device_tz
 from refresh_task import PlaylistRefresh
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
+
+# Simple in-memory cache for ETA computations (per playlist, per-minute)
+_eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
 
 
 @playlist_bp.route("/add_plugin", methods=["POST"])
@@ -82,7 +85,7 @@ def add_plugin():
                 "hint": "Validate inputs; ensure playlist exists and instance name isn’t duplicated.",
             },
         )
-    return jsonify({"success": True, "message": "Scheduled refresh configured."})
+    return json_success("Scheduled refresh configured.")
 
 
 @playlist_bp.route("/playlist")
@@ -256,7 +259,7 @@ def create_playlist():
             },
         )
 
-    return jsonify({"success": True, "message": "Created new Playlist!"})
+    return json_success("Created new Playlist!")
 
 
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
@@ -314,7 +317,7 @@ def update_playlist(playlist_name):
         pass
     device_config.write_config()
 
-    return jsonify({"success": True, "message": f"Updated playlist '{playlist_name}'!"})
+    return json_success(f"Updated playlist '{playlist_name}'!")
 
 
 @playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
@@ -332,7 +335,7 @@ def delete_playlist(playlist_name):
     playlist_manager.delete_playlist(playlist_name)
     device_config.write_config()
 
-    return jsonify({"success": True, "message": f"Deleted playlist '{playlist_name}'!"})
+    return json_success(f"Deleted playlist '{playlist_name}'!")
 
 
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
@@ -355,7 +358,7 @@ def reorder_plugins():
             return json_error("Invalid order payload", status=400)
 
         device_config.write_config()
-        return jsonify({"success": True, "message": "Reordered plugins"})
+        return json_success("Reordered plugins")
     except Exception:
         return json_internal_error(
             "reorder plugins",
@@ -408,11 +411,111 @@ def display_next_in_playlist():
         except Exception:
             pass
 
-        return jsonify({"success": True, "message": "Displayed next instance", "metrics": metrics})
+        return json_success("Displayed next instance", metrics=metrics)
     except Exception:
         return json_internal_error("display next in playlist")
 
 # removed toggle_only_fresh endpoint per product decision
+
+
+@playlist_bp.route("/playlist/eta/<string:playlist_name>")
+def playlist_eta(playlist_name: str):
+    """Return per-instance ETA for the named playlist.
+
+    Cached per minute to keep route lightweight.
+    """
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    pl = playlist_manager.get_playlist(playlist_name)
+    if not pl:
+        return json_error(f"Playlist '{playlist_name}' not found", status=404)
+
+    # Cache key is playlist name; invalidate once per minute
+    try:
+        now = now_device_tz(device_config)
+    except Exception:
+        now = datetime.now()
+    floor_min = now.replace(second=0, microsecond=0)
+
+    cached = _eta_cache.get(playlist_name)
+    if cached and cached[0] == floor_min:
+        return json_success("ok", eta=cached[1])
+
+    # Compute ETA for this playlist only
+    try:
+        # Determine cycle in minutes
+        try:
+            device_cycle_minutes = int(
+                device_config.get_config("plugin_cycle_interval_seconds", default=3600)
+                // 60
+            )
+        except Exception:
+            device_cycle_minutes = 60
+        cycle_sec = getattr(pl, "cycle_interval_seconds", None)
+        cycle_min = int((cycle_sec or device_cycle_minutes * 60) // 60)
+
+        # Determine last refresh and which index is next
+        try:
+            ri_obj = device_config.get_refresh_info()
+            last_dt = (
+                ri_obj.get_refresh_datetime()
+                if hasattr(ri_obj, "get_refresh_datetime")
+                else None
+            )
+        except Exception:
+            last_dt = None
+
+        try:
+            num = len(pl.plugins)
+        except Exception:
+            num = 0
+
+        eta_map: dict[str, dict] = {}
+        if num > 0:
+            try:
+                if pl.current_plugin_index is None:
+                    next_index = 0
+                else:
+                    if not (0 <= pl.current_plugin_index < num):
+                        next_index = 0
+                    else:
+                        next_index = (pl.current_plugin_index + 1) % num
+            except Exception:
+                next_index = 0
+
+            try:
+                if last_dt and getattr(ri_obj, "playlist", None) == playlist_name:
+                    until_next_min = max(
+                        0,
+                        int(
+                            (
+                                last_dt + timedelta(minutes=cycle_min) - now
+                            ).total_seconds()
+                            // 60
+                        ),
+                    )
+                else:
+                    until_next_min = cycle_min
+            except Exception:
+                until_next_min = cycle_min
+
+            for idx, inst in enumerate(pl.plugins):
+                try:
+                    steps = (idx - next_index + num) % num
+                    total_min = until_next_min + steps * cycle_min
+                    eta_dt = now + timedelta(minutes=total_min)
+                    eta_map[inst.name] = {
+                        "minutes": total_min,
+                        "at": eta_dt.strftime("%H:%M"),
+                    }
+                except Exception:
+                    continue
+
+        _eta_cache[playlist_name] = (floor_min, eta_map)
+        return json_success("ok", eta=eta_map)
+    except Exception:
+        return json_internal_error("compute playlist eta")
 
 
 @playlist_bp.app_template_filter("format_relative_time")

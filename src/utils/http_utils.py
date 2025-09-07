@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 import requests
-from flask import Request, jsonify, request
+from flask import Request, jsonify, request, g
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -40,6 +40,38 @@ class APIError(Exception):
         self.details = details
 
 
+def _get_or_set_request_id() -> str | None:
+    """Return a stable per-request id if a request context exists.
+
+    - Prefer an existing value in flask.g
+    - Else prefer inbound header 'X-Request-Id'
+    - Else generate a new uuid4 and store in flask.g
+    - If no request context, return None
+    """
+    try:
+        # Ensure we have a request context
+        _ = request  # may raise if outside request context
+    except Exception:
+        return None
+    try:
+        rid_existing: str | None = getattr(g, "request_id", None)
+        if rid_existing is not None and rid_existing != "":
+            return rid_existing
+        # Prefer inbound X-Request-Id if provided by client/proxy
+        rid_hdr: str | None = request.headers.get("X-Request-Id")
+        if rid_hdr is not None and rid_hdr != "":
+            g.request_id = rid_hdr
+            return rid_hdr
+        # Generate
+        import uuid
+
+        rid_gen: str = str(uuid.uuid4())
+        g.request_id = rid_gen
+        return rid_gen
+    except Exception:
+        return None
+
+
 def json_error(
     message: str,
     status: int = 400,
@@ -51,6 +83,9 @@ def json_error(
         payload["code"] = code
     if details is not None:
         payload["details"] = details
+    rid = _get_or_set_request_id()
+    if rid is not None:
+        payload["request_id"] = rid
     return jsonify(payload), status
 
 
@@ -59,6 +94,9 @@ def json_success(message: str | None = None, status: int = 200, **payload: Any):
     if message is not None:
         body["message"] = message
     body.update(payload)
+    rid = _get_or_set_request_id()
+    if rid is not None:
+        body["request_id"] = rid
     return jsonify(body), status
 
 

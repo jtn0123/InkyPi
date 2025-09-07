@@ -115,6 +115,34 @@ def test_delete_playlist_not_exist(client):
     assert resp.status_code == 400
 
 
+def test_eta_endpoint_and_request_ids(client, device_config_dev):
+    # Build a playlist with 2 plugins
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin({"plugin_id": "weather", "name": "A", "plugin_settings": {}, "refresh": {"interval": 60}})
+    pl.add_plugin({"plugin_id": "clock", "name": "B", "plugin_settings": {}, "refresh": {"interval": 60}})
+    device_config_dev.write_config()
+
+    # ETA endpoint should return success and include request_id
+    r = client.get("/playlist/eta/Default")
+    assert r.status_code == 200
+    j = r.get_json()
+    assert j.get("success") is True
+    assert isinstance(j.get("request_id"), str) and len(j["request_id"]) > 0
+    eta = j.get("eta") or {}
+    # Should include the plugin keys
+    assert "A" in eta and "B" in eta
+    assert "minutes" in eta["A"] and "at" in eta["A"]
+
+    # Not found case
+    r2 = client.get("/playlist/eta/NoSuch")
+    assert r2.status_code == 404
+    j2 = r2.get_json()
+    assert "error" in j2
+    assert isinstance(j2.get("request_id"), str) and len(j2["request_id"]) > 0
+
+
 def test_format_relative_time_filter_cases():
     from blueprints.playlist import format_relative_time
 
