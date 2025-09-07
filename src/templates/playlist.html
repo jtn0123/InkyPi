@@ -309,28 +309,19 @@
             // Compute "Next in" countdowns client-side for interval-based instances
             try {
                 const tzOffsetMin = {{ device_tz_offset_min | default(0) }};
-                // Device vs Local time toggle
-                (function initTimeToggle(){
-                    const btn = document.getElementById('toggleTimeMode');
+                // Render device time continuously
+                (function initDeviceClock(){
                     const val = document.getElementById('currentTimeValue');
-                    if (!btn || !val) return;
-                    let mode = 'device';
+                    if (!val) return;
                     function render(){
                         try {
                             const now = new Date();
-                            if (mode === 'device'){
-                                const browserOffsetMin = -now.getTimezoneOffset();
-                                const adjustMs = ({{ device_tz_offset_min | default(0) }} - browserOffsetMin) * 60000;
-                                const devNow = new Date(now.getTime() + adjustMs);
-                                val.textContent = devNow.toLocaleString(undefined, { hour12: false });
-                                btn.textContent = 'Use Local';
-                            } else {
-                                val.textContent = now.toLocaleString();
-                                btn.textContent = 'Use Device';
-                            }
+                            const browserOffsetMin = -now.getTimezoneOffset();
+                            const adjustMs = ({{ device_tz_offset_min | default(0) }} - browserOffsetMin) * 60000;
+                            const devNow = new Date(now.getTime() + adjustMs);
+                            val.textContent = devNow.toLocaleString(undefined, { hour12: false });
                         } catch(e) {}
                     }
-                    btn.addEventListener('click', function(){ mode = (mode === 'device') ? 'local' : 'device'; render(); });
                     setInterval(render, 1000);
                     render();
                 })();
@@ -423,9 +414,7 @@
         <div class="separator"></div>
         <div class="status-bar" style="margin-bottom:8px;">
             <div class="status-card">
-                <div class="status-title">Current time
-                    <button id="toggleTimeMode" class="header-button is-dark" type="button" style="margin-left:8px;">Use Local</button>
-                </div>
+                <div class="status-title">Current time</div>
                 <div class="status-body"><span id="currentTimeValue">{{ device_now or '—' }}</span></div>
             </div>
             <div class="status-card">
