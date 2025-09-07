@@ -108,7 +108,7 @@ body {
 
 /* Individual button styling */
 .icon-button {
-    border: 1px solid #ddd;
+    border: 1px solid var(--surface-border);
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -116,13 +116,14 @@ body {
     height: 70px; /* Reduce button height */
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     background-color: var(--surface);
 }
 
 .icon-button:hover {
     transform: translateY(-3px);
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+    border-color: var(--divider);
 }
 
 /* Icon image styling */
@@ -560,18 +561,19 @@ body {
     --subtext: #666666;
 }
 [data-theme="dark"] {
-    --bg: #0f1115;
-    --surface: #141821;
-    --surface-border: #222736;
-    --text: #e6e8ee;
-    --muted: #b0b4c0;
-    --divider: #2a2f3e;
-    --button-bg: #1a1f2b;
-    --input-bg: #0f1115;
-    --accent: #4fd1c5;
-    --panel-bg: #1b2130;
-    --panel-border: #2a2f3e;
-    --subtext: #a9b0be;
+    /* Neutral, low-chroma dark theme */
+    --bg: #0e0f12;            /* page background */
+    --surface: #171a1f;       /* cards/panels */
+    --surface-border: #252a33;
+    --text: #e4e7ec;          /* primary text */
+    --muted: #b3b9c4;         /* secondary text */
+    --divider: #2a2f38;       /* separators */
+    --button-bg: #1b1f27;     /* neutral button background */
+    --input-bg: #0e0f12;      /* inputs blend with page */
+    --accent: #34c6a6;        /* teal green accent (less blue/purple) */
+    --panel-bg: #1a1e25;      /* inner panels */
+    --panel-border: #2a2f38;
+    --subtext: #a6adbb;       /* tertiary text */
 }
 
 .success-failure-modal .response-modal-content {
