@@ -18,6 +18,9 @@ def _is_dev_mode() -> bool:
     env_mode = (
         os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
     ).lower()
+    # When running tests, prefer stable import behavior so monkeypatch/patch works reliably
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
     return env_mode in ("dev", "development")
 
 
