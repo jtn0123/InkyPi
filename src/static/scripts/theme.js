@@ -1,5 +1,12 @@
 // Simple dark mode toggler with system preference fallback
 (function(){
+  // Early apply to avoid flash of wrong theme
+  try {
+    const stored = localStorage.getItem('theme');
+    if (stored === 'light' || stored === 'dark') {
+      document.documentElement.setAttribute('data-theme', stored);
+    }
+  } catch(e) {}
   const STORAGE_KEY = 'theme';
 
   function getStoredTheme(){
@@ -19,10 +26,7 @@
   function applyTheme(theme){
     const html = document.documentElement;
     html.setAttribute('data-theme', theme);
-    const btn = document.getElementById('themeToggle');
-    if (btn){
-      btn.textContent = theme === 'dark' ? 'Light Mode' : 'Dark Mode';
-    }
+    // icon-only button switches via CSS; no text change needed
   }
 
   function init(){
