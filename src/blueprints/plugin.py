@@ -219,8 +219,32 @@ def display_plugin_instance():
             "display plugin instance",
             details={"hint": "Ensure playlist and instance exist and are valid."},
         )
+    # Include latest metrics from refresh info for richer UI feedback
+    request_ms = display_ms = generate_ms = preprocess_ms = None
+    try:
+        ri = device_config.get_refresh_info()
+        request_ms = getattr(ri, "request_ms", None)
+        display_ms = getattr(ri, "display_ms", None)
+        generate_ms = getattr(ri, "generate_ms", None)
+        preprocess_ms = getattr(ri, "preprocess_ms", None)
+    except Exception:
+        pass
 
-    return jsonify({"success": True, "message": "Display updated"}), 200
+    return (
+        jsonify(
+            {
+                "success": True,
+                "message": "Display updated",
+                "metrics": {
+                    "request_ms": request_ms,
+                    "generate_ms": generate_ms,
+                    "preprocess_ms": preprocess_ms,
+                    "display_ms": display_ms,
+                },
+            }
+        ),
+        200,
+    )
 
 
 @plugin_bp.route("/update_now", methods=["POST"])

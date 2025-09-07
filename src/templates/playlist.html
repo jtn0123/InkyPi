@@ -37,7 +37,16 @@
 
         async function displayPluginInstance(playlistName, pluginId, pluginInstance) {
             const loadingIndicator = document.getElementById(pluginInstance)?.querySelector('.loading-indicator');
-            loadingIndicator.style.display = 'block';
+            const progress = document.getElementById('globalProgress');
+            const progressText = document.getElementById('globalProgressText');
+            const progressBar = document.getElementById('globalProgressBar');
+            function setStep(text, pct){
+                if (progress) progress.style.display = 'block';
+                if (progressText) progressText.textContent = text;
+                if (progressBar && typeof pct === 'number') progressBar.style.width = pct + '%';
+            }
+            if (loadingIndicator) loadingIndicator.style.display = 'block';
+            setStep('Preparing…', 10);
             try {
                 const response = await fetch("{{ url_for('plugin.display_plugin_instance') }}", {
                     method: 'POST',
@@ -51,8 +60,15 @@
                     })
                 });
                 
+                setStep('Waiting (device)…', 60);
                 const result = await response.json();
                 if (response.ok) {
+                    if (result && result.metrics){
+                        const m = result.metrics;
+                        const text = `Request ${m.request_ms ?? '-'} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
+                        if (progressText) progressText.textContent = text;
+                    }
+                    setStep('Display updating…', 90);
                     sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
                     location.reload();
                 } else {
@@ -63,7 +79,9 @@
                 alert('An error occurred while processing your request.');
             } finally {
                 // Hide loading indicator after the action is complete
-                loadingIndicator.style.display = 'none';
+                if (loadingIndicator) loadingIndicator.style.display = 'none';
+                setStep('Done', 100);
+                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
             }
         }
 
@@ -287,6 +305,13 @@
             </div>
             {% endfor %}
         </div>
+    </div>
+
+    <div id="globalProgress" class="progress-block" style="display:none;">
+        <div class="progress-header">
+            <span id="globalProgressText">Preparing…</span>
+        </div>
+        <div class="progress-bar"><div id="globalProgressBar" class="progress-fill" style="width: 10%;"></div></div>
     </div>
 
     <!-- Schedule Configuration Modal -->
