@@ -176,7 +176,7 @@
         <div class="app-header">
             <div class="title-container">
                 {% from 'macros/icons.html' import icon %}
-                {{ icon('gear-six', 'app-icon') }}
+                {{ icon('gear-six', 'app-icon') | safe }}
                 <h1 class="app-title">API Keys</h1>
             </div>
         </div>

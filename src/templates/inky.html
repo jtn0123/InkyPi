@@ -25,9 +25,9 @@
                 </svg>
             </button>
             {% from 'macros/icons.html' import icon %}
-            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') }}</a>
-            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') }}</a>
-            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') }}</a>
+            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
+            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
+            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
         </header>
 
         <!-- Display the current image (auto-refreshing preview) -->

@@ -80,7 +80,7 @@
             <div class="header-content">
                 <div class="title-container">
                     {% from 'macros/icons.html' import icon %}
-                    {{ icon('clock-counter-clockwise', 'app-icon') }}
+                    {{ icon('clock-counter-clockwise', 'app-icon') | safe }}
                     <h1 class="app-title">History</h1>
                 </div>
                 <div>

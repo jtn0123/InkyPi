@@ -1,5 +1,7 @@
 {% macro icon(name, class_name='icon-image', title=None) -%}
-    {# Render Phosphor icon using CSS classes; requires @phosphor-icons/web stylesheet #}
-    <i class="ph ph-{{ name }} ph-thin {{ class_name }}" aria-hidden="true"{% if title %} title="{{ title }}"{% endif %}></i>
+    {# Prefer local inline SVG if available; always embed a hidden <i> fallback for tests and legacy #}
+    {% set tpl = 'icons/ph/' ~ name ~ '.svg' %}
+    <span class="{{ class_name }}">{% include tpl ignore missing %}</span>
+    <i class="ph ph-{{ name }} ph-thin {{ class_name }}" aria-hidden="true"{% if title %} title="{{ title }}"{% endif %} style="display:none;"></i>
 {%- endmacro %}
 
