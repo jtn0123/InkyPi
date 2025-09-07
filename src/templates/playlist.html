@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playlists</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.0.3/src/style.css">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/icons_loader.js') }}"></script>
     <script>
         // Drag-and-drop reordering support (desktop/basic)
         let dragSrcEl = null;
@@ -88,7 +86,7 @@
             }
         }
 
-        async function displayPluginInstance(playlistName, pluginId, pluginInstance) {
+        async function displayPluginInstance(playlistName, pluginId, pluginInstance, btnEl) {
             const loadingIndicator = document.getElementById(pluginInstance)?.querySelector('.loading-indicator');
             const progress = document.getElementById('globalProgress');
             const progressText = document.getElementById('globalProgressText');
@@ -99,6 +97,7 @@
                 if (progressBar && typeof pct === 'number') progressBar.style.width = pct + '%';
             }
             if (loadingIndicator) loadingIndicator.style.display = 'block';
+            if (btnEl) { btnEl.disabled = true; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'inline-block'; }
             setStep('Preparing…', 10);
             try {
                 const response = await fetch("{{ url_for('plugin.display_plugin_instance') }}", {
@@ -133,6 +132,7 @@
             } finally {
                 // Hide loading indicator after the action is complete
                 if (loadingIndicator) loadingIndicator.style.display = 'none';
+                if (btnEl) { btnEl.disabled = false; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'none'; }
                 setStep('Done', 100);
                 setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
             }
@@ -309,6 +309,31 @@
             // Compute "Next in" countdowns client-side for interval-based instances
             try {
                 const tzOffsetMin = {{ device_tz_offset_min | default(0) }};
+                // Device vs Local time toggle
+                (function initTimeToggle(){
+                    const btn = document.getElementById('toggleTimeMode');
+                    const val = document.getElementById('currentTimeValue');
+                    if (!btn || !val) return;
+                    let mode = 'device';
+                    function render(){
+                        try {
+                            const now = new Date();
+                            if (mode === 'device'){
+                                const browserOffsetMin = -now.getTimezoneOffset();
+                                const adjustMs = ({{ device_tz_offset_min | default(0) }} - browserOffsetMin) * 60000;
+                                const devNow = new Date(now.getTime() + adjustMs);
+                                val.textContent = devNow.toLocaleString(undefined, { hour12: false });
+                                btn.textContent = 'Use Local';
+                            } else {
+                                val.textContent = now.toLocaleString();
+                                btn.textContent = 'Use Device';
+                            }
+                        } catch(e) {}
+                    }
+                    btn.addEventListener('click', function(){ mode = (mode === 'device') ? 'local' : 'device'; render(); });
+                    setInterval(render, 1000);
+                    render();
+                })();
                 function parseISO(s){ try { return s ? new Date(s) : null; } catch(e){ return null; } }
                 function renderNextIn(){
                     document.querySelectorAll('.plugin-item').forEach(item => {
@@ -398,8 +423,10 @@
         <div class="separator"></div>
         <div class="status-bar" style="margin-bottom:8px;">
             <div class="status-card">
-                <div class="status-title">Current time</div>
-                <div class="status-body">{{ device_now or '—' }}</div>
+                <div class="status-title">Current time
+                    <button id="toggleTimeMode" class="header-button is-dark" type="button" style="margin-left:8px;">Use Local</button>
+                </div>
+                <div class="status-body"><span id="currentTimeValue">{{ device_now or '—' }}</span></div>
             </div>
             <div class="status-card">
                 <div class="status-title">Device refresh cadence</div>
@@ -431,7 +458,7 @@
                     <div class="playlist-header">
                         <span class="playlist-title" title="Cycle: {{ (playlist_timing.get(playlist.name).cycle_minutes if (playlist_timing and playlist_timing.get(playlist.name)) else device_cycle_minutes) }} min{% if playlist_timing and playlist_timing.get(playlist.name) and playlist_timing.get(playlist.name).next_at %}\nNext at: {{ playlist_timing.get(playlist.name).next_at }}{% endif %}">{{ playlist.name }}</span>
                         <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}', '{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}')">{{ icon('gear-six', 'action-icon') }}</button>
-                        <button class="edit-button" title="Display next in this playlist" onclick="displayNextInPlaylist('{{ playlist.name }}')">{{ icon('play', 'action-icon') }}</button>
+                        <button class="header-button" title="Run next in this playlist" onclick="displayNextInPlaylist('{{ playlist.name }}')">Run Next</button>
                         <button class="delete-button" title="Delete playlist" onclick="deletePlaylistQuick('{{ playlist.name }}')">{{ icon('trash', 'action-icon') }}</button>
                     </div>
                     <!-- Plugin List -->
@@ -456,7 +483,8 @@
 
                             </div>
                             <div class="plugin-thumb">
-                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview" onerror="this.style.display='none';">
+                                <div class="img-skeleton" aria-hidden="true"></div>
+                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview" width="120" height="90" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
                             </div>
                             <div class="plugin-actions">
                                 <div class="timing-row">
@@ -483,9 +511,9 @@
                                     {% endif %}
                                 </div>
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="btn-label">Edit</span></a>
-                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') | safe }}<span class="btn-label">Display</span></button>
-                                <button class="delete-button" title="Delete Plugin Instance" onclick="if(confirm('Delete {{ plugin_instance.name }}?')) deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') | safe }}<span class="btn-label">Delete</span></button>
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="btn" title="Edit"><span class="btn-label">Edit</span></a>
+                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this)"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
+                                <button class="btn btn-danger" title="Delete Plugin Instance" onclick="if(confirm('Delete {{ plugin_instance.name }}?')) deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')"><span class="btn-label">Delete</span></button>
                                 
                             </div>
                         </div>

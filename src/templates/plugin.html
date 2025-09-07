@@ -136,9 +136,8 @@
         }
         async function refreshPreviewImage(){
             const img = document.getElementById('previewImage');
-            if (img){
-                img.src = previewUrl + '?t=' + Date.now();
-            }
+            const skel = document.getElementById('previewSkeleton');
+            if (img){ if (skel) skel.style.display=''; img.src = previewUrl + '?t=' + Date.now(); }
             // Update current display timestamp/meta
             try {
                 const res = await fetch(refreshInfoUrl);
@@ -396,7 +395,8 @@
                 <div class="status-title">Current display</div>
                 <div class="status-body">
                     <div class="image-container {% if not fit %}native{% endif %}">
-                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image"
+                        <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}"
                              {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
                     </div>
                 </div>
@@ -409,7 +409,8 @@
                 <div class="status-title">This plugin instance</div>
                 <div class="status-body">
                     {% if plugin_instance %}
-                    <img id="instancePreviewImage" src="#" alt="Latest for this instance" onerror="this.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
+                    <div class="img-skeleton" aria-hidden="true" style="width:100%;height:160px;"></div>
+                    <img id="instancePreviewImage" src="#" alt="Latest for this instance" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
                     <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
                         No saved image found for this instance yet.
                         {% if plugin_instance and plugin_instance_playlist %}

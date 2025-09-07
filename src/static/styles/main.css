@@ -66,6 +66,20 @@ body {
     cursor: zoom-in;
 }
 
+/* Lightweight skeleton for reserved image space */
+.img-skeleton {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.10) 37%, rgba(0,0,0,0.06) 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: 0 0; }
+}
+
 .preview-link {
     cursor: pointer;
 }
@@ -750,9 +764,14 @@ body {
 }
 
 .plugin-actions { display:flex; justify-content:flex-end; gap:6px; align-items:center; }
-.plugin-actions .edit-button, .plugin-actions .delete-button { display:inline-flex; align-items:center; gap:4px; padding: 4px 6px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
-.plugin-actions .edit-button:hover, .plugin-actions .delete-button:hover { background: rgba(255,255,255,0.04); }
-.btn-label { font-size: 0.78em; }
+.plugin-actions .btn { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
+.plugin-actions .btn:hover { background: rgba(255,255,255,0.04); }
+.plugin-actions .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.plugin-actions .btn-primary:hover { background: #2fd1b6; }
+.plugin-actions .btn-danger { background: #c4515b; color: #fff; border-color: #c4515b; }
+.plugin-actions .btn-danger:hover { background: #a93943; }
+.btn-label { font-size: 0.85em; }
+.btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff; border-radius: 50%; display:none; animation: spin .9s linear infinite; }
 
 /* Plugin Icon */
 .plugin-icon {
@@ -774,6 +793,12 @@ body {
     overflow: hidden;
 }
 .plugin-thumb img { width: 100%; height: 100%; object-fit: contain; display:block; background: var(--panel-bg); }
+
+/* Virtualize large lists with content-visibility */
+.playlist-list, .button-grid, .history-grid {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 5000px; /* allow fast initial layout */
+}
 
 /* Edit & Delete Buttons */
 .edit-button, .delete-button {
