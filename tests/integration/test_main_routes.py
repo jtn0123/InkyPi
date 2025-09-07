@@ -73,3 +73,41 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
     assert b"weather" in resp.data
     assert b"Home Weather" in resp.data
     assert b"Default" in resp.data
+
+
+def test_next_up_endpoint_and_ssr(client, device_config_dev):
+    # Seed playlist with two items so peek returns the second when index is None (first is candidate)
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "Home Weather",
+            "plugin_settings": {},
+            "refresh": {"interval": 600},
+        }
+    )
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock",
+            "plugin_settings": {},
+            "refresh": {"interval": 600},
+        }
+    )
+    device_config_dev.write_config()
+
+    # SSR should include Next up with the first item since index is None -> peek returns first
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Next up:" in resp.data
+    assert b"weather" in resp.data or b"clock" in resp.data
+
+    # Endpoint should return a structured JSON
+    r = client.get("/next-up")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert isinstance(data, dict)
+    # One of the seeded plugin ids
+    assert data.get("plugin_id") in ("weather", "clock")

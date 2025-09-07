@@ -64,6 +64,24 @@
             </div>
         </div>
 
+        <!-- Next up: non-mutating preview of the upcoming instance -->
+        <div id="nextUp" class="image-meta" style="margin-top: 4px; {% if not next_up or not next_up.plugin_id %}display:none;{% endif %}">
+            <div id="nextUpContent">
+                <strong>Next up:</strong>
+                <span id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</span>
+                {% if next_up and next_up.plugin_instance %}
+                (<span id="nuInstance">{{ next_up.plugin_instance }}</span>)
+                {% else %}
+                <span id="nuInstance" style="display:none;"></span>
+                {% endif %}
+                {% if next_up and next_up.playlist %}
+                • <span id="nuPlaylist">{{ next_up.playlist }}</span>
+                {% else %}
+                <span id="nuPlaylist" style="display:none;"></span>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Separator -->
         <div class="separator"></div>
         <h2 class="plugins-title">Plugins</h2>
@@ -155,6 +173,37 @@
         } catch (e) {
             // Non-fatal if refresh-info endpoint fails
         }
+        // Update Next up block (separate fetch to avoid blocking image/refresh-info)
+        try {
+            const res2 = await fetch('{{ url_for('main.next_up') }}');
+            const up = await res2.json();
+            const nu = document.getElementById('nextUp');
+            const nuPlugin = document.getElementById('nuPlugin');
+            const nuInst = document.getElementById('nuInstance');
+            const nuPl = document.getElementById('nuPlaylist');
+            if (nu && nuPlugin && nuInst && nuPl) {
+                if (up && up.plugin_id) {
+                    nu.style.display = 'block';
+                    nuPlugin.textContent = up.plugin_id || '';
+                    if (up.plugin_instance) {
+                        nuInst.style.display = '';
+                        nuInst.textContent = up.plugin_instance;
+                    } else {
+                        nuInst.style.display = 'none';
+                        nuInst.textContent = '';
+                    }
+                    if (up.playlist) {
+                        nuPl.style.display = '';
+                        nuPl.textContent = up.playlist;
+                    } else {
+                        nuPl.style.display = 'none';
+                        nuPl.textContent = '';
+                    }
+                } else {
+                    nu.style.display = 'none';
+                }
+            }
+        } catch (e) { /* ignore */ }
     }
     // Refresh every 5 seconds
     setInterval(refreshPreview, 5000);

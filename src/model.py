@@ -301,6 +301,23 @@ class Playlist:
 
         return self.plugins[self.current_plugin_index]
 
+    def peek_next_plugin(self):
+        """Returns the next plugin instance without mutating the current index.
+
+        If the index is unset or invalid, returns the first plugin as the next candidate.
+        """
+        if not self.plugins:
+            return None
+
+        if self.current_plugin_index is None:
+            return self.plugins[0]
+
+        if not (0 <= self.current_plugin_index < len(self.plugins)):
+            return self.plugins[0]
+
+        next_index = (self.current_plugin_index + 1) % len(self.plugins)
+        return self.plugins[next_index]
+
     def get_priority(self):
         """Determine priority of a playlist, based on the time range"""
         return self.get_time_range_minutes()
