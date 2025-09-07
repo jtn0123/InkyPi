@@ -79,6 +79,7 @@
                 {% else %}
                 <span id="nuPlaylist" style="display:none;"></span>
                 {% endif %}
+                <button id="displayNextBtn" class="action-button compact" style="margin-left:8px;" onclick="displayNextNow()">Display Next</button>
             </div>
         </div>
 
@@ -204,6 +205,22 @@
                 }
             }
         } catch (e) { /* ignore */ }
+    }
+
+    async function displayNextNow(){
+        const btn = document.getElementById('displayNextBtn');
+        if (btn) btn.disabled = true;
+        try{
+            const resp = await fetch('{{ url_for('main.display_next') }}', {method:'POST'});
+            const j = await resp.json();
+            if (!resp.ok || !j.success){
+                alert('Failed to display next: ' + (j.error || '')); 
+            } else {
+                // Refresh preview and info shortly after
+                setTimeout(refreshPreview, 300);
+            }
+        } catch(e){ /* ignore */ }
+        finally { if (btn) btn.disabled = false; }
     }
     // Refresh every 5 seconds
     setInterval(refreshPreview, 5000);

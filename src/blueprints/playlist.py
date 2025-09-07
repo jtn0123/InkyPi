@@ -205,6 +205,84 @@ def delete_playlist(playlist_name):
     return jsonify({"success": True, "message": f"Deleted playlist '{playlist_name}'!"})
 
 
+@playlist_bp.route("/reorder_plugins", methods=["POST"])
+def reorder_plugins():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    try:
+        data = request.get_json(force=True, silent=False)
+        playlist_name = data.get("playlist_name")
+        ordered = data.get("ordered")  # list of {plugin_id, name}
+        if not playlist_name or not isinstance(ordered, list):
+            return json_error("playlist_name and ordered list are required", status=400)
+
+        playlist = playlist_manager.get_playlist(playlist_name)
+        if not playlist:
+            return json_error(f"Playlist '{playlist_name}' not found", status=400)
+
+        if not playlist.reorder_plugins(ordered):
+            return json_error("Invalid order payload", status=400)
+
+        device_config.write_config()
+        return jsonify({"success": True, "message": "Reordered plugins"})
+    except Exception:
+        return json_internal_error(
+            "reorder plugins",
+            details={"hint": "Validate payload shape and ensure playlist exists."},
+        )
+
+
+@playlist_bp.route("/set_snooze", methods=["POST"])
+def set_snooze():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+    try:
+        data = request.get_json(force=True, silent=False)
+        playlist_name = data.get("playlist_name")
+        plugin_id = data.get("plugin_id")
+        instance_name = data.get("plugin_instance")
+        snooze_until = data.get("snooze_until")  # ISO string or null to clear
+        if not all([playlist_name, plugin_id, instance_name]):
+            return json_error("playlist_name, plugin_id, plugin_instance required", status=400)
+        playlist = playlist_manager.get_playlist(playlist_name)
+        if not playlist:
+            return json_error("Playlist not found", status=400)
+        inst = playlist.find_plugin(plugin_id, instance_name)
+        if not inst:
+            return json_error("Plugin instance not found", status=400)
+        inst.snooze_until = snooze_until
+        device_config.write_config()
+        return jsonify({"success": True, "message": "Snooze updated"})
+    except Exception:
+        return json_internal_error("set snooze")
+
+
+@playlist_bp.route("/toggle_only_fresh", methods=["POST"])
+def toggle_only_fresh():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    playlist_manager = device_config.get_playlist_manager()
+    try:
+        data = request.get_json(force=True, silent=False)
+        playlist_name = data.get("playlist_name")
+        plugin_id = data.get("plugin_id")
+        instance_name = data.get("plugin_instance")
+        only_fresh = bool(data.get("only_fresh"))
+        if not all([playlist_name, plugin_id, instance_name]):
+            return json_error("playlist_name, plugin_id, plugin_instance required", status=400)
+        playlist = playlist_manager.get_playlist(playlist_name)
+        if not playlist:
+            return json_error("Playlist not found", status=400)
+        inst = playlist.find_plugin(plugin_id, instance_name)
+        if not inst:
+            return json_error("Plugin instance not found", status=400)
+        inst.only_show_when_fresh = only_fresh
+        device_config.write_config()
+        return jsonify({"success": True, "message": "Only fresh updated"})
+    except Exception:
+        return json_internal_error("toggle only fresh")
+
+
 @playlist_bp.app_template_filter("format_relative_time")
 def format_relative_time(iso_date_string):
     # Parse the input ISO date string

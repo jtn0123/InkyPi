@@ -10,6 +10,57 @@
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/icons_loader.js') }}"></script>
     <script>
+        // Drag-and-drop reordering support (desktop/basic)
+        let dragSrcEl = null;
+        function handleDragStart(e){
+            dragSrcEl = this;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', this.id);
+            this.classList.add('dragging');
+        }
+        function handleDragOver(e){
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+        function handleDrop(e){
+            if (e.stopPropagation) e.stopPropagation();
+            const srcId = e.dataTransfer.getData('text/plain');
+            const srcEl = document.getElementById(srcId);
+            if (srcEl && srcEl !== this){
+                this.parentNode.insertBefore(srcEl, this.nextSibling);
+                // After drop, persist new order for this playlist
+                const container = this.closest('.playlist-item');
+                const playlistName = container?.getAttribute('data-playlist-name');
+                const ordered = Array.from(container.querySelectorAll('.plugin-item'))
+                    .map(el => ({ plugin_id: el.getAttribute('data-plugin-id'), name: el.getAttribute('data-instance-name') }));
+                if (playlistName && ordered.length){
+                    fetch("{{ url_for('playlist.reorder_plugins') }}", {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playlist_name: playlistName, ordered })
+                    }).then(r => r.json()).then(j => {
+                        if (!j.success){
+                            showResponseModal('failure', `Error!  ${j.error || 'Failed to reorder'}`);
+                        } else {
+                            sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
+                        }
+                    }).catch(() => showResponseModal('failure', 'Error saving new order'));
+                }
+            }
+            return false;
+        }
+        function handleDragEnd(){ this.classList.remove('dragging'); }
+
+        function enableDrag(container){
+            const items = container.querySelectorAll('.plugin-item');
+            items.forEach((item) => {
+                if (!item.id) item.id = `plg-${Math.random().toString(36).slice(2)}`;
+                item.draggable = true;
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragover', handleDragOver);
+                item.addEventListener('drop', handleDrop);
+                item.addEventListener('dragend', handleDragEnd);
+            });
+        }
         async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
             try {
                 const response = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", {
@@ -221,7 +272,34 @@
             endSelect.innerHTML += `<option value="24:00">24:00</option>`;
         }
 
-        document.addEventListener("DOMContentLoaded", populateTimeOptions);
+        document.addEventListener("DOMContentLoaded", function(){
+            populateTimeOptions();
+            // Enable DnD for each playlist's plugin list
+            document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
+        });
+
+        async function toggleOnlyFresh(playlistName, pluginId, instanceName, onlyFresh){
+            try{
+                const resp = await fetch("{{ url_for('playlist.toggle_only_fresh') }}", {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName, only_fresh: !!onlyFresh})});
+                const j = await resp.json();
+                if (!resp.ok || !j.success){
+                    showResponseModal('failure', `Error!  ${j.error || 'Failed to update'}`);
+                } else {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
+                }
+            } catch(e){ showResponseModal('failure', 'Error updating setting'); }
+        }
+        async function setSnooze(playlistName, pluginId, instanceName, isoStr){
+            try{
+                const resp = await fetch("{{ url_for('playlist.set_snooze') }}", {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName, snooze_until: isoStr})});
+                const j = await resp.json();
+                if (!resp.ok || !j.success){
+                    showResponseModal('failure', `Error!  ${j.error || 'Failed to snooze'}`);
+                } else {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
+                }
+            } catch(e){ showResponseModal('failure', 'Error setting snooze'); }
+        }
 
         window.addEventListener("load", function () {
             let storedMessage = sessionStorage.getItem("storedMessage");
@@ -281,7 +359,7 @@
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% for playlist in playlist_config.playlists %}
-            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}">
+            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
                     <div class="playlist-header">
                         <span class="playlist-title">{{ playlist.name }}</span>
                         <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')">{{ icon('gear-six', 'action-icon') }}</button>
@@ -289,7 +367,7 @@
                     <!-- Plugin List -->
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item">
+                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}">
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 {% from 'macros/icons.html' import icon %}
                                 {{ icon(plugin_icon_map.get(plugin_instance.plugin_id, 'images-square'), 'plugin-icon') | safe }}
@@ -321,6 +399,14 @@
                                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') | safe }}</a>
                                 <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') | safe }}</button>
                                 <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') | safe }}</button>
+                                <div class="form-group nowrap" style="margin-left:8px;">
+                                    <label class="form-label" title="Only display this instance when it has new content">Only fresh</label>
+                                    <input type="checkbox" onchange="toggleOnlyFresh('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this.checked)" {% if plugin_instance.only_show_when_fresh %}checked{% endif %}>
+                                </div>
+                                <div class="form-group nowrap" style="margin-left:8px;">
+                                    <label class="form-label" for="snooze_{{loop.index}}">Snooze</label>
+                                    <input id="snooze_{{loop.index}}" class="time-input" type="datetime-local" onchange="setSnooze('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this.value ? new Date(this.value).toISOString() : null)" {% if plugin_instance.snooze_until %}value="{{ plugin_instance.snooze_until[:16] }}"{% endif %}>
+                                </div>
                             </div>
                         </div>
                         {% endfor %}

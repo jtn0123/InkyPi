@@ -284,12 +284,18 @@ class RefreshTask:
             )
             return None, None
 
-        plugin = playlist.get_next_plugin()
-        logger.info(
-            f"Determined next plugin. | active_playlist: {playlist.name} | plugin_instance: {plugin.name}"
-        )
+        # Use eligibility-aware selection
+        plugin = playlist.get_next_eligible_plugin(current_dt)
+        if plugin:
+            logger.info(
+                f"Determined next plugin. | active_playlist: {playlist.name} | plugin_instance: {plugin.name}"
+            )
+            return playlist, plugin
 
-        return playlist, plugin
+        logger.info(
+            f"No eligible plugin to display in active playlist '{playlist.name}'."
+        )
+        return None, None
 
     def log_system_stats(self):
         try:

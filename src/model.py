@@ -318,6 +318,89 @@ class Playlist:
         next_index = (self.current_plugin_index + 1) % len(self.plugins)
         return self.plugins[next_index]
 
+    def get_next_eligible_plugin(self, current_time: datetime):
+        """Advance to and return the next eligible plugin based on current_time.
+
+        Tries up to N plugins (size of list) to find one that is_show_eligible.
+        Mutates current_plugin_index similarly to get_next_plugin.
+        Returns None if no eligible plugin is found.
+        """
+        if not self.plugins:
+            return None
+
+        original_index = self.current_plugin_index
+        attempts = 0
+        while attempts < len(self.plugins):
+            # compute next index like get_next_plugin without committing first
+            if self.current_plugin_index is None:
+                next_index = 0
+            else:
+                if not (0 <= self.current_plugin_index < len(self.plugins)):
+                    next_index = 0
+                else:
+                    next_index = (self.current_plugin_index + 1) % len(self.plugins)
+
+            candidate = self.plugins[next_index]
+            if candidate.is_show_eligible(current_time):
+                self.current_plugin_index = next_index
+                return candidate
+
+            # advance and try again
+            self.current_plugin_index = next_index
+            attempts += 1
+
+        # none eligible; restore index
+        self.current_plugin_index = original_index
+        return None
+
+    def peek_next_eligible_plugin(self, current_time: datetime):
+        """Return next eligible plugin without changing current_plugin_index."""
+        saved = self.current_plugin_index
+        try:
+            return self.get_next_eligible_plugin(current_time)
+        finally:
+            self.current_plugin_index = saved
+
+    def reorder_plugins(self, ordered_pairs):
+        """Reorder plugins using a list of ordered (plugin_id, name) pairs.
+
+        The ordered_pairs may be a list of tuples or dicts with keys 'plugin_id' and 'name'.
+        Returns True on success, False if validation fails.
+        """
+        if not isinstance(ordered_pairs, list):
+            return False
+
+        def _key_for(p_inst):
+            return (p_inst.plugin_id, p_inst.name)
+
+        mapping = {(_key_for(p)): p for p in self.plugins}
+
+        normalized_keys: list[tuple] = []
+        for item in ordered_pairs:
+            if isinstance(item, dict):
+                pid = item.get("plugin_id")
+                name = item.get("name") or item.get("instance_name")
+                normalized_keys.append((pid, name))
+            elif isinstance(item, (list, tuple)) and len(item) == 2:
+                normalized_keys.append((item[0], item[1]))
+            else:
+                return False
+
+        # Validate count and membership
+        if len(normalized_keys) != len(self.plugins):
+            return False
+        try:
+            new_order = [mapping[(pid, name)] for (pid, name) in normalized_keys]
+        except KeyError:
+            return False
+
+        self.plugins = new_order
+        # Reset index within bounds after reorder
+        if self.current_plugin_index is not None:
+            if not (0 <= self.current_plugin_index < len(self.plugins)):
+                self.current_plugin_index = 0
+        return True
+
     def get_priority(self):
         """Determine priority of a playlist, based on the time range"""
         return self.get_time_range_minutes()
@@ -365,19 +448,21 @@ class PluginInstance:
         latest_refresh (str): ISO-formatted string representing the last refresh time.
     """
 
-    def __init__(self, plugin_id, name, settings, refresh, latest_refresh_time=None):
+    def __init__(self, plugin_id, name, settings, refresh, latest_refresh_time=None, only_show_when_fresh=False, snooze_until=None):
         self.plugin_id = plugin_id
         self.name = name
         self.settings = settings
         self.refresh = refresh
         self.latest_refresh_time = latest_refresh_time
+        self.only_show_when_fresh = only_show_when_fresh
+        self.snooze_until = snooze_until
 
     def update(self, updated_data):
         """Update attributes of the class with the dictionary values."""
         for key, value in updated_data.items():
             setattr(self, key, value)
 
-    def should_refresh(self, current_time):
+    def should_refresh(self, current_time: datetime) -> bool:
         """Checks whether the plugin should be refreshed based on its refresh settings and the current time."""
         latest_refresh_dt = self.get_latest_refresh_dt()
         if not latest_refresh_dt:
@@ -419,6 +504,33 @@ class PluginInstance:
 
         return False
 
+    def is_show_eligible(self, current_time: datetime) -> bool:
+        """Determine if this instance should be considered for display now.
+
+        - If snoozed until a future time, not eligible
+        - If only_show_when_fresh, only eligible when should_refresh(current_time) is True
+        """
+        try:
+            if self.snooze_until:
+                try:
+                    snooze_dt = datetime.fromisoformat(self.snooze_until)
+                    if snooze_dt.tzinfo is None:
+                        # Treat naive as UTC
+                        from datetime import timezone
+
+                        snooze_dt = snooze_dt.replace(tzinfo=timezone.utc)
+                    if current_time < snooze_dt:
+                        return False
+                except Exception:
+                    # Ignore malformed snooze value
+                    pass
+
+            if self.only_show_when_fresh:
+                return self.should_refresh(current_time)
+            return True
+        except Exception:
+            return True
+
     def get_image_path(self):
         """Formats the image path for this plugin instance."""
         return f"{self.plugin_id}_{self.name.replace(' ', '_')}.png"
@@ -437,6 +549,8 @@ class PluginInstance:
             "plugin_settings": self.settings,
             "refresh": self.refresh,
             "latest_refresh_time": self.latest_refresh_time,
+            "only_show_when_fresh": self.only_show_when_fresh,
+            "snooze_until": self.snooze_until,
         }
 
     @classmethod
@@ -447,4 +561,6 @@ class PluginInstance:
             settings=data["plugin_settings"],
             refresh=data["refresh"],
             latest_refresh_time=data.get("latest_refresh_time"),
+            only_show_when_fresh=data.get("only_show_when_fresh", False),
+            snooze_until=data.get("snooze_until"),
         )
