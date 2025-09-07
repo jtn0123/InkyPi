@@ -15,19 +15,23 @@
         <!-- Page Title -->
         <header class="header">
             <h1>{{ config.name }}</h1>
-            <button id="themeToggle" class="header-button icon" type="button" style="float:right;" title="Toggle theme">
-                <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                </svg>
-                <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                </svg>
-            </button>
-            {% from 'macros/icons.html' import icon %}
-            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
-            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
-            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
+            <div class="header-icons">
+                <div class="nav-icons">
+                    {% from 'macros/icons.html' import icon %}
+                    <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
+                </div>
+                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
+                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                    </svg>
+                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <!-- Display the current image (auto-refreshing preview) -->
@@ -90,7 +94,7 @@
                 let html = '';
                 if (date) html += `<div><strong>Wikipedia Picture of the Day:</strong> ${date}</div>`;
                 if (caption) html += `<div style="margin-top:4px;">${caption}</div>`;
-                if (link) html += `<div style="margin-top:4px;"><a href="${link}" target="_blank" rel="noopener noreferrer">Learn more</a></div>`;
+                if (link) html += `<div style=\"margin-top:4px;\"><a href=\"${link}\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div>`;
                 if (html) {
                     metaContent.innerHTML = html;
                     metaDiv.style.display = 'block';
