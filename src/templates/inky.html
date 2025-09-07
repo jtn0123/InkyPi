@@ -65,7 +65,8 @@
             {% for plugin in plugins %}
             <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button" title="{{ plugin.display_name }}">
                 {% set ph = icon_map.get(plugin.id, 'image') %}
-                <i class="ph ph-{{ ph }} ph-thin icon-image"></i>
+                {% from 'macros/icons.html' import icon %}
+                {{ icon(ph, 'icon-image') | safe }}
             </a>
             {% endfor %}
         </div>

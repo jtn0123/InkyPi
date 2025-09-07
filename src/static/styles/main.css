@@ -434,6 +434,17 @@ body {
     margin-bottom: 0px;
 }
 
+/* Ensure inline SVG icons render correctly in header/links */
+.settings-button svg.icon-image,
+.settings-button .icon-image svg,
+.settings-button .app-icon svg,
+.settings-button svg.app-icon {
+    width: 30px;
+    height: 30px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
 .settings-button:hover {
     background-color: #e0e0e0;
     box-shadow: 0px 5px 8px rgba(0, 0, 0, 0.1);
