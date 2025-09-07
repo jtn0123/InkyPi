@@ -5,11 +5,12 @@
 # Description: This script automates the installatin of InkyPI and creation of
 #              the InkyPI service.
 #
-# Usage: ./install.sh [-W <waveshare_device>]
+# Usage: ./install.sh [-W <waveshare_device>] [-v]
 #        -W <waveshare_device> (optional) Install for a Waveshare device, 
 #                               specifying the device model type, e.g. epd7in3e.
+#        -v                    (optional) Verbose mode; stream output instead of spinner
 #
-#                               If not specified then the Pimoroni Inky display
+#                               If -W is not specified then the Pimoroni Inky display
 #                               is assumed.
 # =============================================================================
 
@@ -48,13 +49,19 @@ PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 WS_TYPE=""
 WS_REQUIREMENTS_FILE="$SCRIPT_DIR/ws-requirements.txt"
 
-# Parse the agumments, looking for the -W option.
+# Verbose mode flag (0: spinner, 1: stream command output)
+VERBOSE=0
+
+# Parse the arguments, looking for -W (waveshare) and -v (verbose).
 parse_arguments() {
-    while getopts ":W:" opt; do
+    while getopts ":W:v" opt; do
         case $opt in
             W) WS_TYPE=$OPTARG
                 echo "Optional parameter WS is set for Waveshare support.  Screen type is: $WS_TYPE"
                 ;;
+            v) VERBOSE=1
+               echo "Verbose mode enabled."
+               ;;
             \?) echo "Invalid option: -$OPTARG." >&2
                 exit 1
                 ;;
@@ -181,11 +188,17 @@ echo_blue() {
 
 install_debian_dependencies() {
   if [ -f "$APT_REQUIREMENTS_FILE" ]; then
-    sudo apt-get update > /dev/null &
-    show_loader "Fetch available system dependencies updates. " 
-
-    xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null &
-    show_loader "Installing system dependencies. "
+    if [[ "$VERBOSE" -eq 1 ]]; then
+      echo_header "Fetching available system dependency updates"
+      sudo apt-get update -y
+      echo_header "Installing system dependencies"
+      xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y
+    else
+      sudo apt-get update > /dev/null &
+      show_loader "Fetch available system dependencies updates. " 
+      xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null &
+      show_loader "Installing system dependencies. "
+    fi
   else
     echo "ERROR: System dependencies file $APT_REQUIREMENTS_FILE not found!"
     exit 1
@@ -204,14 +217,14 @@ setup_memory_management() {
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel > /dev/null
-  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq > /dev/null &
+  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
+  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
   show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE > ws_pip_install.log &
+    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
     show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
