@@ -50,6 +50,10 @@ def plugin_page(plugin_id):
                 # add plugin instance settings to the template to prepopulate
                 template_params["plugin_settings"] = plugin_instance.settings
                 template_params["plugin_instance"] = plugin_instance_name
+                # expose latest refresh time for this instance (for UI status)
+                template_params["plugin_instance_last_refresh"] = (
+                    plugin_instance.latest_refresh_time
+                )
             else:
                 # Try to find a saved settings instance for this plugin
                 default_playlist = playlist_manager.get_playlist("Default")
@@ -62,6 +66,9 @@ def plugin_page(plugin_id):
                         # Load the saved settings
                         template_params["plugin_settings"] = saved_instance.settings
                         template_params["plugin_instance"] = saved_instance_name
+                        template_params["plugin_instance_last_refresh"] = (
+                            saved_instance.latest_refresh_time
+                        )
 
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:

@@ -175,6 +175,17 @@
                 <div class="history-meta">
                     <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
                     <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
+                    {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
+                    <div class="history-sub">
+                        <span>Source:</span>
+                        <span>
+                            {% if img.meta.refresh_type %}{{ img.meta.refresh_type }}{% endif %}
+                            {% if img.meta.plugin_id %} • {{ img.meta.plugin_id }}{% endif %}
+                            {% if img.meta.playlist %} • {{ img.meta.playlist }}{% endif %}
+                            {% if img.meta.plugin_instance %} • {{ img.meta.plugin_instance }}{% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="history-actions">
                     <button id="btn-{{ img.filename }}" class="btn btn-primary" onclick="redisplay('{{ img.filename }}')">Display</button>

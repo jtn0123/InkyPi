@@ -83,6 +83,55 @@ body {
     cursor: zoom-out;
 }
 
+/* Status bar (top previews) */
+.status-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin: 8px 0 0 0;
+}
+.status-card {
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 10px;
+}
+.status-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+.status-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.status-body img {
+    max-width: 100%;
+    max-height: 160px;
+    display: block;
+}
+.status-placeholder {
+    color: var(--muted);
+    font-size: 0.9rem;
+    padding: 10px;
+    text-align: center;
+}
+.status-meta {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: baseline;
+}
+.status-meta .label { color: var(--muted); font-size: 0.85rem; }
+.status-meta .value { color: var(--text); font-size: 0.95rem; font-weight: 600; }
+
 /* Separator styling */
 .separator {
     width: 100%;

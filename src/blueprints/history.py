@@ -60,6 +60,18 @@ def _list_history_images(history_dir: str) -> list[dict]:
         except Exception:
             # Skip files that were deleted or cannot be accessed
             continue
+        # Try to load sidecar metadata (JSON) if present
+        meta: dict = {}
+        try:
+            base, _ = os.path.splitext(f)
+            sidecar_path = os.path.join(history_dir, f"{base}.json")
+            if os.path.exists(sidecar_path):
+                import json
+                with open(sidecar_path, "r", encoding="utf-8") as fh:
+                    meta = json.load(fh) or {}
+        except Exception:
+            # Non-fatal; ignore malformed sidecar
+            meta = {}
         try:
             # Use device timezone for display
             device_config = current_app.config.get("DEVICE_CONFIG")
@@ -76,6 +88,7 @@ def _list_history_images(history_dir: str) -> list[dict]:
                 .replace(" 0", " "),
                 "size": size,
                 "size_str": _format_size(size),
+                "meta": meta,
             }
         )
     return result

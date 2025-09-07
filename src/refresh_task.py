@@ -166,9 +166,17 @@ class RefreshTask:
                             logger.info(
                                 f"Updating display. | refresh_info: {refresh_info}"
                             )
+                            # Pass history metadata so the history page can show source info
+                            history_meta = {
+                                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
+                                "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
+                                "playlist": refresh_action.get_refresh_info().get("playlist"),
+                                "plugin_instance": refresh_action.get_refresh_info().get("plugin_instance"),
+                            }
                             self.display_manager.display_image(
                                 image,
                                 image_settings=plugin.config.get("image_settings", []),
+                                history_meta=history_meta,
                             )
                         else:
                             logger.info(

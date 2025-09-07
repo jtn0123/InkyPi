@@ -15,6 +15,13 @@
         const loadPluginSettings = pluginInstanceName != '';
         const styleSettings = {{ style_settings | default(false) | tojson }};
         const previewUrl = '{{ url_for("main.preview_image") }}';
+        const refreshInfoUrl = '{{ url_for("main.refresh_info") }}';
+        const instancePreviewUrl = (pluginId, instanceName) => {
+            if (!pluginId || !instanceName) return null;
+            return '{{ url_for("plugin.plugin_instance_image", plugin_id="__PID__", instance_name="__INST__") }}'
+                .replace('__PID__', pluginId)
+                .replace('__INST__', instanceName);
+        };
 
         let uploadedFiles = {};
 
@@ -132,9 +139,15 @@
             if (img){
                 img.src = previewUrl + '?t=' + Date.now();
             }
+            // Update current display timestamp/meta
             try {
-                const res = await fetch('{{ url_for('main.refresh_info') }}');
+                const res = await fetch(refreshInfoUrl);
                 const info = await res.json();
+                // Update current display timestamp
+                const ts = info && info.refresh_time ? new Date(info.refresh_time) : null;
+                const currTime = document.getElementById('currentDisplayTime');
+                if (currTime) currTime.textContent = ts ? ts.toLocaleString() : '—';
+                // Update optional plugin meta (e.g., WPOTD)
                 const metaDiv = document.getElementById('pluginMeta');
                 const metaContent = document.getElementById('pluginMetaContent');
                 if (info && info.plugin_id === 'wpotd' && info.plugin_meta) {
@@ -157,9 +170,7 @@
                     metaDiv.style.display = 'none';
                     metaContent.textContent = '';
                 }
-            } catch (e) {
-                // ignore
-            }
+            } catch (e) { /* ignore */ }
         }
 
         function openModal(modal_id) {
@@ -238,6 +249,23 @@
 
         // populate form values from plugin settings
         document.addEventListener('DOMContentLoaded', () => {
+            // Populate top status bar previews and timestamps
+            (function initStatusBar(){
+                const pluginId = '{{ plugin.id }}';
+                const instanceName = pluginInstanceName;
+                const instImgEl = document.getElementById('instancePreviewImage');
+                const instTimeEl = document.getElementById('instanceLastTime');
+                const instUrl = instancePreviewUrl(pluginId, instanceName);
+                if (instImgEl && instUrl) {
+                    instImgEl.src = instUrl + '?t=' + Date.now();
+                }
+                const lastStr = '{{ plugin_instance_last_refresh or '' }}';
+                if (instTimeEl) {
+                    instTimeEl.textContent = lastStr ? new Date(lastStr).toLocaleString() : '—';
+                }
+                // Also initialize current display timestamp
+                refreshPreviewImage();
+            })();
             if (!styleSettings){
                 return;
             }
@@ -361,12 +389,39 @@
         </div>
         <div class="separator"></div>
 
-        <!-- Live preview of what will be displayed -->
+        <!-- Status: current display vs this plugin instance -->
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
-        <div class="image-container {% if not fit %}native{% endif %}">
-            <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image"
-                 {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
+        <div class="status-bar">
+            <div class="status-card">
+                <div class="status-title">Current display</div>
+                <div class="status-body">
+                    <div class="image-container {% if not fit %}native{% endif %}">
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image"
+                             {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
+                    </div>
+                </div>
+                <div class="status-meta">
+                    <span class="label">Updated</span>
+                    <span id="currentDisplayTime" class="value">—</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <div class="status-title">This plugin instance</div>
+                <div class="status-body">
+                    {% if plugin_instance %}
+                    <img id="instancePreviewImage" src="#" alt="Latest for this instance">
+                    {% else %}
+                    <div class="status-placeholder">Save or select an instance to see its latest image.</div>
+                    {% endif %}
+                </div>
+                <div class="status-meta">
+                    <span class="label">Last generated</span>
+                    <span id="instanceLastTime" class="value">—</span>
+                </div>
+            </div>
         </div>
+        <div class="separator"></div>
+
         <div id="pluginMeta" class="image-meta" style="display:none; margin-top: 8px;"><div id="pluginMetaContent"></div></div>
 
         <!-- Include plugin settings -->

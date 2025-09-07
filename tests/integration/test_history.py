@@ -17,6 +17,31 @@ def test_history_page_lists_images(client, device_config_dev):
     assert "display_20250101_000100.png" in body
 
 
+def test_history_sidecar_metadata_rendered(client, device_config_dev):
+    # Create an image and matching sidecar json
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_010000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    sidecar = {
+        "refresh_type": "Playlist",
+        "plugin_id": "ai_text",
+        "playlist": "Default",
+        "plugin_instance": "ai_text_saved_settings",
+    }
+    import json
+
+    with open(os.path.join(d, "display_20250101_010000.json"), "w", encoding="utf-8") as fh:
+        json.dump(sidecar, fh)
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "Source:" in text
+    assert "Playlist" in text
+    assert "ai_text" in text
+
+
 def test_history_redisplay_succeeds(client, device_config_dev, monkeypatch):
     # Create one image
     d = device_config_dev.history_image_dir

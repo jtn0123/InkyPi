@@ -35,3 +35,30 @@ def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b'id="previewImage" style=' not in resp.data
+
+
+def test_plugin_page_status_bar_present(client):
+    resp = client.get("/plugin/ai_text")
+    assert resp.status_code == 200
+    body = resp.data
+    assert b'class="status-bar"' in body
+    assert b'id="currentDisplayTime"' in body
+
+
+def test_plugin_page_instance_preview_shown_when_instance(client):
+    # Create saved settings for ai_text to have an instance
+    data = {
+        "plugin_id": "ai_text",
+        "title": "T1",
+        "textModel": "gpt-4o",
+        "textPrompt": "Hi",
+    }
+    resp = client.post("/save_plugin_settings", data=data)
+    assert resp.status_code == 200
+    inst = resp.get_json()["instance_name"]
+
+    page = client.get(f"/plugin/ai_text?instance={inst}")
+    assert page.status_code == 200
+    body = page.data
+    # Instance preview image element should be present when instance is specified
+    assert b'id="instancePreviewImage"' in body

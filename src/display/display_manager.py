@@ -63,7 +63,7 @@ class DisplayManager:
         else:
             raise ValueError(f"Unsupported display type: {display_type}")
 
-    def display_image(self, image, image_settings=None):
+    def display_image(self, image, image_settings=None, history_meta=None):
         """
         Delegates image rendering to the appropriate display instance.
 
@@ -113,6 +113,21 @@ class DisplayManager:
                 self.device_config.history_image_dir, history_filename
             )
             image.save(history_path)
+            # Write sidecar metadata if available
+            try:
+                if history_meta is not None:
+                    import json
+                    sidecar = dict(history_meta)
+                    sidecar.setdefault("history_filename", history_filename)
+                    sidecar.setdefault("saved_at", timestamp)
+                    json_path = os.path.join(
+                        self.device_config.history_image_dir,
+                        f"display_{timestamp}.json",
+                    )
+                    with open(json_path, "w", encoding="utf-8") as fh:
+                        json.dump(sidecar, fh, ensure_ascii=False, indent=2)
+            except Exception:
+                logger.exception("Failed to write history sidecar metadata")
         except Exception:
             logger.exception("Failed to save history copy of processed image")
 
