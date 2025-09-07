@@ -217,26 +217,15 @@ setup_memory_management() {
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  if [[ "$VERBOSE" -eq 1 ]]; then
-    echo_header "Upgrading pip and core build tools (pip/setuptools/wheel)"
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir
-    echo_header "Installing python dependencies"
-    $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir
-  else
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
-    $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
-    show_loader "\tInstalling python dependencies. "
-  fi
+  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
+  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
+  show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    if [[ "$VERBOSE" -eq 1 ]]; then
-      $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir
-    else
-      $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
-      show_loader "\tInstalling additional Waveshare python dependencies. "
-    fi
+    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
+    show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
 }
@@ -374,40 +363,25 @@ ask_for_reboot() {
   fi
 }
 
-# Simple step progress headings
-STEP=1
-step() { echo_header "[$STEP] $1"; STEP=$((STEP+1)); }
-
 # check if we have an argument for WS display support.  Parameter is not required
 # to maintain default INKY display support.
 parse_arguments "$@"
 check_permissions
-step "Stop existing service (if running)"
 stop_service
 # fetch the WS display driver if defined.
 if [[ -n "$WS_TYPE" ]]; then
-  step "Fetch Waveshare driver: $WS_TYPE"
   fetch_waveshare_driver
 fi
-step "Enable required interfaces (SPI/I2C and overlays)"
 enable_interfaces
-step "Install system dependencies"
 install_debian_dependencies
-step "Configure memory management (zramswap, earlyoom)"
 setup_memory_management
-step "Install application to $INSTALL_PATH"
 copy_project
-step "Create virtual environment and install Python packages"
 create_venv
-step "Install command shim to $BINPATH/$APPNAME"
 install_executable
-step "Install default config files"
 install_config
 # update the config file with additional WS if defined.
 if [[ -n "$WS_TYPE" ]]; then
-  step "Update config with Waveshare display type"
   update_config
 fi
-step "Install and enable systemd service"
 install_app_service
 ask_for_reboot
