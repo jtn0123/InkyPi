@@ -130,8 +130,6 @@ body {
 .icon-button svg,
 .icon-button .icon-image {
     color: var(--text);
-    fill: currentColor;
-    stroke: currentColor;
 }
 
 /* Icon image styling */
@@ -140,8 +138,6 @@ body {
     height: 32px; /* Keep a proportional height */
     margin-bottom: 8px;
     color: var(--text);
-    fill: currentColor;
-    stroke: currentColor;
 }
 
 /* App header container */
@@ -455,9 +451,6 @@ body {
     height: 30px;
     display: inline-block;
     vertical-align: middle;
-    color: var(--text);
-    fill: currentColor;
-    stroke: currentColor;
 }
 
 .settings-button:hover {
