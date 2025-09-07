@@ -36,8 +36,17 @@ class AIText(BasePlugin):
 
         try:
             ai_client = OpenAI(api_key=api_key)
+            # Map optional creativity level (0..1) to temperature with sensible defaults
+            creativity = settings.get("creativity")
+            temperature = None
+            if isinstance(creativity, str) and creativity.strip():
+                try:
+                    val = float(creativity)
+                    temperature = max(0.0, min(1.5, val))
+                except Exception:
+                    temperature = None
             prompt_response = AIText.fetch_text_prompt(
-                ai_client, text_model, text_prompt
+                ai_client, text_model, text_prompt, temperature=temperature
             )
         except Exception as e:
             logger.error(f"Failed to make Open AI request: {str(e)}")
@@ -60,33 +69,36 @@ class AIText(BasePlugin):
         return image
 
     @staticmethod
-    def fetch_text_prompt(ai_client, model, text_prompt):
+    def fetch_text_prompt(ai_client, model, text_prompt, temperature: float | None = None):
         logger.info(
             f"Getting random text prompt from input {text_prompt}, model: {model}"
         )
 
         system_content = (
-            "You are a highly intelligent text generation assistant. Generate concise, "
-            "relevant, and accurate responses tailored to the user's input. The response "
-            "should be 70 words or less."
-            "IMPORTANT: Do not rephrase, reword, or provide an introduction. Respond directly "
-            "to the request without adding explanations or extra context "
-            "IMPORTANT: If the response naturally requires a newline for formatting, provide "
-            "the '\n' newline character explicitly for every new line. For regular sentences "
-            "or paragraphs do not provide the new line character."
+            "You are a creative, vivid, and succinct writing assistant for an e-ink display. "
+            "Produce a compact, evocative response (≤70 words) tailored to the user's input. "
+            "Favor strong imagery, metaphor, or wit without being verbose. Avoid hedging. "
+            "Do NOT add prefaces or explanations; respond directly. If formatting needs lines, use '\n'. "
+            "No emojis, no markdown, no lists. Keep language clear, bold, and readable at a glance. "
             f"For context, today is {datetime.today().strftime('%Y-%m-%d')}"
         )
         user_content = text_prompt
 
         # Make the API call
-        response = ai_client.chat.completions.create(
-            model=model,
-            messages=[
+        kwargs = {
+            "model": model,
+            "messages": [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": user_content},
             ],
-            temperature=1,
-        )
+        }
+        # Default slightly elevated creativity if not provided
+        if temperature is None:
+            kwargs["temperature"] = 1.1
+        else:
+            kwargs["temperature"] = temperature
+
+        response = ai_client.chat.completions.create(**kwargs)
 
         prompt = response.choices[0].message.content.strip()
         logger.info(f"Generated random text prompt: {prompt}")
