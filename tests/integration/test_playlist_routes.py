@@ -62,8 +62,7 @@ def test_toggle_only_fresh_and_snooze(client, device_config_dev):
     pl.add_plugin({"plugin_id": "weather", "name": "A", "plugin_settings": {}, "refresh": {"interval": 60}})
     device_config_dev.write_config()
 
-    resp = client.post("/toggle_only_fresh", json={"playlist_name": "Default", "plugin_id": "weather", "plugin_instance": "A", "only_fresh": True})
-    assert resp.status_code == 200 and resp.get_json().get("success")
+    # Only-fresh endpoint removed; just verify snooze works
 
     resp2 = client.post("/set_snooze", json={"playlist_name": "Default", "plugin_id": "weather", "plugin_instance": "A", "snooze_until": None})
     assert resp2.status_code == 200 and resp2.get_json().get("success")

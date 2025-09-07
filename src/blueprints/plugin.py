@@ -78,26 +78,23 @@ def plugin_page(plugin_id):
                     logger.exception("Failed resolving instance playlist")
                     template_params["plugin_instance_playlist"] = None
             else:
-                # Try to find a saved settings instance for this plugin
-                default_playlist = playlist_manager.get_playlist("Default")
-                if default_playlist:
-                    saved_instance_name = f"{plugin_id}_saved_settings"
-                    saved_instance = default_playlist.find_plugin(
-                        plugin_id, saved_instance_name
+                # Load saved settings for this plugin (non-recurring; not tied to a playlist)
+                try:
+                    saved = device_config.get_config("saved_settings", {}).get(
+                        plugin_id
                     )
-                    if saved_instance:
-                        # Load the saved settings
-                        template_params["plugin_settings"] = saved_instance.settings
-                        template_params["plugin_instance"] = saved_instance_name
-                        template_params["plugin_instance_last_refresh"] = (
-                            saved_instance.latest_refresh_time
-                        )
+                    if saved:
+                        template_params["plugin_settings"] = saved
+                        template_params["plugin_instance"] = ""
+                        template_params["plugin_instance_last_refresh"] = None
+                        template_params["plugin_instance_playlist"] = None
                         logger.info(
-                            "Using saved settings instance | plugin_id=%s instance=%s",
+                            "Loaded saved settings | plugin_id=%s",
                             plugin_id,
-                            saved_instance_name,
                         )
-                        template_params["plugin_instance_playlist"] = "Default"
+                except Exception:
+                    # Best-effort; continue without saved settings
+                    pass
 
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:
@@ -502,39 +499,19 @@ def save_plugin_settings():
         plugin_settings.update(handle_request_files(request.files))
         plugin_id = plugin_settings.pop("plugin_id")
 
-        # Use "Default" playlist, create it if it doesn't exist
-        default_playlist_name = "Default"
-        playlist = playlist_manager.get_playlist(default_playlist_name)
-        if not playlist:
-            playlist_manager.add_playlist(default_playlist_name)
-            playlist = playlist_manager.get_playlist(default_playlist_name)
-
-        # Create a default instance name for this plugin
-        instance_name = f"{plugin_id}_saved_settings"
-
-        # Check if instance already exists
-        existing_instance = playlist.find_plugin(plugin_id, instance_name)
-        if existing_instance:
-            # Update existing instance
-            existing_instance.settings = plugin_settings
-        else:
-            # Create new instance
-            plugin_dict = {
-                "plugin_id": plugin_id,
-                "refresh": {"interval": 3600},  # Default to 1 hour
-                "plugin_settings": plugin_settings,
-                "name": instance_name,
-            }
-            playlist.add_plugin(plugin_dict)
-
-        device_config.write_config()
+        # Persist settings under top-level saved_settings
+        try:
+            saved_all = device_config.get_config("saved_settings") or {}
+        except Exception:
+            saved_all = {}
+        saved_all[plugin_id] = plugin_settings
+        device_config.update_value("saved_settings", saved_all, write=True)
 
         return (
             jsonify(
                 {
                     "success": True,
-                    "message": f"Settings saved to {default_playlist_name} playlist",
-                    "instance_name": instance_name,
+                    "message": "Settings saved. Use 'Add to Playlist' to schedule recurrence.",
                 }
             ),
             200,
@@ -545,6 +522,6 @@ def save_plugin_settings():
         return json_internal_error(
             "save plugin settings",
             details={
-                "hint": "Check Default playlist creation and config file permissions.",
+                "hint": "Check config file permissions.",
             },
         )

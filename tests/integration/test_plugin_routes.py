@@ -177,9 +177,10 @@ def test_update_now_exception_handling(client, flask_app, monkeypatch):
 
 
 def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch):
-    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
+    dc = flask_app.config["DEVICE_CONFIG"]
+    # Make update_value raise to simulate config failure
     monkeypatch.setattr(
-        pm, "get_playlist", lambda x: (_ for _ in ()).throw(Exception("test"))
+        dc, "update_value", lambda *args, **kwargs: (_ for _ in ()).throw(Exception("test"))
     )
 
     resp = client.post("/save_plugin_settings", data={"plugin_id": "ai_text"})
@@ -202,36 +203,25 @@ def test_update_plugin_instance_missing(client):
     assert resp.status_code in (200, 500)
 
 
-def test_save_plugin_settings_creates_then_updates(client, monkeypatch):
-    # First: create new default instance
+def test_save_plugin_settings_persist_and_load_on_plugin_page(client, monkeypatch):
+    # First: save settings
     data = {
         "plugin_id": "ai_text",
         "title": "T1",
         "textModel": "gpt-4o",
-        "textPrompt": "Hi",
+        "textPrompt": "Hello",
     }
     resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == 200
-    instance_name = resp.get_json()["instance_name"]
-    assert instance_name == "ai_text_saved_settings"
+    j = resp.get_json()
+    assert j.get("success") is True
+    assert "Add to Playlist" in j.get("message", "")
 
-    # Second: update existing instance via another save
-    data2 = {
-        "plugin_id": "ai_text",
-        "title": "T2",
-        "textModel": "gpt-4o",
-        "textPrompt": "Hi again",
-    }
-    resp2 = client.post("/save_plugin_settings", data=data2)
-    assert resp2.status_code == 200
-    assert resp2.get_json()["instance_name"] == instance_name
-
-    # Third: open plugin page and confirm instance prepopulates
+    # Then open plugin page and confirm settings prepopulate (not tied to any instance)
     page = client.get("/plugin/ai_text")
     assert page.status_code == 200
     body = page.get_data(as_text=True)
-    # The saved title value should appear in HTML (template uses settings to fill form)
-    assert ("T2" in body) or ("Hi again" in body)
+    assert ("T1" in body) or ("Hello" in body)
 
 
 def test_plugin_instance_image_404(client):

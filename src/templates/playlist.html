@@ -278,17 +278,6 @@
             document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
         });
 
-        async function toggleOnlyFresh(playlistName, pluginId, instanceName, onlyFresh){
-            try{
-                const resp = await fetch("{{ url_for('playlist.toggle_only_fresh') }}", {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName, only_fresh: !!onlyFresh})});
-                const j = await resp.json();
-                if (!resp.ok || !j.success){
-                    showResponseModal('failure', `Error!  ${j.error || 'Failed to update'}`);
-                } else {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${j.message}` }));
-                }
-            } catch(e){ showResponseModal('failure', 'Error updating setting'); }
-        }
         async function setSnooze(playlistName, pluginId, instanceName, isoStr){
             try{
                 const resp = await fetch("{{ url_for('playlist.set_snooze') }}", {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName, snooze_until: isoStr})});
@@ -399,10 +388,6 @@
                                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">{{ icon('pencil-simple', 'action-icon') | safe }}</a>
                                 <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('monitor', 'action-icon') | safe }}</button>
                                 <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">{{ icon('trash', 'action-icon') | safe }}</button>
-                                <div class="form-group nowrap" style="margin-left:8px;">
-                                    <label class="form-label" title="Only display this instance when it has new content">Only fresh</label>
-                                    <input type="checkbox" onchange="toggleOnlyFresh('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this.checked)" {% if plugin_instance.only_show_when_fresh %}checked{% endif %}>
-                                </div>
                                 <div class="form-group nowrap" style="margin-left:8px;">
                                     <label class="form-label" for="snooze_{{loop.index}}">Snooze</label>
                                     <input id="snooze_{{loop.index}}" class="time-input" type="datetime-local" onchange="setSnooze('{{ playlist.name }}','{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}', this.value ? new Date(this.value).toISOString() : null)" {% if plugin_instance.snooze_until %}value="{{ plugin_instance.snooze_until[:16] }}"{% endif %}>

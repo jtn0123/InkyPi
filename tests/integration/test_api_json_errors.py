@@ -21,12 +21,11 @@ def test_update_now_surfaces_plugin_error_json(client, monkeypatch):
 
 
 def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):
-    pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
-
-    def bad_get_playlist(name):
+    # Simulate a config write failure so endpoint returns JSON error
+    dc = flask_app.config["DEVICE_CONFIG"]
+    def boom_update_value(*args, **kwargs):
         raise RuntimeError("boom")
-
-    monkeypatch.setattr(pm, "get_playlist", bad_get_playlist, raising=True)
+    monkeypatch.setattr(dc, "update_value", boom_update_value, raising=True)
 
     resp = client.post("/save_plugin_settings", data={"plugin_id": "ai_text"})
     assert resp.status_code == 500

@@ -139,6 +139,22 @@ def create_playlist():
                 f"Playlist with name '{playlist_name}' already exists", status=400
             )
 
+        # Prevent overlapping time windows
+        try:
+            new_start = datetime.strptime(start_time, "%H:%M")
+            new_end = datetime.strptime(end_time, "%H:%M") if end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+            for pl in playlist_manager.playlists:
+                if getattr(pl, 'name', '') == 'Default':
+                    continue
+                ps = datetime.strptime(pl.start_time, "%H:%M")
+                pe = datetime.strptime(pl.end_time, "%H:%M") if pl.end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+                # overlap if start < other_end and other_start < end
+                if new_start < pe and ps < new_end:
+                    return json_error("Playlist time range overlaps with existing playlist", status=400)
+        except Exception:
+            # best-effort, fallback to allow
+            pass
+
         result = playlist_manager.add_playlist(playlist_name, start_time, end_time)
         if not result:
             return json_error("Failed to create playlist", status=500)
@@ -176,6 +192,22 @@ def update_playlist(playlist_name):
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
         return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
+
+    # Prevent overlapping (exclude the playlist being updated)
+    try:
+        new_start = datetime.strptime(start_time, "%H:%M")
+        new_end = datetime.strptime(end_time, "%H:%M") if end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+        for pl in playlist_manager.playlists:
+            if pl.name == playlist_name:
+                continue
+            if getattr(pl, 'name', '') == 'Default':
+                continue
+            ps = datetime.strptime(pl.start_time, "%H:%M")
+            pe = datetime.strptime(pl.end_time, "%H:%M") if pl.end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+            if new_start < pe and ps < new_end:
+                return json_error("Playlist time range overlaps with existing playlist", status=400)
+    except Exception:
+        pass
 
     result = playlist_manager.update_playlist(
         playlist_name, new_name, start_time, end_time
@@ -258,29 +290,7 @@ def set_snooze():
         return json_internal_error("set snooze")
 
 
-@playlist_bp.route("/toggle_only_fresh", methods=["POST"])
-def toggle_only_fresh():
-    device_config = current_app.config["DEVICE_CONFIG"]
-    playlist_manager = device_config.get_playlist_manager()
-    try:
-        data = request.get_json(force=True, silent=False)
-        playlist_name = data.get("playlist_name")
-        plugin_id = data.get("plugin_id")
-        instance_name = data.get("plugin_instance")
-        only_fresh = bool(data.get("only_fresh"))
-        if not all([playlist_name, plugin_id, instance_name]):
-            return json_error("playlist_name, plugin_id, plugin_instance required", status=400)
-        playlist = playlist_manager.get_playlist(playlist_name)
-        if not playlist:
-            return json_error("Playlist not found", status=400)
-        inst = playlist.find_plugin(plugin_id, instance_name)
-        if not inst:
-            return json_error("Plugin instance not found", status=400)
-        inst.only_show_when_fresh = only_fresh
-        device_config.write_config()
-        return jsonify({"success": True, "message": "Only fresh updated"})
-    except Exception:
-        return json_internal_error("toggle only fresh")
+# removed toggle_only_fresh endpoint per product decision
 
 
 @playlist_bp.app_template_filter("format_relative_time")

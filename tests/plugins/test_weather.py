@@ -504,12 +504,12 @@ def test_weather_save_settings(client, monkeypatch):
         "weatherTimeZone": "configuredTimeZone",
     }
 
-    # Test saving settings
+    # Test saving settings (non-recurring)
     resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == 200
     result = resp.get_json()
     assert result["success"] is True
-    assert "weather_saved_settings" in result["instance_name"]
+    assert "Add to Playlist" in result.get("message", "")
 
 
 def test_weather_settings_persistence(client, monkeypatch):
@@ -567,7 +567,7 @@ def test_weather_settings_persistence(client, monkeypatch):
         "weatherTimeZone": "configuredTimeZone",
     }
 
-    # Save settings first
+    # Save settings first (non-recurring)
     resp = client.post("/save_plugin_settings", data=data)
     assert resp.status_code == 200
 
