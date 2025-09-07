@@ -6,6 +6,7 @@
     <title>{{ config.name }}</title>
 </head>
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+<link rel="stylesheet" href="https://unpkg.com/phosphor-icons@2.0.3/src/css/phosphor.css">
 <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
 <body>
     <!-- Subtle frame container -->
@@ -22,14 +23,14 @@
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
                 </svg>
             </button>
-            <a href="{{ url_for('history.history_page') }}" class="settings-button">
-                <img src="{{ url_for('static', filename='icons/playlist.png') }}" title="History" alt="history icon" class="icon-image">
+            <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">
+                <i class="ph ph-clock-counter-clockwise ph-thin icon-image"></i>
             </a>
-            <a href="{{ url_for('playlist.playlists') }}" class="settings-button">
-                <img src="{{ url_for('static', filename='icons/display.png') }}" title="Playlists" alt="playlists icon" class="icon-image">
+            <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">
+                <i class="ph ph-squares-four ph-thin icon-image"></i>
             </a>
-            <a href="{{ url_for('settings.settings_page') }}" class="settings-button">
-                <img src="{{ url_for('static', filename='icons/settings.png') }}" title="Settings" alt="settings icon" class="icon-image">
+            <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">
+                <i class="ph ph-gear-six ph-thin icon-image"></i>
             </a>
         </header>
 
@@ -43,10 +44,27 @@
         <!-- Separator -->
         <div class="separator"></div>
         <h2 class="plugins-title">Plugins</h2>
+        {% set icon_map = {
+            'ai_text': 'text-t',
+            'ai_image': 'magic-wand',
+            'weather': 'cloud-sun',
+            'calendar': 'calendar-blank',
+            'clock': 'clock',
+            'newspaper': 'newspaper-clipping',
+            'apod': 'planet',
+            'unsplash': 'images-square',
+            'image_url': 'link-simple',
+            'image_upload': 'upload-simple',
+            'image_folder': 'folder-simple',
+            'screenshot': 'monitor',
+            'wpotd': 'book-open-text',
+            'comic': 'mask-happy'
+        } %}
         <div class="button-grid">
             {% for plugin in plugins %}
-            <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button" title="{{ plugin.display_name }}" >
-                <img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="icon-image">
+            <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button" title="{{ plugin.display_name }}">
+                {% set ph = icon_map.get(plugin.id, 'image') %}
+                <i class="ph ph-{{ ph }} ph-thin icon-image"></i>
             </a>
             {% endfor %}
         </div>

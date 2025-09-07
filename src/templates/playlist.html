@@ -264,7 +264,7 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}">
                     <div class="playlist-header">
                         <span class="playlist-title">{{ playlist.name }}</span>
-                        <button class="edit-button" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')"><img src="{{ url_for('static', filename='icons/settings.png') }}" alt="edit playlist" class="action-icon"></button>
+                        <button class="edit-button" title="Edit playlist" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')"><i class="ph ph-gear-six ph-thin action-icon"></i></button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
@@ -297,14 +297,14 @@
                                     </span>
                                 {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button">
-                                    <img src="{{ url_for('static', filename='icons/edit.png') }}" alt="edit plugin" class="action-icon">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit">
+                                    <i class="ph ph-pencil-simple ph-thin action-icon"></i>
                                 </a>
                                 <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
-                                    <img src="{{ url_for('static', filename='icons/display.png') }}" alt="display now" class="action-icon">
+                                    <i class="ph ph-monitor ph-thin action-icon"></i>
                                 </button>
                                 <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
-                                    <img src="{{ url_for('static', filename='icons/remove.png') }}" alt="delete plugin" class="action-icon">
+                                    <i class="ph ph-trash ph-thin action-icon"></i>
                                 </button>
                             </div>
                         </div>

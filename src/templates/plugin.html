@@ -297,7 +297,28 @@
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
+            {% set plugin_icon_map = {
+                'ai_image': 'magic-wand',
+                'ai_text': 'text-t',
+                'weather': 'cloud-sun',
+                'calendar': 'calendar-blank',
+                'clock': 'clock',
+                'newspaper': 'newspaper-clipping',
+                'apod': 'planet',
+                'unsplash': 'images-square',
+                'image_url': 'link-simple',
+                'image_upload': 'upload-simple',
+                'image_folder': 'folder-simple',
+                'screenshot': 'monitor',
+                'wpotd': 'book-open-text',
+                'comic': 'mask-happy'
+            } %}
+            {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
+            {% if ph_icon %}
+            <i class="ph ph-{{ ph_icon }} ph-thin app-icon" aria-hidden="true"></i>
+            {% else %}
             <img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">
+            {% endif %}
             <h1 class="app-title">{{ plugin.display_name }}</h1>
             <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
                 <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
