@@ -96,7 +96,12 @@ class BasePlugin:
             plugin_css = os.path.join(self.render_dir, css_file)
             css_files.append(plugin_css)
 
-        template_params["style_sheets"] = css_files
+        # Convert to file:// URLs so the headless browser can load local assets.
+        style_sheet_urls = [
+            (f"file://{path}" if not path.startswith("file://") else path)
+            for path in css_files
+        ]
+        template_params["style_sheets"] = style_sheet_urls
         template_params["width"] = dimensions[0]
         template_params["height"] = dimensions[1]
         template_params["font_faces"] = get_fonts()

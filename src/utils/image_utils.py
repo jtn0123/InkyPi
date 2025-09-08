@@ -240,6 +240,9 @@ def take_screenshot(target, dimensions, timeout_ms=None):
                     "--disable-plugins",
                     "--mute-audio",
                     "--no-sandbox",
+                    # Allow loading local file-based resources referenced by templates
+                    "--allow-file-access-from-files",
+                    "--enable-local-file-accesses",
                 ]
                 if timeout_ms:
                     command.append(f"--timeout={timeout_ms}")

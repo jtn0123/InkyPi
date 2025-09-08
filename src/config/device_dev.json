@@ -54,7 +54,7 @@
                         "refresh": {
                             "interval": 3600
                         },
-                        "latest_refresh_time": "2025-09-07T21:15:56.523448+00:00",
+                        "latest_refresh_time": "2025-09-07T17:41:31.511004-07:00",
                         "only_show_when_fresh": false,
                         "snooze_until": null
                     },
@@ -68,63 +68,34 @@
                         "latest_refresh_time": "2025-09-07T21:16:23.571926+00:00",
                         "only_show_when_fresh": false,
                         "snooze_until": null
-                    },
-                    {
-                        "plugin_id": "ai_image",
-                        "name": "AI Image",
-                        "plugin_settings": {
-                            "textPrompt": "",
-                            "imageModel": "dall-e-3",
-                            "quality": "standard"
-                        },
-                        "refresh": {
-                            "interval": 1800
-                        },
-                        "latest_refresh_time": null,
-                        "only_show_when_fresh": false,
-                        "snooze_until": null
-                    },
-                    {
-                        "plugin_id": "ai_image",
-                        "name": "ai_image_saved_settings",
-                        "plugin_settings": {
-                            "textPrompt": "",
-                            "imageModel": "dall-e-3",
-                            "quality": "standard",
-                            "randomizePrompt": "true"
-                        },
-                        "refresh": {
-                            "interval": 3600
-                        },
-                        "latest_refresh_time": null,
-                        "only_show_when_fresh": false,
-                        "snooze_until": null
                     }
                 ],
-                "current_plugin_index": 0
+                "current_plugin_index": 1
             }
         ],
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-07T21:16:23.571926+00:00",
-        "image_hash": "ba8379adc14c5609a3f4424b4b7f79c2b3eaceafe3d858cce27a4a0ccaf1843f",
-        "refresh_type": "Playlist",
-        "plugin_id": "wpotd",
-        "playlist": "Default",
-        "plugin_instance": "wpotd_saved_settings",
-        "request_ms": 10359,
+        "refresh_time": "2025-09-07T18:48:01.288012-07:00",
+        "image_hash": "154cd2a8172a04aff464541b5c0af2fa0096103c02eec0dfbad67290049ad9bc",
+        "refresh_type": "Manual Update",
+        "plugin_id": "newspaper",
+        "request_ms": 888,
         "display_ms": 26,
-        "generate_ms": 6034,
+        "generate_ms": 517,
         "preprocess_ms": 3,
-        "used_cached": false,
-        "plugin_meta": {
-            "date": "2025-09-07",
-            "filename": "File:Arenal volcano (70785p) (cropped).jpg",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/3/3a/Arenal_volcano_%2870785p%29_%28cropped%29.jpg",
-            "page_url": "https://en.wikipedia.org/wiki/Template:POTD/2025-09-07",
-            "caption": "Arenal Volcano panorama",
-            "description_url": "https://commons.wikimedia.org/wiki/File:Arenal_volcano_(70785p)_(cropped).jpg"
-        }
-    }
+        "used_cached": false
+    },
+    "inverted_image": null,
+    "log_system_stats": null,
+    "timezone": "America/Los_Angeles",
+    "time_format": "12h",
+    "plugin_cycle_interval_seconds": 3600,
+    "image_settings": {
+        "saturation": 1.0,
+        "brightness": 1.0,
+        "sharpness": 1.0,
+        "contrast": 1.0
+    },
+    "preview_size_mode": "native"
 }

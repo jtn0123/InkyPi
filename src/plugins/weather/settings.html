@@ -12,6 +12,7 @@
         <input readonly type="text" id="longitude" name="longitude" class="form-input" />
     </div>
     <button type="button" id="openMap" class="action-button compact">Select Location</button>
+    <button type="button" id="useBrowserLocation" class="action-button compact is-secondary" title="Use this browser's current location">Use Browser Location</button>
 </div>
 
 <div class="form-group">
@@ -240,11 +241,44 @@
             document.getElementById('forecastDays').value = 7;
             document.getElementById('moonPhase').checked = false;
             document.getElementById('weatherTimeZone').value = "locationTimeZone";
+
+            // Auto-populate from device settings location if available and empty
+            try {
+                const deviceCfg = {{ config | tojson }};
+                const devLoc = deviceCfg && deviceCfg.device_location;
+                if ((!latitude || !longitude) && devLoc && typeof devLoc.lat === 'number' && typeof devLoc.lon === 'number'){
+                    latitude = devLoc.lat;
+                    longitude = devLoc.lon;
+                    $latitude.value = String(latitude);
+                    $longitude.value = String(longitude);
+                    updateZoom();
+                }
+            } catch(e) { /* ignore */ }
         }
 
         document.getElementById('weatherProvider').value = weatherProvider;
         document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
         updateTitleOptions(weatherProvider)
+
+        // Use browser geolocation button
+        const $useBrowser = document.getElementById('useBrowserLocation');
+        if ($useBrowser && navigator.geolocation){
+            $useBrowser.addEventListener('click', () => {
+                try{
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                        try{
+                            latitude = pos.coords.latitude;
+                            longitude = pos.coords.longitude;
+                            $latitude.value = String(latitude);
+                            $longitude.value = String(longitude);
+                            updateZoom();
+                        } catch(e){}
+                    }, () => {
+                        if (window.showResponseModal){ showResponseModal('failure', 'Location permission denied.'); }
+                    }, { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 });
+                } catch(e){}
+            });
+        }
     });
 
     // Client-side validation specific to Weather plugin

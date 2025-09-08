@@ -11,6 +11,16 @@
         async function handleAction() {
             const form = document.querySelector('.settings-form');
             const formData = new FormData(form);
+            // Attach browser geolocation if requested and available
+            try {
+                if (window.__attachGeo === true && navigator.geolocation) {
+                    const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, maximumAge: 60000, timeout: 4000 }));
+                    if (pos && pos.coords) {
+                        formData.set('deviceLat', String(pos.coords.latitude));
+                        formData.set('deviceLon', String(pos.coords.longitude));
+                    }
+                }
+            } catch(e) { /* ignore geolocation errors */ }
 
             try {
                 const response = await fetch("{{ url_for('settings.save_settings') }}", {
@@ -86,6 +96,11 @@
             valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
         }
         document.addEventListener('DOMContentLoaded', populateIntervalFields);
+        // Toggle to include geolocation on save
+        window.__attachGeo = false;
+        function toggleUseDeviceLocation(cb){
+            window.__attachGeo = !!cb.checked;
+        }
 
         // Logs viewer state
         let logsPollingHandle = null;
@@ -389,6 +404,13 @@
                             <option value="{{ timezone }}"></option>
                             {% endfor %}
                         </datalist>
+                    </div>
+                    <div class="form-group nowrap">
+                        <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
+                        <label class="toggle-container">
+                            <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox" onchange="toggleUseDeviceLocation(this)">
+                            <span class="toggle-label"></span>
+                        </label>
                     </div>
                     <div class="form-group nowrap">
                         <label for="timeFormat" class="form-label">Time Format</label>

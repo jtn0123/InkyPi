@@ -325,6 +325,19 @@ def save_settings():
             },
             "preview_size_mode": form_data.get("previewSizeMode", "native"),
         }
+        # Optional: device geolocation from browser
+        try:
+            lat_raw = form_data.get("deviceLat")
+            lon_raw = form_data.get("deviceLon")
+            if lat_raw is not None and lon_raw is not None and lat_raw != "" and lon_raw != "":
+                lat = float(lat_raw)
+                lon = float(lon_raw)
+                # Basic sanity range check
+                if -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0:
+                    settings["device_location"] = {"lat": lat, "lon": lon}
+        except Exception:
+            # Ignore invalid inputs; keep existing config
+            pass
         device_config.update_config(settings)
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:
