@@ -198,8 +198,10 @@ def main():
         
         x_offset = 0
         from PIL import ImageDraw, ImageFont
+        from typing import Union
         draw = ImageDraw.Draw(composite)
         
+        font: Union[ImageFont.FreeTypeFont, ImageFont.ImageFont]
         try:
             font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
         except Exception:
