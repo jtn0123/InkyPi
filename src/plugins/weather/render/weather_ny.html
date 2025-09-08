@@ -71,13 +71,14 @@
       <div class="chart-container ny">
         <canvas id="hourlyTemperatureChart" style="width: 100%; height: 100%;"></canvas>
       </div>
+      {% if plugin_settings.displayRefreshTime == "true" %}
+      <div class="last-refresh">{{ last_refresh_time }}</div>
+      {% endif %}
       {% endif %}
     </div>
   </div>
 
-  {% if plugin_settings.displayRefreshTime == "true" %}
-  <div class="last-refresh">{{ last_refresh_time }}</div>
-  {% endif %}
+  
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -100,7 +101,8 @@
     let maxTemp = temperatures.length ? Math.max(...temperatures) : 30;
 
     // Visually emphasize bars when measurable rain is present
-    const barColors = rainIn.map(v => (Number(v) || 0) > 0.01 ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.25)');
+    // POP bars: blue with alpha scaled to percent
+    const barColors = precipitation.map(p => `rgba(30,80,200,${Math.max(0.15, Math.min(1, (Number(p)||0)/100))})`);
 
     // Draw a subtle vertical line at "now" (index 0), and annotate min/max
     const nowLine = {
@@ -146,8 +148,23 @@
       }
     };
 
+    // Gradient for the temperature line, recomputed after layout
+    const tempGradient = {
+      id: 'tempGradient',
+      beforeDraw(chart, args, opts) {
+        const {ctx, chartArea} = chart;
+        if (!chartArea) return;
+        const grad = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+        grad.addColorStop(0, 'rgba(30,80,200,0.9)');   // cooler
+        grad.addColorStop(0.5, 'rgba(120,120,120,0.95)');
+        grad.addColorStop(1, 'rgba(220,60,40,0.95)');  // warmer
+        const ds = chart.data.datasets[0];
+        ds.borderColor = grad;
+      }
+    };
+
     new Chart(ctx, {
-      plugins: [nowLine, minMaxLabels],
+      plugins: [nowLine, minMaxLabels, tempGradient],
       data: {
         labels,
         datasets: [
@@ -160,7 +177,7 @@
             pointRadius: 0,
             pointHoverRadius: 4,
             pointHoverBackgroundColor: '#000',
-            tension: 0.2,
+            tension: 0.35,
             yAxisID: 'y',
             fill: false,
             spanGaps: true

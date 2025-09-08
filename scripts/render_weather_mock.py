@@ -34,12 +34,19 @@ def _build_fake_owm_payload(now: datetime) -> dict:
     hourly = []
     for i in range(24):
         ts = base_ts + i * 3600
-        temp = 72 - max(0, (i - 8)) * 1  # a gentle cooling curve
-        pop = 0.05 * (i % 5)  # 0..0.2
-        rain_mm = 0.0 if i not in (10, 11, 12, 16, 17) else (0.6 if i == 12 else 1.2)
+        # Diurnal temp curve (warmer late afternoon, cooler early AM)
+        temp = 65 + 15 * __import__('math').sin((i - 4) * __import__('math').pi / 12)
+        # POP cycles with fronts
+        pop = max(0.0, min(1.0, 0.2 + 0.6 * (1 if 15 <= i <= 20 else (0.5 if 9 <= i <= 12 else 0))))
+        # Rain bursts in evening hours
+        rain_mm = 0.0
+        if 16 <= i <= 18:
+            rain_mm = 0.8 + 0.4 * (i - 16)
+        elif 19 <= i <= 20:
+            rain_mm = 1.2 - 0.6 * (i - 19)
         hourly.append({
             "dt": ts,
-            "temp": temp,
+            "temp": round(temp, 1),
             "pop": pop,
             "rain": {"1h": rain_mm},
         })

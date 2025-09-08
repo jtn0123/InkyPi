@@ -15,10 +15,7 @@
   color: rgba(0,0,0,0.7);
   font-weight: 400;
   text-align: right;
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
-  margin: 0;
+  margin-top: 2px;
 }
 
 .alerts { 
