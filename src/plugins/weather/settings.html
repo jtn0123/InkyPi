@@ -242,11 +242,13 @@
             document.getElementById('moonPhase').checked = false;
             document.getElementById('weatherTimeZone').value = "locationTimeZone";
 
-            // Auto-populate from device settings location if available and empty
+            // Auto-populate from device settings location if available and empty (or saved weather has no coords)
             try {
                 const deviceCfg = {{ config | tojson }};
                 const devLoc = deviceCfg && deviceCfg.device_location;
-                if ((!latitude || !longitude) && devLoc && typeof devLoc.lat === 'number' && typeof devLoc.lon === 'number'){
+                const savedLat = pluginSettings && pluginSettings.latitude;
+                const savedLon = pluginSettings && pluginSettings.longitude;
+                if ((!(savedLat) || !(savedLon)) && (!latitude || !longitude) && devLoc && typeof devLoc.lat === 'number' && typeof devLoc.lon === 'number'){
                     latitude = devLoc.lat;
                     longitude = devLoc.lon;
                     $latitude.value = String(latitude);
@@ -260,23 +262,79 @@
         document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
         updateTitleOptions(weatherProvider)
 
+        // Helper to apply coordinates to inputs and map state
+        function applyLatLon(lat, lon){
+            try{
+                latitude = Number(lat);
+                longitude = Number(lon);
+                $latitude.value = String(latitude);
+                $longitude.value = String(longitude);
+                updateZoom();
+            } catch(e){}
+        }
+
+        async function sendClientLog(level, message, extra){
+            try{
+                await fetch('{{ url_for('settings.client_log') }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ level, message, extra }) });
+            } catch(_){}
+        }
+
+        async function fallbackApproxLocation(){
+            try{
+                // IP-based approximate location fallback (no prompt; less precise)
+                let lat = null, lon = null;
+                try {
+                    const r = await fetch('https://ipapi.co/json', { cache: 'no-store' });
+                    const j = await r.json();
+                    if (j && typeof j.latitude === 'number' && typeof j.longitude === 'number'){
+                        lat = j.latitude; lon = j.longitude;
+                    }
+                } catch(_) {}
+                if (lat === null || lon === null){
+                    const r2 = await fetch('https://ip-api.com/json', { cache: 'no-store' });
+                    const j2 = await r2.json();
+                    if (j2 && typeof j2.lat === 'number' && typeof j2.lon === 'number'){
+                        lat = j2.lat; lon = j2.lon;
+                    }
+                }
+                if (lat !== null && lon !== null){
+                    applyLatLon(lat, lon);
+                    sendClientLog('info', 'weather: used approximate IP location', { lat, lon });
+                    if (window.showResponseModal){ showResponseModal('success', 'Used approximate location (IP).'); }
+                } else {
+                    sendClientLog('warn', 'weather: IP location unavailable');
+                    if (window.showResponseModal){ showResponseModal('failure', 'Unable to determine location automatically. Use Select Location.'); }
+                }
+            } catch(e){
+                sendClientLog('error', 'weather: IP location error', { error: String(e && e.message || e) });
+                if (window.showResponseModal){ showResponseModal('failure', 'Unable to determine location automatically. Use Select Location.'); }
+            }
+        }
+
         // Use browser geolocation button
         const $useBrowser = document.getElementById('useBrowserLocation');
-        if ($useBrowser && navigator.geolocation){
+        if ($useBrowser){
             $useBrowser.addEventListener('click', () => {
                 try{
+                    if (!navigator.geolocation || !window.isSecureContext){
+                        sendClientLog('warn', 'weather: precise geolocation unavailable (insecure context)');
+                        if (window.showResponseModal){ showResponseModal('failure', 'Browser blocked precise location (requires HTTPS or localhost). Using approximate IP location…'); }
+                        fallbackApproxLocation();
+                        return;
+                    }
                     navigator.geolocation.getCurrentPosition((pos) => {
-                        try{
-                            latitude = pos.coords.latitude;
-                            longitude = pos.coords.longitude;
-                            $latitude.value = String(latitude);
-                            $longitude.value = String(longitude);
-                            updateZoom();
-                        } catch(e){}
-                    }, () => {
-                        if (window.showResponseModal){ showResponseModal('failure', 'Location permission denied.'); }
+                        const { latitude: plat, longitude: plon, accuracy } = pos.coords || {};
+                        applyLatLon(plat, plon);
+                        sendClientLog('info', 'weather: precise location success', { lat: plat, lon: plon, accuracy });
+                    }, (err) => {
+                        sendClientLog('warn', 'weather: precise location denied/failure', { code: err && err.code, message: err && err.message });
+                        if (window.showResponseModal){
+                            const msg = (err && err.code === 1) ? 'Location permission denied. Using approximate IP location…' : 'Unable to get precise location. Using approximate IP location…';
+                            showResponseModal('failure', msg);
+                        }
+                        fallbackApproxLocation();
                     }, { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 });
-                } catch(e){}
+                } catch(e){ fallbackApproxLocation(); }
             });
         }
     });
@@ -285,6 +343,12 @@
     // Ensures latitude and longitude are present before Update Now or Add to Playlist
     window.validatePluginSettings = function(action){
         try {
+            // Emit a small client log so we can verify saves contain the values
+            try {
+                const latDbg = document.getElementById('latitude')?.value;
+                const lonDbg = document.getElementById('longitude')?.value;
+                fetch('{{ url_for('settings.client_log') }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ level: 'debug', message: 'weather: submitting settings', extra: { action, lat: latDbg, lon: lonDbg } }) });
+            } catch(e) {}
             const provider = (document.getElementById('weatherProvider') || {}).value || 'OpenWeatherMap';
             // Only enforce for providers that need coordinates (both do)
             const latEl = document.getElementById('latitude');

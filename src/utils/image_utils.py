@@ -176,6 +176,39 @@ def compute_image_hash(image):
     return hashlib.sha256(img_bytes).hexdigest()
 
 
+def _playwright_screenshot_html(html_file_path: str, dimensions: tuple[int, int]) -> Image.Image | None:
+    """Try to render a local HTML file using Playwright (if available)."""
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return None
+
+    img: Image.Image | None = None
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=[
+            "--allow-file-access-from-files",
+            "--enable-local-file-accesses",
+            "--disable-web-security",
+        ])
+        try:
+            page = browser.new_page(viewport={"width": int(dimensions[0]), "height": int(dimensions[1])})
+            page.goto(f"file://{html_file_path}")
+            # Wait for network to be idle-ish
+            try:
+                page.wait_for_load_state("load", timeout=4000)
+                # Ensure <img> resources finished (including file://)
+                page.evaluate(
+                    "() => Promise.all(Array.from(document.images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = () => r(); img.onerror = () => r(); })))"
+                )
+            except Exception:
+                pass
+            png_bytes = page.screenshot(clip={"x": 0, "y": 0, "width": int(dimensions[0]), "height": int(dimensions[1])})
+            img = load_image_from_bytes(png_bytes)
+        finally:
+            browser.close()
+    return img
+
+
 def take_screenshot_html(html_str, dimensions, timeout_ms=None):
     image = None
     html_file_path = None
@@ -185,7 +218,12 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
             html_file.write(html_str.encode("utf-8"))
             html_file_path = html_file.name
 
-        image = take_screenshot(html_file_path, dimensions, timeout_ms)
+        # Load via file:// scheme so linked local assets (CSS, fonts, images)
+        # are treated as same-origin file resources in headless Chrome.
+        # Prefer Playwright if available; it tends to load local assets more reliably
+        image = _playwright_screenshot_html(html_file_path, dimensions)
+        if image is None:
+            image = take_screenshot(f"file://{html_file_path}", dimensions, timeout_ms)
     except Exception as e:
         logger.error(f"Failed to take screenshot: {str(e)}")
     finally:
@@ -224,7 +262,6 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             ):
                 command = [
                     browser,
-                    target,
                     "--headless",
                     f"--screenshot={img_file_path}",
                     f"--window-size={dimensions[0]},{dimensions[1]}",
@@ -243,6 +280,9 @@ def take_screenshot(target, dimensions, timeout_ms=None):
                     # Allow loading local file-based resources referenced by templates
                     "--allow-file-access-from-files",
                     "--enable-local-file-accesses",
+                    # Relax same-origin so file:// linked assets load predictably
+                    "--disable-web-security",
+                    target,
                 ]
                 if timeout_ms:
                     command.append(f"--timeout={timeout_ms}")

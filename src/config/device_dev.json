@@ -76,13 +76,13 @@
         "active_playlist": "Default"
     },
     "refresh_info": {
-        "refresh_time": "2025-09-07T18:48:01.288012-07:00",
-        "image_hash": "154cd2a8172a04aff464541b5c0af2fa0096103c02eec0dfbad67290049ad9bc",
+        "refresh_time": "2025-09-07T19:43:24.176723-07:00",
+        "image_hash": "f6817b02a3a6d4a75c056b2284a78aa48474297222cab8a818f5e5432f2a30dc",
         "refresh_type": "Manual Update",
-        "plugin_id": "newspaper",
-        "request_ms": 888,
+        "plugin_id": "weather",
+        "request_ms": 1633,
         "display_ms": 26,
-        "generate_ms": 517,
+        "generate_ms": 1531,
         "preprocess_ms": 3,
         "used_cached": false
     },
@@ -97,5 +97,29 @@
         "sharpness": 1.0,
         "contrast": 1.0
     },
-    "preview_size_mode": "native"
+    "preview_size_mode": "native",
+    "saved_settings": {
+        "weather": {
+            "latitude": "32.9161",
+            "longitude": "-117.1402",
+            "weatherProvider": "OpenWeatherMap",
+            "units": "imperial",
+            "titleSelection": "location",
+            "customTitle": "",
+            "displayRefreshTime": "true",
+            "displayMetrics": "true",
+            "displayGraph": "true",
+            "displayForecast": "true",
+            "forecastDays": "7",
+            "weatherTimeZone": "locationTimeZone",
+            "selectedFrame": "None",
+            "topMargin": "5",
+            "bottomMargin": "5",
+            "leftMargin": "5",
+            "rightMargin": "5",
+            "backgroundOption": "color",
+            "backgroundColor": "#ffffff",
+            "textColor": "#000000"
+        }
+    }
 }

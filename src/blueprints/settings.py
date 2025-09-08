@@ -355,6 +355,41 @@ def save_settings():
     return jsonify({"success": True, "message": "Saved settings."})
 
 
+@settings_bp.route("/settings/client_log", methods=["POST"])
+def client_log():
+    """Accept lightweight client logs and emit them to server logs.
+
+    Intended for front-end flows (e.g., browser geolocation) where we need
+    visibility in terminal logs without failing the UX if logging fails.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        level = str(data.get("level") or "info").lower()
+        message = str(data.get("message") or "")
+        extra = data.get("extra")
+        # Render extra as compact string to avoid noisy logs
+        try:
+            import json as _json
+
+            extra_str = _json.dumps(extra, separators=(",", ":")) if extra is not None else "{}"
+        except Exception:
+            extra_str = str(extra)
+
+        line = f"client_log | level={level} msg={message} extra={extra_str}"
+        if level == "debug":
+            logger.debug(line)
+        elif level in ("warn", "warning"):
+            logger.warning(line)
+        elif level in ("err", "error"):
+            logger.error(line)
+        else:
+            logger.info(line)
+        return jsonify({"success": True})
+    except Exception:
+        logger.exception("/settings/client_log failure")
+        return json_internal_error("client_log", details={"hint": "Check payload shape."})
+
+
 @settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
     data = request.get_json() or {}

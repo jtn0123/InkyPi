@@ -6,6 +6,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_utils import take_screenshot_html
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,34 @@ class BasePlugin:
             plugin_dir = os.path.join(plugin_dir, path)
         return plugin_dir
 
+    def to_file_url(self, path: str) -> str:
+        """Convert a local filesystem path to a file:// URL if needed.
+
+        Leaves http(s), data:, and file:// URLs untouched so callers can pass
+        through remote assets without change.
+        """
+        try:
+            if path.startswith(("http://", "https://", "data:", "file://")):
+                return path
+            return f"file://{path}"
+        except Exception:
+            return path
+
+    def path_to_data_uri(self, path: str) -> str:
+        """Return a data: URI for a local file path, falling back to file:// if read fails."""
+        try:
+            with open(path, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode("ascii")
+            # Best-effort mime by extension
+            mime = "image/png"
+            if path.endswith(".jpg") or path.endswith(".jpeg"):
+                mime = "image/jpeg"
+            elif path.endswith(".gif"):
+                mime = "image/gif"
+            return f"data:{mime};base64,{b64}"
+        except Exception:
+            return self.to_file_url(path)
+
     def generate_settings_template(self):
         template_params = {"settings_template": "base_plugin/settings.html", "style_settings": True}
 
@@ -97,14 +126,33 @@ class BasePlugin:
             css_files.append(plugin_css)
 
         # Convert to file:// URLs so the headless browser can load local assets.
-        style_sheet_urls = [
-            (f"file://{path}" if not path.startswith("file://") else path)
-            for path in css_files
-        ]
+        style_sheet_urls = [self.to_file_url(path) for path in css_files]
         template_params["style_sheets"] = style_sheet_urls
         template_params["width"] = dimensions[0]
         template_params["height"] = dimensions[1]
-        template_params["font_faces"] = get_fonts()
+        # Convert font file paths to file URLs
+        fonts = get_fonts()
+        for f in fonts:
+            try:
+                f["url"] = self.to_file_url(f.get("url", ""))
+            except Exception:
+                pass
+        template_params["font_faces"] = fonts
+
+        # Optionally inline CSS when running in headless screenshot mode to avoid any
+        # possible file:// loading issues on some platforms
+        try:
+            inline_css: list[str] = []
+            for css_path in css_files:
+                try:
+                    with open(css_path, "r", encoding="utf-8") as f:
+                        inline_css.append(f.read())
+                except Exception:
+                    pass
+            if inline_css:
+                template_params["inline_styles"] = inline_css
+        except Exception:
+            pass
 
         # load and render the given html template
         template = self.env.get_template(html_file)

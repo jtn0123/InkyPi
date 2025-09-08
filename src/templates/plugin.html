@@ -12,7 +12,9 @@
     <script>
         const pluginSettings = {{ plugin_settings | tojson if plugin_settings else {} }};
         const pluginInstanceName ='{{ plugin_instance }}';
-        const loadPluginSettings = pluginInstanceName != '';
+        const hasPluginSettings = !!(pluginSettings && Object.keys(pluginSettings).length);
+        // Treat either editing an instance or having saved (non-instance) settings as "load settings"
+        const loadPluginSettings = (pluginInstanceName != '') || hasPluginSettings;
         const styleSettings = {{ style_settings | default(false) | tojson }};
         const previewUrl = '{{ url_for("main.preview_image") }}';
         const refreshInfoUrl = '{{ url_for("main.refresh_info") }}';

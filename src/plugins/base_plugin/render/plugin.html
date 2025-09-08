@@ -1,8 +1,14 @@
 <html>
     <head>
-    {% for style in style_sheets %}
+    {% if inline_styles %}
+        {% for css in inline_styles %}
+        <style>{{ css | safe }}</style>
+        {% endfor %}
+    {% else %}
+        {% for style in style_sheets %}
         <link rel="stylesheet" href="{{style}}">
-    {% endfor %}
+        {% endfor %}
+    {% endif %}
     <style>
         {% for font in font_faces %}
         @font-face {
