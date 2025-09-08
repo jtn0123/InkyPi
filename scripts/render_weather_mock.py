@@ -201,7 +201,6 @@ def main():
         draw = ImageDraw.Draw(composite)
         
         try:
-            from PIL.ImageFont import FreeTypeFont
             font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
         except Exception:
             font = ImageFont.load_default()
