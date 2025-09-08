@@ -124,6 +124,14 @@ class BasePlugin:
         if css_file:
             plugin_css = os.path.join(self.render_dir, css_file)
             css_files.append(plugin_css)
+        # Allow passing a list of extra CSS file names
+        extra_css_files = template_params.get("extra_css_files") or []
+        if isinstance(extra_css_files, list):
+            for fname in extra_css_files:
+                try:
+                    css_files.append(os.path.join(self.render_dir, fname))
+                except Exception:
+                    pass
 
         # Convert to file:// URLs so the headless browser can load local assets.
         style_sheet_urls = [self.to_file_url(path) for path in css_files]
@@ -149,6 +157,15 @@ class BasePlugin:
                         inline_css.append(f.read())
                 except Exception:
                     pass
+            # Allow per-render extra CSS injection via plugin_settings.extra_css
+            try:
+                extra_css = (
+                    (template_params.get("plugin_settings", {}) or {}).get("extra_css")
+                )
+                if isinstance(extra_css, str) and extra_css.strip():
+                    inline_css.append(extra_css)
+            except Exception:
+                pass
             if inline_css:
                 template_params["inline_styles"] = inline_css
         except Exception:

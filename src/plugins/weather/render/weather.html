@@ -109,7 +109,8 @@
 	const units = document.getElementById('units-container').dataset.units;
 	const isImperial = units === "imperial";
 	const unit = isImperial ? "in" : "mm";
-	const threshold = isImperial ? 0.0035 : 0.09;
+	// Show labels whenever measurable rain is present
+	const threshold = 0.0;
 	
     // Find min and max temperatures
     let minTemp = 0;
@@ -192,6 +193,7 @@
             yAxisID: 'y1',
             barPercentage: 1.0, // Ensures full width
             categoryPercentage: 1.0,  // Ensures full width
+            barThickness: 6,
             fill: true, // Enable filling the area under the line
           }
         ]

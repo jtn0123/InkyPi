@@ -482,6 +482,57 @@ def update_now():
     )
 
 
+@plugin_bp.route("/ab_compare", methods=["POST"])
+def ab_compare():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    display_manager = current_app.config["DISPLAY_MANAGER"]
+
+    try:
+        form = parse_form(request.form)
+        form.update(handle_request_files(request.files))
+        plugin_id = form.get("plugin_id")
+        extra_css = form.get("extra_css", "")
+        if not plugin_id:
+            return json_error("plugin_id required", status=400)
+
+        plugin_config = device_config.get_plugin(plugin_id)
+        if not plugin_config:
+            return json_error(f"Plugin '{plugin_id}' not found", status=404)
+        plugin = get_plugin_instance(plugin_config)
+
+        # Baseline (A)
+        image_a = plugin.generate_image(form, device_config)
+        try:
+            display_manager.save_image_only(image_a, filename="current_image.png")
+        except Exception:
+            target = resolve_path("static/images/current_image.png")
+            image_a.save(target)
+
+        # Variant (B)
+        form_with_css = dict(form)
+        form_with_css["extra_css"] = extra_css
+        image_b = plugin.generate_image(form_with_css, device_config)
+        try:
+            display_manager.save_image_only(
+                image_b, filename="current_image_variant.png"
+            )
+        except Exception:
+            target_b = resolve_path("static/images/current_image_variant.png")
+            image_b.save(target_b)
+
+        from flask import url_for
+        return jsonify(
+            {
+                "success": True,
+                "baseline_path": url_for("static", filename="images/current_image.png"),
+                "variant_path": url_for("static", filename="images/current_image_variant.png"),
+            }
+        )
+    except Exception:
+        logger.exception("Error in ab_compare")
+        return json_internal_error("ab compare")
+
+
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
 def save_plugin_settings():
     device_config = current_app.config["DEVICE_CONFIG"]

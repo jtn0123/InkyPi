@@ -152,6 +152,20 @@ class DisplayManager:
         except Exception:
             logger.exception("Failed to record display metrics")
 
+    def save_image_only(self, image, filename: str = "current_image.png"):
+        """Save an image under static preview directory without display/processing.
+
+        This is useful for A/B comparisons and UI previews.
+        """
+        try:
+            preview_dir = os.path.dirname(self.device_config.processed_image_file)
+            target = os.path.join(preview_dir, filename)
+            os.makedirs(preview_dir, exist_ok=True)
+            image.save(target)
+            logger.info("Saved preview image | path=%s", target)
+        except Exception:
+            logger.exception("Failed to save preview image")
+
     def display_preprocessed_image(self, image_path: str):
         """
         Display a previously processed image without re-processing.

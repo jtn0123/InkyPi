@@ -90,6 +90,14 @@
         </select>
     </div>
 
+    <div class="form-group">
+        <label for="layoutStyle" class="form-label">Layout Style:</label>
+        <select id="layoutStyle" name="layoutStyle" class="form-input">
+            <option value="classic">Classic</option>
+            <option value="ny_color">NY Color</option>
+        </select>
+    </div>
+
 </div>
 
 <div id="mapModal" class="modal">
@@ -220,6 +228,7 @@
             document.getElementById('moonPhase').value = pluginSettings.moonPhase;
 
             document.getElementById('weatherTimeZone').value = pluginSettings.weatherTimeZone;
+            document.getElementById('layoutStyle').value = pluginSettings.layoutStyle || 'classic';
             
             selectedTitle = pluginSettings.titleSelection || 'location';
             weatherProvider = pluginSettings.weatherProvider || 'OpenWeatherMap';
@@ -241,6 +250,7 @@
             document.getElementById('forecastDays').value = 7;
             document.getElementById('moonPhase').checked = false;
             document.getElementById('weatherTimeZone').value = "locationTimeZone";
+            document.getElementById('layoutStyle').value = 'classic';
 
             // Auto-populate from device settings location if available and empty (or saved weather has no coords)
             try {
@@ -391,4 +401,52 @@
             return true; // do not block if validator fails unexpectedly
         }
     }
+</script>
+
+<!-- A/B Compare Modal -->
+<div id="abModal" class="modal">
+  <div class="modal-content">
+    <span class="close-button" onclick="closeModal('abModal')">×</span>
+    <h2>Compare (A/B) — Extra CSS</h2>
+    <div class="separator"></div>
+    <textarea id="extraCss" class="form-input" rows="8" placeholder="/* Paste CSS overrides here for Variant (B) */"></textarea>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button id="runAb" class="action-button">Render A/B</button>
+      <div id="abStatus" style="align-self:center; font-size: 12px;"></div>
+    </div>
+  </div>
+  </div>
+
+<script>
+  (function(){
+    const btn = document.createElement('button');
+    btn.textContent = 'Compare (A/B)';
+    btn.className = 'action-button';
+    btn.style.marginTop = '10px';
+    const form = document.getElementById('settingsForm') || document.body;
+    form.appendChild(btn);
+
+    btn.addEventListener('click', () => openModal('abModal'));
+
+    document.getElementById('runAb').addEventListener('click', async () => {
+      const css = document.getElementById('extraCss').value || '';
+      const fd = new FormData(document.getElementById('settingsForm'));
+      fd.append('plugin_id', 'weather');
+      fd.append('extra_css', css);
+      document.getElementById('abStatus').textContent = 'Rendering…';
+      try{
+        const resp = await fetch('{{ url_for("plugin.ab_compare") }}', {method:'POST', body: fd});
+        const j = await resp.json();
+        if(!resp.ok || !j.success){
+          document.getElementById('abStatus').textContent = 'Failed: ' + (j.error || resp.statusText);
+          return;
+        }
+        document.getElementById('abStatus').textContent = 'Done. Opening images…';
+        window.open(j.baseline_path, '_blank');
+        window.open(j.variant_path, '_blank');
+      }catch(e){
+        document.getElementById('abStatus').textContent = 'Error: ' + e;
+      }
+    });
+  })();
 </script>

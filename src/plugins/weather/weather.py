@@ -110,6 +110,13 @@ class Weather(BasePlugin):
             dimensions = dimensions[::-1]
 
         template_params["plugin_settings"] = settings
+        # Allow selectable layout style to pull in extra CSS file(s)
+        try:
+            layout_style = (settings.get("layoutStyle") or "classic").strip().lower()
+        except Exception:
+            layout_style = "classic"
+        if layout_style == "ny_color":
+            template_params.setdefault("extra_css_files", []).append("weather_ny.css")
 
         # Add last refresh time
         now = datetime.now(tz)
@@ -119,8 +126,15 @@ class Weather(BasePlugin):
             last_refresh_time = now.strftime("%Y-%m-%d %I:%M %p")
         template_params["last_refresh_time"] = last_refresh_time
 
+        # Select template and css based on layout style
+        template_name = "weather.html"
+        css_name = "weather.css"
+        if layout_style == "ny_color":
+            template_name = "weather_ny.html"
+            css_name = "weather_ny.css"
+
         image = self.render_image(
-            dimensions, "weather.html", "weather.css", template_params
+            dimensions, template_name, css_name, template_params
         )
 
         if not image:
@@ -144,6 +158,20 @@ class Weather(BasePlugin):
             "units": units,
             "time_format": time_format,
         }
+        # Extract up to two unique alert event titles if provided by OWM One Call
+        try:
+            alerts_src = weather_data.get("alerts", []) or []
+            alert_events: list[str] = []
+            for a in alerts_src:
+                event = str(a.get("event", "")).strip()
+                if event and event not in alert_events:
+                    alert_events.append(event)
+                if len(alert_events) >= 2:
+                    break
+            if alert_events:
+                data["alerts"] = alert_events
+        except Exception:
+            pass
         data["forecast"] = self.parse_forecast(weather_data.get("daily"), tz)
         data["data_points"] = self.parse_data_points(
             weather_data, aqi_data, tz, units, time_format
@@ -181,6 +209,11 @@ class Weather(BasePlugin):
             "units": units,
             "time_format": time_format,
         }
+        # Open-Meteo endpoint currently does not include alert events; keep optional key empty
+        try:
+            data["alerts"] = []
+        except Exception:
+            pass
 
         data["forecast"] = self.parse_open_meteo_forecast(
             weather_data.get("daily", {}), tz
@@ -424,6 +457,13 @@ class Weather(BasePlugin):
     def parse_data_points(self, weather, air_quality, tz, units, time_format):
         data_points = []
         sunrise_epoch = weather.get("current", {}).get("sunrise")
+        # Fallback: derive sunrise/sunset from 'daily' if missing in 'current'
+        if not sunrise_epoch:
+            try:
+                first_daily = (weather.get("daily") or [{}])[0]
+                sunrise_epoch = first_daily.get("sunrise")
+            except Exception:
+                sunrise_epoch = None
 
         if sunrise_epoch:
             sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=UTC).astimezone(tz)
@@ -443,6 +483,12 @@ class Weather(BasePlugin):
             )
 
         sunset_epoch = weather.get("current", {}).get("sunset")
+        if not sunset_epoch:
+            try:
+                first_daily = (weather.get("daily") or [{}])[0]
+                sunset_epoch = first_daily.get("sunset")
+            except Exception:
+                sunset_epoch = None
         if sunset_epoch:
             sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=UTC).astimezone(tz)
             data_points.append(
