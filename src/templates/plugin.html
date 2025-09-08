@@ -348,6 +348,7 @@
     </script>
 </head>
 <body>
+    <main>
     <div class="frame">
         <!-- Back Button -->
         <button onclick="history.back()" class="back-button">← Back</button>
@@ -496,7 +497,7 @@
                                     <input type="radio" name="backgroundOption" value="color" checked>
                                     Color
                                 </label>
-                                <input type="color" id="backgroundColor" name="backgroundColor" class="color-picker" value="#ffffff">
+                                <input type="color" id="backgroundColor" name="backgroundColor" class="color-picker" value="#ffffff" aria-label="Background color">
                             </div>
                             <div class="form-group nowrap">
                                 <label>
@@ -576,19 +577,19 @@
                     <span title="Determines how often the data and image should be refreshed.">ⓘ</span>
                 </div>
                 <div class="form-group nowrap">
-                    <input type="radio" name="refreshType" value="interval" checked>
-                    <label for="interval">Every</label>
-                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter a number">
-                    <select id="unit" name="unit" class="form-input" required>
+                    <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
+                    <label for="refreshTypeInterval">Every</label>
+                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter a number" aria-label="Interval value">
+                    <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
                         <option value="minute">Minute</option>
                         <option value="hour">Hour</option>
                         <option value="day">Day</option>
                     </select>
                 </div>
                 <div class="form-group nowrap">
-                    <input type="radio" name="refreshType" value="scheduled">
-                    <label for="scheduled">Daily at </label>
-                    <input id="scheduled" class="time-input" type="time" name="refreshTime" step="900">
+                    <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
+                    <label for="refreshTypeScheduled">Daily at</label>
+                    <input id="scheduled" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
                 </div>
             </form>
             <div class="buttons-container">
@@ -661,5 +662,6 @@
             }
         }
     </script>
+    </main>
 </body>
 </html>
