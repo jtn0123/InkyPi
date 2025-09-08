@@ -16,7 +16,9 @@
             update_playlist_base_url: "{{ url_for('playlist.update_playlist', playlist_name='') }}",
             delete_playlist_base_url: "{{ url_for('playlist.delete_playlist', playlist_name='') }}",
             display_next_url: "{{ url_for('playlist.display_next_in_playlist') }}",
-            device_tz_offset_min: {{ device_tz_offset_min | default(0) }}
+            device_tz_offset_min: {{ device_tz_offset_min | default(0) }},
+            update_device_cycle_url: "{{ url_for('playlist.update_device_cycle') }}",
+            device_cycle_minutes: {{ device_cycle_minutes | default(60) }}
         };
     </script>
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}" defer></script>
@@ -57,7 +59,10 @@
             </div>
             <div class="status-card">
                 <div class="status-title">Device refresh cadence</div>
-                <div class="status-body">Every {{ device_cycle_minutes }} min</div>
+                <div class="status-body" style="gap:8px; justify-content:space-between;">
+                    <span id="deviceCadenceText">Every {{ device_cycle_minutes }} min</span>
+                    <button id="editDeviceCycleBtn" class="btn" aria-label="Edit device refresh cadence"><span class="btn-label">Edit</span></button>
+                </div>
             </div>
         </div>
 
@@ -109,7 +114,7 @@
                                 <div id="loadingIndicator" class="loading-indicator small left-align"></div>
 
                             </div>
-                            <div class="plugin-thumb" data-frame-style="{{ plugin_instance.plugin_settings.selectedFrame if plugin_instance.plugin_settings and plugin_instance.plugin_settings.selectedFrame else '' }}">
+                            <div class="plugin-thumb" data-frame-style="{{ plugin_instance.plugin_settings.selectedFrame if plugin_instance.plugin_settings and plugin_instance.plugin_settings.selectedFrame else '' }}" tabindex="0" role="button" aria-label="Open preview of {{ plugin_instance.name }}">
                                 <div class="img-skeleton" aria-hidden="true"></div>
                                 <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview of {{ plugin_instance.name }}" width="120" height="90" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
                             </div>
@@ -220,6 +225,33 @@
                 <button type="button" class="action-button" id="saveButton">Save</button>
                 <button type="button" class="action-button warn hidden" id="deleteButton" onclick="deletePlaylist()">Delete</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Device cadence edit modal -->
+    <div id="deviceCycleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deviceCycleTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeDeviceCycleModal()" aria-label="Close">×</span>
+            <h2 id="deviceCycleTitle">Device refresh cadence</h2>
+            <div class="separator"></div>
+            <form class="settings-form" onsubmit="event.preventDefault(); saveDeviceCycle();">
+                <div class="form-group">
+                    <label for="device_cycle_minutes" class="form-label">Every (minutes):</label>
+                    <input type="number" id="device_cycle_minutes" name="device_cycle_minutes" class="form-input" min="1" max="1440" required>
+                </div>
+            </form>
+            <div class="buttons-container">
+                <button type="button" class="action-button" onclick="saveDeviceCycle()">Save</button>
+                <button type="button" class="action-button" onclick="closeDeviceCycleModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image preview (lightbox) -->
+    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeImagePreview()" aria-label="Close">×</span>
+            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
         </div>
     </div>
 

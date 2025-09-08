@@ -338,6 +338,29 @@ def delete_playlist(playlist_name):
     return json_success(f"Deleted playlist '{playlist_name}'!")
 
 
+@playlist_bp.route("/update_device_cycle", methods=["PUT"])
+def update_device_cycle():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    refresh_task = current_app.config["REFRESH_TASK"]
+    data = request.get_json(silent=True) or {}
+    minutes = data.get("minutes") or 0
+    try:
+        m = int(minutes)
+        if m < 1 or m > 1440:
+            return json_error("Minutes must be between 1 and 1440", status=400)
+    except Exception:
+        return json_error("Invalid minutes", status=400)
+    try:
+        device_config.update_value("plugin_cycle_interval_seconds", m * 60, write=True)
+        try:
+            refresh_task.signal_config_change()
+        except Exception:
+            pass
+        return json_success("Device refresh cadence updated.")
+    except Exception:
+        return json_internal_error("update_device_cycle", details={"hint": "Check config write permissions."})
+
+
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
 def reorder_plugins():
     device_config = current_app.config["DEVICE_CONFIG"]

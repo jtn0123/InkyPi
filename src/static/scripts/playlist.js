@@ -178,6 +178,30 @@
     function openModal() { const modal = document.getElementById('playlistModal'); modal.style.display = 'block'; }
     function closeModal() { const modal = document.getElementById('playlistModal'); modal.style.display = 'none'; }
 
+    // Device cadence modal helpers
+    function openDeviceCycleModal(){
+        try {
+            const input = document.getElementById('device_cycle_minutes');
+            if (input) input.value = (C.device_cycle_minutes || 60);
+        } catch(e){}
+        const m = document.getElementById('deviceCycleModal');
+        if (m) m.style.display = 'block';
+    }
+    function closeDeviceCycleModal(){
+        const m = document.getElementById('deviceCycleModal');
+        if (m) m.style.display = 'none';
+    }
+    async function saveDeviceCycle(){
+        const input = document.getElementById('device_cycle_minutes');
+        const minutes = parseInt((input?.value || '').trim(), 10);
+        if (!minutes || minutes < 1 || minutes > 1440) { showResponseModal('failure', 'Enter minutes between 1 and 1440'); return; }
+        try{
+            const resp = await fetch(C.update_device_cycle_url, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ minutes }) });
+            const j = await handleJsonResponse(resp);
+            if (resp.ok && j && j.success){ closeDeviceCycleModal(); location.reload(); }
+        } catch(e){ showResponseModal('failure', 'Failed saving cadence'); }
+    }
+
     async function createPlaylist() {
         let playlistName = document.getElementById("playlist_name").value.trim();
         let startTime = document.getElementById("start_time").value;
@@ -323,6 +347,25 @@
                 displayPluginInstance(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
             });
         });
+        
+        // Device cadence editor
+        const editCadence = document.getElementById('editDeviceCycleBtn');
+        if (editCadence){ editCadence.addEventListener('click', openDeviceCycleModal); }
+
+        // Click-to-zoom thumbnails
+        document.querySelectorAll('.plugin-thumb').forEach(box => {
+            try {
+                box.style.cursor = 'zoom-in';
+                box.setAttribute('role', 'button');
+                box.setAttribute('tabindex', '0');
+                const handler = () => {
+                    const img = box.querySelector('img');
+                    if (img && img.src && img.style.display !== 'none'){ openImagePreview(img.src, img.alt); }
+                };
+                box.addEventListener('click', handler);
+                box.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
+            } catch(e){}
+        });
         try {
             initDeviceClock();
             setInterval(renderNextIn, 60000);
@@ -349,6 +392,26 @@
     window.displayNextInPlaylist = displayNextInPlaylist;
     window.deletePluginInstance = deletePluginInstance;
     window.displayPluginInstance = displayPluginInstance;
+    window.openDeviceCycleModal = openDeviceCycleModal;
+    window.closeDeviceCycleModal = closeDeviceCycleModal;
+    window.saveDeviceCycle = saveDeviceCycle;
+    
+    function openImagePreview(url, alt){
+        const m = document.getElementById('imagePreviewModal');
+        const img = document.getElementById('imagePreviewImg');
+        if (!m || !img) return;
+        img.src = url;
+        img.alt = alt || 'Large preview';
+        m.style.display = 'block';
+        function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
+        document.addEventListener('keydown', esc);
+    }
+    function closeImagePreview(){
+        const m = document.getElementById('imagePreviewModal');
+        if (m) m.style.display = 'none';
+    }
+    window.openImagePreview = openImagePreview;
+    window.closeImagePreview = closeImagePreview;
 
     // --- Delete confirm flows (replace confirm()) ---
     function showUndo(text){

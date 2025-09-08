@@ -544,6 +544,8 @@ body {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     animation: fadeIn 0.3s ease-out;
 }
+/* For image preview modal, allow larger canvas */
+.image-modal .modal-content { max-width: 95vw; width: auto; margin: 5vh auto; background: var(--surface); }
 
 .modal-content h2 {
     font-size: 1.2rem;
@@ -800,6 +802,9 @@ body {
     padding: 8px; /* Inner padding to avoid visual clipping on e-ink */
     background: var(--surface);
     position: relative;
+    cursor: zoom-in;
+    margin-left: auto;
+    flex: 0 0 120px;
 }
 .plugin-thumb img { width: 100%; height: 100%; object-fit: contain; display:block; background: var(--panel-bg); }
 
