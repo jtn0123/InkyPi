@@ -1,19 +1,50 @@
-/* NY Color layout now mirrors the streamlined ESP32-style */
+/* NY Color layout - ESP32 E-Paper inspired newspaper style */
 .weather-dashboard.ny {
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.2;
+  padding: 4px;
+  position: relative;
 }
 
-.last-refresh { font-size: 12px; margin-bottom: 6px; }
+.last-refresh { 
+  font-size: 11px; 
+  color: rgba(0,0,0,0.7);
+  font-weight: 400;
+  text-align: right;
+  position: absolute;
+  right: 6px;
+  bottom: 4px;
+  margin: 0;
+}
 
-.alerts { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px; }
+.alerts { 
+  display: flex; 
+  gap: 4px; 
+  flex-wrap: wrap; 
+  margin: 0 0 4px; 
+}
 .alert-pill {
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 500;
   padding: 2px 8px;
-  border: 1px solid rgba(0,0,0,0.6);
+  background: rgba(255, 165, 0, 0.1);
+  border: 1px solid rgba(255, 165, 0, 0.4);
   border-radius: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.alert-pill.alert-overflow {
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  color: rgba(0, 0, 0, 0.7);
+  font-style: italic;
 }
 
 .header {
@@ -22,44 +53,201 @@
   align-items: baseline;
   margin-bottom: 6px;
 }
-.header .title { font-size: 28px; font-weight: 700; }
-.header .current-date { font-size: 18px; }
-
-.top-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  align-items: center;
+.header .title { 
+  font-size: 30px; 
+  font-weight: 800; 
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  text-align: right;
+}
+.header .current-date { 
+  font-size: 18px; 
+  font-weight: 600;
+  color: rgba(0,0,0,0.75);
+  text-align: right;
 }
 
-.big-icon-temp { display: flex; align-items: center; gap: 8px; }
-.current-icon { width: 96px; height: 96px; object-fit: contain; }
-.current-weather .current-temp { font-size: 60px; line-height: 1; }
-.current-weather .feels-like, .current-weather .min-max { font-size: 15px; }
+.main-grid { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 10px; align-items: start; flex: 1 1 auto; min-height: 0; }
+.left-col { display: flex; flex-direction: column; gap: 6px; }
+.right-col { display: flex; flex-direction: column; gap: 8px; flex: 1 1 auto; min-height: 0; }
 
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
+.big-icon-temp { 
+  display: flex; 
+  align-items: center; 
+  gap: 8px; 
 }
-.metric { display: flex; gap: 6px; align-items: center; }
-.metric-icon { width: 24px; height: 24px; }
-.metric-label { font-size: 12px; }
-.metric-value { font-size: 14px; }
-
-.forecast.ny {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-  margin-top: 6px;
-  align-items: start;
+.current-icon { 
+  width: 120px; 
+  height: 120px; 
+  object-fit: contain; 
+  flex-shrink: 0;
 }
-.forecast-day { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.forecast-day-name { font-size: 12px; }
-.forecast-icon { width: 32px; height: 32px; }
-.forecast-temps { font-size: 12px; }
-.moon-phase-container { display: flex; gap: 4px; align-items: center; font-size: 11px; }
-.moon-phase-icon { width: 16px; height: 16px; }
+.current-weather .current-temp { 
+  font-size: 68px; 
+  font-weight: 800; 
+  line-height: 0.85; 
+  letter-spacing: -0.02em;
+}
+.current-weather .temperature-unit { 
+  font-size: 30px; 
+  font-weight: 400; 
+  vertical-align: top;
+}
+.current-weather .feels-like { 
+  font-size: 14px; 
+  color: rgba(0,0,0,0.7); 
+  margin-top: 1px;
+  font-weight: 400;
+}
+.current-weather .min-max { 
+  font-size: 18px; 
+  font-weight: 700; 
+  margin-top: 2px;
+}
 
-.chart-container.ny { margin-top: 6px; height: 38%; }
+.metrics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 12px; padding-left: 2px; }
+.metric { 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
+}
+.metric-icon { 
+  width: 24px; 
+  height: 24px; 
+  flex-shrink: 0;
+}
+.metric-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+.metric-label { 
+  font-size: 12px; 
+  color: rgba(0,0,0,0.6);
+  font-weight: 400;
+  line-height: 1.1;
+}
+.metric-value { 
+  font-size: 16px; 
+  font-weight: 700;
+  line-height: 1.1;
+}
+.metric-unit {
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.forecast.ny { display: grid; gap: 8px; margin-top: 6px; padding: 12px 8px; background: rgba(0,0,0,0.02); border-radius: 4px; text-align: center; }
+
+@media (max-width: 600px) {
+  .forecast.ny {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .forecast.ny {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.forecast-day { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  gap: 3px; 
+  padding: 2px 1px;
+}
+
+.forecast-day-name { 
+  font-size: 10px; 
+  font-weight: 700;
+  color: rgba(0,0,0,0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.forecast-icon { 
+  width: 32px; 
+  height: 32px; 
+  object-fit: contain;
+}
+
+.forecast-temps { 
+  font-size: 11px; 
+  text-align: center;
+  line-height: 1.2;
+}
+
+.forecast-temps .high { 
+  font-weight: 700; 
+  color: #000;
+}
+
+.forecast-temps .low { 
+  font-weight: 400; 
+  color: rgba(0,0,0,0.6);
+}
+
+.moon-phase-container { 
+  display: flex; 
+  flex-direction: column;
+  gap: 1px; 
+  align-items: center; 
+  font-size: 8px; 
+  color: rgba(0,0,0,0.5);
+}
+
+.moon-phase-icon { 
+  width: 12px; 
+  height: 12px; 
+}
+
+.chart-container.ny { 
+  height: 75%; 
+  min-height: 260px;
+  padding: 2px 4px 0 2px;
+  background: rgba(0,0,0,0.01);
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.05);
+  flex: 1;
+}
+
+/* Variant A: More compact, tighter spacing */
+.weather-dashboard.ny.variant-a .header { margin-bottom: 4px; }
+.weather-dashboard.ny.variant-a .main-grid { gap: 8px; }
+.weather-dashboard.ny.variant-a .current-weather .current-temp { font-size: 42px; }
+.weather-dashboard.ny.variant-a .metrics-grid { gap: 2px 6px; }
+.weather-dashboard.ny.variant-a .forecast.ny { margin-top: 4px; padding: 4px 2px; }
+.weather-dashboard.ny.variant-a .chart-container.ny { height: 65%; }
+
+/* Variant B: Bolder, more newspaper-like */
+.weather-dashboard.ny.variant-b .header .title { 
+  font-size: 32px; 
+  font-weight: 900; 
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+}
+.weather-dashboard.ny.variant-b .current-weather .current-temp { 
+  font-size: 54px; 
+  font-weight: 900; 
+}
+.weather-dashboard.ny.variant-b .forecast.ny {
+  background: rgba(0,0,0,0.04);
+  border: 2px solid rgba(0,0,0,0.1);
+}
+.weather-dashboard.ny.variant-b .alert-pill {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.weather-dashboard.ny.variant-b .chart-container.ny { height: 62%; border: 2px solid rgba(0,0,0,0.1);} 
+
+/* Subtle shift of header to the right within the right column */
+.right-col > .header { padding-left: 12px; }
+
+/* Ensure alert pills never clip last digit */
+.alerts { align-items: center; }
+.alert-pill { max-width: 240px; padding: 3px 10px; }
 

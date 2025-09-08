@@ -3,73 +3,80 @@
 {% block content %}
 <div id="units-container" data-units="{{ units }}"></div>
 
-<div class="weather-dashboard ny">
-  {% if plugin_settings.displayRefreshTime == "true" %}
-  <div class="last-refresh">Last refresh: {{ last_refresh_time }}</div>
-  {% endif %}
+<div class="weather-dashboard ny{% if plugin_settings.variant_A == "true" %} variant-a{% endif %}{% if plugin_settings.variant_B == "true" %} variant-b{% endif %}">
 
-  <div class="header">
-    <div class="title">{{ title }}</div>
-    <div class="current-date">{{ current_date }}</div>
-  </div>
-
-  {% if alerts %}
-  <div class="alerts">
-    {% for a in alerts %}
-    <div class="alert-pill">{{ a }}</div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <div class="top-row">
-    <div class="big-icon-temp">
-      <img class="current-icon" src="{{ current_day_icon }}" alt="Current Weather Icon">
-      <div class="current-weather">
-        <div class="current-temp">{{ current_temperature }}<span class="temperature-unit">{{ temperature_unit }}</span></div>
-        <div class="feels-like">Feels Like {{ feels_like }}{% if units != "standard" %}°{% endif %}</div>
-        <div class="min-max">{{ forecast[0].high }}{% if units != "standard" %}°{% endif %} / {{ forecast[0].low }}{% if units != "standard" %}°{% endif %}</div>
-      </div>
-    </div>
-
-    <div class="metrics-grid">
-      {% for dp in data_points %}
-      <div class="metric">
-        <img class="metric-icon" src="{{ dp.icon }}" alt="{{ dp.label }}">
-        <div class="metric-text">
-          <div class="metric-label">{{ dp.label }}</div>
-          <div class="metric-value">{{ dp.measurement }}{% if dp.unit %}<span class="metric-unit">{{ dp.unit }}</span>{% endif %}</div>
+  <div class="main-grid">
+    <div class="left-col">
+      <div class="big-icon-temp">
+        <img class="current-icon" src="{{ current_day_icon }}" alt="Current Weather Icon">
+        <div class="current-weather">
+          <div class="current-temp">{{ current_temperature }}<span class="temperature-unit">{{ temperature_unit }}</span></div>
+          <div class="feels-like">Feels Like {{ feels_like }}{% if units != "standard" %}°{% endif %}</div>
+          <div class="min-max">{{ forecast[0].high }}{% if units != "standard" %}°{% endif %} / {{ forecast[0].low }}{% if units != "standard" %}°{% endif %}</div>
         </div>
       </div>
-      {% endfor %}
-    </div>
-  </div>
 
-  {% if plugin_settings.displayForecast and plugin_settings.displayForecast == "true" %}
-  <div class="forecast ny">
-    {% set days = (plugin_settings.forecastDays | int) %}
-    {% for day in forecast[1:days + 1] %}
-      <div class="forecast-day">
-        <div class="forecast-day-name">{{ day.day }}</div>
-        <img class="forecast-icon" src="{{ day.icon }}" alt="{{ day.day }} Weather Icon">
-        <div class="forecast-temps">
-          <span class="high">{{ day.high }}{% if units != "standard" %}°{% endif %}</span> /
-          <span class="low">{{ day.low }}{% if units != "standard" %}°{% endif %}</span>
-        </div>
-        {% if plugin_settings.moonPhase and plugin_settings.moonPhase == "true" %}
-        <div class="moon-phase-container">
-          <img class="moon-phase-icon" src="{{ day.moon_phase_icon }}" alt="Moon phase icon">
-          <span class="moon-phase-pct">{{ day.moon_phase_pct }}%</span>
-        </div>
+      {% if alerts %}
+      <div class="alerts">
+        {% for a in alerts[:2] %}
+        <div class="alert-pill">{{ a }}</div>
+        {% endfor %}
+        {% if alerts|length > 2 %}
+        <div class="alert-pill alert-overflow">+{{ alerts|length - 2 }} more</div>
         {% endif %}
       </div>
-    {% endfor %}
-  </div>
-  {% endif %}
+      {% endif %}
 
-  {% if plugin_settings.displayGraph and plugin_settings.displayGraph == "true" %}
-  <div class="chart-container ny">
-    <canvas id="hourlyTemperatureChart"></canvas>
+      <div class="metrics-grid">
+        {% for dp in data_points %}
+        <div class="metric">
+          <img class="metric-icon" src="{{ dp.icon }}" alt="{{ dp.label }}">
+          <div class="metric-text">
+            <div class="metric-label">{{ dp.label }}</div>
+            <div class="metric-value">{{ dp.measurement }}{% if dp.unit %}<span class="metric-unit">{{ dp.unit }}</span>{% endif %}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="right-col">
+      <div class="header">
+        <div class="title">{{ title }}</div>
+        <div class="current-date">{{ current_date }}</div>
+      </div>
+      {% if plugin_settings.displayForecast and plugin_settings.displayForecast == "true" %}
+      {% set days = (plugin_settings.forecastDays | int) %}
+      <div class="forecast ny" style="grid-template-columns: repeat({{ days }}, 1fr);">
+        {% for day in forecast[1:days + 1] %}
+          <div class="forecast-day">
+            <div class="forecast-day-name">{{ day.day }}</div>
+            <img class="forecast-icon" src="{{ day.icon }}" alt="{{ day.day }} Weather Icon">
+            <div class="forecast-temps">
+              <span class="high">{{ day.high }}{% if units != "standard" %}°{% endif %}</span> /
+              <span class="low">{{ day.low }}{% if units != "standard" %}°{% endif %}</span>
+            </div>
+            {% if plugin_settings.moonPhase and plugin_settings.moonPhase == "true" %}
+            <div class="moon-phase-container">
+              <img class="moon-phase-icon" src="{{ day.moon_phase_icon }}" alt="Moon phase icon">
+              <span class="moon-phase-pct">{{ day.moon_phase_pct }}%</span>
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if plugin_settings.displayGraph and plugin_settings.displayGraph == "true" %}
+      <div class="chart-container ny">
+        <canvas id="hourlyTemperatureChart" style="width: 100%; height: 100%;"></canvas>
+      </div>
+      {% endif %}
+    </div>
   </div>
+
+  {% if plugin_settings.displayRefreshTime == "true" %}
+  <div class="last-refresh">{{ last_refresh_time }}</div>
   {% endif %}
 </div>
 
@@ -92,7 +99,55 @@
     let minTemp = temperatures.length ? Math.min(...temperatures) : 0;
     let maxTemp = temperatures.length ? Math.max(...temperatures) : 30;
 
+    // Visually emphasize bars when measurable rain is present
+    const barColors = rainIn.map(v => (Number(v) || 0) > 0.01 ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.25)');
+
+    // Draw a subtle vertical line at "now" (index 0), and annotate min/max
+    const nowLine = {
+      id: 'nowLine',
+      afterDraw(chart) {
+        const {ctx, chartArea: {top, bottom}, scales: {x}} = chart;
+        if (!x) return;
+        const xPos = x.getPixelForValue(0);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(xPos, top);
+        ctx.lineTo(xPos, bottom);
+        ctx.stroke();
+        ctx.restore();
+      }
+    };
+
+    const minMaxLabels = {
+      id: 'minMaxLabels',
+      afterDatasetsDraw(chart) {
+        if (!temperatures || !temperatures.length) return;
+        const {ctx, scales: {x, y}} = chart;
+        if (!x || !y) return;
+        const minVal = Math.min(...temperatures);
+        const maxVal = Math.max(...temperatures);
+        const minIndex = temperatures.indexOf(minVal);
+        const maxIndex = temperatures.indexOf(maxVal);
+        const draw = (idx, text, yOffset) => {
+          const xp = x.getPixelForValue(idx);
+          const yp = y.getPixelForValue(temperatures[idx]);
+          ctx.save();
+          ctx.fillStyle = 'rgba(0,0,0,0.75)';
+          ctx.font = '10px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(text, xp, yp + yOffset);
+          ctx.restore();
+        };
+        // Slight offsets to avoid overlapping the line
+        draw(minIndex, `${minVal}°`, 12);
+        draw(maxIndex, `${maxVal}°`, -6);
+      }
+    };
+
     new Chart(ctx, {
+      plugins: [nowLine, minMaxLabels],
       data: {
         labels,
         datasets: [
@@ -100,36 +155,54 @@
             type: 'line',
             label: 'Temp',
             data: temperatures,
-            borderColor: '#000',
-            borderWidth: 2,
+            borderColor: 'rgba(0,0,0,0.85)',
+            borderWidth: 2.5,
             pointRadius: 0,
-            tension: 0.3,
-            yAxisID: 'y'
+            pointHoverRadius: 4,
+            pointHoverBackgroundColor: '#000',
+            tension: 0.2,
+            yAxisID: 'y',
+            fill: false,
+            spanGaps: true
           },
           {
             type: 'bar',
             label: 'POP %',
             data: precipitation,
-            backgroundColor: '#000',
-            borderWidth: 0,
+            backgroundColor: barColors,
+            borderColor: barColors,
+            borderWidth: 1,
+            borderSkipped: false,
             yAxisID: 'y2',
-            barPercentage: 0.9,
+            barPercentage: 0.7,
             categoryPercentage: 0.9
           }
         ]
       },
       options: {
-        responsive: false,
+        animation: false,
+        responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'nearest', intersect: false },
+        elements: { point: { radius: 0 } },
         scales: {
           y: {
             position: 'left',
-            grid: { display: true, color: 'rgba(0,0,0,0.15)', lineWidth: 1 },
-            min: minTemp,
-            max: maxTemp,
+            grid: { 
+              display: true, 
+              color: 'rgba(0,0,0,0.08)', 
+              lineWidth: 1,
+              drawTicks: false
+            },
+            border: { display: false },
+            min: minTemp - 2,
+            max: maxTemp + 2,
             ticks: {
               callback: (v) => `${v}°`,
-              maxTicksLimit: 6
+              maxTicksLimit: 5,
+              color: 'rgba(0,0,0,0.6)',
+              font: { size: 11, weight: '400' },
+              padding: 8
             }
           },
           y2: {
@@ -137,28 +210,33 @@
             min: 0,
             max: 100,
             grid: { display: false },
+            border: { display: false },
             ticks: {
               callback: (v) => `${v}%`,
-              maxTicksLimit: 6
+              maxTicksLimit: 5,
+              color: 'rgba(0,0,0,0.6)',
+              font: { size: 11, weight: '400' },
+              padding: 8
             }
           },
           x: {
             grid: { display: false },
-            ticks: { maxTicksLimit: 12 }
+            border: { display: false },
+            ticks: { 
+              maxTicksLimit: 12,
+              callback: (v, i) => (i % 2 === 0 ? labels[i] : ''),
+              color: 'rgba(0,0,0,0.6)',
+              font: { size: 10, weight: '400' },
+              padding: 6
+            }
           }
+        },
+        layout: {
+          padding: { left: 2, right: 2, top: 4, bottom: 2 }
         },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              afterBody: (items) => {
-                if ("{{ plugin_settings.displayRain }}" !== "true") return '';
-                const i = items && items.length ? (items[0].dataIndex ?? 0) : 0;
-                const v = (Number(rainIn[i]) || 0);
-                return `Rain: ${v.toFixed(2)} in`;
-              }
-            }
-          }
+          tooltip: { enabled: false }
         }
       }
     });

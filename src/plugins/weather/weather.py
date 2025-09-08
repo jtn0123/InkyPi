@@ -146,7 +146,19 @@ class Weather(BasePlugin):
         if current is None:
             raise KeyError("current")
         dt = datetime.fromtimestamp(current.get("dt"), tz=UTC).astimezone(tz)
-        current_icon = current.get("weather")[0].get("icon").replace("n", "d")
+        # Pick day/night icon based on whether current time is after sunset or before sunrise
+        ow_icon = current.get("weather")[0].get("icon")
+        sunrise_epoch = current.get("sunrise") or ((weather_data.get("daily") or [{}])[0].get("sunrise"))
+        sunset_epoch = current.get("sunset") or ((weather_data.get("daily") or [{}])[0].get("sunset"))
+        try:
+            is_night = False
+            if sunrise_epoch and sunset_epoch:
+                now_ts = int(dt.timestamp())
+                # Treat night as outside [sunrise, sunset]
+                is_night = not (now_ts >= int(sunrise_epoch) and now_ts <= int(sunset_epoch))
+            current_icon = ow_icon if is_night else ow_icon.replace("n", "d")
+        except Exception:
+            current_icon = ow_icon.replace("n", "d")
         data = {
             "current_date": dt.strftime("%A, %B %d"),
             "current_day_icon": self.path_to_data_uri(

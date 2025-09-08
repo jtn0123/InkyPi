@@ -96,6 +96,52 @@ python scripts/plugin_validator.py clock   # validate a single plugin
   - `src/config/schemas/plugin-info.schema.json`
 
 
+## Weather Plugin – NY Layout Iteration Plan
+
+### Goals
+- Match ESP32-style hierarchy and newspaper density
+- Preserve color icons and maximize chart prominence
+- Support quick iterations with mock rendering (no network)
+
+### Current Implementation Notes
+- Template: `src/plugins/weather/render/weather_ny.html`
+- Styles: `src/plugins/weather/render/weather_ny.css`
+- Mock rendering: `scripts/render_weather_mock.py`
+- Rendering executes JS via Playwright/Chromium in `utils/image_utils.take_screenshot_html`
+
+### Recent Improvements
+- Chart: now-line at current hour, min/max labels, emphasized rain bars when measurable, denser x‑ticks (every other label), disabled tooltip for clean static render, no animation for deterministic screenshots.
+- Layout: chart remains prominent (50% height) with `min-height` and `flex: 1`.
+
+### How to Test Quickly
+```bash
+# Standard
+python scripts/render_weather_mock.py --layout ny_color --units imperial
+
+# Variant A
+python scripts/render_weather_mock.py --variant A --out weather_variant_a.png
+
+# Variant B
+python scripts/render_weather_mock.py --variant B --out weather_variant_b.png
+
+# Composite 3/5/7 days
+python scripts/render_weather_mock.py --composite --out weather_composite.png
+```
+
+### Validation Criteria
+- Chart always visible and prominent; no clipping; labels legible
+- Alerts collapse to at most 2 pills with overflow "+N more"
+- Forecast grid adapts 7→5→3 columns with tight spacing
+- Icons remain color and high quality
+- Test suite passes with no regressions
+
+### Open Questions / Next Tweaks
+- Optional thin x-axis gridlines (every 3 hours) to aid scanning
+- Tiny point markers only at inflection points for the temperature line
+- Micro-typography: adjust header tracking and forecast day font size by 1px
+- Optional monochrome export for non-color e‑ink devices
+
+
 ## Testing Your Changes
 
 1. Configure a plugin through the web UI

@@ -118,9 +118,11 @@ def main():
     parser = argparse.ArgumentParser(description="Render weather with mocked APIs")
     parser.add_argument("--layout", default="ny_color", choices=["classic", "ny_color"], help="Layout style to render")
     parser.add_argument("--units", default="imperial", choices=["metric", "imperial", "standard"], help="Units for temperature/speed")
+    parser.add_argument("--variant", choices=["A", "B"], help="Visual variant for A/B testing")
     parser.add_argument("--out", default=os.path.join("src", "static", "images", "current_image_variant.png"), help="Output PNG path")
     parser.add_argument("--width", type=int, default=800, help="Canvas width")
     parser.add_argument("--height", type=int, default=480, help="Canvas height")
+    parser.add_argument("--composite", action="store_true", help="Generate composite preview with multiple variants")
     args = parser.parse_args()
 
     # Late imports after sys.path tweak
@@ -154,29 +156,86 @@ def main():
 
     dev = _DevCfg(args.width, args.height)
 
-    # Instantiate plugin and settings
-    p = Weather({"id": "weather"})
-    settings = {
-        "latitude": 32.7157,
-        "longitude": -117.1611,
-        "units": args.units,
-        "weatherProvider": "OpenWeatherMap",
-        "titleSelection": "location",
-        "customTitle": "San Diego, California",
-        "displayRefreshTime": "true",
-        "displayMetrics": "true",
-        "displayGraph": "true",
-        "displayRain": "true",
-        "displayForecast": "true",
-        "forecastDays": 5,
-        "moonPhase": "true",
-        "layoutStyle": args.layout,
-    }
+    if args.composite:
+        # Generate composite preview with 3/5/7 day variants
+        from PIL import Image
+        variants = []
+        for days in [3, 5, 7]:
+            p = Weather({"id": "weather"})
+            settings = {
+                "latitude": 32.7157,
+                "longitude": -117.1611,
+                "units": args.units,
+                "weatherProvider": "OpenWeatherMap",
+                "titleSelection": "location",
+                "customTitle": "San Diego, California",
+                "displayRefreshTime": "true",
+                "displayMetrics": "true",
+                "displayGraph": "true",
+                "displayRain": "true",
+                "displayForecast": "true",
+                "forecastDays": days,
+                "moonPhase": "true",
+                "layoutStyle": args.layout,
+            }
+            if args.variant:
+                settings[f"variant_{args.variant}"] = "true"
+                
+            img = p.generate_image(settings, dev)
+            variants.append((img, f"{days}-day"))
+        
+        # Create composite image
+        composite_width = sum(img.width for img, _ in variants)
+        composite_height = max(img.height for img, _ in variants) + 30  # space for labels
+        composite = Image.new("RGB", (composite_width, composite_height), "white")
+        
+        x_offset = 0
+        from PIL import ImageDraw, ImageFont
+        draw = ImageDraw.Draw(composite)
+        
+        try:
+            from PIL.ImageFont import FreeTypeFont
+            font = ImageFont.truetype("/System/Library/Fonts/Arial.ttf", 20)
+        except Exception:
+            font = ImageFont.load_default()
+            
+        for img, label in variants:
+            composite.paste(img, (x_offset, 30))
+            # Draw label
+            bbox = draw.textbbox((0, 0), label, font=font)
+            text_width = bbox[2] - bbox[0]
+            draw.text((x_offset + (img.width - text_width) // 2, 5), label, fill="black", font=font)
+            x_offset += img.width
+            
+        os.makedirs(os.path.dirname(args.out), exist_ok=True)
+        composite.save(args.out)
+        print(f"Saved composite: {args.out}")
+    else:
+        # Single render
+        p = Weather({"id": "weather"})
+        settings = {
+            "latitude": 32.7157,
+            "longitude": -117.1611,
+            "units": args.units,
+            "weatherProvider": "OpenWeatherMap",
+            "titleSelection": "location",
+            "customTitle": "San Diego, California",
+            "displayRefreshTime": "true",
+            "displayMetrics": "true",
+            "displayGraph": "true",
+            "displayRain": "true",
+            "displayForecast": "true",
+            "forecastDays": 5,
+            "moonPhase": "true",
+            "layoutStyle": args.layout,
+        }
+        if args.variant:
+            settings[f"variant_{args.variant}"] = "true"
 
-    img = p.generate_image(settings, dev)
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    img.save(args.out)
-    print(f"Saved: {args.out}")
+        img = p.generate_image(settings, dev)
+        os.makedirs(os.path.dirname(args.out), exist_ok=True)
+        img.save(args.out)
+        print(f"Saved: {args.out}")
 
 
 if __name__ == "__main__":
