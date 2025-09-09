@@ -1,0 +1,20 @@
+{
+  "01d": "original/static/clear-day.svg",
+  "01n": "original/static/clear-night.svg",
+  "02d": "original/static/cloudy-1-day.svg",
+  "02n": "original/static/cloudy-1-night.svg",
+  "03d": "original/static/cloudy-2-day.svg",
+  "03n": "original/static/cloudy-2-night.svg",
+  "04d": "original/static/cloudy-3-day.svg",
+  "04n": "original/static/cloudy-3-night.svg",
+  "09d": "original/static/rainy-2-day.svg",
+  "09n": "original/static/rainy-2-night.svg",
+  "10d": "original/static/rainy-1-day.svg",
+  "10n": "original/static/rainy-1-night.svg",
+  "11d": "original/static/thunderstorms.svg",
+  "11n": "original/static/isolated-thunderstorms-night.svg",
+  "13d": "original/static/snowy-2-day.svg",
+  "13n": "original/static/snowy-2-night.svg",
+  "50d": "original/static/fog-day.svg",
+  "50n": "original/static/fog-night.svg"
+}

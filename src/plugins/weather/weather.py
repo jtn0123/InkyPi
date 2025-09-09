@@ -1,4 +1,5 @@
 import logging
+import os
 import math
 from datetime import UTC, datetime
 
@@ -7,6 +8,7 @@ import requests
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from utils.http_utils import http_get
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,33 @@ OPEN_METEO_UNIT_PARAMS = {
     "imperial": "temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
 }
 
+# Repository root (three levels up from this file: src/plugins/weather/weather.py)
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Icon pack definitions (roots and mapping JSONs)
+ICON_PACKS: Dict[str, Dict[str, Optional[str]]] = {
+    # Current PNG set inside plugin
+    "current": {
+        "root": os.path.join(REPO_ROOT, "src", "plugins", "weather", "icons"),
+        "map": None,
+    },
+    # Pack A: Makin-Things original/static
+    "A": {
+        "root": os.path.join(REPO_ROOT, "vendor", "icons", "makin_things"),
+        "map": os.path.join(REPO_ROOT, "vendor", "icons", "mapping_makin_things.json"),
+    },
+    # Pack B: Makin-Things BOM/app
+    "B": {
+        "root": os.path.join(REPO_ROOT, "vendor", "icons", "makin_things"),
+        "map": os.path.join(REPO_ROOT, "vendor", "icons", "mapping_bom_app.json"),
+    },
+    # Pack C: Bas Milius (fill/svg-static)
+    "C": {
+        "root": os.path.join(REPO_ROOT, "vendor", "icons", "basmilius"),
+        "map": os.path.join(REPO_ROOT, "vendor", "icons", "mapping_basmilius_fill.json"),
+    },
+}
+
 
 class Weather(BasePlugin):
     def generate_settings_template(self):
@@ -39,6 +68,74 @@ class Weather(BasePlugin):
         }
         template_params["style_settings"] = True
         return template_params
+
+    # --- icon pack mapping cache (class-level) ---
+    _icon_maps: dict[str, dict] = {}
+
+    def _load_icon_map(self, pack_key: str) -> Dict[str, str]:
+        cfg = ICON_PACKS.get(pack_key)
+        if not cfg or not cfg.get("map"):
+            return {}
+        map_path = cfg.get("map")
+        if not map_path:
+            return {}
+        path = map_path
+        if pack_key in self._icon_maps:
+            return self._icon_maps[pack_key]
+        try:
+            import json
+            with open(path, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            mapping: Dict[str, str] = raw if isinstance(raw, dict) else {}
+            self._icon_maps[pack_key] = mapping
+            return mapping
+        except Exception:
+            return {}
+
+    def _resolve_cond_icon_path(self, owm_code: str, pack_key: str) -> str:
+        """Return absolute path to icon for a condition code based on selected pack, with fallback to current PNG set."""
+        cfg = ICON_PACKS.get(pack_key) or ICON_PACKS["current"]
+        pack_root = cfg.get("root") or ICON_PACKS["current"].get("root") or ""
+        # current pack uses pngs named like 01d.png in plugin icons folder
+        if pack_key == "current" or not cfg.get("map"):
+            candidate = os.path.join(pack_root, f"{owm_code}.png")
+            if os.path.exists(candidate):
+                return candidate
+            # fallback day variant
+            candidate = os.path.join(pack_root, f"{owm_code.replace('n','d')}.png")
+            if os.path.exists(candidate):
+                return candidate
+            return ""
+        # mapped packs (A/B/C)
+        mapping = self._load_icon_map(pack_key)
+        mapped_rel = mapping.get(owm_code) or mapping.get(owm_code.replace("n", "d"))
+        if mapped_rel:
+            candidate = os.path.join(pack_root, mapped_rel)
+            if os.path.exists(candidate):
+                return candidate
+        # fallback to current PNG
+        fallback_root = ICON_PACKS.get("current", {}).get("root") or ""
+        fallback = os.path.join(fallback_root, f"{owm_code}.png")
+        if not os.path.exists(fallback):
+            fallback = os.path.join(fallback_root, f"{owm_code.replace('n','d')}.png")
+        return fallback if os.path.exists(fallback) else ""
+
+    def _resolve_moon_icon_path(self, phase_key: str, moon_pack_key: str) -> str:
+        cfg = ICON_PACKS.get(moon_pack_key) or ICON_PACKS["current"]
+        pack_root = cfg.get("root") or ICON_PACKS["current"].get("root") or ""
+        if moon_pack_key == "current" or not cfg.get("map"):
+            p = os.path.join(pack_root, f"{phase_key}.png")
+            return p if os.path.exists(p) else ""
+        mapping = self._load_icon_map(moon_pack_key)
+        mapped_rel = mapping.get(phase_key)
+        if mapped_rel:
+            candidate = os.path.join(pack_root, mapped_rel)
+            if os.path.exists(candidate):
+                return candidate
+        # fallback to current PNG phase
+        fallback_root = ICON_PACKS.get("current", {}).get("root") or ""
+        fallback = os.path.join(fallback_root, f"{phase_key}.png")
+        return fallback if os.path.exists(fallback) else ""
 
     def generate_image(self, settings, device_config):
         lat = settings.get("latitude")
@@ -110,6 +207,16 @@ class Weather(BasePlugin):
             dimensions = dimensions[::-1]
 
         template_params["plugin_settings"] = settings
+        # Normalize selected icon packs (defaults)
+        weather_pack = (settings.get("weatherIconPack") or "current").strip()
+        moon_pack = (settings.get("moonIconPack") or "current").strip()
+        if weather_pack not in ICON_PACKS:
+            weather_pack = "current"
+        if moon_pack not in ICON_PACKS:
+            moon_pack = "current"
+        template_params["_icon_packs"] = {"weather": weather_pack, "moon": moon_pack}
+        # Persist for downstream parse methods
+        self._state = {"last_settings": settings}
         # Allow selectable layout style to pull in extra CSS file(s)
         try:
             layout_style = (settings.get("layoutStyle") or "classic").strip().lower()
@@ -118,8 +225,15 @@ class Weather(BasePlugin):
         if layout_style == "ny_color":
             template_params.setdefault("extra_css_files", []).append("weather_ny.css")
 
-        # Add last refresh time
-        now = datetime.now(tz)
+        # Add last refresh time (allow dev override for simulator)
+        override = device_config.get_config("dev_time")
+        if override:
+            try:
+                now = datetime.fromisoformat(str(override)).astimezone(tz)
+            except Exception:
+                now = datetime.now(tz)
+        else:
+            now = datetime.now(tz)
         if time_format == "24h":
             last_refresh_time = now.strftime("%Y-%m-%d %H:%M")
         else:
@@ -132,6 +246,14 @@ class Weather(BasePlugin):
         if layout_style == "ny_color":
             template_name = "weather_ny.html"
             css_name = "weather_ny.css"
+            # Propagate variant C if present
+            # Pass-through variant toggles
+            try:
+                for flag in ("variant_C5",):
+                    if settings.get(flag) == "true":
+                        template_params.setdefault("plugin_settings", {})[flag] = "true"
+            except Exception:
+                pass
 
         image = self.render_image(
             dimensions, template_name, css_name, template_params
@@ -146,24 +268,45 @@ class Weather(BasePlugin):
         if current is None:
             raise KeyError("current")
         dt = datetime.fromtimestamp(current.get("dt"), tz=UTC).astimezone(tz)
-        # Pick day/night icon based on whether current time is after sunset or before sunrise
+        # Pick day/night icon. If API explicitly gives a night icon ("*n"), honor it.
         ow_icon = current.get("weather")[0].get("icon")
         sunrise_epoch = current.get("sunrise") or ((weather_data.get("daily") or [{}])[0].get("sunrise"))
         sunset_epoch = current.get("sunset") or ((weather_data.get("daily") or [{}])[0].get("sunset"))
         try:
-            is_night = False
-            if sunrise_epoch and sunset_epoch:
+            # Intended night/day state
+            intended_night = False
+            if isinstance(ow_icon, str) and ow_icon.endswith("n"):
+                intended_night = True
+            elif sunrise_epoch and sunset_epoch:
                 now_ts = int(dt.timestamp())
-                # Treat night as outside [sunrise, sunset]
-                is_night = not (now_ts >= int(sunrise_epoch) and now_ts <= int(sunset_epoch))
-            current_icon = ow_icon if is_night else ow_icon.replace("n", "d")
+                intended_night = not (now_ts >= int(sunrise_epoch) and now_ts <= int(sunset_epoch))
+
+            candidate = (ow_icon or "01d")
+            candidate = candidate.replace("d", "n") if intended_night else candidate.replace("n", "d")
+            # Fallback to day variant if night asset not available
+            icon_path = self.get_plugin_dir(f"icons/{candidate}.png")
+            if not os.path.exists(icon_path):
+                candidate = candidate.replace("n", "d")
+            current_icon = candidate
+            # Persist intended night flag for template overlays, even if asset fallback occurred
+            intended_is_night = intended_night
         except Exception:
             current_icon = ow_icon.replace("n", "d")
+            intended_is_night = False
+        # Resolve icon according to selected pack
+        state_obj = getattr(self, "_state", None)
+        if isinstance(state_obj, dict):
+            settings = state_obj.get("last_settings", {})
+        else:
+            settings = {}
+        weather_pack_val = (settings.get("weatherIconPack") or "current") if isinstance(settings, dict) else "current"
+        weather_pack = str(weather_pack_val).strip()
+        if weather_pack not in ICON_PACKS:
+            weather_pack = "current"
+        icon_abs_path = self._resolve_cond_icon_path(current_icon, weather_pack)
         data = {
             "current_date": dt.strftime("%A, %B %d"),
-            "current_day_icon": self.path_to_data_uri(
-                self.get_plugin_dir(f"icons/{current_icon}.png")
-            ),
+            "current_day_icon": self.path_to_data_uri(icon_abs_path) if icon_abs_path else self.path_to_data_uri(self.get_plugin_dir(f"icons/{current_icon}.png")),
             "current_temperature": str(round(current.get("temp"))),
             "feels_like": str(round(current.get("feels_like"))),
             "temperature_unit": UNITS[units]["temperature"],
@@ -185,6 +328,15 @@ class Weather(BasePlugin):
         except Exception:
             pass
         data["forecast"] = self.parse_forecast(weather_data.get("daily"), tz)
+        # Night overlay support: expose intended night flag and a moon icon for current day
+        try:
+            data["is_night"] = bool(intended_is_night)
+            if data["is_night"] and data.get("forecast"):
+                data["current_moon_phase_icon"] = data["forecast"][0]["moon_phase_icon"]
+                # Use moon icon as the primary current icon at night to avoid sun glyph
+                data["current_day_icon"] = data["current_moon_phase_icon"]
+        except Exception:
+            pass
         data["data_points"] = self.parse_data_points(
             weather_data, aqi_data, tz, units, time_format
         )
@@ -302,22 +454,33 @@ class Weather(BasePlugin):
             else:
                 return "waningcrescent"
 
+        # Determine selected packs
+        settings = getattr(self, "_state", {}).get("last_settings", {})
+        weather_pack = (settings.get("weatherIconPack") or "current").strip()
+        if weather_pack not in ICON_PACKS:
+            weather_pack = "current"
+        moon_pack = (settings.get("moonIconPack") or "current").strip()
+        if moon_pack not in ICON_PACKS:
+            moon_pack = "current"
+
         forecast = []
         for day in daily_forecast:
             # --- weather icon ---
             weather_icon = day["weather"][0]["icon"]  # e.g. "10d", "01n"
             # always show day‑style icon
             weather_icon = weather_icon.replace("n", "d")
-            weather_icon_path = self.path_to_data_uri(
-                self.get_plugin_dir(f"icons/{weather_icon}.png")
-            )
+            cond_abs = self._resolve_cond_icon_path(weather_icon, weather_pack)
+            if not cond_abs:
+                cond_abs = self.get_plugin_dir(f"icons/{weather_icon}.png")
+            weather_icon_path = self.path_to_data_uri(cond_abs)
 
             # --- moon phase & icon ---
             moon_phase = float(day["moon_phase"])  # [0.0–1.0]
             phase_name = choose_phase_name(moon_phase)
-            moon_icon_path = self.path_to_data_uri(
-                self.get_plugin_dir(f"icons/{phase_name}.png")
-            )
+            moon_abs = self._resolve_moon_icon_path(phase_name, moon_pack)
+            if not moon_abs:
+                moon_abs = self.get_plugin_dir(f"icons/{phase_name}.png")
+            moon_icon_path = self.path_to_data_uri(moon_abs)
             # --- true illumination percent, no decimals ---
             illum_fraction = (1 - math.cos(2 * math.pi * moon_phase)) / 2
             moon_pct = f"{illum_fraction * 100:.0f}"
@@ -381,8 +544,34 @@ class Weather(BasePlugin):
                 elif phase_name in ("1stquarter", "firstquarter"):
                     phase_name = "firstquarter"
             except Exception:
-                illum_pct = 0
-                phase_name = "newmoon"
+                # Fallback: approximate moon illumination from synodic cycle when API fails
+                try:
+                    import math
+                    synodic_days = 29.53058867
+                    # Reference new moon epoch (UTC): 2000-01-06
+                    ref = datetime(2000, 1, 6, tzinfo=UTC)
+                    days_since_ref = (dt - ref).total_seconds() / 86400.0
+                    phase = (days_since_ref % synodic_days) / synodic_days  # 0..1
+                    illum_pct = (1 - math.cos(2 * math.pi * phase)) / 2 * 100
+                    if phase < 0.03 or phase > 0.97:
+                        phase_name = "newmoon"
+                    elif 0.22 <= phase <= 0.28:
+                        phase_name = "firstquarter"
+                    elif 0.47 <= phase <= 0.53:
+                        phase_name = "fullmoon"
+                    elif 0.72 <= phase <= 0.78:
+                        phase_name = "lastquarter"
+                    elif phase < 0.25:
+                        phase_name = "waxingcrescent"
+                    elif phase < 0.5:
+                        phase_name = "waxinggibbous"
+                    elif phase < 0.75:
+                        phase_name = "waninggibbous"
+                    else:
+                        phase_name = "waningcrescent"
+                except Exception:
+                    illum_pct = 0
+                    phase_name = "newmoon"
 
             moon_icon_path = self.path_to_data_uri(
                 self.get_plugin_dir(f"icons/{phase_name}.png")
@@ -553,6 +742,36 @@ class Weather(BasePlugin):
                 "icon": self.path_to_data_uri(self.get_plugin_dir("icons/uvi.png")),
             }
         )
+
+        # Cloud cover (%), if available
+        try:
+            clouds = weather.get("current", {}).get("clouds")
+            if clouds is not None:
+                data_points.append(
+                    {
+                        "label": "Cloud Cover",
+                        "measurement": clouds,
+                        "unit": "%",
+                        "icon": self.path_to_data_uri(self.get_plugin_dir("icons/03d.png")),
+                    }
+                )
+        except Exception:
+            pass
+
+        # Wind gusts, if provided
+        try:
+            gust = weather.get("current", {}).get("wind_gust")
+            if gust is not None:
+                data_points.append(
+                    {
+                        "label": "Wind Gusts",
+                        "measurement": gust,
+                        "unit": UNITS[units]["speed"],
+                        "icon": self.path_to_data_uri(self.get_plugin_dir("icons/wind.png")),
+                    }
+                )
+        except Exception:
+            pass
 
         visibility_raw = weather.get("current", {}).get("visibility")
         try:

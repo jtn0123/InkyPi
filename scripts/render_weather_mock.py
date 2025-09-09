@@ -14,6 +14,7 @@ import argparse
 import os
 import sys
 from datetime import datetime, timezone, timedelta
+import pytz
 
 
 # Ensure src/ is on the import path
@@ -23,7 +24,7 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 
-def _build_fake_owm_payload(now: datetime) -> dict:
+def _build_fake_owm_payload(now: datetime, tz_str: str) -> dict:
     """Return a minimal One Call style payload with alerts, current, daily, hourly.
 
     Matches the fields our parser uses in plugins.weather.weather.
@@ -70,8 +71,14 @@ def _build_fake_owm_payload(now: datetime) -> dict:
             "sunset": sunset,
         })
 
+    try:
+        local_hour = now.astimezone(pytz.timezone(tz_str)).hour
+    except Exception:
+        local_hour = now.hour
+    is_night_local = local_hour < 6 or local_hour >= 20
+
     return {
-        "timezone": "America/Los_Angeles",
+        "timezone": tz_str,
         "alerts": [
             {"event": "Heat Advisory"},
             {"event": "Air Quality Alert"},
@@ -80,12 +87,15 @@ def _build_fake_owm_payload(now: datetime) -> dict:
             "dt": base_ts,
             "temp": 72,
             "feels_like": 72,
-            "weather": [{"icon": "01d"}],
+            # Alternate icons, switched to night set when local night
+            "weather": [{"icon": ("01n" if is_night_local else "01d") if (now.hour % 3 == 0) else (("10n" if is_night_local else "10d") if (now.hour % 3 == 1) else ("03n" if is_night_local else "03d"))}],
+            "clouds": 62,
             "humidity": 70,
             "pressure": 1016,
             "uvi": 0,
             "visibility": 12000,
             "wind_speed": 4.6,
+            "wind_gust": 11.2,
             # Leave sunrise/sunset absent here to validate fallback path
         },
         "daily": daily,
@@ -93,10 +103,10 @@ def _build_fake_owm_payload(now: datetime) -> dict:
     }
 
 
-def _make_fake_http_get(now: datetime):
+def _make_fake_http_get(now: datetime, tz_str: str = "America/Los_Angeles"):
     """Return a function that mimics utils.http_get returning minimal objects."""
 
-    fake_weather = _build_fake_owm_payload(now)
+    fake_weather = _build_fake_owm_payload(now, tz_str)
 
     class _Resp:
         def __init__(self, payload):
@@ -125,11 +135,21 @@ def main():
     parser = argparse.ArgumentParser(description="Render weather with mocked APIs")
     parser.add_argument("--layout", default="ny_color", choices=["classic", "ny_color"], help="Layout style to render")
     parser.add_argument("--units", default="imperial", choices=["metric", "imperial", "standard"], help="Units for temperature/speed")
-    parser.add_argument("--variant", choices=["A", "B"], help="Visual variant for A/B testing")
+    parser.add_argument("--provider", default="OpenMeteo", choices=["OpenWeatherMap", "OpenMeteo"], help="Weather provider")
+    parser.add_argument("--weather-pack", default="current", choices=["current","A","B","C"], help="Weather icon pack")
+    parser.add_argument("--moon-pack", default="current", choices=["current","C"], help="Moon icon pack")
+    parser.add_argument("--save-json", help="Save provider JSONs here (no refetch next time)")
+    parser.add_argument("--use-json", help="Load provider JSONs from here instead of fetching")
+    parser.add_argument("--variant", choices=["C5"], help="Visual variant set (C5 only)")
     parser.add_argument("--out", default=os.path.join("src", "static", "images", "current_image_variant.png"), help="Output PNG path")
     parser.add_argument("--width", type=int, default=800, help="Canvas width")
     parser.add_argument("--height", type=int, default=480, help="Canvas height")
     parser.add_argument("--composite", action="store_true", help="Generate composite preview with multiple variants")
+    parser.add_argument("--night", action="store_true", help="Force night-time current icon for preview")
+    parser.add_argument("--hour", type=int, help="Force hour for rendering (0-23)")
+    parser.add_argument("--tz", default="America/Los_Angeles", help="Timezone name, e.g., Europe/London")
+    parser.add_argument("--lat", type=float, default=32.7157, help="Latitude")
+    parser.add_argument("--lon", type=float, default=-117.1611, help="Longitude")
     args = parser.parse_args()
 
     # Late imports after sys.path tweak
@@ -138,7 +158,49 @@ def main():
     # Monkeypatch network calls used by the weather plugin
     import plugins.weather.weather as weather_mod
     now = datetime.now(timezone.utc)
-    weather_mod.http_get = _make_fake_http_get(now)
+    if args.hour is not None:
+        now = now.replace(hour=args.hour, minute=0, second=0, microsecond=0)
+    if args.use_json:
+        # Monkeypatch http_get to read JSON responses from local files
+        import json as _json
+        import plugins.weather.weather as weather_mod
+        def _load_json(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    return _json.load(f)
+            except Exception:
+                return None
+        class _Resp:
+            def __init__(self, payload):
+                self.status_code = 200
+                self._payload = payload
+                self.content = b""
+            def json(self):
+                return self._payload
+        def _json_http_get(url, *a, **kw):
+            if "onecall" in url:
+                p = _load_json(os.path.join(args.use_json, "weather.json"))
+                return _Resp(p if p is not None else {})
+            if "air_pollution" in url:
+                p = _load_json(os.path.join(args.use_json, "aqi.json"))
+                return _Resp(p if p is not None else {"list": [{"main": {"aqi": 2}}]})
+            if "open-meteo.com" in url and "/forecast" in url:
+                p = _load_json(os.path.join(args.use_json, "open_meteo_weather.json"))
+                return _Resp(p if p is not None else {})
+            if "air-quality-api.open-meteo" in url:
+                p = _load_json(os.path.join(args.use_json, "open_meteo_aqi.json"))
+                return _Resp(p if p is not None else {})
+            if "/geo/1.0/reverse" in url:
+                return _Resp([{"name": "Cached City", "state": "CA", "country": "US"}])
+            return _Resp({})
+        weather_mod.http_get = _json_http_get
+    elif args.provider == "OpenMeteo":
+        # For Open-Meteo, allow real network (no API key required) unless night override is requested
+        if args.night:
+            weather_mod.http_get = _make_fake_http_get(now, args.tz)
+    else:
+        # For OWM, stay mocked unless user provides a real key via env (not supported here)
+        weather_mod.http_get = _make_fake_http_get(now, args.tz)
 
     # Minimal device config stub used by Weather.generate_image
     class _DevCfg:
@@ -150,7 +212,7 @@ def main():
 
         def get_config(self, key, default=None):
             mapping = {
-                "timezone": "America/Los_Angeles",
+                "timezone": args.tz,
                 "time_format": "12h",
                 "orientation": "horizontal",
                 "image_settings": {},
@@ -170,12 +232,12 @@ def main():
         for days in [3, 5, 7]:
             p = Weather({"id": "weather"})
             settings = {
-                "latitude": 32.7157,
-                "longitude": -117.1611,
+                "latitude": args.lat,
+                "longitude": args.lon,
                 "units": args.units,
-                "weatherProvider": "OpenWeatherMap",
+                "weatherProvider": args.provider,
                 "titleSelection": "location",
-                "customTitle": "San Diego, California",
+                "customTitle": ("London, United Kingdom" if abs(args.lat-51.5074)<1 and abs(args.lon-(-0.1278))<1 else "Custom Location"),
                 "displayRefreshTime": "true",
                 "displayMetrics": "true",
                 "displayGraph": "true",
@@ -222,12 +284,12 @@ def main():
         # Single render
         p = Weather({"id": "weather"})
         settings = {
-            "latitude": 32.7157,
-            "longitude": -117.1611,
+            "latitude": args.lat,
+            "longitude": args.lon,
             "units": args.units,
-            "weatherProvider": "OpenWeatherMap",
+            "weatherProvider": args.provider,
             "titleSelection": "location",
-            "customTitle": "San Diego, California",
+            "customTitle": ("London, United Kingdom" if abs(args.lat-51.5074)<1 and abs(args.lon-(-0.1278))<1 else "Custom Location"),
             "displayRefreshTime": "true",
             "displayMetrics": "true",
             "displayGraph": "true",
@@ -236,11 +298,59 @@ def main():
             "forecastDays": 5,
             "moonPhase": "true",
             "layoutStyle": args.layout,
+            "weatherIconPack": args.weather_pack,
+            "moonIconPack": args.moon_pack,
         }
         if args.variant:
             settings[f"variant_{args.variant}"] = "true"
+        if args.night:
+            # Wrap the existing fake http_get (already set to our mock) and post-edit payload
+            import plugins.weather.weather as weather_mod
+            original_http_get = weather_mod.http_get
+            def _night_http_get(url, *a, **kw):
+                resp = original_http_get(url, *a, **kw)
+                try:
+                    payload = resp.json()
+                    if isinstance(payload, dict) and "current" in payload:
+                        try:
+                            icon = payload["current"]["weather"][0]["icon"]
+                            payload["current"]["weather"][0]["icon"] = icon.replace("d", "n")
+                        except Exception:
+                            pass
+                    class _R:
+                        def __init__(self, p):
+                            self.status_code = 200
+                            self._p = p
+                            self.content = b""
+                        def json(self):
+                            return self._p
+                    return _R(payload)
+                except Exception:
+                    return resp
+            weather_mod.http_get = _night_http_get
 
         img = p.generate_image(settings, dev)
+        if args.save_json and not args.use_json:
+            # Save last fetched payloads if provider methods exist
+            try:
+                import json as _json
+                os.makedirs(args.save_json, exist_ok=True)
+                if args.provider == "OpenWeatherMap":
+                    weather = p.get_weather_data("fake", args.units, args.lat, args.lon)
+                    aqi = p.get_air_quality("fake", args.lat, args.lon)
+                    with open(os.path.join(args.save_json, "weather.json"), "w", encoding="utf-8") as f:
+                        _json.dump(weather, f)
+                    with open(os.path.join(args.save_json, "aqi.json"), "w", encoding="utf-8") as f:
+                        _json.dump(aqi, f)
+                else:
+                    w = p.get_open_meteo_data(args.lat, args.lon, args.units, 8)
+                    a = p.get_open_meteo_air_quality(args.lat, args.lon)
+                    with open(os.path.join(args.save_json, "open_meteo_weather.json"), "w", encoding="utf-8") as f:
+                        _json.dump(w, f)
+                    with open(os.path.join(args.save_json, "open_meteo_aqi.json"), "w", encoding="utf-8") as f:
+                        _json.dump(a, f)
+            except Exception:
+                pass
         os.makedirs(os.path.dirname(args.out), exist_ok=True)
         img.save(args.out)
         print(f"Saved: {args.out}")

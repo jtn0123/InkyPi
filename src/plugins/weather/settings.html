@@ -98,6 +98,24 @@
         </select>
     </div>
 
+    <div class="form-group">
+        <label for="weatherIconPack" class="form-label">Weather Icon Pack:</label>
+        <select id="weatherIconPack" name="weatherIconPack" class="form-input">
+            <option value="current">Current (PNG)</option>
+            <option value="A">Pack A (Makin-Things original)</option>
+            <option value="B">Pack B (Makin-Things BOM)</option>
+            <option value="C">Pack C (Bas Milius static)</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="moonIconPack" class="form-label">Moon Icon Pack:</label>
+        <select id="moonIconPack" name="moonIconPack" class="form-input">
+            <option value="current">Current (PNG)</option>
+            <option value="C">Pack C (Bas Milius static)</option>
+        </select>
+    </div>
+
 </div>
 
 <div id="mapModal" class="modal">
@@ -229,6 +247,8 @@
 
             document.getElementById('weatherTimeZone').value = pluginSettings.weatherTimeZone;
             document.getElementById('layoutStyle').value = pluginSettings.layoutStyle || 'classic';
+            if (pluginSettings.weatherIconPack) { document.getElementById('weatherIconPack').value = pluginSettings.weatherIconPack; }
+            if (pluginSettings.moonIconPack) { document.getElementById('moonIconPack').value = pluginSettings.moonIconPack; }
             
             selectedTitle = pluginSettings.titleSelection || 'location';
             weatherProvider = pluginSettings.weatherProvider || 'OpenWeatherMap';
@@ -251,6 +271,8 @@
             document.getElementById('moonPhase').checked = false;
             document.getElementById('weatherTimeZone').value = "locationTimeZone";
             document.getElementById('layoutStyle').value = 'classic';
+            document.getElementById('weatherIconPack').value = 'current';
+            document.getElementById('moonIconPack').value = 'current';
 
             // Auto-populate from device settings location if available and empty (or saved weather has no coords)
             try {
@@ -271,6 +293,35 @@
         document.getElementById('weatherProvider').value = weatherProvider;
         document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
         updateTitleOptions(weatherProvider)
+
+        // Add inline preview buttons for icon packs
+        try {
+            const grp = document.createElement('div');
+            grp.className = 'form-group';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'action-button is-secondary';
+            btn.textContent = 'Preview Icon Packs (no refetch)';
+            const img = document.createElement('img');
+            img.style.maxWidth = '100%';
+            img.style.marginTop = '8px';
+            grp.appendChild(btn);
+            grp.appendChild(img);
+            const formContainer = document.querySelector('.settings-container');
+            formContainer && formContainer.appendChild(grp);
+            btn.addEventListener('click', async () => {
+                try {
+                    const fd = new FormData(document.getElementById('settingsForm'));
+                    fd.append('plugin_id', 'weather');
+                    const resp = await fetch('{{ url_for("plugin.weather_icon_preview") }}', { method: 'POST', body: fd });
+                    if (!resp.ok) throw new Error(String(resp.statusText));
+                    const blob = await resp.blob();
+                    img.src = URL.createObjectURL(blob);
+                } catch(e) {
+                    if (window.showResponseModal){ showResponseModal('failure', 'Preview failed: ' + e); }
+                }
+            });
+        } catch(_e) {}
 
         // Helper to apply coordinates to inputs and map state
         function applyLatLon(lat, lon){

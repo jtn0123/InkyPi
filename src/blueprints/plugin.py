@@ -561,3 +561,63 @@ def save_plugin_settings():
                 "hint": "Check config file permissions.",
             },
         )
+
+
+@plugin_bp.route("/weather/icon_preview", methods=["POST"])
+def weather_icon_preview():
+    from io import BytesIO
+    from PIL import Image
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        form = parse_form(request.form)
+        form.update(handle_request_files(request.files))
+        plugin_id = form.get("plugin_id")
+        if plugin_id != "weather":
+            return json_error("plugin_id must be 'weather'", status=400)
+
+        # Build four variant settings from form without changing saved settings
+        base_settings = dict(form)
+        packs = [
+            ("current", "current"),
+            ("A", "current"),
+            ("B", "current"),
+            ("C", form.get("moonIconPack") or "current"),
+        ]
+
+        from plugins.plugin_registry import get_plugin_instance
+        plugin_config = device_config.get_plugin("weather")
+        if not plugin_config:
+            return json_error("Weather plugin not found", status=404)
+        plugin = get_plugin_instance(plugin_config)
+
+        # Render images using the same data fetch in a single request
+        # (Weather plugin internally will fetch; these all happen back-to-back)
+        imgs = []
+        for w_pack, m_pack in packs:
+            s = dict(base_settings)
+            s["weatherIconPack"] = w_pack
+            s["moonIconPack"] = m_pack
+            try:
+                img = plugin.generate_image(s, device_config)
+            except Exception:
+                # Fallback: create blank image
+                from PIL import Image as _Image
+                img = _Image.new("RGB", (800, 480), "white")
+            imgs.append((img, f"{w_pack}"))
+
+        # Composite horizontally
+        h = max(im.height for im, _ in imgs)
+        w = sum(im.width for im, _ in imgs)
+        composite = Image.new("RGB", (w, h), "white")
+        x = 0
+        for im, _lbl in imgs:
+            composite.paste(im, (x, 0))
+            x += im.width
+
+        fp = BytesIO()
+        composite.save(fp, format="PNG")
+        fp.seek(0)
+        return current_app.response_class(fp.read(), mimetype="image/png")
+    except Exception:
+        logger.exception("Error in weather_icon_preview")
+        return json_internal_error("weather icon preview")

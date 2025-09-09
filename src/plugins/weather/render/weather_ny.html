@@ -3,7 +3,7 @@
 {% block content %}
 <div id="units-container" data-units="{{ units }}"></div>
 
-<div class="weather-dashboard ny{% if plugin_settings.variant_A == "true" %} variant-a{% endif %}{% if plugin_settings.variant_B == "true" %} variant-b{% endif %}">
+<div class="weather-dashboard ny{% if plugin_settings.variant_C5 == "true" %} variant-c5{% endif %}">
 
   <div class="main-grid">
     <div class="left-col">
@@ -38,6 +38,13 @@
         </div>
         {% endfor %}
       </div>
+
+      {% if not (plugin_settings.displayForecast and plugin_settings.displayForecast == "true") and (plugin_settings.moonPhase and plugin_settings.moonPhase == "true") %}
+      <div class="moon-phase-container">
+        <img class="moon-phase-icon" src="{{ forecast[0].moon_phase_icon }}" alt="Moon phase icon">
+        <span class="moon-phase-pct">{{ forecast[0].moon_phase_pct }}%</span>
+      </div>
+      {% endif %}
     </div>
 
     <div class="right-col">
@@ -122,29 +129,56 @@
       }
     };
 
-    const minMaxLabels = {
-      id: 'minMaxLabels',
-      afterDatasetsDraw(chart) {
-        if (!temperatures || !temperatures.length) return;
-        const {ctx, scales: {x, y}} = chart;
-        if (!x || !y) return;
-        const minVal = Math.min(...temperatures);
-        const maxVal = Math.max(...temperatures);
-        const minIndex = temperatures.indexOf(minVal);
-        const maxIndex = temperatures.indexOf(maxVal);
-        const draw = (idx, text, yOffset) => {
-          const xp = x.getPixelForValue(idx);
-          const yp = y.getPixelForValue(temperatures[idx]);
-          ctx.save();
-          ctx.fillStyle = 'rgba(0,0,0,0.75)';
-          ctx.font = '10px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(text, xp, yp + yOffset);
-          ctx.restore();
-        };
-        // Slight offsets to avoid overlapping the line
-        draw(minIndex, `${minVal}°`, 12);
-        draw(maxIndex, `${maxVal}°`, -6);
+    // Removed explicit min/max labels to reduce clutter
+
+    // Optional midlines (25/50/75%) per variant C2/C3/C4
+    const isC2 = ("{{ plugin_settings.variant_C2 }}" === "true");
+    const isC3 = ("{{ plugin_settings.variant_C3 }}" === "true");
+    const isC4 = ("{{ plugin_settings.variant_C4 }}" === "true");
+    const isC5 = ("{{ plugin_settings.variant_C5 }}" === "true");
+
+    const midLines = {
+      id: 'midLines',
+      afterDraw(chart) {
+        const {ctx, scales: {y}, chartArea: {left, right, top, bottom}} = chart;
+        if (!y) return;
+        // For C5, compute fixed lines from low/high across visible range
+        let values;
+        if (isC5) {
+          const low = Math.round(y.min);
+          const high = Math.round(y.max);
+          const span = high - low;
+          const q25 = Math.round(low + 0.25 * span);
+          const q50 = Math.round(low + 0.5 * span);
+          const q75 = Math.round(low + 0.75 * span);
+          values = [low, q25, q50, q75, high];
+        } else {
+          values = [0.25, 0.5, 0.75].map(r => y.min + r * (y.max - y.min));
+        }
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+        values.forEach((v, idx) => {
+          const yp = y.getPixelForValue(v);
+          ctx.beginPath();
+          if (isC3) {
+            ctx.setLineDash([4, 3]);
+          } else {
+            ctx.setLineDash([]);
+          }
+          ctx.lineWidth = (isC4 && (!isC5 ? idx === 1 : v === Math.round((Math.round(y.min)+Math.round(y.max))/2))) ? 1.6 : 1;
+          ctx.moveTo(left, yp);
+          ctx.lineTo(right, yp);
+          ctx.stroke();
+          // Label each line near right edge
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(0,0,0,0.6)';
+          ctx.font = '11px -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif';
+          const label = `${Math.round(v)}°`;
+          ctx.textAlign = 'right';
+          const yLabel = Math.min(Math.max(yp - 2, top + 10), bottom - 8);
+          ctx.fillText(label, left - 6, yLabel);
+        });
+        ctx.restore();
       }
     };
 
@@ -154,17 +188,23 @@
       beforeDraw(chart, args, opts) {
         const {ctx, chartArea} = chart;
         if (!chartArea) return;
+        // Tone-mapped grayscale for e-ink contrast
         const grad = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
-        grad.addColorStop(0, 'rgba(30,80,200,0.9)');   // cooler
-        grad.addColorStop(0.5, 'rgba(120,120,120,0.95)');
-        grad.addColorStop(1, 'rgba(220,60,40,0.95)');  // warmer
+        grad.addColorStop(0, 'rgba(0,0,0,0.55)');
+        grad.addColorStop(0.5, 'rgba(0,0,0,0.75)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.95)');
         const ds = chart.data.datasets[0];
         ds.borderColor = grad;
       }
     };
 
+    const plugins = [nowLine, tempGradient];
+    if (isC2 || isC3 || isC4 || isC5) {
+      plugins.push(midLines);
+    }
+
     new Chart(ctx, {
-      plugins: [nowLine, minMaxLabels, tempGradient],
+      plugins,
       data: {
         labels,
         datasets: [
@@ -191,8 +231,8 @@
             borderWidth: 1,
             borderSkipped: false,
             yAxisID: 'y2',
-            barPercentage: 0.7,
-            categoryPercentage: 0.9
+            barPercentage: 0.65,
+            categoryPercentage: 0.88
           }
         ]
       },
@@ -206,7 +246,7 @@
           y: {
             position: 'left',
             grid: { 
-              display: true, 
+              display: !(isC2 || isC3 || isC4 || isC5), 
               color: 'rgba(0,0,0,0.08)', 
               lineWidth: 1,
               drawTicks: false
@@ -215,8 +255,8 @@
             min: minTemp - 2,
             max: maxTemp + 2,
             ticks: {
-              callback: (v) => `${v}°`,
-              maxTicksLimit: 5,
+              callback: (v) => (isC2 || isC3 || isC4 || isC5) ? '' : `${v}°`,
+              maxTicksLimit: (isC2 || isC3 || isC4 || isC5) ? 0 : 5,
               color: 'rgba(0,0,0,0.6)',
               font: { size: 11, weight: '400' },
               padding: 8
@@ -230,10 +270,12 @@
             border: { display: false },
             ticks: {
               callback: (v) => `${v}%`,
-              maxTicksLimit: 5,
+              stepSize: 50,
+              maxTicksLimit: 3,
+              autoSkip: false,
               color: 'rgba(0,0,0,0.6)',
               font: { size: 11, weight: '400' },
-              padding: 8
+              padding: 10
             }
           },
           x: {
@@ -249,7 +291,7 @@
           }
         },
         layout: {
-          padding: { left: 2, right: 2, top: 4, bottom: 2 }
+          padding: { left: (isC2 || isC3 || isC4 || isC5) ? 36 : 6, right: 18, top: 6, bottom: 10 }
         },
         plugins: {
           legend: { display: false },
