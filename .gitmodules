@@ -1,0 +1,3 @@
+[submodule "vendor/icons/basmilius"]
+	path = vendor/icons/basmilius
+	url = https://github.com/basmilius/weather-icons.git
