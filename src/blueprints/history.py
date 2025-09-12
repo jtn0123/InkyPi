@@ -50,7 +50,10 @@ def _list_history_images(history_dir: str) -> list[dict]:
         except Exception:
             return 0.0
 
-    files.sort(key=lambda f: _safe_mtime(os.path.join(history_dir, f)), reverse=True)
+    files.sort(
+        key=lambda f: (_safe_mtime(os.path.join(history_dir, f)), f),
+        reverse=True,
+    )
     result: list[dict] = []
     for f in files:
         full_path = os.path.join(history_dir, f)
