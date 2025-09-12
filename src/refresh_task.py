@@ -4,13 +4,10 @@ import threading
 from datetime import datetime
 from time import perf_counter
 
-import pytz
-from PIL import Image
-
 from model import PlaylistManager, RefreshInfo
-from utils.time_utils import now_device_tz
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +34,9 @@ class RefreshTask:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
-            self.thread = threading.Thread(target=self._run, daemon=True, name="RefreshTask")
+            self.thread = threading.Thread(
+                target=self._run, daemon=True, name="RefreshTask"
+            )
             self.running = True
             self.thread.start()
 
@@ -168,22 +167,34 @@ class RefreshTask:
                             )
                             # Pass history metadata so the history page can show source info
                             history_meta = {
-                                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
-                                "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
-                                "playlist": refresh_action.get_refresh_info().get("playlist"),
-                                "plugin_instance": refresh_action.get_refresh_info().get("plugin_instance"),
+                                "refresh_type": refresh_action.get_refresh_info().get(
+                                    "refresh_type"
+                                ),
+                                "plugin_id": refresh_action.get_refresh_info().get(
+                                    "plugin_id"
+                                ),
+                                "playlist": refresh_action.get_refresh_info().get(
+                                    "playlist"
+                                ),
+                                "plugin_instance": refresh_action.get_refresh_info().get(
+                                    "plugin_instance"
+                                ),
                             }
                             try:
                                 self.display_manager.display_image(
                                     image,
-                                    image_settings=plugin.config.get("image_settings", []),
+                                    image_settings=plugin.config.get(
+                                        "image_settings", []
+                                    ),
                                     history_meta=history_meta,
                                 )
                             except TypeError:
                                 # Back-compat for mocks/tests without history_meta param
                                 self.display_manager.display_image(
                                     image,
-                                    image_settings=plugin.config.get("image_settings", []),
+                                    image_settings=plugin.config.get(
+                                        "image_settings", []
+                                    ),
                                 )
                         else:
                             logger.info(
@@ -194,8 +205,12 @@ class RefreshTask:
                         request_ms = int((perf_counter() - _t_req_start) * 1000)
                         # Merge metrics captured by display manager if any
                         dm_info = getattr(self.device_config, "refresh_info", None)
-                        display_ms = getattr(dm_info, "display_ms", None) if dm_info else None
-                        preprocess_ms = getattr(dm_info, "preprocess_ms", None) if dm_info else None
+                        display_ms = (
+                            getattr(dm_info, "display_ms", None) if dm_info else None
+                        )
+                        preprocess_ms = (
+                            getattr(dm_info, "preprocess_ms", None) if dm_info else None
+                        )
                         self.device_config.refresh_info = RefreshInfo(
                             **refresh_info,
                             request_ms=request_ms,
@@ -267,7 +282,9 @@ class RefreshTask:
 
         latest_refresh_dt = latest_refresh_info.get_refresh_datetime()
         # Allow per-playlist override; fallback to device-level interval
-        plugin_cycle_interval = getattr(playlist, "cycle_interval_seconds", None) or self.device_config.get_config(
+        plugin_cycle_interval = getattr(
+            playlist, "cycle_interval_seconds", None
+        ) or self.device_config.get_config(
             "plugin_cycle_interval_seconds", default=3600
         )
         should_refresh = PlaylistManager.should_refresh(
