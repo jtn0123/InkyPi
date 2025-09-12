@@ -323,7 +323,8 @@ class RefreshTask:
             return
 
         metrics = {
-            "cpu_percent": psutil.cpu_percent(interval=1),
+            # interval=None ensures a non-blocking snapshot of CPU usage
+            "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
             "disk_percent": psutil.disk_usage("/").percent,
             "load_avg_1_5_15": os.getloadavg(),
