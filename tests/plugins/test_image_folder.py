@@ -112,3 +112,13 @@ def test_generate_image_errors(tmp_path, device_config_dev):
         assert False
     except RuntimeError as e:
         assert "No image files found" in str(e)
+
+
+def test_image_folder_initializes_without_name_error():
+    """Plugin should be importable and instantiable without NameError."""
+    from plugins.image_folder.image_folder import ImageFolder
+
+    plugin = ImageFolder(
+        {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
+    )
+    assert plugin is not None
