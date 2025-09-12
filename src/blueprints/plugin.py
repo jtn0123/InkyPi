@@ -22,6 +22,113 @@ plugin_bp = Blueprint("plugin", __name__)
 PLUGINS_DIR = resolve_path("plugins")
 
 
+def _generate_instance_image_from_saved_settings(
+    device_config, plugin_id: str, instance_name: str, path: str
+) -> bool:
+    """Attempt to generate and persist an instance image using saved settings.
+
+    Returns True on success, False otherwise. Any exception is caught and logged
+    with contextual information.
+    """
+
+    try:
+        plugin_config = device_config.get_plugin(plugin_id)
+        if not plugin_config:
+            logger.error(
+                "Dev fallback plugin config not found | plugin_id=%s", plugin_id
+            )
+            return False
+
+        plugin = get_plugin_instance(plugin_config)
+        playlist_manager = device_config.get_playlist_manager()
+        inst = None
+        for name in playlist_manager.get_playlist_names():
+            pl = playlist_manager.get_playlist(name)
+            if pl:
+                inst = pl.find_plugin(plugin_id, instance_name)
+                if inst:
+                    logger.info(
+                        "Found instance in playlist | playlist=%s plugin_id=%s instance=%s",
+                        name,
+                        plugin_id,
+                        instance_name,
+                    )
+                    break
+
+        if not inst:
+            logger.error(
+                "Dev fallback instance not found | plugin_id=%s instance=%s",
+                plugin_id,
+                instance_name,
+            )
+            return False
+
+        image = plugin.generate_image(inst.settings, device_config)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        image.save(path)
+        logger.info(
+            "Generated instance image | plugin_id=%s instance=%s path=%s",
+            plugin_id,
+            instance_name,
+            path,
+        )
+        return True
+    except Exception:
+        logger.exception(
+            "Dev fallback failed | plugin_id=%s instance=%s path=%s",
+            plugin_id,
+            instance_name,
+            path,
+        )
+        return False
+
+
+def _get_instance_image_from_history(device_config, plugin_id: str, instance_name: str):
+    """Locate latest history PNG for a plugin instance based on sidecar metadata."""
+
+    try:
+        history_dir = device_config.history_image_dir
+        latest_match = None
+        latest_mtime: float = -1.0
+        for fname in os.listdir(history_dir):
+            if not fname.endswith(".json"):
+                continue
+            import json
+            import os as _os
+
+            p = _os.path.join(history_dir, fname)
+            try:
+                with open(p, encoding="utf-8") as fh:
+                    meta = json.load(fh) or {}
+                if (
+                    meta.get("plugin_id") == plugin_id
+                    and meta.get("plugin_instance") == instance_name
+                ):
+                    mtime = _os.path.getmtime(p)
+                    if mtime > latest_mtime:
+                        latest_mtime = mtime
+                        png_name = fname.replace(".json", ".png")
+                        latest_match = _os.path.join(history_dir, png_name)
+            except Exception:
+                logger.exception(
+                    "Failed reading history sidecar | path=%s", p
+                )
+
+        if latest_match and os.path.exists(latest_match):
+            logger.info(
+                "Serving instance image from history fallback | plugin_id=%s instance=%s history=%s",
+                plugin_id,
+                instance_name,
+                latest_match,
+            )
+            return latest_match
+    except Exception:
+        logger.exception(
+            "History fallback failed | plugin_id=%s instance=%s", plugin_id, instance_name
+        )
+    return None
+
+
 @plugin_bp.route("/plugin/<plugin_id>")
 def plugin_page(plugin_id):
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -140,86 +247,41 @@ def plugin_instance_image(plugin_id, instance_name):
     base_dir = os.path.abspath(device_config.plugin_image_dir)
     path = os.path.abspath(os.path.join(base_dir, filename))
 
-    # Prevent path traversal and ensure file exists
-    if not path.startswith(base_dir + os.sep) or not os.path.exists(path):
-        logger.info(
-            "Instance image missing, attempting dev fallback | plugin_id=%s instance=%s path=%s",
+    # Prevent path traversal
+    if not path.startswith(base_dir + os.sep):
+        logger.error(
+            "Invalid instance image path | plugin_id=%s instance=%s path=%s",
             plugin_id,
             instance_name,
             path,
         )
-        # Dev fallback: if instance image not yet created, try to generate from saved settings
-        try:
-            device_config = current_app.config["DEVICE_CONFIG"]
-            playlist_manager = device_config.get_playlist_manager()
-            plugin_config = device_config.get_plugin(plugin_id)
-            if plugin_config:
-                plugin = get_plugin_instance(plugin_config)
-                # Try to find instance in any playlist
-                inst = None
-                for name in playlist_manager.get_playlist_names():
-                    pl = playlist_manager.get_playlist(name)
-                    if pl:
-                        inst = pl.find_plugin(plugin_id, instance_name)
-                        if inst:
-                            logger.info(
-                                "Found instance in playlist | playlist=%s plugin_id=%s instance=%s",
-                                name,
-                                plugin_id,
-                                instance_name,
-                            )
-                            break
-                if inst:
-                    # Generate image and persist to plugin image dir
-                    image = plugin.generate_image(inst.settings, device_config)
-                    os.makedirs(base_dir, exist_ok=True)
-                    image.save(path)
-                    logger.info("Generated instance image | path=%s", path)
-        except Exception:
-            # Ignore failures; keep 404 behavior below if still missing
-            logger.exception("Failed to generate instance image in dev fallback")
-        if not os.path.exists(path):
-            # Second fallback: search history sidecars for latest matching plugin/instance and serve that PNG
-            try:
-                device_config = current_app.config["DEVICE_CONFIG"]
-                history_dir = device_config.history_image_dir
-                latest_match = None
-                latest_mtime: float = -1.0
-                for fname in os.listdir(history_dir):
-                    if not fname.endswith(".json"):
-                        continue
-                    import json
-                    import os as _os
+        return abort(404, description="Instance image not found")
 
-                    p = _os.path.join(history_dir, fname)
-                    try:
-                        with open(p, encoding="utf-8") as fh:
-                            meta = json.load(fh) or {}
-                        if (
-                            meta.get("plugin_id") == plugin_id
-                            and meta.get("plugin_instance") == instance_name
-                        ):
-                            mtime = _os.path.getmtime(p)
-                            if mtime > latest_mtime:
-                                latest_mtime = mtime
-                                # sidecar base name matches PNG filename
-                                png_name = fname.replace(".json", ".png")
-                                latest_match = _os.path.join(history_dir, png_name)
-                    except Exception:
-                        continue
-                if latest_match and os.path.exists(latest_match):
-                    logger.info(
-                        "Serving instance image from history fallback | plugin_id=%s instance=%s history=%s",
-                        plugin_id,
-                        instance_name,
-                        latest_match,
-                    )
-                    return send_file(
-                        latest_match, mimetype="image/png", conditional=True
-                    )
-            except Exception:
-                logger.exception("Failed during history fallback for instance image")
-            return abort(404)
+    if not os.path.exists(path):
+        logger.info(
+            "Instance image missing, attempting fallbacks | plugin_id=%s instance=%s path=%s",
+            plugin_id,
+            instance_name,
+            path,
+        )
+        # Try dev generation from saved settings
+        success = _generate_instance_image_from_saved_settings(
+            device_config, plugin_id, instance_name, path
+        )
+        if not success:
+            # Try history sidecar fallback
+            history_path = _get_instance_image_from_history(
+                device_config, plugin_id, instance_name
+            )
+            if history_path:
+                return send_file(history_path, mimetype="image/png", conditional=True)
+            logger.error(
+                "Instance image fallbacks failed | plugin_id=%s instance=%s path=%s",
+                plugin_id,
+                instance_name,
+                path,
+            )
+            return abort(404, description="Instance image not found")
 
     return send_file(path, mimetype="image/png", conditional=True)
 

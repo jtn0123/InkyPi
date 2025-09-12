@@ -240,3 +240,82 @@ def test_plugin_instance_image_serves_png(client, device_config_dev):
     resp = client.get("/instance_image/ai_text/Inst One")
     assert resp.status_code == 200
     assert resp.headers.get("Content-Type", "").startswith("image/")
+
+
+def _setup_playlist_for_instance(device_config_dev):
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "ai_text",
+            "name": "Inst One",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
+
+def test_instance_image_generated_from_settings(client, device_config_dev, monkeypatch):
+    import io
+    import os
+    from PIL import Image
+
+    _setup_playlist_for_instance(device_config_dev)
+
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    if os.path.exists(path):
+        os.remove(path)
+
+    class _StubPlugin:
+        def generate_image(self, settings, device_config):
+            return Image.new("RGB", (10, 10), "blue")
+
+    monkeypatch.setattr(
+        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+    )
+
+    resp = client.get("/instance_image/ai_text/Inst One")
+    assert resp.status_code == 200
+    # Ensure file persisted and served
+    assert os.path.exists(path)
+    img = Image.open(io.BytesIO(resp.data))
+    assert img.getpixel((0, 0)) == (0, 0, 255)
+
+
+def test_instance_image_served_from_history_on_generation_failure(
+    client, device_config_dev, monkeypatch
+):
+    import io
+    import json
+    import os
+    from PIL import Image
+
+    _setup_playlist_for_instance(device_config_dev)
+
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    if os.path.exists(path):
+        os.remove(path)
+
+    # Prepare history sidecar
+    history_dir = device_config_dev.history_image_dir
+    png_path = os.path.join(history_dir, "display_000001.png")
+    json_path = os.path.join(history_dir, "display_000001.json")
+    Image.new("RGB", (10, 10), "red").save(png_path)
+    with open(json_path, "w", encoding="utf-8") as fh:
+        json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
+
+    class _StubPlugin:
+        def generate_image(self, settings, device_config):
+            raise RuntimeError("fail")
+
+    monkeypatch.setattr(
+        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+    )
+
+    resp = client.get("/instance_image/ai_text/Inst One")
+    assert resp.status_code == 200
+    img = Image.open(io.BytesIO(resp.data))
+    assert img.getpixel((0, 0)) == (255, 0, 0)
