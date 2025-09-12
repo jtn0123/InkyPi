@@ -18,7 +18,6 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 1)
-green=$(tput setaf 2)
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
@@ -147,25 +146,26 @@ enable_interfaces(){
   fi 
 }
 
+
 show_loader() {
   local pid=$!
   local delay=0.1
-  local spinstr='|/-\'
-  if [[ -z "$pid" ]]; then
+  local spinstr="|/-\\"
+  if [[ -z $pid ]]; then
     printf "%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$1"
     return
   fi
-  printf "$1 [${spinstr:0:1}] "
+  printf "%s [%s] " "$1" "${spinstr:0:1}"
   while ps a | awk '{print $1}' | grep -q "${pid}"; do
     local temp=${spinstr#?}
-    printf "\r$1 [${temp:0:1}] "
+    printf "\r%s [%s] " "$1" "${temp:0:1}"
     spinstr=${temp}${spinstr%"${temp}"}
-    sleep ${delay}
+    sleep "$delay"
   done
-  if [[ $? -eq 0 ]]; then
-    printf "\r$1 [\e[32m\xE2\x9C\x94\e[0m]\n"
+  if wait "$pid"; then
+    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$1"
   else
-    printf "\r$1 [\e[31m\xE2\x9C\x98\e[0m]\n"
+    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$1"
   fi
 }
 
@@ -223,12 +223,12 @@ create_venv(){
   python3 -m venv "$VENV_PATH"
   if [[ "$VERBOSE" -eq 1 ]]; then
     echo_header "Upgrading pip and core build tools (pip/setuptools/wheel)"
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir
+    "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir
     echo_header "Installing python dependencies"
-    $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir
+    "$VENV_PATH/bin/python" -m pip install -r "$PIP_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir
   else
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
-    $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
+    "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
+    "$VENV_PATH/bin/python" -m pip install -r "$PIP_REQUIREMENTS_FILE" -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
     show_loader "\tInstalling python dependencies. "
   fi
 
@@ -236,9 +236,9 @@ create_venv(){
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
     if [[ "$VERBOSE" -eq 1 ]]; then
-      $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir
+      "$VENV_PATH/bin/python" -m pip install -r "$WS_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir
     else
-      $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
+      "$VENV_PATH/bin/python" -m pip install -r "$WS_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
       show_loader "\tInstalling additional Waveshare python dependencies. "
     fi
   fi
@@ -259,7 +259,7 @@ install_app_service() {
 
 install_executable() {
   echo "Adding executable to ${BINPATH}/$APPNAME"
-  cp $SCRIPT_DIR/inkypi $BINPATH/
+  cp "$SCRIPT_DIR/inkypi" "$BINPATH/"
   sudo chmod +x $BINPATH/$APPNAME
 }
 
@@ -344,7 +344,7 @@ copy_project() {
 
 # Get Raspberry Pi hostname
 get_hostname() {
-  echo "$(hostname)"
+  hostname
 }
 
 # Get Raspberry Pi IP address
@@ -362,7 +362,7 @@ ask_for_reboot() {
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
   echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/fatihak/InkyPi/issues"
 
-  read -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
+  read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
 
   if [[ "${userInput,,}" == "y" ]]; then

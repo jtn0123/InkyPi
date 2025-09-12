@@ -2,14 +2,15 @@
 
 # entry script to launch the service
 
-PROGRAM_PATH=/usr/local/inkypi
+PROGRAM_PATH="/usr/local/inkypi"
 VENV_PATH="$PROGRAM_PATH/venv_inkypi"
 
+# shellcheck source=/dev/null
 source "$VENV_PATH/bin/activate"
 
 export PROJECT_DIR="$PROGRAM_PATH"
 export SRC_DIR="$PROGRAM_PATH/src"
 
-python -u "$(realpath $PROGRAM_PATH/src/inkypi.py)"
+python -u "$(realpath "$PROGRAM_PATH/src/inkypi.py")"
 
 deactivate
