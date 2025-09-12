@@ -58,9 +58,15 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
 
-    # Mock psutil
+    # Mock psutil with non-blocking cpu_percent
     mock_psutil = type("MockPsutil", (), {})()
-    mock_psutil.cpu_percent = lambda interval=1: 50.0
+    cpu_call = {}
+
+    def fake_cpu_percent(interval=None):
+        cpu_call["interval"] = interval
+        return 50.0
+
+    mock_psutil.cpu_percent = fake_cpu_percent
     mock_psutil.virtual_memory = lambda: type("MockVM", (), {"percent": 60.0})()
     mock_psutil.disk_usage = lambda path: type("MockDisk", (), {"percent": 70.0})()
     mock_psutil.swap_memory = lambda: type("MockSwap", (), {"percent": 10.0})()
@@ -82,8 +88,15 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
     monkeypatch.setattr("builtins.__import__", mock_import)
 
-    # This should trigger the system stats logging
+    # This should trigger the system stats logging without blocking
+    from time import perf_counter
+
+    start = perf_counter()
     task.log_system_stats()
+    duration = perf_counter() - start
+
+    assert cpu_call.get("interval") in (None, 0)
+    assert duration < 0.5
     # Restore import early to avoid interfering with pytest internals during teardown
     monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
