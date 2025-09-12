@@ -181,6 +181,31 @@ def test_plugin_instance_should_refresh_interval_and_scheduled():
     assert pi.should_refresh(now) is True
 
 
+def test_plugin_instance_scheduled_across_day_boundary_once():
+    tz = pytz.UTC
+    schedule = "12:00"
+    yesterday = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)  # after schedule yesterday
+    today_before = datetime(2025, 1, 2, 11, 0, 0, tzinfo=tz)
+    today_at = datetime(2025, 1, 2, 12, 0, 0, tzinfo=tz)
+    tomorrow_at = datetime(2025, 1, 3, 12, 0, 0, tzinfo=tz)
+
+    pi = PluginInstance(
+        "x",
+        "inst",
+        {},
+        {"scheduled": schedule},
+        latest_refresh_time=yesterday.isoformat(),
+    )
+
+    assert pi.should_refresh(today_before) is False
+    assert pi.should_refresh(today_at) is True
+
+    # Simulate refresh occurring at scheduled time
+    pi.latest_refresh_time = today_at.isoformat()
+    assert pi.should_refresh(today_at + timedelta(minutes=1)) is False
+    assert pi.should_refresh(tomorrow_at) is True
+
+
 def test_get_time_range_minutes():
     p = Playlist("Morning", "06:00", "09:30")
     assert p.get_time_range_minutes() == 210
