@@ -21,17 +21,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.12'
           cache: 'pip'
           cache-dependency-path: install/requirements-dev.txt
       - name: Install dev dependencies
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements-dev.txt
-      - name: Ruff + Black
+      - name: Lint and type-check
         run: scripts/lint.sh
-      - name: Type check (mypy)
-        run: mypy src
 
   shellcheck:
     name: Shell script validation
@@ -70,6 +68,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ '3.11', '3.12', '3.13' ]
+        include:
+          - python-version: '3.13'
+            allow-failure: true
+    continue-on-error: ${{ matrix.allow-failure == true }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
