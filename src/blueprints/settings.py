@@ -3,15 +3,15 @@ import io
 import logging
 import os
 import re
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-import time
 
 import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
 
 from utils.http_utils import json_error, json_internal_error
-from utils.time_utils import calculate_seconds, now_device_tz, get_timezone
+from utils.time_utils import calculate_seconds, get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
@@ -100,23 +100,29 @@ def _read_log_lines(hours: int) -> list[str]:
 
     # Journal available path
     reader = JournalReader()
-    reader.open(JournalOpenMode.SYSTEM)
-    reader.add_filter(Rule("_SYSTEMD_UNIT", "inkypi.service"))
-    reader.seek_realtime_usec(int(since.timestamp() * 1_000_000))
+    try:
+        reader.open(JournalOpenMode.SYSTEM)
+        reader.add_filter(Rule("_SYSTEMD_UNIT", "inkypi.service"))
+        reader.seek_realtime_usec(int(since.timestamp() * 1_000_000))
 
-    for record in reader:
+        for record in reader:
+            try:
+                ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
+                formatted_ts = ts.strftime("%b %d %H:%M:%S")
+            except Exception:
+                formatted_ts = "??? ?? ??:??:??"
+
+            data = record.data
+            hostname = data.get("_HOSTNAME", "unknown-host")
+            identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
+            pid = data.get("_PID", "?")
+            msg = data.get("MESSAGE", "").rstrip()
+            lines.append(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}")
+    finally:
         try:
-            ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
-            formatted_ts = ts.strftime("%b %d %H:%M:%S")
+            reader.close()
         except Exception:
-            formatted_ts = "??? ?? ??:??:??"
-
-        data = record.data
-        hostname = data.get("_HOSTNAME", "unknown-host")
-        identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
-        pid = data.get("_PID", "?")
-        msg = data.get("MESSAGE", "").rstrip()
-        lines.append(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}")
+            pass
     return lines
 
 
@@ -134,14 +140,20 @@ def backup_restore_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
     return render_template(
-        "settings.html", device_settings=device_config.get_config(), timezones=sorted(pytz.all_timezones_set)
+        "settings.html",
+        device_settings=device_config.get_config(),
+        timezones=sorted(pytz.all_timezones_set),
     )
 
 
 @settings_bp.route("/settings/export", methods=["GET"])
 def export_settings():
     try:
-        include_keys = (request.args.get("include_keys", "1").strip().lower() in ("1", "true", "yes"))
+        include_keys = request.args.get("include_keys", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         device_config = current_app.config["DEVICE_CONFIG"]
 
         # Build export object with config plus env keys when requested
@@ -151,7 +163,12 @@ def export_settings():
         if include_keys:
             # Include known API keys and possibly other keys
             keys = {}
-            for k in ("OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET", "UNSPLASH_ACCESS_KEY"):
+            for k in (
+                "OPEN_AI_SECRET",
+                "OPEN_WEATHER_MAP_SECRET",
+                "NASA_SECRET",
+                "UNSPLASH_ACCESS_KEY",
+            ):
                 try:
                     v = device_config.load_env_key(k)
                 except Exception:
@@ -164,7 +181,10 @@ def export_settings():
         return jsonify({"success": True, "data": data})
     except Exception as e:
         logger.exception("Error exporting settings")
-        return json_internal_error("export settings", details={"hint": "Check config readability.", "error": str(e)})
+        return json_internal_error(
+            "export settings",
+            details={"hint": "Check config readability.", "error": str(e)},
+        )
 
 
 @settings_bp.route("/settings/import", methods=["POST"])
@@ -179,6 +199,7 @@ def import_settings():
             file = request.files.get("file")
             if file:
                 import json as _json
+
                 payload = _json.loads(file.stream.read().decode("utf-8"))
         if not payload or not isinstance(payload, dict):
             return json_error("Invalid import payload", status=400)
@@ -201,7 +222,13 @@ def import_settings():
         return jsonify({"success": True, "message": "Import completed"})
     except Exception as e:
         logger.exception("Error importing settings")
-        return json_internal_error("import settings", details={"hint": "Verify JSON structure and file permissions.", "error": str(e)})
+        return json_internal_error(
+            "import settings",
+            details={
+                "hint": "Verify JSON structure and file permissions.",
+                "error": str(e),
+            },
+        )
 
 
 @settings_bp.route("/settings/api-keys")
@@ -329,7 +356,12 @@ def save_settings():
         try:
             lat_raw = form_data.get("deviceLat")
             lon_raw = form_data.get("deviceLon")
-            if lat_raw is not None and lon_raw is not None and lat_raw != "" and lon_raw != "":
+            if (
+                lat_raw is not None
+                and lon_raw is not None
+                and lat_raw != ""
+                and lon_raw != ""
+            ):
                 lat = float(lat_raw)
                 lon = float(lon_raw)
                 # Basic sanity range check
@@ -371,7 +403,9 @@ def client_log():
         try:
             import json as _json
 
-            extra_str = _json.dumps(extra, separators=(",", ":")) if extra is not None else "{}"
+            extra_str = (
+                _json.dumps(extra, separators=(",", ":")) if extra is not None else "{}"
+            )
         except Exception:
             extra_str = str(extra)
 
@@ -387,7 +421,9 @@ def client_log():
         return jsonify({"success": True})
     except Exception:
         logger.exception("/settings/client_log failure")
-        return json_internal_error("client_log", details={"hint": "Check payload shape."})
+        return json_internal_error(
+            "client_log", details={"hint": "Check payload shape."}
+        )
 
 
 @settings_bp.route("/shutdown", methods=["POST"])
