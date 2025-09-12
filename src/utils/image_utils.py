@@ -100,6 +100,8 @@ def change_orientation(image, orientation, inverted=False):
         angle = 0
     elif orientation == "vertical":
         angle = 90
+    else:
+        raise ValueError(f"Unknown orientation: {orientation}")
 
     if inverted:
         angle = (angle + 180) % 360

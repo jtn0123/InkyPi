@@ -60,6 +60,12 @@ def test_change_orientation():
     assert out_v.size[0] != img.size[0] or out_v.size[1] != img.size[1]
 
 
+def test_change_orientation_invalid():
+    img = Image.new("RGB", (10, 10), "white")
+    with pytest.raises(ValueError):
+        image_utils.change_orientation(img, "diagonal")
+
+
 def test_resize_image_and_keep_width():
     img = Image.new("RGB", (200, 100), "white")
     out = image_utils.resize_image(img, (100, 100))
