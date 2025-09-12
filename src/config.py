@@ -181,9 +181,10 @@ class Config:
             json.dump(self.config, outfile, indent=4)
 
     def get_config(self, key=None, default=None):
-        if default is None:
-            default = {}
-        """Gets the value of a specific configuration key or returns the entire config if none provided."""
+        """Gets the value of a specific configuration key or returns the entire config if none provided.
+
+        If the key is absent and no default is supplied, ``None`` is returned.
+        """
         if key is not None:
             return self.config.get(key, default)
         return self.config
@@ -283,14 +284,16 @@ class Config:
 
     def load_playlist_manager(self):
         """Loads the playlist manager object from the config."""
-        playlist_manager = PlaylistManager.from_dict(self.get_config("playlist_config"))
+        playlist_manager = PlaylistManager.from_dict(
+            self.get_config("playlist_config", {})
+        )
         if not playlist_manager.playlists:
             playlist_manager.add_default_playlist()
         return playlist_manager
 
     def load_refresh_info(self):
         """Loads the refresh information from the config."""
-        return RefreshInfo.from_dict(self.get_config("refresh_info"))
+        return RefreshInfo.from_dict(self.get_config("refresh_info", {}))
 
     def get_playlist_manager(self):
         """Returns the playlist manager."""
