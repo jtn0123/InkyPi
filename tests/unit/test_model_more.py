@@ -53,3 +53,11 @@ def test_refresh_info_helpers():
     d = ri.to_dict()
     ri2 = RefreshInfo.from_dict(d)
     assert ri2.plugin_id == "ai_text"
+
+
+def test_add_default_playlist_returns_true_and_grows_list():
+    pm = PlaylistManager([])
+    before = len(pm.playlists)
+    result = pm.add_default_playlist()
+    assert result is True
+    assert len(pm.playlists) == before + 1

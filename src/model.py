@@ -126,7 +126,7 @@ class PlaylistManager:
 
     def add_default_playlist(self):
         """Add a default playlist to the manager, called when no playlists exist."""
-        return self.playlists.append(
+        self.playlists.append(
             Playlist(
                 "Default",
                 PlaylistManager.DEFAULT_PLAYLIST_START,
@@ -134,6 +134,7 @@ class PlaylistManager:
                 [],
             )
         )
+        return True
 
     def find_plugin(self, plugin_id, instance):
         """Searches playlists to find a plugin with the given ID and instance."""
