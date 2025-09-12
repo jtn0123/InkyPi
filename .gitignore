@@ -180,3 +180,6 @@ src/static/images/saved/
 
 # Ignore downloaded icon packs; we vendor only curated SVGs under templates
 phosphor-icons/
+
+# Backup files
+*.bak*
