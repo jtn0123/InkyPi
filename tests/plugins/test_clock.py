@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
-import math
 from datetime import datetime
+import math
 
 import pytest
 from PIL import Image
