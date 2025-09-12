@@ -1,7 +1,6 @@
 import fnmatch
 import logging
 import os
-from datetime import datetime
 
 from display.abstract_display import AbstractDisplay
 from display.mock_display import MockDisplay
