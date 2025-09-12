@@ -1,4 +1,5 @@
 import os
+import re
 from markupsafe import Markup
 
 
@@ -21,9 +22,11 @@ def render_icon(name: str, class_name: str = "icon-image", title: str | None = N
             if "<svg" in svg and "class=" not in svg.split("<svg", 1)[1].split(">", 1)[0]:
                 svg = svg.replace("<svg", f"<svg {cls_attr}", 1)
             # title
-            if title:
-                if "<title>" not in svg:
-                    svg = svg.replace("<svg", "<svg", 1).replace(">", f"><title>{title}</title>", 1)
+            if title and "<title>" not in svg:
+                match = re.search(r"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
+                if match:
+                    pos = match.end()
+                    svg = svg[:pos] + f"<title>{title}</title>" + svg[pos:]
             return Markup(svg)
     except Exception:
         # On any failure, fall through to class-based fallback
