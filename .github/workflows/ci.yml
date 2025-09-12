@@ -186,6 +186,7 @@ jobs:
           curl -fsS ${SERVER_URL}/settings >/dev/null
           curl -fsS ${SERVER_URL}/playlist >/dev/null
           curl -sS -o /dev/null -w "%{http_code}\n" ${SERVER_URL}/preview | tee preview_code.txt
+          grep -q '^200$' preview_code.txt || { echo "Preview route did not return 200" >&2; kill $SERVER_PID 2>/dev/null || true; exit 1; }
           curl -fsS ${SERVER_URL}/plugin/clock >/dev/null
           curl -fsS ${SERVER_URL}/images/clock/faces/digital.png >/dev/null
           curl -fsS "${SERVER_URL}/download-logs?hours=2" >/dev/null
