@@ -6,18 +6,22 @@ from datetime import datetime
 main_bp = Blueprint("main", __name__)
 
 
+def _current_dt(device_config):
+    try:
+        from utils.time_utils import now_device_tz
+
+        return now_device_tz(device_config)
+    except Exception:
+        return datetime.utcnow()
+
+
 @main_bp.route("/")
 def main_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     # Compute a non-mutating next-up preview for SSR convenience
     playlist_manager = device_config.get_playlist_manager()
     latest_refresh = device_config.get_refresh_info()
-    try:
-        from utils.time_utils import now_device_tz
-
-        current_dt = now_device_tz(device_config)
-    except Exception:
-        current_dt = datetime.utcnow()
+    current_dt = _current_dt(device_config)
 
     next_up = {}
     try:
@@ -68,12 +72,7 @@ def refresh_info():
 def next_up():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
-    try:
-        from utils.time_utils import now_device_tz
-
-        current_dt = now_device_tz(device_config)
-    except Exception:
-        current_dt = datetime.utcnow()
+    current_dt = _current_dt(device_config)
 
     try:
         playlist = playlist_manager.determine_active_playlist(current_dt)
@@ -101,12 +100,7 @@ def display_next():
     playlist_manager = device_config.get_playlist_manager()
 
     # Determine current time
-    try:
-        from utils.time_utils import now_device_tz
-
-        current_dt = now_device_tz(device_config)
-    except Exception:
-        current_dt = datetime.utcnow()
+    current_dt = _current_dt(device_config)
 
     # Pick next eligible and commit index change
     playlist = playlist_manager.determine_active_playlist(current_dt)
