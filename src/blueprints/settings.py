@@ -3,6 +3,7 @@ import io
 import logging
 import os
 import re
+import subprocess
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
@@ -428,14 +429,24 @@ def client_log():
 
 @settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
+    """Reboot or shut down the device.
+
+    Consider adding authentication or CSRF protection if publicly exposed.
+    """
     data = request.get_json() or {}
-    if data.get("reboot"):
-        logger.info("Reboot requested")
-        os.system("sudo reboot")
-    else:
-        logger.info("Shutdown requested")
-        os.system("sudo shutdown -h now")
-    return jsonify({"success": True})
+    try:
+        if data.get("reboot"):
+            logger.info("Reboot requested")
+            subprocess.run(["sudo", "reboot"], check=True)
+        else:
+            logger.info("Shutdown requested")
+            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        return jsonify({"success": True})
+    except subprocess.CalledProcessError as e:
+        logger.exception("Failed to execute shutdown command")
+        return json_internal_error(
+            "shutdown", details={"error": str(e)}
+        )
 
 
 @settings_bp.route("/download-logs")
