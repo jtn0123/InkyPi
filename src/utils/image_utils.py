@@ -95,11 +95,17 @@ def get_image(image_url, timeout_seconds: float = 10.0):
     return img
 
 
-def change_orientation(image, orientation, inverted=False):
+def change_orientation(image, orientation, inverted: bool = False):
+    """Rotate an image based on the given orientation.
+
+    Raises a :class:`ValueError` if an unsupported orientation is provided.
+    """
     if orientation == "horizontal":
         angle = 0
     elif orientation == "vertical":
         angle = 90
+    else:
+        raise ValueError(f"Unsupported orientation: {orientation}")
 
     if inverted:
         angle = (angle + 180) % 360
