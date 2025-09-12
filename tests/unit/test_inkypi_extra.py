@@ -31,8 +31,9 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
-
-    return importlib.reload(sys.modules["inkypi"])
+    mod = importlib.reload(sys.modules["inkypi"])
+    mod.main(argv[1:])
+    return mod
 
 
 def test_create_app_before_request_starts_refresh(monkeypatch):
