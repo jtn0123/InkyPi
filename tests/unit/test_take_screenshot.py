@@ -173,6 +173,10 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
     monkeypatch.setattr("utils.image_utils.subprocess.run", fake_run)
     monkeypatch.setattr("utils.image_utils.os.path.exists", mock_exists)
     monkeypatch.setattr("utils.image_utils.os.remove", lambda p: None)
+    monkeypatch.setattr(
+        "utils.image_utils.shutil.which",
+        lambda b: b if b in ["chromium", "chromium-headless-shell", "google-chrome"] else None,
+    )
 
     class _Ctx:
         def __init__(self, size=(10, 6)):
@@ -202,14 +206,8 @@ def test_take_screenshot_no_browser_available(monkeypatch):
 
     image_utils = importlib.reload(image_utils)
 
-    def fake_which(cmd):
-        return False
-
     monkeypatch.setattr("utils.image_utils.os.path.exists", lambda p: False)
-    monkeypatch.setattr(
-        "utils.image_utils.subprocess.run",
-        lambda cmd, **kwargs: type("Result", (), {"returncode": 1})(),
-    )
+    monkeypatch.setattr("utils.image_utils.shutil.which", lambda b: None)
 
     out = image_utils.take_screenshot("http://example.com", (8, 4))
     assert out is None
