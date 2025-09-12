@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # =============================================================================
 # Script Name: install.sh
 # Description: This script automates the installatin of InkyPI and creation of
@@ -15,10 +17,10 @@
 # =============================================================================
 
 # Formatting stuff
-bold=$(tput bold)
-normal=$(tput sgr0)
-red=$(tput setaf 1)
-green=$(tput setaf 2)
+bold=$(tput bold 2>/dev/null || true)
+normal=$(tput sgr0 2>/dev/null || true)
+red=$(tput setaf 1 2>/dev/null || true)
+green=$(tput setaf 2 2>/dev/null || true)
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
