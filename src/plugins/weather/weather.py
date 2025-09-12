@@ -294,10 +294,32 @@ class Weather(BasePlugin):
 
         return forecast
 
+    def calculate_moon_phase(self, dt):
+        """Calculate moon phase name and illumination percentage for a given datetime."""
+        try:
+            # Days since known new moon (2000-01-06 18:14 UTC)
+            diff = (dt - datetime(2000, 1, 6, 18, 14, tzinfo=UTC)).total_seconds() / 86400
+            synodic_month = 29.53058867
+            phase = diff % synodic_month
+            illum_pct = (1 - math.cos(2 * math.pi * phase / synodic_month)) / 2 * 100
+            index = int((phase / synodic_month) * 8 + 0.5) % 8
+            phase_names = [
+                "newmoon",
+                "waxingcrescent",
+                "firstquarter",
+                "waxinggibbous",
+                "fullmoon",
+                "waninggibbous",
+                "lastquarter",
+                "waningcrescent",
+            ]
+            return phase_names[index], illum_pct
+        except Exception as e:
+            logger.warning(f"Moon phase calculation failed: {e}")
+            return "newmoon", 0.0
+
     def parse_open_meteo_forecast(self, daily_data, tz):
-        """
-        Parse the daily forecast from Open-Meteo API and inject moon phase from Farmsense API.
-        """
+        """Parse the daily forecast from Open-Meteo API and compute moon phases locally."""
         times = daily_data.get("time", [])
         weather_codes = daily_data.get("weathercode", [])
         temp_max = daily_data.get("temperature_2m_max", [])
@@ -305,40 +327,31 @@ class Weather(BasePlugin):
 
         forecast = []
 
-        for i in range(0, len(times)):
-            dt = datetime.fromisoformat(times[i]).replace(tzinfo=UTC).astimezone(tz)
-            day_label = dt.strftime("%a")
+        # Precompute datetimes and moon phases to avoid per-day API calls
+        datetimes: list[datetime] = []
+        moon_data: list[tuple[str, float]] = []
+        for time_str in times:
+            try:
+                dt = datetime.fromisoformat(time_str).replace(tzinfo=UTC).astimezone(tz)
+            except ValueError:
+                logger.warning(f"Could not parse time string {time_str} in daily data.")
+                continue
+            datetimes.append(dt)
+            try:
+                moon_data.append(self.calculate_moon_phase(dt))
+            except Exception as e:
+                logger.warning(f"Moon phase calculation failed: {e}")
+                moon_data.append(("newmoon", 0.0))
 
+        for i, dt in enumerate(datetimes):
+            day_label = dt.strftime("%a")
             code = weather_codes[i] if i < len(weather_codes) else 0
             weather_icon = self.map_weather_code_to_icon(code, 12)
             weather_icon_path = self.path_to_data_uri(
                 self.get_plugin_dir(f"icons/{weather_icon}.png")
             )
 
-            timestamp = int(dt.replace(hour=12, minute=0, second=0).timestamp())
-            api_url = f"https://api.farmsense.net/v1/moonphases/?d={timestamp}"
-
-            try:
-                resp = http_get(api_url, timeout=10)
-                # Ensure HTTP errors surface; keep tests compatible if mock lacks method
-                if hasattr(resp, "raise_for_status"):
-                    resp.raise_for_status()
-                elif getattr(resp, "status_code", 200) not in (200, 201, 204):
-                    raise requests.exceptions.HTTPError(str(resp.status_code))
-                moon = resp.json()[0]
-                phase_raw = moon.get("Phase", "New Moon")
-                illum_pct = float(moon.get("Illumination", 0)) * 100
-                phase_name = phase_raw.lower().replace(" ", "")
-                if phase_name == "darkmoon":
-                    phase_name = "newmoon"
-                elif phase_name in ("3rdquarter", "thirdquarter"):
-                    phase_name = "lastquarter"
-                elif phase_name in ("1stquarter", "firstquarter"):
-                    phase_name = "firstquarter"
-            except Exception:
-                illum_pct = 0
-                phase_name = "newmoon"
-
+            phase_name, illum_pct = moon_data[i]
             moon_icon_path = self.path_to_data_uri(
                 self.get_plugin_dir(f"icons/{phase_name}.png")
             )

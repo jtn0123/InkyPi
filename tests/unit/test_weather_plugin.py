@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 import pytz
+from datetime import UTC, datetime
 
 from src.plugins.weather.weather import Weather
 
@@ -195,7 +196,24 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
     assert "Visibility" in labels2 and "Air Quality" in labels2
 
 
-def test_open_meteo_moon_phase_fetch_failure(monkeypatch, weather_plugin):
+def test_open_meteo_moon_phase_calculation(weather_plugin):
+    w = weather_plugin
+    tz = pytz.timezone("UTC")
+    dt = datetime(2025, 1, 1, tzinfo=UTC)
+    daily = {
+        "time": [dt.isoformat()],
+        "weathercode": [0],
+        "temperature_2m_max": [20],
+        "temperature_2m_min": [10],
+    }
+
+    phase_name, illum = w.calculate_moon_phase(dt)
+    res = w.parse_open_meteo_forecast(daily, tz)
+    assert res and res[0]["moon_phase_pct"] == f"{illum:.0f}"
+    assert res[0]["moon_phase_icon"].endswith(f"{phase_name}.png")
+
+
+def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
     w = weather_plugin
     tz = pytz.timezone("UTC")
     daily = {
@@ -205,9 +223,11 @@ def test_open_meteo_moon_phase_fetch_failure(monkeypatch, weather_plugin):
         "temperature_2m_min": [10],
     }
 
-    # Make farmsense call raise to hit fallback path (illum_pct=0, newmoon)
-    import requests
-    monkeypatch.setattr("requests.get", lambda *a, **k: (_ for _ in ()).throw(requests.exceptions.ConnectionError()))
+    # Force moon phase calculation to fail
+    def raise_error(dt):
+        raise RuntimeError("fail")
+
+    monkeypatch.setattr(w, "calculate_moon_phase", raise_error)
     res = w.parse_open_meteo_forecast(daily, tz)
     assert res and res[0]["moon_phase_pct"] == "0"
     assert res[0]["moon_phase_icon"].endswith("newmoon.png")
