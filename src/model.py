@@ -484,27 +484,23 @@ class PluginInstance:
         # Check for scheduled refresh (HH:MM format)
         if "scheduled" in self.refresh:
             scheduled_time_str = self.refresh.get("scheduled")
-            latest_refresh_str = latest_refresh_dt.strftime("%H:%M")
-
-            # If the latest refresh is before the scheduled time today
-            if latest_refresh_str < scheduled_time_str:
-                return True
-
-        if "scheduled" in self.refresh:
-            scheduled_time_str = self.refresh.get("scheduled")
             scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M").time()
 
-            latest_refresh_date = latest_refresh_dt.date()
-            current_date = current_time.date()
+            scheduled_dt = current_time.replace(
+                hour=scheduled_time.hour,
+                minute=scheduled_time.minute,
+                second=0,
+                microsecond=0,
+            )
 
-            # Determine if a refresh is needed based on scheduled time and last refresh
-            if (
-                latest_refresh_date < current_date
-                and current_time.time() >= scheduled_time
-            ) or (
-                latest_refresh_date == current_date
-                and latest_refresh_dt.time() < scheduled_time <= current_time.time()
-            ):
+            # Align timezone awareness for comparison
+            if scheduled_dt.tzinfo and latest_refresh_dt.tzinfo is None:
+                latest_refresh_dt = latest_refresh_dt.replace(tzinfo=scheduled_dt.tzinfo)
+            elif latest_refresh_dt.tzinfo and scheduled_dt.tzinfo is None:
+                scheduled_dt = scheduled_dt.replace(tzinfo=latest_refresh_dt.tzinfo)
+
+            # Refresh if we haven't refreshed since today's scheduled time
+            if latest_refresh_dt < scheduled_dt <= current_time:
                 return True
 
         return False
