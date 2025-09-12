@@ -1,54 +1,28 @@
 import logging
+from dataclasses import asdict, dataclass, fields
 from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class RefreshInfo:
-    """Keeps track of refresh metadata.
+    """Keeps track of refresh metadata."""
 
-    Attributes:
-        refresh_time (str): ISO-formatted time string of the refresh.
-        image_hash (int): SHA-256 hash of the image.
-        refresh_type (str): Refresh type ['Manual Update', 'Playlist'].
-        plugin_id (str): Plugin id of the refresh.
-        playlist (str): Playlist name if refresh_type is 'Playlist'.
-        plugin_instance (str): Plugin instance name if refresh_type is 'Playlist'.
-        plugin_meta (dict | None): Optional plugin-specific metadata for the latest refresh.
-    """
-
-    def __init__(
-        self,
-        refresh_type,
-        plugin_id,
-        refresh_time,
-        image_hash,
-        playlist=None,
-        plugin_instance=None,
-        # Optional performance metrics
-        request_ms: int | None = None,
-        display_ms: int | None = None,
-        generate_ms: int | None = None,
-        preprocess_ms: int | None = None,
-        used_cached: bool | None = None,
-        # Optional plugin-specific metadata
-        plugin_meta: dict | None = None,
-    ):
-        """Initialize RefreshInfo instance."""
-        self.refresh_time = refresh_time
-        self.image_hash = image_hash
-        self.refresh_type = refresh_type
-        self.plugin_id = plugin_id
-        self.playlist = playlist
-        self.plugin_instance = plugin_instance
-        # Optional metrics
-        self.request_ms = request_ms
-        self.display_ms = display_ms
-        self.generate_ms = generate_ms
-        self.preprocess_ms = preprocess_ms
-        self.used_cached = used_cached
-        # Optional plugin-specific metadata (e.g., WPOTD date/description)
-        self.plugin_meta = plugin_meta
+    refresh_type: str
+    plugin_id: str
+    refresh_time: str
+    image_hash: int
+    playlist: str | None = None
+    plugin_instance: str | None = None
+    # Optional performance metrics
+    request_ms: int | None = None
+    display_ms: int | None = None
+    generate_ms: int | None = None
+    preprocess_ms: int | None = None
+    used_cached: bool | None = None
+    # Optional plugin-specific metadata (e.g., WPOTD date/description)
+    plugin_meta: dict | None = None
 
     def get_refresh_datetime(self):
         """Returns the refresh time as a datetime object or None if not set."""
@@ -58,48 +32,13 @@ class RefreshInfo:
         return latest_refresh
 
     def to_dict(self):
-        refresh_dict = {
-            "refresh_time": self.refresh_time,
-            "image_hash": self.image_hash,
-            "refresh_type": self.refresh_type,
-            "plugin_id": self.plugin_id,
-        }
-        if self.playlist:
-            refresh_dict["playlist"] = self.playlist
-        if self.plugin_instance:
-            refresh_dict["plugin_instance"] = self.plugin_instance
-        # Include optional metrics if available
-        if self.request_ms is not None:
-            refresh_dict["request_ms"] = self.request_ms
-        if self.display_ms is not None:
-            refresh_dict["display_ms"] = self.display_ms
-        if self.generate_ms is not None:
-            refresh_dict["generate_ms"] = self.generate_ms
-        if self.preprocess_ms is not None:
-            refresh_dict["preprocess_ms"] = self.preprocess_ms
-        if self.used_cached is not None:
-            refresh_dict["used_cached"] = self.used_cached
-        # Include optional plugin metadata if available
-        if getattr(self, "plugin_meta", None) is not None:
-            refresh_dict["plugin_meta"] = self.plugin_meta
-        return refresh_dict
+        return {k: v for k, v in asdict(self).items() if v is not None}
 
     @classmethod
     def from_dict(cls, data):
-        return cls(
-            refresh_time=data.get("refresh_time"),
-            image_hash=data.get("image_hash"),
-            refresh_type=data.get("refresh_type"),
-            plugin_id=data.get("plugin_id"),
-            playlist=data.get("playlist"),
-            plugin_instance=data.get("plugin_instance"),
-            request_ms=data.get("request_ms"),
-            display_ms=data.get("display_ms"),
-            generate_ms=data.get("generate_ms"),
-            preprocess_ms=data.get("preprocess_ms"),
-            used_cached=data.get("used_cached"),
-            plugin_meta=data.get("plugin_meta"),
-        )
+        field_names = {f.name for f in fields(cls)}
+        filtered = {k: v for k, v in data.items() if k in field_names}
+        return cls(**filtered)
 
 
 class PlaylistManager:

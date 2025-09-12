@@ -6,21 +6,22 @@ import model
 from model import Playlist, PlaylistManager, PluginInstance
 
 
-def test_refresh_info_to_from_dict_and_datetime():
-    now_iso = datetime.utcnow().isoformat()
-    ri = model.RefreshInfo(
-        refresh_type="Manual Update",
-        plugin_id="p1",
-        refresh_time=now_iso,
-        image_hash=123,
-    )
-    d = ri.to_dict()
-    assert d["refresh_time"] == now_iso
-    assert d["image_hash"] == 123
+class TestRefreshInfo:
+    def test_to_dict_from_dict_and_datetime(self):
+        now_iso = datetime.utcnow().isoformat()
+        ri = model.RefreshInfo(
+            refresh_type="Manual Update",
+            plugin_id="p1",
+            refresh_time=now_iso,
+            image_hash=123,
+        )
+        d = ri.to_dict()
+        assert d["refresh_time"] == now_iso
+        assert d["image_hash"] == 123
 
-    ri2 = model.RefreshInfo.from_dict(d)
-    assert ri2.refresh_time == now_iso
-    assert ri2.get_refresh_datetime() == datetime.fromisoformat(now_iso)
+        ri2 = model.RefreshInfo.from_dict(d)
+        assert ri2.refresh_time == now_iso
+        assert ri2.get_refresh_datetime() == datetime.fromisoformat(now_iso)
 
 
 def test_playlist_and_plugininstance_basic_operations():
