@@ -46,7 +46,7 @@ def _load_single_plugin_instance(plugin_config):
         _LAST_HOT_RELOAD = {"plugin_id": plugin_id, "reloaded": reloaded}
         return instance
     except ImportError as e:
-        logging.error(f"Failed to import plugin module {module_name}: {e}")
+        logger.error(f"Failed to import plugin module {module_name}: {e}")
         raise
 
 
@@ -55,19 +55,19 @@ def load_plugins(plugins_config):
     for plugin in plugins_config:
         plugin_id = plugin.get("id")
         if plugin.get("disabled", False):
-            logging.info(f"Plugin {plugin_id} is disabled, skipping.")
+            logger.info(f"Plugin {plugin_id} is disabled, skipping.")
             continue
 
         plugin_dir = plugins_module_path / plugin_id
         if not plugin_dir.is_dir():
-            logging.error(
+            logger.error(
                 f"Could not find plugin directory {plugin_dir} for '{plugin_id}', skipping."
             )
             continue
 
         module_path = plugin_dir / f"{plugin_id}.py"
         if not module_path.is_file():
-            logging.error(
+            logger.error(
                 f"Could not find module path {module_path} for '{plugin_id}', skipping."
             )
             continue
