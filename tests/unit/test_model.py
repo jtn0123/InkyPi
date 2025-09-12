@@ -209,3 +209,17 @@ def test_plugin_instance_scheduled_across_day_boundary_once():
 def test_get_time_range_minutes():
     p = Playlist("Morning", "06:00", "09:30")
     assert p.get_time_range_minutes() == 210
+
+
+def test_playlist_wraparound_is_active():
+    p = Playlist("Late Night", "23:00", "02:00")
+    assert p.is_active("23:30") is True
+    assert p.is_active("00:30") is True
+    assert p.is_active("01:59") is True
+    assert p.is_active("22:59") is False
+    assert p.is_active("02:00") is False
+
+
+def test_get_time_range_minutes_wraparound():
+    p = Playlist("Late Night", "23:00", "02:00")
+    assert p.get_time_range_minutes() == 180

@@ -249,9 +249,26 @@ class Playlist:
         self.current_plugin_index = current_plugin_index
         self.cycle_interval_seconds = cycle_interval_seconds
 
+    @staticmethod
+    def _to_minutes(time_str: str) -> int:
+        """Convert an ``HH:MM`` string to minutes since midnight.
+
+        ``24:00`` is treated as midnight of the following day (1440 minutes).
+        """
+        if time_str == "24:00":
+            return 24 * 60
+        hour, minute = map(int, time_str.split(":"))
+        return hour * 60 + minute
+
     def is_active(self, current_time):
         """Check if the playlist is active at the given time."""
-        return self.start_time <= current_time < self.end_time
+        start = self._to_minutes(self.start_time)
+        end = self._to_minutes(self.end_time)
+        current = self._to_minutes(current_time)
+
+        if start <= end:
+            return start <= current < end
+        return current >= start or current < end
 
     def add_plugin(self, plugin_data):
         """Add a new plugin instance to the playlist."""
@@ -414,16 +431,16 @@ class Playlist:
         return self.get_time_range_minutes()
 
     def get_time_range_minutes(self):
-        """Calculate the time difference in minutes between start_time and end_time."""
-        start = datetime.strptime(self.start_time, "%H:%M")
-        # Handle '24:00' by converting it to '00:00' of the next day
-        if self.end_time != "24:00":
-            end = datetime.strptime(self.end_time, "%H:%M")
-        else:
-            end = datetime.strptime("00:00", "%H:%M")
-            end += timedelta(days=1)
+        """Calculate the duration in minutes between start_time and end_time.
 
-        return int((end - start).total_seconds() // 60)
+        When ``start_time`` is later than ``end_time`` the range is assumed to
+        wrap past midnight.
+        """
+        start = self._to_minutes(self.start_time)
+        end = self._to_minutes(self.end_time)
+        if end >= start:
+            return end - start
+        return (24 * 60 - start) + end
 
     def to_dict(self):
         data = {
