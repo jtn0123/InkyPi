@@ -136,7 +136,7 @@ jobs:
         run: |
           . .venv/bin/activate
           pip install -r install/requirements.txt
-          pip check || true
+          pip check
       - name: Import smoke
         run: |
           . .venv/bin/activate
