@@ -307,7 +307,7 @@
         });
     }
 
-    document.addEventListener("DOMContentLoaded", function(){
+    function init(){
         populateTimeOptions();
         document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
         // Bind header buttons
@@ -371,7 +371,14 @@
             setInterval(renderNextIn, 60000);
             renderNextIn();
         } catch(e) { /* ignore */ }
-    });
+    }
+
+    if (document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // If injected after DOM is already ready (e.g., Playwright set_content), initialize immediately
+        try { init(); } catch(e) {}
+    }
 
     window.addEventListener("load", function () {
         const storedMessage = sessionStorage.getItem("storedMessage");

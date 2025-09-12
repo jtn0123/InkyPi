@@ -42,10 +42,6 @@ def _prepare_playlist(device_config_dev):
     device_config_dev.write_config()
 
 
-@pytest.mark.skipif(
-    os.getenv("SKIP_UI", "").lower() in ("1", "true"),
-    reason="UI interactions skipped by env",
-)
 def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, monkeypatch):
     pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
@@ -64,7 +60,8 @@ def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, m
         # Load HTML and front-end scripts
         page.set_content(html)
         # Make response_modal helpers available
-        js_modal = open("src/static/scripts/response_modal.js", "r", encoding="utf-8").read()
+        with open("src/static/scripts/response_modal.js", "r", encoding="utf-8") as f:
+            js_modal = f.read()
         page.add_script_tag(content=js_modal)
 
         # Set up mocks and context
@@ -87,13 +84,14 @@ def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, m
             window.fetch = (url, opts) => {
                 opts = opts || {};
                 console.log('Mock fetch called with URL:', url);
-                try { window.__requests__.push({url: url, body: opts.body}); } catch(e){ console.error('Error pushing request:', e); };
+                try { window.__requests__.push({url: (url && url.toString ? url.toString() : String(url)), body: opts.body, method: (opts && opts.method) || 'GET'}); } catch(e){ console.error('Error pushing request:', e); };
                 return Promise.resolve(ok());
             };
         """)
 
         # Attach playlist behavior script
-        js_playlist = open("src/static/scripts/playlist.js", "r", encoding="utf-8").read()
+        with open("src/static/scripts/playlist.js", "r", encoding="utf-8") as f:
+            js_playlist = f.read()
         page.evaluate(f"""
             try {{
                 {js_playlist}
@@ -114,22 +112,30 @@ def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, m
 
         # Focus first plugin item and move it down with ArrowDown to trigger reorder
         page.focus(".plugin-item")
-        page.keyboard.press("ArrowDown")
+        page.evaluate("""
+            const el = document.querySelector('.plugin-item');
+            if (el){
+                const evt = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+                el.dispatchEvent(evt);
+            }
+        """)
 
         # Wait a bit for any async operations
         page.wait_for_timeout(100)
 
-        # Skip this test for now - the functionality may not be fully implemented
-        pytest.skip("Test requires further investigation of frontend script loading")
+        # Ensure reordering via ArrowDown triggers our mock fetch to reorder endpoint
+        reqs = page.evaluate("() => window.__requests__")
+        assert any((r and r.get('url') and isinstance(r.get('url'), str) and r.get('url').endswith('/reorder_plugins')) for r in reqs)
+
+        # Open and confirm Delete Playlist modal; ensure DELETE request fires
+        page.click(".delete-playlist-btn")
+        page.click("#confirmDeletePlaylistBtn")
+        reqs2 = page.evaluate("() => window.__requests__")
+        assert any((r and isinstance(r.get('url'), str) and '/delete_playlist/' in r.get('url') and r.get('method') == 'DELETE') for r in reqs2)
 
         # Trigger delete playlist modal and confirm
         # Click the first playlist's delete button
-        page.click(".delete-playlist-btn")
-        # Confirm delete in modal
-        page.click("#confirmDeletePlaylistBtn")
-        # Verify delete endpoint was called
-        reqs2 = page.evaluate("() => window.__requests__")
-        assert any("/delete_playlist/" in r.get("url", "") for r in reqs2)
+        # (Assertions moved above after modal interaction)
 
         browser.close()
 
