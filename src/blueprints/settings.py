@@ -1,11 +1,12 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportMissingModuleSource=false, reportRedeclaration=false
 import io
 import logging
-import os
 import re
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 import time
+
+import subprocess
 
 import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
@@ -392,14 +393,22 @@ def client_log():
 
 @settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
+    """Shutdown or reboot the device.
+
+    Note: Add authentication or CSRF protection if exposing publicly.
+    """
     data = request.get_json() or {}
-    if data.get("reboot"):
-        logger.info("Reboot requested")
-        os.system("sudo reboot")
-    else:
-        logger.info("Shutdown requested")
-        os.system("sudo shutdown -h now")
-    return jsonify({"success": True})
+    try:
+        if data.get("reboot"):
+            logger.info("Reboot requested")
+            subprocess.run(["sudo", "reboot"], check=True)
+        else:
+            logger.info("Shutdown requested")
+            subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        return jsonify({"success": True})
+    except subprocess.CalledProcessError as e:
+        logger.error("Shutdown command failed: %s", e)
+        return json_internal_error("shutdown", details={"error": str(e)})
 
 
 @settings_bp.route("/download-logs")

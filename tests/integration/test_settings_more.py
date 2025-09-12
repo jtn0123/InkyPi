@@ -3,12 +3,17 @@
 
 def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
     calls = {"cmd": None}
-    monkeypatch.setattr("os.system", lambda cmd: calls.update(cmd=cmd))
+
+    def fake_run(cmd, check):
+        calls["cmd"] = cmd
+
+    monkeypatch.setattr("subprocess.run", fake_run)
 
     resp = client.post("/shutdown", json={"reboot": False})
     assert resp.status_code == 200
     assert resp.json.get("success") is True
-    assert isinstance(calls["cmd"], str)
+    assert isinstance(calls["cmd"], list)
+    assert "shutdown" in calls["cmd"]
 
 
 def test_download_logs_dev_mode_message(client, monkeypatch):
@@ -210,12 +215,16 @@ def test_shutdown_route_reboot(client, monkeypatch):
     import blueprints.settings as settings_mod
 
     calls = {"cmd": None}
-    monkeypatch.setattr(settings_mod.os, "system", lambda cmd: calls.update(cmd=cmd))
+
+    def fake_run(cmd, check):
+        calls["cmd"] = cmd
+
+    monkeypatch.setattr(settings_mod.subprocess, "run", fake_run)
 
     resp = client.post("/shutdown", json={"reboot": True})
     assert resp.status_code == 200
-    assert isinstance(calls["cmd"], str)
-    assert "reboot" in calls["cmd"]  # type: ignore[unreachable]
+    assert isinstance(calls["cmd"], list)
+    assert "reboot" in calls["cmd"]
 
 
 def test_download_logs_with_parameters(client, monkeypatch):

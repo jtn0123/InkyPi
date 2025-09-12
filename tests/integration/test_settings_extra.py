@@ -24,11 +24,15 @@ def test_save_settings_zero_interval_rejected(client):
 
 def test_shutdown_reboot_path(client, monkeypatch):
     calls = {"cmd": None}
-    monkeypatch.setattr("os.system", lambda cmd: calls.update(cmd=cmd))
+
+    def fake_run(cmd, check):
+        calls["cmd"] = cmd
+
+    monkeypatch.setattr("subprocess.run", fake_run)
 
     resp = client.post("/shutdown", json={"reboot": True})
     assert resp.status_code == 200
-    assert "reboot" in (calls["cmd"] or "")
+    assert calls["cmd"] and "reboot" in calls["cmd"]
 
 
 def test_download_logs_has_attachment_header(client, monkeypatch):
