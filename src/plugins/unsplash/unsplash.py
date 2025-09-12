@@ -1,14 +1,13 @@
 import logging
 import random
-from io import BytesIO
 
 import requests
 from PIL import Image
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
-from utils.image_utils import process_image_from_bytes
 from utils.http_utils import http_get
+from utils.image_utils import process_image_from_bytes
 
 LANCZOS = Resampling.LANCZOS
 

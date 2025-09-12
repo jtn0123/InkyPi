@@ -4,13 +4,10 @@ import threading
 from datetime import datetime
 from time import perf_counter
 
-import pytz
-from PIL import Image
-
 from model import PlaylistManager, RefreshInfo
-from utils.time_utils import now_device_tz
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
