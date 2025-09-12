@@ -83,38 +83,22 @@ def test_parse_forecast_basic(weather_plugin):
     assert res[1]["icon"].endswith("01d.png")
 
 
-def test_parse_open_meteo_forecast_handles_api_and_fallback(
-    monkeypatch, weather_plugin
-):
+def test_parse_open_meteo_forecast_uses_local_phase(monkeypatch, weather_plugin):
     w = weather_plugin
     tz = pytz.timezone("UTC")
-    # create daily_data with one day
-    time_str = "2023-01-01T00:00"
     daily = {
-        "time": [time_str],
+        "time": ["2023-01-01T00:00"],
         "weathercode": [0],
         "temperature_2m_max": [15],
         "temperature_2m_min": [5],
     }
 
-    # mock requests.get for farmsense
-    class DummyResp:
-        def __init__(self, json_data):
-            self._json = json_data
-
-        def json(self):
-            return self._json
-
-    monkeypatch.setattr(
-        "src.plugins.weather.weather.http_get",
-        lambda *args, **kwargs: DummyResp(
-            [{"Phase": "Full Moon", "Illumination": 0.5}]
-        ),
-    )
+    monkeypatch.setattr(w, "_compute_moon_phase", lambda dt: ("fullmoon", 50.0))
     res = w.parse_open_meteo_forecast(daily, tz)
     assert isinstance(res, list)
     assert res[0]["high"] == 15
     assert res[0]["moon_phase_pct"] == "50"
+    assert res[0]["moon_phase_icon"].endswith("fullmoon.png")
 
 
 def test_parse_hourly_and_unit_conversion(weather_plugin):
@@ -195,7 +179,7 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
     assert "Visibility" in labels2 and "Air Quality" in labels2
 
 
-def test_open_meteo_moon_phase_fetch_failure(monkeypatch, weather_plugin):
+def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
     w = weather_plugin
     tz = pytz.timezone("UTC")
     daily = {
@@ -205,9 +189,10 @@ def test_open_meteo_moon_phase_fetch_failure(monkeypatch, weather_plugin):
         "temperature_2m_min": [10],
     }
 
-    # Make farmsense call raise to hit fallback path (illum_pct=0, newmoon)
-    import requests
-    monkeypatch.setattr("requests.get", lambda *a, **k: (_ for _ in ()).throw(requests.exceptions.ConnectionError()))
+    def boom(dt):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(w, "_compute_moon_phase", boom)
     res = w.parse_open_meteo_forecast(daily, tz)
     assert res and res[0]["moon_phase_pct"] == "0"
     assert res[0]["moon_phase_icon"].endswith("newmoon.png")

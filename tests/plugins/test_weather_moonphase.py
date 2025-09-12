@@ -3,13 +3,12 @@ from unittest.mock import patch
 import pytest
 
 
-def test_weather_moon_phase_network_error_fallback(device_config_dev, monkeypatch):
-    """If moon phase API fails, fallback should use newmoon and 0% illumination."""
+def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch):
+    """Generated forecast should include moon phase info without external calls."""
     from plugins.weather.weather import Weather
 
     w = Weather({"id": "weather"})
 
-    # Minimal inputs
     settings = {
         "latitude": "40.0",
         "longitude": "-74.0",
@@ -19,7 +18,9 @@ def test_weather_moon_phase_network_error_fallback(device_config_dev, monkeypatc
 
     # Configure device settings used by plugin
     monkeypatch.setattr(
-        device_config_dev, "get_config", lambda key, default=None: {
+        device_config_dev,
+        "get_config",
+        lambda key, default=None: {
             "timezone": "UTC",
             "time_format": "12h",
             "resolution": [400, 300],
@@ -50,19 +51,15 @@ def test_weather_moon_phase_network_error_fallback(device_config_dev, monkeypatc
     }
     mock_aqi = {"hourly": {"time": ["2025-01-01T12:00"], "uv_index": [3.5]}}
 
-    # Monkeypatch weather APIs
     monkeypatch.setattr(Weather, "get_open_meteo_data", lambda self, lat, lon, units, d: mock_weather)
     monkeypatch.setattr(Weather, "get_open_meteo_air_quality", lambda self, lat, lon: mock_aqi)
 
-    # Force the moon phase http_get to raise, triggering fallback
-    def raise_error(*args, **kwargs):
-        raise RuntimeError("network failure")
+    # Provide deterministic moon phase result
+    monkeypatch.setattr(Weather, "_compute_moon_phase", lambda self, dt: ("fullmoon", 50.0))
 
-    monkeypatch.setattr("plugins.weather.weather.http_get", raise_error, raising=True)
-
-    # Bypass headless rendering with an in-memory image (fixture in conftest)
-    with patch.object(w, "render_image", return_value=object()):
+    with patch.object(w, "render_image", return_value=object()) as mock_render:
         result = w.generate_image(settings, device_config_dev)
         assert result is not None
-
-
+        template_params = mock_render.call_args[0][3]
+        assert template_params["forecast"][0]["moon_phase_pct"] == "50"
+        assert template_params["forecast"][0]["moon_phase_icon"]
