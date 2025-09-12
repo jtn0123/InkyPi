@@ -8,7 +8,7 @@ from pathlib import Path
 
 from utils.app_utils import resolve_path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("plugins.plugin_registry")
 PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
 _LAST_HOT_RELOAD: dict | None = None

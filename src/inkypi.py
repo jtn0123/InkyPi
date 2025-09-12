@@ -59,7 +59,8 @@ def _setup_logging():
         )
     else:
         logging.config.fileConfig(
-            os.path.join(os.path.dirname(__file__), "config", "logging.conf")
+            os.path.join(os.path.dirname(__file__), "config", "logging.conf"),
+            disable_existing_loggers=False,
         )
 
 
