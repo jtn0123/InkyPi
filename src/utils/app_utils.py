@@ -64,10 +64,15 @@ def is_connected():
     """Check if the Raspberry Pi has an internet connection."""
     try:
         # Try to connect to Google's public DNS server
-        socket.create_connection(("8.8.8.8", 53), timeout=2)
-        return True
+        conn = socket.create_connection(("8.8.8.8", 53), timeout=2)
     except OSError:
         return False
+    else:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return True
 
 
 def get_font(font_name, font_size=50, font_weight="normal"):
