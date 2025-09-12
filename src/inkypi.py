@@ -1,9 +1,31 @@
 #!/usr/bin/env python3
 
-# set up logging
+import argparse
 import logging
 import logging.config
 import os
+import secrets
+import warnings
+
+from flask import Flask, request
+from jinja2 import ChoiceLoader, FileSystemLoader
+from waitress import serve  # type: ignore
+from werkzeug.serving import is_running_from_reloader
+
+from blueprints.main import main_bp
+from blueprints.playlist import playlist_bp
+from blueprints.plugin import plugin_bp
+from blueprints.settings import settings_bp
+from config import Config
+from display.display_manager import DisplayManager
+from plugins.plugin_registry import load_plugins, pop_hot_reload_info
+from refresh_task import RefreshTask
+from utils.app_utils import generate_startup_image, get_ip_address
+from utils.http_utils import APIError, json_error, json_internal_error, wants_json
+
+# suppress warning from inky library https://github.com/pimoroni/inky/issues/205
+warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
+
 
 def _use_json_logging():
     fmt = (os.getenv("INKYPI_LOG_FORMAT") or "").strip().lower()
@@ -42,30 +64,6 @@ def _setup_logging():
 
 
 _setup_logging()
-
-# suppress warning from inky library https://github.com/pimoroni/inky/issues/205
-import warnings
-
-warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
-
-import argparse
-import secrets
-
-from flask import Flask, request, g
-from jinja2 import ChoiceLoader, FileSystemLoader
-from waitress import serve  # type: ignore
-from werkzeug.serving import is_running_from_reloader
-
-from blueprints.main import main_bp
-from blueprints.playlist import playlist_bp
-from blueprints.plugin import plugin_bp
-from blueprints.settings import settings_bp
-from config import Config
-from display.display_manager import DisplayManager
-from plugins.plugin_registry import load_plugins, pop_hot_reload_info
-from refresh_task import RefreshTask
-from utils.app_utils import generate_startup_image, get_ip_address
-from utils.http_utils import APIError, json_error, wants_json, json_internal_error
 
 logger = logging.getLogger(__name__)
 
@@ -194,7 +192,9 @@ def create_app():
             try:
                 device_config.set_env_key("SECRET_KEY", generated)
                 secret = generated
-                logger.info("SECRET_KEY not found; generated and persisted a dev fallback in .env")
+                logger.info(
+                    "SECRET_KEY not found; generated and persisted a dev fallback in .env"
+                )
             except Exception:
                 secret = generated
                 logger.warning(
@@ -330,9 +330,20 @@ def create_app():
             pass
         # Content Security Policy (Report-Only by default)
         try:
-            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
-            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in ("1", "true", "yes")
-            header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
+            csp_value = (
+                os.getenv("INKYPI_CSP")
+                or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
+            )
+            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            header_name = (
+                "Content-Security-Policy-Report-Only"
+                if report_only
+                else "Content-Security-Policy"
+            )
             if header_name not in response.headers:
                 response.headers[header_name] = csp_value
         except Exception:
@@ -342,7 +353,8 @@ def create_app():
             info = pop_hot_reload_info()
             if info and DEV_MODE:
                 response.headers.setdefault(
-                    "X-InkyPi-Hot-Reload", f"{info['plugin_id']}:{int(info['reloaded'])}"
+                    "X-InkyPi-Hot-Reload",
+                    f"{info['plugin_id']}:{int(info['reloaded'])}",
                 )
         except Exception:
             pass
