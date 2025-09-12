@@ -12,7 +12,7 @@ from flask import (
 )
 
 from utils.http_utils import json_error, json_internal_error
-from utils.time_utils import now_device_tz, get_timezone
+from utils.time_utils import get_timezone, now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def _list_history_images(history_dir: str) -> list[dict]:
             sidecar_path = os.path.join(history_dir, f"{base}.json")
             if os.path.exists(sidecar_path):
                 import json
-                with open(sidecar_path, "r", encoding="utf-8") as fh:
+                with open(sidecar_path, encoding="utf-8") as fh:
                     meta = json.load(fh) or {}
         except Exception:
             # Non-fatal; ignore malformed sidecar
