@@ -115,6 +115,61 @@ def test_read_log_lines_journal_available_false(monkeypatch):
     assert "Log download not available" in lines[0]
 
 
+def test_read_log_lines_journal_available_true(monkeypatch):
+    import blueprints.settings as settings_mod
+
+    class FakeRecord:
+        def __init__(self):
+            self.data = {
+                "_HOSTNAME": "host",
+                "SYSLOG_IDENTIFIER": "inkypi",
+                "_PID": "1",
+                "MESSAGE": "test message",
+            }
+
+        def get_realtime_usec(self):
+            return 0
+
+    class FakeJournalReader:
+        instance = None
+
+        def __init__(self):
+            FakeJournalReader.instance = self
+            self.closed = False
+
+        def open(self, mode):
+            pass
+
+        def add_filter(self, rule):
+            pass
+
+        def seek_realtime_usec(self, ts):
+            pass
+
+        def __iter__(self):
+            return iter([FakeRecord()])
+
+        def close(self):
+            self.closed = True
+
+    class FakeJournalOpenMode:
+        SYSTEM = object()
+
+    class FakeRule:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True)
+    monkeypatch.setattr(settings_mod, "JournalReader", FakeJournalReader)
+    monkeypatch.setattr(settings_mod, "JournalOpenMode", FakeJournalOpenMode)
+    monkeypatch.setattr(settings_mod, "Rule", FakeRule)
+
+    lines = settings_mod._read_log_lines(1)
+    assert any("test message" in ln for ln in lines)
+    # ensure reader.close() was called
+    assert FakeJournalReader.instance.closed
+
+
 def test_api_keys_masking_functions():
     # Test masking function - it's actually a nested function in the route
     # Let's test the actual behavior by calling the route
