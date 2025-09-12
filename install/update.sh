@@ -1,10 +1,7 @@
 #!/bin/bash
 
 # Formatting stuff
-bold=$(tput bold)
-normal=$(tput sgr0)
-green=$(tput setaf 2)
-red=$(tput setaf 1)
+
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
@@ -58,6 +55,7 @@ if [ ! -d "$VENV_PATH" ]; then
 fi
 
 # Activate the virtual environment
+# shellcheck source=/dev/null
 source "$VENV_PATH/bin/activate"
 
 # Upgrade pip
@@ -74,7 +72,7 @@ else
 fi
 
 echo "Updating executable in ${BINPATH}/$APPNAME"
-cp $SCRIPT_DIR/inkypi $BINPATH/
+cp "$SCRIPT_DIR"/inkypi "$BINPATH/"
 sudo chmod +x $BINPATH/$APPNAME
 
 echo "Restarting $APPNAME service."
