@@ -68,81 +68,129 @@ _setup_logging()
 
 logger = logging.getLogger(__name__)
 
-"""CLI and runtime configuration
+"""Runtime configuration.
 
-Options precedence:
-1. CLI flags
-2. Environment variables (INKYPI_*, PORT)
-3. Defaults
+When imported, values are derived from environment variables only. The
+``main`` function performs CLI parsing and updates these globals when invoked.
 """
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="InkyPi Display Server")
-parser.add_argument("--dev", action="store_true", help="Run in development mode")
-parser.add_argument(
-    "--config", type=str, default=None, help="Path to device config JSON file"
-)
-parser.add_argument("--port", type=int, default=None, help="Port to listen on")
-parser.add_argument(
-    "--web-only",
-    "--no-refresh",
-    dest="web_only",
-    action="store_true",
-    help="Run web UI only (disable background refresh task)",
-)
-parser.add_argument(
-    "--fast-dev",
-    action="store_true",
-    help="Use faster refresh intervals and skip startup image in dev",
-)
-args, _unknown = parser.parse_known_args()
 
-# Infer DEV_MODE from CLI or environment
-env_mode = (
-    os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
-).lower()
-DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
+def _env_dev_mode() -> bool:
+    env_mode = (
+        os.getenv("INKYPI_ENV", "").strip()
+        or os.getenv("FLASK_ENV", "").strip()
+    ).lower()
+    return env_mode in ("dev", "development")
 
-# Toggle for disabling background refresh thread
-WEB_ONLY = bool(
-    args.web_only
-    or (os.getenv("INKYPI_NO_REFRESH", "").strip().lower() in ("1", "true", "yes"))
+
+DEV_MODE = _env_dev_mode()
+WEB_ONLY = os.getenv("INKYPI_NO_REFRESH", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+FAST_DEV = os.getenv("INKYPI_FAST_DEV", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
 )
 
-# If --dev explicitly passed, set env var for downstream logic and logs
-if args.dev:
-    os.environ["INKYPI_ENV"] = "dev"
-    # If explicitly opting for web-only via CLI, mirror it in the environment for downstream logic
-    if args.web_only:
-        os.environ["INKYPI_NO_REFRESH"] = "1"
 
-# Config file selection via CLI has highest priority; otherwise resolver will decide
-if args.config:
-    Config.config_file = args.config
-
-# Determine port
-if args.port is not None:
-    PORT = args.port
-else:
-    # Prefer env INKYPI_PORT then PORT; default by mode
+def _env_port() -> int:
     env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
     if env_port:
         try:
-            PORT = int(env_port)
+            return int(env_port)
         except ValueError:
-            PORT = 8080 if DEV_MODE else 80
-    else:
-        PORT = 8080 if DEV_MODE else 80
+            return 8080 if DEV_MODE else 80
+    return 8080 if DEV_MODE else 80
 
-if DEV_MODE:
-    logger.info(f"Starting InkyPi in DEVELOPMENT mode on port {PORT}")
-else:
-    logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
-logging.getLogger("waitress.queue").setLevel(logging.ERROR)
-FAST_DEV = bool(
-    args.fast_dev
-    or (os.getenv("INKYPI_FAST_DEV", "").strip().lower() in ("1", "true", "yes"))
-)
+
+PORT = _env_port()
+args = None  # Populated by main()
+app = None
+
+
+def main(argv: list[str] | None = None):
+    """Parse CLI arguments and initialise the application."""
+
+    global args, DEV_MODE, WEB_ONLY, FAST_DEV, PORT, app
+
+    parser = argparse.ArgumentParser(description="InkyPi Display Server")
+    parser.add_argument("--dev", action="store_true", help="Run in development mode")
+    parser.add_argument(
+        "--config", type=str, default=None, help="Path to device config JSON file"
+    )
+    parser.add_argument("--port", type=int, default=None, help="Port to listen on")
+    parser.add_argument(
+        "--web-only",
+        "--no-refresh",
+        dest="web_only",
+        action="store_true",
+        help="Run web UI only (disable background refresh task)",
+    )
+    parser.add_argument(
+        "--fast-dev",
+        action="store_true",
+        help="Use faster refresh intervals and skip startup image in dev",
+    )
+    args, _unknown = parser.parse_known_args(argv)
+
+    # Infer DEV_MODE from CLI or environment
+    env_mode = (
+        os.getenv("INKYPI_ENV", "").strip()
+        or os.getenv("FLASK_ENV", "").strip()
+    ).lower()
+    DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
+
+    # Toggle for disabling background refresh thread
+    WEB_ONLY = bool(
+        args.web_only
+        or (
+            os.getenv("INKYPI_NO_REFRESH", "").strip().lower()
+            in ("1", "true", "yes")
+        )
+    )
+
+    # If --dev explicitly passed, set env var for downstream logic and logs
+    if args.dev:
+        os.environ["INKYPI_ENV"] = "dev"
+        # If explicitly opting for web-only via CLI, mirror it in the environment for downstream logic
+        if args.web_only:
+            os.environ["INKYPI_NO_REFRESH"] = "1"
+
+    # Config file selection via CLI has highest priority; otherwise resolver will decide
+    if args.config:
+        Config.config_file = args.config
+
+    # Determine port
+    if args.port is not None:
+        PORT = args.port
+    else:
+        # Prefer env INKYPI_PORT then PORT; default by mode
+        env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
+        if env_port:
+            try:
+                PORT = int(env_port)
+            except ValueError:
+                PORT = 8080 if DEV_MODE else 80
+        else:
+            PORT = 8080 if DEV_MODE else 80
+
+    if DEV_MODE:
+        logger.info(f"Starting InkyPi in DEVELOPMENT mode on port {PORT}")
+    else:
+        logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
+    logging.getLogger("waitress.queue").setLevel(logging.ERROR)
+    FAST_DEV = bool(
+        args.fast_dev
+        or (
+            os.getenv("INKYPI_FAST_DEV", "").strip().lower() in ("1", "true", "yes")
+        )
+    )
+
+    app = create_app()
+    return app
 
 
 def create_app():
@@ -364,10 +412,8 @@ def create_app():
     return app
 
 
-# Module-level app instance for direct execution and tests
-app = create_app()
-
 if __name__ == "__main__":
+    main()
 
     # start the background refresh task (unless running web-only)
     refresh_task = app.config["REFRESH_TASK"]

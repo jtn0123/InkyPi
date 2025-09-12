@@ -52,6 +52,7 @@ def test_secret_key_dev_persisted(tmp_path, monkeypatch):
     # Force fresh import with current env
     sys.modules.pop("inkypi", None)
     inkypi = importlib.import_module("inkypi")
+    inkypi.main([])
 
     # SECRET_KEY should be generated and persisted in .env under PROJECT_DIR
     secret = inkypi.app.secret_key
@@ -87,6 +88,7 @@ def test_secret_key_prod_ephemeral(tmp_path, monkeypatch):
     # Fresh import
     sys.modules.pop("inkypi", None)
     inkypi = importlib.import_module("inkypi")
+    inkypi.main([])
 
     # Verify we're actually in production mode
     assert not inkypi.DEV_MODE, f"DEV_MODE should be False but is {inkypi.DEV_MODE}"
@@ -129,8 +131,9 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
-
-    return importlib.reload(sys.modules["inkypi"])
+    mod = importlib.reload(sys.modules["inkypi"])
+    mod.main(argv[1:])
+    return mod
 
 
 def test_secret_key_from_env(monkeypatch, tmp_path):
