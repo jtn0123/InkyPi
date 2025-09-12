@@ -11,6 +11,7 @@ This guide explains how to run, extend, and understand the test setup.
 bash scripts/venv.sh
 . .venv/bin/activate
 python -m pip install -r install/requirements.txt || true   # hardware/system deps may fail on non-Pi
+python -m pip install freezegun                           # required for time-freeze tests
 ```
 
 2) Run tests
