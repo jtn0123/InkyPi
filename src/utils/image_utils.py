@@ -4,19 +4,18 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
 from io import BytesIO
+from typing import Any
 
-import requests
 from PIL import Image, ImageEnhance
 from PIL.Image import Resampling
+
 from utils.http_utils import http_get
 
 LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
-
-
-from typing import Callable, Any
 
 
 def load_image_from_bytes(
@@ -183,7 +182,9 @@ def compute_image_hash(image):
     return hashlib.sha256(img_bytes).hexdigest()
 
 
-def _playwright_screenshot_html(html_file_path: str, dimensions: tuple[int, int]) -> Image.Image | None:
+def _playwright_screenshot_html(
+    html_file_path: str, dimensions: tuple[int, int]
+) -> Image.Image | None:
     """Try to render a local HTML file using Playwright (if available)."""
     try:
         from playwright.sync_api import sync_playwright
@@ -192,13 +193,17 @@ def _playwright_screenshot_html(html_file_path: str, dimensions: tuple[int, int]
 
     img: Image.Image | None = None
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=[
-            "--allow-file-access-from-files",
-            "--enable-local-file-accesses",
-            "--disable-web-security",
-        ])
+        browser = p.chromium.launch(
+            args=[
+                "--allow-file-access-from-files",
+                "--enable-local-file-accesses",
+                "--disable-web-security",
+            ]
+        )
         try:
-            page = browser.new_page(viewport={"width": int(dimensions[0]), "height": int(dimensions[1])})
+            page = browser.new_page(
+                viewport={"width": int(dimensions[0]), "height": int(dimensions[1])}
+            )
             page.goto(f"file://{html_file_path}")
             # Wait for network to be idle-ish
             try:
@@ -209,7 +214,14 @@ def _playwright_screenshot_html(html_file_path: str, dimensions: tuple[int, int]
                 )
             except Exception:
                 pass
-            png_bytes = page.screenshot(clip={"x": 0, "y": 0, "width": int(dimensions[0]), "height": int(dimensions[1])})
+            png_bytes = page.screenshot(
+                clip={
+                    "x": 0,
+                    "y": 0,
+                    "width": int(dimensions[0]),
+                    "height": int(dimensions[1]),
+                }
+            )
             img = load_image_from_bytes(png_bytes)
         finally:
             browser.close()

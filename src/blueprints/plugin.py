@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Any
 
 from flask import (
     Blueprint,
@@ -189,10 +188,12 @@ def plugin_instance_image(plugin_id, instance_name):
                 for fname in os.listdir(history_dir):
                     if not fname.endswith(".json"):
                         continue
-                    import json, os as _os
+                    import json
+                    import os as _os
+
                     p = _os.path.join(history_dir, fname)
                     try:
-                        with open(p, "r", encoding="utf-8") as fh:
+                        with open(p, encoding="utf-8") as fh:
                             meta = json.load(fh) or {}
                         if (
                             meta.get("plugin_id") == plugin_id
@@ -213,7 +214,9 @@ def plugin_instance_image(plugin_id, instance_name):
                         instance_name,
                         latest_match,
                     )
-                    return send_file(latest_match, mimetype="image/png", conditional=True)
+                    return send_file(
+                        latest_match, mimetype="image/png", conditional=True
+                    )
             except Exception:
                 logger.exception("Failed during history fallback for instance image")
             return abort(404)
@@ -284,7 +287,9 @@ def update_plugin_instance(instance_name):
         logger.exception("Error updating plugin instance")
         return json_internal_error(
             "update plugin instance",
-            details={"hint": "Ensure instance exists; check config file write permissions."},
+            details={
+                "hint": "Ensure instance exists; check config file write permissions."
+            },
         )
     return jsonify(
         {"success": True, "message": f"Updated plugin instance {instance_name}."}
@@ -376,6 +381,7 @@ def update_now():
     try:
         # Start timing (request overall)
         from time import perf_counter
+
         _t_req_start = perf_counter()
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
@@ -467,6 +473,7 @@ def update_now():
     try:
         if request_ms is None:
             from time import perf_counter
+
             request_ms = int((perf_counter() - _t_req_start) * 1000)
     except Exception:
         pass
@@ -521,11 +528,14 @@ def ab_compare():
             image_b.save(target_b)
 
         from flask import url_for
+
         return jsonify(
             {
                 "success": True,
                 "baseline_path": url_for("static", filename="images/current_image.png"),
-                "variant_path": url_for("static", filename="images/current_image_variant.png"),
+                "variant_path": url_for(
+                    "static", filename="images/current_image_variant.png"
+                ),
             }
         )
     except Exception:
@@ -536,7 +546,6 @@ def ab_compare():
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
 def save_plugin_settings():
     device_config = current_app.config["DEVICE_CONFIG"]
-    playlist_manager = device_config.get_playlist_manager()
 
     try:
         plugin_settings = parse_form(request.form)
@@ -551,7 +560,9 @@ def save_plugin_settings():
         saved_all[plugin_id] = plugin_settings
         device_config.update_value("saved_settings", saved_all, write=True)
 
-        return json_success("Settings saved. Use 'Add to Playlist' to schedule recurrence.")
+        return json_success(
+            "Settings saved. Use 'Add to Playlist' to schedule recurrence."
+        )
 
     except Exception as e:
         logger.exception(f"Error saving plugin settings: {str(e)}")
@@ -566,7 +577,9 @@ def save_plugin_settings():
 @plugin_bp.route("/weather/icon_preview", methods=["POST"])
 def weather_icon_preview():
     from io import BytesIO
+
     from PIL import Image
+
     try:
         device_config = current_app.config["DEVICE_CONFIG"]
         form = parse_form(request.form)
@@ -585,6 +598,7 @@ def weather_icon_preview():
         ]
 
         from plugins.plugin_registry import get_plugin_instance
+
         plugin_config = device_config.get_plugin("weather")
         if not plugin_config:
             return json_error("Weather plugin not found", status=404)
@@ -602,6 +616,7 @@ def weather_icon_preview():
             except Exception:
                 # Fallback: create blank image
                 from PIL import Image as _Image
+
                 img = _Image.new("RGB", (800, 480), "white")
             imgs.append((img, f"{w_pack}"))
 

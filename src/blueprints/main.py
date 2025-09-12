@@ -1,7 +1,7 @@
 import os
+from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, render_template, send_file
-from datetime import datetime
 
 main_bp = Blueprint("main", __name__)
 
@@ -20,14 +20,17 @@ def main_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     # Compute a non-mutating next-up preview for SSR convenience
     playlist_manager = device_config.get_playlist_manager()
-    latest_refresh = device_config.get_refresh_info()
     current_dt = _current_dt(device_config)
 
     next_up = {}
     try:
         playlist = playlist_manager.determine_active_playlist(current_dt)
         if playlist:
-            inst = playlist.peek_next_eligible_plugin(current_dt) if hasattr(playlist, 'peek_next_eligible_plugin') else playlist.peek_next_plugin()
+            inst = (
+                playlist.peek_next_eligible_plugin(current_dt)
+                if hasattr(playlist, "peek_next_eligible_plugin")
+                else playlist.peek_next_plugin()
+            )
             if inst:
                 next_up = {
                     "playlist": playlist.name,
@@ -78,7 +81,11 @@ def next_up():
         playlist = playlist_manager.determine_active_playlist(current_dt)
         if not playlist:
             return jsonify({})
-        inst = playlist.peek_next_eligible_plugin(current_dt) if hasattr(playlist, 'peek_next_eligible_plugin') else playlist.peek_next_plugin()
+        inst = (
+            playlist.peek_next_eligible_plugin(current_dt)
+            if hasattr(playlist, "peek_next_eligible_plugin")
+            else playlist.peek_next_plugin()
+        )
         if not inst:
             return jsonify({})
         return jsonify(
@@ -109,7 +116,10 @@ def display_next():
 
     plugin_instance = playlist.get_next_eligible_plugin(current_dt)
     if not plugin_instance:
-        return jsonify({"success": False, "error": "No eligible plugin to display"}), 400
+        return (
+            jsonify({"success": False, "error": "No eligible plugin to display"}),
+            400,
+        )
 
     # Execute via background task if running; else do a direct update (dev path)
     request_ms = display_ms = generate_ms = preprocess_ms = None
@@ -117,16 +127,22 @@ def display_next():
         if getattr(refresh_task, "running", False):
             from refresh_task import PlaylistRefresh
 
-            refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
+            refresh_task.manual_update(
+                PlaylistRefresh(playlist, plugin_instance, force=True)
+            )
         else:
             # Direct path similar to update_now
             from time import perf_counter
+
             from plugins.plugin_registry import get_plugin_instance
             from utils.image_utils import compute_image_hash
 
             plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
             if not plugin_config:
-                return jsonify({"success": False, "error": "Plugin config not found"}), 404
+                return (
+                    jsonify({"success": False, "error": "Plugin config not found"}),
+                    404,
+                )
             plugin = get_plugin_instance(plugin_config)
             _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_instance.settings, device_config)
@@ -186,13 +202,18 @@ def display_next():
     except Exception:
         pass
 
-    return jsonify({
-        "success": True,
-        "message": "Display updated",
-        "metrics": {
-            "request_ms": request_ms,
-            "generate_ms": generate_ms,
-            "preprocess_ms": preprocess_ms,
-            "display_ms": display_ms,
-        }
-    }), 200
+    return (
+        jsonify(
+            {
+                "success": True,
+                "message": "Display updated",
+                "metrics": {
+                    "request_ms": request_ms,
+                    "generate_ms": generate_ms,
+                    "preprocess_ms": preprocess_ms,
+                    "display_ms": display_ms,
+                },
+            }
+        ),
+        200,
+    )

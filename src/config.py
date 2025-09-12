@@ -8,14 +8,14 @@ from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
 
+from model import PlaylistManager, RefreshInfo
+
 # Optional dependency: jsonschema for validating device.json (loaded dynamically to avoid typing issues)
 jsonschema: Any = None
 try:
     jsonschema = importlib.import_module("jsonschema")
 except Exception:  # pragma: no cover
     jsonschema = None
-
-from model import PlaylistManager, RefreshInfo
 
 logger = logging.getLogger(__name__)
 
@@ -338,7 +338,10 @@ class Config:
         try:
             schema_path = os.path.join(self._schema_dir(), "device_config.schema.json")
             if not os.path.isfile(schema_path):
-                logger.warning("Device config schema not found at %s; skipping validation", schema_path)
+                logger.warning(
+                    "Device config schema not found at %s; skipping validation",
+                    schema_path,
+                )
                 return
             schema = _load_json_schema(schema_path)
             jsonschema.Draft202012Validator(schema).validate(config)
@@ -367,7 +370,9 @@ class Config:
                 except Exception:
                     pass
                 raise ValueError(f"device.json failed schema validation: {msg}") from ex
-            logger.warning("device.json validation encountered a non-fatal error: %s", ex)
+            logger.warning(
+                "device.json validation encountered a non-fatal error: %s", ex
+            )
 
     @staticmethod
     def _sanitize_config_for_log(config_dict):
@@ -379,13 +384,19 @@ class Config:
           credentials saved in settings.
         - Keeps non-sensitive high-level fields as-is for debuggability.
         """
+
         def _looks_sensitive(key_name: str) -> bool:
             lowered = key_name.lower()
-            return any(s in lowered for s in ("secret", "token", "api", "key", "password"))
+            return any(
+                s in lowered for s in ("secret", "token", "api", "key", "password")
+            )
 
         def _mask(value):
             if isinstance(value, dict):
-                return {k: ("***" if _looks_sensitive(k) else _mask(v)) for k, v in value.items()}
+                return {
+                    k: ("***" if _looks_sensitive(k) else _mask(v))
+                    for k, v in value.items()
+                }
             if isinstance(value, list):
                 return [_mask(v) for v in value]
             # Do not attempt to log raw bytes or large strings; keep small scalars
@@ -393,18 +404,30 @@ class Config:
                 return value
             if isinstance(value, str):
                 # Keep short benign strings; mask long ones
-                return value if len(value) <= 64 and not any(c in value for c in ("\n", "\r")) else "***"
+                return (
+                    value
+                    if len(value) <= 64 and not any(c in value for c in ("\n", "\r"))
+                    else "***"
+                )
             return "<omitted>"
 
         sanitized: dict[str, Any] = {}
         for key, value in (config_dict or {}).items():
             if key == "playlist_config" and isinstance(value, dict):
-                playlists = value.get("playlists", []) if isinstance(value.get("playlists"), list) else []
+                playlists = (
+                    value.get("playlists", [])
+                    if isinstance(value.get("playlists"), list)
+                    else []
+                )
                 sanitized_playlists = []
                 for pl in playlists:
                     try:
                         pl_name = pl.get("name")
-                        plugins = pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
+                        plugins = (
+                            pl.get("plugins", [])
+                            if isinstance(pl.get("plugins"), list)
+                            else []
+                        )
                         sanitized_playlists.append(
                             {
                                 "name": pl_name,
@@ -421,7 +444,9 @@ class Config:
                             }
                         )
                     except Exception:
-                        sanitized_playlists.append({"name": "<unknown>", "num_plugins": 0})
+                        sanitized_playlists.append(
+                            {"name": "<unknown>", "num_plugins": 0}
+                        )
                 sanitized[key] = {
                     "active_playlist": value.get("active_playlist"),
                     "playlists": sanitized_playlists,

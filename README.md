@@ -143,6 +143,13 @@ Behavior in dev:
 
 ### Development Tools
 
+- Pre-commit hooks ensure consistent style and type checking.
+
+```bash
+pre-commit install               # install hooks
+pre-commit run --files <paths>   # run checks on the given files
+```
+
 - Hot reload for plugins: When `INKYPI_ENV=dev` or `--dev`, plugin code is reloaded on each request, so changes to `plugins/<id>/<id>.py` take effect immediately.
 - Plugin validator: Validate plugin folders quickly.
 

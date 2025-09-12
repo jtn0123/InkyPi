@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,13 @@ class Playlist:
     """
 
     def __init__(
-        self, name, start_time, end_time, plugins=None, current_plugin_index=None, cycle_interval_seconds=None
+        self,
+        name,
+        start_time,
+        end_time,
+        plugins=None,
+        current_plugin_index=None,
+        cycle_interval_seconds=None,
     ):
         self.name = name
         self.start_time = start_time
@@ -382,7 +388,7 @@ class Playlist:
                 pid = item.get("plugin_id")
                 name = item.get("name") or item.get("instance_name")
                 normalized_keys.append((pid, name))
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
+            elif isinstance(item, list | tuple) and len(item) == 2:
                 normalized_keys.append((item[0], item[1]))
             else:
                 return False
@@ -453,7 +459,16 @@ class PluginInstance:
         latest_refresh (str): ISO-formatted string representing the last refresh time.
     """
 
-    def __init__(self, plugin_id, name, settings, refresh, latest_refresh_time=None, only_show_when_fresh=False, snooze_until=None):
+    def __init__(
+        self,
+        plugin_id,
+        name,
+        settings,
+        refresh,
+        latest_refresh_time=None,
+        only_show_when_fresh=False,
+        snooze_until=None,
+    ):
         self.plugin_id = plugin_id
         self.name = name
         self.settings = settings
@@ -521,9 +536,8 @@ class PluginInstance:
                     snooze_dt = datetime.fromisoformat(self.snooze_until)
                     if snooze_dt.tzinfo is None:
                         # Treat naive as UTC
-                        from datetime import timezone
 
-                        snooze_dt = snooze_dt.replace(tzinfo=timezone.utc)
+                        snooze_dt = snooze_dt.replace(tzinfo=UTC)
                     if current_time < snooze_dt:
                         return False
                 except Exception:
