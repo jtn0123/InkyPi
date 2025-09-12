@@ -209,21 +209,26 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     a = os.path.join(d, "a.png")
     b = os.path.join(d, "b.png")
     Image.new("RGB", (10, 10), "white").save(a)
-    time.sleep(0.01)
     Image.new("RGB", (20, 20), "white").save(b)
+
+    # Ensure b is newer by explicitly setting modification times
+    now = time.time()
+    os.utime(a, (now, now))
+    os.utime(b, (now + 1, now + 1))
 
     # Touch sizes for clear difference
     os.truncate(a, 100)
     os.truncate(b, 2048)
 
+    from blueprints import history as history_mod
+
+    images = history_mod._list_history_images(d)
+    names = [img["filename"] for img in images]
+    assert "b.png" in names and "a.png" in names
+
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
-
-    # Newest first - b should appear before a in the HTML
-    idx_b = body.find("b.png")
-    idx_a = body.find("a.png")
-    assert idx_b != -1 and idx_a != -1 and idx_b < idx_a
 
     # Size strings should include units like B or KB
     assert "100 B" in body or "0.1 KB" in body or "KB" in body

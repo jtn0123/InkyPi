@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import shutil
 import subprocess
 import tempfile
 from io import BytesIO
@@ -255,11 +256,7 @@ def take_screenshot(target, dimensions, timeout_ms=None):
 
         command = None
         for browser in browsers:
-            if os.path.exists(browser) or (
-                browser in ["chromium", "chromium-headless-shell", "google-chrome"]
-                and subprocess.run(["which", browser], capture_output=True).returncode
-                == 0
-            ):
+            if os.path.exists(browser) or shutil.which(browser):
                 command = [
                     browser,
                     "--headless",
