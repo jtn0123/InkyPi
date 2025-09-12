@@ -199,6 +199,28 @@ def test_get_ip_address(monkeypatch):
     assert result == "192.168.1.100"
 
 
+def test_get_ip_address_failure(monkeypatch):
+    """get_ip_address returns None when socket operations fail."""
+    import socket
+
+    class MockSocket:
+        AF_INET = socket.AF_INET
+        SOCK_DGRAM = socket.SOCK_DGRAM
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def connect(self, *args, **kwargs):
+            raise OSError("boom")
+
+    monkeypatch.setattr(socket, "socket", lambda *a, **kw: MockSocket())
+    result = app_utils.get_ip_address()
+    assert result is None
+
+
 def test_get_font_valid(monkeypatch, tmp_path):
     """Test get_font with valid font family."""
     from PIL import ImageFont

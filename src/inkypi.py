@@ -66,7 +66,7 @@ from config import Config
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
-from utils.app_utils import generate_startup_image
+from utils.app_utils import generate_startup_image, get_ip_address
 from utils.http_utils import APIError, json_error, wants_json, json_internal_error
 
 logger = logging.getLogger(__name__)
@@ -379,16 +379,9 @@ if __name__ == "__main__":
 
         # Get local IP address for display (only in dev mode when running on non-Pi)
         if DEV_MODE:
-            import socket
-
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                s.connect(("8.8.8.8", 80))
-                local_ip = s.getsockname()[0]
-                s.close()
+            local_ip = get_ip_address()
+            if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
-            except OSError:
-                pass  # Ignore if we can't get the IP
 
         serve(app, host="0.0.0.0", port=PORT, threads=1)
     finally:
