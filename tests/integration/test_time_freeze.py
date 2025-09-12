@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import pytest
 import pytz
+
+pytest.importorskip("freezegun")
 from freezegun import freeze_time
 
 
@@ -26,14 +29,16 @@ def test_playlist_rotation_respects_device_timezone_freeze(device_config_dev):
         assert playlist.name == "Morning"
 
 
-def test_refresh_cadence_interval_respects_device_timezone_freeze(device_config_dev, monkeypatch):
+def test_refresh_cadence_interval_respects_device_timezone_freeze(
+    device_config_dev, monkeypatch
+):
     # Set device timezone
     device_config_dev.update_value("timezone", "US/Eastern", write=True)
     # Ensure a short plugin cycle interval (1 hour)
     device_config_dev.update_value("plugin_cycle_interval_seconds", 3600, write=True)
 
     # Prepare a playlist with a single plugin instance
-    from model import PluginInstance, RefreshInfo
+    from model import RefreshInfo
 
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("P1", "00:00", "24:00")
@@ -50,7 +55,9 @@ def test_refresh_cadence_interval_respects_device_timezone_freeze(device_config_
     # Force determine_active_playlist to choose our playlist deterministically
     playlist = pm.get_playlist("P1")
     assert playlist is not None
-    monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: playlist, raising=True)
+    monkeypatch.setattr(
+        pm, "determine_active_playlist", lambda dt: playlist, raising=True
+    )
 
     # Latest refresh at 08:30 -0500
     device_config_dev.refresh_info = RefreshInfo(
@@ -67,13 +74,17 @@ def test_refresh_cadence_interval_respects_device_timezone_freeze(device_config_
     # 1) At 09:00 -0500 only 30 mins elapsed → NOT time to refresh
     with freeze_time("2025-01-01 14:00:00", tz_offset=0):  # 09:00 ET
         current_dt = task._get_current_datetime()
-        p, inst = task._determine_next_plugin(pm, device_config_dev.get_refresh_info(), current_dt)
+        p, inst = task._determine_next_plugin(
+            pm, device_config_dev.get_refresh_info(), current_dt
+        )
         assert p is None and inst is None
 
     # 2) At 10:00 -0500 90 mins elapsed → SHOULD refresh
     with freeze_time("2025-01-01 15:00:00", tz_offset=0):  # 10:00 ET
         current_dt = task._get_current_datetime()
-        p, inst = task._determine_next_plugin(pm, device_config_dev.get_refresh_info(), current_dt)
+        p, inst = task._determine_next_plugin(
+            pm, device_config_dev.get_refresh_info(), current_dt
+        )
         assert p is not None and inst is not None
 
 
@@ -102,7 +113,9 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
 
     monkeypatch.setattr(settings_mod, "JOURNAL_AVAILABLE", True, raising=True)
     monkeypatch.setattr(settings_mod, "JournalReader", FakeJR, raising=True)
-    monkeypatch.setattr(settings_mod, "JournalOpenMode", type("M", (), {"SYSTEM": object()}))
+    monkeypatch.setattr(
+        settings_mod, "JournalOpenMode", type("M", (), {"SYSTEM": object()})
+    )
     monkeypatch.setattr(settings_mod, "Rule", lambda *a, **k: (a, k))
 
     # Freeze to 08:00 ET and request 2 hours
@@ -117,5 +130,3 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
         expected_usec = int(since_et * 1_000_000)
 
         assert captured["since_usec"] == expected_usec
-
-
