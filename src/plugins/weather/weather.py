@@ -502,19 +502,65 @@ class Weather(BasePlugin):
 
         return forecast
 
+    def _compute_moon_phase(self, dt: datetime) -> tuple[str, float]:
+        """Return (phase_name, illumination_pct) for a given datetime.
+
+        The calculation uses a simple approximation based on the synodic cycle
+        and does not require any external API requests.  On failure, a
+        ``("newmoon", 0.0)`` tuple is returned.
+        """
+
+        try:
+            synodic_days = 29.53058867
+            # Reference new moon epoch (UTC): 2000-01-06
+            ref = datetime(2000, 1, 6, tzinfo=UTC)
+            days_since_ref = (dt - ref).total_seconds() / 86400.0
+            phase = (days_since_ref % synodic_days) / synodic_days  # 0..1
+            illum_pct = (1 - math.cos(2 * math.pi * phase)) / 2 * 100
+            if phase < 0.03 or phase > 0.97:
+                phase_name = "newmoon"
+            elif 0.22 <= phase <= 0.28:
+                phase_name = "firstquarter"
+            elif 0.47 <= phase <= 0.53:
+                phase_name = "fullmoon"
+            elif 0.72 <= phase <= 0.78:
+                phase_name = "lastquarter"
+            elif phase < 0.25:
+                phase_name = "waxingcrescent"
+            elif phase < 0.5:
+                phase_name = "waxinggibbous"
+            elif phase < 0.75:
+                phase_name = "waninggibbous"
+            else:
+                phase_name = "waningcrescent"
+            return phase_name, float(illum_pct)
+        except Exception:
+            return "newmoon", 0.0
+
     def parse_open_meteo_forecast(self, daily_data, tz):
-        """
-        Parse the daily forecast from Open-Meteo API and inject moon phase from Farmsense API.
-        """
+        """Parse daily forecast from Open-Meteo and compute moon phases locally."""
         times = daily_data.get("time", [])
         weather_codes = daily_data.get("weathercode", [])
         temp_max = daily_data.get("temperature_2m_max", [])
         temp_min = daily_data.get("temperature_2m_min", [])
 
-        forecast = []
+        # Precompute datetime objects and moon phases for each day to avoid
+        # repeated work inside the main loop.
+        datetimes: list[datetime] = []
+        moon_info: list[tuple[str, float]] = []
+        for t in times:
+            try:
+                dt = datetime.fromisoformat(t).replace(tzinfo=UTC).astimezone(tz)
+            except Exception:
+                dt = datetime.now(tz)
+            datetimes.append(dt)
+            try:
+                moon_info.append(self._compute_moon_phase(dt))
+            except Exception:
+                moon_info.append(("newmoon", 0.0))
 
-        for i in range(0, len(times)):
-            dt = datetime.fromisoformat(times[i]).replace(tzinfo=UTC).astimezone(tz)
+        forecast = []
+        for i, dt in enumerate(datetimes):
             day_label = dt.strftime("%a")
 
             code = weather_codes[i] if i < len(weather_codes) else 0
@@ -523,56 +569,9 @@ class Weather(BasePlugin):
                 self.get_plugin_dir(f"icons/{weather_icon}.png")
             )
 
-            timestamp = int(dt.replace(hour=12, minute=0, second=0).timestamp())
-            api_url = f"https://api.farmsense.net/v1/moonphases/?d={timestamp}"
-
-            try:
-                resp = http_get(api_url, timeout=10)
-                # Ensure HTTP errors surface; keep tests compatible if mock lacks method
-                if hasattr(resp, "raise_for_status"):
-                    resp.raise_for_status()
-                elif getattr(resp, "status_code", 200) not in (200, 201, 204):
-                    raise requests.exceptions.HTTPError(str(resp.status_code))
-                moon = resp.json()[0]
-                phase_raw = moon.get("Phase", "New Moon")
-                illum_pct = float(moon.get("Illumination", 0)) * 100
-                phase_name = phase_raw.lower().replace(" ", "")
-                if phase_name == "darkmoon":
-                    phase_name = "newmoon"
-                elif phase_name in ("3rdquarter", "thirdquarter"):
-                    phase_name = "lastquarter"
-                elif phase_name in ("1stquarter", "firstquarter"):
-                    phase_name = "firstquarter"
-            except Exception:
-                # Fallback: approximate moon illumination from synodic cycle when API fails
-                try:
-                    import math
-                    synodic_days = 29.53058867
-                    # Reference new moon epoch (UTC): 2000-01-06
-                    ref = datetime(2000, 1, 6, tzinfo=UTC)
-                    days_since_ref = (dt - ref).total_seconds() / 86400.0
-                    phase = (days_since_ref % synodic_days) / synodic_days  # 0..1
-                    illum_pct = (1 - math.cos(2 * math.pi * phase)) / 2 * 100
-                    if phase < 0.03 or phase > 0.97:
-                        phase_name = "newmoon"
-                    elif 0.22 <= phase <= 0.28:
-                        phase_name = "firstquarter"
-                    elif 0.47 <= phase <= 0.53:
-                        phase_name = "fullmoon"
-                    elif 0.72 <= phase <= 0.78:
-                        phase_name = "lastquarter"
-                    elif phase < 0.25:
-                        phase_name = "waxingcrescent"
-                    elif phase < 0.5:
-                        phase_name = "waxinggibbous"
-                    elif phase < 0.75:
-                        phase_name = "waninggibbous"
-                    else:
-                        phase_name = "waningcrescent"
-                except Exception:
-                    illum_pct = 0
-                    phase_name = "newmoon"
-
+            phase_name, illum_pct = (
+                moon_info[i] if i < len(moon_info) else ("newmoon", 0.0)
+            )
             moon_icon_path = self.path_to_data_uri(
                 self.get_plugin_dir(f"icons/{phase_name}.png")
             )
