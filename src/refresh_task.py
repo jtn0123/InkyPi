@@ -52,180 +52,189 @@ class RefreshTask:
                 logger.warning("Refresh task thread did not stop within timeout")
 
     def _run(self):
-        """Background task that manages the periodic refresh of the display.
+        """Background thread loop coordinating refresh operations.
 
-        This function runs in a loop, sleeping for a configured duration (`plugin_cycle_interval_seconds`) or until
-        manually triggered via `manual_update()`. Detrmines the next plugin to refresh based on active playlists and
-        updates the display accordingly.
-
-        Workflow:
-        1. Waits for the configured sleep duration or until notified of a manual update.
-        2. Checks if a manual update has been requested:
-        - If so, refreshes the specified plugin immediately.
-        3. Otherwise, determines the next plugin to refresh based on the active playlist and generates an image.
-        4. Compares the image hash with the last displayed image hash.
-        - If the image has changed, updates the display.
-        - If the image is the same, skips the refresh.
-        5. Updates the refresh metadata in the device configuration.
-        6. Repeats the process until `stop()` is called.
-
-        Handles any exceptions that occur during the refresh process and ensures the refresh event is set
-        to indicate completion.
-
-        Exceptions:
-        - Captures and logs any unexpected errors during execution to prevent the thread from exiting.
+        The method waits for either the configured interval or a manual trigger,
+        selects the appropriate :class:`RefreshAction`, performs the refresh,
+        and updates refresh metadata. Threading primitives are handled in helper
+        methods to keep the flow readable.
         """
         while True:
             try:
-                # Step 1: Wait for interval or notification and decide next action while holding the lock
-                with self.condition:
-                    sleep_time = self.device_config.get_config(
-                        "plugin_cycle_interval_seconds", default=60 * 60
-                    )
+                result = self._wait_for_trigger()
+                if result is None:
+                    break
 
-                    # Wait for sleep_time or until notified
-                    self.condition.wait(timeout=sleep_time)
+                playlist_manager, latest_refresh, current_dt, manual_action = result
+                refresh_action = self._select_refresh_action(
+                    playlist_manager, latest_refresh, current_dt, manual_action
+                )
 
-                    # Exit if `stop()` is called
-                    if not self.running:
-                        break
-
-                    playlist_manager = self.device_config.get_playlist_manager()
-                    latest_refresh = self.device_config.get_refresh_info()
-                    current_dt = self._get_current_datetime()
-
-                    refresh_action = None
-                    if self.manual_update_request is not None:
-                        # handle immediate update request
-                        logger.info("Manual update requested")
-                        refresh_action = self.manual_update_request
-                        self.manual_update_request = None
-                    else:
-                        if self.device_config.get_config("log_system_stats"):
-                            self.log_system_stats()
-
-                        # handle refresh based on playlists
-                        logger.info(
-                            f"Running interval refresh check. | current_time: {current_dt.strftime('%Y-%m-%d %H:%M:%S')}"
-                        )
-                        playlist, plugin_instance = self._determine_next_plugin(
-                            playlist_manager, latest_refresh, current_dt
-                        )
-                        if plugin_instance:
-                            refresh_action = PlaylistRefresh(playlist, plugin_instance)
-
-                # Step 2: Perform work outside the lock to avoid blocking other signals
                 if refresh_action:
-                    # Prepare signaling state for any waiter (e.g., manual_update)
                     self.refresh_result = {}
                     self.refresh_event.clear()
 
-                    plugin_config = self.device_config.get_plugin(
-                        refresh_action.get_plugin_id()
+                    refresh_info, used_cached, metrics = self._perform_refresh(
+                        refresh_action, latest_refresh, current_dt
                     )
-                    if plugin_config is None:
-                        logger.error(
-                            f"Plugin config not found for '{refresh_action.get_plugin_id()}'."
-                        )
-                    else:
-                        plugin = get_plugin_instance(plugin_config)
-                        # Measure generate duration separately
-                        _t_req_start = perf_counter()
-                        _t_gen_start = perf_counter()
-                        image = refresh_action.execute(
-                            plugin, self.device_config, current_dt
-                        )
-                        generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-                        if image is None:
-                            raise RuntimeError(
-                                "Plugin returned None image; cannot refresh display."
-                            )
-                        image_hash = compute_image_hash(image)
-
-                        refresh_info = refresh_action.get_refresh_info()
-                        # Attach plugin-provided metadata if available
-                        try:
-                            plugin_meta = None
-                            if hasattr(plugin, "get_latest_metadata"):
-                                plugin_meta = plugin.get_latest_metadata()
-                            if plugin_meta:
-                                refresh_info.update({"plugin_meta": plugin_meta})
-                        except Exception:
-                            # Non-fatal; continue without metadata
-                            pass
-                        refresh_info.update(
-                            {
-                                "refresh_time": current_dt.isoformat(),
-                                "image_hash": image_hash,
-                            }
-                        )
-                        # check if image is the same as current image
-                        used_cached = image_hash == latest_refresh.image_hash
-                        if not used_cached:
-                            logger.info(
-                                f"Updating display. | refresh_info: {refresh_info}"
-                            )
-                            # Pass history metadata so the history page can show source info
-                            history_meta = {
-                                "refresh_type": refresh_action.get_refresh_info().get(
-                                    "refresh_type"
-                                ),
-                                "plugin_id": refresh_action.get_refresh_info().get(
-                                    "plugin_id"
-                                ),
-                                "playlist": refresh_action.get_refresh_info().get(
-                                    "playlist"
-                                ),
-                                "plugin_instance": refresh_action.get_refresh_info().get(
-                                    "plugin_instance"
-                                ),
-                            }
-                            try:
-                                self.display_manager.display_image(
-                                    image,
-                                    image_settings=plugin.config.get(
-                                        "image_settings", []
-                                    ),
-                                    history_meta=history_meta,
-                                )
-                            except TypeError:
-                                # Back-compat for mocks/tests without history_meta param
-                                self.display_manager.display_image(
-                                    image,
-                                    image_settings=plugin.config.get(
-                                        "image_settings", []
-                                    ),
-                                )
-                        else:
-                            logger.info(
-                                f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
-                            )
-
-                        # update latest refresh data in the device config
-                        request_ms = int((perf_counter() - _t_req_start) * 1000)
-                        # Merge metrics captured by display manager if any
-                        dm_info = getattr(self.device_config, "refresh_info", None)
-                        display_ms = (
-                            getattr(dm_info, "display_ms", None) if dm_info else None
-                        )
-                        preprocess_ms = (
-                            getattr(dm_info, "preprocess_ms", None) if dm_info else None
-                        )
-                        self.device_config.refresh_info = RefreshInfo(
-                            **refresh_info,
-                            request_ms=request_ms,
-                            display_ms=display_ms,
-                            generate_ms=generate_ms,
-                            preprocess_ms=preprocess_ms,
-                            used_cached=used_cached,
-                        )
-                        self.device_config.write_config()
+                    if refresh_info is not None:
+                        self._update_refresh_info(refresh_info, metrics, used_cached)
 
             except Exception as e:
                 logger.exception("Exception during refresh")
                 self.refresh_result["exception"] = e  # Capture exception
             finally:
                 self.refresh_event.set()
+
+    def _wait_for_trigger(self):
+        """Wait for the next refresh trigger while holding the condition lock.
+
+        The method blocks for ``plugin_cycle_interval_seconds`` or until notified
+        of a manual update. It returns the contextual objects required for the
+        refresh cycle or ``None`` if the task was stopped.
+
+        Threading:
+            Acquires ``self.condition`` and releases it before returning.
+        """
+        with self.condition:
+            sleep_time = self.device_config.get_config(
+                "plugin_cycle_interval_seconds", default=60 * 60
+            )
+            self.condition.wait(timeout=sleep_time)
+            if not self.running:
+                return None
+
+            playlist_manager = self.device_config.get_playlist_manager()
+            latest_refresh = self.device_config.get_refresh_info()
+            current_dt = self._get_current_datetime()
+            manual_action = self.manual_update_request
+            if manual_action is not None:
+                self.manual_update_request = None
+            return playlist_manager, latest_refresh, current_dt, manual_action
+
+    def _select_refresh_action(
+        self, playlist_manager, latest_refresh, current_dt, manual_action
+    ):
+        """Determine which refresh action to perform.
+
+        If ``manual_action`` is provided it is returned immediately. Otherwise,
+        the next eligible plugin is selected based on playlists.
+
+        Threading:
+            No locks are held during execution.
+        """
+        refresh_action = None
+        if manual_action is not None:
+            logger.info("Manual update requested")
+            refresh_action = manual_action
+        else:
+            if self.device_config.get_config("log_system_stats"):
+                self.log_system_stats()
+            logger.info(
+                f"Running interval refresh check. | current_time: {current_dt.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+            playlist, plugin_instance = self._determine_next_plugin(
+                playlist_manager, latest_refresh, current_dt
+            )
+            if plugin_instance:
+                refresh_action = PlaylistRefresh(playlist, plugin_instance)
+        return refresh_action
+
+    def _perform_refresh(self, refresh_action, latest_refresh, current_dt):
+        """Execute the refresh action and update the display if needed.
+
+        Returns a tuple ``(refresh_info, used_cached, metrics)`` where
+        ``refresh_info`` is a dictionary with metadata, ``used_cached`` indicates
+        whether the image was unchanged, and ``metrics`` contains timing data.
+
+        Threading:
+            Must be called without holding ``self.condition``.
+        """
+        plugin_config = self.device_config.get_plugin(refresh_action.get_plugin_id())
+        if plugin_config is None:
+            logger.error(
+                f"Plugin config not found for '{refresh_action.get_plugin_id()}'."
+            )
+            return None, False, {}
+
+        plugin = get_plugin_instance(plugin_config)
+        _t_req_start = perf_counter()
+        _t_gen_start = perf_counter()
+        image = refresh_action.execute(plugin, self.device_config, current_dt)
+        generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+        if image is None:
+            raise RuntimeError("Plugin returned None image; cannot refresh display.")
+        image_hash = compute_image_hash(image)
+
+        refresh_info = refresh_action.get_refresh_info()
+        try:
+            plugin_meta = None
+            if hasattr(plugin, "get_latest_metadata"):
+                plugin_meta = plugin.get_latest_metadata()
+            if plugin_meta:
+                refresh_info.update({"plugin_meta": plugin_meta})
+        except Exception:
+            pass
+
+        refresh_info.update(
+            {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
+        )
+        used_cached = image_hash == latest_refresh.image_hash
+        if not used_cached:
+            logger.info(f"Updating display. | refresh_info: {refresh_info}")
+            history_meta = {
+                "refresh_type": refresh_action.get_refresh_info().get(
+                    "refresh_type"
+                ),
+                "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
+                "playlist": refresh_action.get_refresh_info().get("playlist"),
+                "plugin_instance": refresh_action.get_refresh_info().get(
+                    "plugin_instance"
+                ),
+            }
+            try:
+                self.display_manager.display_image(
+                    image,
+                    image_settings=plugin.config.get("image_settings", []),
+                    history_meta=history_meta,
+                )
+            except TypeError:
+                self.display_manager.display_image(
+                    image,
+                    image_settings=plugin.config.get("image_settings", []),
+                )
+        else:
+            logger.info(
+                f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
+            )
+
+        request_ms = int((perf_counter() - _t_req_start) * 1000)
+        dm_info = getattr(self.device_config, "refresh_info", None)
+        display_ms = getattr(dm_info, "display_ms", None) if dm_info else None
+        preprocess_ms = getattr(dm_info, "preprocess_ms", None) if dm_info else None
+        metrics = {
+            "request_ms": request_ms,
+            "display_ms": display_ms,
+            "generate_ms": generate_ms,
+            "preprocess_ms": preprocess_ms,
+        }
+        return refresh_info, used_cached, metrics
+
+    def _update_refresh_info(self, refresh_info, metrics, used_cached):
+        """Persist the latest refresh information to the device config.
+
+        Threading:
+            Should be invoked without holding ``self.condition``.
+        """
+        self.device_config.refresh_info = RefreshInfo(
+            **refresh_info,
+            request_ms=metrics.get("request_ms"),
+            display_ms=metrics.get("display_ms"),
+            generate_ms=metrics.get("generate_ms"),
+            preprocess_ms=metrics.get("preprocess_ms"),
+            used_cached=used_cached,
+        )
+        self.device_config.write_config()
 
     def manual_update(self, refresh_action):
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
