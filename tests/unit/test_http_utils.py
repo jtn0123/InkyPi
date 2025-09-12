@@ -74,13 +74,30 @@ def test_shared_session_retry_configuration(monkeypatch):
     assert 503 in (retry.status_forcelist or set())
 
 
-def test_shared_session_singleton():
+def test_shared_session_thread_isolation():
+    import threading
+    import requests
     import utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
+
+    # Same thread should reuse the session
     s1 = http_utils.get_shared_session()
     s2 = http_utils.get_shared_session()
     assert s1 is s2
+
+    # Different threads should get distinct sessions
+    other_session: list[requests.Session] = []
+
+    def worker():
+        other_session.append(http_utils.get_shared_session())
+
+    t = threading.Thread(target=worker)
+    t.start()
+    t.join()
+
+    assert other_session, "worker thread failed to store session"
+    assert s1 is not other_session[0]
 
 from unittest.mock import Mock, patch
 

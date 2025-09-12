@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 import requests
@@ -144,7 +145,8 @@ def wants_json(req: Request | None = None) -> bool:
 
 # ---- HTTP client helpers ----------------------------------------------------
 
-_session: requests.Session | None = None
+# Use a thread-local container to avoid sharing sessions across threads.
+_thread_local = threading.local()
 
 # Conservative defaults that keep tests fast (no backoff sleeps) while providing resiliency
 DEFAULT_TIMEOUT_SECONDS: float = 20.0
@@ -174,16 +176,22 @@ def _build_retry() -> Retry:
     )
 
 
+def _build_session() -> requests.Session:
+    s = requests.Session()
+    adapter = HTTPAdapter(max_retries=_build_retry())
+    s.headers.update(DEFAULT_HEADERS)
+    s.mount("http://", adapter)
+    s.mount("https://", adapter)
+    return s
+
+
 def get_shared_session() -> requests.Session:
-    global _session
-    if _session is None:
-        s = requests.Session()
-        adapter = HTTPAdapter(max_retries=_build_retry())
-        s.headers.update(DEFAULT_HEADERS)
-        s.mount("http://", adapter)
-        s.mount("https://", adapter)
-        _session = s
-    return _session
+    """Return a requests.Session unique to the current thread."""
+    session: requests.Session | None = getattr(_thread_local, "session", None)
+    if session is None:
+        session = _build_session()
+        _thread_local.session = session
+    return session
 
 
 def http_get(
@@ -218,5 +226,5 @@ def http_get(
 
 def _reset_shared_session_for_tests() -> None:
     """Reset the shared session (testing only)."""
-    global _session
-    _session = None
+    if hasattr(_thread_local, "session"):
+        delattr(_thread_local, "session")
