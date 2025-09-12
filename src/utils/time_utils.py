@@ -1,13 +1,14 @@
 import logging
 from datetime import datetime
-from typing import Optional
 
 import pytz
+
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 
-def calculate_seconds(interval, unit):
+def calculate_seconds(interval: int, unit: str) -> int:
     seconds = 5 * 60  # default to five minutes
     if unit == "minute":
         seconds = interval * 60
@@ -20,7 +21,7 @@ def calculate_seconds(interval, unit):
     return seconds
 
 
-def get_timezone(tz_name: Optional[str]):
+def get_timezone(tz_name: str | None):
     """Return a tzinfo for the provided timezone name using pytz.
 
     Falls back to UTC if the timezone string is invalid or missing.
@@ -33,13 +34,13 @@ def get_timezone(tz_name: Optional[str]):
     return pytz.UTC
 
 
-def now_in_timezone(tz_name: Optional[str] = "UTC") -> datetime:
+def now_in_timezone(tz_name: str | None = "UTC") -> datetime:
     """Return timezone-aware current datetime for the given timezone name."""
     tz = get_timezone(tz_name)
     return datetime.now(tz)
 
 
-def now_device_tz(device_config) -> datetime:
+def now_device_tz(device_config: Config) -> datetime:
     """Return timezone-aware current datetime using device configuration timezone."""
     try:
         tz_name = device_config.get_config("timezone", default="UTC")
