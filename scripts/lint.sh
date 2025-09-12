@@ -53,3 +53,9 @@ fi
 # Add your post-run actions here - they will execute regardless of lint failures
 
 
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_EXIT -ne 0 ]; then
+    exit 1
+fi
+
+exit 0
+
