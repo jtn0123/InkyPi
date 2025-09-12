@@ -267,7 +267,7 @@ def test_refresh_action_base_class():
 
     # Test that NotImplementedError is raised for abstract methods
     try:
-        action.refresh(None, None, None)
+        action.execute(None, None, None)
         assert False, "Should have raised NotImplementedError"
     except NotImplementedError:
         pass
