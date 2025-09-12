@@ -31,7 +31,7 @@ class Newspaper(BasePlugin):
             image_url = FREEDOM_FORUM_URL.format(date.day, newspaper_slug)
             image = get_image(image_url)
             if image:
-                logging.info(
+                logger.info(
                     f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}"
                 )
                 break

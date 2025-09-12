@@ -1,8 +1,18 @@
 from PIL import Image
+from plugins.newspaper.constants import NEWSPAPERS
 
 
 def _png_image(size=(600, 800), color="white"):
     return Image.new("RGB", size, color)
+
+
+def test_newspaper_initialization():
+    from plugins.newspaper.newspaper import Newspaper
+
+    plugin = Newspaper({"id": "newspaper"})
+    template = plugin.generate_settings_template()
+
+    assert template["newspapers"] == sorted(NEWSPAPERS, key=lambda n: n["name"])
 
 
 def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
