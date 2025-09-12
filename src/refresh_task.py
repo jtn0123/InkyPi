@@ -338,11 +338,15 @@ class RefreshTask:
 
 
 class RefreshAction:
-    """Base class for a refresh action. Subclasses should override the methods below."""
+    """Base class for a refresh action.
 
-    def refresh(self, plugin, device_config, current_dt):
-        """Perform a refresh operation and return the updated image."""
-        raise NotImplementedError("Subclasses must implement the refresh method.")
+    Subclasses must implement :meth:`execute` to perform the refresh operation
+    and return the resulting image.
+    """
+
+    def execute(self, plugin, device_config, current_dt):
+        """Execute the refresh operation and return the updated image."""
+        raise NotImplementedError("Subclasses must implement the execute method.")
 
     def get_refresh_info(self):
         """Return refresh metadata as a dictionary."""
