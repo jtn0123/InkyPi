@@ -3,7 +3,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
-cd "${REPO_ROOT}"
+cd "${REPO_ROOT}" || exit
 
 source scripts/venv.sh
 
