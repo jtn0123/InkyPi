@@ -104,7 +104,13 @@ from unittest.mock import Mock, patch
 import pytest
 from flask import Flask
 
-from src.utils.http_utils import APIError, json_error, json_success, wants_json
+from src.utils.http_utils import (
+    APIError,
+    json_error,
+    json_internal_error,
+    json_success,
+    wants_json,
+)
 
 
 @pytest.fixture
@@ -180,6 +186,43 @@ class TestJsonError:
             assert status == 404
             response_data = response.get_json()
             assert response_data["error"] == "Not found"
+
+
+class TestJsonInternalError:
+    """Test cases for the json_internal_error function."""
+
+    def test_json_internal_error_basic(self, app):
+        """Test default json_internal_error response."""
+        with app.app_context():
+            response, status = json_internal_error("test context")
+            assert status == 500
+            response_data = response.get_json()
+            assert response_data["error"] == "An internal error occurred"
+            assert response_data["code"] == "internal_error"
+            assert response_data["details"] == {"context": "test context"}
+
+    def test_json_internal_error_with_details(self, app):
+        """Test json_internal_error with additional details."""
+        details = {"hint": "try again"}
+        with app.app_context():
+            response, status = json_internal_error("processing", details=details)
+            assert status == 500
+            response_data = response.get_json()
+            assert response_data["error"] == "An internal error occurred"
+            assert response_data["code"] == "internal_error"
+            assert response_data["details"] == {"context": "processing", "hint": "try again"}
+
+    def test_json_internal_error_custom_status_and_code(self, app):
+        """Test custom status and error code propagation."""
+        with app.app_context():
+            response, status = json_internal_error(
+                "db failure", status=503, code="DB_DOWN"
+            )
+            assert status == 503
+            response_data = response.get_json()
+            assert response_data["error"] == "An internal error occurred"
+            assert response_data["code"] == "DB_DOWN"
+            assert response_data["details"] == {"context": "db failure"}
 
 
 class TestJsonSuccess:
