@@ -118,6 +118,11 @@ def resize_image(image, desired_size, image_settings=None):
     desired_width, desired_height = desired_size
     desired_width, desired_height = int(desired_width), int(desired_height)
 
+    if img_height == 0:
+        raise ValueError("Image height must be non-zero")
+    if desired_height == 0:
+        raise ValueError("Desired height must be non-zero")
+
     img_ratio = img_width / img_height
     desired_ratio = desired_width / desired_height
 
@@ -128,7 +133,6 @@ def resize_image(image, desired_size, image_settings=None):
     x_offset, y_offset = 0, 0
     new_width, new_height = img_width, img_height
     # Step 1: Determine crop dimensions
-    desired_ratio = desired_width / desired_height
     if img_ratio > desired_ratio:
         # Image is wider than desired aspect ratio
         new_width = int(img_height * desired_ratio)

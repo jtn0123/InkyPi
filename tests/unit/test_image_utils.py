@@ -175,3 +175,17 @@ def test_take_screenshot_general_exception(monkeypatch):
     # But we can test that the function returns an image when mocked
     result = image_utils.take_screenshot("http://example.com", (80, 60))
     assert isinstance(result, Image.Image)
+
+
+def test_resize_image_zero_img_height():
+    """resize_image should fail when source image height is zero."""
+    img = Image.new("RGB", (10, 0), "white")
+    with pytest.raises(ValueError):
+        image_utils.resize_image(img, (5, 5))
+
+
+def test_resize_image_zero_desired_height():
+    """resize_image should fail when desired height is zero."""
+    img = Image.new("RGB", (10, 10), "white")
+    with pytest.raises(ValueError):
+        image_utils.resize_image(img, (5, 0))
