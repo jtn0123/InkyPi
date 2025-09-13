@@ -103,8 +103,6 @@
         }
 
         // Logs viewer state
-        let logsPollingHandle = null;
-        let logsPaused = false;
         let logsAutoScroll = true;
         let logsWrap = true;
         let lastLogsRaw = "";
@@ -175,10 +173,14 @@
             }
         }
 
+        function flashLogsViewer() {
+            const viewer = document.getElementById('logsViewer');
+            if (!viewer) return;
+            viewer.style.boxShadow = `0 0 0 2px var(--accent)`;
+            setTimeout(() => { viewer.style.boxShadow = ''; }, 500);
+        }
+
         async function fetchAndRenderLogs() {
-            if (logsPaused) {
-                return;
-            }
             const hoursSelect = document.getElementById('logsHours');
             const hours = hoursSelect ? hoursSelect.value : '2';
             const viewer = document.getElementById('logsViewer');
@@ -188,35 +190,10 @@
                 lastLogsRaw = await resp.text();
                 updateLastUpdated();
                 applyLogFiltersAndRender();
+                flashLogsViewer();
             } catch (e) {
                 console.error('Failed to fetch logs', e);
             }
-        }
-
-        function startLogsPolling() {
-            const intervalInput = document.getElementById('logsInterval');
-            const intervalMs = Math.max(3, parseInt(intervalInput?.value || '5', 10)) * 1000;
-            stopLogsPolling();
-            // initial fetch immediately
-            fetchAndRenderLogs();
-            logsPollingHandle = setInterval(fetchAndRenderLogs, intervalMs);
-        }
-
-        function stopLogsPolling() {
-            if (logsPollingHandle) {
-                clearInterval(logsPollingHandle);
-                logsPollingHandle = null;
-            }
-        }
-
-        function toggleLogsPause() {
-            logsPaused = !logsPaused;
-            const btn = document.getElementById('logsPauseBtn');
-            if (btn) btn.textContent = logsPaused ? 'Resume' : 'Pause';
-            if (!logsPaused) {
-                fetchAndRenderLogs();
-            }
-            savePref('paused', logsPaused);
         }
 
         function toggleLogsAutoScroll() {
@@ -229,12 +206,10 @@
         function onLogsControlsChanged() {
             // Persist controls
             const hours = document.getElementById('logsHours');
-            const interval = document.getElementById('logsInterval');
             const maxLines = document.getElementById('logsMaxLines');
             if (hours) savePref('hours', hours.value);
-            if (interval) savePref('interval', interval.value);
             if (maxLines) savePref('maxLines', maxLines.value);
-            startLogsPolling();
+            fetchAndRenderLogs();
         }
 
         function onLogsFilterChanged() {
@@ -245,8 +220,22 @@
             applyLogFiltersAndRender();
         }
 
-        function manualLogsRefresh() {
-            fetchAndRenderLogs();
+        async function manualLogsRefresh() {
+            const btn = document.getElementById('logsRefreshBtn');
+            const updated = document.getElementById('logsUpdated');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Refreshing...';
+            }
+            if (updated) updated.textContent = 'Refreshing...';
+            try {
+                await fetchAndRenderLogs();
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh';
+                }
+            }
         }
 
         function copyLogsToClipboard() {
@@ -282,8 +271,6 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Initialize logs controls
             const hours = document.getElementById('logsHours');
-            const interval = document.getElementById('logsInterval');
-            const pauseBtn = document.getElementById('logsPauseBtn');
             const autoBtn = document.getElementById('logsAutoScrollBtn');
             const filterInput = document.getElementById('logsFilter');
             const levelSelect = document.getElementById('logsLevel');
@@ -298,22 +285,16 @@
             if (levelSelect) levelSelect.value = loadPref('level', 'all');
             if (hours) hours.value = loadPref('hours', '2');
             if (maxLinesInput) maxLinesInput.value = loadPref('maxLines', '500');
-            if (interval) interval.value = loadPref('interval', '5');
             const storedAuto = loadPref('autoScroll', 'true') === 'true';
             const storedWrap = loadPref('wrap', 'true') === 'true';
-            const storedPaused = loadPref('paused', 'false') === 'true';
             logsAutoScroll = storedAuto;
             logsWrap = storedWrap;
-            logsPaused = storedPaused;
             if (autoBtn) autoBtn.textContent = logsAutoScroll ? 'Auto-Scroll: On' : 'Auto-Scroll: Off';
             if (wrapBtn) wrapBtn.textContent = logsWrap ? 'Wrap: On' : 'Wrap: Off';
-            if (pauseBtn) pauseBtn.textContent = logsPaused ? 'Resume' : 'Pause';
             const viewer = document.getElementById('logsViewer');
             if (viewer) viewer.style.whiteSpace = logsWrap ? 'pre-wrap' : 'pre';
 
             if (hours) hours.addEventListener('change', onLogsControlsChanged);
-            if (interval) interval.addEventListener('change', onLogsControlsChanged);
-            if (pauseBtn) pauseBtn.addEventListener('click', toggleLogsPause);
             if (autoBtn) autoBtn.addEventListener('click', toggleLogsAutoScroll);
             if (filterInput) filterInput.addEventListener('input', debounce(onLogsFilterChanged, 200));
             if (levelSelect) levelSelect.addEventListener('change', onLogsFilterChanged);
@@ -322,7 +303,7 @@
             if (copyBtn) copyBtn.addEventListener('click', copyLogsToClipboard);
             if (clearBtn) clearBtn.addEventListener('click', clearLogsView);
             if (wrapBtn) wrapBtn.addEventListener('click', toggleLogsWrap);
-            startLogsPolling();
+            fetchAndRenderLogs();
         });
     </script>
 </head>
@@ -531,11 +512,8 @@
                     </select>
                     <label for="logsMaxLines" class="form-label">Max lines:</label>
                     <input id="logsMaxLines" type="number" min="50" value="500" class="form-input" />
-                    <label for="logsInterval" class="form-label">Refresh(s):</label>
-                    <input id="logsInterval" type="number" min="3" value="5" class="form-input" />
                 </div>
                 <div class="logs-actions">
-                    <button id="logsPauseBtn" class="header-button is-dark" type="button">Pause</button>
                     <button id="logsAutoScrollBtn" class="header-button is-secondary" type="button">Auto-Scroll: On</button>
                     <button id="logsWrapBtn" class="header-button is-secondary" type="button">Wrap: On</button>
                     <button id="logsRefreshBtn" class="header-button is-secondary" type="button">Refresh</button>
