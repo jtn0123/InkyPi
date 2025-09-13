@@ -102,7 +102,8 @@ def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, m
         """)
 
         # Check if playlist functions are loaded
-        print(f"DEBUG: Playlist functions loaded: {page.evaluate('() => typeof window.reorderPlugins !== \"undefined\"')}")
+        loaded = page.evaluate("() => typeof window.reorderPlugins !== 'undefined'")
+        print(f"DEBUG: Playlist functions loaded: {loaded}")
 
         # Check if plugin items exist
         plugin_items = page.query_selector_all(".plugin-item")
