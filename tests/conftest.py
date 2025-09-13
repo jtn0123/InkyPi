@@ -14,6 +14,24 @@ SRC_ABS = os.path.abspath(os.path.join(PROJECT_ROOT, "src"))
 if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
+# Auto-skip UI/a11y tests when Playwright browsers are unavailable
+try:  # pragma: no cover - best effort detection
+    from playwright.sync_api import sync_playwright
+
+    _has_browser = True
+    with sync_playwright() as _p:
+        try:
+            _b = _p.chromium.launch()
+            _b.close()
+        except Exception:
+            _has_browser = False
+    if not _has_browser:
+        os.environ.setdefault("SKIP_A11Y", "true")
+        os.environ.setdefault("SKIP_UI", "true")
+except Exception:
+    os.environ.setdefault("SKIP_A11Y", "true")
+    os.environ.setdefault("SKIP_UI", "true")
+
 
 @pytest.fixture(autouse=True)
 def mock_screenshot(monkeypatch):
@@ -25,10 +43,17 @@ def mock_screenshot(monkeypatch):
         return img
 
     import utils.image_utils as image_utils
+    import plugins.base_plugin.base_plugin as base_plugin
 
     monkeypatch.setattr(image_utils, "take_screenshot", _fake_screenshot, raising=True)
     monkeypatch.setattr(
         image_utils,
+        "take_screenshot_html",
+        lambda html, dimensions, timeout_ms=None: _fake_screenshot(None, dimensions),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        base_plugin,
         "take_screenshot_html",
         lambda html, dimensions, timeout_ms=None: _fake_screenshot(None, dimensions),
         raising=True,

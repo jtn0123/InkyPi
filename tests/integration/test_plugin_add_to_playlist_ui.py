@@ -2,6 +2,11 @@ import os
 
 import pytest
 
+pytestmark = pytest.mark.skipif(
+    os.getenv("SKIP_UI", "").lower() in ("1", "true"),
+    reason="UI interactions skipped by env",
+)
+
 
 def test_plugin_add_to_playlist_flow(client):
     pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
