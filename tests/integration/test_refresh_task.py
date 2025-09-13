@@ -101,6 +101,57 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
 
+def test_refresh_task_system_stats_logging_no_getloadavg(device_config_dev, monkeypatch):
+    """Ensure system stats logging handles missing getloadavg gracefully."""
+    from display.display_manager import DisplayManager
+    import refresh_task
+
+    display_manager = DisplayManager(device_config_dev)
+    task = refresh_task.RefreshTask(device_config_dev, display_manager)
+
+    # Mock psutil similar to previous test
+    mock_psutil = type("MockPsutil", (), {})()
+    mock_psutil.cpu_percent = lambda interval=None: 50.0
+    mock_psutil.virtual_memory = lambda: type("MockVM", (), {"percent": 60.0})()
+    mock_psutil.disk_usage = lambda path: type("MockDisk", (), {"percent": 70.0})()
+    mock_psutil.swap_memory = lambda: type("MockSwap", (), {"percent": 10.0})()
+    mock_psutil.net_io_counters = lambda: type(
+        "MockNet", (), {"bytes_sent": 1000, "bytes_recv": 2000}
+    )()
+
+    # Mock psutil import
+    import builtins as _builtins
+    _orig_import = _builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name == "psutil":
+            return mock_psutil
+        return _orig_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", mock_import)
+
+    # Simulate getloadavg missing/unsupported
+    def fake_getloadavg():
+        raise OSError("unsupported")
+
+    monkeypatch.setattr("os.getloadavg", fake_getloadavg)
+
+    logged = {}
+
+    def fake_logger(msg):
+        logged["msg"] = msg
+
+    monkeypatch.setattr(refresh_task.logger, "info", fake_logger)
+
+    task.log_system_stats()
+
+    assert "System Stats" in logged.get("msg", "")
+    assert "'load_avg_1_5_15': None" in logged.get("msg", "")
+
+    # Restore import early to avoid interfering with pytest internals during teardown
+    monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
+
+
 def test_refresh_task_plugin_config_not_found(device_config_dev, monkeypatch):
     """Test handling when plugin config is not found."""
     from refresh_task import PlaylistRefresh
