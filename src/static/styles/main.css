@@ -389,6 +389,36 @@ body {
     color: var(--text);
 }
 
+/* Unified styling for dropdowns to match the rest of the UI */
+select.form-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--surface-border);
+    padding-right: 2rem; /* room for chevron */
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px 12px;
+    /* Chevron icon (uses a neutral stroke for both themes) */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239aa3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* Hide legacy arrow in old browsers */
+select.form-input::-ms-expand { display: none; }
+
+/* Options list should follow theme colors */
+select.form-input option {
+    background-color: var(--surface);
+    color: var(--text);
+}
+
+/* Dark theme: nudge chevron contrast slightly */
+[data-theme="dark"] select.form-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23b3b9c4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
 .form-input:focus {
     outline: none;
     border-color: var(--accent);
