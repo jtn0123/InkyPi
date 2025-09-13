@@ -246,6 +246,12 @@ def test_get_font_invalid_family():
     assert result is None
 
 
+def test_get_font_strict_raises():
+    """get_font should raise when strict mode is enabled."""
+    with pytest.raises(ValueError):
+        app_utils.get_font("InvalidFont", 24, strict=True)
+
+
 def test_get_font_invalid_weight(monkeypatch, tmp_path):
     """Test get_font with invalid weight for valid family."""
     from PIL import ImageFont
