@@ -336,13 +336,17 @@ class RefreshTask:
             "cpu_percent": psutil.cpu_percent(interval=None),
             "memory_percent": psutil.virtual_memory().percent,
             "disk_percent": psutil.disk_usage("/").percent,
-            "load_avg_1_5_15": os.getloadavg(),
             "swap_percent": psutil.swap_memory().percent,
             "net_io": {
                 "bytes_sent": psutil.net_io_counters().bytes_sent,
                 "bytes_recv": psutil.net_io_counters().bytes_recv,
             },
         }
+
+        try:
+            metrics["load_avg_1_5_15"] = os.getloadavg()
+        except (OSError, AttributeError):
+            metrics["load_avg_1_5_15"] = None
 
         logger.info(f"System Stats: {metrics}")
 
