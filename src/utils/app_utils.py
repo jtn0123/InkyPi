@@ -75,29 +75,43 @@ def is_connected():
         return True
 
 
-def get_font(font_name, font_size=50, font_weight="normal"):
-    if font_name in FONT_FAMILIES:
-        font_variants = FONT_FAMILIES[font_name]
+def get_font(
+    font_name, font_size=50, font_weight="normal", *, strict=False
+):
+    """Return a PIL ImageFont for the requested font.
 
-        font_entry = next(
-            (entry for entry in font_variants if entry["font-weight"] == font_weight),
-            None,
-        )
-        if font_entry is None:
-            font_entry = font_variants[0]  # Default to first available variant
+    If ``strict`` is ``True`` an exception will be raised when the font or
+    weight cannot be resolved.  Otherwise a warning is logged and ``None`` is
+    returned.  This behaviour preserves the previous API while allowing callers
+    to opt in to stricter error handling.
+    """
 
-        if font_entry:
-            font_path = resolve_path(
-                os.path.join("static", "fonts", font_entry["file"])
-            )
-            return ImageFont.truetype(font_path, font_size)
-        else:
-            logger.warning(
-                f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}"
-            )
-    else:
-        logger.warning(f"Requested font not found: font_name={font_name}")
+    if font_name not in FONT_FAMILIES:
+        message = f"Requested font not found: font_name={font_name}"
+        if strict:
+            raise ValueError(message)
+        logger.warning(message)
+        return None
 
+    font_variants = FONT_FAMILIES[font_name]
+
+    font_entry = next(
+        (entry for entry in font_variants if entry["font-weight"] == font_weight),
+        None,
+    )
+    if font_entry is None:
+        font_entry = font_variants[0]  # Default to first available variant
+
+    if font_entry:
+        font_path = resolve_path(os.path.join("static", "fonts", font_entry["file"]))
+        return ImageFont.truetype(font_path, font_size)
+
+    message = (
+        f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}"
+    )
+    if strict:
+        raise ValueError(message)
+    logger.warning(message)
     return None
 
 
@@ -133,22 +147,36 @@ def generate_startup_image(dimensions=(800, 480)):
     image_draw = ImageDraw.Draw(image)
 
     title_font_size = width * 0.145
+    title_font = get_font("Jost", title_font_size)
+    if title_font is None:
+        logger.warning("Falling back to default font for startup title")
+        try:
+            title_font = ImageFont.load_default()
+        except Exception as exc:
+            raise RuntimeError("Unable to load a font for startup title") from exc
     image_draw.text(
         (width / 2, height / 2),
         "inkypi",
         anchor="mm",
         fill=text_color,
-        font=get_font("Jost", title_font_size),
+        font=title_font,
     )
 
     text = f"To get started, visit http://{hostname}.local"
     text_font_size = width * 0.032
+    text_font = get_font("Jost", text_font_size)
+    if text_font is None:
+        logger.warning("Falling back to default font for startup message")
+        try:
+            text_font = ImageFont.load_default()
+        except Exception as exc:
+            raise RuntimeError("Unable to load a font for startup message") from exc
     image_draw.text(
         (width / 2, height * 3 / 4),
         text,
         anchor="mm",
         fill=text_color,
-        font=get_font("Jost", text_font_size),
+        font=text_font,
     )
 
     return image
