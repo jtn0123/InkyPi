@@ -21,8 +21,8 @@
         const instancePreviewUrl = (pluginId, instanceName) => {
             if (!pluginId || !instanceName) return null;
             return '{{ url_for("plugin.plugin_instance_image", plugin_id="__PID__", instance_name="__INST__") }}'
-                .replace('__PID__', pluginId)
-                .replace('__INST__', instanceName);
+                .replace('__PID__', encodeURIComponent(pluginId))
+                .replace('__INST__', encodeURIComponent(instanceName));
         };
 
         let uploadedFiles = {};

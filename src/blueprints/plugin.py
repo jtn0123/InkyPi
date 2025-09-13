@@ -162,9 +162,45 @@ def plugin_page(plugin_id):
                 template_params["plugin_settings"] = plugin_instance.settings
                 template_params["plugin_instance"] = plugin_instance_name
                 # expose latest refresh time for this instance (for UI status)
-                template_params["plugin_instance_last_refresh"] = (
-                    plugin_instance.latest_refresh_time
-                )
+                last_refresh_ts = plugin_instance.latest_refresh_time
+                if not last_refresh_ts:
+                    # Derive from history sidecars if available
+                    try:
+                        import json as _json
+                        import os as _os
+
+                        history_dir = device_config.history_image_dir
+                        latest_mtime: float = -1.0
+                        latest_saved_at: str | None = None
+                        for fname in _os.listdir(history_dir):
+                            if not fname.endswith(".json"):
+                                continue
+                            p = _os.path.join(history_dir, fname)
+                            try:
+                                with open(p, encoding="utf-8") as fh:
+                                    meta = _json.load(fh) or {}
+                                if (
+                                    meta.get("plugin_id") == plugin_id
+                                    and meta.get("plugin_instance") == plugin_instance_name
+                                ):
+                                    mtime = _os.path.getmtime(p)
+                                    if mtime > latest_mtime:
+                                        latest_mtime = mtime
+                                        latest_saved_at = meta.get("saved_at")
+                            except Exception:
+                                logger.exception("Failed reading history sidecar for last refresh | path=%s", p)
+                        # saved_at is in '%Y%m%d_%H%M%S'; keep raw for JS to format? we can convert to ISO
+                        if latest_saved_at:
+                            try:
+                                from datetime import datetime as _dt
+
+                                dt = _dt.strptime(latest_saved_at, "%Y%m%d_%H%M%S")
+                                last_refresh_ts = dt.isoformat()
+                            except Exception:
+                                last_refresh_ts = latest_saved_at
+                    except Exception:
+                        logger.exception("History fallback for last_refresh failed")
+                template_params["plugin_instance_last_refresh"] = last_refresh_ts
                 # find and expose the playlist containing this instance for UI actions
                 try:
                     playlist_name = None
