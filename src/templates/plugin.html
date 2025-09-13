@@ -358,7 +358,8 @@
     <main>
     <div class="frame">
         <!-- Back Button -->
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Go to Home">← Home</a>
+        {% from 'macros/icons.html' import icon %}
+        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">

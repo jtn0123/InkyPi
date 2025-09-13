@@ -312,7 +312,8 @@
     <div class="settings-grid">
     <div class="frame settings-panel">
         <!-- Back Button -->
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Go to Home">← Home</a>
+        {% from 'macros/icons.html' import icon %}
+        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">

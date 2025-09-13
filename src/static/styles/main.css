@@ -328,6 +328,13 @@ body {
     outline-offset: 2px;
 }
 
+/* Reduce icon size inside back button for subtlety */
+.back-button .icon-image {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
 /* Action buttons styling */
 .action-button {
     flex: 1; /* Take up equal width for both buttons */
