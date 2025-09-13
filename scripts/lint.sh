@@ -5,7 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="${SCRIPT_DIR}/.."
 cd "${REPO_ROOT}" || exit
 
-source scripts/venv.sh
+# Use existing environment in CI or when a virtualenv is active
+if [[ -z "${CI:-}" && -z "${VIRTUAL_ENV:-}" ]]; then
+    # shellcheck source=scripts/venv.sh
+    source scripts/venv.sh
+fi
 
 # Track failures
 RUFF_EXIT=0

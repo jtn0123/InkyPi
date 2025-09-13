@@ -150,6 +150,10 @@ pre-commit install               # install hooks
 pre-commit run --files <paths>   # run checks on the given files
 ```
 
+- Linting: `scripts/lint.sh` uses a local `.venv` automatically. When `CI` or
+  `VIRTUAL_ENV` is set, it assumes dependencies are already installed and skips
+  creating the virtual environment.
+
 - Hot reload for plugins: When `INKYPI_ENV=dev` or `--dev`, plugin code is reloaded on each request, so changes to `plugins/<id>/<id>.py` take effect immediately.
 - Plugin validator: Validate plugin folders quickly.
 
