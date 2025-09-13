@@ -192,39 +192,45 @@ def _playwright_screenshot_html(
         return None
 
     img: Image.Image | None = None
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            args=[
-                "--allow-file-access-from-files",
-                "--enable-local-file-accesses",
-                "--disable-web-security",
-            ]
-        )
-        try:
-            page = browser.new_page(
-                viewport={"width": int(dimensions[0]), "height": int(dimensions[1])}
-            )
-            page.goto(f"file://{html_file_path}")
-            # Wait for network to be idle-ish
+    try:
+        with sync_playwright() as p:
             try:
-                page.wait_for_load_state("load", timeout=4000)
-                # Ensure <img> resources finished (including file://)
-                page.evaluate(
-                    "() => Promise.all(Array.from(document.images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = () => r(); img.onerror = () => r(); })))"
+                browser = p.chromium.launch(
+                    args=[
+                        "--allow-file-access-from-files",
+                        "--enable-local-file-accesses",
+                        "--disable-web-security",
+                    ]
                 )
             except Exception:
-                pass
-            png_bytes = page.screenshot(
-                clip={
-                    "x": 0,
-                    "y": 0,
-                    "width": int(dimensions[0]),
-                    "height": int(dimensions[1]),
-                }
-            )
-            img = load_image_from_bytes(png_bytes)
-        finally:
-            browser.close()
+                return None
+            try:
+                page = browser.new_page(
+                    viewport={"width": int(dimensions[0]), "height": int(dimensions[1])}
+                )
+                page.goto(f"file://{html_file_path}")
+                # Wait for network to be idle-ish
+                try:
+                    page.wait_for_load_state("load", timeout=4000)
+                    # Ensure <img> resources finished (including file://)
+                    page.evaluate(
+                        "() => Promise.all(Array.from(document.images).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = () => r(); img.onerror = () => r(); })))"
+                    )
+                except Exception:
+                    pass
+                png_bytes = page.screenshot(
+                    clip={
+                        "x": 0,
+                        "y": 0,
+                        "width": int(dimensions[0]),
+                        "height": int(dimensions[1]),
+                    }
+                )
+                img = load_image_from_bytes(png_bytes)
+            finally:
+                browser.close()
+    except Exception:
+        return None
     return img
 
 

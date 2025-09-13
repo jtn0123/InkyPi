@@ -293,7 +293,12 @@ class Config:
 
     def load_refresh_info(self):
         """Loads the refresh information from the config."""
-        return RefreshInfo.from_dict(self.get_config("refresh_info", {}))
+        data = self.get_config("refresh_info", {}) or {}
+        try:
+            return RefreshInfo.from_dict(data)
+        except Exception:
+            # If the config is missing required fields, fall back to empty defaults
+            return RefreshInfo("Manual Update", "", None, None)
 
     def get_playlist_manager(self):
         """Returns the playlist manager."""
