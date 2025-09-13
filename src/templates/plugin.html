@@ -394,7 +394,8 @@
         <!-- Status: current display vs this plugin instance -->
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="status-bar">
-            <div class="status-card">
+            <!-- Compact current display thumbnail on the left -->
+            <div class="status-card compact">
                 <div class="status-title">Current display</div>
                 <div class="status-body">
                     <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
@@ -409,11 +410,12 @@
                     <span id="currentDisplayTime" class="value">—</span>
                 </div>
             </div>
-            <div class="status-card">
+            <!-- Full, non-cropped plugin instance preview on the right -->
+            <div class="status-card instance">
                 <div class="status-title">This plugin instance</div>
                 <div class="status-body">
                     {% if plugin_instance %}
-                    <div class="img-skeleton" aria-hidden="true" style="width:100%;height:160px;"></div>
+                    <div class="img-skeleton" aria-hidden="true" style="width:100%;"></div>
                     <img id="instancePreviewImage" src="#" alt="Latest for this instance" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
                     <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
                         No saved image found for this instance yet.
