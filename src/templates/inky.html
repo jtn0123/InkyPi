@@ -120,16 +120,35 @@
         previewImg.addEventListener('load', function(){ if (previewSkel) previewSkel.style.display = 'none'; });
         previewImg.addEventListener('error', function(){ if (previewSkel) previewSkel.style.display = 'none'; });
     }
+    // Track latest image hash so we can avoid reloading when unchanged
+    let lastImageHash = {{ refresh_info.get('image_hash')|tojson }};
+
     async function refreshPreview(){
         const base = '{{ url_for('main.preview_image') }}';
-        if (previewSkel) previewSkel.style.display = '';
-        previewImg.src = base + '?t=' + Date.now();
+        let info = null;
+        let up = null;
+        // Fetch refresh_info and next_up concurrently
         try {
-            const res = await fetch('{{ url_for('main.refresh_info') }}');
-            const info = await res.json();
+            [info, up] = await Promise.all([
+                fetch('{{ url_for('main.refresh_info') }}').then(r => r.json()).catch(() => null),
+                fetch('{{ url_for('main.next_up') }}').then(r => r.json()).catch(() => null)
+            ]);
+        } catch(e) {
+            info = null;
+            up = null;
+        }
+
+        if (info) {
+            // Only reload image if the hash changed
+            if (info.image_hash && info.image_hash !== lastImageHash) {
+                lastImageHash = info.image_hash;
+                if (previewSkel) previewSkel.style.display = '';
+                previewImg.src = base + '?t=' + Date.now();
+            }
+
             const metaDiv = document.getElementById('imageMeta');
             const metaContent = document.getElementById('imageMetaContent');
-            if (info && info.plugin_id === 'wpotd' && info.plugin_meta) {
+            if (info.plugin_id === 'wpotd' && info.plugin_meta) {
                 const m = info.plugin_meta;
                 const date = m.date ? new Date(m.date).toISOString().slice(0,10) : '';
                 const caption = m.caption || '';
@@ -156,7 +175,7 @@
             const nsInst = document.getElementById('nsInstance');
             const nsPl = document.getElementById('nsPlaylist');
             if (ns && nsPlugin && nsInst && nsPl) {
-                if (info && info.plugin_id) {
+                if (info.plugin_id) {
                     ns.style.display = 'block';
                     nsPlugin.textContent = info.plugin_id || '';
                     if (info.plugin_instance) {
@@ -177,19 +196,16 @@
                     ns.style.display = 'none';
                 }
             }
-        } catch (e) {
-            // Non-fatal if refresh-info endpoint fails
         }
-        // Update Next up block (separate fetch to avoid blocking image/refresh-info)
-        try {
-            const res2 = await fetch('{{ url_for('main.next_up') }}');
-            const up = await res2.json();
+
+        if (up) {
+            // Update Next up block
             const nu = document.getElementById('nextUp');
             const nuPlugin = document.getElementById('nuPlugin');
             const nuInst = document.getElementById('nuInstance');
             const nuPl = document.getElementById('nuPlaylist');
             if (nu && nuPlugin && nuInst && nuPl) {
-                if (up && up.plugin_id) {
+                if (up.plugin_id) {
                     nu.style.display = 'block';
                     nuPlugin.textContent = up.plugin_id || '';
                     if (up.plugin_instance) {
@@ -210,7 +226,7 @@
                     nu.style.display = 'none';
                 }
             }
-        } catch (e) { /* ignore */ }
+        }
     }
 
     async function displayNextNow(){
@@ -228,8 +244,25 @@
         } catch(e){ /* ignore */ }
         finally { if (btn) btn.disabled = false; }
     }
-    // Refresh every 5 seconds
-    setInterval(refreshPreview, 5000);
+    // Refresh every 5 seconds; optionally use SSE/WebSocket when available
+    function startPolling(){
+        refreshPreview();
+        return setInterval(refreshPreview, 5000);
+    }
+    (function(){
+        const pushUrl = window.INKYPI_PUSH_URL;
+        if (pushUrl && window.EventSource){
+            try {
+                const es = new EventSource(pushUrl);
+                es.onmessage = () => refreshPreview();
+                es.onerror = () => { es.close(); startPolling(); };
+            } catch(e){
+                startPolling();
+            }
+        } else {
+            startPolling();
+        }
+    })();
 
     // Click to toggle between fit and native resolution
     (function(){
