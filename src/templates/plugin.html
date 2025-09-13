@@ -24,6 +24,11 @@
                 .replace('__PID__', encodeURIComponent(pluginId))
                 .replace('__INST__', encodeURIComponent(instanceName));
         };
+        const latestPluginUrl = (pluginId) => {
+            if (!pluginId) return null;
+            return '{{ url_for("plugin.plugin_latest_image", plugin_id="__PID__") }}'
+                .replace('__PID__', encodeURIComponent(pluginId));
+        };
 
         let uploadedFiles = {};
 
@@ -257,10 +262,12 @@
                 const instImgEl = document.getElementById('instancePreviewImage');
                 const instTimeEl = document.getElementById('instanceLastTime');
                 const instUrl = instancePreviewUrl(pluginId, instanceName);
-                if (instImgEl && instUrl) {
-                    instImgEl.src = instUrl + '?t=' + Date.now();
+                const latestUrl = latestPluginUrl(pluginId);
+                if (instImgEl) {
+                    const url = instUrl || latestUrl;
+                    if (url) instImgEl.src = url + '?t=' + Date.now();
                 }
-                const lastStr = '{{ plugin_instance_last_refresh or '' }}';
+                const lastStr = '{{ plugin_instance_last_refresh or plugin_latest_refresh or '' }}';
                 if (instTimeEl) {
                     instTimeEl.textContent = lastStr ? new Date(lastStr).toLocaleString() : '—';
                 }

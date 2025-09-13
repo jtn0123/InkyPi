@@ -129,6 +129,59 @@ def _get_instance_image_from_history(device_config, plugin_id: str, instance_nam
     return None
 
 
+def _get_latest_plugin_history_image(device_config, plugin_id: str):
+    """Return tuple (png_path, saved_at_iso_str|None) for the latest history image for a plugin.
+
+    Searches the history sidecar JSON files for entries matching the plugin_id
+    irrespective of instance, and returns the PNG path and saved_at timestamp
+    (converted to ISO string) of the newest one.
+    """
+
+    try:
+        history_dir = device_config.history_image_dir
+        latest_match = None
+        latest_saved_at_iso: str | None = None
+        latest_mtime: float = -1.0
+        for fname in os.listdir(history_dir):
+            if not fname.endswith(".json"):
+                continue
+            import json as _json
+            import os as _os
+
+            p = _os.path.join(history_dir, fname)
+            try:
+                with open(p, encoding="utf-8") as fh:
+                    meta = _json.load(fh) or {}
+                if meta.get("plugin_id") == plugin_id:
+                    mtime = _os.path.getmtime(p)
+                    if mtime > latest_mtime:
+                        latest_mtime = mtime
+                        png_name = fname.replace(".json", ".png")
+                        latest_match = _os.path.join(history_dir, png_name)
+                        saved_at = meta.get("saved_at")
+                        if saved_at:
+                            try:
+                                from datetime import datetime as _dt
+
+                                dt = _dt.strptime(saved_at, "%Y%m%d_%H%M%S")
+                                latest_saved_at_iso = dt.isoformat()
+                            except Exception:
+                                latest_saved_at_iso = saved_at
+            except Exception:
+                logger.exception("Failed reading plugin history sidecar | path=%s", p)
+
+        if latest_match and os.path.exists(latest_match):
+            logger.info(
+                "Resolved latest plugin history image | plugin_id=%s history=%s",
+                plugin_id,
+                latest_match,
+            )
+            return latest_match, latest_saved_at_iso
+    except Exception:
+        logger.exception("Latest plugin history lookup failed | plugin_id=%s", plugin_id)
+    return None, None
+
+
 @plugin_bp.route("/plugin/<plugin_id>")
 def plugin_page(plugin_id):
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -238,6 +291,15 @@ def plugin_page(plugin_id):
                     # Best-effort; continue without saved settings
                     pass
 
+                # Regardless of saved settings, try to surface latest plugin history for UI
+                try:
+                    _png_path, latest_ts = _get_latest_plugin_history_image(
+                        device_config, plugin_id
+                    )
+                    template_params["plugin_latest_refresh"] = latest_ts
+                except Exception:
+                    template_params["plugin_latest_refresh"] = None
+
             template_params["playlists"] = playlist_manager.get_playlist_names()
         except Exception as e:
             logger.exception("EXCEPTION CAUGHT: " + str(e))
@@ -321,6 +383,18 @@ def plugin_instance_image(plugin_id, instance_name):
 
     return send_file(path, mimetype="image/png", conditional=True)
 
+
+@plugin_bp.route("/plugin_latest_image/<string:plugin_id>")
+def plugin_latest_image(plugin_id):
+    """Serve the most recent processed image for a given plugin from history.
+
+    Falls back to 404 when none are available.
+    """
+    device_config = current_app.config["DEVICE_CONFIG"]
+    png_path, _ts = _get_latest_plugin_history_image(device_config, plugin_id)
+    if png_path and os.path.exists(png_path):
+        return send_file(png_path, mimetype="image/png", conditional=True)
+    return abort(404)
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST"])
 def delete_plugin_instance():

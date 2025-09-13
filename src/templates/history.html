@@ -82,7 +82,8 @@
 <body>
     <main>
     <div class="frame">
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Go to Home">← Home</a>
+        {% from 'macros/icons.html' import icon %}
+        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
         <div class="app-header">
             <div class="header-content">
                 <div class="title-container">
