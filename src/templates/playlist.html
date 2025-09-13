@@ -27,7 +27,7 @@
     <main id="main" role="main">
     <div class="frame">
         <!-- Back Button -->
-        <button onclick="history.back()" class="back-button">← Back</button>
+        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Go to Home">← Home</a>
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
