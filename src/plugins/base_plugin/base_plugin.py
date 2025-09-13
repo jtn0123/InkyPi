@@ -131,8 +131,8 @@ class BasePlugin:
             for fname in extra_css_files:
                 try:
                     css_files.append(os.path.join(self.render_dir, fname))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to add extra CSS file %s: %s", fname, e)
 
         # Convert to file:// URLs so the headless browser can load local assets.
         style_sheet_urls = [self.to_file_url(path) for path in css_files]
@@ -144,33 +144,34 @@ class BasePlugin:
         for f in fonts:
             try:
                 f["url"] = self.to_file_url(f.get("url", ""))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(
+                    "Failed to convert font URL %s: %s", f.get("url", ""), e
+                )
         template_params["font_faces"] = fonts
 
         # Optionally inline CSS when running in headless screenshot mode to avoid any
         # possible file:// loading issues on some platforms
-        try:
-            inline_css: list[str] = []
-            for css_path in css_files:
-                try:
-                    with open(css_path, "r", encoding="utf-8") as f:
-                        inline_css.append(f.read())
-                except Exception:
-                    pass
-            # Allow per-render extra CSS injection via plugin_settings.extra_css
+        inline_css: list[str] = []
+        for css_path in css_files:
             try:
-                extra_css = (
-                    (template_params.get("plugin_settings", {}) or {}).get("extra_css")
-                )
-                if isinstance(extra_css, str) and extra_css.strip():
-                    inline_css.append(extra_css)
-            except Exception:
-                pass
-            if inline_css:
-                template_params["inline_styles"] = inline_css
-        except Exception:
-            pass
+                with open(css_path, "r", encoding="utf-8") as f:
+                    inline_css.append(f.read())
+            except Exception as e:
+                logger.warning("Failed to read CSS file %s: %s", css_path, e)
+                raise RuntimeError(f"Unable to read CSS file {css_path}") from e
+        # Allow per-render extra CSS injection via plugin_settings.extra_css
+        try:
+            extra_css = (
+                (template_params.get("plugin_settings", {}) or {}).get("extra_css")
+            )
+            if isinstance(extra_css, str) and extra_css.strip():
+                inline_css.append(extra_css)
+        except Exception as e:
+            logger.warning("Failed to process extra CSS string %r: %s", extra_css, e)
+            raise RuntimeError("Unable to process extra CSS string") from e
+        if inline_css:
+            template_params["inline_styles"] = inline_css
 
         # load and render the given html template
         template = self.env.get_template(html_file)
