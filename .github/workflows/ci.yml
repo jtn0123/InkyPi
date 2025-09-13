@@ -29,6 +29,8 @@ jobs:
           python -m pip install -U pip wheel
           pip install -r install/requirements-dev.txt
       - name: Lint and type-check
+        env:
+          CI: true
         run: scripts/lint.sh
 
   shellcheck:
