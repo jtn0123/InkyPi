@@ -173,8 +173,12 @@ class RefreshTask:
                 plugin_meta = plugin.get_latest_metadata()
             if plugin_meta:
                 refresh_info.update({"plugin_meta": plugin_meta})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Error getting latest metadata for plugin %s: %s",
+                refresh_action.get_plugin_id(),
+                exc,
+            )
 
         refresh_info.update(
             {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
