@@ -61,6 +61,16 @@ class Config:
         os.makedirs(self.plugin_image_dir, exist_ok=True)
         os.makedirs(self.history_image_dir, exist_ok=True)
 
+        # Ensure a preview image exists so the web UI's /preview route works
+        try:
+            default_img = os.path.join(self.BASE_DIR, "static", "images", "inkypi.png")
+            if not os.path.exists(self.processed_image_file):
+                shutil.copyfile(default_img, self.processed_image_file)
+            if not os.path.exists(self.current_image_file):
+                shutil.copyfile(self.processed_image_file, self.current_image_file)
+        except Exception:
+            pass
+
         self.config = self.read_config()
         self.plugins_list = self.read_plugins_list()
         self.playlist_manager = self.load_playlist_manager()

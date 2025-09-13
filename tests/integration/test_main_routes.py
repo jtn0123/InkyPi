@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+import os
 from model import RefreshInfo
 
 def test_main_page(client):
@@ -24,6 +25,12 @@ def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
 
 
 def test_preview_404_when_no_image(client):
+    dc = client.application.config["DEVICE_CONFIG"]
+    for path in (dc.processed_image_file, dc.current_image_file):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
     resp = client.get("/preview")
     assert resp.status_code == 404
 

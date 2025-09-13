@@ -7,6 +7,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_utils import take_screenshot_html
 import base64
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -180,5 +181,10 @@ class BasePlugin:
             logger.error(
                 "Rendering HTML to image returned None. Check screenshot backend."
             )
-            raise RuntimeError("Failed to render plugin image. See logs for details.")
+            try:
+                image = Image.new("RGB", (int(dimensions[0]), int(dimensions[1])), "white")
+            except Exception:
+                raise RuntimeError(
+                    "Failed to render plugin image. See logs for details."
+                )
         return image
