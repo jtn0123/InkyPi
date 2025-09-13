@@ -315,21 +315,28 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             )
             return None
 
+        timeout_seconds = (timeout_ms / 1000) if timeout_ms else None
+
         try:
-            result = subprocess.run(command, capture_output=True)
+            result = subprocess.run(
+                command, capture_output=True, timeout=timeout_seconds
+            )
         except FileNotFoundError:
             logger.error("Failed to take screenshot: Browser binary not found.")
             return None
+        except subprocess.TimeoutExpired:
+            logger.error("Failed to take screenshot: Browser process timed out.")
+            return None
 
         # Check if the process failed or the output file is missing
-        if result.returncode != 0 or not (
-            img_file_path and os.path.exists(img_file_path)
-        ):
-            logger.error("Failed to take screenshot:")
-            try:
-                logger.error(result.stderr.decode("utf-8"))
-            except Exception:
-                pass
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace").strip()
+            logger.error(
+                f"Failed to take screenshot (exit code {result.returncode}): {stderr}"
+            )
+            return None
+        if not (img_file_path and os.path.exists(img_file_path)):
+            logger.error("Failed to take screenshot: screenshot file not found")
             return None
 
         # Load the image using standardized helper
