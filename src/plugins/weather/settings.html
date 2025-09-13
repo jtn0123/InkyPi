@@ -1,5 +1,3 @@
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <div class="form-group">
     <label class="form-label">Location: </label>
@@ -175,6 +173,27 @@
         const $mapModal = document.querySelector('#mapModal');
         const $closeMap = document.querySelector('#closeMap');
 
+        let leafletLoaded = false;
+        function loadLeaflet() {
+            if (leafletLoaded) return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+                link.crossOrigin = '';
+                document.head.appendChild(link);
+
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+                script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+                script.crossOrigin = '';
+                script.onload = () => { leafletLoaded = true; resolve(); };
+                script.onerror = reject;
+                document.body.appendChild(script);
+            });
+        }
+
         let latitude = +$latitude.value || 0;
         let longitude = +$longitude.value || 0;
         let zoom = (latitude && longitude) ? 4.5 : 2.5;
@@ -187,8 +206,9 @@
 
         let map, marker;
 
-        $openMap.addEventListener('click', () => {
-            openModal('mapModal')
+        $openMap.addEventListener('click', async () => {
+            await loadLeaflet();
+            openModal('mapModal');
             setTimeout(() => {
                 if (!map) {
                     map = L.map('map').setView([latitude, longitude], zoom);
