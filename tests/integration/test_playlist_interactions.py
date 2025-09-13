@@ -3,6 +3,11 @@ from datetime import datetime, timezone
 
 import pytest
 
+pytestmark = pytest.mark.skipif(
+    os.getenv("SKIP_UI", "").lower() in ("1", "true"),
+    reason="UI interactions skipped by env",
+)
+
 from model import RefreshInfo
 
 

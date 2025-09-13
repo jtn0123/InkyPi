@@ -1,4 +1,12 @@
 import json
+import os
+
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("SKIP_UI", "").lower() in ("1", "true"),
+    reason="UI interactions skipped by env",
+)
 
 
 def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
