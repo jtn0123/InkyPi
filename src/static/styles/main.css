@@ -66,6 +66,11 @@ body {
     cursor: zoom-in;
 }
 
+/* Any image marked lightboxable gets the zoom-in cursor */
+.lightboxable { cursor: zoom-in; }
+
+/* A/B compare UI styles removed (feature disabled in UI). */
+
 /* Lightweight skeleton for reserved image space */
 .img-skeleton {
     width: 100%;
@@ -255,7 +260,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.2rem 1rem;
-    margin: 5px 0 5px 0; /* Bottom margin reduced for spacing */
+    margin: 6px 0 6px 0; /* even spacing */
     flex-wrap: wrap;
     flex: auto;
 }
@@ -285,6 +290,9 @@ body {
     background-color: var(--input-bg);
     color: var(--text);
 }
+
+/* Align text inputs with selects/toggles visually */
+.form-group input[type="text"], .form-group select.form-input { height: 36px; }
 
 .form-group input[type="number"] {
     min-width: 50px;
@@ -369,6 +377,22 @@ body {
     width: auto;
 }
 
+/* Secondary/outline variants for action buttons to keep consistency app-wide */
+.action-button.is-secondary {
+    background-color: #2c66b1;
+}
+.action-button.is-secondary:hover {
+    background-color: #244f8a;
+}
+.action-button.is-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--surface-border);
+}
+.action-button.is-outline:hover {
+    background-color: rgba(255,255,255,0.04);
+}
+
 /* Form styling for inline layout */
 .form-inline {
     display: flex;
@@ -406,6 +430,7 @@ select.form-input {
     color: var(--text);
     border: 1px solid var(--surface-border);
     padding-right: 2rem; /* room for chevron */
+    height: 36px;
     background-repeat: no-repeat;
     background-position: right 10px center;
     background-size: 12px 12px;
@@ -1212,11 +1237,49 @@ select.form-input option {
 }
 
 .button-group button.active {
-  background-color: #007BFF;
-  color: white;
-  border-color: #007BFF;
+  background-color: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
   z-index: 2; /* Ensure active button is above others */
 }
+
+/* Compact grid for groups of options */
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 6px 12px;
+}
+.options-grid .form-group { margin: 0; }
+
+/* Aligned variant: tidy label width for vertical alignment */
+.options-grid.aligned { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.options-grid.aligned .form-group { display:flex; align-items:center; gap:10px; }
+.options-grid.aligned .form-group .form-label { width: 160px; }
+
+/* Title row tidy spacing */
+.title-row { gap: 10px; }
+.title-row { align-items: center; }
+.title-row .button-group { flex-wrap: nowrap; }
+.title-row .button-group button { flex: 0 0 auto; }
+
+/* Align labels in Icons & Layout section */
+.icons-layout .form-group .form-label { width: 160px; }
+.icons-layout .form-group .form-input { flex: 1; width: 100%; min-width: 220px; }
+.preview-block { flex-direction: column; align-items: flex-start; }
+
+/* Inline add-on next to toggles (e.g., forecast days) */
+.inline-addon { margin-left: 8px; }
+
+/* Disabled look and interaction for grouped controls */
+.is-disabled { opacity: 0.5; pointer-events: none; }
+.forecast-days-group[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+
+/* Small button helpers for inline actions */
+.btn-sm { padding: 6px 10px; font-size: 0.85rem; }
+.btn-secondary { background-color: #2c66b1; color: #fff; }
+.btn-secondary:hover { background-color: #244f8a; }
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--surface-border); }
+.btn-outline:hover { background: rgba(255,255,255,0.04); }
 
 .font-weight-normal {
   font-weight: normal; /* or 400 */
@@ -1405,7 +1468,7 @@ select.form-input option {
   background: #fafafa;
   border-radius: 8px;
   padding: 10px 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .section-title {
@@ -1415,6 +1478,18 @@ select.form-input option {
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Sections grid (used by plugin settings pages like Weather) */
+.sections-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  grid-auto-flow: dense; /* backfill empty spaces for better packing */
+}
+.sections-grid .col-span-2 { grid-column: 1 / -1; }
+@media (min-width: 680px) {
+  .sections-grid.two-col { grid-template-columns: repeat(2, minmax(240px, 1fr)); }
 }
 
 /* Header button color variants */

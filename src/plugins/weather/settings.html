@@ -1,94 +1,58 @@
 
-<div class="form-group">
-    <label class="form-label">Location: </label>
+<div class="sections-grid two-col">
+
+<div class="section">
+    <div class="section-title">Location</div>
     <div class="form-group">
-        <span>Latitude </span>
-        <input readonly type="text" id="latitude" name="latitude" class="form-input" />
+        <label class="form-label">Coordinates:</label>
+        <div class="form-group nowrap">
+            <span>Latitude </span>
+            <input readonly type="text" id="latitude" name="latitude" class="form-input" />
+        </div>
+        <div class="form-group nowrap">
+            <span>Longitude </span>
+            <input readonly type="text" id="longitude" name="longitude" class="form-input" />
+        </div>
     </div>
     <div class="form-group">
-        <span>Longitude </span>
-        <input readonly type="text" id="longitude" name="longitude" class="form-input" />
+        <button type="button" id="openMap" class="action-button compact">Select Location</button>
+        <button type="button" id="useBrowserLocation" class="action-button compact is-secondary" title="Use this browser's current location">Use Browser Location</button>
     </div>
-    <button type="button" id="openMap" class="action-button compact">Select Location</button>
-    <button type="button" id="useBrowserLocation" class="action-button compact is-secondary" title="Use this browser's current location">Use Browser Location</button>
-</div>
-
-<div class="form-group">
-    <label for="weatherProvider" class="form-label">Weather Provider:</label>
-    <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
-        <option value="OpenWeatherMap">OpenWeatherMap</option>
-        <option value="OpenMeteo">Open-Meteo</option>
-    </select>
-
-    <label for="units" class="form-label">Units:</label>
-    <select id="units" name="units" class="form-input">
-        <option value="imperial">Imperial (°F)</option>
-        <option value="metric">Metric (°C)</option>
-        <option value="standard">Standard (K)</option>
-    </select>
-</div>
-
-<div class="form-group" id="titleOptionWrapper">
-    <label class="form-label">Title:</label>
-
-    <div class="form-group">
-        <input type="radio" id="title-location" name="titleSelection" value="location">
-        <label for="title-location">Location</label>
-
-        <input type="radio" id="title-custom" name="titleSelection" value="custom">
-        <label for="title-custom">Custom</label>
-        <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Type something..." />
-    </div>
-</div>
-
-<div class="form-group">
-    <label for="displayMetrics" class="form-label">Display: </label>
-
-    <div class="form-group">
-      <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" onclick="this.value=this.checked ? 'true' : 'false';">
-      <span>Refresh Time</span>
     </div>
 
+<div class="section">
+    <div class="section-title">Source & Units</div>
     <div class="form-group">
-        <input type="checkbox" id="displayMetrics" name="displayMetrics" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Metrics</span>
-    </div>
-
-    <div class="form-group">
-        <input type="checkbox" id="displayGraph" name="displayGraph" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Weather Graph</span>
-    </div>
-
-    <div class="form-group">
-        <input type="checkbox" id="displayRain" name="displayRain" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Rain Amount</span>
-    </div>
-
-    <div class="form-group">
-        <input type="checkbox" id="moonPhase" name="moonPhase" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Moon Phase</span>
-    </div>
-
-    <div class="form-group">
-        <input type="checkbox" id="displayForecast" name="displayForecast" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Forecast</span>
-        <select id="forecastDays" name="forecastDays" class="form-input">
-            <option value=3>3</option>
-            <option value=5>5</option>
-            <option value=7>7</option>
+        <label for="weatherProvider" class="form-label">Weather Provider:</label>
+        <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
+            <option value="OpenWeatherMap">OpenWeatherMap</option>
+            <option value="OpenMeteo">Open-Meteo</option>
         </select>
-        days
-    </div>
 
-    <div class="form-group">
-        <label for="weatherTimeZone" class="form-label">Time Zone:</label>
-        <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
-            <option value="locationTimeZone">Use Location Time Zone</option>
-            <option value="localTimeZone">Use Local Time Zone</option>
+        <label for="units" class="form-label">Units:</label>
+        <select id="units" name="units" class="form-input">
+            <option value="imperial">Imperial (°F)</option>
+            <option value="metric">Metric (°C)</option>
+            <option value="standard">Standard (K)</option>
         </select>
     </div>
+</div>
 
-    <div class="form-group">
+<div class="section" id="titleOptionWrapper">
+    <div class="section-title">Title</div>
+    <div class="form-group nowrap title-row">
+        <div id="titleSelector" class="button-group">
+            <button type="button" data-value="location">Location</button>
+            <button type="button" data-value="custom">Custom</button>
+        </div>
+        <input type="hidden" id="titleSelection" name="titleSelection" value="location" />
+        <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Type something..." style="flex:1; min-width: 160px;" />
+    </div>
+</div>
+
+<div class="section icons-layout">
+    <div class="section-title">Icons & Layout</div>
+    <div class="form-group nowrap">
         <label for="layoutStyle" class="form-label">Layout Style:</label>
         <select id="layoutStyle" name="layoutStyle" class="form-input">
             <option value="classic">Classic</option>
@@ -96,7 +60,7 @@
         </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group nowrap">
         <label for="weatherIconPack" class="form-label">Weather Icon Pack:</label>
         <select id="weatherIconPack" name="weatherIconPack" class="form-input">
             <option value="current">Current (PNG)</option>
@@ -106,13 +70,87 @@
         </select>
     </div>
 
-    <div class="form-group">
+    <div class="form-group nowrap">
         <label for="moonIconPack" class="form-label">Moon Icon Pack:</label>
         <select id="moonIconPack" name="moonIconPack" class="form-input">
             <option value="current">Current (PNG)</option>
             <option value="C">Pack C (Bas Milius static)</option>
         </select>
     </div>
+
+    <div class="form-group preview-block">
+        <button id="iconPreviewButton" type="button" class="action-button compact is-secondary">Preview Icon Packs (no refetch)</button>
+        <img id="iconPreviewImage" class="lightboxable" alt="Icon Pack Preview" style="max-width:100%; margin-top:8px; display:none;">
+    </div>
+</div>
+
+<div class="section col-span-2">
+    <div class="section-title">Display</div>
+    <div class="options-grid aligned">
+        <div class="form-group nowrap">
+            <label class="form-label" for="displayRefreshTime">Refresh Time</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="displayRefreshTime" class="toggle-label"></label>
+            </div>
+        </div>
+
+        <div class="form-group nowrap">
+            <label class="form-label" for="displayMetrics">Metrics</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="displayMetrics" name="displayMetrics" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="displayMetrics" class="toggle-label"></label>
+            </div>
+        </div>
+
+        <div class="form-group nowrap">
+            <label class="form-label" for="displayGraph">Weather Graph</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="displayGraph" name="displayGraph" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="displayGraph" class="toggle-label"></label>
+            </div>
+        </div>
+
+        <div class="form-group nowrap">
+            <label class="form-label" for="displayRain">Rain Amount</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="displayRain" name="displayRain" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="displayRain" class="toggle-label"></label>
+            </div>
+        </div>
+
+        <div class="form-group nowrap">
+            <label class="form-label" for="moonPhase">Moon Phase</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="moonPhase" name="moonPhase" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="moonPhase" class="toggle-label"></label>
+            </div>
+        </div>
+
+        <div class="form-group nowrap">
+            <label class="form-label" for="displayForecast">Forecast</label>
+            <div class="toggle-container">
+                <input type="checkbox" id="displayForecast" name="displayForecast" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <label for="displayForecast" class="toggle-label"></label>
+            </div>
+            <div id="forecastDaysGroup" class="button-group inline-addon forecast-days-group" aria-disabled="true">
+                <button type="button" data-value="3">3</button>
+                <button type="button" data-value="5">5</button>
+                <button type="button" data-value="7">7</button>
+            </div>
+            <input type="hidden" id="forecastDays" name="forecastDays" value="7" />
+        </div>
+
+        <div class="form-group nowrap">
+            <label for="weatherTimeZone" class="form-label">Time Zone:</label>
+            <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
+                <option value="locationTimeZone">Use Location Time Zone</option>
+                <option value="localTimeZone">Use Local Time Zone</option>
+            </select>
+        </div>
+    </div>
+    </div>
+
 
 </div>
 
@@ -128,36 +166,36 @@
 
 <script>
 
+    // Segmented control helper
+    function initButtonGroup(groupId, hiddenId){
+        const group = document.getElementById(groupId);
+        if (!group) return { set: function(){} };
+        const hidden = document.getElementById(hiddenId);
+        const buttons = Array.from(group.querySelectorAll('button[data-value]'));
+        function set(val){
+            buttons.forEach(b => b.classList.toggle('active', String(b.dataset.value) === String(val)));
+            if (hidden) hidden.value = String(val);
+        }
+        buttons.forEach(btn => btn.addEventListener('click', () => set(btn.dataset.value)));
+        return { set };
+    }
+
     function updateTitleOptions(provider) {
-        const titleLocationRadio = document.getElementById('title-location');
-        const titleLocationLabel = document.querySelector('label[for="title-location"]');
-        const titleCustomRadio = document.getElementById('title-custom');
         const customTitleInput = document.getElementById('customTitle');
         const titleTimeZone = document.getElementById('weatherTimeZone');
         const titleTimeZoneLabel = document.querySelector('label[for="weatherTimeZone"]');
+        const titleGroup = document.getElementById('titleSelector');
+        const locationBtn = titleGroup ? titleGroup.querySelector('button[data-value="location"]') : null;
 
         if (provider === 'OpenMeteo') {
-            // Hide or disable "Location" radio option
-            titleLocationRadio.style.display = 'none';
-            titleLocationLabel.style.display = 'none';
-            titleLocationRadio.disabled = true;
+            if (locationBtn) locationBtn.style.display = 'none';
+            if (window.titleGroupCtrl && window.titleGroupCtrl.set) window.titleGroupCtrl.set('custom');
+            if (customTitleInput) customTitleInput.disabled = false;
             titleTimeZone.style.display = 'none';
             titleTimeZoneLabel.style.display = 'none';
             titleTimeZone.disabled = true;
-
-            // Select and enable "Custom"
-            titleCustomRadio.checked = true;
-            titleCustomRadio.disabled = false;
-            customTitleInput.disabled = false;
         } else {
-            // Show and enable both options
-            titleLocationRadio.style.display = '';
-            titleLocationLabel.style.display = '';
-            titleLocationRadio.disabled = false;
-
-            titleCustomRadio.disabled = false;
-            customTitleInput.disabled = false;
-
+            if (locationBtn) locationBtn.style.display = '';
             titleTimeZone.style.display = '';
             titleTimeZoneLabel.style.display = '';
             titleTimeZone.disabled = false;
@@ -311,37 +349,41 @@
         }
 
         document.getElementById('weatherProvider').value = weatherProvider;
-        document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
-        updateTitleOptions(weatherProvider)
 
-        // Add inline preview buttons for icon packs
-        try {
-            const grp = document.createElement('div');
-            grp.className = 'form-group';
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'action-button is-secondary';
-            btn.textContent = 'Preview Icon Packs (no refetch)';
-            const img = document.createElement('img');
-            img.style.maxWidth = '100%';
-            img.style.marginTop = '8px';
-            grp.appendChild(btn);
-            grp.appendChild(img);
-            const formContainer = document.querySelector('.settings-container');
-            formContainer && formContainer.appendChild(grp);
-            btn.addEventListener('click', async () => {
-                try {
-                    const fd = new FormData(document.getElementById('settingsForm'));
-                    fd.append('plugin_id', 'weather');
-                    const resp = await fetch('{{ url_for("plugin.weather_icon_preview") }}', { method: 'POST', body: fd });
-                    if (!resp.ok) throw new Error(String(resp.statusText));
-                    const blob = await resp.blob();
-                    img.src = URL.createObjectURL(blob);
-                } catch(e) {
-                    if (window.showResponseModal){ showResponseModal('failure', 'Preview failed: ' + e); }
-                }
+        // Initialize segmented Title control
+        const titleHidden = document.getElementById('titleSelection');
+        titleHidden.value = selectedTitle;
+        window.titleGroupCtrl = initButtonGroup('titleSelector', 'titleSelection');
+        window.titleGroupCtrl.set(selectedTitle);
+        const customTitleInput = document.getElementById('customTitle');
+        if (customTitleInput) customTitleInput.disabled = (selectedTitle !== 'custom');
+        const titleSel = document.getElementById('titleSelector');
+        if (titleSel){
+            titleSel.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-value]');
+                if (!btn) return;
+                const val = btn.dataset.value;
+                if (customTitleInput) customTitleInput.disabled = (val !== 'custom');
             });
-        } catch(_e) {}
+        }
+
+        // Initialize segmented Forecast days
+        window.forecastGroupCtrl = initButtonGroup('forecastDaysGroup', 'forecastDays');
+        window.forecastGroupCtrl.set(String(document.getElementById('forecastDays').value || '7'));
+
+        // Enable/disable forecast days group based on toggle
+        const forecastToggle = document.getElementById('displayForecast');
+        const forecastDaysGroup = document.getElementById('forecastDaysGroup');
+        function setForecastEnabled(on){
+            if (!forecastDaysGroup) return;
+            try {
+                forecastDaysGroup.setAttribute('aria-disabled', on ? 'false' : 'true');
+            } catch(e) {}
+        }
+        setForecastEnabled(forecastToggle && forecastToggle.checked);
+        if (forecastToggle) forecastToggle.addEventListener('change', ()=> setForecastEnabled(forecastToggle.checked));
+
+        updateTitleOptions(weatherProvider)
 
         // Helper to apply coordinates to inputs and map state
         function applyLatLon(lat, lon){
@@ -420,6 +462,29 @@
         }
     });
 
+    // Inline icon pack preview (no refetch)
+    (function(){
+        try {
+            const btn = document.getElementById('iconPreviewButton');
+            const img = document.getElementById('iconPreviewImage');
+            if (btn && img) {
+                btn.addEventListener('click', async () => {
+                    try {
+                        const fd = new FormData(document.getElementById('settingsForm'));
+                        fd.append('plugin_id', 'weather');
+                        const resp = await fetch('{{ url_for("plugin.weather_icon_preview") }}', { method: 'POST', body: fd });
+                        if (!resp.ok) throw new Error(String(resp.statusText));
+                        const blob = await resp.blob();
+                        img.src = URL.createObjectURL(blob);
+                        img.style.display = 'block';
+                    } catch(e) {
+                        if (window.showResponseModal){ showResponseModal('failure', 'Preview failed: ' + e); }
+                    }
+                });
+            }
+        } catch(_e) {}
+    })();
+
     // Client-side validation specific to Weather plugin
     // Ensures latitude and longitude are present before Update Now or Add to Playlist
     window.validatePluginSettings = function(action){
@@ -474,50 +539,4 @@
     }
 </script>
 
-<!-- A/B Compare Modal -->
-<div id="abModal" class="modal">
-  <div class="modal-content">
-    <span class="close-button" onclick="closeModal('abModal')">×</span>
-    <h2>Compare (A/B) — Extra CSS</h2>
-    <div class="separator"></div>
-    <textarea id="extraCss" class="form-input" rows="8" placeholder="/* Paste CSS overrides here for Variant (B) */"></textarea>
-    <div style="margin-top:10px; display:flex; gap:8px;">
-      <button id="runAb" class="action-button">Render A/B</button>
-      <div id="abStatus" style="align-self:center; font-size: 12px;"></div>
-    </div>
-  </div>
-  </div>
-
-<script>
-  (function(){
-    const btn = document.createElement('button');
-    btn.textContent = 'Compare (A/B)';
-    btn.className = 'action-button';
-    btn.style.marginTop = '10px';
-    const form = document.getElementById('settingsForm') || document.body;
-    form.appendChild(btn);
-
-    btn.addEventListener('click', () => openModal('abModal'));
-
-    document.getElementById('runAb').addEventListener('click', async () => {
-      const css = document.getElementById('extraCss').value || '';
-      const fd = new FormData(document.getElementById('settingsForm'));
-      fd.append('plugin_id', 'weather');
-      fd.append('extra_css', css);
-      document.getElementById('abStatus').textContent = 'Rendering…';
-      try{
-        const resp = await fetch('{{ url_for("plugin.ab_compare") }}', {method:'POST', body: fd});
-        const j = await resp.json();
-        if(!resp.ok || !j.success){
-          document.getElementById('abStatus').textContent = 'Failed: ' + (j.error || resp.statusText);
-          return;
-        }
-        document.getElementById('abStatus').textContent = 'Done. Opening images…';
-        window.open(j.baseline_path, '_blank');
-        window.open(j.variant_path, '_blank');
-      }catch(e){
-        document.getElementById('abStatus').textContent = 'Error: ' + e;
-      }
-    });
-  })();
-</script>
+<!-- A/B compare UI removed per request. Backend route stays available for debugging. -->
