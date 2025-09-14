@@ -842,14 +842,17 @@ select.form-input option {
 }
 
 /* Subtle accent overlay to mirror plugin card hover */
-.nav-icons .settings-button::before {
+/* Create overlay only on hover to avoid any inner-edge artifacts */
+.nav-icons .settings-button::before { content: none; }
+.nav-icons .settings-button:hover::before {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
     background: var(--accent);
-    opacity: 0;
+    opacity: 0.04;
     transition: opacity 0.2s ease;
+    background-clip: padding-box;
 }
 
 .nav-icons .settings-button:hover {
@@ -858,8 +861,10 @@ select.form-input option {
     transform: none;
 }
 
-.nav-icons .settings-button:hover::before {
-    opacity: 0.04;
+/* no separate rule needed; overlay created with opacity already applied */
+.header-button.icon svg {
+    display: block;
+    shape-rendering: geometricPrecision;
 }
 
 /* Ensure nav icons are perfectly centered and not pushed by defaults */
@@ -2266,8 +2271,20 @@ select.form-input option {
 .header-button.icon:hover {
     background-color: var(--panel-bg);
     color: var(--text);
-    border-color: var(--surface-border);
+    border-color: var(--accent);
     transform: none; /* Remove excessive animation */
+}
+
+.header-button.icon::before { content: none; }
+.header-button.icon:hover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0.04;
+    transition: opacity 0.2s ease;
+    background-clip: padding-box;
 }
 
 .header-button.icon:focus-visible {
