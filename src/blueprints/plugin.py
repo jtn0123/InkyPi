@@ -15,6 +15,7 @@ from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.http_utils import APIError, json_error, json_internal_error, json_success
+from utils.progress import ProgressTracker, track_progress
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -110,9 +111,7 @@ def _get_instance_image_from_history(device_config, plugin_id: str, instance_nam
                         png_name = fname.replace(".json", ".png")
                         latest_match = _os.path.join(history_dir, png_name)
             except Exception:
-                logger.exception(
-                    "Failed reading history sidecar | path=%s", p
-                )
+                logger.exception("Failed reading history sidecar | path=%s", p)
 
         if latest_match and os.path.exists(latest_match):
             logger.info(
@@ -124,7 +123,9 @@ def _get_instance_image_from_history(device_config, plugin_id: str, instance_nam
             return latest_match
     except Exception:
         logger.exception(
-            "History fallback failed | plugin_id=%s instance=%s", plugin_id, instance_name
+            "History fallback failed | plugin_id=%s instance=%s",
+            plugin_id,
+            instance_name,
         )
     return None
 
@@ -178,7 +179,9 @@ def _get_latest_plugin_history_image(device_config, plugin_id: str):
             )
             return latest_match, latest_saved_at_iso
     except Exception:
-        logger.exception("Latest plugin history lookup failed | plugin_id=%s", plugin_id)
+        logger.exception(
+            "Latest plugin history lookup failed | plugin_id=%s", plugin_id
+        )
     return None, None
 
 
@@ -234,14 +237,18 @@ def plugin_page(plugin_id):
                                     meta = _json.load(fh) or {}
                                 if (
                                     meta.get("plugin_id") == plugin_id
-                                    and meta.get("plugin_instance") == plugin_instance_name
+                                    and meta.get("plugin_instance")
+                                    == plugin_instance_name
                                 ):
                                     mtime = _os.path.getmtime(p)
                                     if mtime > latest_mtime:
                                         latest_mtime = mtime
                                         latest_saved_at = meta.get("saved_at")
                             except Exception:
-                                logger.exception("Failed reading history sidecar for last refresh | path=%s", p)
+                                logger.exception(
+                                    "Failed reading history sidecar for last refresh | path=%s",
+                                    p,
+                                )
                         # saved_at is in '%Y%m%d_%H%M%S'; keep raw for JS to format? we can convert to ISO
                         if latest_saved_at:
                             try:
@@ -396,6 +403,7 @@ def plugin_latest_image(plugin_id):
         return send_file(png_path, mimetype="image/png", conditional=True)
     return abort(404)
 
+
 @plugin_bp.route("/delete_plugin_instance", methods=["POST"])
 def delete_plugin_instance():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -499,7 +507,7 @@ def display_plugin_instance():
             plugin_id,
             plugin_instance_name,
         )
-        refresh_task.manual_update(
+        metrics = refresh_task.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
     except Exception:
@@ -510,12 +518,20 @@ def display_plugin_instance():
         )
     # Include latest metrics from refresh info for richer UI feedback
     request_ms = display_ms = generate_ms = preprocess_ms = None
+    steps = None
     try:
-        ri = device_config.get_refresh_info()
-        request_ms = getattr(ri, "request_ms", None)
-        display_ms = getattr(ri, "display_ms", None)
-        generate_ms = getattr(ri, "generate_ms", None)
-        preprocess_ms = getattr(ri, "preprocess_ms", None)
+        if metrics:
+            request_ms = metrics.get("request_ms")
+            display_ms = metrics.get("display_ms")
+            generate_ms = metrics.get("generate_ms")
+            preprocess_ms = metrics.get("preprocess_ms")
+            steps = metrics.get("steps")
+        else:
+            ri = device_config.get_refresh_info()
+            request_ms = getattr(ri, "request_ms", None)
+            display_ms = getattr(ri, "display_ms", None)
+            generate_ms = getattr(ri, "generate_ms", None)
+            preprocess_ms = getattr(ri, "preprocess_ms", None)
     except Exception:
         pass
 
@@ -534,6 +550,7 @@ def display_plugin_instance():
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
             "display_ms": display_ms,
+            "steps": steps,
         },
     )
 
@@ -549,6 +566,7 @@ def update_now():
     display_ms: int | None = None
     generate_ms: int | None = None
     preprocess_ms: int | None = None
+    steps = None
 
     try:
         # Start timing (request overall)
@@ -562,7 +580,9 @@ def update_now():
 
         # Check if refresh task is running
         if refresh_task.running:
-            refresh_task.manual_update(ManualRefresh(plugin_id, plugin_settings))
+            metrics = refresh_task.manual_update(
+                ManualRefresh(plugin_id, plugin_settings)
+            )
         else:
             # In development mode, directly update the display
             logger.info("Refresh task not running, updating display directly")
@@ -571,9 +591,18 @@ def update_now():
                 return json_error(f"Plugin '{plugin_id}' not found", status=404)
 
             plugin = get_plugin_instance(plugin_config)
-            _t_gen_start = perf_counter()
-            image = plugin.generate_image(plugin_settings, device_config)
+            tracker: ProgressTracker
+            with track_progress() as tracker:
+                _t_gen_start = perf_counter()
+                image = plugin.generate_image(plugin_settings, device_config)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+            steps = tracker.get_steps()
+            metrics = {
+                "generate_ms": generate_ms,
+                "display_ms": None,
+                "preprocess_ms": None,
+                "steps": steps,
+            }
             # Pass history metadata even in direct dev path
             history_meta = {
                 "refresh_type": "Manual Update",
@@ -629,15 +658,22 @@ def update_now():
 
     # Build metrics payload from device_config.refresh_info (populated by task/display)
     try:
-        ri = device_config.get_refresh_info()
-        if request_ms is None:
-            request_ms = getattr(ri, "request_ms", None)
-        if display_ms is None:
-            display_ms = getattr(ri, "display_ms", None)
-        if generate_ms is None:
-            generate_ms = getattr(ri, "generate_ms", None)
-        if preprocess_ms is None:
-            preprocess_ms = getattr(ri, "preprocess_ms", None)
+        if metrics:
+            request_ms = metrics.get("request_ms", request_ms)
+            display_ms = metrics.get("display_ms", display_ms)
+            generate_ms = metrics.get("generate_ms", generate_ms)
+            preprocess_ms = metrics.get("preprocess_ms", preprocess_ms)
+            steps = metrics.get("steps", steps)
+        else:
+            ri = device_config.get_refresh_info()
+            if request_ms is None:
+                request_ms = getattr(ri, "request_ms", None)
+            if display_ms is None:
+                display_ms = getattr(ri, "display_ms", None)
+            if generate_ms is None:
+                generate_ms = getattr(ri, "generate_ms", None)
+            if preprocess_ms is None:
+                preprocess_ms = getattr(ri, "preprocess_ms", None)
     except Exception:
         pass
 
@@ -657,6 +693,7 @@ def update_now():
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
             "display_ms": display_ms,
+            "steps": steps,
         },
     )
 

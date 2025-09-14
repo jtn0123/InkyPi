@@ -7,6 +7,7 @@ from time import perf_counter
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
+from utils.progress import ProgressTracker, track_progress
 from utils.time_utils import now_device_tz
 from uuid import uuid4
 
@@ -88,6 +89,7 @@ class RefreshTask:
                     refresh_info, used_cached, metrics = self._perform_refresh(
                         refresh_action, latest_refresh, current_dt
                     )
+                    self.refresh_result["metrics"] = metrics
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
 
@@ -173,12 +175,19 @@ class RefreshTask:
         # Correlate this refresh with a benchmark id so parallel stage events can attach
         benchmark_id = str(uuid4())
         _t_gen_start = perf_counter()
-        stage_t0 = perf_counter()
-        image = refresh_action.execute(plugin, self.device_config, current_dt)
-        try:
-            save_stage_event(self.device_config, benchmark_id, "generate_image", int((perf_counter() - stage_t0) * 1000))
-        except Exception:
-            pass
+        tracker: ProgressTracker
+        with track_progress() as tracker:
+            stage_t0 = perf_counter()
+            image = refresh_action.execute(plugin, self.device_config, current_dt)
+            try:
+                save_stage_event(
+                    self.device_config,
+                    benchmark_id,
+                    "generate_image",
+                    int((perf_counter() - stage_t0) * 1000),
+                )
+            except Exception:
+                pass
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
@@ -205,9 +214,7 @@ class RefreshTask:
         if not used_cached:
             logger.info(f"Updating display. | refresh_info: {refresh_info}")
             history_meta = {
-                "refresh_type": refresh_action.get_refresh_info().get(
-                    "refresh_type"
-                ),
+                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
                 "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
                 "playlist": refresh_action.get_refresh_info().get("playlist"),
                 "plugin_instance": refresh_action.get_refresh_info().get(
@@ -222,18 +229,20 @@ class RefreshTask:
                     image_settings=plugin.config.get("image_settings", []),
                     history_meta=history_meta,
                 )
-                try:
-                    save_stage_event(self.device_config, benchmark_id, "display_pipeline", int((perf_counter() - stage_t1) * 1000))
-                except Exception:
-                    pass
             except TypeError:
                 stage_t1 = perf_counter()
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                 )
+            finally:
                 try:
-                    save_stage_event(self.device_config, benchmark_id, "display_pipeline", int((perf_counter() - stage_t1) * 1000))
+                    save_stage_event(
+                        self.device_config,
+                        benchmark_id,
+                        "display_pipeline",
+                        int((perf_counter() - stage_t1) * 1000),
+                    )
                 except Exception:
                     pass
         else:
@@ -250,6 +259,7 @@ class RefreshTask:
             "display_ms": display_ms,
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
+            "steps": tracker.get_steps(),
         }
         # Persist a refresh_event row best-effort
         try:
@@ -311,11 +321,13 @@ class RefreshTask:
                 self.condition.notify_all()  # Wake the thread to process manual update
 
             self.refresh_event.wait()
+            metrics = self.refresh_result.get("metrics")
             exc = self.refresh_result.get("exception")
             if exc is not None:
                 if isinstance(exc, BaseException):
                     raise exc
                 raise RuntimeError(str(exc))
+            return metrics
         else:
             logger.warning(
                 "Background refresh task is not running, unable to do a manual update"
@@ -329,6 +341,7 @@ class RefreshTask:
                     if isinstance(exc, BaseException):
                         raise exc
                     raise RuntimeError(str(exc))
+            return self.refresh_result.get("metrics")
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated)."""
