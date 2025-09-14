@@ -1,17 +1,28 @@
-/* Base styling */
-* {
+/* Base styling - CSS Reset */
+*,
+*::before,
+*::after {
     box-sizing: border-box;
+}
+
+* {
     margin: 0;
     padding: 0;
 }
 
+/* Base body styling */
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-display: swap;
     background-color: var(--bg);
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    line-height: 1.6;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Subtle frame container */
@@ -71,18 +82,24 @@ body {
 
 /* A/B compare UI styles removed (feature disabled in UI). */
 
-/* Lightweight skeleton for reserved image space */
+/* Optimized skeleton loader */
 .img-skeleton {
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, rgba(0,0,0,0.06) 25%, rgba(0,0,0,0.10) 37%, rgba(0,0,0,0.06) 63%);
+    background: linear-gradient(
+        90deg,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
+        var(--skeleton-highlight, rgba(0,0,0,0.10)) 37%,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 63%
+    );
     background-size: 400% 100%;
-    animation: shimmer 1.2s ease-in-out infinite;
+    animation: shimmer 1.5s ease-in-out infinite;
+    will-change: background-position;
 }
 
 @keyframes shimmer {
     0% { background-position: 100% 0; }
-    100% { background-position: 0 0; }
+    100% { background-position: -100% 0; }
 }
 
 .preview-link {
@@ -142,10 +159,29 @@ body {
 .status-card.instance .status-body { overflow: visible; }
 .status-card.instance .status-body img { width: 100%; height: auto; max-height: none; object-fit: contain; }
 
-/* Responsive: stack on narrow screens */
+/* Enhanced responsive design */
 @media (max-width: 900px) {
-  .status-bar { grid-template-columns: 1fr; }
-  .status-card.compact .image-container { width: 100%; }
+  .status-bar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .status-card.compact .image-container {
+    width: 100%;
+  }
+
+  /* Improve button spacing on mobile */
+  .button-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 20px;
+    padding: 20px 12px;
+  }
+
+  /* Better modal sizing */
+  .modal-content {
+    margin: 10% auto;
+    width: 95%;
+    max-width: 500px;
+  }
 }
 .status-placeholder {
     color: var(--muted);
@@ -179,33 +215,58 @@ body {
     margin-left: 5px
 }
 
-/* Button grid container styling */
+/* Optimized button grid with better performance */
 .button-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* auto adjust buttons per row */
-    gap: 15px; /* Smaller space between buttons */
-    overflow-y: auto; /* Allows scrolling if content exceeds the frame */
-    padding: 10px 5px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+    overflow-y: auto;
+    padding: 16px 8px;
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 400px;
 }
 
-/* Individual button styling */
+/* Improved button styling with better touch targets */
 .icon-button {
     border: 1px solid var(--surface-border);
-    border-radius: 8px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 70px; /* Reduce button height */
+    min-height: 72px; /* Increased for better touch targets */
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
+                border-color 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     background-color: var(--surface);
+    position: relative;
+    overflow: hidden;
 }
 
 .icon-button:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
-    border-color: var(--divider);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+    border-color: var(--accent);
+}
+
+.icon-button:active {
+    transform: translateY(-1px);
+    transition-duration: 0.1s;
+}
+
+.icon-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.icon-button:hover::before {
+    opacity: 0.04;
 }
 
 /* Ensure icon buttons inherit high-contrast color */
@@ -332,9 +393,61 @@ body {
 .back-button:hover {
     background-color: rgba(255,255,255,0.06);
 }
+/* Enhanced focus management */
 .back-button:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Global focus improvements */
+*:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.icon-button:focus-visible,
+.action-button:focus-visible,
+.header-button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    z-index: 1;
+}
+
+/* Skip navigation link */
+.skip-nav {
+    position: absolute;
+    top: -40px;
+    left: 8px;
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    text-decoration: none;
+    border-radius: 4px;
+    z-index: 9999;
+    font-weight: 600;
+    transition: top 0.2s ease;
+}
+
+.skip-nav:focus {
+    top: 8px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .img-skeleton {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
 }
 
 /* Reduce icon size inside back button for subtlety */
@@ -344,19 +457,26 @@ body {
     margin: 0;
 }
 
-/* Action buttons styling */
+/* Enhanced action buttons */
 .action-button {
-    flex: 1; /* Take up equal width for both buttons */
+    flex: 1;
     background-color: var(--accent);
     color: #fff;
     border: none;
-    border-radius: 5px;
-    padding: 15px;
-    font-size: 1.1rem;
-    font-weight: bold;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 1rem;
+    font-weight: 600;
     cursor: pointer;
     text-align: center;
-    width:100%;
+    width: 100%;
+    min-height: 48px; /* Better touch target */
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
+                background-color 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .action-button.warn {
@@ -368,7 +488,30 @@ body {
 }
 
 .action-button:hover {
-    background-color: #2fd1b6; /* lighten accent on hover */
+    background-color: #2fd1b6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition-duration: 0.1s;
+}
+
+.action-button::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.action-button:active::after {
+    opacity: 1;
+    transition-duration: 0s;
 }
 
 .action-button.compact {
@@ -450,6 +593,27 @@ select.form-input option {
 /* Dark theme: nudge chevron contrast slightly */
 [data-theme="dark"] select.form-input {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23b3b9c4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --surface-border: #000;
+        --text: #000;
+        --accent: #0066cc;
+    }
+
+    [data-theme="dark"] {
+        --surface-border: #fff;
+        --text: #fff;
+        --accent: #4d9fff;
+    }
+
+    .icon-button,
+    .action-button,
+    .header-button {
+        border-width: 2px;
+    }
 }
 
 .form-input:focus {
@@ -661,7 +825,88 @@ select.form-input option {
 /* Subtle zoom for image lightbox */
 @keyframes zoomIn { from { transform: scale(0.98); opacity: 0.9; } to { transform: scale(1); opacity: 1; } }
 
-/* Success/Failure Modal Styles */
+/* Enhanced Toast Notification System */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+    max-width: 400px;
+}
+
+.toast {
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: var(--text);
+    font-size: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: auto;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.2, 0, 0.38, 0.9);
+    position: relative;
+    overflow: hidden;
+}
+
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast.success {
+    border-left: 4px solid var(--success);
+    background: linear-gradient(90deg, rgba(56, 161, 105, 0.1) 0%, var(--surface) 20%);
+}
+
+.toast.error {
+    border-left: 4px solid var(--error);
+    background: linear-gradient(90deg, rgba(229, 62, 62, 0.1) 0%, var(--surface) 20%);
+}
+
+.toast.warning {
+    border-left: 4px solid var(--warning);
+    background: linear-gradient(90deg, rgba(214, 158, 46, 0.1) 0%, var(--surface) 20%);
+}
+
+.toast-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.toast-content {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.toast-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toast-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: var(--text);
+}
+
+/* Legacy modal styles for backward compatibility */
 .success-failure-modal {
     display: none;
     position: fixed;
@@ -671,10 +916,10 @@ select.form-input option {
     z-index: 1000;
     max-width: 400px;
     border-radius: 8px;
-    background-color: #1abc9c; /* Default color for success */
-    padding: 10px 16px 10px 24px; /* Added left padding for spacing */
+    background-color: #1abc9c;
+    padding: 10px 16px 10px 24px;
     color: white;
-    font-family: Arial, sans-serif;
+    font-family: inherit;
     font-size: 16px;
     text-align: center;
 }
@@ -732,6 +977,32 @@ select.form-input option {
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, var(--accent), #2fd1b6);
+    border-radius: inherit;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
+    transform: translateX(-100%);
+    animation: progress-shine 2s ease-in-out infinite;
+}
+
+@keyframes progress-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
 /* Progress meta row and log */
@@ -767,37 +1038,47 @@ select.form-input option {
   .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 }
 
-/* Theme tokens */
+/* Enhanced theme tokens with better contrast */
 :root {
     --bg: #f4f4f9;
     --surface: #ffffff;
     --surface-border: #e0e0e0;
-    --text: #333333;
-    --muted: #555555;
+    --text: #1a1a1a; /* Improved contrast */
+    --muted: #4a5568; /* Better contrast */
     --divider: #dddddd;
     --button-bg: #f4f4f9;
     --input-bg: #ffffff;
     --accent: #1abc9c;
     --panel-bg: #fafafa;
     --panel-border: #eeeeee;
-    --subtext: #666666;
-    --frame-lining: #b5b5b5; /* neutral hairline for previews */
+    --subtext: #4a5568; /* Consistent with muted */
+    --frame-lining: #b5b5b5;
+    --skeleton-base: rgba(0,0,0,0.06);
+    --skeleton-highlight: rgba(0,0,0,0.10);
+    --error: #e53e3e;
+    --success: #38a169;
+    --warning: #d69e2e;
 }
 [data-theme="dark"] {
-    /* Neutral, low-chroma dark theme */
-    --bg: #0e0f12;            /* page background */
-    --surface: #171a1f;       /* cards/panels */
-    --surface-border: #252a33;
-    --text: #e4e7ec;          /* primary text */
-    --muted: #b3b9c4;         /* secondary text */
-    --divider: #2a2f38;       /* separators */
-    --button-bg: #1b1f27;     /* neutral button background */
-    --input-bg: #0e0f12;      /* inputs blend with page */
-    --accent: #34c6a6;        /* teal green accent (less blue/purple) */
-    --panel-bg: #1a1e25;      /* inner panels */
-    --panel-border: #2a2f38;
-    --subtext: #a6adbb;       /* tertiary text */
-    --frame-lining: #7a828e;
+    /* Enhanced dark theme with better accessibility */
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-border: #30363d;
+    --text: #f0f6fc; /* Higher contrast */
+    --muted: #8b949e;
+    --divider: #30363d;
+    --button-bg: #21262d;
+    --input-bg: #0d1117;
+    --accent: #2ea043; /* Better contrast green */
+    --panel-bg: #1c2128;
+    --panel-border: #30363d;
+    --subtext: #7d8590;
+    --frame-lining: #6e7681;
+    --skeleton-base: rgba(255,255,255,0.06);
+    --skeleton-highlight: rgba(255,255,255,0.12);
+    --error: #f85149;
+    --success: #2ea043;
+    --warning: #d29922;
 }
 
 .success-failure-modal .response-modal-content {
@@ -824,17 +1105,17 @@ select.form-input option {
     background-color: #c4515b; /* Failure color */
 }
 
-/* Loading Indicator Styles */
+/* Enhanced Loading Indicators */
 .loading-indicator {
-    display: none; /* Hidden by default */
+    display: none;
     width: 40px;
     height: 40px;
-    border: 4px solid transparent;
-    border-top: 4px solid #0c7586; /* Blue color for the spinner */
+    border: 3px solid var(--surface-border);
+    border-top: 3px solid var(--accent);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-
+    animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
     margin-left: auto;
+    will-change: transform;
 }
 
 .loading-indicator.small {
@@ -847,10 +1128,47 @@ select.form-input option {
     margin-left: 0;
 }
 
-/* Spinner animation */
+/* Improved spinner animation */
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* New loading states */
+.loading-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.loading-dots::after {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: loading-dots 1.4s ease-in-out infinite both;
+    animation-delay: 0.16s;
+}
+
+.loading-dots::before {
+    content: '';
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: loading-dots 1.4s ease-in-out infinite both;
+}
+
+@keyframes loading-dots {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .color-picker {
@@ -1201,10 +1519,92 @@ select.form-input option {
     padding: 0px 0px;
 }
 
+/* Improved mobile layout */
+@media (max-width: 768px) {
+  .frame {
+    width: 95%;
+    padding: 16px;
+    min-height: 95vh;
+  }
+
+  .app-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .buttons-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .form-group {
+    gap: 8px 12px;
+  }
+
+  /* Stack form elements on very small screens */
+  .form-group.nowrap {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Better modal sizing on small screens */
+  .modal-content {
+    margin: 5% auto;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Improve form inputs on mobile */
+  .form-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+    min-height: 44px;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+  .icon-button,
+  .action-button,
+  .header-button {
+    min-height: 48px;
+    padding: 12px;
+  }
+
+  .icon-button:hover {
+    transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .action-button:hover {
+    transform: none;
+    background-color: var(--accent);
+  }
+
+  /* Better tap feedback */
+  .icon-button:active,
+  .action-button:active,
+  .header-button:active {
+    transform: scale(0.95);
+    transition-duration: 0.1s;
+  }
+
+  /* Toast positioning for mobile */
+  .toast-container {
+    right: 12px;
+    left: 12px;
+    top: 16px;
+    max-width: none;
+  }
+
+  .toast {
+    font-size: 16px; /* Prevent zoom on input focus */
+  }
+}
+
 @media (max-aspect-ratio: 3/4) {
-    .frame {
-      width: 95%;
-    }
+  .frame {
+    width: 95%;
+  }
 }
 
 .button-group {

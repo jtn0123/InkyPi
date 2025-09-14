@@ -8,6 +8,9 @@
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
 <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
 <body>
+    <!-- Skip navigation for accessibility -->
+    <a href="#main-content" class="skip-nav">Skip to main content</a>
+
     <!-- Subtle frame container -->
     <div class="frame">
         <!-- Page Title -->
@@ -32,14 +35,16 @@
             </div>
         </header>
 
-        <!-- Display the current image (auto-refreshing preview) -->
-        {% set fit = (config.get('preview_size_mode') == 'fit') %}
-        <div class="image-container {% if not fit %}native{% endif %}">
-            <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
-            <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image"
-                 width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
-                 {% if not fit %}style="width: {{ config.resolution[0] }}px; height: {{ config.resolution[1] }}px;"{% endif %}>
-        </div>
+        <!-- Main content area -->
+        <main id="main-content" role="main">
+            <!-- Display the current image (auto-refreshing preview) -->
+            {% set fit = (config.get('preview_size_mode') == 'fit') %}
+            <div class="image-container {% if not fit %}native{% endif %}">
+                <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
+                <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display image for {{ config.name }}"
+                     width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
+                     {% if not fit %}style="width: {{ config.resolution[0] }}px; height: {{ config.resolution[1] }}px;"{% endif %}>
+            </div>
 
         <!-- Optional metadata about the current plugin/image (e.g., WPOTD) -->
         <div id="imageMeta" class="image-meta" style="display:none; margin-top: 8px;">
@@ -83,9 +88,14 @@
             </div>
         </div>
 
+        </main>
+
         <!-- Separator -->
-        <div class="separator"></div>
-        <h2 class="plugins-title">Plugins</h2>
+        <div class="separator" role="separator"></div>
+
+        <!-- Plugin navigation section -->
+        <section aria-label="Available plugins">
+            <h2 class="plugins-title">Plugins</h2>
         {% set icon_map = {
             'ai_text': 'text-t',
             'ai_image': 'magic-wand',
@@ -102,15 +112,19 @@
             'wpotd': 'book-open-text',
             'comic': 'mask-happy'
         } %}
-        <div class="button-grid">
-            {% for plugin in plugins %}
-            <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button" title="{{ plugin.display_name }}">
-                {% set ph = icon_map.get(plugin.id, 'image') %}
-                {% from 'macros/icons.html' import icon %}
-                {{ icon(ph, 'icon-image') | safe }}
-            </a>
-            {% endfor %}
-        </div>
+            <div class="button-grid">
+                {% for plugin in plugins %}
+                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button"
+                   title="{{ plugin.display_name }}"
+                   aria-label="Open {{ plugin.display_name }} plugin settings">
+                    {% set ph = icon_map.get(plugin.id, 'image') %}
+                    {% from 'macros/icons.html' import icon %}
+                    {{ icon(ph, 'icon-image') | safe }}
+                    <span class="sr-only">{{ plugin.display_name }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
     </div>
 <script>
     // Periodically refresh the preview image by cache-busting the URL

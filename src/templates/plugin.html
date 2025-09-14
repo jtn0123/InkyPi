@@ -495,7 +495,10 @@
     </script>
 </head>
 <body>
-    <main>
+    <!-- Skip navigation for accessibility -->
+    <a href="#main-content" class="skip-nav">Skip to main content</a>
+
+    <main id="main-content" role="main">
     <div class="frame">
         <!-- Back Button -->
         {% from 'macros/icons.html' import icon %}
@@ -587,8 +590,8 @@
 
         <div id="pluginMeta" class="image-meta" style="display:none; margin-top: 8px;"><div id="pluginMetaContent"></div></div>
 
-        <!-- Include plugin settings -->
-        <form id = "settingsForm" class="settings-form" onsubmit="return false;">
+        <!-- Plugin settings form -->
+        <form id="settingsForm" class="settings-form" onsubmit="return false;" aria-label="Plugin settings for {{ plugin.display_name }}">
             <div class="settings-container">
                 {% include settings_template %}
 
@@ -688,16 +691,20 @@
                 <label class="form-label" for="toggleDeviceFrame" style="display:flex;align-items:center;gap:6px;min-width:fit-content;">
                     <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
                 </label>
-                <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
-                <button type="button" onclick="handleAction('save_settings')" class="action-button center">Save Settings</button>
+                <button type="button" onclick="handleAction()" class="action-button left" aria-describedby="update-now-help">Update Now</button>
+                <button type="button" onclick="handleAction('save_settings')" class="action-button center" aria-describedby="save-settings-help">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" onclick="handleAction('update_instance')" class="action-button right">Update Instance</button>
+                    <button type="button" onclick="handleAction('update_instance')" class="action-button right" aria-describedby="update-instance-help">Update Instance</button>
                 {% else %}
-                    <button type="button" onclick="openModal('scheduleModal')" class="action-button right">Add to Playlist</button>
+                    <button type="button" onclick="openModal('scheduleModal')" class="action-button right" aria-describedby="add-playlist-help">Add to Playlist</button>
                 {% endif %}
             </div>
             <div class="form-help" style="margin-top:8px;">
-                Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.
+                <div id="update-now-help" class="sr-only">Generate and display image immediately with current settings</div>
+                <div id="save-settings-help" class="sr-only">Save settings for future use without generating image</div>
+                <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
+                <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist</div>
+                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.</p>
             </div>
         </form>
     </div>
