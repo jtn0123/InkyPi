@@ -827,7 +827,7 @@ select.form-input option {
 }
 
 .nav-icons .settings-button {
-    padding: 6px;
+    padding: var(--container-padding);
     border-radius: 6px;
     display: inline-flex;
     align-items: center;
