@@ -3,8 +3,8 @@ import math
 import os
 from datetime import UTC, datetime
 
-import pytz  # type: ignore[import-untyped]
-import requests  # type: ignore[import-untyped]
+import pytz
+import requests
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from utils.http_utils import http_get
