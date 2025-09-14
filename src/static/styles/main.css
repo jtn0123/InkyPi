@@ -838,6 +838,8 @@ select.form-input option {
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
+    background-color: transparent;
+    background-clip: padding-box; /* avoid inner square against the border */
     transition: all 0.2s ease;
 }
 
@@ -861,6 +863,12 @@ select.form-input option {
     transform: none;
 }
 
+/* On dark themes, ensure hover overlay stays subtle and no edge shows */
+[data-theme="dark"] .nav-icons .settings-button:hover::before,
+[data-theme="dark"] .header-button.icon:hover::before {
+    opacity: 0.05;
+}
+
 /* no separate rule needed; overlay created with opacity already applied */
 .header-button.icon svg {
     display: block;
@@ -876,6 +884,8 @@ select.form-input option {
     align-items: center;
     justify-content: center;
     line-height: 0;
+    background-color: transparent;
+    background-clip: padding-box;
 }
 
 .nav-icons .settings-button .icon-image svg {
@@ -883,6 +893,8 @@ select.form-input option {
     height: 100%;
     display: block;
     shape-rendering: geometricPrecision;
+    background: transparent;
+    pointer-events: none; /* avoid capturing hover inside */
 }
 
 .settings-button:hover {
@@ -2264,6 +2276,7 @@ select.form-input option {
     width: var(--container-header);
     height: var(--container-header);
     box-sizing: border-box;
+    background-clip: padding-box; /* avoid inner square against the border */
     transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
     position: relative;
 }
