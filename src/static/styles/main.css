@@ -275,30 +275,76 @@ body {
     color: var(--text);
 }
 
-/* Icon image styling */
+/* Standardized icon styling */
 .icon-image {
-    width: 32px; /* Adjust icon size */
-    height: 32px; /* Keep a proportional height */
+    width: var(--icon-xl);
+    height: var(--icon-xl);
     margin-bottom: 8px;
     color: var(--text);
+    flex-shrink: 0;
 }
 
-/* App header container */
+.icon-xs { width: var(--icon-xs); height: var(--icon-xs); }
+.icon-sm { width: var(--icon-sm); height: var(--icon-sm); }
+.icon-md { width: var(--icon-md); height: var(--icon-md); }
+.icon-lg { width: var(--icon-lg); height: var(--icon-lg); }
+.icon-xl { width: var(--icon-xl); height: var(--icon-xl); }
+.icon-xxl { width: var(--icon-xxl); height: var(--icon-xxl); }
+
+/* SVG icon standardization */
+svg.icon-image,
+svg.app-icon,
+svg.action-icon,
+svg.plugin-icon {
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    stroke: currentColor;
+}
+
+/* Thin stroke variant for delicate icons */
+.icon-thin,
+svg.icon-thin {
+    stroke-width: var(--icon-stroke-thin);
+}
+
+/* Enhanced app header layout */
 .app-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 16px;
+    margin-bottom: 12px;
     justify-content: space-between;
+    min-height: 48px; /* Consistent header height */
 }
 
 .app-header .app-title {
     flex: 1 1 auto;
-    margin-left: 8px;
+    margin-left: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
-.app-header > .header-button.icon { margin-left: auto; }
-.app-header .app-icon { width: 28px; height: 28px; }
+/* App icon standardization */
+.app-header .app-icon {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+    flex-shrink: 0;
+}
+
+/* Header actions container */
+.app-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.app-header > .header-button.icon {
+    margin-left: 0;
+}
 
 /* Ensure form and settings container expand */
 .settings-form {
@@ -450,11 +496,16 @@ body {
     }
 }
 
-/* Reduce icon size inside back button for subtlety */
+/* Back button icon sizing */
 .back-button .icon-image {
-    width: 18px;
-    height: 18px;
+    width: var(--icon-sm);
+    height: var(--icon-sm);
     margin: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* Enhanced action buttons */
@@ -737,33 +788,66 @@ select.form-input option {
 
 .settings-button {
     font-size: 1rem;
-    color: var(--text);
+    color: var(--muted);
     text-decoration: none;
-    padding: 6px 8px;
-    border-radius: 8px;
+    padding: 6px;
+    border-radius: 6px;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .settings-button img {
     margin-bottom: 0px;
 }
 
-/* Ensure inline SVG icons render correctly in header/links */
+/* Compact header and navigation icon sizing */
 .settings-button svg.icon-image,
 .settings-button .icon-image svg,
 .settings-button .app-icon svg,
 .settings-button svg.app-icon {
-    width: 30px;
-    height: 30px;
+    width: var(--icon-header);
+    height: var(--icon-header);
     display: inline-block;
     vertical-align: middle;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke-thin);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Compact navigation icons */
+.nav-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-icons .settings-button {
+    padding: 6px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--container-header);
+    height: var(--container-header);
+    border: 1px solid var(--surface-border);
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.nav-icons .settings-button:hover {
+    background-color: var(--panel-bg);
+    transform: none;
 }
 
 .settings-button:hover {
-    background-color: rgba(255,255,255,0.06);
-    box-shadow: 0px 5px 8px rgba(0, 0, 0, 0.1);
-    color: var(--accent);
+    background-color: var(--panel-bg);
+    color: var(--text);
+    transform: none; /* Remove excessive animations */
 }
 
 /* Modal Styling */
@@ -1019,19 +1103,72 @@ select.form-input option {
 .progress-meta .meta-item .label { color: var(--muted); }
 .progress-meta .meta-item .value { color: var(--text); font-weight: 700; background: var(--panel-bg); border:1px solid var(--panel-border); padding: 2px 8px; border-radius: 999px; }
 
+/* Enhanced progress timeline */
 .progress-log {
-    margin-top: 6px;
-    padding-left: 18px;
+    margin-top: 8px;
+    padding-left: 0;
     max-height: 140px;
     overflow: auto;
-    font-size: 0.82rem;
+    font-size: 0.85rem;
     color: var(--text);
+    list-style: none;
 }
-.progress-log li { margin: 4px 0; position: relative; list-style: none; padding-left: 22px; }
-.progress-log li::before { content: ""; position: absolute; left: 8px; top: 0.6em; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px rgba(52, 198, 166, 0.25); }
-.progress-log li::after { content: ""; position: absolute; left: 10.5px; top: 1.2em; bottom: -0.6em; width: 2px; background: var(--panel-border); }
-.progress-log li:last-child::after { display: none; }
-.progress-log time { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+.progress-log li {
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    position: relative;
+    padding: 8px 0 8px 32px;
+    min-height: 32px;
+}
+
+/* Timeline bullet points - properly aligned */
+.progress-log li::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 8px;
+    height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--accent);
+    z-index: 2;
+}
+
+/* Timeline connector lines */
+.progress-log li::after {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 20px;
+    bottom: -8px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--panel-border));
+    z-index: 1;
+}
+
+.progress-log li:last-child::after {
+    display: none;
+}
+
+/* Timeline content styling */
+.progress-log time {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-right: 12px;
+    flex-shrink: 0;
+    min-width: 80px;
+}
+
+.progress-log li .log-content {
+    flex: 1;
+    line-height: 1.4;
+}
 
 @media (max-width: 520px) {
   .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
@@ -1058,6 +1195,25 @@ select.form-input option {
     --error: #e53e3e;
     --success: #38a169;
     --warning: #d69e2e;
+
+    /* Standardized Icon Sizing System */
+    --icon-xs: 14px;      /* Small inline icons */
+    --icon-sm: 16px;      /* Timeline, small UI elements, header nav */
+    --icon-md: 20px;      /* Standard UI, action buttons */
+    --icon-lg: 24px;      /* App icons, prominent elements */
+    --icon-xl: 32px;      /* Large plugin icons */
+    --icon-xxl: 48px;     /* Hero/display icons */
+
+    /* Header-specific sizing for subtle navigation */
+    --icon-header: 16px;  /* Header navigation icons - subtle */
+    --container-header: 44px; /* Header icon containers - standardized touch target */
+    --container-padding: 4px; /* Minimal padding for header containers */
+
+    /* Icon stroke and styling */
+    --icon-stroke: 2px;
+    --icon-stroke-thin: 1.5px;
+    --icon-opacity: 1;
+    --icon-opacity-muted: 0.7;
 }
 [data-theme="dark"] {
     /* Enhanced dark theme with better accessibility */
@@ -1245,16 +1401,34 @@ select.form-input option {
 .btn-label { font-size: 0.85em; }
 .btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.5); border-top-color: #fff; border-radius: 50%; display:none; animation: spin .9s linear infinite; }
 
-/* Plugin Icon */
+/* Enhanced plugin icon styling */
 .plugin-icon {
-    width: 28px;
-    height: 28px;
+    width: var(--icon-lg);
+    height: var(--icon-lg);
     display: inline-block;
+    flex-shrink: 0;
+    color: var(--text);
 }
 
 /* Ensure inline SVG icons inside plugin icon container render uniformly */
-.plugin-info .plugin-icon { flex: 0 0 28px; overflow: hidden; }
-.plugin-icon svg { width: 100%; height: 100%; display: block; }
+.plugin-info .plugin-icon {
+    flex: 0 0 var(--icon-lg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plugin-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 
 .plugin-instance {
     color: var(--text);
@@ -1370,9 +1544,16 @@ select.form-input option {
     color: var(--text);
 }
 
+/* Consistent action icon sizing */
 .action-icon {
-    width: 20px;
-    height: 20px;
+    width: var(--icon-md);
+    height: var(--icon-md);
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
 }
 
 .header-content {
@@ -1391,15 +1572,21 @@ select.form-input option {
 }
 
 .header-button {
-    background-color: #1abc9c;
+    background-color: var(--accent);
     color: white;
     border: none;
-    padding: 8px 15px;
+    padding: 10px 16px;
     border-radius: 8px;
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: background 0.3s ease;
+    transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
     text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+    line-height: 1;
 }
 
 .header-button:hover {
@@ -1482,16 +1669,38 @@ select.form-input option {
 .latest-refresh.nextin:empty { display:none; }
 
 .api-key-label {
-    background-color: #607d8b;
-    color: #ffffff;
-    font-style: italic;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    line-height: 1;
+    background-color: var(--warning);
+    color: #fff;
+    font-style: normal;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    line-height: 1.2;
     text-align: center;
     display: inline-flex;
     align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    white-space: nowrap;
+    min-height: 32px;
+}
+
+.api-key-label:hover {
+    background-color: #b8860b;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    color: #fff;
+}
+
+/* API key icon */
+.api-key-label::before {
+    content: "⚠";
+    font-size: 14px;
+    opacity: 0.9;
 }
 
 .collapsible {
@@ -1558,6 +1767,23 @@ select.form-input option {
   .form-input {
     font-size: 16px; /* Prevent zoom on iOS */
     min-height: 44px;
+  }
+
+  /* Responsive icon sizing for mobile */
+  .app-header .app-icon {
+    width: var(--icon-md);
+    height: var(--icon-md);
+  }
+
+  .header-button.icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+
+  .header-button.icon svg {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
   }
 }
 
@@ -1983,21 +2209,69 @@ select.form-input option {
   margin: 0;
 }
 
-/* --- Theme toggle icon button and icon treatments --- */
+/* Compact header icon buttons - restored visual hierarchy */
 .header-button.icon {
-  padding: 6px 8px;
-  background-color: rgba(255,255,255,0.04);
-  color: var(--text);
-  border: 1px solid var(--surface-border);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border-radius: 10px;
+    padding: var(--container-padding);
+    background-color: transparent;
+    color: var(--muted);
+    border: 1px solid var(--surface-border);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border-radius: 6px;
+    width: var(--container-header);
+    height: var(--container-header);
+    box-sizing: border-box;
+    transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
+    position: relative;
 }
-[data-theme] .theme-icon { stroke: var(--text); }
+
+.header-button.icon:hover {
+    background-color: var(--panel-bg);
+    color: var(--text);
+    border-color: var(--surface-border);
+    transform: none; /* Remove excessive animation */
+}
+
+.header-button.icon:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Header icon sizing - much smaller and subtle */
+.header-button.icon svg {
+    width: var(--icon-header);
+    height: var(--icon-header);
+}
+
+/* Mobile touch targets - invisible expansion */
+@media (hover: none) and (pointer: coarse) {
+    .header-button.icon::after {
+        content: '';
+        position: absolute;
+        inset: -6px; /* Expand touch area without visual bulk */
+        border-radius: inherit;
+    }
+}
+/* Compact theme toggle icons */
+[data-theme] .theme-icon {
+    stroke: currentColor;
+    width: var(--icon-header);
+    height: var(--icon-header);
+    stroke-width: var(--icon-stroke-thin);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: transform 0.2s ease;
+}
+
 :root .theme-icon.moon { display: none; }
 [data-theme="dark"] .theme-icon.sun { display: none; }
 [data-theme="dark"] .theme-icon.moon { display: inline; }
+
+.header-button.icon:hover .theme-icon {
+    transform: rotate(10deg); /* Subtle rotation */
+}
 
 /* Icon color treatment in dark mode (PNG fallbacks) */
 [data-theme="dark"] img.icon-image,
