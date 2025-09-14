@@ -653,11 +653,25 @@ select.form-input option {
 /* Request progress block */
 .progress-block {
     margin: 10px;
+    position: fixed;
+    left: 50%;
+    bottom: 14px;
+    transform: translateX(-50%);
+    z-index: 1100;
+    min-width: min(720px, 92vw);
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 .progress-header {
     font-size: 0.9rem;
     color: var(--text);
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 .progress-bar {
     width: 100%;
@@ -669,7 +683,7 @@ select.form-input option {
 .progress-fill {
     height: 100%;
     width: 0%;
-    background-color: var(--accent);
+    background: linear-gradient(90deg, var(--accent), #2fd1b6);
 }
 
 /* Progress meta row and log */
@@ -682,8 +696,9 @@ select.form-input option {
     color: var(--muted);
     margin: 4px 2px 6px 2px;
 }
-.progress-meta .meta-item { display: inline-flex; align-items: baseline; gap: 4px; }
-.progress-meta .meta-item .value { color: var(--text); font-weight: 600; }
+.progress-meta .meta-item { display: inline-flex; align-items: baseline; gap: 6px; }
+.progress-meta .meta-item .label { color: var(--muted); }
+.progress-meta .meta-item .value { color: var(--text); font-weight: 700; background: var(--panel-bg); border:1px solid var(--panel-border); padding: 2px 8px; border-radius: 999px; }
 
 .progress-log {
     margin-top: 6px;
@@ -693,8 +708,16 @@ select.form-input option {
     font-size: 0.82rem;
     color: var(--text);
 }
-.progress-log li { margin: 2px 0; }
-.progress-log time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.progress-log li { margin: 4px 0; position: relative; list-style: none; padding-left: 22px; }
+.progress-log li::before { content: ""; position: absolute; left: 8px; top: 0.6em; width: 6px; height: 6px; background: var(--accent); border-radius: 50%; box-shadow: 0 0 0 2px rgba(52, 198, 166, 0.25); }
+.progress-log li::after { content: ""; position: absolute; left: 10.5px; top: 1.2em; bottom: -0.6em; width: 2px; background: var(--panel-border); }
+.progress-log li:last-child::after { display: none; }
+.progress-log time { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 520px) {
+  .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
+  .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
+}
 
 /* Theme tokens */
 :root {

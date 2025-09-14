@@ -152,7 +152,14 @@
         }
         if (loadingIndicator) loadingIndicator.style.display = 'block';
         if (btnEl) { btnEl.disabled = true; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'inline-block'; }
+        // Reset meta & log
         try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+        try {
+            if (progressList) progressList.innerHTML = '';
+            if (progressElapsed) progressElapsed.textContent = '0s';
+            if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
+            if (progressBar) progressBar.style.width = '10%';
+        } catch(e){}
         tickClock();
         clockTimer = setInterval(tickClock, 1000);
         setStep('Preparing…', 10);

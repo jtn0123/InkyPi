@@ -74,7 +74,14 @@
                 addLog(text);
             }
             loadingIndicator.style.display = 'block';
+            // Reset meta & log
             try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+            try {
+                if (progressList) progressList.innerHTML = '';
+                if (progressElapsed) progressElapsed.textContent = '0s';
+                if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
+                if (bar) bar.style.width = '10%';
+            } catch(e){}
             tickClock();
             clockTimer = setInterval(tickClock, 1000);
             setStep('Preparing…', 10);
