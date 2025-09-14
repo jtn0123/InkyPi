@@ -133,6 +133,15 @@
             if (response.ok && result && result.success) {
                 if (result && result.metrics){
                     const m = result.metrics;
+                    if (Array.isArray(m.steps) && m.steps.length){
+                        let pct = 60;
+                        const inc = 30 / m.steps.length;
+                        for (const [name, ms] of m.steps){
+                            pct += inc;
+                            setStep(`${name} ${ms} ms`, pct);
+                            await new Promise(r => setTimeout(r, 50));
+                        }
+                    }
                     const text = `Request ${m.request_ms ?? '-'} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
                     if (progressText) progressText.textContent = text;
                 }
