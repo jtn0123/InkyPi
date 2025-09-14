@@ -662,6 +662,7 @@
     <div id="requestProgress" class="progress-block" style="display:none;">
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>
+            <button type="button" class="progress-close" aria-label="Close progress" onclick="(function(){ const el = document.getElementById('requestProgress'); if (el) el.style.display='none'; })()">×</button>
         </div>
         <div class="progress-meta">
             <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
