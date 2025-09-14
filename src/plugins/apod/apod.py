@@ -38,7 +38,9 @@ class Apod(BasePlugin):
         if not api_key:
             raise RuntimeError("NASA API Key not configured.")
 
-        params = {"api_key": api_key}
+        # Ask NASA for thumbnails on non-image days (e.g., YouTube videos)
+        # See https://api.nasa.gov/ for APOD 'thumbs' parameter
+        params = {"api_key": api_key, "thumbs": True}
 
         if settings.get("randomizeApod") == "true":
             start = datetime(2015, 1, 1)
@@ -61,10 +63,14 @@ class Apod(BasePlugin):
 
         data = response.json()
 
-        if data.get("media_type") != "image":
-            raise RuntimeError("APOD is not an image today.")
-
-        image_url = data.get("hdurl") or data.get("url")
+        # On image days, prefer HD URL; on video days, fall back to thumbnail if present
+        if data.get("media_type") == "image":
+            image_url = data.get("hdurl") or data.get("url")
+        else:
+            image_url = data.get("thumbnail_url")
+            if not image_url:
+                # No thumbnail available; surface a clear error
+                raise RuntimeError("APOD is not an image today.")
 
         try:
             try:

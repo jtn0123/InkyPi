@@ -16,6 +16,16 @@ from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.http_utils import APIError, json_error, json_internal_error, json_success
 from utils.progress import ProgressTracker, track_progress
+from uuid import uuid4
+
+try:
+    from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
+except Exception:  # pragma: no cover
+    def save_refresh_event(*args, **kwargs):  # type: ignore
+        return None
+
+    def save_stage_event(*args, **kwargs):  # type: ignore
+        return None
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -579,6 +589,7 @@ def update_now():
         instance_name = plugin_settings.get("instance_name")
 
         # Check if refresh task is running
+        benchmark_id = str(uuid4())
         if refresh_task.running:
             metrics = refresh_task.manual_update(
                 ManualRefresh(plugin_id, plugin_settings)
@@ -595,6 +606,10 @@ def update_now():
             with track_progress() as tracker:
                 _t_gen_start = perf_counter()
                 image = plugin.generate_image(plugin_settings, device_config)
+                try:
+                    save_stage_event(device_config, benchmark_id, "generate_image", int((perf_counter() - _t_gen_start) * 1000))
+                except Exception:
+                    pass
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             steps = tracker.get_steps()
             metrics = {
@@ -611,6 +626,24 @@ def update_now():
                 "plugin_instance": instance_name,
             }
             try:
+                # Prepare minimal refresh_info so display manager can record preprocess/display
+                from model import RefreshInfo
+                from utils.image_utils import compute_image_hash
+                from utils.time_utils import now_device_tz
+
+                device_config.refresh_info = RefreshInfo(
+                    refresh_type="Manual Update",
+                    plugin_id=plugin_id,
+                    refresh_time=now_device_tz(device_config).isoformat(),
+                    image_hash=compute_image_hash(image),
+                    request_ms=None,
+                    display_ms=None,
+                    generate_ms=generate_ms,
+                    preprocess_ms=None,
+                    used_cached=False,
+                    benchmark_id=benchmark_id,
+                    plugin_meta=None,
+                )
                 display_manager.display_image(
                     image,
                     image_settings=plugin_config.get("image_settings", []),
@@ -622,6 +655,37 @@ def update_now():
                     image,
                     image_settings=plugin_config.get("image_settings", []),
                 )
+            try:
+                # Persist a refresh_event row for the dev path
+                ri = device_config.get_refresh_info()
+                cpu_percent = memory_percent = None
+                try:
+                    import psutil  # type: ignore
+
+                    cpu_percent = psutil.cpu_percent(interval=None)
+                    memory_percent = psutil.virtual_memory().percent
+                except Exception:
+                    pass
+                save_refresh_event(
+                    device_config,
+                    {
+                        "refresh_id": benchmark_id,
+                        "ts": None,
+                        "plugin_id": plugin_id,
+                        "instance": instance_name,
+                        "playlist": None,
+                        "used_cached": False,
+                        "request_ms": None,  # finalized below
+                        "generate_ms": generate_ms,
+                        "preprocess_ms": getattr(ri, "preprocess_ms", None),
+                        "display_ms": getattr(ri, "display_ms", None),
+                        "cpu_percent": cpu_percent,
+                        "memory_percent": memory_percent,
+                        "notes": "dev_update_now",
+                    },
+                )
+            except Exception:
+                pass
             # In dev path (no background task), persist minimal refresh_info with plugin_meta
             try:
                 from model import RefreshInfo

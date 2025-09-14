@@ -89,6 +89,13 @@ def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
         try:
             _ensure_schema(conn)
             cur = conn.cursor()
+            # Resolve timestamp safely
+            ts_raw = refresh_event.get("ts", None)
+            try:
+                ts_value = float(ts_raw) if ts_raw is not None else time.time()
+            except Exception:
+                ts_value = time.time()
+
             cur.execute(
                 """
                 INSERT INTO refresh_events (
@@ -99,7 +106,7 @@ def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
                 """,
                 (
                     refresh_event.get("refresh_id"),
-                    float(refresh_event.get("ts", time.time())),
+                    ts_value,
                     refresh_event.get("plugin_id"),
                     refresh_event.get("instance"),
                     refresh_event.get("playlist"),

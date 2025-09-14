@@ -187,3 +187,11 @@ phosphor-icons/
 
 # Backup files
 *.bak*
+
+# Local benchmark database
+src/benchmarks.db
+benchmarks.db
+
+# Coverage/Reports (ensure not committed)
+htmlcov/
+coverage.xml

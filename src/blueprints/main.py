@@ -2,6 +2,16 @@ import os
 from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, render_template, send_file
+from uuid import uuid4
+
+try:
+    from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
+except Exception:  # pragma: no cover
+    def save_refresh_event(*args, **kwargs):  # type: ignore
+        return None
+
+    def save_stage_event(*args, **kwargs):  # type: ignore
+        return None
 
 main_bp = Blueprint("main", __name__)
 
@@ -123,6 +133,7 @@ def display_next():
 
     # Execute via background task if running; else do a direct update (dev path)
     request_ms = display_ms = generate_ms = preprocess_ms = None
+    benchmark_id = str(uuid4())
     try:
         if getattr(refresh_task, "running", False):
             from refresh_task import PlaylistRefresh
@@ -147,6 +158,10 @@ def display_next():
             _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_instance.settings, device_config)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+            try:
+                save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
+            except Exception:
+                pass
             # Display
             try:
                 display_manager.display_image(
@@ -181,6 +196,7 @@ def display_next():
                     generate_ms=generate_ms,
                     preprocess_ms=None,
                     used_cached=False,
+                    benchmark_id=benchmark_id,
                 )
                 device_config.write_config()
             except Exception:
@@ -199,6 +215,42 @@ def display_next():
             generate_ms = getattr(ri, "generate_ms", None)
         if preprocess_ms is None:
             preprocess_ms = getattr(ri, "preprocess_ms", None)
+    except Exception:
+        pass
+
+    # Persist a refresh event for the dev path if request_ms is still None, compute it now
+    try:
+        if request_ms is None:
+            from time import perf_counter as _pc
+
+            request_ms = int((_pc() - _t_gen_start) * 1000)
+        ri = device_config.get_refresh_info()
+        cpu_percent = memory_percent = None
+        try:
+            import psutil  # type: ignore
+
+            cpu_percent = psutil.cpu_percent(interval=None)
+            memory_percent = psutil.virtual_memory().percent
+        except Exception:
+            pass
+        save_refresh_event(
+            device_config,
+            {
+                "refresh_id": getattr(ri, "benchmark_id", benchmark_id),
+                "ts": None,
+                "plugin_id": plugin_instance.plugin_id,
+                "instance": plugin_instance.name,
+                "playlist": playlist.name,
+                "used_cached": False,
+                "request_ms": request_ms,
+                "generate_ms": generate_ms,
+                "preprocess_ms": getattr(ri, "preprocess_ms", None),
+                "display_ms": getattr(ri, "display_ms", None),
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory_percent,
+                "notes": "display_next_dev",
+            },
+        )
     except Exception:
         pass
 

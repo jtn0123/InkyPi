@@ -162,6 +162,23 @@ python scripts/plugin_validator.py                 # validate all plugins
 python scripts/plugin_validator.py weather         # validate a single plugin
 ```
 
+### Benchmarking
+
+InkyPi records refresh performance metrics (opt-in, enabled by default in dev) and stores them in a local SQLite database. See `docs/benchmarking.md` for details.
+
+- View recent runs (aligned table):
+  ```bash
+  PYTHONPATH=src python scripts/show_benchmarks.py --limit 20
+  ```
+- Export a markdown snapshot:
+  ```bash
+  PYTHONPATH=src python scripts/export_benchmarks_report.py
+  # Open docs/benchmarks_report.md
+  ```
+
+Config keys in `src/config/device*.json`:
+- `enable_benchmarks` (bool), `benchmark_sample_rate` (0..1), `benchmarks_db_path` (optional).
+
 - Configuration schemas: JSON Schemas for editor integration and CI validation are in `src/config/schemas/`:
   - `device_config.schema.json`
   - `plugin-info.schema.json`

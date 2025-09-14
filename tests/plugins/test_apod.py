@@ -195,27 +195,79 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_apod_non_image_media_type(device_config_dev, monkeypatch):
-    """Test APOD plugin when NASA returns non-image media (video)."""
+def test_apod_video_with_thumbnail_fallback(device_config_dev, monkeypatch):
+    """Video days should fall back to NASA-provided thumbnail when available."""
     from plugins.apod.apod import Apod
 
     # Mock env key
     monkeypatch.setattr(device_config_dev, 'load_env_key', lambda key: 'test_key')
 
-    # Mock requests to return video media type
     with patch('plugins.apod.apod.http_get') as mock_requests:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
+        # First call: NASA APOD API returns video with thumbnail
+        mock_api_response = MagicMock()
+        mock_api_response.status_code = 200
+        mock_api_response.json.return_value = {
             "media_type": "video",
-            "url": "http://example.com/video.mp4"
+            "url": "http://example.com/video.mp4",
+            "thumbnail_url": "http://example.com/thumb.png",
         }
-        mock_requests.return_value = mock_response
+
+        # Second call: image bytes for thumbnail
+        mock_img_response = MagicMock()
+        mock_img_response.status_code = 200
+        from io import BytesIO
+        from PIL import Image
+        buf = BytesIO()
+        Image.new('RGB', (10, 10), 'white').save(buf, format='PNG')
+        mock_img_response.content = buf.getvalue()
+
+        mock_requests.side_effect = [mock_api_response, mock_img_response]
 
         p = Apod({"id": "apod"})
+        img = p.generate_image({}, device_config_dev)
+        assert img is not None
+        assert img.size[0] > 0
 
-        with pytest.raises(RuntimeError, match="APOD is not an image today"):
-            p.generate_image({}, device_config_dev)
+
+def test_apod_sends_thumbs_param(monkeypatch, device_config_dev):
+    """Ensure we request APOD with thumbs=True so thumbnail_url is provided on video days."""
+    from plugins.apod.apod import Apod
+
+    # Mock env key
+    monkeypatch.setenv('NASA_SECRET', 'k')
+
+    calls = {
+        'first_params': None,
+    }
+
+    class RespApi:
+        status_code = 200
+        def json(self):
+            return {"media_type": "image", "url": "http://img"}
+
+    class RespImg:
+        status_code = 200
+        def __init__(self):
+            from io import BytesIO
+            from PIL import Image
+            buf = BytesIO()
+            Image.new('RGB', (5, 5), 'white').save(buf, format='PNG')
+            self.content = buf.getvalue()
+
+    def fake_get(url, params=None, **kwargs):
+        # Capture first call params (NASA API call)
+        if 'api.nasa.gov/planetary/apod' in url:
+            calls['first_params'] = params
+            return RespApi()
+        return RespImg()
+
+    monkeypatch.setattr('plugins.apod.apod.http_get', fake_get)
+
+    img = Apod({"id": "apod"}).generate_image({}, device_config_dev)
+    assert img is not None
+    assert calls['first_params'] is not None
+    # thumbs should be truthy (True)
+    assert calls['first_params'].get('thumbs') in (True, 'true', 'True')
 
 
 def test_apod_hdurl_preference(device_config_dev, monkeypatch):
