@@ -32,6 +32,51 @@
 
         let uploadedFiles = {};
 
+        const LAST_PROGRESS_KEY = 'INKYPI_LAST_PROGRESS';
+        function saveLastProgressSnapshot(context){
+            try {
+                const list = document.getElementById('requestProgressList');
+                const textEl = document.getElementById('requestProgressText');
+                const lines = Array.from(list ? list.querySelectorAll('li') : [], li => li.textContent || '');
+                const data = {
+                    finishedAtIso: new Date().toISOString(),
+                    summary: textEl ? textEl.textContent : 'Done',
+                    lines,
+                    ctx: context || { page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null }
+                };
+                sessionStorage.setItem(LAST_PROGRESS_KEY, JSON.stringify(data));
+            } catch(e){}
+        }
+        function showLastProgress(){
+            try {
+                const raw = sessionStorage.getItem(LAST_PROGRESS_KEY);
+                if (!raw) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
+                const data = JSON.parse(raw);
+                const progress = document.getElementById('requestProgress');
+                const textEl = document.getElementById('requestProgressText');
+                const clockEl = document.getElementById('requestProgressClock');
+                const elapsedEl = document.getElementById('requestProgressElapsed');
+                const list = document.getElementById('requestProgressList');
+                const bar = document.getElementById('requestProgressBar');
+                if (list) {
+                    list.innerHTML = '';
+                    data.lines.forEach(line => {
+                        const li = document.createElement('li');
+                        const ts = document.createElement('time');
+                        ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+                        li.appendChild(ts);
+                        li.appendChild(document.createTextNode(line));
+                        list.appendChild(li);
+                    });
+                }
+                if (textEl) textEl.textContent = data.summary || 'Last run';
+                if (clockEl) clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+                if (elapsedEl) elapsedEl.textContent = '—';
+                if (bar) bar.style.width = '100%';
+                if (progress) progress.style.display = 'block';
+            } catch(e){}
+        }
+
         async function handleAction(action) {
             const loadingIndicator = document.getElementById('loadingIndicator');
             const progress = document.getElementById('requestProgress');
@@ -190,6 +235,7 @@
                 loadingIndicator.style.display = 'none';
                 setStep('Done', 100);
                 try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+                saveLastProgressSnapshot({ page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null });
                 setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
             }
         }
@@ -447,6 +493,8 @@
             {% if api_key and api_key.required %}
             <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
             {% endif %}
+            {% from 'macros/icons.html' import icon %}
+            <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock', 'icon-image') | safe }}</button>
             <div id="loadingIndicator" class="loading-indicator"></div>
         </div>
         <div class="separator"></div>

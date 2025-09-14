@@ -48,6 +48,8 @@
                         </svg>
                     </button>
                     
+                    {% from 'macros/icons.html' import icon %}
+                    <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgressGlobal()">{{ icon('clock', 'icon-image') | safe }}</button>
                     <button class="header-button" id="newPlaylistBtn">New Playlist</button>
                 </div>
             </div>

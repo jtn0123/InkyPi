@@ -13,6 +13,7 @@
 
 (function(){
     const C = window.PLAYLIST_CTX || {};
+    const LAST_PROGRESS_KEY = 'INKYPI_LAST_PROGRESS';
 
     // Drag-and-drop reordering support
     let dragSrcEl = null;
@@ -198,6 +199,16 @@
             if (btnEl) { btnEl.disabled = false; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'none'; }
             setStep('Done', 100);
             try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+            try {
+                const lines = Array.from(progressList ? progressList.querySelectorAll('li') : [], li => li.textContent || '');
+                const data = {
+                    finishedAtIso: new Date().toISOString(),
+                    summary: progressText ? progressText.textContent : 'Done',
+                    lines,
+                    ctx: { page: 'playlist', playlist: playlistName, pluginId, instance: pluginInstance }
+                };
+                sessionStorage.setItem(LAST_PROGRESS_KEY, JSON.stringify(data));
+            } catch(e){}
             setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
         }
     }
@@ -439,6 +450,37 @@
             sessionStorage.removeItem("storedMessage");
         }
     });
+
+    function showLastProgressGlobal(){
+        try {
+            const raw = sessionStorage.getItem(LAST_PROGRESS_KEY);
+            if (!raw) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
+            const data = JSON.parse(raw);
+            const progress = document.getElementById('globalProgress');
+            const textEl = document.getElementById('globalProgressText');
+            const clockEl = document.getElementById('globalProgressClock');
+            const elapsedEl = document.getElementById('globalProgressElapsed');
+            const list = document.getElementById('globalProgressList');
+            const bar = document.getElementById('globalProgressBar');
+            if (list) {
+                list.innerHTML = '';
+                data.lines.forEach(line => {
+                    const li = document.createElement('li');
+                    const ts = document.createElement('time');
+                    ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+                    li.appendChild(ts);
+                    li.appendChild(document.createTextNode(line));
+                    list.appendChild(li);
+                });
+            }
+            if (textEl) textEl.textContent = data.summary || 'Last run';
+            if (clockEl) clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+            if (elapsedEl) elapsedEl.textContent = '—';
+            if (bar) bar.style.width = '100%';
+            if (progress) progress.style.display = 'block';
+        } catch(e){}
+    }
+    window.showLastProgressGlobal = showLastProgressGlobal;
 
     window.openCreateModal = openCreateModal;
     window.openEditModal = openEditModal;
