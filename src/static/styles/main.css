@@ -232,6 +232,7 @@ body {
 }
 
 .app-header > .header-button.icon { margin-left: auto; }
+.app-header .app-icon { width: 28px; height: 28px; }
 
 /* Ensure form and settings container expand */
 .settings-form {
@@ -597,10 +598,10 @@ select.form-input option {
     width: 90%;
     max-width: 400px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.22s ease-out;
 }
 /* For image preview modal, allow larger canvas */
-.image-modal .modal-content { max-width: 95vw; width: auto; margin: 5vh auto; background: var(--surface); }
+.image-modal .modal-content { max-width: 95vw; width: auto; margin: 5vh auto; background: var(--surface); animation: zoomIn 0.2s ease-out; }
 
 .modal-content h2 {
     font-size: 1.2rem;
@@ -631,6 +632,9 @@ select.form-input option {
         opacity: 1;
     }
 }
+
+/* Subtle zoom for image lightbox */
+@keyframes zoomIn { from { transform: scale(0.98); opacity: 0.9; } to { transform: scale(1); opacity: 1; } }
 
 /* Success/Failure Modal Styles */
 .success-failure-modal {
@@ -664,7 +668,7 @@ select.form-input option {
     border-radius: 12px;
     padding: 10px 12px 12px 12px;
     box-shadow: 0 14px 40px rgba(0,0,0,0.35);
-    animation: slideDown .22s ease-out;
+    animation: slideDown .20s ease-out;
 }
 
 @keyframes slideDown {
@@ -1135,13 +1139,16 @@ select.form-input option {
 .latest-refresh.nextin:empty { display:none; }
 
 .api-key-label {
-    background-color: lightslategray;
-    color: white;
+    background-color: #607d8b;
+    color: #ffffff;
     font-style: italic;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8em;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    line-height: 1;
     text-align: center;
+    display: inline-flex;
+    align-items: center;
 }
 
 .collapsible {

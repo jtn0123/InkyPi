@@ -47,7 +47,15 @@
             try {
                 const list = document.getElementById('requestProgressList');
                 const textEl = document.getElementById('requestProgressText');
-                const lines = Array.from(list ? list.querySelectorAll('li') : [], li => li.textContent || '');
+                function extractLine(li){
+                    try {
+                        const t = li.querySelector('time');
+                        const txt = li.textContent || '';
+                        const tt = t ? (t.textContent || '') : '';
+                        return tt && txt.startsWith(tt) ? txt.slice(tt.length).trimStart() : txt.trim();
+                    } catch(e){ return (li.textContent || '').trim(); }
+                }
+                const lines = Array.from(list ? list.querySelectorAll('li') : [], extractLine);
                 const data = {
                     finishedAtIso: new Date().toISOString(),
                     summary: textEl ? textEl.textContent : 'Done',
@@ -81,12 +89,16 @@
                 const bar = document.getElementById('requestProgressBar');
                 if (list) {
                     list.innerHTML = '';
-                    data.lines.forEach(line => {
+                    const stripLeadingTime = (s) => {
+                        try { return s.replace(/^\s*\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?\s*/i, ''); } catch(_) { return s; }
+                    };
+                    data.lines.forEach(rawLine => {
+                        const line = stripLeadingTime(rawLine);
                         const li = document.createElement('li');
                         const ts = document.createElement('time');
                         ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
                         li.appendChild(ts);
-                        li.appendChild(document.createTextNode(line));
+                        li.appendChild(document.createTextNode(' ' + line));
                         list.appendChild(li);
                     });
                 }
@@ -211,7 +223,7 @@
                 if (response.ok) {
                     // Show metrics if present
                     if (result && result.metrics) {
-                        const m = result.metrics;
+                        const m = result.metrics || {};
                         if (Array.isArray(m.steps) && m.steps.length) {
                             let pct = 60;
                             const inc = 30 / m.steps.length;
@@ -221,9 +233,18 @@
                                 await new Promise(r => setTimeout(r, 50));
                             }
                         }
-                        const text = `Request ${m.request_ms} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
-                        if (progressText) progressText.textContent = text;
-                        addLog(text);
+                        // Compose clean summary: include only available metrics
+                        const parts = [];
+                        const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
+                        add('Request', m.request_ms);
+                        add('Generate', m.generate_ms);
+                        add('Preprocess', m.preprocess_ms);
+                        add('Display', m.display_ms);
+                        if (parts.length) {
+                            const text = parts.join(' • ');
+                            if (progressText) progressText.textContent = text;
+                            addLog(text);
+                        }
                     }
                     setStep('Display updating…', 90);
                     showResponseModal('success', `Success! ${result.message}`);
@@ -663,8 +684,8 @@
             <input type="hidden" name="instance_name" value="{{ plugin_instance }}">
             {% endif %}
 
-            <div class="buttons-container">
-                <label class="form-label" for="toggleDeviceFrame" style="display:flex;align-items:center;gap:6px;">
+            <div class="buttons-container" style="align-items:center;flex-wrap:wrap;">
+                <label class="form-label" for="toggleDeviceFrame" style="display:flex;align-items:center;gap:6px;min-width:fit-content;">
                     <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
                 </label>
                 <button type="button" onclick="handleAction()" class="action-button left">Update Now</button>
@@ -728,6 +749,14 @@
             </div>
         </div>
     </div>
+    
+    <!-- Image preview (lightbox) for plugin page -->
+    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="(function(){ const m=document.getElementById('imagePreviewModal'); if(m) m.style.display='none'; })()" aria-label="Close">×</span>
+            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
+        </div>
+    </div>
     <div id="requestProgress" class="progress-block" style="display:none;">
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>
@@ -741,28 +770,60 @@
         <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
     <script>
-        // Click to toggle between fit and native resolution on plugin page
+        // Lightbox + native-size toggle behavior for plugin page previews
         (function(){
             const previewImg = document.getElementById('previewImage');
+            const instanceImg = document.getElementById('instancePreviewImage');
             const container = previewImg && previewImg.parentElement;
-            if (!previewImg || !container) return;
             const nativeWidth = {{ resolution[0] }};
             const nativeHeight = {{ resolution[1] }};
-            previewImg.addEventListener('click', function(){
-                if (container.classList.contains('native')) {
-                    container.classList.remove('native');
-                    previewImg.removeAttribute('style');
-                } else {
-                    container.classList.add('native');
-                    previewImg.style.width = nativeWidth + 'px';
-                    previewImg.style.height = nativeHeight + 'px';
-                }
+
+            function openImagePreview(url, alt){
+                const m = document.getElementById('imagePreviewModal');
+                const img = document.getElementById('imagePreviewImg');
+                if (!m || !img) return;
+                img.src = url;
+                img.alt = alt || 'Large preview';
+                m.style.display = 'block';
+                function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
+                document.addEventListener('keydown', esc);
+            }
+            function closeImagePreview(){ const m = document.getElementById('imagePreviewModal'); if (m) m.style.display = 'none'; }
+            window.closeImagePreview = closeImagePreview;
+
+            // Close when clicking outside modal content
+            window.addEventListener('click', function(ev){
+                const m = document.getElementById('imagePreviewModal');
+                if (ev.target === m) { closeImagePreview(); }
             });
+
+            if (previewImg){
+                // Single click opens lightbox
+                previewImg.addEventListener('click', function(){ if (previewImg.src) openImagePreview(previewImg.src, previewImg.alt); });
+                // Double click toggles native size in-page (retains previous behavior)
+                if (container){
+                    previewImg.addEventListener('dblclick', function(e){
+                        e.preventDefault();
+                        if (container.classList.contains('native')) {
+                            container.classList.remove('native');
+                            previewImg.removeAttribute('style');
+                        } else {
+                            container.classList.add('native');
+                            previewImg.style.width = nativeWidth + 'px';
+                            previewImg.style.height = nativeHeight + 'px';
+                        }
+                    });
+                }
+            }
+            if (instanceImg){
+                instanceImg.style.cursor = 'zoom-in';
+                instanceImg.addEventListener('click', function(){ if (instanceImg.src && instanceImg.style.display !== 'none'){ openImagePreview(instanceImg.src, instanceImg.alt); } });
+            }
+
             // Device frame overlay toggle
             const toggle = document.getElementById('toggleDeviceFrame');
             const overlay = document.getElementById('deviceFrameOverlay');
             if (toggle && overlay){
-                // Choose a frame asset; using neutral SVG/PNG path in base plugin assets if present
                 try { overlay.style.backgroundImage = "url('" + {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }} + "')"; } catch(e) {}
                 toggle.addEventListener('change', function(){
                     const parent = document.getElementById('currentPreviewContainer');

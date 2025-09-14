@@ -146,12 +146,13 @@
         }
         function addLog(line){
             if (!progressList) return;
+            const stripLeadingTime = (s) => { try { return s.replace(/^\s*\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?\s*/i, ''); } catch(_) { return s; } };
             const li = document.createElement('li');
             const ts = document.createElement('time');
             ts.dateTime = new Date().toISOString();
             ts.textContent = new Date().toLocaleTimeString();
             li.appendChild(ts);
-            li.appendChild(document.createTextNode(line));
+            li.appendChild(document.createTextNode(' ' + stripLeadingTime(line)));
             progressList.appendChild(li);
             try { progressList.scrollTop = progressList.scrollHeight; } catch(e){}
         }
@@ -183,7 +184,7 @@
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success) {
                 if (result && result.metrics){
-                    const m = result.metrics;
+                    const m = result.metrics || {};
                     if (Array.isArray(m.steps) && m.steps.length){
                         let pct = 60;
                         const inc = 30 / m.steps.length;
@@ -193,9 +194,17 @@
                             await new Promise(r => setTimeout(r, 50));
                         }
                     }
-                    const text = `Request ${m.request_ms ?? '-'} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
-                    if (progressText) progressText.textContent = text;
-                    addLog(text);
+                    const parts = [];
+                    const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
+                    add('Request', m.request_ms);
+                    add('Generate', m.generate_ms);
+                    add('Preprocess', m.preprocess_ms);
+                    add('Display', m.display_ms);
+                    if (parts.length){
+                        const text = parts.join(' • ');
+                        if (progressText) progressText.textContent = text;
+                        addLog(text);
+                    }
                 }
                 setStep('Display updating…', 90);
                 sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
