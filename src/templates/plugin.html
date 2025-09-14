@@ -36,13 +36,47 @@
             const loadingIndicator = document.getElementById('loadingIndicator');
             const progress = document.getElementById('requestProgress');
             const progressText = document.getElementById('requestProgressText');
+            const progressClock = document.getElementById('requestProgressClock');
+            const progressElapsed = document.getElementById('requestProgressElapsed');
+            const progressList = document.getElementById('requestProgressList');
+            const bar = document.getElementById('requestProgressBar');
+            const t0 = Date.now();
+            let clockTimer = null;
+            function fmtElapsed(ms){
+                const s = Math.floor(ms / 1000);
+                const m = Math.floor(s / 60);
+                const rem = s % 60;
+                if (m > 0) return `${m}m ${rem}s`;
+                return `${s}s`;
+            }
+            function tickClock(){
+                try {
+                    if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
+                    if (progressElapsed) progressElapsed.textContent = fmtElapsed(Date.now() - t0);
+                } catch(e){}
+            }
+            function ensureVisible(){ if (progress) progress.style.display = 'block'; }
+            function addLog(line){
+                if (!progressList) return;
+                const li = document.createElement('li');
+                const ts = document.createElement('time');
+                ts.dateTime = new Date().toISOString();
+                ts.textContent = new Date().toLocaleTimeString();
+                li.appendChild(ts);
+                li.appendChild(document.createTextNode(line));
+                progressList.appendChild(li);
+                try { progressList.scrollTop = progressList.scrollHeight; } catch(e){}
+            }
             function setStep(text, pct){
-                if (progress) progress.style.display = 'block';
+                ensureVisible();
                 if (progressText) progressText.textContent = text;
-                const bar = document.getElementById('requestProgressBar');
                 if (bar && typeof pct === 'number') bar.style.width = pct + '%';
+                addLog(text);
             }
             loadingIndicator.style.display = 'block';
+            try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+            tickClock();
+            clockTimer = setInterval(tickClock, 1000);
             setStep('Preparing…', 10);
 
             // Allow plugin-specific client-side validation (e.g., require lat/long for Weather)
@@ -116,6 +150,7 @@
                         }
                         const text = `Request ${m.request_ms} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
                         if (progressText) progressText.textContent = text;
+                        addLog(text);
                     }
                     setStep('Display updating…', 90);
                     showResponseModal('success', `Success! ${result.message}`);
@@ -147,7 +182,8 @@
                 // Hide loading indicator after the action is complete
                 loadingIndicator.style.display = 'none';
                 setStep('Done', 100);
-                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
+                try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
             }
         }
         async function refreshPreviewImage(){
@@ -620,7 +656,12 @@
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>
         </div>
+        <div class="progress-meta">
+            <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
+            <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
+        </div>
         <div class="progress-bar"><div id="requestProgressBar" class="progress-fill" style="width: 10%;"></div></div>
+        <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
     <script>
         // Click to toggle between fit and native resolution on plugin page

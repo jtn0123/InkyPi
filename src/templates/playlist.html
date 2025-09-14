@@ -161,7 +161,12 @@
         <div class="progress-header">
             <span id="globalProgressText">Preparing…</span>
         </div>
+        <div class="progress-meta">
+            <span class="meta-item"><span>Now:</span> <span id="globalProgressClock" class="value">—</span></span>
+            <span class="meta-item"><span>Elapsed:</span> <span id="globalProgressElapsed" class="value">0s</span></span>
+        </div>
         <div class="progress-bar"><div id="globalProgressBar" class="progress-fill" style="width: 10%;"></div></div>
+        <ol id="globalProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
 
     <!-- Delete Confirmation Modal (Playlist) -->

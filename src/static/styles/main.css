@@ -672,6 +672,30 @@ select.form-input option {
     background-color: var(--accent);
 }
 
+/* Progress meta row and log */
+.progress-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 4px 2px 6px 2px;
+}
+.progress-meta .meta-item { display: inline-flex; align-items: baseline; gap: 4px; }
+.progress-meta .meta-item .value { color: var(--text); font-weight: 600; }
+
+.progress-log {
+    margin-top: 6px;
+    padding-left: 18px;
+    max-height: 140px;
+    overflow: auto;
+    font-size: 0.82rem;
+    color: var(--text);
+}
+.progress-log li { margin: 2px 0; }
+.progress-log time { color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+
 /* Theme tokens */
 :root {
     --bg: #f4f4f9;

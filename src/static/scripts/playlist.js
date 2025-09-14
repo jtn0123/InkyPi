@@ -115,13 +115,46 @@
         const progress = document.getElementById('globalProgress');
         const progressText = document.getElementById('globalProgressText');
         const progressBar = document.getElementById('globalProgressBar');
+        const progressClock = document.getElementById('globalProgressClock');
+        const progressElapsed = document.getElementById('globalProgressElapsed');
+        const progressList = document.getElementById('globalProgressList');
+        const t0 = Date.now();
+        let clockTimer = null;
+        function fmtElapsed(ms){
+            const s = Math.floor(ms / 1000);
+            const m = Math.floor(s / 60);
+            const rem = s % 60;
+            if (m > 0) return `${m}m ${rem}s`;
+            return `${s}s`;
+        }
+        function tickClock(){
+            try {
+                if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
+                if (progressElapsed) progressElapsed.textContent = fmtElapsed(Date.now() - t0);
+            } catch(e){}
+        }
+        function addLog(line){
+            if (!progressList) return;
+            const li = document.createElement('li');
+            const ts = document.createElement('time');
+            ts.dateTime = new Date().toISOString();
+            ts.textContent = new Date().toLocaleTimeString();
+            li.appendChild(ts);
+            li.appendChild(document.createTextNode(line));
+            progressList.appendChild(li);
+            try { progressList.scrollTop = progressList.scrollHeight; } catch(e){}
+        }
         function setStep(text, pct){
             if (progress) progress.style.display = 'block';
             if (progressText) progressText.textContent = text;
             if (progressBar && typeof pct === 'number') progressBar.style.width = pct + '%';
+            addLog(text);
         }
         if (loadingIndicator) loadingIndicator.style.display = 'block';
         if (btnEl) { btnEl.disabled = true; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'inline-block'; }
+        try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+        tickClock();
+        clockTimer = setInterval(tickClock, 1000);
         setStep('Preparing…', 10);
         try {
             const response = await fetch(C.display_plugin_instance_url, {
@@ -144,6 +177,7 @@
                     }
                     const text = `Request ${m.request_ms ?? '-'} ms • Generate ${m.generate_ms ?? '-'} ms • Preprocess ${m.preprocess_ms ?? '-'} ms • Display ${m.display_ms ?? '-'} ms`;
                     if (progressText) progressText.textContent = text;
+                    addLog(text);
                 }
                 setStep('Display updating…', 90);
                 sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
@@ -156,7 +190,8 @@
             if (loadingIndicator) loadingIndicator.style.display = 'none';
             if (btnEl) { btnEl.disabled = false; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'none'; }
             setStep('Done', 100);
-            setTimeout(() => { if (progress) progress.style.display = 'none'; }, 1200);
+            try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
+            setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
         }
     }
 
