@@ -8,6 +8,17 @@ from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
 from utils.time_utils import now_device_tz
+from uuid import uuid4
+
+try:
+    # Optional import; code must continue if unavailable
+    from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
+except Exception:  # pragma: no cover
+    def save_refresh_event(*args, **kwargs):  # type: ignore
+        return None
+
+    def save_stage_event(*args, **kwargs):  # type: ignore
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -159,8 +170,15 @@ class RefreshTask:
 
         plugin = get_plugin_instance(plugin_config)
         _t_req_start = perf_counter()
+        # Correlate this refresh with a benchmark id so parallel stage events can attach
+        benchmark_id = str(uuid4())
         _t_gen_start = perf_counter()
+        stage_t0 = perf_counter()
         image = refresh_action.execute(plugin, self.device_config, current_dt)
+        try:
+            save_stage_event(self.device_config, benchmark_id, "generate_image", int((perf_counter() - stage_t0) * 1000))
+        except Exception:
+            pass
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
@@ -197,16 +215,27 @@ class RefreshTask:
                 ),
             }
             try:
+                # Mark preprocess/display as stages around display_manager call
+                stage_t1 = perf_counter()
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                     history_meta=history_meta,
                 )
+                try:
+                    save_stage_event(self.device_config, benchmark_id, "display_pipeline", int((perf_counter() - stage_t1) * 1000))
+                except Exception:
+                    pass
             except TypeError:
+                stage_t1 = perf_counter()
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                 )
+                try:
+                    save_stage_event(self.device_config, benchmark_id, "display_pipeline", int((perf_counter() - stage_t1) * 1000))
+                except Exception:
+                    pass
         else:
             logger.info(
                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
@@ -222,7 +251,38 @@ class RefreshTask:
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
         }
-        return refresh_info, used_cached, metrics
+        # Persist a refresh_event row best-effort
+        try:
+            # capture lightweight system snapshot
+            cpu_percent = memory_percent = None
+            try:
+                import psutil  # type: ignore
+
+                cpu_percent = psutil.cpu_percent(interval=None)
+                memory_percent = psutil.virtual_memory().percent
+            except Exception:
+                pass
+            save_refresh_event(
+                self.device_config,
+                {
+                    "refresh_id": benchmark_id,
+                    "ts": None,
+                    "plugin_id": refresh_info.get("plugin_id"),
+                    "instance": refresh_info.get("plugin_instance"),
+                    "playlist": refresh_info.get("playlist"),
+                    "used_cached": used_cached,
+                    "request_ms": request_ms,
+                    "generate_ms": generate_ms,
+                    "preprocess_ms": preprocess_ms,
+                    "display_ms": display_ms,
+                    "cpu_percent": cpu_percent,
+                    "memory_percent": memory_percent,
+                    "notes": None,
+                },
+            )
+        except Exception:
+            pass
+        return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
     def _update_refresh_info(self, refresh_info, metrics, used_cached):
         """Persist the latest refresh information to the device config.
@@ -330,7 +390,7 @@ class RefreshTask:
 
     def log_system_stats(self):
         try:
-            import psutil  # type: ignore
+            import psutil
         except Exception:
             logger.info("System Stats: psutil not available")
             return

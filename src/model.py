@@ -31,6 +31,8 @@ class RefreshInfo:
         generate_ms: int | None = None,
         preprocess_ms: int | None = None,
         used_cached: bool | None = None,
+        # Optional benchmark correlation id
+        benchmark_id: str | None = None,
         # Optional plugin-specific metadata
         plugin_meta: dict | None = None,
     ):
@@ -47,6 +49,8 @@ class RefreshInfo:
         self.generate_ms = generate_ms
         self.preprocess_ms = preprocess_ms
         self.used_cached = used_cached
+        # Optional benchmark correlation id so other components can attach stage events
+        self.benchmark_id = benchmark_id
         # Optional plugin-specific metadata (e.g., WPOTD date/description)
         self.plugin_meta = plugin_meta
 
@@ -79,6 +83,8 @@ class RefreshInfo:
             refresh_dict["preprocess_ms"] = self.preprocess_ms
         if self.used_cached is not None:
             refresh_dict["used_cached"] = self.used_cached
+        if getattr(self, "benchmark_id", None) is not None:
+            refresh_dict["benchmark_id"] = self.benchmark_id
         # Include optional plugin metadata if available
         if getattr(self, "plugin_meta", None) is not None:
             refresh_dict["plugin_meta"] = self.plugin_meta
@@ -98,6 +104,7 @@ class RefreshInfo:
             generate_ms=data.get("generate_ms"),
             preprocess_ms=data.get("preprocess_ms"),
             used_cached=data.get("used_cached"),
+            benchmark_id=data.get("benchmark_id"),
             plugin_meta=data.get("plugin_meta"),
         )
 

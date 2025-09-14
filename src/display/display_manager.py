@@ -151,6 +151,23 @@ class DisplayManager:
         except Exception:
             logger.exception("Failed to record display metrics")
 
+        # Also emit a stage event if a benchmark id is present in refresh_info
+        try:
+            from benchmarks.benchmark_storage import save_stage_event
+
+            ri = getattr(self.device_config, "refresh_info", None)
+            benchmark_id = getattr(ri, "benchmark_id", None) if ri else None
+            if benchmark_id:
+                save_stage_event(
+                    self.device_config,
+                    benchmark_id,
+                    "display_driver",
+                    display_ms,
+                    extra={"display_type": type(self.display).__name__},
+                )
+        except Exception:
+            pass
+
     def save_image_only(self, image, filename: str = "current_image.png"):
         """Save an image under static preview directory without display/processing.
 
