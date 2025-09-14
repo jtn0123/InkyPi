@@ -836,12 +836,40 @@ select.form-input option {
     height: var(--container-header);
     border: 1px solid var(--surface-border);
     box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
     transition: all 0.2s ease;
+}
+
+/* Subtle accent overlay to mirror plugin card hover */
+.nav-icons .settings-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
 .nav-icons .settings-button:hover {
     background-color: var(--panel-bg);
+    border-color: var(--accent);
     transform: none;
+}
+
+.nav-icons .settings-button:hover::before {
+    opacity: 0.04;
+}
+
+/* Ensure nav icons are perfectly centered and not pushed by defaults */
+.nav-icons .settings-button .icon-image {
+    width: var(--icon-header);
+    height: var(--icon-header);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .settings-button:hover {
