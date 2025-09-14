@@ -28,12 +28,38 @@ def _is_enabled(device_config) -> bool:
         enabled = True
     if not enabled:
         return False
+    # Skip entirely when running under pytest to avoid polluting metrics
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
     try:
         sample_rate = float(device_config.get_config("benchmark_sample_rate", default=1.0))
     except Exception:
         sample_rate = 1.0
     sample_rate = max(0.0, min(1.0, sample_rate))
     return random.random() < sample_rate
+
+
+def _should_record_event(device_config, refresh_event: dict[str, Any]) -> bool:
+    if not _is_enabled(device_config):
+        return False
+    # Optional include/exclude plugin filters
+    try:
+        include_list = device_config.get_config("benchmark_include_plugins", default=None)
+    except Exception:
+        include_list = None
+    try:
+        exclude_list = device_config.get_config("benchmark_exclude_plugins", default=None)
+    except Exception:
+        exclude_list = None
+
+    plugin_id = refresh_event.get("plugin_id")
+    if include_list and isinstance(include_list, list):
+        if plugin_id not in include_list:
+            return False
+    if exclude_list and isinstance(exclude_list, list):
+        if plugin_id in exclude_list:
+            return False
+    return True
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -81,7 +107,7 @@ def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
     cpu_percent, memory_percent, notes
     """
     try:
-        if not _is_enabled(device_config):
+        if not _should_record_event(device_config, refresh_event):
             return
         db_path = _get_db_path(device_config)
         os.makedirs(os.path.dirname(db_path), exist_ok=True)

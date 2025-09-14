@@ -32,7 +32,17 @@
 
         let uploadedFiles = {};
 
-        const LAST_PROGRESS_KEY = 'INKYPI_LAST_PROGRESS';
+        const PROGRESS_PAGE_CTX = { page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null };
+        function buildProgressKey(ctx){
+            try {
+                if (ctx && ctx.page === 'plugin'){
+                    const pid = ctx.pluginId || {{ plugin.id|tojson }};
+                    const inst = ctx.instance || '';
+                    return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || '_'}`;
+                }
+            } catch(e){}
+            return 'INKYPI_LAST_PROGRESS';
+        }
         function saveLastProgressSnapshot(context){
             try {
                 const list = document.getElementById('requestProgressList');
@@ -42,16 +52,27 @@
                     finishedAtIso: new Date().toISOString(),
                     summary: textEl ? textEl.textContent : 'Done',
                     lines,
-                    ctx: context || { page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null }
+                    ctx: context || PROGRESS_PAGE_CTX
                 };
-                sessionStorage.setItem(LAST_PROGRESS_KEY, JSON.stringify(data));
+                const key = buildProgressKey(data.ctx);
+                localStorage.setItem(key, JSON.stringify(data));
+                // Also store a global fallback
+                localStorage.setItem('INKYPI_LAST_PROGRESS', JSON.stringify(data));
             } catch(e){}
         }
         function showLastProgress(){
             try {
-                const raw = sessionStorage.getItem(LAST_PROGRESS_KEY);
-                if (!raw) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
-                const data = JSON.parse(raw);
+                const keys = [
+                    buildProgressKey(PROGRESS_PAGE_CTX),
+                    `INKYPI_LAST_PROGRESS:plugin:${ {{ plugin.id|tojson }} }:_`,
+                    'INKYPI_LAST_PROGRESS'
+                ];
+                let data = null;
+                for (const k of keys){
+                    const raw = localStorage.getItem(k);
+                    if (raw){ data = JSON.parse(raw); break; }
+                }
+                if (!data) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
                 const progress = document.getElementById('requestProgress');
                 const textEl = document.getElementById('requestProgressText');
                 const clockEl = document.getElementById('requestProgressClock');
@@ -235,7 +256,7 @@
                 loadingIndicator.style.display = 'none';
                 setStep('Done', 100);
                 try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
-                saveLastProgressSnapshot({ page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null });
+                saveLastProgressSnapshot(PROGRESS_PAGE_CTX);
                 setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
             }
         }
@@ -494,7 +515,7 @@
             <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
             {% endif %}
             {% from 'macros/icons.html' import icon %}
-            <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock', 'icon-image') | safe }}</button>
+            <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
             <div id="loadingIndicator" class="loading-indicator"></div>
         </div>
         <div class="separator"></div>

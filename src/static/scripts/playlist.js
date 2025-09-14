@@ -13,7 +13,17 @@
 
 (function(){
     const C = window.PLAYLIST_CTX || {};
-    const LAST_PROGRESS_KEY = 'INKYPI_LAST_PROGRESS';
+    function buildProgressKey(ctx){
+        try {
+            if (ctx && ctx.page === 'playlist'){
+                const pl = ctx.playlist || '_';
+                const pid = ctx.pluginId || '_';
+                const inst = ctx.instance || '_';
+                return `INKYPI_LAST_PROGRESS:playlist:${pl}:${pid}:${inst}`;
+            }
+        } catch(e){}
+        return 'INKYPI_LAST_PROGRESS';
+    }
 
     // Drag-and-drop reordering support
     let dragSrcEl = null;
@@ -207,7 +217,9 @@
                     lines,
                     ctx: { page: 'playlist', playlist: playlistName, pluginId, instance: pluginInstance }
                 };
-                sessionStorage.setItem(LAST_PROGRESS_KEY, JSON.stringify(data));
+                const key = buildProgressKey(data.ctx);
+                localStorage.setItem(key, JSON.stringify(data));
+                localStorage.setItem('INKYPI_LAST_PROGRESS', JSON.stringify(data));
             } catch(e){}
             setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
         }
@@ -453,9 +465,19 @@
 
     function showLastProgressGlobal(){
         try {
-            const raw = sessionStorage.getItem(LAST_PROGRESS_KEY);
-            if (!raw) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
-            const data = JSON.parse(raw);
+            // Try any playlist-context key first; fallback to global
+            let data = null;
+            for (let i = 0; i < localStorage.length; i++){
+                const k = localStorage.key(i);
+                if (k && k.startsWith('INKYPI_LAST_PROGRESS:playlist:')){
+                    try { data = JSON.parse(localStorage.getItem(k)); } catch(_){}
+                }
+            }
+            if (!data){
+                const raw = localStorage.getItem('INKYPI_LAST_PROGRESS');
+                if (raw) data = JSON.parse(raw);
+            }
+            if (!data) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
             const progress = document.getElementById('globalProgress');
             const textEl = document.getElementById('globalProgressText');
             const clockEl = document.getElementById('globalProgressClock');
