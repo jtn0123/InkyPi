@@ -1,14 +1,14 @@
 import logging
-import os
 import math
+import os
 from datetime import UTC, datetime
 
-import pytz
-import requests
+import pytz  # type: ignore[import-untyped]
+import requests  # type: ignore[import-untyped]
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from utils.http_utils import http_get
-from typing import Any, Dict, Optional
+from utils.progress import record_step
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ OPEN_METEO_UNIT_PARAMS = {
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Icon pack definitions (roots and mapping JSONs)
-ICON_PACKS: Dict[str, Dict[str, Optional[str]]] = {
+ICON_PACKS: dict[str, dict[str, str | None]] = {
     # Current PNG set inside plugin
     "current": {
         "root": os.path.join(REPO_ROOT, "src", "plugins", "weather", "icons"),
@@ -53,7 +53,9 @@ ICON_PACKS: Dict[str, Dict[str, Optional[str]]] = {
     # Pack C: Bas Milius (fill/svg-static)
     "C": {
         "root": os.path.join(REPO_ROOT, "vendor", "icons", "basmilius"),
-        "map": os.path.join(REPO_ROOT, "vendor", "icons", "mapping_basmilius_fill.json"),
+        "map": os.path.join(
+            REPO_ROOT, "vendor", "icons", "mapping_basmilius_fill.json"
+        ),
     },
 }
 
@@ -72,7 +74,7 @@ class Weather(BasePlugin):
     # --- icon pack mapping cache (class-level) ---
     _icon_maps: dict[str, dict] = {}
 
-    def _load_icon_map(self, pack_key: str) -> Dict[str, str]:
+    def _load_icon_map(self, pack_key: str) -> dict[str, str]:
         cfg = ICON_PACKS.get(pack_key)
         if not cfg or not cfg.get("map"):
             return {}
@@ -84,9 +86,10 @@ class Weather(BasePlugin):
             return self._icon_maps[pack_key]
         try:
             import json
-            with open(path, "r", encoding="utf-8") as f:
+
+            with open(path, encoding="utf-8") as f:
                 raw = json.load(f)
-            mapping: Dict[str, str] = raw if isinstance(raw, dict) else {}
+            mapping: dict[str, str] = raw if isinstance(raw, dict) else {}
             self._icon_maps[pack_key] = mapping
             return mapping
         except Exception:
@@ -171,6 +174,7 @@ class Weather(BasePlugin):
                 aqi_data = self.get_air_quality(api_key, lat, long)
                 if settings.get("titleSelection", "location") == "location":
                     title = self.get_location(api_key, lat, long)
+                record_step("api")
                 if (
                     settings.get("weatherTimeZone", "locationTimeZone")
                     == "locationTimeZone"
@@ -185,15 +189,18 @@ class Weather(BasePlugin):
                     template_params = self.parse_weather_data(
                         weather_data, aqi_data, tz, units, time_format
                     )
+                record_step("parse")
             elif weather_provider == "OpenMeteo":
                 forecast_days = 7
                 weather_data = self.get_open_meteo_data(
                     lat, long, units, forecast_days + 1
                 )
                 aqi_data = self.get_open_meteo_air_quality(lat, long)
+                record_step("api")
                 template_params = self.parse_open_meteo_data(
                     weather_data, aqi_data, tz, units, time_format
                 )
+                record_step("parse")
 
             template_params["title"] = title
         except Exception as e:
@@ -255,9 +262,8 @@ class Weather(BasePlugin):
             except Exception:
                 pass
 
-        image = self.render_image(
-            dimensions, template_name, css_name, template_params
-        )
+        image = self.render_image(dimensions, template_name, css_name, template_params)
+        record_step("render")
 
         if not image:
             raise RuntimeError("Failed to take screenshot, please check logs.")
@@ -270,8 +276,12 @@ class Weather(BasePlugin):
         dt = datetime.fromtimestamp(current.get("dt"), tz=UTC).astimezone(tz)
         # Pick day/night icon. If API explicitly gives a night icon ("*n"), honor it.
         ow_icon = current.get("weather")[0].get("icon")
-        sunrise_epoch = current.get("sunrise") or ((weather_data.get("daily") or [{}])[0].get("sunrise"))
-        sunset_epoch = current.get("sunset") or ((weather_data.get("daily") or [{}])[0].get("sunset"))
+        sunrise_epoch = current.get("sunrise") or (
+            (weather_data.get("daily") or [{}])[0].get("sunrise")
+        )
+        sunset_epoch = current.get("sunset") or (
+            (weather_data.get("daily") or [{}])[0].get("sunset")
+        )
         try:
             # Intended night/day state
             intended_night = False
@@ -279,10 +289,16 @@ class Weather(BasePlugin):
                 intended_night = True
             elif sunrise_epoch and sunset_epoch:
                 now_ts = int(dt.timestamp())
-                intended_night = not (now_ts >= int(sunrise_epoch) and now_ts <= int(sunset_epoch))
+                intended_night = not (
+                    now_ts >= int(sunrise_epoch) and now_ts <= int(sunset_epoch)
+                )
 
-            candidate = (ow_icon or "01d")
-            candidate = candidate.replace("d", "n") if intended_night else candidate.replace("n", "d")
+            candidate = ow_icon or "01d"
+            candidate = (
+                candidate.replace("d", "n")
+                if intended_night
+                else candidate.replace("n", "d")
+            )
             # Fallback to day variant if night asset not available
             icon_path = self.get_plugin_dir(f"icons/{candidate}.png")
             if not os.path.exists(icon_path):
@@ -299,14 +315,24 @@ class Weather(BasePlugin):
             settings = state_obj.get("last_settings", {})
         else:
             settings = {}
-        weather_pack_val = (settings.get("weatherIconPack") or "current") if isinstance(settings, dict) else "current"
+        weather_pack_val = (
+            (settings.get("weatherIconPack") or "current")
+            if isinstance(settings, dict)
+            else "current"
+        )
         weather_pack = str(weather_pack_val).strip()
         if weather_pack not in ICON_PACKS:
             weather_pack = "current"
         icon_abs_path = self._resolve_cond_icon_path(current_icon, weather_pack)
         data = {
             "current_date": dt.strftime("%A, %B %d"),
-            "current_day_icon": self.path_to_data_uri(icon_abs_path) if icon_abs_path else self.path_to_data_uri(self.get_plugin_dir(f"icons/{current_icon}.png")),
+            "current_day_icon": (
+                self.path_to_data_uri(icon_abs_path)
+                if icon_abs_path
+                else self.path_to_data_uri(
+                    self.get_plugin_dir(f"icons/{current_icon}.png")
+                )
+            ),
             "current_temperature": str(round(current.get("temp"))),
             "feels_like": str(round(current.get("feels_like"))),
             "temperature_unit": UNITS[units]["temperature"],
@@ -674,7 +700,9 @@ class Weather(BasePlugin):
                         sunrise_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(self.get_plugin_dir("icons/sunrise.png")),
+                    "icon": self.path_to_data_uri(
+                        self.get_plugin_dir("icons/sunrise.png")
+                    ),
                 }
             )
         else:
@@ -698,7 +726,9 @@ class Weather(BasePlugin):
                         sunset_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(self.get_plugin_dir("icons/sunset.png")),
+                    "icon": self.path_to_data_uri(
+                        self.get_plugin_dir("icons/sunset.png")
+                    ),
                 }
             )
         else:
@@ -720,7 +750,9 @@ class Weather(BasePlugin):
                 "label": "Humidity",
                 "measurement": weather.get("current", {}).get("humidity"),
                 "unit": "%",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/humidity.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/humidity.png")
+                ),
             }
         )
 
@@ -729,7 +761,9 @@ class Weather(BasePlugin):
                 "label": "Pressure",
                 "measurement": weather.get("current", {}).get("pressure"),
                 "unit": "hPa",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/pressure.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/pressure.png")
+                ),
             }
         )
 
@@ -751,7 +785,9 @@ class Weather(BasePlugin):
                         "label": "Cloud Cover",
                         "measurement": clouds,
                         "unit": "%",
-                        "icon": self.path_to_data_uri(self.get_plugin_dir("icons/03d.png")),
+                        "icon": self.path_to_data_uri(
+                            self.get_plugin_dir("icons/03d.png")
+                        ),
                     }
                 )
         except Exception:
@@ -766,7 +802,9 @@ class Weather(BasePlugin):
                         "label": "Wind Gusts",
                         "measurement": gust,
                         "unit": UNITS[units]["speed"],
-                        "icon": self.path_to_data_uri(self.get_plugin_dir("icons/wind.png")),
+                        "icon": self.path_to_data_uri(
+                            self.get_plugin_dir("icons/wind.png")
+                        ),
                     }
                 )
         except Exception:
@@ -791,7 +829,9 @@ class Weather(BasePlugin):
                 "label": "Visibility",
                 "measurement": visibility_str,
                 "unit": "km",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/visibility.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/visibility.png")
+                ),
             }
         )
 
@@ -834,7 +874,9 @@ class Weather(BasePlugin):
                         sunrise_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(self.get_plugin_dir("icons/sunrise.png")),
+                    "icon": self.path_to_data_uri(
+                        self.get_plugin_dir("icons/sunrise.png")
+                    ),
                 }
             )
         else:
@@ -853,7 +895,9 @@ class Weather(BasePlugin):
                         sunset_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(self.get_plugin_dir("icons/sunset.png")),
+                    "icon": self.path_to_data_uri(
+                        self.get_plugin_dir("icons/sunset.png")
+                    ),
                 }
             )
         else:
@@ -893,7 +937,9 @@ class Weather(BasePlugin):
                 "label": "Humidity",
                 "measurement": current_humidity,
                 "unit": "%",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/humidity.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/humidity.png")
+                ),
             }
         )
 
@@ -917,7 +963,9 @@ class Weather(BasePlugin):
                 "label": "Pressure",
                 "measurement": current_pressure,
                 "unit": "hPa",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/pressure.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/pressure.png")
+                ),
             }
         )
 
@@ -991,7 +1039,9 @@ class Weather(BasePlugin):
                 "label": "Visibility",
                 "measurement": visibility_str,
                 "unit": unit_label,
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/visibility.png")),
+                "icon": self.path_to_data_uri(
+                    self.get_plugin_dir("icons/visibility.png")
+                ),
             }
         )
 
@@ -1087,9 +1137,7 @@ class Weather(BasePlugin):
             if getattr(response, "status_code", 200) not in (200, 201, 204):
                 raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
-            logging.error(
-                f"Failed to retrieve Open-Meteo weather data: {str(e)}"
-            )
+            logging.error(f"Failed to retrieve Open-Meteo weather data: {str(e)}")
             raise RuntimeError("Failed to retrieve Open-Meteo weather data.")
 
         return response.json()
@@ -1101,9 +1149,7 @@ class Weather(BasePlugin):
             if getattr(response, "status_code", 200) not in (200, 201, 204):
                 raise requests.exceptions.HTTPError(str(response.status_code))
         except Exception as e:
-            logging.error(
-                f"Failed to retrieve Open-Meteo air quality data: {str(e)}"
-            )
+            logging.error(f"Failed to retrieve Open-Meteo air quality data: {str(e)}")
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
 
         return response.json()

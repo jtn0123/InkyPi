@@ -1,13 +1,14 @@
 import logging
 import random
 
-import requests
+import requests  # type: ignore[import-untyped]
 from PIL import Image
 from PIL.Image import Resampling
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from utils.http_utils import http_get
 from utils.image_utils import process_image_from_bytes
+from utils.progress import record_step
 
 LANCZOS = Resampling.LANCZOS
 
@@ -19,6 +20,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
     try:
         response = http_get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
+
         def _resize(im: Image.Image):
             return im.resize(dimensions, LANCZOS)
 
@@ -75,6 +77,7 @@ class Unsplash(BasePlugin):
                 image_url = random.choice(results)["urls"]["full"]
             else:
                 image_url = data["urls"]["full"]
+            record_step("api")
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching image from Unsplash API: {e}")
             raise RuntimeError(
@@ -93,6 +96,7 @@ class Unsplash(BasePlugin):
         logger.info(f"Grabbing image from: {image_url}")
 
         image = grab_image(image_url, dimensions, timeout_ms=40000)
+        record_step("image")
 
         if not image:
             raise RuntimeError("Failed to load image, please check logs.")
