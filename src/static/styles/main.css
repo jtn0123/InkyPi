@@ -1836,13 +1836,14 @@ select.form-input option {
 .api-key-text {
     white-space: nowrap;
     opacity: 1;
-    transition: opacity 0.3s ease, width 0.3s ease;
+    transition: opacity 0.3s ease, max-width 0.3s ease;
+    overflow: hidden;
 }
 
 /* Collapsed state */
 .api-key-indicator.collapsed .api-key-text {
     opacity: 0;
-    width: 0;
+    max-width: 0;
     overflow: hidden;
 }
 
@@ -1854,36 +1855,37 @@ select.form-input option {
 
 /* Auto-collapse animation */
 .api-key-indicator.auto-collapse {
-    animation: collapseAfterDelay 3s ease-in-out forwards;
+    animation: collapseContainer 3s ease-in-out forwards;
+    overflow: hidden; /* Prevent text overflow during animation */
 }
 
-@keyframes collapseAfterDelay {
+@keyframes collapseContainer {
     0%, 66.67% {
         padding: 8px 12px;
-    }
-    66.67%, 100% {
-        padding: 8px;
-    }
-    0%, 66.67% {
         gap: 6px;
     }
-    66.67%, 100% {
+    100% {
+        padding: 8px;
         gap: 0;
     }
 }
 
 .api-key-indicator.auto-collapse .api-key-text {
     animation: fadeOutText 3s ease-in-out forwards;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 @keyframes fadeOutText {
     0%, 66.67% {
         opacity: 1;
-        width: auto;
+        max-width: 100px; /* Set a reasonable max-width instead of auto */
+        margin-right: 0;
     }
     100% {
         opacity: 0;
-        width: 0;
+        max-width: 0;
+        margin-right: 0;
     }
 }
 
@@ -1895,7 +1897,7 @@ select.form-input option {
 
 .api-key-indicator.collapsed:hover .api-key-text {
     opacity: 1;
-    width: auto;
+    max-width: 100px;
 }
 
 .collapsible {
