@@ -1743,7 +1743,7 @@ select.form-input option {
 }
 
 .api-key-label:hover {
-    background-color: #b8860b;
+    background-color: var(--warning);
     transform: translateY(-1px);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     color: #fff;
@@ -1752,6 +1752,24 @@ select.form-input option {
 /* API key icon */
 .api-key-label::before {
     content: "⚠";
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+/* API key configured state */
+.api-key-label.configured {
+    background-color: var(--success);
+    pointer-events: none; /* Not clickable when configured */
+}
+
+.api-key-label.configured:hover {
+    background-color: var(--success);
+    transform: none;
+    box-shadow: none;
+}
+
+.api-key-label.configured::before {
+    content: "✓";
     font-size: 14px;
     opacity: 0.9;
 }

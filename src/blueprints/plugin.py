@@ -207,6 +207,15 @@ def plugin_page(plugin_id):
             plugin = get_plugin_instance(plugin_config)
             template_params = plugin.generate_settings_template()
 
+            # Check API key presence if required
+            if "api_key" in template_params and template_params["api_key"].get("required"):
+                expected_key = template_params["api_key"].get("expected_key")
+                if expected_key:
+                    api_key_value = device_config.load_env_key(expected_key)
+                    template_params["api_key"]["present"] = bool(api_key_value)
+                else:
+                    template_params["api_key"]["present"] = False
+
             # retrieve plugin instance from the query parameters if updating existing plugin instance
             plugin_instance_name = request.args.get("instance")
             logger.info(

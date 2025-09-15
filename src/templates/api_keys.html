@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Keys</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}?v={{ range(1000000)|random }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}?v={{ range(1000000)|random }}"></script>
     <script>
         async function saveKeys() {
             const form = document.getElementById('apiKeysForm');
@@ -178,6 +179,15 @@
                 {{ icon('gear-six', 'app-icon') | safe }}
                 <h1 class="app-title">API Keys</h1>
             </div>
+            <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
+                <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                </svg>
+                <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                </svg>
+            </button>
         </div>
         <div class="separator"></div>
 

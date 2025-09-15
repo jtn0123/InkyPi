@@ -633,7 +633,11 @@
                 </svg>
             </button>
             {% if api_key and api_key.required %}
-            <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
+                {% if api_key.present %}
+                <span class="api-key-label configured" title="{{api_key.service}} API Key is configured">API Key Configured</span>
+                {% else %}
+                <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
+                {% endif %}
             {% endif %}
             {% from 'macros/icons.html' import icon %}
             <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
