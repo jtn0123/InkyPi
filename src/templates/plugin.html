@@ -603,46 +603,59 @@
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
-            {% from 'macros/icons.html' import icon %}
-            {% set plugin_icon_map = {
-                'ai_image': 'magic-wand',
-                'ai_text': 'text-t',
-                'weather': 'cloud-sun',
-                'calendar': 'calendar-blank',
-                'clock': 'clock',
-                'newspaper': 'newspaper-clipping',
-                'apod': 'planet',
-                'unsplash': 'images-square',
-                'image_url': 'link-simple',
-                'image_upload': 'upload-simple',
-                'image_folder': 'folder-simple',
-                'screenshot': 'monitor',
-                'wpotd': 'book-open-text',
-                'comic': 'mask-happy'
-            } %}
-            {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
-            {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
-            <h1 class="app-title">{{ plugin.display_name }}</h1>
-            <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                </svg>
-                <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                </svg>
-            </button>
-            {% if api_key and api_key.required %}
-                {% if api_key.present %}
-                <span class="api-key-label configured" title="{{api_key.service}} API Key is configured">API Key Configured</span>
-                {% else %}
-                <a class="api-key-label" href="{{ url_for('settings.api_keys_page') }}" title="{{api_key.service}} (Set {{api_key.expected_key}} in API Keys)">Requires API Key</a>
+            <div class="app-identity">
+                {% from 'macros/icons.html' import icon %}
+                {% set plugin_icon_map = {
+                    'ai_image': 'magic-wand',
+                    'ai_text': 'text-t',
+                    'weather': 'cloud-sun',
+                    'calendar': 'calendar-blank',
+                    'clock': 'clock',
+                    'newspaper': 'newspaper-clipping',
+                    'apod': 'planet',
+                    'unsplash': 'images-square',
+                    'image_url': 'link-simple',
+                    'image_upload': 'upload-simple',
+                    'image_folder': 'folder-simple',
+                    'screenshot': 'monitor',
+                    'wpotd': 'book-open-text',
+                    'comic': 'mask-happy'
+                } %}
+                {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
+                {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
+                <h1 class="app-title">{{ plugin.display_name }}</h1>
+            </div>
+            <div class="header-controls">
+                <!-- API Key Status Indicator -->
+                {% if api_key and api_key.required %}
+                    {% if api_key.present %}
+                    <div class="api-key-indicator configured" id="apiKeyIndicator" title="{{ api_key.service }} API Key is configured">
+                        <span class="api-key-icon">✓</span>
+                        <span class="api-key-text">API</span>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" title="{{ api_key.service }} API Key required - Click to configure">
+                        <span class="api-key-icon">⚠</span>
+                        <span class="api-key-text">API Required</span>
+                    </a>
+                    {% endif %}
                 {% endif %}
-            {% endif %}
-            {% from 'macros/icons.html' import icon %}
-            <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
-            <div id="loadingIndicator" class="loading-indicator"></div>
+
+                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
+                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                    </svg>
+                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                    </svg>
+                </button>
+                {% from 'macros/icons.html' import icon %}
+                <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                <div id="loadingIndicator" class="loading-indicator"></div>
+            </div>
         </div>
+
         <div class="separator"></div>
 
         <!-- Status: current display vs this plugin instance -->
@@ -976,6 +989,25 @@
                 showResponseModal('failure', 'Failed to display instance');
             }
         }
+    </script>
+
+    <script>
+        // Auto-collapse API key indicator after 3 seconds
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiIndicator = document.getElementById('apiKeyIndicator');
+            if (apiIndicator) {
+                // Add auto-collapse class to trigger animation
+                setTimeout(() => {
+                    apiIndicator.classList.add('auto-collapse');
+
+                    // After animation completes, add collapsed class for hover behavior
+                    setTimeout(() => {
+                        apiIndicator.classList.remove('auto-collapse');
+                        apiIndicator.classList.add('collapsed');
+                    }, 3000);
+                }, 100);
+            }
+        });
     </script>
     </main>
 </body>

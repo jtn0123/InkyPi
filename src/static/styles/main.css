@@ -313,18 +313,30 @@ svg.icon-thin {
 .app-header {
     display: flex;
     align-items: center;
-    gap: 16px;
-    margin-bottom: 12px;
     justify-content: space-between;
+    margin-bottom: 16px;
     min-height: 48px; /* Consistent header height */
 }
 
+.app-identity {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: 1;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .app-header .app-title {
-    flex: 1 1 auto;
-    margin-left: 0;
+    margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.2;
+    color: var(--text);
 }
 
 /* App icon standardization */
@@ -1774,6 +1786,118 @@ select.form-input option {
     opacity: 0.9;
 }
 
+/* Inline API Key Indicator */
+.api-key-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    min-height: var(--container-header);
+    box-sizing: border-box;
+    cursor: default;
+}
+
+.api-key-indicator.configured {
+    background: rgba(56, 161, 105, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(56, 161, 105, 0.2);
+}
+
+.api-key-indicator.missing {
+    background: rgba(251, 191, 36, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+    cursor: pointer;
+}
+
+.api-key-indicator.missing:hover {
+    background: rgba(251, 191, 36, 0.15);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.api-key-icon {
+    width: var(--icon-header);
+    height: var(--icon-header);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    font-weight: bold;
+}
+
+.api-key-text {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.3s ease, width 0.3s ease;
+}
+
+/* Collapsed state */
+.api-key-indicator.collapsed .api-key-text {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.api-key-indicator.collapsed {
+    padding: 8px;
+    min-width: var(--container-header);
+    justify-content: center;
+}
+
+/* Auto-collapse animation */
+.api-key-indicator.auto-collapse {
+    animation: collapseAfterDelay 3s ease-in-out forwards;
+}
+
+@keyframes collapseAfterDelay {
+    0%, 66.67% {
+        padding: 8px 12px;
+    }
+    66.67%, 100% {
+        padding: 8px;
+    }
+    0%, 66.67% {
+        gap: 6px;
+    }
+    66.67%, 100% {
+        gap: 0;
+    }
+}
+
+.api-key-indicator.auto-collapse .api-key-text {
+    animation: fadeOutText 3s ease-in-out forwards;
+}
+
+@keyframes fadeOutText {
+    0%, 66.67% {
+        opacity: 1;
+        width: auto;
+    }
+    100% {
+        opacity: 0;
+        width: 0;
+    }
+}
+
+/* Hover to expand collapsed state */
+.api-key-indicator.collapsed:hover {
+    padding: 8px 12px;
+    gap: 6px;
+}
+
+.api-key-indicator.collapsed:hover .api-key-text {
+    opacity: 1;
+    width: auto;
+}
+
 .collapsible {
     width: 100%;
 }
@@ -1808,8 +1932,33 @@ select.form-input option {
   }
 
   .app-header {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 12px;
+  }
+
+  .app-identity {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .header-controls {
+    align-self: flex-end;
+  }
+
+  .api-key-indicator {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+  }
+
+  .api-key-indicator.collapsed {
+    padding: 6px;
+  }
+
+  .api-key-icon {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    font-size: 14px;
   }
 
   .buttons-container {
