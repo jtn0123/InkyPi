@@ -122,7 +122,7 @@ body {
 /* Status bar (top previews) */
 .status-bar {
     display: grid;
-    grid-template-columns: minmax(200px, 240px) 1fr; /* compact left, full right */
+    grid-template-columns: auto 1fr; /* auto-size compact card, remaining space for instance */
     gap: 8px;
     margin: 6px 0 0 0;
 }
@@ -142,18 +142,35 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 56px;
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     border-radius: 8px;
     overflow: hidden;
     padding: 6px 8px;
 }
+
+/* Compact cards have minimal height, instance cards maintain space for larger content */
+.status-card.compact .status-body {
+    min-height: auto;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.status-card.instance .status-body {
+    min-height: 56px;
+}
 .status-body img { max-width: 100%; max-height: 160px; display: block; }
 
 /* Compact current display thumbnail */
-.status-card.compact .image-container { width: 180px; }
-.status-card.compact .image-container img { max-width: 10rem; max-height: 8rem; }
+.status-card.compact .image-container {
+    width: 200px;
+    max-width: 100%;
+}
+.status-card.compact .image-container img {
+    max-width: 100%;
+    max-height: 10rem;
+    object-fit: contain;
+}
 
 /* Full, non-cropped instance preview */
 .status-card.instance .status-body { overflow: visible; }
@@ -167,6 +184,8 @@ body {
   }
   .status-card.compact .image-container {
     width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
   }
 
   /* Improve button spacing on mobile */
@@ -197,6 +216,16 @@ body {
 }
 .status-meta .label { color: var(--muted); font-size: 0.85rem; }
 .status-meta .value { color: var(--text); font-size: 0.95rem; font-weight: 600; }
+
+/* Compact meta styling when inside status-body */
+.status-meta.compact {
+    margin-top: 0;
+    margin-bottom: 2px;
+    font-size: 0.8rem;
+    justify-content: center;
+}
+.status-meta.compact .label { font-size: 0.75rem; }
+.status-meta.compact .value { font-size: 0.85rem; }
 
 /* Separator styling */
 .separator {
@@ -2433,21 +2462,21 @@ select.form-input option {
 
 /* Compact header icon buttons - restored visual hierarchy */
 .header-button.icon {
-    padding: var(--container-padding);
+    padding: 0;
     background-color: transparent;
     color: var(--muted);
     border: 1px solid var(--surface-border);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    border-radius: 6px;
+    border-radius: 8px;
     width: var(--container-header);
     height: var(--container-header);
     box-sizing: border-box;
     background-clip: padding-box; /* avoid inner square against the border */
     transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
     position: relative;
+    flex-shrink: 0;
 }
 
 .header-button.icon:hover {
@@ -2475,9 +2504,13 @@ select.form-input option {
 }
 
 /* Header icon sizing - much smaller and subtle */
-.header-button.icon svg {
+.header-button.icon svg,
+.header-button.icon .icon-image {
     width: var(--icon-header);
     height: var(--icon-header);
+    display: block;
+    flex-shrink: 0;
+    margin: 0; /* Override any default margin */
 }
 
 /* Mobile touch targets - invisible expansion */
