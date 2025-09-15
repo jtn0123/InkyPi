@@ -250,7 +250,7 @@
                     setStep('Display updating…', 90);
                     showResponseModal('success', `Success! ${result.message}`);
                     // Trigger preview refresh shortly after success
-                    setTimeout(() => { refreshPreviewImage(); }, 250);
+                    setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 250);
                 } else {
                     showResponseModal('failure', `Error!  ${result.error}`);
                 }
@@ -402,12 +402,54 @@
                 const instanceName = pluginInstanceName;
                 const instImgEl = document.getElementById('instancePreviewImage');
                 const instTimeEl = document.getElementById('instanceLastTime');
-                const instUrl = instancePreviewUrl(pluginId, instanceName);
-                const latestUrl = latestPluginUrl(pluginId);
+
                 if (instImgEl) {
-                    const url = instUrl || latestUrl;
-                    if (url) instImgEl.src = url + '?t=' + Date.now();
+                    let imageUrl = null;
+
+                    // First try instance-specific image if we have an instance name
+                    if (instanceName && instanceName.trim()) {
+                        imageUrl = instancePreviewUrl(pluginId, instanceName);
+                    }
+
+                    // If no instance or instance image fails, try latest plugin image
+                    if (!imageUrl) {
+                        imageUrl = latestPluginUrl(pluginId);
+                    }
+
+                    if (imageUrl) {
+                        instImgEl.src = imageUrl + '?t=' + Date.now();
+
+                        // Add error handler to fallback to latest plugin image if instance image fails
+                        instImgEl.onerror = function() {
+                            if (instanceName && instanceName.trim() && imageUrl.includes('instance_image')) {
+                                // Instance image failed, try latest plugin image
+                                const fallbackUrl = latestPluginUrl(pluginId);
+                                if (fallbackUrl && fallbackUrl !== imageUrl) {
+                                    this.src = fallbackUrl + '?t=' + Date.now();
+                                    // Update the error handler to show fallback on second failure
+                                    this.onerror = function() {
+                                        this.style.display='none';
+                                        this.previousElementSibling.style.display='none';
+                                        document.getElementById('instancePreviewFallback').style.display='block';
+                                    };
+                                    return;
+                                }
+                            }
+                            // Show fallback placeholder
+                            this.style.display='none';
+                            this.previousElementSibling.style.display='none';
+                            document.getElementById('instancePreviewFallback').style.display='block';
+                        };
+                    } else {
+                        // No image URL available, show fallback immediately
+                        instImgEl.style.display = 'none';
+                        const skeleton = instImgEl.previousElementSibling;
+                        if (skeleton) skeleton.style.display = 'none';
+                        const fallback = document.getElementById('instancePreviewFallback');
+                        if (fallback) fallback.style.display = 'block';
+                    }
                 }
+
                 const lastStr = '{{ plugin_instance_last_refresh or plugin_latest_refresh or '' }}';
                 if (instTimeEl) {
                     instTimeEl.textContent = lastStr ? new Date(lastStr).toLocaleString() : '—';
@@ -415,6 +457,60 @@
                 // Also initialize current display timestamp
                 refreshPreviewImage();
             })();
+
+            // Function to refresh instance preview image with fallback logic
+            window.refreshInstancePreview = function() {
+                const pluginId = '{{ plugin.id }}';
+                const instanceName = pluginInstanceName;
+                const instImgEl = document.getElementById('instancePreviewImage');
+
+                if (!instImgEl) return;
+
+                // Reset display state
+                const skeleton = instImgEl.previousElementSibling;
+                const fallback = document.getElementById('instancePreviewFallback');
+                if (skeleton) skeleton.style.display = '';
+                if (fallback) fallback.style.display = 'none';
+                instImgEl.style.display = '';
+
+                let imageUrl = null;
+
+                // First try instance-specific image if we have an instance name
+                if (instanceName && instanceName.trim()) {
+                    imageUrl = instancePreviewUrl(pluginId, instanceName);
+                }
+
+                // If no instance, use latest plugin image
+                if (!imageUrl) {
+                    imageUrl = latestPluginUrl(pluginId);
+                }
+
+                if (imageUrl) {
+                    instImgEl.src = imageUrl + '?t=' + Date.now();
+
+                    // Add error handler to fallback to latest plugin image if instance image fails
+                    instImgEl.onerror = function() {
+                        if (instanceName && instanceName.trim() && imageUrl.includes('instance_image')) {
+                            // Instance image failed, try latest plugin image
+                            const fallbackUrl = latestPluginUrl(pluginId);
+                            if (fallbackUrl && fallbackUrl !== imageUrl) {
+                                this.src = fallbackUrl + '?t=' + Date.now();
+                                // Update the error handler to show fallback on second failure
+                                this.onerror = function() {
+                                    this.style.display='none';
+                                    if (skeleton) skeleton.style.display='none';
+                                    if (fallback) fallback.style.display='block';
+                                };
+                                return;
+                            }
+                        }
+                        // Show fallback placeholder
+                        this.style.display='none';
+                        if (skeleton) skeleton.style.display='none';
+                        if (fallback) fallback.style.display='block';
+                    };
+                }
+            };
             if (!styleSettings){
                 return;
             }
@@ -566,20 +662,20 @@
             </div>
             <!-- Full, non-cropped plugin instance preview on the right -->
             <div class="status-card instance">
-                <div class="status-title">This plugin instance</div>
+                <div class="status-title">{% if plugin_instance %}This plugin instance{% else %}Latest from this plugin{% endif %}</div>
                 <div class="status-body">
-                    {% if plugin_instance %}
                     <div class="img-skeleton" aria-hidden="true" style="width:100%;"></div>
-                    <img id="instancePreviewImage" src="#" alt="Latest for this instance" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
+                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
                     <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
+                        {% if plugin_instance %}
                         No saved image found for this instance yet.
-                        {% if plugin_instance and plugin_instance_playlist %}
+                        {% if plugin_instance_playlist %}
                         <div style="margin-top:6px;"><button type="button" class="action-button compact" aria-label="Display this instance now" onclick="displayInstanceNow()">Display Instance</button></div>
                         {% endif %}
+                        {% else %}
+                        No images generated yet. Use "Update Now" to create one.
+                        {% endif %}
                     </div>
-                    {% else %}
-                    <div class="status-placeholder">Save or select an instance to see its latest image.</div>
-                    {% endif %}
                 </div>
                 <div class="status-meta">
                     <span class="label">Last generated</span>
@@ -869,8 +965,7 @@
                 } else {
                     showResponseModal('success', `Success! ${result.message}`);
                     // give backend a moment, then refresh both previews
-                    setTimeout(() => { refreshPreviewImage(); }, 400);
-                    setTimeout(() => { const el = document.getElementById('instancePreviewImage'); if (el) el.src = el.src.split('?')[0] + '?t=' + Date.now(); }, 450);
+                    setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 400);
                 }
             } catch (e){
                 console.error(e);
