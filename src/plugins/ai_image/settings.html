@@ -1,34 +1,49 @@
-<div class="form-group">
-    <label for="textPrompt" class="form-label">Text Prompt:</label>
-    <input type="text" id="textPrompt" name="textPrompt" placeholder="Type something..." required class="form-input">
+<div class="form-section settings-section basic-only">
+    <div class="form-section-title">
+        Image Generation
+        <span class="tooltip" data-tooltip="Describe what you want to generate">
+            <span class="help-icon">ⓘ</span>
+        </span>
+    </div>
+
+    <div class="form-field">
+        <label for="textPrompt" class="form-label">Text Prompt:</label>
+        <input type="text" id="textPrompt" name="textPrompt" placeholder="e.g., A beautiful sunset over mountains" required class="form-input">
+        <div class="validation-message" style="display: none;"></div>
+    </div>
+
+    <div class="form-field">
+        <label for="randomizePrompt" class="form-label">Randomize Prompt:</label>
+        <div class="toggle-container">
+            <input type="checkbox" id="randomizePrompt" name="randomizePrompt" class="toggle-checkbox" value="false" onclick="this.value=this.checked ? 'true' : 'false';">
+            <label for="randomizePrompt" class="toggle-label"></label>
+        </div>
+        <small style="color: var(--muted); font-size: 0.85rem;">Add random elements to make each generation unique</small>
+    </div>
 </div>
 
+<div class="form-section settings-section advanced-only">
+    <div class="form-section-title">
+        Model Settings
+        <span class="tooltip" data-tooltip="Choose the AI model and quality settings">
+            <span class="help-icon">ⓘ</span>
+        </span>
+    </div>
 
-<!-- Dropdown Options -->
-<div class="form-group dropdown-container">
-    <!-- Image Model Dropdown -->
-    <div class="form-group">
-        <label for="imageModel" class="form-label">Image Model:</label>
+
+    <div class="form-field">
+        <label for="imageModel" class="form-label">AI Model:</label>
         <select id="imageModel" name="imageModel" class="form-input" onchange="toggleQualityDropdown()">
+            <option value="dall-e-3" selected>DALL·E 3 (Recommended)</option>
             <option value="dall-e-2">DALL·E 2</option>
-            <option value="dall-e-3" selected>DALL·E 3</option>
             <option value="gpt-image-1">GPT Image 1</option>
         </select>
     </div>
 
-    <!-- Quality Dropdown -->
-    <div class="form-group">
-        <label for="quality" class="form-label">Quality:</label>
+    <div class="form-field">
+        <label for="quality" class="form-label">Image Quality:</label>
         <select id="quality" name="quality" class="form-input">
         </select>
-    </div>
-</div>
-
-<div class="form-group">
-    <label for="randomizePrompt" class="form-label">Randomize Text Prompt:</label>
-    <div class="toggle-container">
-        <input type="checkbox" id="randomizePrompt" name="randomizePrompt" class="toggle-checkbox" value="false" onclick="this.value=this.checked ? 'true' : 'false';">
-        <label for="randomizePrompt" class="toggle-label"></label>
     </div>
 </div>
 
@@ -64,8 +79,52 @@
         }
     }
 
-    // populate form values from plugin settings
-    document.addEventListener('DOMContentLoaded', () => {   
+    // Initialize validation for AI Image plugin
+    document.addEventListener('DOMContentLoaded', () => {
+        // Add validation rules
+        if (window.progressiveDisclosure) {
+            // Text prompt validation
+            window.progressiveDisclosure.addValidationRule('textPrompt', {
+                validate: (value) => {
+                    if (!value || value.trim().length === 0) {
+                        return { valid: false, message: 'Please enter a description for your image' };
+                    }
+                    if (value.trim().length < 3) {
+                        return { valid: false, message: 'Description must be at least 3 characters long' };
+                    }
+                    if (value.trim().length > 1000) {
+                        return { valid: false, message: 'Description must be less than 1000 characters' };
+                    }
+                    // Check for potentially problematic content
+                    const bannedWords = ['nsfw', 'nude', 'naked', 'explicit'];
+                    const lowerValue = value.toLowerCase();
+                    for (const word of bannedWords) {
+                        if (lowerValue.includes(word)) {
+                            return { valid: false, message: 'Please use family-friendly descriptions' };
+                        }
+                    }
+                    return { valid: true };
+                }
+            });
+
+            // Provide helpful suggestions for good prompts
+            const promptInput = document.getElementById('textPrompt');
+            if (promptInput) {
+                promptInput.addEventListener('input', (e) => {
+                    const value = e.target.value.trim();
+                    const fieldContainer = e.target.closest('.form-field');
+
+                    if (value.length > 10 && value.length < 50) {
+                        // Show helpful suggestion
+                        window.progressiveDisclosure.showValidationMessage(
+                            fieldContainer,
+                            'Good start! Try adding details like style, mood, or colors for better results.',
+                            'warning'
+                        );
+                    }
+                });
+            }
+        }   
         // defaults
         var imageModel = 'dall-e-2'
         var quality = 'standard'
