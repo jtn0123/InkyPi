@@ -296,6 +296,10 @@ class ProgressiveDisclosure {
 
     // Live preview system for styling changes
     initLivePreview() {
+        // Only initialize live preview for weather plugin
+        const pluginId = document.querySelector('input[name="plugin_id"]')?.value;
+        if (pluginId !== 'weather') return;
+
         const previewImage = document.getElementById('previewImage');
         const instancePreviewImage = document.getElementById('instancePreviewImage');
 
