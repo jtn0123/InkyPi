@@ -82,13 +82,13 @@
   document.addEventListener("DOMContentLoaded", function () {
     const canvas = document.getElementById('hourlyTemperatureChart');
     if (!canvas) {
-      console.error('Hourly temperature chart canvas not found');
+      // Chart canvas not found - chart feature may not be enabled
       return;
     }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error('Could not get 2d context from canvas');
+      // Could not get 2D context - canvas may not be supported
       return;
     }
 
@@ -102,7 +102,7 @@
 
     // Check if we have data to display
     if (labels.length === 0 || temperatures.length === 0) {
-      console.warn('No hourly forecast data available, skipping chart creation');
+      // No hourly forecast data available for chart
       return;
     }
 
@@ -301,8 +301,7 @@
         chart.update();
       }
     } catch (error) {
-      console.error('Failed to create weather chart:', error);
-      // Hide the chart container if chart creation fails
+      // Chart creation failed - hide container and continue without chart
       canvas.style.display = 'none';
     }
   });

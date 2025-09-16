@@ -250,7 +250,7 @@
             const resp = await fetch('{{ url_for('main.display_next') }}', {method:'POST'});
             const j = await resp.json();
             if (!resp.ok || !j.success){
-                alert('Failed to display next: ' + (j.error || '')); 
+                showResponseModal('failure', 'Failed to display next: ' + (j.error || 'Unknown error'));
             } else {
                 // Refresh preview and info shortly after
                 setTimeout(refreshPreview, 300);

@@ -272,7 +272,7 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred while processing your request.');
+                showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
             } finally {
                 // Hide loading indicator after the action is complete
                 loadingIndicator.style.display = 'none';
@@ -843,7 +843,7 @@
                 </div>
                 <div class="form-group">
                     <label for="instance" class="form-label">Instance Name:</label>
-                    <input type="text" id="instance" name="instance_name" placeholder="Type something..." required class="form-input">
+                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required class="form-input">
                 </div>
                 <div class="form-group">
                     <label>Refresh</label>
@@ -852,7 +852,7 @@
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
                     <label for="refreshTypeInterval">Every</label>
-                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter a number" aria-label="Interval value">
+                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value">
                     <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
                         <option value="minute">Minute</option>
                         <option value="hour">Hour</option>

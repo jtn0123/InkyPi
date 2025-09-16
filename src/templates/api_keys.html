@@ -24,7 +24,7 @@
                     showResponseModal('failure', `Error! ${result.error}`);
                 }
             } catch (e) {
-                alert('Failed to save keys.');
+                showResponseModal('failure', 'Failed to save keys. Please try again.');
             }
         }
 
@@ -131,7 +131,7 @@
                     showResponseModal('failure', `Error! ${result.error}`);
                 }
             } catch (e) {
-                alert('Failed to delete key.');
+                showResponseModal('failure', 'Failed to delete key. Please try again.');
             }
         }
 
@@ -197,13 +197,13 @@
                     <label class="form-label">OpenAI</label>
                     <div id="openai-status">Configured: {{ 'Yes (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'No' }}</div>
                     <div class="input-container">
-                        <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}" />
+                        <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}" />
                         {% if masked.OPEN_AI_SECRET %}
                         <button type="button" class="clear-button" onclick="clearField('openai-input')">×</button>
                         {% endif %}
                     </div>
                     {% if masked.OPEN_AI_SECRET %}
-                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>
+                    <button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>
                     {% endif %}
                 </div>
 
@@ -211,13 +211,13 @@
                     <label class="form-label">OpenWeatherMap</label>
                     <div id="openweather-status">Configured: {{ 'Yes (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'No' }}</div>
                     <div class="input-container">
-                        <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}" />
+                        <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}" />
                         {% if masked.OPEN_WEATHER_MAP_SECRET %}
                         <button type="button" class="clear-button" onclick="clearField('openweather-input')">×</button>
                         {% endif %}
                     </div>
                     {% if masked.OPEN_WEATHER_MAP_SECRET %}
-                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>
+                    <button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>
                     {% endif %}
                 </div>
 
@@ -225,13 +225,13 @@
                     <label class="form-label">NASA APOD</label>
                     <div id="nasa-status">Configured: {{ 'Yes (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'No' }}</div>
                     <div class="input-container">
-                        <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}" />
+                        <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}" />
                         {% if masked.NASA_SECRET %}
                         <button type="button" class="clear-button" onclick="clearField('nasa-input')">×</button>
                         {% endif %}
                     </div>
                     {% if masked.NASA_SECRET %}
-                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('NASA_SECRET')">Delete</button>
+                    <button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('NASA_SECRET')">Delete</button>
                     {% endif %}
                 </div>
 
@@ -239,13 +239,13 @@
                     <label class="form-label">Unsplash</label>
                     <div id="unsplash-status">Configured: {{ 'Yes (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'No' }}</div>
                     <div class="input-container">
-                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter new value (optional)" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}" />
+                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}" />
                         {% if masked.UNSPLASH_ACCESS_KEY %}
                         <button type="button" class="clear-button" onclick="clearField('unsplash-input')">×</button>
                         {% endif %}
                     </div>
                     {% if masked.UNSPLASH_ACCESS_KEY %}
-                    <button type="button" class="header-button delete-button" style="background-color: #E53935; color: #fff; margin-top: 8px;" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>
+                    <button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>
                     {% endif %}
                 </div>
             </div>

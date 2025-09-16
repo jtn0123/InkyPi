@@ -178,7 +178,7 @@
                 <button type="button" data-value="custom">Custom</button>
             </div>
             <input type="hidden" id="titleSelection" name="titleSelection" value="location" />
-            <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Type something..." style="flex:1; min-width: 160px;" />
+            <input type="text" id="customTitle" name="customTitle" class="form-input custom-title-input" placeholder="Enter custom title" />
         </div>
     </div>
 
@@ -650,7 +650,7 @@
                 if (typeof window.showResponseModal === 'function'){
                     window.showResponseModal('failure', message);
                 } else {
-                    alert(message);
+                    console.error('Weather plugin validation:', message);
                 }
                 // Focus the Select Location button to guide the user
                 const openMapBtn = document.getElementById('openMap');
@@ -666,7 +666,7 @@
                 if (typeof window.showResponseModal === 'function'){
                     window.showResponseModal('failure', message);
                 } else {
-                    alert(message);
+                    console.error('Weather plugin validation:', message);
                 }
                 return false;
             }

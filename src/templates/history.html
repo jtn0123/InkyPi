@@ -25,7 +25,7 @@
                 }
             } catch (e) {
                 console.error(e);
-                alert('Failed to redisplay image');
+                showResponseModal('failure', 'Failed to redisplay image. Please try again.');
             } finally {
                 if (btn) btn.disabled = false;
             }

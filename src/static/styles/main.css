@@ -1308,6 +1308,26 @@ select.form-input option {
     --icon-stroke-thin: 1.5px;
     --icon-opacity: 1;
     --icon-opacity-muted: 0.7;
+
+    /* Standardized spacing system */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 16px;
+    --spacing-xl: 20px;
+    --spacing-xxl: 24px;
+
+    /* Component sizing */
+    --border-radius-sm: 6px;
+    --border-radius-md: 8px;
+    --border-radius-lg: 12px;
+    --border-radius-xl: 16px;
+
+    /* Form sizing */
+    --form-input-height: 36px;
+    --form-button-height: 48px;
+    --form-slider-max-width: 400px;
+    --form-label-min-width: 100px;
 }
 [data-theme="dark"] {
     /* Enhanced dark theme with better accessibility */
@@ -3631,4 +3651,112 @@ select.form-input {
     .changes-list {
         font-size: 0.75rem;
     }
+}
+
+/* Utility classes for common inline styles */
+.delete-button-danger {
+    background-color: #E53935;
+    color: #fff;
+    margin-top: 8px;
+}
+
+.header-actions-flex {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.form-label-min-width {
+    min-width: 100px;
+}
+
+.slider-max-width {
+    max-width: 400px;
+}
+
+.custom-title-input {
+    flex: 1;
+    min-width: 160px;
+}
+
+/* Form validation feedback */
+.form-field-error {
+    border-color: var(--error) !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.form-field-success {
+    border-color: var(--success) !important;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.validation-message {
+    font-size: 0.85rem;
+    margin-top: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: none;
+}
+
+.validation-message.error {
+    color: var(--error);
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.validation-message.success {
+    color: var(--success);
+    background-color: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.validation-message.show {
+    display: block;
+}
+
+/* Required field indicators */
+.form-label.required::after {
+    content: " *";
+    color: var(--error);
+    font-weight: bold;
+}
+
+/* Modal focus management enhancements */
+.modal {
+    /* Add focus trapping styles */
+    isolation: isolate;
+}
+
+.modal-content {
+    /* Ensure modal content is in tab order */
+    position: relative;
+}
+
+.modal[aria-hidden="true"] {
+    pointer-events: none;
+}
+
+.modal[aria-hidden="false"] {
+    pointer-events: auto;
+}
+
+/* Focus visible improvements for modals */
+.modal .close-button:focus-visible,
+.modal button:focus-visible,
+.modal input:focus-visible,
+.modal select:focus-visible,
+.modal textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Backdrop click indicator */
+.modal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: transparent;
+    cursor: pointer;
 }

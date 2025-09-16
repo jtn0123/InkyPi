@@ -37,7 +37,7 @@
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred while processing your request.');
+                showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
             }
         }
 
@@ -322,7 +322,7 @@
                     {{ icon('gear-six', 'app-icon') }}
                     <h1 class="app-title">Settings</h1>
                 </div>
-                <div class="header-actions" style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+                <div class="header-actions header-actions-flex">
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
@@ -349,7 +349,7 @@
                     <div class="section-title">Basics</div>
                     <div class="form-group">
                         <label for="deviceName" class="form-label">Device Name</label>
-                        <input type="text" id="deviceName" name="deviceName" placeholder="Type something..." value="{{ device_settings.name }}" required class="form-input">
+                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required class="form-input">
                     </div>
                     <div class="form-group nowrap">
                         <div class="form-group">
@@ -453,24 +453,24 @@
                     </button>
                     <div class="settings-container collapsible-content">
                         <div class="form-group">
-                            <label for="saturation" class="form-label" style="min-width: 100px;">Saturation:</label>
+                            <label for="saturation" class="form-label form-label-min-width">Saturation:</label>
                             <span id="saturation-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
-                            <input type="range" id="saturation" name="saturation" class="form-input" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" style="max-width: 400px;" oninput="updateSliderValue(this)" />
+                            <input type="range" id="saturation" name="saturation" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" oninput="updateSliderValue(this)" />
                         </div>
                         <div class="form-group">
-                            <label for="contrast" class="form-label" style="min-width: 100px;">Contrast:</label>
+                            <label for="contrast" class="form-label form-label-min-width">Contrast:</label>
                             <span id="contrast-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
-                            <input type="range" id="contrast" name="contrast" class="form-input" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" style="max-width: 400px;" oninput="updateSliderValue(this)" />
+                            <input type="range" id="contrast" name="contrast" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" oninput="updateSliderValue(this)" />
                          </div>
                         <div class="form-group">
-                            <label for="sharpness" class="form-label" style="min-width: 100px;">Sharpness:</label>
+                            <label for="sharpness" class="form-label form-label-min-width">Sharpness:</label>
                             <span id="sharpness-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
-                            <input type="range" id="sharpness" name="sharpness" class="form-input" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" style="max-width: 400px;" oninput="updateSliderValue(this)" />
+                            <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" oninput="updateSliderValue(this)" />
                         </div>
                         <div class="form-group">
-                            <label for="brightness" class="form-label" style="min-width: 100px;">Brightness:</label>
+                            <label for="brightness" class="form-label form-label-min-width">Brightness:</label>
                             <span id="brightness-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
-                            <input type="range" id="brightness" name="brightness" class="form-input" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" style="max-width: 400px;" oninput="updateSliderValue(this)" />
+                            <input type="range" id="brightness" name="brightness" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" oninput="updateSliderValue(this)" />
                         </div>
                     </div>
                 </div>
