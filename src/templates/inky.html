@@ -51,9 +51,9 @@
             <div id="imageMetaContent"></div>
         </div>
 
-        <!-- Now showing: current plugin/instance/playlist -->
-        <div id="nowShowing" class="image-meta" style="margin-top: 8px; {% if not refresh_info.plugin_id %}display:none;{% endif %}">
-            <div id="nowShowingContent">
+        <!-- Consolidated status row: Now + Next in a single compact row -->
+        <div id="statusRow" class="image-meta status-row" style="margin-top: 8px; {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}display:none;{% endif %}">
+            <div class="status-meta" id="nowShowingBlock" style="{% if not refresh_info.plugin_id %}display:none;{% endif %}">
                 <strong>Now showing:</strong>
                 <span id="nsPlugin">{{ refresh_info.plugin_id or '' }}</span>
                 {% if refresh_info.plugin_instance %}
@@ -67,11 +67,8 @@
                 <span id="nsPlaylist" style="display:none;"></span>
                 {% endif %}
             </div>
-        </div>
-
-        <!-- Next up: non-mutating preview of the upcoming instance -->
-        <div id="nextUp" class="image-meta" style="margin-top: 4px; {% if not next_up or not next_up.plugin_id %}display:none;{% endif %}">
-            <div id="nextUpContent">
+            <div class="status-divider" aria-hidden="true"></div>
+            <div class="status-meta" id="nextUpBlock" style="{% if not next_up or not next_up.plugin_id %}display:none;{% endif %}">
                 <strong>Next up:</strong>
                 <span id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</span>
                 {% if next_up and next_up.plugin_instance %}
@@ -90,12 +87,9 @@
 
         </main>
 
-        <!-- Separator -->
-        <div class="separator" role="separator"></div>
-
         <!-- Plugin navigation section -->
         <section aria-label="Available plugins">
-            <h2 class="plugins-title">Plugins</h2>
+            <h2 class="plugins-title compact">Plugins</h2>
         {% set icon_map = {
             'ai_text': 'text-t',
             'ai_image': 'magic-wand',

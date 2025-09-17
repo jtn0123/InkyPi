@@ -351,6 +351,9 @@ body {
     margin-top: 6px;
     align-items: baseline;
 }
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.status-row .status-meta { margin-top: 0; }
+.status-divider { width: 1px; height: 18px; background: var(--surface-border); flex: 0 0 1px; opacity: 0.8; }
 .status-meta .label { color: var(--muted); font-size: 0.85rem; }
 .status-meta .value { color: var(--text); font-size: 0.95rem; font-weight: 600; }
 
@@ -369,7 +372,7 @@ body {
     width: 100%;
     height: 1px;
     background-color: var(--divider);
-    margin: 10px 0 10px 0; /* Bottom margin reduced for spacing */
+    margin: 6px 0 6px 0; /* tighter spacing on home */
 }
 
 /* Enhanced plugins section hierarchy */
@@ -377,10 +380,12 @@ body {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text);
-    margin: var(--spacing-xl) 0 var(--spacing-lg) 0;
+    margin: var(--spacing-lg) 0 var(--spacing-md) 0;
     text-align: center;
     position: relative;
 }
+/* Compact variant used on home */
+.plugins-title.compact { margin: var(--spacing-md) 0 var(--spacing-sm) 0; }
 
 .plugins-title::after {
     content: '';
@@ -933,11 +938,8 @@ select.form-input option {
 }
 
 /* Hide Checkbox */
-.toggle-checkbox {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
+/* Legacy hidden checkbox implementation removed to avoid hiding controls */
+/* The project now styles the visible checkbox directly via .toggle-checkbox */
 
 /* Toggle Background */
 .toggle-label {
