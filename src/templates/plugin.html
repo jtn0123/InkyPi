@@ -597,14 +597,22 @@
 
     <main id="main-content" role="main">
     <div class="frame">
-        <!-- Back Button -->
         {% from 'macros/icons.html' import icon %}
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('house', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
             <div class="app-identity">
                 {% from 'macros/icons.html' import icon %}
+                <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
+                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                    </svg>
+                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                    </svg>
+                </button>
                 {% set plugin_icon_map = {
                     'ai_image': 'magic-wand',
                     'ai_text': 'text-t',
@@ -641,15 +649,7 @@
                     {% endif %}
                 {% endif %}
 
-                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                    </svg>
-                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                    </svg>
-                </button>
+                
                 {% from 'macros/icons.html' import icon %}
                 <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
                 <div id="loadingIndicator" class="loading-indicator"></div>
