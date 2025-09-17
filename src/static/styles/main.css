@@ -2465,6 +2465,7 @@ select.form-input option {
 .history-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap; /* prevent overflow on narrow cards */
 }
 
 .btn {
@@ -2538,6 +2539,12 @@ select.form-input option {
 [data-theme="dark"] .form-label { color: var(--text); }
 [data-theme="dark"] .form-input { background-color: var(--input-bg); color: var(--text); border-color: var(--surface-border); }
 [data-theme="dark"] .btn, [data-theme="dark"] .action-button { color: #fff; }
+[data-theme="dark"] .btn { background-color: #30363d; color: #f0f6fc; }
+[data-theme="dark"] .btn:hover { background-color: #3a424a; }
+[data-theme="dark"] .btn.btn-primary { background-color: var(--accent); color: #ffffff; }
+[data-theme="dark"] .btn.btn-primary:hover { background-color: #2fd1b6; }
+[data-theme="dark"] .btn.btn-danger { background-color: #f85149; color: #ffffff; }
+[data-theme="dark"] .btn.btn-danger:hover { background-color: #da463f; }
 [data-theme="dark"] .logs-panel .logs-toolbar {
   background: var(--surface);
 }

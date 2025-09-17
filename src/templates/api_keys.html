@@ -172,12 +172,15 @@
 <body>
     <div class="frame">
         {% from 'macros/icons.html' import icon %}
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
         <div class="app-header">
-            <div class="title-container">
-                {% from 'macros/icons.html' import icon %}
-                {{ icon('gear-six', 'app-icon') | safe }}
-                <h1 class="app-title">API Keys</h1>
+            <div class="header-content">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <div class="title-container">
+                        {{ icon('gear-six', 'app-icon') | safe }}
+                        <h1 class="app-title">API Keys</h1>
+                    </div>
+                </div>
             </div>
             <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                 <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

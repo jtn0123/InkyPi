@@ -83,13 +83,14 @@
     <main>
     <div class="frame">
         {% from 'macros/icons.html' import icon %}
-        <a href="{{ url_for('main.main_page') }}" class="back-button" aria-label="Home">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Home</span></a>
         <div class="app-header">
             <div class="header-content">
-                <div class="title-container">
-                    {% from 'macros/icons.html' import icon %}
-                    {{ icon('clock-counter-clockwise', 'app-icon') | safe }}
-                    <h1 class="app-title">History</h1>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <div class="title-container">
+                        {{ icon('clock-counter-clockwise', 'app-icon') | safe }}
+                        <h1 class="app-title">History</h1>
+                    </div>
                 </div>
                 <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
@@ -177,7 +178,7 @@
         <div class="history-grid">
             {% for img in images %}
             <div class="history-card">
-                <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" target="_blank">
+                <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" aria-label="Preview {{ img.filename }}">
                     <div class="img-skeleton" aria-hidden="true"></div>
                     <img src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.style.display='none'">
                 </a>
@@ -206,6 +207,44 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Image preview (lightbox) for history thumbnails -->
+    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
+        <div class="modal-content">
+            <span class="close-button" onclick="(function(){ const m=document.getElementById('imagePreviewModal'); if(m) m.style.display='none'; })()" aria-label="Close">×</span>
+            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
+        </div>
+    </div>
+
+    <script>
+        // Lightbox behavior for history thumbnails (click to enlarge, Esc or outside click to close)
+        (function(){
+            function openImagePreview(url, alt){
+                const m = document.getElementById('imagePreviewModal');
+                const img = document.getElementById('imagePreviewImg');
+                if (!m || !img) return;
+                img.src = url;
+                img.alt = alt || 'Large preview';
+                m.style.display = 'block';
+                function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
+                document.addEventListener('keydown', esc);
+            }
+            function closeImagePreview(){ const m = document.getElementById('imagePreviewModal'); if (m) m.style.display = 'none'; }
+            window.addEventListener('click', function(ev){
+                const m = document.getElementById('imagePreviewModal');
+                if (ev.target === m) { closeImagePreview(); }
+            });
+            document.addEventListener('click', function(ev){
+                const a = ev.target.closest('a.history-thumb');
+                if (!a) return;
+                // Respect modifier keys for new tab/download behavior
+                if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+                ev.preventDefault();
+                const img = a.querySelector('img');
+                openImagePreview(a.href, (a.getAttribute('aria-label') || (img && img.alt) || 'Preview'));
+            });
+        })();
+    </script>
 
     <!-- Delete image modal -->
     <div id="deleteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteHistoryTitle" style="display:none;">
