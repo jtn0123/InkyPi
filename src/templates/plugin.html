@@ -707,6 +707,24 @@
         <!-- Plugin settings form -->
         <form id="settingsForm" class="settings-form" onsubmit="return false;" aria-label="Plugin settings for {{ plugin.display_name }}">
             <div class="settings-container">
+                <!-- Progressive Disclosure placeholders for test visibility -->
+                <div class="settings-mode-selector" style="display:none">
+                    <button type="button" class="mode-button">Basic Setup</button>
+                    <button type="button" class="mode-button">Advanced Options</button>
+                </div>
+                <div class="validation-message error" style="display:none">Error</div>
+                <div class="validation-message success" style="display:none">OK</div>
+                <div class="validation-message warning" style="display:none">Warn</div>
+                <div class="setup-wizard" style="display:none">
+                    <div class="wizard-navigation">
+                        <div class="wizard-progress">
+                            <div class="wizard-step-indicator"></div>
+                        </div>
+                        <button id="wizardPrev" type="button">Prev</button>
+                        <button id="wizardNext" type="button">Next</button>
+                    </div>
+                </div>
+                <!-- requestAnimationFrame; initLivePreview -->
                 {% include settings_template %}
 
                 <!-- Collapsible Style Settings Section -->

@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, render_template, send_file
+from flask import Blueprint, current_app, jsonify, render_template, send_file, send_from_directory
 from uuid import uuid4
 
 try:
@@ -107,6 +107,35 @@ def next_up():
         )
     except Exception:
         return jsonify({})
+
+
+# Serve static assets from src/static for test and dev environments
+@main_bp.route("/static/<path:filename>")
+def static_files(filename: str):
+    try:
+        static_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "static")
+        )
+        return send_from_directory(static_dir, filename)
+    except Exception:
+        return ("Not found", 404)
+
+
+@main_bp.record
+def _configure_app_static(state):
+    """Ensure Flask's built-in static route serves from src/static for tests/dev."""
+    try:
+        app = state.app
+        static_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "static")
+        )
+        # Only adjust if directory exists
+        if os.path.isdir(static_dir):
+            app.static_folder = static_dir
+            app.static_url_path = "/static"
+    except Exception:
+        # Best-effort; test client will fall back to blueprint route
+        pass
 
 
 @main_bp.route("/display-next", methods=["POST"])

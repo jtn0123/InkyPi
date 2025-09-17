@@ -23,14 +23,33 @@ class ProgressiveDisclosure {
         const settingsContainer = document.querySelector('.settings-container');
         if (!settingsContainer) return;
 
+        // Check if there are actually sections to show/hide
+        const basicSections = settingsContainer.querySelectorAll('.basic-only, .form-section:not(.advanced-only)');
+        const advancedSections = settingsContainer.querySelectorAll('.advanced-only');
+
+        if (basicSections.length === 0 && advancedSections.length === 0) {
+            // No progressive sections found, don't add the selector
+            return;
+        }
+
+        // Try to restore saved mode preference
+        try {
+            const savedMode = localStorage.getItem('inkypi_settings_mode');
+            if (savedMode === 'basic' || savedMode === 'advanced') {
+                this.currentMode = savedMode;
+            }
+        } catch (e) {
+            // Ignore localStorage errors
+        }
+
         // Create mode selector
         const modeSelector = document.createElement('div');
         modeSelector.className = 'settings-mode-selector';
         modeSelector.innerHTML = `
-            <button type="button" class="mode-button active" data-mode="basic">
+            <button type="button" class="mode-button ${this.currentMode === 'basic' ? 'active' : ''}" data-mode="basic">
                 Basic Setup
             </button>
-            <button type="button" class="mode-button" data-mode="advanced">
+            <button type="button" class="mode-button ${this.currentMode === 'advanced' ? 'active' : ''}" data-mode="advanced">
                 Advanced Options
             </button>
         `;
@@ -45,6 +64,11 @@ class ProgressiveDisclosure {
 
             const mode = button.dataset.mode;
             this.switchMode(mode);
+        });
+
+        // Make buttons explicitly keyboard-focusable
+        modeSelector.querySelectorAll('.mode-button').forEach(btn => {
+            btn.setAttribute('tabindex', '0');
         });
 
         // Set initial mode
@@ -63,6 +87,11 @@ class ProgressiveDisclosure {
         const settingsContainer = document.querySelector('.settings-container');
         if (settingsContainer) {
             settingsContainer.setAttribute('data-mode', mode);
+            // Reflect disabled state for assistive technologies
+            const advancedSections = settingsContainer.querySelectorAll('.settings-section.advanced-only');
+            advancedSections.forEach(sec => {
+                sec.setAttribute('aria-disabled', mode === 'basic' ? 'true' : 'false');
+            });
         }
 
         // Store user preference
@@ -94,10 +123,17 @@ class ProgressiveDisclosure {
     }
 
     validateField(field) {
-        const fieldContainer = field.closest('.form-field');
+        const fieldContainer = field.closest('.form-field') || field.closest('.form-group');
         if (!fieldContainer) return;
 
         const value = field.value.trim();
+
+        // Clear previous validation states
+        fieldContainer.classList.remove('has-error', 'has-success');
+        const existingError = fieldContainer.querySelector('.form-error');
+        const existingSuccess = fieldContainer.querySelector('.form-success');
+        if (existingError) existingError.remove();
+        if (existingSuccess) existingSuccess.remove();
         const fieldName = field.name || field.id;
         const rules = this.validationRules.get(fieldName) || [];
 
@@ -112,6 +148,7 @@ class ProgressiveDisclosure {
         for (const rule of rules) {
             const result = rule.validate(value, field);
             if (!result.valid) {
+                fieldContainer.classList.add('has-error');
                 this.showValidationMessage(fieldContainer, result.message, 'error');
                 field.classList.add('invalid');
                 return false;
@@ -120,6 +157,7 @@ class ProgressiveDisclosure {
 
         // Field is valid
         if (value && rules.length > 0) {
+            fieldContainer.classList.add('has-success');
             field.classList.add('valid');
         }
 
@@ -135,7 +173,15 @@ class ProgressiveDisclosure {
 
     showValidationMessage(container, message, type = 'error') {
         const messageEl = document.createElement('div');
-        messageEl.className = `validation-message ${type}`;
+        // Standard classes expected by tests, plus legacy for backward compatibility
+        const baseClass = 'validation-message';
+        let variant = 'error';
+        if (type === 'success') variant = 'success';
+        else if (type === 'warning') variant = 'warning';
+        const legacyClass = variant === 'error' ? 'form-error' : (variant === 'success' ? 'form-success' : '');
+        messageEl.className = `${baseClass} ${variant}${legacyClass ? ' ' + legacyClass : ''}`;
+        // A11y: announce dynamically added messages
+        messageEl.setAttribute('aria-live', 'polite');
         messageEl.textContent = message;
         container.appendChild(messageEl);
     }
@@ -805,6 +851,21 @@ class ProgressiveDisclosure {
         }
     }
 }
+
+/*
+ Validation rule example (for documentation/testing):
+ {
+   validate: (value) => {
+     if (value) { return { valid: true }; }
+     return { valid: false, message: 'Field is required' };
+   }
+ }
+
+ Expected validation message classes:
+ - validation-message error
+ - validation-message success
+ - validation-message warning
+*/
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

@@ -60,11 +60,21 @@ body {
     padding-bottom: 8px;
 }
 
-/* Current image styling */
+/* Enhanced main dashboard layout */
+.frame {
+    gap: var(--spacing-lg);
+}
+
+.frame > * + * {
+    margin-top: var(--spacing-lg);
+}
+
+/* Current image styling with improved hierarchy */
 .image-container {
     position: relative;
     width: 300px;
     margin: 0 auto;
+    padding: var(--spacing-xs);
 }
 
 .image-container img {
@@ -80,12 +90,32 @@ body {
 /* Any image marked lightboxable gets the zoom-in cursor */
 .lightboxable { cursor: zoom-in; }
 
+/* Enhanced meta information hierarchy */
+.image-meta {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--border-radius-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin: var(--spacing-sm) 0;
+    color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.image-meta strong {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+/* Improved spacing for status sections */
+.image-meta + .image-meta {
+    margin-top: var(--spacing-xs);
+}
+
 /* A/B compare UI styles removed (feature disabled in UI). */
 
-/* Optimized skeleton loader */
-.img-skeleton {
-    width: 100%;
-    height: 100%;
+/* Enhanced skeleton loader system */
+.skeleton {
     background: linear-gradient(
         90deg,
         var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
@@ -95,6 +125,57 @@ body {
     background-size: 400% 100%;
     animation: shimmer 1.5s ease-in-out infinite;
     will-change: background-position;
+    border-radius: var(--border-radius-sm);
+}
+
+/* Specific skeleton types */
+.img-skeleton,
+.form-skeleton,
+.button-skeleton,
+.text-skeleton {
+    /* Apply base skeleton styles to all skeleton types */
+    background: linear-gradient(
+        90deg,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
+        var(--skeleton-highlight, rgba(0,0,0,0.10)) 37%,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    will-change: background-position;
+    border-radius: var(--border-radius-sm);
+}
+
+.img-skeleton {
+    width: 100%;
+    height: 100%;
+}
+
+.form-skeleton {
+    height: var(--form-input-height);
+    margin-bottom: var(--spacing-md);
+}
+
+.button-skeleton {
+    height: var(--form-button-height);
+    border-radius: var(--border-radius-md);
+}
+
+.text-skeleton {
+    height: 1.2em;
+    margin-bottom: 0.5em;
+}
+
+.text-skeleton.short {
+    width: 60%;
+}
+
+.text-skeleton.medium {
+    width: 80%;
+}
+
+.text-skeleton.long {
+    width: 100%;
 }
 
 @keyframes shimmer {
@@ -198,8 +279,64 @@ body {
   /* Better modal sizing */
   .modal-content {
     margin: 10% auto;
+  }
+
+  /* Improved mobile form layouts */
+  .form-group.nowrap {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .form-group.nowrap > * {
+    width: 100%;
+    flex: none;
+  }
+
+  /* Stack form controls vertically on mobile */
+  .header-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .buttons-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Better spacing for form sections */
+  .form-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  /* Modal improvements for mobile */
+  .modal-content {
     width: 95%;
     max-width: 500px;
+  }
+
+  /* Improved logs interface on mobile */
+  .logs-filters {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .logs-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  /* Better title-row layout on mobile */
+  .title-row {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .custom-title-input {
+    order: 2;
   }
 }
 .status-placeholder {
@@ -235,13 +372,26 @@ body {
     margin: 10px 0 10px 0; /* Bottom margin reduced for spacing */
 }
 
+/* Enhanced plugins section hierarchy */
 .plugins-title {
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-weight: 600;
-    color: var(--muted);
-    margin-bottom: 10px;
-    text-align: left; /* Aligns the title to the left */
-    margin-left: 5px
+    color: var(--text);
+    margin: var(--spacing-xl) 0 var(--spacing-lg) 0;
+    text-align: center;
+    position: relative;
+}
+
+.plugins-title::after {
+    content: '';
+    position: absolute;
+    bottom: -var(--spacing-xs);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
 }
 
 /* Optimized button grid with better performance */
@@ -439,8 +589,17 @@ svg.icon-thin {
     color: var(--text);
 }
 
-/* Align text inputs with selects/toggles visually */
-.form-group input[type="text"], .form-group select.form-input { height: 36px; }
+/* Standardize form input heights for accessibility */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="url"],
+.form-group input[type="time"],
+.form-group select.form-input {
+    min-height: var(--form-input-height);
+    height: auto;
+}
 
 .form-group input[type="number"] {
     min-width: 50px;
@@ -654,6 +813,9 @@ svg.icon-thin {
     box-sizing: border-box;
     background-color: var(--input-bg);
     color: var(--text);
+    min-height: var(--form-input-height);
+    display: flex;
+    align-items: center;
 }
 
 /* Unified styling for dropdowns to match the rest of the UI */
@@ -712,6 +874,54 @@ select.form-input option {
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(52, 198, 166, 0.28);
+}
+
+/* Enhanced form validation states */
+.form-field {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.form-field.has-error .form-input {
+    border-color: var(--error);
+    box-shadow: 0 0 0 2px rgba(229, 62, 62, 0.2);
+}
+
+.form-field.has-error .form-label {
+    color: var(--error);
+}
+
+.form-error {
+    color: var(--error);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.form-error::before {
+    content: "⚠";
+    font-size: 1rem;
+}
+
+.form-field.has-success .form-input {
+    border-color: var(--success);
+    box-shadow: 0 0 0 2px rgba(56, 161, 105, 0.2);
+}
+
+.form-success {
+    color: var(--success);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.form-success::before {
+    content: "✓";
+    font-size: 1rem;
 }
 
 /* Toggle Container */
@@ -2085,6 +2295,22 @@ select.form-input option {
     transition-duration: 0.1s;
   }
 
+  /* Improve touch targets for form elements */
+  .form-input,
+  .toggle-container,
+  .button-group button {
+    min-height: 48px;
+  }
+
+  /* Larger touch targets for small interactive elements */
+  .toggle-container {
+    min-width: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   /* Toast positioning for mobile */
   .toast-container {
     right: 12px;
@@ -2561,19 +2787,39 @@ select.form-input option {
     transform: rotate(10deg); /* Subtle rotation */
 }
 
-/* Icon color treatment in dark mode (PNG fallbacks) */
-[data-theme="dark"] img.icon-image,
-[data-theme="dark"] img.app-icon,
-[data-theme="dark"] img.action-icon,
-[data-theme="dark"] .settings-button img {
-  filter: invert(1) hue-rotate(180deg) brightness(0.95);
+/* Improved icon treatment in dark mode */
+[data-theme="dark"] img.icon-image:not(.preserve-colors),
+[data-theme="dark"] img.app-icon:not(.preserve-colors),
+[data-theme="dark"] img.action-icon:not(.preserve-colors),
+[data-theme="dark"] .settings-button img:not(.preserve-colors) {
+  filter: brightness(0) saturate(100%) invert(85%) sepia(6%) saturate(473%) hue-rotate(202deg) brightness(103%) contrast(96%);
   transition: filter 0.2s ease;
 }
-[data-theme="dark"] img.icon-image:hover,
-[data-theme="dark"] img.app-icon:hover,
-[data-theme="dark"] img.action-icon:hover,
-[data-theme="dark"] .settings-button img:hover {
-  filter: invert(0) brightness(1.1);
+
+[data-theme="dark"] img.icon-image:hover:not(.preserve-colors),
+[data-theme="dark"] img.app-icon:hover:not(.preserve-colors),
+[data-theme="dark"] img.action-icon:hover:not(.preserve-colors),
+[data-theme="dark"] .settings-button img:hover:not(.preserve-colors) {
+  filter: brightness(0) saturate(100%) invert(100%) sepia(0%) saturate(7444%) hue-rotate(179deg) brightness(111%) contrast(111%);
+}
+
+/* Allow specific icons to preserve their original colors */
+.preserve-colors {
+  filter: none !important;
+}
+
+/* Better consistency for SVG icons */
+svg.icon-image,
+svg.app-icon {
+  color: var(--text);
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Unified hover states */
+.icon-button:hover .icon-image,
+.header-button:hover .icon-image,
+.settings-button:hover .icon-image {
+  opacity: 0.8;
 }
 
 /* Panels/cards adjust with tokens */
