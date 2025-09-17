@@ -29,7 +29,9 @@ class Newspaper(BasePlugin):
         image = None
         pulled_date = None
         for date in days:
-            image_url = FREEDOM_FORUM_URL.format(date.day, newspaper_slug)
+            # Freedom Forum organizes front pages under a month-based folder: jpg{month}
+            # e.g., jpg9 for September. Use month, not day.
+            image_url = FREEDOM_FORUM_URL.format(date.month, newspaper_slug)
             image = get_image(image_url)
             if image:
                 logger.info(
