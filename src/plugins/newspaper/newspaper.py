@@ -27,6 +27,7 @@ class Newspaper(BasePlugin):
         days = [today + timedelta(days=diff) for diff in [1, 0, -1, -2]]
 
         image = None
+        pulled_date = None
         for date in days:
             image_url = FREEDOM_FORUM_URL.format(date.day, newspaper_slug)
             image = get_image(image_url)
@@ -34,6 +35,7 @@ class Newspaper(BasePlugin):
                 logger.info(
                     f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}"
                 )
+                pulled_date = date
                 break
 
         if image:
@@ -51,6 +53,17 @@ class Newspaper(BasePlugin):
                 image = new_image
         else:
             raise RuntimeError("Newspaper front cover not found.")
+
+        # Provide minimal metadata for UI (which paper and date detected)
+        try:
+            plugin_meta = {
+                "date": pulled_date.strftime("%Y-%m-%d") if pulled_date else None,
+                "title": f"{newspaper_slug} front page",
+                "image_url": image_url if image else None,
+            }
+            self.set_latest_metadata(plugin_meta)
+        except Exception:
+            pass
 
         return image
 

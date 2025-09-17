@@ -156,14 +156,23 @@
 
             const metaDiv = document.getElementById('imageMeta');
             const metaContent = document.getElementById('imageMetaContent');
-            if (info.plugin_id === 'wpotd' && info.plugin_meta) {
+            if (info.plugin_meta) {
                 const m = info.plugin_meta;
+                const pid = info.plugin_id || '';
                 const date = m.date ? new Date(m.date).toISOString().slice(0,10) : '';
+                const title = m.title || '';
                 const caption = m.caption || '';
-                const link = m.description_url || m.page_url || '';
+                const expl = m.explanation || '';
+                const link = m.page_url || m.description_url || '';
+                let label = '';
+                if (pid === 'wpotd') label = 'Wikipedia Picture of the Day:';
+                else if (pid === 'apod') label = 'NASA APOD:';
+                else if (pid === 'newspaper') label = 'Newspaper:';
                 let html = '';
-                if (date) html += `<div><strong>Wikipedia Picture of the Day:</strong> ${date}</div>`;
+                if (date || label) html += `<div><strong>${label || pid}</strong> ${date}</div>`;
+                if (title) html += `<div style="margin-top:4px;"><em>${title}</em></div>`;
                 if (caption) html += `<div style="margin-top:4px;">${caption}</div>`;
+                if (expl) html += `<div style=\"margin-top:4px;\">${expl}</div>`;
                 if (link) html += `<div style=\"margin-top:4px;\"><a href=\"${link}\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div>`;
                 if (html) {
                     metaContent.innerHTML = html;

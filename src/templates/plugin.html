@@ -294,29 +294,35 @@
                 const ts = info && info.refresh_time ? new Date(info.refresh_time) : null;
                 const currTime = document.getElementById('currentDisplayTime');
                 if (currTime) currTime.textContent = ts ? ts.toLocaleString() : '—';
-                // Update optional plugin meta (e.g., WPOTD)
+                // Update optional plugin meta (generic across plugins)
                 const metaDiv = document.getElementById('pluginMeta');
                 const metaContent = document.getElementById('pluginMetaContent');
-                if (info && info.plugin_id === 'wpotd' && info.plugin_meta) {
-                    const m = info.plugin_meta;
-                    const date = m.date ? new Date(m.date).toISOString().slice(0,10) : '';
-                    const caption = m.caption || '';
-                    const link = m.description_url || m.page_url || '';
-                    let html = '';
-                    if (date) html += `<div><strong>Wikipedia Picture of the Day:</strong> ${date}</div>`;
-                    if (caption) html += `<div style=\"margin-top:4px;\">${caption}</div>`;
-                    if (link) html += `<div style=\"margin-top:4px;\"><a href=\"${link}\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div>`;
-                    if (html) {
-                        metaContent.innerHTML = html;
-                        metaDiv.style.display = 'block';
+                try {
+                    if (info && info.plugin_meta) {
+                        const m = info.plugin_meta || {};
+                        const pid = info.plugin_id || '';
+                        const date = m.date ? (new Date(m.date).toISOString().slice(0,10)) : '';
+                        const title = m.title || '';
+                        const caption = m.caption || '';
+                        const expl = m.explanation || '';
+                        const link = m.page_url || m.description_url || '';
+                        let label = '';
+                        if (pid === 'wpotd') label = 'Wikipedia Picture of the Day:';
+                        else if (pid === 'apod') label = 'NASA APOD:';
+                        else if (pid === 'newspaper') label = 'Newspaper:';
+                        let html = '';
+                        if (date || label) html += `<div><strong>${label || pid} </strong>${date}</div>`;
+                        if (title) html += `<div style=\"margin-top:4px;\"><em>${title}</em></div>`;
+                        if (caption) html += `<div style=\"margin-top:4px;\">${caption}</div>`;
+                        if (expl) html += `<div style=\"margin-top:4px;\">${expl}</div>`;
+                        if (link) html += `<div style=\"margin-top:4px;\"><a href=\"${link}\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div>`;
+                        if (html) { metaContent.innerHTML = html; metaDiv.style.display = 'block'; }
+                        else { metaDiv.style.display = 'none'; metaContent.textContent=''; }
                     } else {
                         metaDiv.style.display = 'none';
                         metaContent.textContent = '';
                     }
-                } else {
-                    metaDiv.style.display = 'none';
-                    metaContent.textContent = '';
-                }
+                } catch (e) { metaDiv.style.display = 'none'; metaContent.textContent = ''; }
             } catch (e) { /* ignore */ }
         }
 

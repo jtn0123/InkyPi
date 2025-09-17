@@ -89,4 +89,32 @@ class Apod(BasePlugin):
             logger.error(f"Failed to load APOD image: {str(e)}")
             raise RuntimeError("Failed to load APOD image.")
 
+        # Surface metadata for the web UI similar to WPOTD
+        try:
+            apod_date = data.get("date")  # YYYY-MM-DD
+            title = data.get("title")
+            explanation = data.get("explanation")
+            # Build canonical APOD page URL when possible: apYYMMDD.html
+            page_url = None
+            if isinstance(apod_date, str) and len(apod_date) == 10:
+                try:
+                    y, m, d = apod_date.split("-")
+                    page_url = f"https://apod.nasa.gov/apod/ap{y[2:]}{m}{d}.html"
+                except Exception:
+                    page_url = None
+
+            plugin_meta = {
+                "date": apod_date,
+                "title": title,
+                "explanation": explanation,
+                "media_type": data.get("media_type"),
+                "image_url": image_url,
+                "page_url": page_url,
+                "copyright": data.get("copyright"),
+            }
+            self.set_latest_metadata(plugin_meta)
+        except Exception:
+            # Never fail render due to metadata enrichment
+            pass
+
         return image
