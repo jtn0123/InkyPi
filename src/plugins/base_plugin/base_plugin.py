@@ -6,6 +6,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_utils import take_screenshot_html
+import os
+from time import perf_counter
+from utils.progress import record_step
 import base64
 from PIL import Image
 
@@ -175,9 +178,46 @@ class BasePlugin:
 
         # load and render the given html template
         template = self.env.get_template(html_file)
+        t0 = perf_counter()
         rendered_html = template.render(template_params)
+        try:
+            logger.info(
+                "Render template complete | plugin=%s template=%s elapsed_ms=%s",
+                self.get_plugin_id(),
+                html_file,
+                int((perf_counter() - t0) * 1000),
+            )
+        except Exception:
+            pass
+        try:
+            record_step("template")
+        except Exception:
+            pass
 
-        image = take_screenshot_html(rendered_html, dimensions)
+        # Screenshot with optional timeout from environment
+        timeout_ms = None
+        try:
+            raw = os.getenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "").strip()
+            if raw:
+                timeout_ms = int(raw)
+        except Exception:
+            timeout_ms = None
+
+        t1 = perf_counter()
+        image = take_screenshot_html(rendered_html, dimensions, timeout_ms=timeout_ms)
+        try:
+            logger.info(
+                "Screenshot complete | plugin=%s timeout_ms=%s elapsed_ms=%s",
+                self.get_plugin_id(),
+                timeout_ms,
+                int((perf_counter() - t1) * 1000),
+            )
+        except Exception:
+            pass
+        try:
+            record_step("screenshot")
+        except Exception:
+            pass
         if image is None:
             logger.error(
                 "Rendering HTML to image returned None. Check screenshot backend."

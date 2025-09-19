@@ -191,6 +191,33 @@ Enable JSON logs via environment variable (defaults remain plain text from `src/
 INKYPI_LOG_FORMAT=json INKYPI_LOG_LEVEL=DEBUG python -m src.inkypi --web-only --dev
 ```
 
+### Runtime Diagnostics
+
+- Enable request and HTTP latency logging (via environment):
+
+```
+INKYPI_REQUEST_TIMING=1
+INKYPI_HTTP_LOG_LATENCY=1
+# Optional timeouts/retries
+INKYPI_HTTP_TIMEOUT_DEFAULT_S=20
+INKYPI_HTTP_CONNECT_TIMEOUT_S=5
+INKYPI_HTTP_READ_TIMEOUT_S=20
+INKYPI_HTTP_RETRIES=2
+INKYPI_SCREENSHOT_TIMEOUT_MS=45000
+```
+
+- Show recent benchmark rows:
+
+```
+PYTHONPATH=src python scripts/show_benchmarks.py --limit 20
+```
+
+- Network diagnostics on device:
+
+```
+python3 scripts/diag_network.py --urls https://api.openweathermap.org https://images-api.nasa.gov https://www.google.com/generate_204
+```
+
 ## Waveshare Display Support
 
 Waveshare offers a range of e-Paper displays, similar to the Inky screens from Pimoroni, but with slightly different requirements. While Inky displays auto-configure via the inky Python library, Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd).

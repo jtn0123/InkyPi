@@ -7,7 +7,8 @@ import os
 import secrets
 import warnings
 
-from flask import Flask, request
+from flask import Flask, request, g
+from time import perf_counter
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -311,6 +312,12 @@ def create_app():
 
     # Consistent JSON error handling
     @app.before_request
+    def _start_request_timer():
+        try:
+            g._t0 = perf_counter()
+        except Exception:
+            pass
+    @app.before_request
     def _attach_request_id():
         # Ensure each request has a request_id stored in g and echoed in responses
         try:
@@ -361,6 +368,21 @@ def create_app():
 
     @app.after_request
     def _set_security_headers(response):
+        # Request timing log (env-gated)
+        try:
+            if os.getenv("INKYPI_REQUEST_TIMING", "").strip().lower() in ("1", "true", "yes"):
+                t0 = getattr(g, "_t0", None)
+                if t0 is not None:
+                    elapsed_ms = int((perf_counter() - t0) * 1000)
+                    logger.info(
+                        "HTTP %s %s -> %s in %sms",
+                        request.method,
+                        request.path,
+                        response.status_code,
+                        elapsed_ms,
+                    )
+        except Exception:
+            pass
         # Basic hardening headers
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")

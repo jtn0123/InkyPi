@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 import threading
 from typing import Any
+import os
+from time import perf_counter
 
 import requests
 from flask import Request, jsonify, request, g
@@ -149,7 +151,44 @@ def wants_json(req: Request | None = None) -> bool:
 _thread_local = threading.local()
 
 # Conservative defaults that keep tests fast (no backoff sleeps) while providing resiliency
-DEFAULT_TIMEOUT_SECONDS: float = 20.0
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        raw = os.getenv(name)
+        if raw is None or raw.strip() == "":
+            return default
+        return float(raw)
+    except Exception:
+        return default
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        raw = os.getenv(name)
+        if raw is None or raw.strip() == "":
+            return default
+        return int(raw)
+    except Exception:
+        return default
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    try:
+        raw = os.getenv(name, "")
+        return raw.strip().lower() in ("1", "true", "yes", "on")
+    except Exception:
+        return default
+
+DEFAULT_TIMEOUT_SECONDS: float = _env_float("INKYPI_HTTP_TIMEOUT_DEFAULT_S", 20.0)
+CONNECT_TIMEOUT_SECONDS: float | None = None
+READ_TIMEOUT_SECONDS: float | None = None
+try:
+    # Optional split timeouts; if either is set, we pass a (connect, read) tuple
+    _c = os.getenv("INKYPI_HTTP_CONNECT_TIMEOUT_S")
+    _r = os.getenv("INKYPI_HTTP_READ_TIMEOUT_S")
+    CONNECT_TIMEOUT_SECONDS = float(_c) if _c and _c.strip() != "" else None
+    READ_TIMEOUT_SECONDS = float(_r) if _r and _r.strip() != "" else None
+except Exception:
+    CONNECT_TIMEOUT_SECONDS = None
+    READ_TIMEOUT_SECONDS = None
 DEFAULT_HEADERS: dict[str, str] = {
     "User-Agent": "InkyPi/1.0 (+https://github.com/fatihak/InkyPi)"
 }
@@ -157,12 +196,17 @@ DEFAULT_HEADERS: dict[str, str] = {
 
 def _build_retry() -> Retry:
     # Retry idempotent methods on common transient failures
+    retries_total = _env_int("INKYPI_HTTP_RETRIES", 3)
+    retries_connect = _env_int("INKYPI_HTTP_RETRIES_CONNECT", retries_total)
+    retries_read = _env_int("INKYPI_HTTP_RETRIES_READ", retries_total)
+    retries_status = _env_int("INKYPI_HTTP_RETRIES_STATUS", retries_total)
+    backoff = _env_float("INKYPI_HTTP_BACKOFF", 0.0)  # keep tests snappy by default
     return Retry(
-        total=3,
-        connect=3,
-        read=3,
-        status=3,
-        backoff_factor=0.0,  # keep tests snappy; no sleep between retries
+        total=retries_total,
+        connect=retries_connect,
+        read=retries_read,
+        status=retries_status,
+        backoff_factor=backoff,
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=(
             "HEAD",
@@ -214,14 +258,59 @@ def http_get(
     final_headers = dict(DEFAULT_HEADERS)
     if headers:
         final_headers.update(headers)
-    return session.get(
-        url,
-        params=params,
-        headers=final_headers,
-        timeout=DEFAULT_TIMEOUT_SECONDS if timeout is None else timeout,
-        stream=stream,
-        allow_redirects=allow_redirects,
-    )
+
+    # Determine timeout to use
+    effective_timeout: float | tuple[float, float]
+    if timeout is not None:
+        effective_timeout = timeout
+    else:
+        if CONNECT_TIMEOUT_SECONDS is not None or READ_TIMEOUT_SECONDS is not None:
+            ct = CONNECT_TIMEOUT_SECONDS if CONNECT_TIMEOUT_SECONDS is not None else DEFAULT_TIMEOUT_SECONDS
+            rt = READ_TIMEOUT_SECONDS if READ_TIMEOUT_SECONDS is not None else DEFAULT_TIMEOUT_SECONDS
+            effective_timeout = (float(ct), float(rt))
+        else:
+            effective_timeout = DEFAULT_TIMEOUT_SECONDS
+
+    # Optional latency logging
+    log_latency = _env_bool("INKYPI_HTTP_LOG_LATENCY", False)
+    t0 = perf_counter() if log_latency else 0.0
+    try:
+        resp = session.get(
+            url,
+            params=params,
+            headers=final_headers,
+            timeout=effective_timeout,
+            stream=stream,
+            allow_redirects=allow_redirects,
+        )
+    except Exception as ex:
+        if log_latency:
+            elapsed_ms = int((perf_counter() - t0) * 1000)
+            try:
+                logger.warning(
+                    "HTTP GET failed | url=%s elapsed_ms=%s error=%s",
+                    url,
+                    elapsed_ms,
+                    type(ex).__name__,
+                )
+            except Exception:
+                pass
+        raise
+
+    if log_latency:
+        try:
+            elapsed_ms = int((perf_counter() - t0) * 1000)
+            logger.info(
+                "HTTP GET | url=%s status=%s elapsed_ms=%s bytes=%s",
+                url,
+                getattr(resp, "status_code", "?"),
+                elapsed_ms,
+                len(getattr(resp, "content", b"")) if not stream else 0,
+            )
+        except Exception:
+            pass
+
+    return resp
 
 
 def _reset_shared_session_for_tests() -> None:
