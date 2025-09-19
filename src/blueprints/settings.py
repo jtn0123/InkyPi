@@ -3,10 +3,13 @@ import io
 import logging
 import os
 import re
+import shutil
 import subprocess
+import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
+import shlex
 
 import pytz
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
@@ -125,6 +128,226 @@ def _read_log_lines(hours: int) -> list[str]:
         except Exception:
             pass
     return lines
+
+
+def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
+    """Read service logs for the last N hours for one or more units and merge chronologically.
+
+    Falls back to the development message when journal is not available.
+    """
+    try:
+        from flask import current_app
+
+        device_config = current_app.config["DEVICE_CONFIG"]
+        since = now_device_tz(device_config) - timedelta(hours=hours)
+    except Exception:
+        since = datetime.now(tz=get_timezone("UTC")) - timedelta(hours=hours)
+
+    if not JOURNAL_AVAILABLE:
+        dev_lines = [
+            "Log download not available in development mode (cysystemd not installed).",
+            f"Logs would normally show these units from the last {hours} hours: {', '.join(units)}.",
+            "",
+            "To see Flask development logs, check your terminal output.",
+        ]
+        return dev_lines
+
+    merged: list[tuple[float, str]] = []
+    reader = JournalReader()
+    try:
+        reader.open(JournalOpenMode.SYSTEM)
+        reader.seek_realtime_usec(int(since.timestamp() * 1_000_000))
+        for record in reader:
+            try:
+                data = record.data
+                unit_name = data.get("_SYSTEMD_UNIT", "")
+                if unit_name not in units:
+                    continue
+                ts_usec = record.get_realtime_usec()
+                ts = datetime.fromtimestamp(ts_usec / 1_000_000)
+                formatted_ts = ts.strftime("%b %d %H:%M:%S")
+                hostname = data.get("_HOSTNAME", "unknown-host")
+                identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
+                pid = data.get("_PID", "?")
+                msg = (data.get("MESSAGE", "") or "").rstrip()
+                line = f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}"
+                merged.append((ts.timestamp(), line))
+            except Exception:
+                # Skip malformed records
+                continue
+    finally:
+        try:
+            reader.close()
+        except Exception:
+            pass
+    # Sort by timestamp and return only the text
+    merged.sort(key=lambda t: t[0])
+    return [text for _, text in merged]
+
+
+# In-memory update state for coordinating UI status and logs
+_UPDATE_STATE: dict[str, object] = {
+    "running": False,
+    "unit": None,
+    "started_at": None,  # epoch seconds
+}
+
+
+def _get_install_update_script_path() -> str | None:
+    """Return absolute path to update.sh if available on this host.
+
+    Priorities:
+    - $PROJECT_DIR/install/update.sh (production install path)
+    - repo-relative ../../install/update.sh (developer environment)
+    """
+    # 1) production install path
+    project_dir = os.getenv("PROJECT_DIR")
+    if project_dir:
+        prod = os.path.join(project_dir, "install", "update.sh")
+        if os.path.isfile(prod):
+            return prod
+    # 2) repo path (this file: src/blueprints/settings.py → repo_root/install/update.sh)
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_install = os.path.abspath(os.path.join(here, "..", "..", "install", "update.sh"))
+    if os.path.isfile(repo_install):
+        return repo_install
+    return None
+
+
+def _systemd_available() -> bool:
+    try:
+        return shutil.which("systemd-run") is not None
+    except Exception:
+        return False
+
+
+def _set_update_state(running: bool, unit: str | None):
+    _UPDATE_STATE["running"] = bool(running)
+    _UPDATE_STATE["unit"] = unit
+    _UPDATE_STATE["started_at"] = float(time.time()) if running else None
+
+
+def _start_update_via_systemd(unit_name: str, script_path: str) -> None:
+    # Run update script in a transient systemd unit so its logs are visible in journal
+    cmd = [
+        "systemd-run",
+        "--collect",
+        f"--unit={unit_name}",
+        "--property=StandardOutput=journal",
+        "--property=StandardError=journal",
+        "/bin/bash",
+        "-lc",
+        shlex.quote(script_path),
+    ]
+    subprocess.Popen(cmd)  # nosec: commands are fixed, script path quoted
+
+
+def _start_update_fallback_thread(script_path: str | None) -> None:
+    # Development/macOS path: run a simulated update and pipe output into our logger
+    # to make it visible in inkypi.service logs and the UI viewer.
+    def _runner():
+        try:
+            logger.info("web_update: starting")
+            if script_path and os.path.isfile(script_path) and os.access(script_path, os.X_OK):
+                # Do not run the real script unless explicitly enabled
+                allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in ("1", "true", "yes")
+                if allow_real:
+                    proc = subprocess.Popen(
+                        ["/bin/bash", "-lc", shlex.quote(script_path)],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        bufsize=1,
+                        universal_newlines=True,
+                    )
+                    for line in proc.stdout or []:
+                        logger.info("update | %s", line.rstrip())
+                    proc.wait()
+                    rc = proc.returncode if proc.returncode is not None else 0
+                    if rc == 0:
+                        logger.info("web_update: completed successfully")
+                    else:
+                        logger.error("web_update: failed with return code %s", rc)
+                else:
+                    # Simulated update to avoid privileged operations in development and tests
+                    for msg in [
+                        "Simulated update starting...",
+                        "Checking connectivity...",
+                        "Fetching latest dependencies...",
+                        "Updating application files...",
+                        "Restarting service...",
+                        "Update completed.",
+                    ]:
+                        logger.info("update | %s", msg)
+                        time.sleep(0.5)
+            else:
+                for i in range(6):
+                    logger.info("update | step %d/6", i + 1)
+                    time.sleep(0.5)
+                logger.info("update | done (simulated)")
+        except Exception:
+            logger.exception("web_update: exception while running update")
+        finally:
+            _set_update_state(False, None)
+
+    t = threading.Thread(target=_runner, name="update-fallback", daemon=True)
+    t.start()
+
+
+@settings_bp.route("/settings/update", methods=["POST"])  # start update
+def start_update():
+    """Trigger InkyPi update via systemd-run when available, with dev fallback.
+
+    Returns JSON immediately; progress is visible in the Logs panel via /api/logs.
+    """
+    try:
+        if _UPDATE_STATE.get("running"):
+            return jsonify({
+                "success": False,
+                "error": "Update already in progress.",
+                "running": True,
+                "unit": _UPDATE_STATE.get("unit"),
+            }), 409
+
+        script_path = _get_install_update_script_path()
+        unit = f"inkypi-update-{int(time.time())}"
+
+        if _systemd_available():
+            _set_update_state(True, f"{unit}.service")
+            try:
+                _start_update_via_systemd(unit, script_path or "/usr/local/inkypi/install/update.sh")
+            except Exception:
+                # If systemd-run fails unexpectedly, fall back to thread runner
+                logger.exception("systemd-run failed; falling back to thread runner")
+                _start_update_fallback_thread(script_path)
+        else:
+            _set_update_state(True, None)
+            _start_update_fallback_thread(script_path)
+
+        return jsonify({
+            "success": True,
+            "running": True,
+            "unit": _UPDATE_STATE.get("unit"),
+            "message": "Update started. Watch the Logs panel for progress.",
+        })
+    except Exception as e:
+        logger.exception("/settings/update error")
+        return json_internal_error("start update", details={"error": str(e)})
+
+
+@settings_bp.route("/settings/update_status")
+def update_status():
+    try:
+        running = bool(_UPDATE_STATE.get("running"))
+        unit = _UPDATE_STATE.get("unit")
+        started_at = _UPDATE_STATE.get("started_at")
+        return jsonify({
+            "running": running,
+            "unit": unit,
+            "started_at": started_at,
+        })
+    except Exception as e:
+        return json_internal_error("update status", details={"error": str(e)})
 
 
 @settings_bp.route("/settings")
@@ -505,8 +728,15 @@ def api_logs():
 
         level = (request.args.get("level") or "all").lower()
 
-        # Read raw lines then apply filtering server-side
-        lines = _read_log_lines(hours)
+        # Read raw lines for the main service; include update unit if running
+        units = ["inkypi.service"]
+        update_unit = _UPDATE_STATE.get("unit")
+        if isinstance(update_unit, str) and update_unit:
+            units.append(update_unit)
+        if len(units) == 1:
+            lines = _read_log_lines(hours)
+        else:
+            lines = _read_units_log_lines(hours, units)
 
         if contains:
             lc = contains.lower()
@@ -549,6 +779,7 @@ def api_logs():
                     "limit": limit,
                     "level": level,
                     "contains": contains,
+                    "units": units,
                 },
             }
         )

@@ -9,7 +9,10 @@ from utils.image_utils import get_image
 
 logger = logging.getLogger(__name__)
 
-FREEDOM_FORUM_URL = "https://cdn.freedomforum.org/dfp/jpg{}/lg/{}.jpg"
+# Canonical template for building Freedom Forum front page image URLs.
+# Note: Historically the CDN layout has varied across months and sizes.
+# We will construct candidates from these components and try fallbacks.
+FREEDOM_FORUM_URL = "https://cdn.freedomforum.org/dfp/{}/{}/{}.jpg"
 
 
 class Newspaper(BasePlugin):
@@ -18,26 +21,61 @@ class Newspaper(BasePlugin):
 
         if not newspaper_slug:
             raise RuntimeError("Newspaper input not provided.")
-        newspaper_slug = newspaper_slug.upper()
+        # Use slug as-provided by settings (UI provides canonical value from constants).
+        # We'll try multiple case variants as fallbacks below to be robust.
+        provided_slug = str(newspaper_slug)
 
         # Get today's date
         today = datetime.today()
 
-        # check the next day, then today, then prior day
+        # Check the next day, then today, then prior two days (covers early postings and delays)
         days = [today + timedelta(days=diff) for diff in [1, 0, -1, -2]]
 
         image = None
+        image_url = None
         pulled_date = None
+
+        # Build ordered candidate lists to try
+        def build_month_dir_variants(month_number: int) -> list[str]:
+            # Some months may be stored as jpg9 and others as jpg09; try both
+            return [f"jpg{month_number}", f"jpg{month_number:02d}"]
+
+        size_folder_variants = ["lg", "md", "sm"]
+        # Try provided (likely lowercase from constants) first, then uppercase, then lowercase explicitly
+        def build_slug_variants(slug: str) -> list[str]:
+            variants = []
+            for v in [slug, slug.upper(), slug.lower()]:
+                if v not in variants:
+                    variants.append(v)
+            return variants
+
         for date in days:
-            # Freedom Forum organizes front pages under a month-based folder: jpg{month}
-            # e.g., jpg9 for September. Use month, not day.
-            image_url = FREEDOM_FORUM_URL.format(date.month, newspaper_slug)
-            image = get_image(image_url)
+            for month_dir in build_month_dir_variants(date.month):
+                for size_folder in size_folder_variants:
+                    for slug_variant in build_slug_variants(provided_slug):
+                        candidate_url = FREEDOM_FORUM_URL.format(
+                            month_dir, size_folder, slug_variant
+                        )
+                        candidate_img = get_image(candidate_url)
+                        if candidate_img:
+                            image = candidate_img
+                            image_url = candidate_url
+                            pulled_date = date
+                            try:
+                                logger.info(
+                                    "Found %s front cover for %s using %s",
+                                    slug_variant,
+                                    date.strftime("%Y-%m-%d"),
+                                    candidate_url,
+                                )
+                            except Exception:
+                                pass
+                            break
+                    if image:
+                        break
+                if image:
+                    break
             if image:
-                logger.info(
-                    f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}"
-                )
-                pulled_date = date
                 break
 
         if image:
@@ -60,7 +98,7 @@ class Newspaper(BasePlugin):
         try:
             plugin_meta = {
                 "date": pulled_date.strftime("%Y-%m-%d") if pulled_date else None,
-                "title": f"{newspaper_slug} front page",
+                "title": f"{provided_slug} front page",
                 "image_url": image_url if image else None,
             }
             self.set_latest_metadata(plugin_meta)

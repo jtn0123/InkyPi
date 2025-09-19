@@ -42,3 +42,19 @@ def test_save_settings_success_triggers_interval_update(client, flask_app, monke
     assert resp.status_code == 200
     # Changing from default 300s to 3600s should signal
     assert called["signaled"] is True
+
+
+def test_start_update_endpoint(client, monkeypatch):
+    # Ensure start_update returns JSON and doesn't crash in dev
+    resp = client.post("/settings/update")
+    assert resp.status_code in (200, 409)
+    data = resp.get_json()
+    assert isinstance(data, dict)
+    assert "running" in data
+
+
+def test_update_status_endpoint(client):
+    resp = client.get("/settings/update_status")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert "running" in data

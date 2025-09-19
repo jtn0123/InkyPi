@@ -186,8 +186,17 @@
             const viewer = document.getElementById('logsViewer');
             if (!viewer) return;
             try {
-                const resp = await fetch(`{{ url_for('settings.download_logs') }}?hours=${encodeURIComponent(hours)}`, { cache: 'no-store' });
-                lastLogsRaw = await resp.text();
+                const filterInput = document.getElementById('logsFilter');
+                const levelSelect = document.getElementById('logsLevel');
+                const maxLinesInput = document.getElementById('logsMaxLines');
+                const params = new URLSearchParams();
+                params.set('hours', String(hours));
+                if (levelSelect) params.set('level', levelSelect.value || 'all');
+                if (filterInput && filterInput.value) params.set('contains', filterInput.value);
+                if (maxLinesInput) params.set('limit', String(Math.max(50, parseInt(maxLinesInput.value || '500', 10))));
+                const resp = await fetch(`{{ url_for('settings.api_logs') }}?` + params.toString(), { cache: 'no-store' });
+                const data = await resp.json();
+                lastLogsRaw = (data && Array.isArray(data.lines)) ? data.lines.join('\n') : '';
                 updateLastUpdated();
                 applyLogFiltersAndRender();
                 flashLogsViewer();
@@ -334,6 +343,7 @@
                 <div class="header-actions header-actions-flex">
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
+                    <button class="header-button" onclick="startUpdate()">Update InkyPi</button>
                     <button class="header-button" onclick="openBackupRestore()">Backup & Restore</button>
                     <button class="header-button is-warning" onclick="handleShutdown(true)">Reboot</button>
                     <button class="header-button is-danger" onclick="handleShutdown(false)">Shutdown</button>
@@ -535,6 +545,45 @@
     {% include 'response_modal.html' %}
     </main>
     <script>
+        let __updateTimer = null;
+        async function startUpdate(){
+            const btns = document.querySelectorAll('.header-actions .header-button');
+            try {
+                // Disable header actions during update start to avoid duplicates
+                btns.forEach(b => b.disabled = true);
+                const resp = await fetch(`{{ url_for('settings.start_update') }}`, { method: 'POST' });
+                const data = await resp.json();
+                if (!resp.ok || !data.success){
+                    showResponseModal('failure', data.error || 'Failed to start update');
+                    return;
+                }
+                showResponseModal('success', data.message || 'Update started.');
+                // Poll logs frequently while update is running
+                if (__updateTimer) clearInterval(__updateTimer);
+                __updateTimer = setInterval(async () => {
+                    try {
+                        await fetchAndRenderLogs();
+                        const sresp = await fetch(`{{ url_for('settings.update_status') }}`);
+                        const sdata = await sresp.json();
+                        if (!sdata || !sdata.running){
+                            clearInterval(__updateTimer);
+                            __updateTimer = null;
+                            // Final refresh after completion
+                            setTimeout(fetchAndRenderLogs, 500);
+                        }
+                    } catch(e) {
+                        // stop polling on errors
+                        clearInterval(__updateTimer);
+                        __updateTimer = null;
+                    }
+                }, 2000);
+            } catch(e){
+                showResponseModal('failure', 'Failed to start update');
+            } finally {
+                // Re-enable header buttons (except while timer is active we still allow interactions)
+                btns.forEach(b => b.disabled = false);
+            }
+        }
         function openBackupRestore(){
             const section = document.getElementById('backupRestoreSection');
             if (section) {

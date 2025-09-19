@@ -7,6 +7,8 @@ from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 import utils.http_utils as http_utils
+from utils.progress import record_step
+from time import perf_counter
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +122,19 @@ class AIImage(BasePlugin):
 
         # Try image generation; if policy violation occurs, retry once with a safe fallback prompt
         try:
+            _t_provider_gen = perf_counter()
             response = ai_client.images.generate(**args)
+            try:
+                record_step("provider_generate")
+            except Exception:
+                pass
+            try:
+                logger.info(
+                    "AI provider generate elapsed_ms=%s",
+                    int((perf_counter() - _t_provider_gen) * 1000),
+                )
+            except Exception:
+                pass
         except Exception as e:
             if "content_policy_violation" in str(e):
                 logger.warning(
@@ -139,12 +153,25 @@ class AIImage(BasePlugin):
 
         if image_url:
             # Download the generated image using centralized HTTP helper
+            _t_download = perf_counter()
             resp = http_utils.http_get(image_url, timeout=30)
             # Respect raise_for_status if available; MagicMocks in tests will no-op
             raise_for_status = getattr(resp, "raise_for_status", None)
             if callable(raise_for_status):
                 raise_for_status()
             content_bytes = resp.content
+            try:
+                record_step("provider_download")
+            except Exception:
+                pass
+            try:
+                logger.info(
+                    "AI image download elapsed_ms=%s bytes=%s",
+                    int((perf_counter() - _t_download) * 1000),
+                    len(content_bytes),
+                )
+            except Exception:
+                pass
         elif b64_payload:
             # Decode inline base64 payload returned by some OpenAI clients
             import base64
@@ -159,9 +186,21 @@ class AIImage(BasePlugin):
             raise RuntimeError("OpenAI image response missing image data")
 
         from utils.image_utils import load_image_from_bytes
+        _t_decode = perf_counter()
         img = load_image_from_bytes(content_bytes, image_open=Image.open)
         if img is None:
             raise RuntimeError("Failed to decode AI image bytes")
+        try:
+            record_step("provider_decode")
+        except Exception:
+            pass
+        try:
+            logger.info(
+                "AI image decode elapsed_ms=%s",
+                int((perf_counter() - _t_decode) * 1000),
+            )
+        except Exception:
+            pass
         return img
 
     @staticmethod
