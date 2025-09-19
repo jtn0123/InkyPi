@@ -108,7 +108,9 @@ def _env_port() -> int:
 
 PORT = _env_port()
 args = None  # Populated by main()
-app = None
+# Flask app is created in main()/create_app(); declare as Optional for runtime init,
+# but we will guard all uses below so mypy understands non-None when accessed.
+app: Flask | None = None
 
 
 def main(argv: list[str] | None = None):
@@ -413,23 +415,27 @@ def create_app():
 
 
 if __name__ == "__main__":
-    main()
+    created_app = main()
+
+    # Guard: mypy knows created_app is Flask; assign to module-level and use local
+    app = created_app
 
     # start the background refresh task (unless running web-only)
-    refresh_task = app.config["REFRESH_TASK"]
-    if not WEB_ONLY and not is_running_from_reloader():
-        refresh_task.start()
+    refresh_task_obj = created_app.config.get("REFRESH_TASK")
+    if not WEB_ONLY and not is_running_from_reloader() and refresh_task_obj is not None:
+        refresh_task_obj.start()
     else:
         logger.info("Web-only mode enabled: background refresh task will not start")
 
     # display default inkypi image on startup (skip if web-only)
-    if not WEB_ONLY and app.config["DEVICE_CONFIG"].get_config("startup") is True:
+    device_cfg = created_app.config.get("DEVICE_CONFIG")
+    if not WEB_ONLY and device_cfg is not None and device_cfg.get_config("startup") is True:
         logger.info("Startup flag is set, displaying startup image")
-        device_config = app.config["DEVICE_CONFIG"]
-        display_manager = app.config["DISPLAY_MANAGER"]
-        img = generate_startup_image(device_config.get_resolution())
-        display_manager.display_image(img)
-        device_config.update_value("startup", False, write=True)
+        display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
+        img = generate_startup_image(device_cfg.get_resolution())
+        if display_manager_obj is not None:
+            display_manager_obj.display_image(img)
+        device_cfg.update_value("startup", False, write=True)
 
     try:
         # Run the Flask app
@@ -440,7 +446,8 @@ if __name__ == "__main__":
             if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
 
-        serve(app, host="0.0.0.0", port=PORT, threads=1)
+        serve(created_app, host="0.0.0.0", port=PORT, threads=1)
     finally:
-        refresh_task = app.config["REFRESH_TASK"]
-        refresh_task.stop()
+        refresh_task_obj = created_app.config.get("REFRESH_TASK")
+        if refresh_task_obj is not None:
+            refresh_task_obj.stop()
