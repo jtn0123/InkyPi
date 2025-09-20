@@ -315,3 +315,156 @@ def test_main_css_typography_hierarchy(client):
     assert "font-weight: 600" in css_content
     assert "letter-spacing:" in css_content
     assert "line-height:" in css_content
+
+
+def test_main_css_contains_enhanced_skeleton_styles(client):
+    """Test that main.css contains enhanced skeleton loading styles."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for plugin-specific skeleton patterns
+    assert ".plugin-skeleton" in css_content
+    assert ".plugin-skeleton-weather" in css_content
+    assert ".plugin-skeleton-calendar" in css_content
+    assert ".plugin-skeleton-image" in css_content
+    assert ".plugin-skeleton-text" in css_content
+
+    # Check for skeleton components
+    assert ".skeleton-weather-header" in css_content
+    assert ".skeleton-weather-icon" in css_content
+    assert ".skeleton-calendar-grid" in css_content
+    assert ".skeleton-image-main" in css_content
+
+    # Check for progress skeleton
+    assert ".progress-skeleton" in css_content
+    assert ".skeleton-progress-steps" in css_content
+    assert ".skeleton-step-indicator" in css_content
+
+
+def test_main_css_contains_enhanced_progress_styles(client):
+    """Test that main.css contains enhanced progress display styles."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for enhanced progress display
+    assert ".enhanced-progress-header" in css_content
+    assert ".progress-title-section" in css_content
+    assert ".progress-subtitle" in css_content
+    assert ".enhanced-progress-bar-section" in css_content
+    assert ".enhanced-progress-fill" in css_content
+
+    # Check for step indicators
+    assert ".enhanced-progress-steps" in css_content
+    assert ".enhanced-step" in css_content
+    assert ".enhanced-step.active" in css_content
+    assert ".enhanced-step.completed" in css_content
+    assert ".enhanced-step.failed" in css_content
+
+    # Check for progress details
+    assert ".enhanced-progress-details" in css_content
+    assert ".enhanced-progress-log" in css_content
+    assert ".log-entry" in css_content
+
+
+def test_main_css_contains_api_validation_styles(client):
+    """Test that main.css contains API validation indicator styles."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for API validation indicators
+    assert ".api-validation-indicator" in css_content
+    assert ".validation-status" in css_content
+    assert ".status-icon" in css_content
+    assert ".status-text" in css_content
+
+    # Check for validation states
+    assert ".validation-status.status-idle" in css_content
+    assert ".validation-status.status-validating" in css_content
+    assert ".validation-status.status-success" in css_content
+    assert ".validation-status.status-error" in css_content
+
+    # Check for validation details
+    assert ".validation-details" in css_content
+    assert ".detail-item" in css_content
+    assert ".detail-label" in css_content
+    assert ".detail-value" in css_content
+
+    # Check for spin animation
+    assert "@keyframes spin" in css_content
+
+
+def test_main_css_contains_operation_status_styles(client):
+    """Test that main.css contains operation status indicator styles."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for operation status container
+    assert ".operation-status-container" in css_content
+    assert ".status-header" in css_content
+    assert ".status-summary" in css_content
+    assert ".status-count" in css_content
+    assert ".status-rate" in css_content
+
+    # Check for operation items
+    assert ".operation-item" in css_content
+    assert ".operation-header" in css_content
+    assert ".operation-icon" in css_content
+    assert ".operation-description" in css_content
+    assert ".operation-time" in css_content
+
+    # Check for operation states
+    assert ".operation-item.status-in_progress" in css_content
+    assert ".operation-item.status-completed" in css_content
+    assert ".operation-item.status-failed" in css_content
+    assert ".operation-item.status-cancelled" in css_content
+
+    # Check for operation progress
+    assert ".operation-progress" in css_content
+    assert ".operation-step" in css_content
+    assert ".operation-error" in css_content
+
+    # Check for mobile optimizations
+    assert "@media (max-width: 640px)" in css_content
+
+
+def test_main_css_contains_status_color_variables(client):
+    """Test that main.css contains status color variables."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for status color variables
+    assert "--success-bg:" in css_content
+    assert "--error-bg:" in css_content
+    assert "--primary-bg:" in css_content
+
+    # Check for dark theme variants
+    assert "[data-theme=\"dark\"]" in css_content and "--success-bg:" in css_content
+    assert "[data-theme=\"dark\"]" in css_content and "--error-bg:" in css_content
+    assert "[data-theme=\"dark\"]" in css_content and "--primary-bg:" in css_content
+
+
+def test_main_css_contains_shimmer_animation(client):
+    """Test that main.css contains shimmer animation for skeletons."""
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    # Check for shimmer animation
+    assert "@keyframes shimmer" in css_content
+    assert "background-position: 100% 0" in css_content
+    assert "background-position: -100% 0" in css_content
+
+    # Check that skeletons use shimmer animation
+    assert "animation: shimmer" in css_content
+    assert "background-size: 400% 100%" in css_content

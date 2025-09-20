@@ -39,7 +39,7 @@ class ProgressTracker:
     def step(self, name: str, description: str = "") -> None:
         """Record a completed step with timing information."""
         now = perf_counter()
-        elapsed_ms = int((now - self._last) * 1000)
+        elapsed_ms = max(1, int((now - self._last) * 1000))  # Ensure at least 1ms
 
         step = ProgressStep(
             name=name,
@@ -76,7 +76,7 @@ class ProgressTracker:
         """Complete the current step with final timing."""
         if self.steps and self.steps[-1].status == "in_progress":
             now = perf_counter()
-            elapsed_ms = int((now - self._current_step_start) * 1000)
+            elapsed_ms = max(1, int((now - self._current_step_start) * 1000))  # Ensure at least 1ms
             self.steps[-1].elapsed_ms = elapsed_ms
             self.steps[-1].status = "completed"
             if description:
@@ -88,7 +88,7 @@ class ProgressTracker:
         """Mark the current step as failed with an error message."""
         if self.steps and self.steps[-1].status == "in_progress":
             now = perf_counter()
-            elapsed_ms = int((now - self._current_step_start) * 1000)
+            elapsed_ms = max(1, int((now - self._current_step_start) * 1000))  # Ensure at least 1ms
             self.steps[-1].elapsed_ms = elapsed_ms
             self.steps[-1].status = "failed"
             self.steps[-1].error_message = error_message
@@ -102,7 +102,12 @@ class ProgressTracker:
     def get_total_elapsed_ms(self) -> int:
         """Get total elapsed time since tracking started."""
         now = perf_counter()
-        return int((now - self._start) * 1000)
+        total_runtime_ms = int((now - self._start) * 1000)
+        # Ensure the total reported time is at least as much as the sum of
+        # recorded step times. This avoids rare cases where rounding to ms
+        # makes the sum of steps appear slightly larger than the wall time.
+        sum_steps_ms = sum(step.elapsed_ms for step in self.steps)
+        return max(total_runtime_ms, sum_steps_ms)
 
     def get_current_step_name(self) -> Optional[str]:
         """Get the name of the currently active step."""
@@ -117,12 +122,16 @@ class ProgressTracker:
 def track_progress() -> Iterator[ProgressTracker]:
     """Context manager to expose a tracker via thread-local storage."""
 
+    # Save the previous tracker (for nested contexts)
+    previous_tracker = getattr(_thread_local, "tracker", None)
+
     tracker = ProgressTracker()
     _thread_local.tracker = tracker
     try:
         yield tracker
     finally:
-        _thread_local.tracker = None
+        # Restore the previous tracker
+        _thread_local.tracker = previous_tracker
 
 
 def record_step(name: str, description: str = "") -> None:

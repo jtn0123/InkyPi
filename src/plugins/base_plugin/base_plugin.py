@@ -4,11 +4,11 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from utils.app_utils import get_fonts, resolve_path
-from utils.image_utils import take_screenshot_html
+from src.utils.app_utils import get_fonts, resolve_path
+from src.utils.image_utils import take_screenshot_html
 import os
 from time import perf_counter
-from utils.progress import record_step, start_step, update_step, complete_step, fail_step
+from src.utils.progress import record_step, start_step, update_step, complete_step, fail_step
 import base64
 from PIL import Image
 
@@ -184,7 +184,7 @@ class BasePlugin:
             t0 = perf_counter()
             rendered_html = template.render(template_params)
             elapsed_ms = int((perf_counter() - t0) * 1000)
-            complete_step(f"Template rendered successfully ({elapsed_ms}ms)")
+            complete_step(f"Template rendered successfully for {html_file} ({elapsed_ms}ms)")
             logger.info(
                 "Render template complete | plugin=%s template=%s elapsed_ms=%s",
                 self.get_plugin_id(),

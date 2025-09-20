@@ -134,3 +134,58 @@ def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
 
     dm = DisplayManager(device_config_dev)
     assert dm.display.__class__.__name__ == "FakeWS"
+
+
+def test_display_preprocessed_image_success(tmp_path, device_config_dev, monkeypatch):
+    # Ensure mock display
+    device_config_dev.update_value("display_type", "mock")
+
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+
+    # Create a preprocessed image file
+    img_path = tmp_path / "preprocessed.png"
+    img = make_image(120, 90)
+    img.save(img_path)
+
+    # Spy on underlying display call
+    calls = {"display": 0}
+
+    def spy_display(image, image_settings=None):
+        calls["display"] += 1
+
+    monkeypatch.setattr(dm.display, "display_image", spy_display, raising=True)
+
+    dm.display_preprocessed_image(str(img_path))
+
+    # Preview/current files updated
+    from pathlib import Path
+
+    assert Path(device_config_dev.processed_image_file).exists()
+    assert Path(device_config_dev.current_image_file).exists()
+    # Underlying display invoked
+    assert calls["display"] == 1
+
+
+def test_display_preprocessed_image_load_failure(device_config_dev):
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+
+    with pytest.raises(RuntimeError):
+        dm.display_preprocessed_image("/non/existent/file.png")
+
+
+def test_save_image_only(tmp_path, device_config_dev):
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+    img = make_image(50, 60)
+
+    dm.save_image_only(img, filename="preview_test.png")
+
+    from pathlib import Path
+
+    preview_dir = Path(device_config_dev.processed_image_file).parent
+    assert (preview_dir / "preview_test.png").exists()
