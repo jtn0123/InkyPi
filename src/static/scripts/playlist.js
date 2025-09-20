@@ -435,7 +435,7 @@
         const editCadence = document.getElementById('editDeviceCycleBtn');
         if (editCadence){ editCadence.addEventListener('click', openDeviceCycleModal); }
 
-        // Click-to-zoom thumbnails
+        // Click-to-zoom thumbnails (only when an image is present)
         document.querySelectorAll('.plugin-thumb').forEach(box => {
             try {
                 box.style.cursor = 'zoom-in';
@@ -449,6 +449,28 @@
                 box.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
             } catch(e){}
         });
+
+        // Conditionally load thumbnails: only set src if image exists (HEAD)
+        try {
+            const thumbs = document.querySelectorAll('.plugin-thumb img[data-src]');
+            thumbs.forEach(async (img) => {
+                const url = img.getAttribute('data-src');
+                if (!url) return;
+                try {
+                    const resp = await fetch(url, { method: 'HEAD' });
+                    if (resp.ok) {
+                        img.src = url;
+                        img.style.display = '';
+                    } else {
+                        img.style.display = 'none';
+                        const sk = img.previousElementSibling; if (sk) sk.style.display = 'none';
+                    }
+                } catch(_) {
+                    img.style.display = 'none';
+                    const sk = img.previousElementSibling; if (sk) sk.style.display = 'none';
+                }
+            });
+        } catch(e){}
         try {
             initDeviceClock();
             setInterval(renderNextIn, 60000);

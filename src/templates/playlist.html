@@ -119,7 +119,7 @@
                             </div>
                             <div class="plugin-thumb" data-frame-style="{{ plugin_instance.plugin_settings.selectedFrame if plugin_instance.plugin_settings and plugin_instance.plugin_settings.selectedFrame else '' }}" tabindex="0" role="button" aria-label="Open preview of {{ plugin_instance.name }}">
                                 <div class="img-skeleton" aria-hidden="true"></div>
-                                <img src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}" alt="Preview of {{ plugin_instance.name }}" width="120" height="90" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
+                                <img data-src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}?safe=1" alt="Preview of {{ plugin_instance.name }}" width="120" height="90" loading="lazy" style="display:none" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
                             </div>
                             <div class="plugin-actions">
                                 <div class="timing-row">

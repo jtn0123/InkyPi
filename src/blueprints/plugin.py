@@ -388,10 +388,20 @@ def plugin_instance_image(plugin_id, instance_name):
             instance_name,
             path,
         )
-        # Try dev generation from saved settings
-        success = _generate_instance_image_from_saved_settings(
-            device_config, plugin_id, instance_name, path
-        )
+        # If safe=1 is provided, do NOT generate on-demand; only use history fallback
+        try:
+            safe_only = request.args.get("safe") in ("1", "true", "yes")
+        except Exception:
+            safe_only = False
+
+        if not safe_only:
+            # Try dev generation from saved settings
+            success = _generate_instance_image_from_saved_settings(
+                device_config, plugin_id, instance_name, path
+            )
+        else:
+            success = False
+
         if not success:
             # Try history sidecar fallback
             history_path = _get_instance_image_from_history(
