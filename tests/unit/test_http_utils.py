@@ -162,6 +162,119 @@ class TestJsonError:
             assert "code" not in response_data
             assert "details" not in response_data
 
+    def test_json_error_includes_request_id_when_present(self, app, monkeypatch):
+        """json_error should echo request_id if available via header/context."""
+        with app.test_request_context("/", headers={"X-Request-Id": "abc-123"}):
+            response, status = json_error("oops")
+            assert status == 400
+            data = response.get_json()
+            assert data.get("error") == "oops"
+            assert data.get("request_id") == "abc-123"
+
+
+def test_http_get_timeout_tuple_from_env(monkeypatch):
+    import requests
+    import src.utils.http_utils as http_utils
+
+    # Force split timeout tuple via module-level variables (evaluated at import)
+    monkeypatch.setattr(http_utils, "CONNECT_TIMEOUT_SECONDS", 1.5, raising=True)
+    monkeypatch.setattr(http_utils, "READ_TIMEOUT_SECONDS", 3.0, raising=True)
+
+    http_utils._reset_shared_session_for_tests()
+
+    captured = {}
+
+    def fake_get(self, url, **kwargs):  # type: ignore[no-redef]
+        captured["timeout"] = kwargs.get("timeout")
+
+        class R:
+            status_code = 200
+            content = b"ok"
+
+            def json(self):
+                return {}
+
+        return R()
+
+    monkeypatch.setattr(requests.Session, "get", fake_get, raising=True)
+
+    http_utils.http_get("https://example.com")
+    t = captured.get("timeout")
+    assert isinstance(t, tuple) and t == (1.5, 3.0)
+
+
+def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
+    import logging
+    import requests
+    import src.utils.http_utils as http_utils
+
+    http_utils._reset_shared_session_for_tests()
+
+    # Enable latency logging
+    monkeypatch.setenv("INKYPI_HTTP_LOG_LATENCY", "1")
+    caplog.set_level(logging.INFO, logger=http_utils.__name__)
+
+    # Success path
+    def ok_get(self, url, **kwargs):  # type: ignore[no-redef]
+        class R:
+            status_code = 200
+            content = b"x"
+
+            def json(self):
+                return {}
+
+        return R()
+
+    monkeypatch.setattr(requests.Session, "get", ok_get, raising=True)
+    http_utils.http_get("https://example.com/success")
+    assert any(
+        "HTTP GET | url=https://example.com/success" in r.getMessage()
+        for r in caplog.records
+    )
+
+    # Failure path
+    def err_get(self, url, **kwargs):  # type: ignore[no-redef]
+        raise requests.exceptions.ConnectionError("boom")
+
+    caplog.clear()
+    caplog.set_level(logging.WARNING, logger=http_utils.__name__)
+    monkeypatch.setattr(requests.Session, "get", err_get, raising=True)
+    try:
+        http_utils.http_get("https://example.com/fail")
+    except Exception:
+        pass
+    assert any(
+        "HTTP GET failed | url=https://example.com/fail" in r.getMessage()
+        for r in caplog.records
+    )
+
+
+def test_retry_backoff_env_configuration(monkeypatch):
+    import src.utils.http_utils as http_utils
+
+    # Override env-based values by monkeypatching the helper accessors indirectly
+    monkeypatch.setenv("INKYPI_HTTP_RETRIES", "7")
+    monkeypatch.setenv("INKYPI_HTTP_RETRIES_CONNECT", "5")
+    monkeypatch.setenv("INKYPI_HTTP_RETRIES_READ", "6")
+    monkeypatch.setenv("INKYPI_HTTP_RETRIES_STATUS", "4")
+    monkeypatch.setenv("INKYPI_HTTP_BACKOFF", "0.25")
+
+    # Force rebuild of session to pick up new retry config
+    http_utils._reset_shared_session_for_tests()
+    session = http_utils.get_shared_session()
+    https_adapter = session.adapters.get("https://")
+    assert https_adapter is not None
+    retry = https_adapter.max_retries
+    # Depending on type hints, retry may be Retry or int; ensure it's Retry-like
+    from urllib3.util.retry import Retry
+
+    assert isinstance(retry, Retry)
+    assert retry.total == 7
+    assert retry.connect == 5
+    assert retry.read == 6
+    assert retry.status == 4
+    assert retry.backoff_factor == 0.25
+
     def test_json_error_with_code(self, app):
         """Test json_error with error code."""
         with app.app_context():

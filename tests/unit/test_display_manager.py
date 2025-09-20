@@ -3,6 +3,7 @@ import types
 
 import pytest
 from PIL import Image
+from typing import Any
 
 
 def make_image(w=320, h=240, color="white"):
@@ -189,3 +190,73 @@ def test_save_image_only(tmp_path, device_config_dev):
 
     preview_dir = Path(device_config_dev.processed_image_file).parent
     assert (preview_dir / "preview_test.png").exists()
+
+
+def test_display_image_history_sidecar_and_metrics(monkeypatch, device_config_dev):
+    # Ensure mock display
+    device_config_dev.update_value("display_type", "mock")
+
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+
+    # Provide a refresh_info object with empty metrics and a benchmark_id
+    from model import RefreshInfo
+
+    ri = RefreshInfo(
+        refresh_type="Manual Update",
+        plugin_id="test_plugin",
+        refresh_time=None,
+        image_hash=None,
+        benchmark_id="b-123",
+    )
+    device_config_dev.refresh_info = ri
+
+    # Spy save_stage_event
+    saved: dict[str, Any] = {}
+
+    def fake_save_stage_event(cfg, benchmark_id, stage, duration_ms, extra=None):
+        saved["args"] = (benchmark_id, stage, duration_ms)
+        saved["extra"] = extra
+
+    monkeypatch.setenv("TZ", "UTC")
+    monkeypatch.setattr(
+        "benchmarks.benchmark_storage.save_stage_event",
+        fake_save_stage_event,
+        raising=False,
+    )
+
+    # Run display pipeline
+    img = make_image(64, 48)
+    dm.display_image(img, image_settings=[], history_meta={"foo": "bar"})
+
+    # Sidecar JSON should exist in history dir
+    from pathlib import Path
+    import json
+
+    history_dir = Path(device_config_dev.history_image_dir)
+    # Find a sidecar json created very recently
+    jsons = sorted(history_dir.glob("display_*.json"))
+    assert jsons, "expected a sidecar json file to be created"
+    data = json.loads(jsons[-1].read_text())
+    assert data.get("foo") == "bar"
+    assert "history_filename" in data
+    assert "saved_at" in data
+
+    # Metrics persisted in refresh_info if previously None
+    assert ri.preprocess_ms is not None
+    assert ri.display_ms is not None
+
+    # Benchmark stage event emitted
+    assert saved.get("args") is not None
+    args = saved.get("args")
+    assert isinstance(args, tuple)
+    assert len(args) == 3
+    b_id, stage, duration_ms = args
+    assert b_id == "b-123"
+    assert stage == "display_driver"
+    assert isinstance(duration_ms, int)
+    extra_any = saved.get("extra")
+    if not isinstance(extra_any, dict):
+        extra_any = {}
+    assert "display_type" in extra_any
