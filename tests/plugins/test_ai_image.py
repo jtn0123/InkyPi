@@ -92,6 +92,21 @@ def test_ai_image_generate_image_success(client, monkeypatch):
         resp = client.post("/update_now", data=data)
         assert resp.status_code == 200
 
+        # Verify progress steps are present and include key stages
+        payload = resp.get_json()
+        assert payload and "metrics" in payload
+        steps = payload["metrics"].get("steps") or []
+        # names are in objects; accept either tuple-like or dict objects depending on serializer
+        names = []
+        for s in steps:
+            if isinstance(s, dict):
+                names.append(s.get("name"))
+            elif isinstance(s, (list, tuple)) and s:
+                names.append(s[0])
+        # Expect at least these foundational steps from plugin
+        assert any(n == "validate_api_key" for n in names)
+        assert any(n in ("provider_generate", "provider_download", "provider_decode") for n in names)
+
 
 def test_ai_image_openai_api_failure(device_config_dev, monkeypatch):
     """Test ai_image plugin with OpenAI API failure."""
@@ -197,8 +212,15 @@ def test_ai_image_policy_violation_retry_success(device_config_dev, monkeypatch)
                 "quality": "standard",
             }
 
-            img = p.generate_image(settings, device_config_dev)
-            assert img is not None
+            # Track progress around a direct plugin call to inspect steps
+            from utils.progress import track_progress
+            with track_progress() as tracker:
+                img = p.generate_image(settings, device_config_dev)
+                assert img is not None
+                steps = tracker.get_steps()
+                names = [getattr(s, "name", None) for s in steps]
+                # Ensure we recorded fallback step when policy violation occurred
+                assert any(n == "safe_fallback_prompt" for n in names)
 
 
 def test_ai_image_sanitize_prompt_basic():

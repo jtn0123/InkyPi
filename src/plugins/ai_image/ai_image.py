@@ -32,6 +32,10 @@ class AIImage(BasePlugin):
         api_key = device_config.load_env_key("OPEN_AI_SECRET")
         if not api_key:
             raise RuntimeError("OPEN AI API Key not configured.")
+        try:
+            record_step("validate_api_key")
+        except Exception:
+            pass
 
         text_prompt = settings.get("textPrompt", "")
 
@@ -47,10 +51,23 @@ class AIImage(BasePlugin):
             ai_client = OpenAI(api_key=api_key)
             if randomize_prompt:
                 text_prompt = AIImage.fetch_image_prompt(ai_client, text_prompt)
+                try:
+                    record_step("randomize_prompt")
+                except Exception:
+                    pass
 
             # Sanitize prompt before sending to image generation
             text_prompt = AIImage.sanitize_prompt(text_prompt)
+            try:
+                record_step("sanitize_prompt")
+            except Exception:
+                pass
 
+            # Prepare and send provider request (detailed provider steps recorded in fetch_image)
+            try:
+                record_step("prepare_request")
+            except Exception:
+                pass
             image = AIImage.fetch_image(
                 ai_client,
                 text_prompt,
@@ -120,6 +137,12 @@ class AIImage(BasePlugin):
             if q:
                 args["quality"] = q
 
+        # Record that request arguments are fully prepared
+        try:
+            record_step("build_request_args")
+        except Exception:
+            pass
+
         # Try image generation; if policy violation occurs, retry once with a safe fallback prompt
         try:
             _t_provider_gen = perf_counter()
@@ -143,6 +166,10 @@ class AIImage(BasePlugin):
                 safe_prompt = AIImage.build_safe_fallback_prompt()
                 # Preserve sizing/quality args but replace only the prompt
                 args["prompt"] = safe_prompt
+                try:
+                    record_step("safe_fallback_prompt")
+                except Exception:
+                    pass
                 response = ai_client.images.generate(**args)
             else:
                 raise

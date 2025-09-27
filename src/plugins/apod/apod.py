@@ -80,8 +80,10 @@ class Apod(BasePlugin):
         else:
             image_url = data.get("thumbnail_url")
             if not image_url:
-                # No thumbnail available; surface a clear error
-                raise RuntimeError("APOD is not an image today.")
+                # No thumbnail available; surface a clear, actionable error
+                raise RuntimeError(
+                    "APOD is not an image today. Enable 'Randomize' or choose a date with an image."
+                )
 
         try:
             try:

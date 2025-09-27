@@ -30,8 +30,15 @@ OPEN_METEO_UNIT_PARAMS = {
     "imperial": "temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
 }
 
-# Repository root (three levels up from this file: src/plugins/weather/weather.py)
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Repository root (four levels up from this file: repo/src/plugins/weather/weather.py)
+# __file__ -> .../src/plugins/weather/weather.py
+# dirname x1 => .../src/plugins/weather
+# dirname x2 => .../src/plugins
+# dirname x3 => .../src
+# dirname x4 => .../repo root
+REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 # Icon pack definitions (roots and mapping JSONs)
 ICON_PACKS: dict[str, dict[str, str | None]] = {
