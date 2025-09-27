@@ -6,6 +6,7 @@
     <title>Playlists</title>
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     <script>
         window.PLAYLIST_CTX = {
@@ -259,7 +260,7 @@
     <!-- Image preview (lightbox) -->
     <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
         <div class="modal-content">
-            <span class="close-button" onclick="closeImagePreview()" aria-label="Close">×</span>
+            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
             <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
         </div>
     </div>

@@ -7,6 +7,7 @@
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script>
         async function redisplay(filename) {
             const btn = document.getElementById('btn-' + filename);
@@ -211,39 +212,23 @@
     <!-- Image preview (lightbox) for history thumbnails -->
     <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
         <div class="modal-content">
-            <span class="close-button" onclick="(function(){ const m=document.getElementById('imagePreviewModal'); if(m) m.style.display='none'; })()" aria-label="Close">×</span>
+            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
             <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
         </div>
     </div>
 
     <script>
-        // Lightbox behavior for history thumbnails (click to enlarge, Esc or outside click to close)
-        (function(){
-            function openImagePreview(url, alt){
-                const m = document.getElementById('imagePreviewModal');
-                const img = document.getElementById('imagePreviewImg');
-                if (!m || !img) return;
-                img.src = url;
-                img.alt = alt || 'Large preview';
-                m.style.display = 'block';
-                function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
-                document.addEventListener('keydown', esc);
-            }
-            function closeImagePreview(){ const m = document.getElementById('imagePreviewModal'); if (m) m.style.display = 'none'; }
-            window.addEventListener('click', function(ev){
-                const m = document.getElementById('imagePreviewModal');
-                if (ev.target === m) { closeImagePreview(); }
-            });
-            document.addEventListener('click', function(ev){
-                const a = ev.target.closest('a.history-thumb');
-                if (!a) return;
-                // Respect modifier keys for new tab/download behavior
-                if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-                ev.preventDefault();
-                const img = a.querySelector('img');
-                openImagePreview(a.href, (a.getAttribute('aria-label') || (img && img.alt) || 'Preview'));
-            });
-        })();
+        // Bind history thumbnails to shared Lightbox
+        document.addEventListener('click', function(ev){
+            const a = ev.target.closest('a.history-thumb');
+            if (!a) return;
+            if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+            ev.preventDefault();
+            const img = a.querySelector('img');
+            const url = a.href;
+            const alt = a.getAttribute('aria-label') || (img && img.alt) || 'Preview';
+            if (window.Lightbox) window.Lightbox.open(url, alt);
+        });
     </script>
 
     <!-- Delete image modal -->

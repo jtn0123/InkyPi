@@ -435,25 +435,32 @@
         const editCadence = document.getElementById('editDeviceCycleBtn');
         if (editCadence){ editCadence.addEventListener('click', openDeviceCycleModal); }
 
-        // Click-to-zoom thumbnails (only when an image is present)
-        document.querySelectorAll('.plugin-thumb').forEach(box => {
-            try {
+        // Click-to-zoom thumbnails using shared Lightbox
+        try {
+            document.querySelectorAll('.plugin-thumb').forEach(box => {
                 box.style.cursor = 'zoom-in';
                 box.setAttribute('role', 'button');
                 box.setAttribute('tabindex', '0');
-                const handler = () => {
-                    const img = box.querySelector('img');
-                    if (img && img.src && img.style.display !== 'none'){ openImagePreview(img.src, img.alt); }
-                };
-                box.addEventListener('click', handler);
-                box.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); } });
-            } catch(e){}
-        });
+            });
+            if (window.Lightbox){
+                window.Lightbox.bind('.plugin-thumb', {
+                    getUrl: (el) => {
+                        const img = el.querySelector('img');
+                        return (img && img.src && img.style.display !== 'none') ? img.src : null;
+                    },
+                    getAlt: (el) => {
+                        const img = el.querySelector('img');
+                        return (img && img.alt) || 'Preview';
+                    }
+                });
+            }
+        } catch(e){}
 
-        // Conditionally load thumbnails: only set src if image exists (HEAD)
+        // Conditionally lazy-load thumbnails: HEAD check only when visible
         try {
-            const thumbs = document.querySelectorAll('.plugin-thumb img[data-src]');
-            thumbs.forEach(async (img) => {
+            const thumbs = Array.from(document.querySelectorAll('.plugin-thumb img[data-src]'));
+            const loadThumb = async (img) => {
+                if (img.getAttribute('data-loaded') === '1') return;
                 const url = img.getAttribute('data-src');
                 if (!url) return;
                 try {
@@ -461,15 +468,32 @@
                     if (resp.ok) {
                         img.src = url;
                         img.style.display = '';
+                        img.setAttribute('data-loaded', '1');
                     } else {
                         img.style.display = 'none';
                         const sk = img.previousElementSibling; if (sk) sk.style.display = 'none';
+                        img.setAttribute('data-loaded', '1');
                     }
                 } catch(_) {
                     img.style.display = 'none';
                     const sk = img.previousElementSibling; if (sk) sk.style.display = 'none';
+                    img.setAttribute('data-loaded', '1');
                 }
-            });
+            };
+            if ('IntersectionObserver' in window){
+                const io = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting){
+                            const img = entry.target;
+                            io.unobserve(img);
+                            loadThumb(img);
+                        }
+                    });
+                }, { rootMargin: '200px' });
+                thumbs.forEach(img => io.observe(img));
+            } else {
+                thumbs.forEach(loadThumb);
+            }
         } catch(e){}
         try {
             initDeviceClock();
@@ -549,22 +573,7 @@
     window.closeDeviceCycleModal = closeDeviceCycleModal;
     window.saveDeviceCycle = saveDeviceCycle;
     
-    function openImagePreview(url, alt){
-        const m = document.getElementById('imagePreviewModal');
-        const img = document.getElementById('imagePreviewImg');
-        if (!m || !img) return;
-        img.src = url;
-        img.alt = alt || 'Large preview';
-        m.style.display = 'block';
-        function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
-        document.addEventListener('keydown', esc);
-    }
-    function closeImagePreview(){
-        const m = document.getElementById('imagePreviewModal');
-        if (m) m.style.display = 'none';
-    }
-    window.openImagePreview = openImagePreview;
-    window.closeImagePreview = closeImagePreview;
+    // Use shared Lightbox API instead of local implementations
 
     // --- Delete confirm flows (replace confirm()) ---
     function showUndo(text){

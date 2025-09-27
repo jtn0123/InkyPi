@@ -7,7 +7,9 @@
     <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}?v={{ range(1000000)|random }}">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}?v={{ range(1000000)|random }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}?v={{ range(1000000)|random }}"></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}?v={{ range(1000000)|random }}"></script>
     
 
     <script>
@@ -112,175 +114,32 @@
         }
 
         async function handleAction(action) {
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            const progress = document.getElementById('requestProgress');
-            const progressText = document.getElementById('requestProgressText');
-            const progressClock = document.getElementById('requestProgressClock');
-            const progressElapsed = document.getElementById('requestProgressElapsed');
-            const progressList = document.getElementById('requestProgressList');
-            const bar = document.getElementById('requestProgressBar');
-            const t0 = Date.now();
-            let clockTimer = null;
-            function fmtElapsed(ms){
-                const s = Math.floor(ms / 1000);
-                const m = Math.floor(s / 60);
-                const rem = s % 60;
-                if (m > 0) return `${m}m ${rem}s`;
-                return `${s}s`;
-            }
-            function tickClock(){
-                try {
-                    if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
-                    if (progressElapsed) progressElapsed.textContent = fmtElapsed(Date.now() - t0);
-                } catch(e){}
-            }
-            function ensureVisible(){ if (progress) progress.style.display = 'block'; }
-            function addLog(line){
-                if (!progressList) return;
-                const li = document.createElement('li');
-                const ts = document.createElement('time');
-                ts.dateTime = new Date().toISOString();
-                ts.textContent = new Date().toLocaleTimeString();
-                li.appendChild(ts);
-                li.appendChild(document.createTextNode(line));
-                progressList.appendChild(li);
-                try { progressList.scrollTop = progressList.scrollHeight; } catch(e){}
-            }
-            function setStep(text, pct){
-                ensureVisible();
-                if (progressText) progressText.textContent = text;
-                if (bar && typeof pct === 'number') bar.style.width = pct + '%';
-                addLog(text);
-            }
-            loadingIndicator.style.display = 'block';
-            // Reset meta & log
-            try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
-            try {
-                if (progressList) progressList.innerHTML = '';
-                if (progressElapsed) progressElapsed.textContent = '0s';
-                if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
-                if (bar) bar.style.width = '10%';
-            } catch(e){}
-            tickClock();
-            clockTimer = setInterval(tickClock, 1000);
-            setStep('Preparing…', 10);
-
-            // Allow plugin-specific client-side validation (e.g., require lat/long for Weather)
+            // Allow plugin-specific client-side validation
             try {
                 if (typeof window.validatePluginSettings === 'function') {
                     const isValid = window.validatePluginSettings(action);
-                    if (!isValid) {
-                        loadingIndicator.style.display = 'none';
-                        if (progress) progress.style.display = 'none';
-                        return; // abort submission
-                    }
+                    if (!isValid) { return; }
                 }
-            } catch (e) {
-                console.warn('Plugin validation threw an error:', e);
-            }
+            } catch (e) { console.warn('Plugin validation threw an error:', e); }
 
-            // Gather plugin settings form data
-            const form = document.getElementById('settingsForm');
-            const scheduleForm = document.getElementById('scheduleForm');
-
-            const formData = new FormData(form);
-            let url = '{{ url_for("plugin.update_now") }}';
-            let method = 'POST';
-            let clearFormOnSubmit = true;
-            
-            // Add uploaded files to the form under its key
-            Object.keys(uploadedFiles).forEach(key => {
-                if (uploadedFiles[key].length > 0) {
-                    uploadedFiles[key].forEach(file => {
-                        formData.append(key, file);
-                    });
-                }
-            });
-
-            if (action == "add_to_playlist"){
-                url = '{{ url_for('playlist.add_plugin') }}';
-                const scheduleFormData = new FormData(scheduleForm);
-                const scheduleData = {};
-                for (const [key, value] of scheduleFormData.entries()) {
-                    scheduleData[key] = value;
-                }
-                formData.append("refresh_settings", JSON.stringify(scheduleData));
-            } else if (action == "update_instance") {
-                url = "{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName,
-                method = 'PUT'
-                clearFormOnSubmit = false
-            } else if (action == "save_settings") {
-                url = '{{ url_for("plugin.save_plugin_settings") }}';
-                clearFormOnSubmit = false
-            }
-
-            // Send data to the server
-            try {
-                setStep('Sending…', 30);
-                const response = await fetch(url, {method: method, body: formData});
-                setStep('Waiting (device)…', 60);
-                const result = await response.json();
-                // Handle the response
-                if (response.ok) {
-                    // Show metrics if present
-                    if (result && result.metrics) {
-                        const m = result.metrics || {};
-                        if (Array.isArray(m.steps) && m.steps.length) {
-                            let pct = 60;
-                            const inc = 30 / m.steps.length;
-                            for (const [name, ms] of m.steps) {
-                                pct += inc;
-                                setStep(`${name} ${ms} ms`, pct);
-                                await new Promise(r => setTimeout(r, 50));
-                            }
-                        }
-                        // Compose clean summary: include only available metrics
-                        const parts = [];
-                        const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
-                        add('Request', m.request_ms);
-                        add('Generate', m.generate_ms);
-                        add('Preprocess', m.preprocess_ms);
-                        add('Display', m.display_ms);
-                        if (parts.length) {
-                            const text = parts.join(' • ');
-                            if (progressText) progressText.textContent = text;
-                            addLog(text);
-                        }
-                    }
-                    setStep('Display updating…', 90);
-                    showResponseModal('success', `Success! ${result.message}`);
+            const urls = {
+                update_now: '{{ url_for("plugin.update_now") }}',
+                add_to_playlist: '{{ url_for('playlist.add_plugin') }}',
+                update_instance: "{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName,
+                save_settings: '{{ url_for("plugin.save_plugin_settings") }}'
+            };
+            await window.PluginForm.sendForm({
+                action,
+                urls,
+                uploadedFiles,
+                onAfterSuccess: () => {
                     // Trigger preview refresh shortly after success
                     setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 250);
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
+                    closeModal('scheduleModal');
                 }
-                closeModal('scheduleModal');
-
-                if (clearFormOnSubmit) {
-                    form.reset()
-                    uploadedFiles = {};
-                    document.querySelectorAll('input[clear-on-submit]').forEach(input => {
-                        input.value = '';
-                        input.dispatchEvent(new Event('change'));
-                    });
-                    document.querySelectorAll('[delete-on-submit]').forEach(div => {
-                        div.remove();
-                    });
-                    if (action == "add_to_playlist"){
-                        scheduleForm.reset()
-                    }
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
-            } finally {
-                // Hide loading indicator after the action is complete
-                loadingIndicator.style.display = 'none';
-                setStep('Done', 100);
-                try { if (clockTimer) clearInterval(clockTimer); } catch(e){}
-                saveLastProgressSnapshot(PROGRESS_PAGE_CTX);
-                setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
-            }
+            });
+            // Persist progress snapshot after each run
+            try { saveLastProgressSnapshot(PROGRESS_PAGE_CTX); } catch(e){}
         }
         async function refreshPreviewImage(){
             const img = document.getElementById('previewImage');
@@ -898,7 +757,7 @@
     <!-- Image preview (lightbox) for plugin page -->
     <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
         <div class="modal-content">
-            <span class="close-button" onclick="(function(){ const m=document.getElementById('imagePreviewModal'); if(m) m.style.display='none'; })()" aria-label="Close">×</span>
+            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
             <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
         </div>
     </div>
@@ -915,7 +774,7 @@
         <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
     <script>
-        // Lightbox + native-size toggle behavior for plugin page previews
+        // Lightbox + native-size toggle behavior for plugin page previews (uses shared Lightbox)
         (function(){
             const previewImg = document.getElementById('previewImage');
             const instanceImg = document.getElementById('instancePreviewImage');
@@ -923,28 +782,9 @@
             const nativeWidth = {{ resolution[0] }};
             const nativeHeight = {{ resolution[1] }};
 
-            function openImagePreview(url, alt){
-                const m = document.getElementById('imagePreviewModal');
-                const img = document.getElementById('imagePreviewImg');
-                if (!m || !img) return;
-                img.src = url;
-                img.alt = alt || 'Large preview';
-                m.style.display = 'block';
-                function esc(e){ if (e.key === 'Escape') { closeImagePreview(); document.removeEventListener('keydown', esc); } }
-                document.addEventListener('keydown', esc);
-            }
-            function closeImagePreview(){ const m = document.getElementById('imagePreviewModal'); if (m) m.style.display = 'none'; }
-            window.closeImagePreview = closeImagePreview;
-
-            // Close when clicking outside modal content
-            window.addEventListener('click', function(ev){
-                const m = document.getElementById('imagePreviewModal');
-                if (ev.target === m) { closeImagePreview(); }
-            });
-
             if (previewImg){
                 // Single click opens lightbox
-                previewImg.addEventListener('click', function(){ if (previewImg.src) openImagePreview(previewImg.src, previewImg.alt); });
+                previewImg.addEventListener('click', function(){ if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt); });
                 // Double click toggles native size in-page (retains previous behavior)
                 if (container){
                     previewImg.addEventListener('dblclick', function(e){
@@ -962,16 +802,16 @@
             }
             if (instanceImg){
                 instanceImg.style.cursor = 'zoom-in';
-                instanceImg.addEventListener('click', function(){ if (instanceImg.src && instanceImg.style.display !== 'none'){ openImagePreview(instanceImg.src, instanceImg.alt); } });
+                instanceImg.addEventListener('click', function(){ if (instanceImg.src && instanceImg.style.display !== 'none' && window.Lightbox){ window.Lightbox.open(instanceImg.src, instanceImg.alt); } });
             }
 
             // Delegate: any image with class .lightboxable opens in lightbox
             document.addEventListener('click', function(e){
                 const img = e.target.closest('img.lightboxable');
                 if (!img) return;
-                if (img.src) {
+                if (img.src && window.Lightbox) {
                     e.preventDefault();
-                    openImagePreview(img.src, img.alt || 'Preview');
+                    window.Lightbox.open(img.src, img.alt || 'Preview');
                 }
             });
 

@@ -7,6 +7,7 @@
 </head>
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
 <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
+<script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
 <body>
     <!-- Skip navigation for accessibility -->
     <a href="#main-content" class="skip-nav">Skip to main content</a>
@@ -261,6 +262,30 @@
         } catch(e){ /* ignore */ }
         finally { if (btn) btn.disabled = false; }
     }
+    // Enable shared lightbox: single-click opens; double-click toggles native size
+    (function(){
+        const container = previewImg && previewImg.parentElement;
+        const nativeWidth = {{ config.resolution[0] }};
+        const nativeHeight = {{ config.resolution[1] }};
+        if (previewImg){
+            previewImg.style.cursor = 'zoom-in';
+            previewImg.addEventListener('click', function(){ if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt); });
+            if (container){
+                previewImg.addEventListener('dblclick', function(e){
+                    e.preventDefault();
+                    if (container.classList.contains('native')) {
+                        container.classList.remove('native');
+                        previewImg.removeAttribute('style');
+                    } else {
+                        container.classList.add('native');
+                        previewImg.style.width = nativeWidth + 'px';
+                        previewImg.style.height = nativeHeight + 'px';
+                    }
+                });
+            }
+        }
+    })();
+
     // Refresh every 5 seconds; optionally use SSE/WebSocket when available
     function startPolling(){
         refreshPreview();
