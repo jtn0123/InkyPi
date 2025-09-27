@@ -334,9 +334,9 @@ class Weather(BasePlugin):
         data = {
             "current_date": dt.strftime("%A, %B %d"),
             "current_day_icon": (
-                self.path_to_data_uri(icon_abs_path)
+                self.to_file_url(icon_abs_path)
                 if icon_abs_path
-                else self.path_to_data_uri(
+                else self.to_file_url(
                     self.get_plugin_dir(f"icons/{current_icon}.png")
                 )
             ),
@@ -393,7 +393,7 @@ class Weather(BasePlugin):
 
         data = {
             "current_date": dt.strftime("%A, %B %d"),
-            "current_day_icon": self.path_to_data_uri(
+            "current_day_icon": self.to_file_url(
                 self.get_plugin_dir(f"icons/{current_icon}.png")
             ),
             "current_temperature": str(round(current.get("temperature", 0))),
@@ -505,7 +505,7 @@ class Weather(BasePlugin):
             cond_abs = self._resolve_cond_icon_path(weather_icon, weather_pack)
             if not cond_abs:
                 cond_abs = self.get_plugin_dir(f"icons/{weather_icon}.png")
-            weather_icon_path = self.path_to_data_uri(cond_abs)
+            weather_icon_path = self.to_file_url(cond_abs)
 
             # --- moon phase & icon ---
             moon_phase = float(day["moon_phase"])  # [0.0–1.0]
@@ -513,7 +513,7 @@ class Weather(BasePlugin):
             moon_abs = self._resolve_moon_icon_path(phase_name, moon_pack)
             if not moon_abs:
                 moon_abs = self.get_plugin_dir(f"icons/{phase_name}.png")
-            moon_icon_path = self.path_to_data_uri(moon_abs)
+            moon_icon_path = self.to_file_url(moon_abs)
             # --- true illumination percent, no decimals ---
             illum_fraction = (1 - math.cos(2 * math.pi * moon_phase)) / 2
             moon_pct = f"{illum_fraction * 100:.0f}"
@@ -598,14 +598,14 @@ class Weather(BasePlugin):
 
             code = weather_codes[i] if i < len(weather_codes) else 0
             weather_icon = self.map_weather_code_to_icon(code, 12)
-            weather_icon_path = self.path_to_data_uri(
+            weather_icon_path = self.to_file_url(
                 self.get_plugin_dir(f"icons/{weather_icon}.png")
             )
 
             phase_name, illum_pct = (
                 moon_info[i] if i < len(moon_info) else ("newmoon", 0.0)
             )
-            moon_icon_path = self.path_to_data_uri(
+            moon_icon_path = self.to_file_url(
                 self.get_plugin_dir(f"icons/{phase_name}.png")
             )
 
@@ -707,7 +707,7 @@ class Weather(BasePlugin):
                         sunrise_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(
+                    "icon": self.to_file_url(
                         self.get_plugin_dir("icons/sunrise.png")
                     ),
                 }
@@ -733,9 +733,9 @@ class Weather(BasePlugin):
                         sunset_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(
-                        self.get_plugin_dir("icons/sunset.png")
-                    ),
+                "icon": self.to_file_url(
+                    self.get_plugin_dir("icons/sunset.png")
+                ),
                 }
             )
         else:
@@ -748,7 +748,7 @@ class Weather(BasePlugin):
                 "label": "Wind",
                 "measurement": weather.get("current", {}).get("wind_speed"),
                 "unit": UNITS[units]["speed"],
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/wind.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/wind.png")),
             }
         )
 
@@ -757,7 +757,7 @@ class Weather(BasePlugin):
                 "label": "Humidity",
                 "measurement": weather.get("current", {}).get("humidity"),
                 "unit": "%",
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/humidity.png")
                 ),
             }
@@ -768,7 +768,7 @@ class Weather(BasePlugin):
                 "label": "Pressure",
                 "measurement": weather.get("current", {}).get("pressure"),
                 "unit": "hPa",
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/pressure.png")
                 ),
             }
@@ -779,7 +779,7 @@ class Weather(BasePlugin):
                 "label": "UV Index",
                 "measurement": weather.get("current", {}).get("uvi"),
                 "unit": "",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/uvi.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/uvi.png")),
             }
         )
 
@@ -792,7 +792,7 @@ class Weather(BasePlugin):
                         "label": "Cloud Cover",
                         "measurement": clouds,
                         "unit": "%",
-                        "icon": self.path_to_data_uri(
+                        "icon": self.to_file_url(
                             self.get_plugin_dir("icons/03d.png")
                         ),
                     }
@@ -809,7 +809,7 @@ class Weather(BasePlugin):
                         "label": "Wind Gusts",
                         "measurement": gust,
                         "unit": UNITS[units]["speed"],
-                        "icon": self.path_to_data_uri(
+                        "icon": self.to_file_url(
                             self.get_plugin_dir("icons/wind.png")
                         ),
                     }
@@ -836,7 +836,7 @@ class Weather(BasePlugin):
                 "label": "Visibility",
                 "measurement": visibility_str,
                 "unit": "km",
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/visibility.png")
                 ),
             }
@@ -853,7 +853,7 @@ class Weather(BasePlugin):
                 "label": "Air Quality",
                 "measurement": aqi,
                 "unit": aqi_label,
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/aqi.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/aqi.png")),
             }
         )
 
@@ -881,7 +881,7 @@ class Weather(BasePlugin):
                         sunrise_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(
+                    "icon": self.to_file_url(
                         self.get_plugin_dir("icons/sunrise.png")
                     ),
                 }
@@ -902,7 +902,7 @@ class Weather(BasePlugin):
                         sunset_dt, time_format, include_am_pm=False
                     ),
                     "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                    "icon": self.path_to_data_uri(
+                    "icon": self.to_file_url(
                         self.get_plugin_dir("icons/sunset.png")
                     ),
                 }
@@ -920,7 +920,7 @@ class Weather(BasePlugin):
                 "label": "Wind",
                 "measurement": wind_speed,
                 "unit": wind_unit,
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/wind.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/wind.png")),
             }
         )
 
@@ -944,7 +944,7 @@ class Weather(BasePlugin):
                 "label": "Humidity",
                 "measurement": current_humidity,
                 "unit": "%",
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/humidity.png")
                 ),
             }
@@ -970,7 +970,7 @@ class Weather(BasePlugin):
                 "label": "Pressure",
                 "measurement": current_pressure,
                 "unit": "hPa",
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/pressure.png")
                 ),
             }
@@ -996,7 +996,7 @@ class Weather(BasePlugin):
                 "label": "UV Index",
                 "measurement": current_uv_index,
                 "unit": "",
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/uvi.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/uvi.png")),
             }
         )
 
@@ -1046,7 +1046,7 @@ class Weather(BasePlugin):
                 "label": "Visibility",
                 "measurement": visibility_str,
                 "unit": unit_label,
-                "icon": self.path_to_data_uri(
+                "icon": self.to_file_url(
                     self.get_plugin_dir("icons/visibility.png")
                 ),
             }
@@ -1086,7 +1086,7 @@ class Weather(BasePlugin):
                 "label": "Air Quality",
                 "measurement": measurement_value,
                 "unit": scale,
-                "icon": self.path_to_data_uri(self.get_plugin_dir("icons/aqi.png")),
+                "icon": self.to_file_url(self.get_plugin_dir("icons/aqi.png")),
             }
         )
 

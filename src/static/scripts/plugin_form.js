@@ -29,12 +29,14 @@
     return { setStep, start, stop };
   }
 
-  async function sendForm({ action, urls, uploadedFiles, onAfterSuccess }){
+  async function sendForm({ action, urls, uploadedFiles }){
     const loadingIndicator = $('loadingIndicator');
     const progress = initProgress();
     const form = $('settingsForm');
     const scheduleForm = $('scheduleForm');
     const formData = new FormData(form);
+    let success = false;
+    let result = null;
 
     // append uploaded files
     try { Object.keys(uploadedFiles || {}).forEach(key => { (uploadedFiles[key] || []).forEach(f => formData.append(key, f)); }); } catch(e){}
@@ -54,7 +56,7 @@
       progress.setStep('Sending…', 30);
       const response = await fetch(url, { method, body: formData });
       progress.setStep('Waiting (device)…', 60);
-      const result = await response.json();
+      result = await response.json();
       if (response.ok){
         // metrics display
         const m = result && result.metrics || null;
@@ -63,7 +65,7 @@
         if (m){ add('Request', m.request_ms); add('Generate', m.generate_ms); add('Preprocess', m.preprocess_ms); add('Display', m.display_ms); }
         if (parts.length){ progress.setStep(parts.join(' • '), 90); }
         if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
-        if (typeof onAfterSuccess === 'function') onAfterSuccess();
+        success = true;
       } else {
         if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
       }
@@ -75,6 +77,7 @@
       progress.setStep('Done', 100);
       progress.stop();
     }
+    return { success, result };
   }
 
   // Public API

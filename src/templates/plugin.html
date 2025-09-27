@@ -113,6 +113,79 @@
             } catch(e){}
         }
 
+        async function legacySendForm(payload) {
+            const { action, urls, uploadedFiles, onAfterSuccess } = payload || {};
+            if (!urls) { return { success: false }; }
+            const form = document.getElementById('settingsForm');
+            if (!form) { return { success: false }; }
+            const formData = new FormData(form);
+            if (uploadedFiles && typeof uploadedFiles === 'object') {
+                for (const key of Object.keys(uploadedFiles)) {
+                    try {
+                        (uploadedFiles[key] || []).forEach((file) => formData.append(key, file));
+                    } catch (_) {}
+                }
+            }
+
+            let targetUrl = urls.update_now;
+            let method = 'POST';
+            if (action === 'add_to_playlist') {
+                const scheduleForm = document.getElementById('scheduleForm');
+                const scheduleData = {};
+                if (scheduleForm) {
+                    const scheduleFormData = new FormData(scheduleForm);
+                    scheduleFormData.forEach((value, key) => {
+                        scheduleData[key] = value;
+                    });
+                }
+                formData.append('refresh_settings', JSON.stringify(scheduleData));
+                targetUrl = urls.add_to_playlist;
+            } else if (action === 'update_instance') {
+                targetUrl = urls.update_instance;
+                method = 'PUT';
+            } else if (action === 'save_settings') {
+                targetUrl = urls.save_settings;
+            }
+
+            try {
+                const response = await fetch(targetUrl, { method, body: formData });
+                let result = {};
+                try { result = await response.clone().json(); } catch (_) {}
+                if (window.showResponseModal && result) {
+                    if (response.ok) {
+                        showResponseModal('success', `Success! ${result.message || 'Saved'}`);
+                    } else {
+                        showResponseModal('failure', `Error!  ${result.error || response.statusText}`);
+                    }
+                }
+                if (response.ok && typeof onAfterSuccess === 'function') {
+                    onAfterSuccess();
+                }
+                return { success: response.ok, ...(response.ok ? { message: result.message || 'OK' } : { error: result.error || response.statusText }) };
+            } catch (error) {
+                console.error('Legacy sendForm error:', error);
+                if (window.showResponseModal) {
+                    showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
+                }
+                return { success: false, error: error?.message || 'request failed' };
+            }
+        }
+
+        async function sendFormWithFallback(payload) {
+            if (window.PluginForm && typeof window.PluginForm.sendForm === 'function') {
+                try {
+                    const result = await window.PluginForm.sendForm(payload);
+                    if (result && typeof result === 'object' && 'success' in result) {
+                        return result;
+                    }
+                    return { success: true };
+                } catch (error) {
+                    console.warn('PluginForm.sendForm failed, using legacy fallback.', error);
+                }
+            }
+            return legacySendForm(payload);
+        }
+
         async function handleAction(action) {
             // Allow plugin-specific client-side validation
             try {
@@ -128,16 +201,16 @@
                 update_instance: "{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName,
                 save_settings: '{{ url_for("plugin.save_plugin_settings") }}'
             };
-            await window.PluginForm.sendForm({
+            const response = await sendFormWithFallback({
                 action,
                 urls,
                 uploadedFiles,
                 onAfterSuccess: () => {
-                    // Trigger preview refresh shortly after success
                     setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 250);
                     closeModal('scheduleModal');
                 }
             });
+            const { success } = response || {};
             // Persist progress snapshot after each run
             try { saveLastProgressSnapshot(PROGRESS_PAGE_CTX); } catch(e){}
         }

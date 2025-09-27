@@ -4,6 +4,7 @@
 def test_plugin_page_not_found(client):
     resp = client.get("/plugin/unknown")
     assert resp.status_code == 404
+    assert b"not found" in resp.data.lower()
 
 
 # Skip this test - the exception handling is already covered by existing tests

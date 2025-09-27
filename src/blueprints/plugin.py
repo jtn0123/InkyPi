@@ -229,16 +229,7 @@ def plugin_page(plugin_id):
                 )
                 if not plugin_instance:
                     # Return a user-friendly 404 page rather than JSON from a page route
-                    try:
-                        return (
-                            render_template(
-                                "response_modal.html",
-                                # Minimal friendly message surfaced via legacy modal/toast
-                            ),
-                            404,
-                        )
-                    except Exception:
-                        return abort(404, description=f"Plugin instance '{plugin_instance_name}' not found")
+                    return abort(404, description=f"Plugin instance '{plugin_instance_name}' not found")
 
                 # add plugin instance settings to the template to prepopulate
                 template_params["plugin_settings"] = plugin_instance.settings
