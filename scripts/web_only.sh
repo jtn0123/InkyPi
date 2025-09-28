@@ -9,7 +9,6 @@ source scripts/venv.sh
 
 export INKYPI_ENV=dev
 export INKYPI_NO_REFRESH=1
-export PYTHONPATH="src:${PYTHONPATH:-}"
 
 # Prefer a local, ignored device config to avoid touching tracked files
 LOCAL_CFG="${REPO_ROOT}/src/config/device.local.json"

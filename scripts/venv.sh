@@ -2,7 +2,9 @@
 
 VENV_DIR=".venv"
 REQUIREMENTS_FILE="install/requirements-dev.txt"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" && cd .. && pwd)"
 SRC_DIR="src"
+SRC_ABS="${REPO_ROOT}/${SRC_DIR}"
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment in $VENV_DIR..."
@@ -22,7 +24,17 @@ fi
 python -m pip install --upgrade pip
 python -m pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
 
-export PYTHONPATH="$SRC_DIR${PYTHONPATH:+:$PYTHONPATH}"
+PYTHONPATH_ENTRIES=("$SRC_ABS" "$REPO_ROOT")
+for entry in "${PYTHONPATH_ENTRIES[@]}"; do
+    case ":${PYTHONPATH:-}:" in
+        *":${entry}:"*) ;;
+        *)
+            PYTHONPATH="${entry}${PYTHONPATH:+:$PYTHONPATH}"
+            ;;
+    esac
+done
+
+export PYTHONPATH
 export SRC_DIR=$SRC_DIR
 
 echo "Python virtual environment initialized, run 'deactivate' to exit"
