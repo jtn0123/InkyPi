@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
 
-PLUGINS_DIR = resolve_path("plugins")
+# Removed module-level PLUGINS_DIR - resolve dynamically inside route handlers
 
 
 def _generate_instance_image_from_saved_settings(
@@ -347,15 +347,31 @@ def plugin_page(plugin_id):
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>")
 def image(plugin_id, filename):
-    # Serve files from the specific plugin subdirectory
-    plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
-    full_path = os.path.abspath(os.path.join(plugin_dir, filename))
-    # Prevent path traversal
-    if not full_path.startswith(plugin_dir + os.sep):
+    # Resolve plugins directory dynamically
+    plugins_dir = resolve_path("plugins")
+
+    # Construct the full path to the plugin's file
+    plugin_dir = os.path.join(plugins_dir, plugin_id)
+
+    # Security check to prevent directory traversal
+    safe_path = os.path.abspath(os.path.join(plugin_dir, filename))
+    if not safe_path.startswith(os.path.abspath(plugin_dir) + os.sep):
         return abort(404)
-    if not os.path.exists(full_path):
+
+    # Convert to absolute path for sending
+    abs_plugin_dir = os.path.abspath(plugin_dir)
+
+    # Check if the directory and file exist
+    if not os.path.isdir(abs_plugin_dir):
+        logger.error(f"Plugin directory not found: {abs_plugin_dir}")
         return abort(404)
-    return send_file(full_path)
+
+    if not os.path.isfile(safe_path):
+        logger.error(f"File not found: {safe_path}")
+        return abort(404)
+
+    # Serve the file
+    return send_file(safe_path)
 
 
 @plugin_bp.route("/instance_image/<string:plugin_id>/<string:instance_name>")

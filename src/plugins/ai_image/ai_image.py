@@ -1,7 +1,4 @@
 import logging
-from io import BytesIO
-
-import requests
 from openai import OpenAI
 from PIL import Image
 
@@ -84,7 +81,7 @@ class AIImage(BasePlugin):
     def fetch_image(
         ai_client,
         prompt,
-        model="dalle-e-3",
+        model="dall-e-3",
         quality="standard",
         orientation="horizontal",
     ):
