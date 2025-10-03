@@ -6,8 +6,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" && cd .. && pwd)"
 SRC_DIR="src"
 SRC_ABS="${REPO_ROOT}/${SRC_DIR}"
 
+# Provide a python shim if python is missing but python3 exists
+if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    python() { command python3 "$@"; }
+fi
+
 setup_pythonpath() {
     local entry
+    # Order matters for tests: repo root then src (prepending builds reversed order)
     PYTHONPATH_ENTRIES=("$SRC_ABS" "$REPO_ROOT")
     for entry in "${PYTHONPATH_ENTRIES[@]}"; do
         case ":${PYTHONPATH:-}:" in
@@ -43,8 +49,14 @@ if ! source "$VENV_DIR/bin/activate"; then
     exit 1
 fi
 
-python -m pip install --upgrade pip
-python -m pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
+if command -v python3 >/dev/null 2>&1; then
+    PY_BIN=python3
+else
+    PY_BIN=python
+fi
+
+$PY_BIN -m pip install --upgrade pip
+$PY_BIN -m pip install --no-cache-dir -r "$REQUIREMENTS_FILE"
 
 setup_pythonpath
 
