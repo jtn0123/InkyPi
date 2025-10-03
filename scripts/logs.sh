@@ -68,16 +68,22 @@ if [[ -n "$SINCE" ]]; then
 fi
 
 GREP_FLAG=""
-PIPE_GREP=0
 if [[ -n "$GREP_PATTERN" ]]; then
   # Prefer server-side grep if supported by journalctl (most modern systems)
   GREP_FLAG="--grep=$GREP_PATTERN"
   # Fallback could pipe to grep, but avoid unless necessary
 fi
 
-OUTPUT_FLAG="-o $OUTPUT_FORMAT"
-
-JOURNAL_CMD=(journalctl -u "$UNIT" -n "$NUM_LINES" $FOLLOW_FLAG $SINCE_FLAG $GREP_FLAG --no-pager $OUTPUT_FLAG)
+JOURNAL_CMD=(journalctl -u "$UNIT" -n "$NUM_LINES" --no-pager -o "$OUTPUT_FORMAT")
+if [[ -n "$FOLLOW_FLAG" ]]; then
+  JOURNAL_CMD+=("$FOLLOW_FLAG")
+fi
+if [[ -n "$SINCE_FLAG" ]]; then
+  JOURNAL_CMD+=("$SINCE_FLAG")
+fi
+if [[ -n "$GREP_FLAG" ]]; then
+  JOURNAL_CMD+=("$GREP_FLAG")
+fi
 
 if [[ -n "$REMOTE_HOST" ]]; then
   SSH_ARGS=("$REMOTE_HOST")

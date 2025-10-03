@@ -30,8 +30,12 @@ setup_pythonpath() {
 
 if [ "${INKYPI_PYTHONPATH_ONLY:-}" = "1" ]; then
     setup_pythonpath
-    # shellcheck disable=SC2310
-    return 0 2>/dev/null || exit 0
+    # Exit appropriately whether sourced or executed
+    if (return 0 2>/dev/null); then
+        return 0
+    else
+        exit 0
+    fi
 fi
 
 if [ ! -d "$VENV_DIR" ]; then

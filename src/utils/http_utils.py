@@ -246,6 +246,8 @@ def http_get(
     timeout: float | tuple[float, float] | None = None,
     stream: bool = False,
     allow_redirects: bool = True,
+    use_cache: bool = True,
+    cache_ttl: float | None = None,
 ) -> requests.Response:
     """Perform a GET using a shared session with retries and sane defaults.
 
@@ -253,7 +255,34 @@ def http_get(
     - Applies a default timeout if none is provided
     - Uses a shared requests.Session configured with HTTPAdapter retries
     - SSL verification is enabled by default (do not disable)
+    - Supports optional HTTP response caching with TTL
+
+    Args:
+        url: URL to request
+        params: Query parameters
+        headers: Additional headers
+        timeout: Request timeout (seconds or tuple)
+        stream: Whether to stream the response
+        allow_redirects: Whether to follow redirects
+        use_cache: Whether to use HTTP cache (default: True)
+        cache_ttl: Override cache TTL in seconds (default: from config)
+
+    Returns:
+        Response object (may be from cache)
     """
+    # Check cache first (unless streaming or caching disabled)
+    if use_cache and not stream:
+        try:
+            from utils.http_cache import get_cache
+
+            cache = get_cache()
+            cached_response = cache.get(url, params)
+            if cached_response is not None:
+                return cached_response
+        except Exception:
+            # Cache errors shouldn't break requests
+            pass
+
     session = get_shared_session()
     final_headers = dict(DEFAULT_HEADERS)
     if headers:
@@ -308,6 +337,17 @@ def http_get(
                 len(getattr(resp, "content", b"")) if not stream else 0,
             )
         except Exception:
+            pass
+
+    # Store in cache if caching is enabled and not streaming
+    if use_cache and not stream:
+        try:
+            from utils.http_cache import get_cache
+
+            cache = get_cache()
+            cache.put(url, resp, params, ttl=cache_ttl)
+        except Exception:
+            # Cache errors shouldn't break requests
             pass
 
     return resp
