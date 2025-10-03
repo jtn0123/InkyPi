@@ -383,6 +383,16 @@ def create_app():
                     )
         except Exception:
             pass
+
+        # Static asset caching for better performance
+        if request.path.startswith('/static/'):
+            # Cache CSS, JS, and images for 1 year (they have versioned URLs when changed)
+            if any(request.path.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf']):
+                response.headers.setdefault('Cache-Control', 'public, max-age=31536000, immutable')
+            else:
+                # Other static files: 1 day cache
+                response.headers.setdefault('Cache-Control', 'public, max-age=86400')
+
         # Basic hardening headers
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")

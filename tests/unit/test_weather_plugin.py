@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime
 
 import pytest
@@ -202,3 +203,152 @@ def test_open_meteo_unknown_code_maps_default(weather_plugin):
     w = weather_plugin
     # Code not in mapping should return default "01d"
     assert w.map_weather_code_to_icon(12345, 12) == "01d"
+
+
+def test_generate_settings_template(weather_plugin):
+    w = weather_plugin
+    template = w.generate_settings_template()
+    assert template["api_key"]["required"] is True
+    assert template["api_key"]["service"] == "OpenWeatherMap"
+    assert template["api_key"]["expected_key"] == "OPEN_WEATHER_MAP_SECRET"
+    assert template["style_settings"] is True
+
+
+def test_load_icon_map_returns_dict(weather_plugin):
+    w = weather_plugin
+    # Load icon map should always return a dict (empty or populated)
+    result = w._load_icon_map("current")
+    assert isinstance(result, dict)
+
+
+def test_load_icon_map_invalid_json(weather_plugin, tmp_path, monkeypatch):
+    w = weather_plugin
+    # Create invalid JSON file
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("{invalid json")
+
+    from plugins.weather import weather
+
+    original_packs = weather.ICON_PACKS.copy()
+    weather.ICON_PACKS["bad"] = {"root": str(tmp_path), "map": str(bad_file)}
+
+    try:
+        # Should return empty dict on error
+        result = w._load_icon_map("bad")
+        assert result == {}
+    finally:
+        weather.ICON_PACKS = original_packs
+
+
+def test_load_icon_map_no_map_path(weather_plugin):
+    w = weather_plugin
+    # Pack with no map should return empty dict
+    result = w._load_icon_map("current")
+    assert result == {}
+
+
+def test_load_icon_map_nonexistent_pack(weather_plugin):
+    w = weather_plugin
+    # Nonexistent pack should return empty dict
+    result = w._load_icon_map("nonexistent_pack")
+    assert result == {}
+
+
+def test_resolve_cond_icon_path_current_pack(weather_plugin, tmp_path, monkeypatch):
+    w = weather_plugin
+    # Create icon file
+    icon_dir = tmp_path / "icons"
+    icon_dir.mkdir()
+    icon_file = icon_dir / "01d.png"
+    icon_file.write_bytes(b"fake png data")
+
+    from plugins.weather import weather
+
+    original_packs = weather.ICON_PACKS.copy()
+    weather.ICON_PACKS["current"] = {"root": str(icon_dir), "map": None}
+
+    try:
+        path = w._resolve_cond_icon_path("01d", "current")
+        assert path.endswith("01d.png")
+        assert os.path.exists(path)
+    finally:
+        weather.ICON_PACKS = original_packs
+
+
+def test_resolve_cond_icon_path_night_to_day_fallback(weather_plugin, tmp_path, monkeypatch):
+    w = weather_plugin
+    # Create only day variant icon
+    icon_dir = tmp_path / "icons"
+    icon_dir.mkdir()
+    day_icon = icon_dir / "01d.png"
+    day_icon.write_bytes(b"fake png")
+
+    from plugins.weather import weather
+
+    original_packs = weather.ICON_PACKS.copy()
+    weather.ICON_PACKS["current"] = {"root": str(icon_dir), "map": None}
+
+    try:
+        # Request night icon, should fallback to day
+        path = w._resolve_cond_icon_path("01n", "current")
+        assert path.endswith("01d.png")
+    finally:
+        weather.ICON_PACKS = original_packs
+
+
+def test_resolve_cond_icon_path_returns_string(weather_plugin):
+    w = weather_plugin
+    # Should always return a string (path or empty)
+    path = w._resolve_cond_icon_path("01d", "current")
+    assert isinstance(path, str)
+
+
+def test_resolve_moon_icon_path_current_pack(weather_plugin, tmp_path, monkeypatch):
+    w = weather_plugin
+    # Create moon phase icon
+    icon_dir = tmp_path / "icons"
+    icon_dir.mkdir()
+    moon_file = icon_dir / "fullmoon.png"
+    moon_file.write_bytes(b"fake moon")
+
+    from plugins.weather import weather
+
+    original_packs = weather.ICON_PACKS.copy()
+    weather.ICON_PACKS["current"] = {"root": str(icon_dir), "map": None}
+
+    try:
+        path = w._resolve_moon_icon_path("fullmoon", "current")
+        assert path.endswith("fullmoon.png")
+        assert os.path.exists(path)
+    finally:
+        weather.ICON_PACKS = original_packs
+
+
+def test_resolve_moon_icon_path_returns_string(weather_plugin):
+    w = weather_plugin
+    # Should always return a string (path or empty)
+    path = w._resolve_moon_icon_path("fullmoon", "current")
+    assert isinstance(path, str)
+
+
+def test_get_weather_data_error_handling(weather_plugin, requests_mock):
+    w = weather_plugin
+    # Mock API to return error
+    requests_mock.get("https://api.openweathermap.org/data/3.0/onecall", status_code=401)
+
+    with pytest.raises(RuntimeError):
+        w.get_weather_data("bad_key", "metric", 40.7, -74.0)
+
+
+def test_parse_timezone_missing_field(weather_plugin):
+    w = weather_plugin
+    # Missing timezone field should raise error
+    with pytest.raises(RuntimeError):
+        w.parse_timezone({})
+
+
+def test_parse_timezone_invalid_value(weather_plugin):
+    w = weather_plugin
+    # Invalid timezone should raise error
+    with pytest.raises(Exception):  # pytz raises an exception for invalid timezones
+        w.parse_timezone({"timezone": "Invalid/Timezone"})
