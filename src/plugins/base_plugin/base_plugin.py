@@ -4,11 +4,11 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from src.utils.app_utils import get_fonts, resolve_path
-from src.utils.image_utils import take_screenshot_html
+from utils.app_utils import get_fonts, resolve_path
+from utils.image_utils import take_screenshot_html
 import os
 from time import perf_counter
-from src.utils.progress import record_step, start_step, update_step, complete_step, fail_step
+from utils.progress import record_step, start_step, update_step, complete_step, fail_step
 import base64
 from PIL import Image
 
