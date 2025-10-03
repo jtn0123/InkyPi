@@ -4,9 +4,32 @@
 
 ---
 
+## ✅ Completed
+
+- Dark Mode Implementation — Implemented with system preference detection and toggle
+  - Toggle in `src/templates/settings.html` (button `#themeToggle`)
+  - Theme logic in `src/static/scripts/theme.js`
+  - Styles/variables in `src/static/styles/main.css`
+- Request Timing & Progress — Implemented
+  - Enhanced progress component in `src/static/scripts/enhanced_progress.js`
+  - Live Logs viewer and filters in `src/templates/settings.html` via `/api/logs`
+  - Optional HTTP latency logging via `INKYPI_HTTP_LOG_LATENCY` in `src/utils/http_utils.py`
+- Backup & Restore — Implemented
+  - Export/import endpoints and include-keys option in `src/blueprints/settings.py`
+  - UI controls under Backup & Restore in `src/templates/settings.html`
+- Benchmarking — Implemented
+  - Instrumentation in `src/refresh_task.py` and `src/display/display_manager.py`
+  - See `docs/benchmarking.md` for details
+- Developer Workflow — Implemented
+  - Quick dev without hardware, hot reload path in `README.md` and `docs/development.md`
+  - Plugin validator `scripts/plugin_validator.py`
+- Light Monitoring (Basic) — Implemented
+  - Logs API and viewer in Settings; future p50/p95 dashboard remains TODO
+
 ## 🎨 UI & User Experience (Top Priority)
 
 ### Dark Mode Implementation
+Status: Completed
 **Goal**: Clean, system-aware dark mode toggle
 - Add CSS custom properties for colors in existing stylesheets
 - JavaScript toggle with `localStorage` persistence and system preference detection
@@ -23,6 +46,7 @@
 - **Effort**: 4-6 hours | **Risk**: Low
 
 ### Request Timing & Progress
+Status: Completed (core)
 **Goal**: Transparent request timing and progress (excluding display update)
 - **Per-request timing**: Measure request duration with a monotonic clock; exclude e‑ink display update time from metrics
 - **Progress bar**: Steps shown in UI – Preparing → Sending → Waiting (device) → Display updating (excluded) → Done
@@ -65,6 +89,7 @@
 ## 💾 Backup & Recovery
 
 ### Configuration Backup
+Status: Completed
 **Goal**: Never lose your setup
 - **Auto-backup**: Daily backup of device config and plugin settings to local file (includes API keys by default)
 - **Manual export**: Download complete configuration as JSON; "Exclude API keys" checkbox (unchecked by default)
@@ -85,6 +110,7 @@
 ## 🛠️ Developer Experience & Tools
 
 ### Development Workflow
+Status: Partially Completed (validator, hot reload/dev UX in place)
 **Goal**: Easier development and debugging
 - **Live reload**: Auto-refresh browser when templates/CSS change
 - **Debug mode**: Detailed error messages and request logging
@@ -105,6 +131,7 @@
 ## 📊 Light Monitoring (Built-in)
 
 ### Simple System Health
+Status: Partially Completed (logs viewer & filters shipped; dashboard metrics TODO)
 **Goal**: Know when things aren't working
 - **Plugin status dashboard**: Visual health check for all plugins
 - **Error logging**: Centralized error collection and display
@@ -118,10 +145,10 @@
 ## 🚀 Implementation Priority
 
 ### Phase 1 (Week 1): Quick Wins
-1. **Dark mode** - Immediate visual improvement
-2. **UI organization** - Better plugin grid and settings layout
-3. **Backup & Restore UI** - Includes API keys by default (opt-out available)
-4. **Request timing & progress UI** - Visible durations and progress bar
+1. **UI organization** - Better plugin grid and settings layout
+2. (Completed) Dark mode
+3. (Completed) Backup & Restore UI
+4. (Completed) Request timing & progress UI
 
 ### Phase 2 (Week 2): Polish & Reliability  
 1. **Subtle UI enhancements** - Loading states, animations
