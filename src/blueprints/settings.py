@@ -49,6 +49,25 @@ _REQUESTS: dict[str, deque] = defaultdict(deque)
 _RATE_LIMIT_WINDOW_SECONDS = 60
 _RATE_LIMIT_MAX_REQUESTS = 120
 
+# Dev mode in-memory log buffer (circular buffer)
+DEV_LOG_BUFFER_SIZE = 1000
+_dev_log_buffer: deque = deque(maxlen=DEV_LOG_BUFFER_SIZE)
+_dev_log_lock = threading.Lock()
+
+
+class DevModeLogHandler(logging.Handler):
+    """Captures logs in memory for dev mode log viewing."""
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            timestamp = datetime.fromtimestamp(record.created).strftime("%b %d %H:%M:%S")
+            log_line = f"{timestamp} [{record.levelname}] {record.name}: {msg}"
+            with _dev_log_lock:
+                _dev_log_buffer.append((record.created, log_line))
+        except Exception:
+            self.handleError(record)
+
 
 def _rate_limit_ok(remote_addr: str | None) -> bool:
     try:
@@ -91,15 +110,20 @@ def _read_log_lines(hours: int) -> list[str]:
         since = datetime.now(tz=get_timezone("UTC")) - timedelta(hours=hours)
     lines: list[str] = []
     if not JOURNAL_AVAILABLE:
-        # Development mode message when systemd journal is not accessible
-        lines.append(
-            "Log download not available in development mode (cysystemd not installed)."
-        )
-        lines.append(
-            f"Logs would normally show InkyPi service logs from the last {hours} hours."
-        )
+        # Development mode: return in-memory captured logs
+        lines.append("=== Development Mode Logs (In-Memory Buffer) ===")
+        lines.append(f"Showing logs from the last {hours} hours (max {DEV_LOG_BUFFER_SIZE} entries)")
+        lines.append(f"For complete logs, check your terminal output where Flask is running.")
         lines.append("")
-        lines.append("To see Flask development logs, check your terminal output.")
+
+        cutoff_timestamp = since.timestamp()
+        with _dev_log_lock:
+            for ts, log_line in _dev_log_buffer:
+                if ts >= cutoff_timestamp:
+                    lines.append(log_line)
+
+        if len(lines) == 4:  # Only headers, no actual logs
+            lines.append("(No logs captured in buffer yet)")
         return lines
 
     # Journal available path
@@ -145,11 +169,20 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
 
     if not JOURNAL_AVAILABLE:
         dev_lines = [
-            "Log download not available in development mode (cysystemd not installed).",
-            f"Logs would normally show these units from the last {hours} hours: {', '.join(units)}.",
+            "=== Development Mode Logs (In-Memory Buffer) ===",
+            f"Showing logs from the last {hours} hours (max {DEV_LOG_BUFFER_SIZE} entries)",
+            f"Units requested: {', '.join(units)}",
+            "For complete logs, check your terminal output where Flask is running.",
             "",
-            "To see Flask development logs, check your terminal output.",
         ]
+        cutoff_timestamp = since.timestamp()
+        with _dev_log_lock:
+            for ts, log_line in _dev_log_buffer:
+                if ts >= cutoff_timestamp:
+                    dev_lines.append(log_line)
+
+        if len(dev_lines) == 5:  # Only headers
+            dev_lines.append("(No logs captured in buffer yet)")
         return dev_lines
 
     merged: list[tuple[float, str]] = []

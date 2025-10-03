@@ -21,7 +21,7 @@ def test_download_logs_dev_mode_message(client, monkeypatch):
 
     resp = client.get("/download-logs?hours=1")
     assert resp.status_code == 200
-    assert b"Log download not available" in resp.data
+    assert b"Development Mode Logs" in resp.data
 
 
 def test_api_logs_basic(client, monkeypatch):
@@ -114,7 +114,7 @@ def test_read_log_lines_journal_available_false(monkeypatch):
 
     lines = settings_mod._read_log_lines(5)
     assert len(lines) > 0
-    assert "Log download not available" in lines[0]
+    assert "Development Mode Logs" in lines[0]
 
 
 def test_read_log_lines_journal_available_true(monkeypatch):

@@ -193,6 +193,18 @@ def main(argv: list[str] | None = None):
     )
 
     app = create_app()
+
+    # Enable dev mode logging handler for in-memory log capture
+    if DEV_MODE:
+        try:
+            from blueprints.settings import DevModeLogHandler
+            dev_handler = DevModeLogHandler()
+            dev_handler.setLevel(logging.DEBUG)
+            logging.getLogger().addHandler(dev_handler)
+            logger.info("Dev mode log handler enabled (in-memory buffer)")
+        except Exception as e:
+            logger.warning(f"Could not enable dev mode log handler: {e}")
+
     return app
 
 

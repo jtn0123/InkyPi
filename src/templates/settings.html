@@ -344,7 +344,6 @@
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                     <button class="header-button" onclick="startUpdate()">Update InkyPi</button>
-                    <button class="header-button" onclick="openBackupRestore()">Backup & Restore</button>
                     <button class="header-button is-warning" onclick="handleShutdown(true)">Reboot</button>
                     <button class="header-button is-danger" onclick="handleShutdown(false)">Shutdown</button>
                 </div>
@@ -387,72 +386,84 @@
                 </div>
 
                 <!-- Time & Locale -->
-                <div class="section">
-                    <div class="section-title">Time & Locale</div>
-                    <div class="form-group nowrap">
-                        <label for="timezone" class="form-label">Time Zone</label>
-                        <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.timezone }}" />
-                        <datalist id="timezoneList">
-                            {% for timezone in timezones %}
-                            <option value="{{ timezone }}"></option>
-                            {% endfor %}
-                        </datalist>
-                    </div>
-                    <div class="form-group nowrap">
-                        <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
-                        <label class="toggle-container">
-                            <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox" onchange="toggleUseDeviceLocation(this)">
-                            <span class="toggle-label"></span>
-                        </label>
-                    </div>
-                    <div class="form-group nowrap">
-                        <label for="timeFormat" class="form-label">Time Format</label>
-                        <select id="timeFormat" name="timeFormat" class="form-input">
-                            <option value="12h" {% if device_settings.time_format == "12h" %}selected{% endif %}>12 Hour (AM/PM)</option>
-                            <option value="24h" {% if device_settings.time_format == "24h" %}selected{% endif %}>24 Hour</option>
-                        </select>
+                <div class="collapsible">
+                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                        Time & Locale <span class="collapsible-icon">▼</span>
+                    </button>
+                    <div class="settings-container collapsible-content">
+                        <div class="form-group nowrap">
+                            <label for="timezone" class="form-label">Time Zone</label>
+                            <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.timezone }}" />
+                            <datalist id="timezoneList">
+                                {% for timezone in timezones %}
+                                <option value="{{ timezone }}"></option>
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="form-group nowrap">
+                            <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
+                            <label class="toggle-container">
+                                <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox" onchange="toggleUseDeviceLocation(this)">
+                                <span class="toggle-label"></span>
+                            </label>
+                        </div>
+                        <div class="form-group nowrap">
+                            <label for="timeFormat" class="form-label">Time Format</label>
+                            <select id="timeFormat" name="timeFormat" class="form-input">
+                                <option value="12h" {% if device_settings.time_format == "12h" %}selected{% endif %}>12 Hour (AM/PM)</option>
+                                <option value="24h" {% if device_settings.time_format == "24h" %}selected{% endif %}>24 Hour</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Plugin cycle & system -->
-                <div class="section">
-                    <div class="section-title">Display Cycle & System</div>
-                    <div class="form-group">
-                        <label for="interval" class="form-label">Plugin Cycle Interval</label>
-                        <span title="Determines how often the display switches to a new plugin.">ⓘ</span>
-                        <span>Every</span>
-                        <input type="number" id="interval" name="interval" class="form-input" required min="1">
-                        <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
-                            <option value="minute">Minute</option>
-                            <option value="hour">Hour</option>
-                        </select>
-                    </div>
+                <div class="collapsible">
+                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                        Display Cycle & System <span class="collapsible-icon">▼</span>
+                    </button>
+                    <div class="settings-container collapsible-content">
+                        <div class="form-group">
+                            <label for="interval" class="form-label">Plugin Cycle Interval</label>
+                            <span title="Determines how often the display switches to a new plugin.">ⓘ</span>
+                            <span>Every</span>
+                            <input type="number" id="interval" name="interval" class="form-input" required min="1">
+                            <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
+                                <option value="minute">Minute</option>
+                                <option value="hour">Hour</option>
+                            </select>
+                        </div>
 
-                    <div class="form-group nowrap">
-                        <label class="form-label" for="logSystemStats">Log System Stats</label>
-                        <label class="toggle-container">
-                            <input type="checkbox" id="logSystemStats" name="logSystemStats" class="toggle-checkbox" {% if device_settings.log_system_stats %}checked{% endif %}>
-                            <span class="toggle-label"></span>
-                        </label>
+                        <div class="form-group nowrap">
+                            <label class="form-label" for="logSystemStats">Log System Stats</label>
+                            <label class="toggle-container">
+                                <input type="checkbox" id="logSystemStats" name="logSystemStats" class="toggle-checkbox" {% if device_settings.log_system_stats %}checked{% endif %}>
+                                <span class="toggle-label"></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Backup & Restore -->
-                <div class="section" id="backupRestoreSection" style="display:none;">
-                    <div class="section-title">Backup & Restore</div>
-                    <div class="form-group">
-                        <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup</button>
-                    </div>
-                    <div class="form-group nowrap">
-                        <label class="form-label" for="includeKeys">Include API keys</label>
-                        <label class="toggle-container">
-                            <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
-                            <span class="toggle-label"></span>
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
-                        <button type="button" class="action-button compact warn" onclick="importConfig()">Restore from File</button>
+                <div class="collapsible">
+                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                        Backup & Restore <span class="collapsible-icon">▼</span>
+                    </button>
+                    <div class="settings-container collapsible-content">
+                        <div class="form-group">
+                            <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup</button>
+                        </div>
+                        <div class="form-group nowrap">
+                            <label class="form-label" for="includeKeys">Include API keys</label>
+                            <label class="toggle-container">
+                                <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
+                                <span class="toggle-label"></span>
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
+                            <button type="button" class="action-button compact warn" onclick="importConfig()">Restore from File</button>
+                        </div>
                     </div>
                 </div>
 
@@ -584,12 +595,13 @@
                 btns.forEach(b => b.disabled = false);
             }
         }
-        function openBackupRestore(){
-            const section = document.getElementById('backupRestoreSection');
-            if (section) {
-                section.style.display = section.style.display === 'none' ? 'block' : 'none';
-            }
-        }
+        // Initialize all collapsible sections to be expanded on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            const collapsibleSections = document.querySelectorAll('.collapsible-content');
+            collapsibleSections.forEach(section => {
+                section.style.display = 'block';
+            });
+        });
         async function exportConfig(){
             const include = document.getElementById('includeKeys')?.checked;
             const url = `{{ url_for('settings.export_settings') }}?include_keys=${include ? '1' : '0'}`;
