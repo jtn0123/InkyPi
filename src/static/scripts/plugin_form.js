@@ -60,7 +60,7 @@
       if (response.ok){
         // metrics display
         const m = result && result.metrics || null;
-        if (m && Array.isArray(m.steps) && m.steps.length){ let pct = 60; const inc = 30 / m.steps.length; for (const [name, ms] of m.steps){ pct += inc; progress.setStep(`${name} ${ms} ms`, pct); await new Promise(r => setTimeout(r, 50)); } }
+        if (m && Array.isArray(m.steps) && m.steps.length){ let pct = 60; const inc = 30 / m.steps.length; for (const step of m.steps){ pct += inc; progress.setStep(`${step.name} ${step.elapsed_ms} ms`, pct); await new Promise(r => setTimeout(r, 50)); } }
         const parts = []; const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
         if (m){ add('Request', m.request_ms); add('Generate', m.generate_ms); add('Preprocess', m.preprocess_ms); add('Display', m.display_ms); }
         if (parts.length){ progress.setStep(parts.join(' • '), 90); }
@@ -70,7 +70,8 @@
         if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
       }
     } catch (e){
-      console.error('Error:', e);
+      console.error('Error in plugin form submission:', e);
+      console.error('Error stack:', e.stack);
       if (window.showResponseModal) window.showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
     } finally {
       if (loadingIndicator) loadingIndicator.style.display = 'none';
