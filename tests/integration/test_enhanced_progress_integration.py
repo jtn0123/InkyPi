@@ -2,8 +2,8 @@
 
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from src.utils.progress import track_progress, get_current_tracker
-from src.plugins.base_plugin.base_plugin import BasePlugin
+from utils.progress import track_progress, get_current_tracker
+from plugins.base_plugin.base_plugin import BasePlugin
 
 
 class TestProgressTrackingIntegration:
@@ -22,7 +22,7 @@ class TestProgressTrackingIntegration:
 
         # Mock the template environment and screenshot function
         with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('src.plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
+             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
              patch('builtins.open', create=True) as mock_open:
 
             # Setup mocks
@@ -92,7 +92,7 @@ class TestProgressTrackingIntegration:
         plugin = BasePlugin(mock_config)
 
         with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('src.plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
+             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
              patch('builtins.open', create=True) as mock_open:
 
             # Setup successful template rendering
@@ -130,7 +130,7 @@ class TestProgressTrackingIntegration:
         plugin = BasePlugin(mock_config)
 
         with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('src.plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
+             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
              patch('builtins.open', create=True) as mock_open:
 
             # Setup mocks with small delays to ensure timing
@@ -174,7 +174,7 @@ class TestProgressTrackingIntegration:
         plugin = BasePlugin(mock_config)
 
         with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('src.plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
+             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
              patch('builtins.open', create=True) as mock_open:
 
             mock_template = Mock()
@@ -213,7 +213,7 @@ class TestProgressTrackingIntegration:
         plugin = BasePlugin(mock_config)
 
         with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('src.plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
+             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
              patch('builtins.open', create=True) as mock_open:
 
             mock_template = Mock()
@@ -254,7 +254,7 @@ class TestProgressTrackingHelpers:
 
     def test_progress_helpers_in_context(self):
         """Test that global helper functions work within tracking context."""
-        from src.utils.progress import record_step, start_step, complete_step
+        from utils.progress import record_step, start_step, complete_step
 
         with track_progress() as tracker:
             # Use global helpers
@@ -274,7 +274,7 @@ class TestProgressTrackingHelpers:
 
     def test_progress_helpers_without_context(self):
         """Test that global helpers don't break without tracking context."""
-        from src.utils.progress import record_step, start_step, complete_step, fail_step
+        from utils.progress import record_step, start_step, complete_step, fail_step
 
         # These should not raise errors even without tracking context
         record_step("orphan_step", "Orphaned step")
