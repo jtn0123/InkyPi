@@ -29,7 +29,7 @@
     return { setStep, start, stop };
   }
 
-  async function sendForm({ action, urls, uploadedFiles }){
+  async function sendForm({ action, urls, uploadedFiles, onAfterSuccess }){
     const loadingIndicator = $('loadingIndicator');
     const progress = initProgress();
     const form = $('settingsForm');
@@ -66,6 +66,10 @@
         if (parts.length){ progress.setStep(parts.join(' • '), 90); }
         if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
         success = true;
+        // Call the success callback to refresh images
+        if (typeof onAfterSuccess === 'function') {
+          try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); }
+        }
       } else {
         if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
       }
