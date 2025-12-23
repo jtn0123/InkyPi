@@ -349,7 +349,7 @@ class Weather(BasePlugin):
             except Exception as e:
                 logger.error(f"Error calculating moon phase for {target_date}: {e}")
                 illum_pct = 0
-                phase_name = "newmoon"
+                phase_name_north_hemi = "newmoon"
             moon_icon_path = self.get_moon_phase_icon_path(phase_name_north_hemi, lat)
 
             forecast.append({
@@ -475,8 +475,12 @@ class Weather(BasePlugin):
             "icon": self.get_plugin_dir('icons/uvi.png')
         })
 
-        visibility = weather.get('current', {}).get("visibility")/1000
-        visibility_str = f">{visibility}" if visibility >= 10 else visibility
+        visibility_raw = weather.get('current', {}).get("visibility")
+        if visibility_raw is not None:
+            visibility = visibility_raw / 1000
+            visibility_str = f">{visibility}" if visibility >= 10 else visibility
+        else:
+            visibility_str = "N/A"
         data_points.append({
             "label": "Visibility",
             "measurement": visibility_str,
@@ -484,11 +488,21 @@ class Weather(BasePlugin):
             "icon": self.get_plugin_dir('icons/visibility.png')
         })
 
-        aqi = air_quality.get('list', [])[0].get("main", {}).get("aqi")
+        aqi_list = air_quality.get('list', [])
+        if aqi_list:
+            aqi = aqi_list[0].get("main", {}).get("aqi")
+        else:
+            aqi = None
+
+        if aqi is not None:
+            aqi_unit = ["Good", "Fair", "Moderate", "Poor", "Very Poor"][int(aqi)-1]
+        else:
+            aqi_unit = ""
+
         data_points.append({
             "label": "Air Quality",
-            "measurement": aqi,
-            "unit": ["Good", "Fair", "Moderate", "Poor", "Very Poor"][int(aqi)-1],
+            "measurement": aqi if aqi is not None else "N/A",
+            "unit": aqi_unit,
             "icon": self.get_plugin_dir('icons/aqi.png')
         })
 
@@ -592,6 +606,7 @@ class Weather(BasePlugin):
 
         # Visibility
         current_visibility = "N/A"
+        unit_label = "ft" if units == "imperial" else "km"
         visibility_hourly_times = hourly_data.get('time', [])
         visibility_values = hourly_data.get('visibility', [])
         for i, time_str in enumerate(visibility_hourly_times):
@@ -632,7 +647,7 @@ class Weather(BasePlugin):
                 logger.warning(f"Could not parse time string {time_str} for AQI.")
                 continue
         scale = ""
-        if current_aqi:
+        if isinstance(current_aqi, (int, float)):
             scale = ["Good","Fair","Moderate","Poor","Very Poor","Ext Poor"][min(current_aqi//20,5)]
         data_points.append({
             "label": "Air Quality", "measurement": current_aqi,

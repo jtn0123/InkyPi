@@ -841,7 +841,7 @@ def test_weather_parse_weather_data_missing_current():
 
 
 def test_weather_parse_open_meteo_data_missing_current():
-    """Test parsing OpenMeteo data with missing current weather info."""
+    """Test parsing OpenMeteo data with missing current weather info handles gracefully."""
     import pytz
 
     from plugins.weather.weather import Weather
@@ -853,8 +853,11 @@ def test_weather_parse_open_meteo_data_missing_current():
     weather_data: dict[str, dict] = {"daily": {}, "hourly": {}}
     aqi_data: dict = {}
 
-    with pytest.raises((KeyError, AttributeError)):
-        p.parse_open_meteo_data(weather_data, aqi_data, tz, "metric", "12h", 40.7)
+    # Should handle missing data gracefully with defaults
+    result = p.parse_open_meteo_data(weather_data, aqi_data, tz, "metric", "12h", 40.7)
+    assert result is not None
+    assert "current_temperature" in result
+    assert result["current_temperature"] == "0"  # Default temperature
 
 
 def test_weather_map_weather_code_to_icon():

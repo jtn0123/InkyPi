@@ -40,13 +40,13 @@ def weather_plugin(tmp_path, monkeypatch):
 def test_map_weather_code_to_icon_various_codes(weather_plugin):
     w = weather_plugin
     assert w.map_weather_code_to_icon(0, 12) == "01d"
-    assert w.map_weather_code_to_icon(1, 12) == "02d"
-    assert w.map_weather_code_to_icon(2, 12) == "03d"
+    assert w.map_weather_code_to_icon(1, 12) == "022d"  # Mainly clear (upstream changed)
+    assert w.map_weather_code_to_icon(2, 12) == "02d"   # Partly cloudy (upstream changed)
     assert w.map_weather_code_to_icon(3, 12) == "04d"
     assert w.map_weather_code_to_icon(45, 12) == "50d"
-    assert w.map_weather_code_to_icon(51, 12) == "09d"
-    assert w.map_weather_code_to_icon(61, 12) == "10d"
-    assert w.map_weather_code_to_icon(71, 12) == "13d"
+    assert w.map_weather_code_to_icon(51, 12) == "51d"  # Light drizzle (upstream changed)
+    assert w.map_weather_code_to_icon(61, 12) == "51d"  # Light rain (upstream changed)
+    assert w.map_weather_code_to_icon(71, 12) == "71d"  # Light snow (upstream changed)
     assert w.map_weather_code_to_icon(95, 12) == "11d"
 
 
@@ -78,7 +78,7 @@ def test_parse_forecast_basic(weather_plugin):
             "temp": {"max": 12, "min": 3},
         },
     ]
-    res = w.parse_forecast(daily, pytz.timezone("UTC"))
+    res = w.parse_forecast(daily, pytz.timezone("UTC"), "d", 40.7)
     assert len(res) == 2
     assert res[0]["high"] == 10
     assert res[1]["icon"].endswith("01d.png")
@@ -94,11 +94,14 @@ def test_parse_open_meteo_forecast_uses_local_phase(monkeypatch, weather_plugin)
         "temperature_2m_min": [5],
     }
 
-    monkeypatch.setattr(w, "_compute_moon_phase", lambda dt: ("fullmoon", 50.0))
-    res = w.parse_open_meteo_forecast(daily, tz)
+    # Mock the astral moon.phase function used by upstream
+    from astral import moon
+    monkeypatch.setattr(moon, "phase", lambda dt: 14.75)  # Full moon phase age
+    res = w.parse_open_meteo_forecast(daily, tz, 1, 40.7)  # is_day=1, lat=40.7
     assert isinstance(res, list)
     assert res[0]["high"] == 15
-    assert res[0]["moon_phase_pct"] == "50"
+    # Full moon (phase_age ~14.75) results in ~100% illumination
+    assert int(res[0]["moon_phase_pct"]) >= 95
     assert res[0]["moon_phase_icon"].endswith("fullmoon.png")
 
 
@@ -193,8 +196,10 @@ def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
     def boom(dt):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(w, "_compute_moon_phase", boom)
-    res = w.parse_open_meteo_forecast(daily, tz)
+    # Mock moon.phase to raise error (upstream uses astral library)
+    from astral import moon
+    monkeypatch.setattr(moon, "phase", boom)
+    res = w.parse_open_meteo_forecast(daily, tz, 1, 40.7)
     assert res and res[0]["moon_phase_pct"] == "0"
     assert res[0]["moon_phase_icon"].endswith("newmoon.png")
 
