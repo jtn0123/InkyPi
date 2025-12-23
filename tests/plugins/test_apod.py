@@ -195,6 +195,7 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
+@pytest.mark.skip(reason="Tests thumbnail_url fallback feature that was removed in upstream - videos now raise error")
 def test_apod_video_with_thumbnail_fallback(device_config_dev, monkeypatch):
     """Video days should fall back to NASA-provided thumbnail when available."""
     from plugins.apod.apod import Apod
@@ -229,6 +230,7 @@ def test_apod_video_with_thumbnail_fallback(device_config_dev, monkeypatch):
         assert img.size[0] > 0
 
 
+@pytest.mark.skip(reason="Tests thumbs=true parameter that was removed in upstream")
 def test_apod_sends_thumbs_param(monkeypatch, device_config_dev):
     """Ensure we request APOD with thumbs=True so thumbnail_url is provided on video days."""
     from plugins.apod.apod import Apod

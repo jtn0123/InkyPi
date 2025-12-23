@@ -365,10 +365,10 @@ def test_grab_image_success():
         mock_response.content = b"fake_image_data"
         mock_requests.return_value = mock_response
 
-        # Mock PIL Image
+        # Mock PIL Image (grab_image doesn't use context manager)
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
             mock_img_instance = MagicMock()
-            mock_image.open.return_value.__enter__.return_value = mock_img_instance
+            mock_image.open.return_value = mock_img_instance
             mock_img_instance.resize.return_value = MagicMock()
 
             result = grab_image("http://example.com/image.png", (800, 600))
@@ -377,9 +377,8 @@ def test_grab_image_success():
             mock_requests.assert_called_with(
                 "http://example.com/image.png", timeout=40.0
             )
-            from PIL.Image import Resampling
-
-            mock_img_instance.resize.assert_called_with((800, 600), Resampling.LANCZOS)
+            # Upstream uses Image.LANCZOS constant directly
+            mock_img_instance.resize.assert_called_with((800, 600), mock_image.LANCZOS)
 
 
 def test_grab_image_download_failure():
