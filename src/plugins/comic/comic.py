@@ -35,7 +35,8 @@ class Comic(BasePlugin):
 
         with Image.open(response.raw) as img:
             background = Image.new("RGB", (width, height), "white")
-            font = get_font("Jost", font_size=int(caption_font_size))
+            font_size = int(caption_font_size) if caption_font_size else 20
+            font = get_font("Jost", font_size=font_size)
             draw = ImageDraw.Draw(background)
             top_padding, bottom_padding = 0, 0
 

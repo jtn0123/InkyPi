@@ -30,16 +30,16 @@ def test_generate_image_valid_flow_horizontal(
 ):
     from plugins.comic.comic import Comic
 
-    # mock RSS image URL parsing
+    # mock get_panel (upstream uses comic_parser.get_panel instead of get_image_url)
     monkeypatch.setattr(
-        "plugins.comic.comic.Comic.get_image_url",
-        lambda self, c: "http://img/latest.png",
+        "plugins.comic.comic_parser.get_panel",
+        lambda c: {"image_url": "http://img/latest.png", "title": "Test", "caption": "Test caption"},
     )
 
     # mock requests.get streaming for image bytes
     class Resp:
         status_code = 200
-        content = _png_bytes((400, 300))
+        raw = BytesIO(_png_bytes((400, 300)))
 
         def raise_for_status(self):
             return None
@@ -63,13 +63,13 @@ def test_generate_image_vertical_orientation(
     device_config_dev.update_value("orientation", "vertical")
 
     monkeypatch.setattr(
-        "plugins.comic.comic.Comic.get_image_url",
-        lambda self, c: "http://img/latest.png",
+        "plugins.comic.comic_parser.get_panel",
+        lambda c: {"image_url": "http://img/latest.png", "title": "Test", "caption": "Test caption"},
     )
 
     class Resp:
         status_code = 200
-        content = _png_bytes((400, 300))
+        raw = BytesIO(_png_bytes((400, 300)))
 
         def raise_for_status(self):
             return None
@@ -94,6 +94,7 @@ def test_generate_image_invalid_comic_raises(plugin_config, device_config_dev):
         p.generate_image({"comic": "NotARealOne"}, device_config_dev)
 
 
+@pytest.mark.skip(reason="Tests get_image_url method that was refactored into get_panel function in upstream")
 def test_get_image_url_bad_feed_raises(monkeypatch, plugin_config):
     from plugins.comic.comic import Comic
 
@@ -114,6 +115,7 @@ def test_get_image_url_bad_feed_raises(monkeypatch, plugin_config):
         p.get_image_url("XKCD")
 
 
+@pytest.mark.skip(reason="Tests get_image_url method that was refactored into get_panel function in upstream")
 def test_get_image_url_parsing_all_comics(monkeypatch, plugin_config):
     from plugins.comic.comic import Comic
 
@@ -180,19 +182,20 @@ def test_get_image_url_parsing_all_comics(monkeypatch, plugin_config):
     assert p.get_image_url("Cyanide & Happiness").endswith((".png", ".jpg"))
 
 
+@pytest.mark.skip(reason="Tests retry logic that was removed in upstream - upstream uses requests.get with stream=True")
 def test_generate_image_retries_without_timeout_arg(
     monkeypatch, plugin_config, device_config_dev
 ):
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
-        "plugins.comic.comic.Comic.get_image_url",
-        lambda self, c: "http://img/latest.png",
+        "plugins.comic.comic_parser.get_panel",
+        lambda c: {"image_url": "http://img/latest.png", "title": "Test", "caption": "Test caption"},
     )
 
     class Resp:
         status_code = 200
-        content = _png_bytes((50, 50))
+        raw = BytesIO(_png_bytes((50, 50)))
 
         def raise_for_status(self):
             return None
@@ -217,8 +220,8 @@ def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev)
     from plugins.comic.comic import Comic
 
     monkeypatch.setattr(
-        "plugins.comic.comic.Comic.get_image_url",
-        lambda self, c: "http://img/latest.png",
+        "plugins.comic.comic_parser.get_panel",
+        lambda c: {"image_url": "http://img/latest.png", "title": "", "caption": ""},
     )
 
     # create a tall/narrow source so centering is apparent
@@ -226,7 +229,7 @@ def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev)
 
     class Resp:
         status_code = 200
-        content = _png_bytes((src_w, src_h), color="black")
+        raw = BytesIO(_png_bytes((src_w, src_h), color="black"))
 
         def raise_for_status(self):
             return None
@@ -236,7 +239,7 @@ def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev)
     )
 
     p = Comic(plugin_config)
-    img = p.generate_image({"comic": "XKCD"}, device_config_dev)
+    img = p.generate_image({"comic": "XKCD", "titleCaption": "false"}, device_config_dev)
 
     # Ensure white background and image centered (check corners are white)
     w, h = device_config_dev.get_resolution()
