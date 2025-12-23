@@ -27,6 +27,9 @@ class ImageUpload(BasePlugin):
         img_index = settings.get("image_index", 0)
         image_locations = settings.get("imageFiles[]")
 
+        if not image_locations:
+            raise RuntimeError("No images provided.")
+
         if img_index >= len(image_locations):
             # Prevent Index out of range issues when file list has changed
             img_index = 0
