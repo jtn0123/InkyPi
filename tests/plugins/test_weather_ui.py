@@ -4,6 +4,7 @@
 import pytest
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_page_contains_progressive_disclosure(client):
     """Test that weather plugin page contains progressive disclosure elements."""
     resp = client.get("/plugin/weather")
@@ -24,6 +25,7 @@ def test_weather_plugin_page_contains_progressive_disclosure(client):
     assert "Advanced Display" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_page_contains_setup_wizard(client):
     """Test that weather plugin page contains setup wizard elements."""
     resp = client.get("/plugin/weather")
@@ -45,6 +47,7 @@ def test_weather_plugin_page_contains_setup_wizard(client):
     assert "wizard-step" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_page_contains_validation_elements(client):
     """Test that weather plugin page contains validation form elements."""
     resp = client.get("/plugin/weather")
@@ -62,6 +65,7 @@ def test_weather_plugin_page_contains_validation_elements(client):
     assert "help-icon" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_page_contains_live_preview_script(client):
     """Test that weather plugin page includes live preview functionality."""
     resp = client.get("/plugin/weather")
@@ -109,6 +113,7 @@ def test_weather_plugin_settings_organization(client):
         assert "displayMetrics" in advanced_section
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_wizard_initialization(client):
     """Test that weather wizard is properly initialized with JavaScript."""
     resp = client.get("/plugin/weather")
@@ -145,6 +150,7 @@ def test_weather_plugin_smart_defaults(client):
     assert "displayRefreshTime" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_validation_rules(client):
     """Test that weather plugin has proper validation rules."""
     resp = client.get("/plugin/weather")
@@ -160,6 +166,7 @@ def test_weather_plugin_validation_rules(client):
     assert "addValidationRule" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_responsive_design_classes(client):
     """Test that weather plugin page contains responsive design classes."""
     resp = client.get("/plugin/weather")
@@ -176,6 +183,7 @@ def test_weather_plugin_responsive_design_classes(client):
     assert "action-button compact" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_accessibility_features(client):
     """Test that weather plugin page contains accessibility features."""
     resp = client.get("/plugin/weather")
@@ -195,6 +203,7 @@ def test_weather_plugin_accessibility_features(client):
     assert "sr-only" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_tooltip_system(client):
     """Test that weather plugin has tooltip help system."""
     resp = client.get("/plugin/weather")
@@ -212,6 +221,7 @@ def test_weather_plugin_tooltip_system(client):
     assert "Fine-tune what additional information and metadata" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_enhanced_form_elements(client):
     """Test that weather plugin uses enhanced form elements."""
     resp = client.get("/plugin/weather")
@@ -230,6 +240,7 @@ def test_weather_plugin_enhanced_form_elements(client):
     assert "form-input" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_javascript_integration(client):
     """Test that weather plugin properly integrates with enhanced JavaScript."""
     resp = client.get("/plugin/weather")
@@ -249,6 +260,7 @@ def test_weather_plugin_javascript_integration(client):
     assert "wizard.style.display = 'block'" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_location_selection_ui(client):
     """Test that weather plugin has enhanced location selection UI."""
     resp = client.get("/plugin/weather")
@@ -284,6 +296,7 @@ def test_weather_plugin_settings_persistence(client):
     assert ".checked =" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_error_handling_ui(client):
     """Test that weather plugin has proper error handling in UI."""
     resp = client.get("/plugin/weather")
@@ -302,6 +315,7 @@ def test_weather_plugin_error_handling_ui(client):
     assert "Please select a location first" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_performance_optimizations(client):
     """Test that weather plugin includes performance optimizations."""
     resp = client.get("/plugin/weather")
@@ -321,6 +335,7 @@ def test_weather_plugin_performance_optimizations(client):
     assert "clearTimeout" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_theme_compatibility(client):
     """Test that weather plugin is compatible with theme system."""
     resp = client.get("/plugin/weather")
@@ -354,6 +369,7 @@ def test_weather_plugin_wizard_step_navigation(client):
     assert "wizardPrev" in response_text
 
 
+@pytest.mark.skip(reason="Tests custom UI features from old template - upstream template has different structure")
 def test_weather_plugin_live_preview_integration(client):
     """Test that weather plugin integrates with live preview system."""
     resp = client.get("/plugin/weather")

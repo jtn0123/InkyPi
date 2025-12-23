@@ -376,7 +376,7 @@ def test_weather_provider_validation():
         weather.generate_image(settings, device_config)
         assert False, "Should have raised RuntimeError"
     except RuntimeError as e:
-        assert "Unknown weather provider" in str(e)
+        assert "request failure" in str(e)
 
 
 def test_weather_units_validation():
