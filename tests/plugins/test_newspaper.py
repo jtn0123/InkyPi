@@ -1,3 +1,4 @@
+import pytest
 from PIL import Image
 from plugins.newspaper.constants import NEWSPAPERS
 

@@ -1,6 +1,8 @@
+import pytest
 from plugins.weather.weather import Weather
 
 
+@pytest.mark.skip(reason="Tests _resolve_cond_icon_path method that was removed in upstream")
 def test_current_pack_has_all_core_condition_icons():
     w = Weather({"id": "weather"})
 
@@ -17,6 +19,7 @@ def test_current_pack_has_all_core_condition_icons():
         assert path.endswith(".png") and len(path) > 0
 
 
+@pytest.mark.skip(reason="Tests _resolve_moon_phase_icon_path method that was removed in upstream")
 def test_current_pack_has_all_core_moon_phase_icons():
     w = Weather({"id": "weather"})
 

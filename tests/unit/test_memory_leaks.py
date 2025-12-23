@@ -329,7 +329,7 @@ def test_image_history_doesnt_accumulate_in_memory(device_config_dev):
     for i in range(30):
         img = Image.new("RGB", (400, 300), color=((i * 10) % 256, 128, 200))
         # This saves to history
-        dm.display_image(img, history_meta={"test": f"iteration_{i}"})
+        dm.display_image(img)
         del img
 
     gc.collect()

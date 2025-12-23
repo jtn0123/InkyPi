@@ -31,7 +31,7 @@ def test_display_continue_on_save_failures(monkeypatch, device_config_dev):
     # Run display; failures should be logged but not crash; render should still be called
     img = Image.new("RGB", (64, 48), "white")
     try:
-        dm.display_image(img, image_settings=[], history_meta={"k": "v"})
+        dm.display_image(img, image_settings=[])
     except Exception as e:
         # Should not raise due to save failures
         raise AssertionError(f"display_image should tolerate save failures: {e}")
