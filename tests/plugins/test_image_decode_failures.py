@@ -30,7 +30,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
         else:
             return R2()  # Second call returns invalid image
 
-    monkeypatch.setattr("plugins.apod.apod.http_get", mock_http_get)
+    monkeypatch.setattr("requests.get", mock_http_get)
 
     with pytest.raises(RuntimeError):
         p.generate_image({}, device_config_dev)
@@ -49,7 +49,7 @@ def test_unsplash_decode_failure(device_config_dev, monkeypatch):
         def json(self):
             return {"urls": {"full": "https://example.com/x.jpg"}}
 
-    monkeypatch.setattr("plugins.unsplash.unsplash.http_get", lambda *a, **k: R(), raising=True)
+    monkeypatch.setattr("requests.get", lambda *a, **k: R(), raising=True)
 
     # Make grab_image return None (decode failure path)
     monkeypatch.setattr("plugins.unsplash.unsplash.grab_image", lambda *a, **k: None, raising=True)
