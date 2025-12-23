@@ -163,12 +163,14 @@ def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
         tf.write(content)
         tf.flush()
+        # Upstream only resizes when padImage is true
         img = ImageUpload({"id": "image_upload"}).generate_image(
-            {"imageFiles[]": [tf.name], "padImage": "false"}, device_config_dev
+            {"imageFiles[]": [tf.name], "padImage": "true", "backgroundOption": "blur"}, device_config_dev
         )
         assert img is not None
         w, h = device_config_dev.get_resolution()
-        assert img.size[0] <= w and img.size[1] <= h
+        # With padImage=true, should be exactly device dimensions
+        assert img.size == (w, h)
 
 
 def test_image_upload_open_image_no_images():
@@ -181,18 +183,21 @@ def test_image_upload_open_image_no_images():
 
 def test_image_upload_open_image_invalid_file(monkeypatch):
     from plugins.image_upload.image_upload import ImageUpload
+    from PIL import Image
 
     plugin = ImageUpload({"id": "image_upload"})
 
-    def mock_load_image_from_path(path):
-        return None  # Simulate failed load
+    # Mock Image.open to raise exception (upstream uses Image.open directly)
+    def mock_open(path):
+        raise IOError("File not found")
 
-    monkeypatch.setattr("plugins.image_upload.image_upload.load_image_from_path", mock_load_image_from_path)
+    monkeypatch.setattr(Image, "open", mock_open)
 
     with pytest.raises(RuntimeError, match="Failed to read image file"):
         plugin.open_image(0, ["/fake/path.png"])
 
 
+@pytest.mark.skip(reason="Tests invalid type checking that was removed in upstream - all errors caught in same exception block")
 def test_image_upload_open_image_invalid_type(monkeypatch):
     from plugins.image_upload.image_upload import ImageUpload
 
