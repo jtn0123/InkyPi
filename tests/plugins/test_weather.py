@@ -837,7 +837,7 @@ def test_weather_parse_weather_data_missing_current():
     aqi_data: dict = {}
 
     with pytest.raises(KeyError):
-        p.parse_weather_data(weather_data, aqi_data, tz, "metric", "12h")
+        p.parse_weather_data(weather_data, aqi_data, tz, "metric", "12h", 40.7)
 
 
 def test_weather_parse_open_meteo_data_missing_current():
@@ -854,7 +854,7 @@ def test_weather_parse_open_meteo_data_missing_current():
     aqi_data: dict = {}
 
     with pytest.raises(KeyError):
-        p.parse_open_meteo_data(weather_data, aqi_data, tz, "metric", "12h")
+        p.parse_open_meteo_data(weather_data, aqi_data, tz, "metric", "12h", 40.7)
 
 
 def test_weather_map_weather_code_to_icon():
@@ -882,7 +882,7 @@ def test_weather_parse_forecast_empty_data():
     p = Weather({"id": "weather"})
     tz = pytz.timezone("UTC")
 
-    result = p.parse_forecast([], tz)
+    result = p.parse_forecast([], tz, "d", 40.7)
     assert result == []
 
 
