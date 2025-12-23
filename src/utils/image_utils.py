@@ -8,7 +8,7 @@ from collections.abc import Callable
 from io import BytesIO
 from typing import Any
 
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from PIL.Image import Resampling
 
 from utils.http_utils import http_get
@@ -171,6 +171,16 @@ def apply_image_enhancement(img, image_settings=None):
     img = ImageEnhance.Sharpness(img).enhance(image_settings.get("sharpness", 1.0))
 
     return img
+
+
+def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
+    bkg = ImageOps.fit(img, dimensions)
+    bkg = bkg.filter(ImageFilter.BoxBlur(8))
+    img = ImageOps.contain(img, dimensions)
+
+    img_size = img.size
+    bkg.paste(img, ((dimensions[0] - img_size[0]) // 2, (dimensions[1] - img_size[1]) // 2))
+    return bkg
 
 
 def compute_image_hash(image):

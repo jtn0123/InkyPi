@@ -10,6 +10,7 @@ pytz==2025.2
 openai==1.58.1
 numpy==2.2.1
 icalendar==6.3.1
+recurring-ical-events==3.7.0
 fontTools==4.57.1
 fonttools-utils==1.0.3
 cysystemd==2.0.1
