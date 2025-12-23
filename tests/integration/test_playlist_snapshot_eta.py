@@ -54,21 +54,37 @@ def _prepare_playlist_state(device_config_dev):
     device_config_dev.write_config()
 
 
-@pytest.mark.skip(reason="Tests ETA UI rendering that was removed in upstream - backend ETA calculation still exists but not displayed in HTML")
 def test_eta_math_renders_expected(client, device_config_dev, monkeypatch):
+    """Test ETA calculation via backend API endpoint (UI rendering was removed in upstream)."""
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     # Patch the imported alias used inside blueprints.playlist
     monkeypatch.setattr("blueprints.playlist.now_device_tz", _fixed_now, raising=True)
     _prepare_playlist_state(device_config_dev)
 
-    resp = client.get("/playlist")
+    # Test the backend API endpoint instead of HTML rendering
+    resp = client.get("/playlist/eta/Default")
     assert resp.status_code == 200
-    html = resp.data.decode("utf-8")
+    data = resp.get_json()
 
-    # Expect ETA sequence for the three instances
-    found = re.findall(r"Next in(?:\s+\d+h)?\s+(\d+)m\s+• at\s+(\d{2}:\d{2})", html)
-    assert ("5", "08:05") in found
-    assert ("10", "08:10") in found
-    # First item is at 0m ("now"), which our regex doesn't capture; subsequent two should be present
+    assert data["success"] is True
+    assert "eta" in data
+
+    # Verify ETA calculations for the three instances
+    eta = data["eta"]
+    assert "Clock A" in eta
+    assert "Weather B" in eta
+    assert "Calendar C" in eta
+
+    # First instance should be next (0 minutes)
+    assert eta["Clock A"]["minutes"] == 0
+    assert eta["Clock A"]["at"] == "08:00"
+
+    # Second instance should be in 5 minutes
+    assert eta["Weather B"]["minutes"] == 5
+    assert eta["Weather B"]["at"] == "08:05"
+
+    # Third instance should be in 10 minutes
+    assert eta["Calendar C"]["minutes"] == 10
+    assert eta["Calendar C"]["at"] == "08:10"
 
 
