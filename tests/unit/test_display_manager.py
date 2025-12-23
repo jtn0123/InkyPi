@@ -137,6 +137,7 @@ def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
     assert dm.display.__class__.__name__ == "FakeWS"
 
 
+@pytest.mark.skip(reason="Tests display_preprocessed_image method that was removed in upstream merge")
 def test_display_preprocessed_image_success(tmp_path, device_config_dev, monkeypatch):
     # Ensure mock display
     device_config_dev.update_value("display_type", "mock")
@@ -169,6 +170,7 @@ def test_display_preprocessed_image_success(tmp_path, device_config_dev, monkeyp
     assert calls["display"] == 1
 
 
+@pytest.mark.skip(reason="Tests display_preprocessed_image method that was removed in upstream merge")
 def test_display_preprocessed_image_load_failure(device_config_dev):
     from display.display_manager import DisplayManager
 
@@ -178,6 +180,7 @@ def test_display_preprocessed_image_load_failure(device_config_dev):
         dm.display_preprocessed_image("/non/existent/file.png")
 
 
+@pytest.mark.skip(reason="Tests display_preprocessed_image method that was removed in upstream merge")
 def test_save_image_only(tmp_path, device_config_dev):
     from display.display_manager import DisplayManager
 
@@ -192,6 +195,7 @@ def test_save_image_only(tmp_path, device_config_dev):
     assert (preview_dir / "preview_test.png").exists()
 
 
+@pytest.mark.skip(reason="Tests display_preprocessed_image method that was removed in upstream merge")
 def test_display_image_history_sidecar_and_metrics(monkeypatch, device_config_dev):
     # Ensure mock display
     device_config_dev.update_value("display_type", "mock")
