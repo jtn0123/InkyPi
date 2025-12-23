@@ -24,8 +24,12 @@ def _html(client, path: str) -> str:
 
 
 def _has_icon(html: str, class_marker: str, svg_class: str) -> bool:
-    # Accept either CDN class-based icon or inline SVG using our class
-    return (class_marker in html) or (f'class="{svg_class}"' in html and '<svg' in html)
+    # Accept either CDN class-based icon, inline SVG, or PNG img using our class
+    # Upstream changed to use <img> tags with PNG icons instead of SVG/Phosphor
+    has_class_marker = class_marker in html
+    has_svg_with_class = f'class="{svg_class}"' in html and '<svg' in html
+    has_img_with_class = f'class="{svg_class}"' in html and '<img' in html
+    return has_class_marker or has_svg_with_class or has_img_with_class
 
 
 def test_home_includes_phosphor_and_icons(icons_csp_env, client):
