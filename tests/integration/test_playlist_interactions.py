@@ -1,3 +1,51 @@
+"""
+UI Interaction Tests
+
+WHY THESE TESTS REQUIRE BROWSER AUTOMATION:
+================================================================================
+These tests verify dynamic JavaScript behavior in the web interface that cannot
+be tested via static HTML requests. They require Playwright/Selenium because:
+
+1. **JavaScript Execution**:
+   - Tests verify client-side form validation
+   - Dynamic DOM updates (add/remove playlist items)
+   - AJAX requests and response handling
+   - Event listeners and user interactions
+   Cannot be tested with Flask test client (no JavaScript engine)
+
+2. **User Interactions**:
+   - Button clicks (add plugin, delete instance, etc.)
+   - Form submissions with validation
+   - Drag-and-drop reordering
+   - Modal dialogs (open/close/submit)
+   - Real browser events (mousedown, keypress, etc.)
+
+3. **Asynchronous Behavior**:
+   - Fetch API calls to backend
+   - Promise resolution and error handling
+   - Loading states and spinners
+   - Success/error message display
+   - Real network timing
+
+4. **Environment Requirements**:
+   - Browser automation framework (Playwright/Selenium)
+   - Browser binaries (Chromium ~200MB)
+   - JavaScript runtime
+   - Headless mode or display server
+
+WHAT THESE TESTS VERIFY:
+- Playlist UI allows adding/removing plugins via JavaScript
+- Form validation prevents invalid configurations
+- Dynamic updates work without page reload
+- Error messages display correctly
+- Modals and dialogs function properly
+
+TO RUN THESE TESTS:
+1. Install Playwright: pip install playwright
+2. Install browsers: playwright install chromium
+3. Unset SKIP_UI: unset SKIP_UI or SKIP_UI=0 pytest tests/integration/test_playlist_interactions.py
+"""
+
 import os
 from datetime import datetime, timezone
 

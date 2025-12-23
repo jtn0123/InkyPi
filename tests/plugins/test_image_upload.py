@@ -4,7 +4,6 @@ from io import BytesIO
 from PIL import Image
 import pytest
 
-
 def build_upload(name: str, content: bytes, content_type: str = "image/png"):
     class F:
         def __init__(self, n, b, ct):
@@ -34,7 +33,6 @@ def build_upload(name: str, content: bytes, content_type: str = "image/png"):
 
     return F(name, content, content_type)
 
-
 class MultiDict:
     def __init__(self, items):
         self._items = items
@@ -44,7 +42,6 @@ class MultiDict:
 
     def keys(self):
         return [k for (k, _v) in self._items]
-
 
 def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
     # Ensure request.files handling saves and plugin loads correctly
@@ -76,7 +73,6 @@ def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
     resp = client.post("/update_now", data=data)
     assert resp.status_code == 200
 
-
 def test_image_upload_rejects_non_image(client, monkeypatch):
     bad_content = b"%PDF-1.4 Not an image"
 
@@ -99,7 +95,6 @@ def test_image_upload_rejects_non_image(client, monkeypatch):
     resp = client.post("/update_now", data={"plugin_id": "image_upload"})
     # No files processed; plugin will error due to no images provided
     assert resp.status_code == 500
-
 
 def test_image_upload_rejects_oversize(client, monkeypatch):
     # 11MB fake PNG-like bytes (not decodable)
@@ -125,7 +120,6 @@ def test_image_upload_rejects_oversize(client, monkeypatch):
     resp = client.post("/update_now", data={"plugin_id": "image_upload"})
     assert resp.status_code == 500
 
-
 def test_image_upload_rejects_decode_error(client, monkeypatch):
     # Small bytes with PNG extension but invalid image data
     invalid = b"not-an-image"
@@ -147,7 +141,6 @@ def test_image_upload_rejects_decode_error(client, monkeypatch):
 
     resp = client.post("/update_now", data={"plugin_id": "image_upload"})
     assert resp.status_code == 500
-
 
 def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev):
     # Directly invoke plugin.generate_image to verify contain/pad
@@ -172,14 +165,12 @@ def test_image_upload_success_returns_sized_image(monkeypatch, device_config_dev
         # With padImage=true, should be exactly device dimensions
         assert img.size == (w, h)
 
-
 def test_image_upload_open_image_no_images():
     from plugins.image_upload.image_upload import ImageUpload
 
     plugin = ImageUpload({"id": "image_upload"})
     with pytest.raises(RuntimeError, match="No images provided"):
         plugin.open_image(0, [])
-
 
 def test_image_upload_open_image_invalid_file(monkeypatch):
     from plugins.image_upload.image_upload import ImageUpload
@@ -195,22 +186,6 @@ def test_image_upload_open_image_invalid_file(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to read image file"):
         plugin.open_image(0, ["/fake/path.png"])
-
-
-@pytest.mark.skip(reason="Tests invalid type checking that was removed in upstream - all errors caught in same exception block")
-def test_image_upload_open_image_invalid_type(monkeypatch):
-    from plugins.image_upload.image_upload import ImageUpload
-
-    plugin = ImageUpload({"id": "image_upload"})
-
-    def mock_load_image_from_path(path):
-        return "not_an_image"  # Simulate invalid type
-
-    monkeypatch.setattr("plugins.image_upload.image_upload.load_image_from_path", mock_load_image_from_path)
-
-    with pytest.raises(RuntimeError, match="Invalid image type loaded"):
-        plugin.open_image(0, ["/fake/path.png"])
-
 
 def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_config_dev):
     from plugins.image_upload.image_upload import ImageUpload
@@ -232,7 +207,6 @@ def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_conf
             {"imageFiles[]": [tf.name], "image_index": 5}, device_config_dev
         )
         assert result is not None
-
 
 def test_image_upload_generate_image_randomize(monkeypatch, device_config_dev):
     from plugins.image_upload.image_upload import ImageUpload
@@ -258,7 +232,6 @@ def test_image_upload_generate_image_randomize(monkeypatch, device_config_dev):
             {"imageFiles[]": [tf1.name, tf2.name], "randomize": "true"}, device_config_dev
         )
         assert result is not None
-
 
 def test_image_upload_generate_image_vertical_orientation(monkeypatch, device_config_dev):
     from plugins.image_upload.image_upload import ImageUpload
@@ -288,7 +261,6 @@ def test_image_upload_generate_image_vertical_orientation(monkeypatch, device_co
             {"imageFiles[]": [tf.name], "padImage": "false"}, device_config_dev
         )
         assert result is not None
-
 
 def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev):
     from plugins.image_upload.image_upload import ImageUpload

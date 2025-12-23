@@ -1,3 +1,47 @@
+"""
+E-paper Display Hardware Configuration Tests
+
+WHY HARDWARE IS REQUIRED FOR SKIPPED TESTS:
+================================================================================
+These skipped tests verify GPIO pin communication, SPI bus operations, and
+platform-specific hardware initialization for e-paper displays. They cannot
+run without physical hardware because:
+
+1. **GPIO Operations**: Tests verify actual GPIO pin states (HIGH/LOW) for:
+   - Reset pins (RST_PIN)
+   - Data/Command selection (DC_PIN)
+   - Busy status reading (BUSY_PIN)
+   - Chip select (CS_PIN)
+   These require physical GPIO chips (BCM2835 on Raspberry Pi, Tegra on Jetson)
+
+2. **SPI Communication**: Tests verify Serial Peripheral Interface operations:
+   - SPI bus initialization (/dev/spidev0.0 or /dev/spidev0.1)
+   - Byte transfer operations (writebytes, writebytes2)
+   - Clock speed configuration (2MHz typical)
+   - Mode settings (CPOL, CPHA)
+   Cannot be mocked as they test actual SPI hardware timing
+
+3. **Platform Detection**: Tests verify platform-specific libraries:
+   - Raspberry Pi: Requires gpiozero, spidev, RPi.GPIO
+   - Jetson Nano: Requires Jetson.GPIO with Tegra GPIO driver
+   - Sunrise X3: Requires Hobot.GPIO with custom pinmux
+   These libraries fail import without matching hardware
+
+4. **E-paper Display Driver**: Tests verify display controller communication:
+   - Send commands to IL0373/SSD1681/UC8151D controllers via SPI
+   - Read busy state from display's BUSY pin
+   - Power management (VCOM, gate voltage) via hardware-specific sysfs
+   Requires actual e-paper panel connected
+
+HARDWARE REQUIRED:
+- Waveshare e-paper HAT (2.13", 2.7", 4.2", 5.83", 7.5", etc.)
+- OR Inky pHAT/wHAT/Impression
+- Connected to Raspberry Pi, Jetson Nano, or compatible SBC
+- With working SPI bus and GPIO pins
+
+Without hardware, only software logic tests (non-skipped) can run.
+"""
+
 import importlib
 import sys
 import types

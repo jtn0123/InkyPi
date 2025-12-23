@@ -3,7 +3,6 @@ import os
 import pytest
 from PIL import Image
 
-
 def test_history_page_lists_images(client, device_config_dev):
     # Create two history images
     d = device_config_dev.history_image_dir
@@ -16,7 +15,6 @@ def test_history_page_lists_images(client, device_config_dev):
     body = resp.data.decode("utf-8")
     assert "display_20250101_000000.png" in body
     assert "display_20250101_000100.png" in body
-
 
 def test_history_sidecar_metadata_rendered(client, device_config_dev):
     # Create an image and matching sidecar json
@@ -42,37 +40,6 @@ def test_history_sidecar_metadata_rendered(client, device_config_dev):
     assert "Playlist" in text
     assert "ai_text" in text
 
-
-@pytest.mark.skip(reason="Tests redisplay feature that relies on removed display_preprocessed_image method")
-def test_history_redisplay_succeeds(client, device_config_dev, monkeypatch):
-    # Create one image
-    d = device_config_dev.history_image_dir
-    os.makedirs(d, exist_ok=True)
-    filename = "display_20250101_000200.png"
-    path = os.path.join(d, filename)
-    Image.new("RGB", (10, 10), "white").save(path)
-
-    # Spy on display_preprocessed_image
-    call_count = [0]
-    last_path = [""]
-    display_manager = client.application.config["DISPLAY_MANAGER"]
-    original = display_manager.display_preprocessed_image
-
-    def _spy(p):
-        call_count[0] += 1
-        last_path[0] = str(p)
-        return original(p)
-
-    monkeypatch.setattr(
-        display_manager, "display_preprocessed_image", _spy, raising=True
-    )
-
-    resp = client.post("/history/redisplay", json={"filename": filename})
-    assert resp.status_code == 200
-    assert call_count[0] == 1
-    assert last_path[0].endswith(filename)
-
-
 def test_history_delete_and_clear(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -92,7 +59,6 @@ def test_history_delete_and_clear(client, device_config_dev):
     assert resp.status_code == 200
     assert not os.path.exists(b)
 
-
 def test_history_page_shows_no_history_message(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -105,7 +71,6 @@ def test_history_page_shows_no_history_message(client, device_config_dev):
     body = resp.data.decode("utf-8")
     assert "No history yet." in body
 
-
 def test_history_page_contains_storage_block(client):
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -113,7 +78,6 @@ def test_history_page_contains_storage_block(client):
     assert 'id="storage-block"' in body
     # Should include server-rendered text placeholders or values
     assert "Storage available" in body
-
 
 def test_history_image_route_serves_png(client, device_config_dev):
     d = device_config_dev.history_image_dir
@@ -127,12 +91,10 @@ def test_history_image_route_serves_png(client, device_config_dev):
     assert resp.status_code == 200
     assert resp.headers.get("Content-Type", "").startswith("image/")
 
-
 def test_history_security_blocks_path_traversal_on_delete(client):
     # Attempt to escape history dir
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
-
 
 def test_history_storage_endpoint_values(client, monkeypatch):
     # Monkeypatch shutil.disk_usage to return known numbers for precise assertions
@@ -153,7 +115,6 @@ def test_history_storage_endpoint_values(client, monkeypatch):
     assert data["free_gb"] == 1.0
     assert data["used_gb"] == 3.0
     assert data["pct_free"] == 25.0
-
 
 def test_history_clear_then_storage_endpoint_ok(client, device_config_dev):
     d = device_config_dev.history_image_dir
@@ -176,7 +137,6 @@ def test_history_clear_then_storage_endpoint_ok(client, device_config_dev):
         0.0 <= float(data2.get("pct_free")) <= 100.0
     )
 
-
 def test_history_redisplay_errors(client):
     # Missing filename
     resp = client.post("/history/redisplay", json={})
@@ -190,7 +150,6 @@ def test_history_redisplay_errors(client):
     resp = client.post("/history/redisplay", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
 
-
 def test_history_delete_errors(client):
     # Missing filename
     resp = client.post("/history/delete", json={})
@@ -199,7 +158,6 @@ def test_history_delete_errors(client):
     # Traversal attempt
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
-
 
 def test_history_sorting_and_size_formatting(client, device_config_dev):
     import time
@@ -235,7 +193,6 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     # Size strings should include units like B or KB
     assert "100 B" in body or "0.1 KB" in body or "KB" in body
 
-
 def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     class Usage:
         total = 4 * (1024**3)
@@ -252,7 +209,6 @@ def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     # Match new template wording
     assert "GB remaining of" in body and "GB total" in body
 
-
 def test_history_server_handles_disk_usage_failure(client, monkeypatch):
     import shutil as _shutil
 
@@ -264,7 +220,6 @@ def test_history_server_handles_disk_usage_failure(client, monkeypatch):
     body = resp.data.decode("utf-8")
     # Storage block may be hidden; ensure page still renders with header
     assert "History" in body
-
 
 def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
     d = device_config_dev.history_image_dir
@@ -294,7 +249,6 @@ def test_history_handles_file_stat_race(client, device_config_dev, monkeypatch):
     # Page should still render; either show no entries or skip the raced file
     assert "History" in body
 
-
 def test_history_template_scripts_closed_and_grid_renders(client):
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -309,7 +263,6 @@ def test_history_template_scripts_closed_and_grid_renders(client):
     if grid_idx != -1:
         assert first_script_close < grid_idx
 
-
 def test_format_size_exception_handling(monkeypatch):
     from blueprints.history import _format_size
 
@@ -318,7 +271,6 @@ def test_format_size_exception_handling(monkeypatch):
     result = _format_size(10**20)  # Very large number
     # Should still format properly or fall back to exception path
     assert isinstance(result, str)
-
 
 def test_list_history_images_exception_handling(client, device_config_dev, monkeypatch):
     import blueprints.history as history_mod
@@ -331,31 +283,6 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
     result = history_mod._list_history_images(device_config_dev.history_image_dir)
     assert result == []
 
-
-@pytest.mark.skip(reason="Tests redisplay feature that relies on removed display_preprocessed_image method")
-def test_history_redisplay_exception_handling(client, flask_app, monkeypatch):
-    # Mock display manager to raise exception
-    dm = flask_app.config["DISPLAY_MANAGER"]
-    monkeypatch.setattr(
-        dm,
-        "display_preprocessed_image",
-        lambda x: (_ for _ in ()).throw(Exception("test")),
-    )
-
-    # Create a test image first
-    d = flask_app.config["DEVICE_CONFIG"].history_image_dir
-    import os
-
-    os.makedirs(d, exist_ok=True)
-    from PIL import Image
-
-    Image.new("RGB", (10, 10), "white").save(os.path.join(d, "test.png"))
-
-    resp = client.post("/history/redisplay", json={"filename": "test.png"})
-    assert resp.status_code == 500
-    assert "An internal error occurred" in resp.get_json().get("error", "")
-
-
 def test_history_delete_exception_handling(client, flask_app, monkeypatch):
     import os.path
 
@@ -367,7 +294,6 @@ def test_history_delete_exception_handling(client, flask_app, monkeypatch):
     assert resp.status_code == 500
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
-
 def test_history_clear_exception_handling(client, flask_app, monkeypatch):
     import blueprints.history as history_mod
 
@@ -378,7 +304,6 @@ def test_history_clear_exception_handling(client, flask_app, monkeypatch):
     resp = client.post("/history/clear")
     assert resp.status_code == 500
     assert "An error occurred" in resp.get_json().get("error", "")
-
 
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     import shutil as _shutil
