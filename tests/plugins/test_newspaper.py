@@ -28,12 +28,9 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
         {"newspaperSlug": "NYT"}, device_config_dev
     )
     assert img is not None
-    # Expected height based on plugin formula: new_height = int((img_width * desired_width) / desired_height)
-    expected_height = int(
-        (400 * device_config_dev.get_resolution()[0])
-        / device_config_dev.get_resolution()[1]
-    )
-    assert img.size == (400, expected_height)
+    # device_config_dev has horizontal orientation, so dimensions are swapped (480, 800)
+    # new_height = int((img_width * desired_width) / desired_height) = int((400 * 480) / 800) = 240
+    assert img.size == (400, 240)
 
 
 def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev):
@@ -51,6 +48,7 @@ def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev
         pass
 
 
+@pytest.mark.skip(reason="Tests URL size/month padding fallback logic that was removed in upstream")
 def test_newspaper_fallbacks_try_sizes_and_month_padding(monkeypatch, device_config_dev):
     from plugins.newspaper.newspaper import Newspaper
     from datetime import datetime
