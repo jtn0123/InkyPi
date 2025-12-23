@@ -34,6 +34,28 @@ class AIImage(BasePlugin):
         if image_model not in IMAGE_MODELS:
             raise RuntimeError("Invalid Image Model provided.")
         image_quality = settings.get('quality', "medium" if image_model == "gpt-image-1" else "standard")
+
+        # Normalize quality for different models
+        if image_model == "dall-e-3":
+            # Normalize to lowercase, map "high" to "hd"
+            quality_lower = str(image_quality).lower() if image_quality else ""
+            if quality_lower in ["hd", "high"]:
+                image_quality = "hd"
+            elif quality_lower == "standard" or quality_lower == "":
+                image_quality = "standard"
+            else:
+                image_quality = "standard"  # Default fallback
+        elif image_model == "gpt-image-1":
+            # Normalize to lowercase, validate against allowed values
+            quality_lower = str(image_quality).lower() if image_quality else ""
+            if quality_lower in ["low", "medium", "high", "auto"]:
+                image_quality = quality_lower
+            else:
+                image_quality = "medium"  # Default fallback
+        elif image_model == "dall-e-2":
+            # dall-e-2 doesn't support quality parameter
+            image_quality = None
+
         randomize_prompt = settings.get('randomizePrompt') == 'true'
 
         image = None
@@ -73,10 +95,12 @@ class AIImage(BasePlugin):
         }
         if model == "dall-e-3":
             args["size"] = "1792x1024" if orientation == "horizontal" else "1024x1792"
-            args["quality"] = quality
+            if quality is not None:
+                args["quality"] = quality
         elif model == "gpt-image-1":
             args["size"] = "1536x1024" if orientation == "horizontal" else "1024x1536"
-            args["quality"] = quality
+            if quality is not None:
+                args["quality"] = quality
 
         response = ai_client.images.generate(**args)
         if model in ["dall-e-3", "dall-e-2"]:
