@@ -27,6 +27,13 @@ from utils.http_utils import APIError, json_error, json_internal_error, wants_js
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 
+# Register HEIF/HEIC image support (for iPhone photos)
+try:
+    from pi_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass  # pi-heif not installed, skip HEIF support
+
 
 def _use_json_logging():
     fmt = (os.getenv("INKYPI_LOG_FORMAT") or "").strip().lower()

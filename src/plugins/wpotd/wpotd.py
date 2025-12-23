@@ -1,7 +1,7 @@
 """
 Wpotd Plugin for InkyPi
 This plugin fetches the Wikipedia Picture of the Day (Wpotd) from Wikipedia's API
-and displays it on the InkyPi device.
+and displays it on the InkyPi device. 
 
 It supports optional manual date selection or random dates and can resize the image to fit the device's dimensions.
 
@@ -21,37 +21,29 @@ Flow:
 6. Optionally resize the image to fit the device dimensions. (_shrink_to_fit))
 """
 
-import logging
-from datetime import date, datetime, timedelta
-from io import BytesIO
-from random import randint
-from typing import Any
-from PIL import Image, UnidentifiedImageError
-from PIL.Image import Resampling
-
 from plugins.base_plugin.base_plugin import BasePlugin
-from utils.http_utils import DEFAULT_HEADERS, get_shared_session
-from utils.image_utils import load_image_from_bytes
-
-LANCZOS = Resampling.LANCZOS
+from PIL import Image, UnidentifiedImageError
+from io import BytesIO
+import requests
+import logging
+from random import randint
+from datetime import datetime, timedelta, date
+from functools import lru_cache
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-
 class Wpotd(BasePlugin):
-    # Reuse global default headers and shared session for consistency
-    SESSION = get_shared_session()
-    HEADERS = dict(DEFAULT_HEADERS)
+    SESSION = requests.Session()
+    HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
     API_URL = "https://en.wikipedia.org/w/api.php"
 
-    def generate_settings_template(self) -> dict[str, Any]:
-        template_params: dict[str, Any] = super().generate_settings_template()
-        template_params["style_settings"] = False
+    def generate_settings_template(self) -> Dict[str, Any]:
+        template_params = super().generate_settings_template()
+        template_params['style_settings'] = False
         return template_params
 
-    def generate_image(
-        self, settings: dict[str, Any], device_config: Any
-    ) -> Image.Image:
+    def generate_image(self, settings: Dict[str, Any], device_config: Dict[str, Any]) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -65,32 +57,16 @@ class Wpotd(BasePlugin):
             logger.error("Failed to download WPOTD image.")
             raise RuntimeError("Failed to download WPOTD image.")
         if settings.get("shrinkToFitWpotd") == "true":
-            max_width, max_height = device_config.get_resolution()
+            dimensions = device_config.get_resolution()
+            if device_config.get_config("orientation") == "vertical":
+                dimensions = dimensions[::-1]
+            max_width, max_height = dimensions
             image = self._shrink_to_fit(image, max_width, max_height)
-            logger.info(
-                f"Image resized to fit device dimensions: {max_width},{max_height}"
-            )
-
-        # Attempt to gather and surface metadata for the web UI
-        try:
-            filename = data.get("filename")
-            meta = self._fetch_image_metadata(filename)
-            # Compose plugin-level metadata for UI display
-            plugin_meta = {
-                "date": datetofetch.isoformat(),
-                "filename": filename,
-                "image_url": data.get("image_src"),
-                "page_url": data.get("image_page_url"),
-                "caption": meta.get("caption"),
-                "description_url": meta.get("description_url"),
-            }
-            self.set_latest_metadata(plugin_meta)
-        except Exception as e:
-            logger.info(f"WPOTD metadata unavailable: {e}")
+            logger.info(f"Image resized to fit device dimensions: {max_width},{max_height}")
 
         return image
 
-    def _determine_date(self, settings: dict[str, Any]) -> date:
+    def _determine_date(self, settings: Dict[str, Any]) -> date:
         if settings.get("randomizeWpotd") == "true":
             start = datetime(2015, 1, 1)
             delta_days = (datetime.today() - start).days
@@ -100,37 +76,30 @@ class Wpotd(BasePlugin):
         else:
             return datetime.today().date()
 
-    def _download_image(self, url: str) -> Image.Image | None:
+    def _download_image(self, url: str) -> Image.Image:
         try:
             if url.lower().endswith(".svg"):
-                logger.warning(
-                    "SVG format is not supported by Pillow. Skipping image download."
-                )
+                logger.warning("SVG format is not supported by Pillow. Skipping image download.")
                 raise RuntimeError("Unsupported image format: SVG.")
 
             response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
-            # Use standardized helper to ensure resources are released
-            img = load_image_from_bytes(response.content, image_open=Image.open)
-            if img is None:
-                # Raise as UnidentifiedImageError to map to specific error handling
-                raise UnidentifiedImageError("Failed to decode image bytes")
-            return img
+            return Image.open(BytesIO(response.content))
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
-            raise RuntimeError("Unsupported image format")
+            raise RuntimeError("Unsupported image format.")
         except Exception as e:
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
             raise RuntimeError("Failed to load WPOTD image.")
 
-    def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
+    def _fetch_potd(self, cur_date: date) -> Dict[str, Any]:
         title = f"Template:POTD/{cur_date.isoformat()}"
         params = {
             "action": "query",
             "format": "json",
             "formatversion": "2",
             "prop": "images",
-            "titles": title,
+            "titles": title
         }
 
         data = self._make_request(params)
@@ -146,7 +115,7 @@ class Wpotd(BasePlugin):
             "filename": filename,
             "image_src": image_src,
             "image_page_url": f"https://en.wikipedia.org/wiki/{title}",
-            "date": cur_date,
+            "date": cur_date
         }
 
     def _fetch_image_src(self, filename: str) -> str:
@@ -155,79 +124,26 @@ class Wpotd(BasePlugin):
             "format": "json",
             "prop": "imageinfo",
             "iiprop": "url",
-            "titles": filename,
+            "titles": filename
         }
         data = self._make_request(params)
         try:
             page = next(iter(data["query"]["pages"].values()))
-            url: str = page["imageinfo"][0].get("url")
-            if not url:
-                raise RuntimeError("Image URL missing in response")
-            return url
+            return page["imageinfo"][0]["url"]
         except (KeyError, IndexError, StopIteration) as e:
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
             raise RuntimeError("Failed to retrieve image URL.")
 
-    def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
+    def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            response = self.SESSION.get(
-                self.API_URL, params=params, headers=self.HEADERS, timeout=10
-            )
+            response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
-            data: dict[str, Any] = response.json()
-            return data
+            return response.json()
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
             raise RuntimeError("Wikipedia API request failed.")
-
-    def _fetch_image_metadata(self, filename: str | None) -> dict[str, Any]:
-        """Fetch extended metadata for the image file from MediaWiki.
-
-        Returns a dict with keys like caption and description_url when available.
-        """
-        result: dict[str, Any] = {}
-        if not filename:
-            return result
-        params = {
-            "action": "query",
-            "format": "json",
-            "prop": "imageinfo",
-            "iiprop": "url|extmetadata|descriptionurl",
-            "titles": filename,
-            "formatversion": "2",
-        }
-        data = self._make_request(params)
-        try:
-            page = data["query"]["pages"][0]
-            info = (page.get("imageinfo") or [{}])[0]
-            ext = info.get("extmetadata") or {}
-            caption_raw = None
-            # Prefer ImageDescription; fallback to ObjectName if present
-            if isinstance(ext.get("ImageDescription"), dict):
-                caption_raw = ext["ImageDescription"].get("value")
-            if not caption_raw and isinstance(ext.get("ObjectName"), dict):
-                caption_raw = ext["ObjectName"].get("value")
-            result["caption"] = self._strip_html(caption_raw) if caption_raw else None
-            # descriptionurl points to the Commons file page
-            result["description_url"] = info.get("descriptionurl")
-        except Exception as e:
-            logger.info(f"WPOTD extmetadata not available for {filename}: {e}")
-        return result
-
-    @staticmethod
-    def _strip_html(text: str | None) -> str | None:
-        if not text:
-            return text
-        try:
-            import re
-
-            return re.sub(r"<[^>]+>", "", text)
-        except Exception:
-            return text
-
-    def _shrink_to_fit(
-        self, image: Image.Image, max_width: int, max_height: int
-    ) -> Image.Image:
+        
+    def _shrink_to_fit(self, image: Image.Image, max_width: int, max_height: int) -> Image.Image:
         """
         Resize the image to fit within max_width and max_height while maintaining aspect ratio.
         Uses high-quality resampling.
@@ -251,12 +167,10 @@ class Wpotd(BasePlugin):
                 else:
                     new_width, new_height = orig_width, orig_height
             # Resize using high-quality resampling
-            image = image.resize((new_width, new_height), LANCZOS)
+            image = image.resize((new_width, new_height), Image.LANCZOS)
             # Create a new image with white background and paste the resized image in the center
             new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
-            new_image.paste(
-                image, ((max_width - new_width) // 2, (max_height - new_height) // 2)
-            )
+            new_image.paste(image, ((max_width - new_width) // 2, (max_height - new_height) // 2))
             return new_image
         else:
             # If the image is already within bounds, return it as is

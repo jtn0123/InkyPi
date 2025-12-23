@@ -4,153 +4,394 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Playlists</title>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     <script>
-        window.PLAYLIST_CTX = {
-            reorder_url: "{{ url_for('playlist.reorder_plugins') }}",
-            delete_plugin_instance_url: "{{ url_for('plugin.delete_plugin_instance') }}",
-            display_plugin_instance_url: "{{ url_for('plugin.display_plugin_instance') }}",
-            create_playlist_url: "{{ url_for('playlist.create_playlist') }}",
-            update_playlist_base_url: "{{ url_for('playlist.update_playlist', playlist_name='') }}",
-            delete_playlist_base_url: "{{ url_for('playlist.delete_playlist', playlist_name='') }}",
-            display_next_url: "{{ url_for('playlist.display_next_in_playlist') }}",
-            device_tz_offset_min: {{ device_tz_offset_min | default(0) }},
-            update_device_cycle_url: "{{ url_for('playlist.update_device_cycle') }}",
-            device_cycle_minutes: {{ device_cycle_minutes | default(60) }}
-        };
+        (function() {
+            const theme = localStorage.getItem('inkypi-theme') ||
+                         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
     </script>
-    <script src="{{ url_for('static', filename='scripts/playlist.js') }}" defer></script>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/dark_mode.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <style>
+        /* Plugin Instance Thumbnail */
+        .plugin-thumbnail-container {
+            position: relative;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .plugin-thumbnail {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .plugin-thumbnail:hover {
+            transform: scale(1.1);
+            border-color: var(--accent-primary);
+        }
+
+        /* Thumbnail Preview Modal */
+        .thumbnail-preview-modal {
+            display: none;
+            position: fixed;
+            z-index: 1001;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--modal-overlay);
+            backdrop-filter: blur(3px);
+        }
+
+        .thumbnail-preview-content {
+            position: relative;
+            margin: 5% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 800px;
+            background-color: var(--modal-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px var(--shadow-medium);
+        }
+
+        .thumbnail-preview-content img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .thumbnail-preview-close {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 35px;
+            font-weight: bold;
+            color: var(--close-btn-color);
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .thumbnail-preview-close:hover,
+        .thumbnail-preview-close:focus {
+            color: var(--close-btn-hover);
+        }
+
+        .thumbnail-preview-info {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: var(--bg-primary);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+    </style>
+    <script>
+        async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
+            try {
+                const response = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        playlist_name: playlistName,
+                        plugin_id: pluginId,
+                        plugin_instance: pluginInstance
+                    })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request.');
+            }
+        }
+
+        function showThumbnailPreview(playlistName, pluginId, instanceName) {
+            const modal = document.getElementById('thumbnailPreviewModal');
+            const img = document.getElementById('thumbnailPreviewImage');
+            const info = document.getElementById('thumbnailPreviewInfo');
+
+            const imageUrl = `/plugin_instance_image/${encodeURIComponent(playlistName)}/${encodeURIComponent(pluginId)}/${encodeURIComponent(instanceName)}`;
+            img.src = imageUrl;
+            info.textContent = `Plugin: ${pluginId} | Instance: ${instanceName}`;
+            modal.style.display = 'block';
+        }
+
+        function closeThumbnailPreview() {
+            const modal = document.getElementById('thumbnailPreviewModal');
+            modal.style.display = 'none';
+        }
+
+        // Close modal when clicking outside the image
+        window.onclick = function(event) {
+            const modal = document.getElementById('thumbnailPreviewModal');
+            if (event.target === modal) {
+                closeThumbnailPreview();
+            }
+        }
+
+        async function displayPluginInstance(playlistName, pluginId, pluginInstance) {
+            const loadingIndicator = document.getElementById(pluginInstance)?.querySelector('.loading-indicator');
+            loadingIndicator.style.display = 'block';
+            try {
+                const response = await fetch("{{ url_for('plugin.display_plugin_instance') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        playlist_name: playlistName,
+                        plugin_id: pluginId,
+                        plugin_instance: pluginInstance
+                    })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request.');
+            } finally {
+                // Hide loading indicator after the action is complete
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        // Open modal for **creating** a new playlist
+        function openCreateModal() {
+            document.getElementById("modalTitle").textContent = "New Playlist";
+            document.getElementById("playlist_name").value = "";
+            document.getElementById("editingPlaylistName").value = ""; // Empty value means it's new
+            document.getElementById("start_time").value = "00:00";
+            document.getElementById("end_time").value = "24:00";
+
+            document.getElementById("saveButton").setAttribute("onclick", "createPlaylist()");
+            document.getElementById("deleteButton").classList.add("hidden"); // Hide delete button
+
+            document.getElementById("playlistModal").style.display = "block";
+        }
+
+        // Open modal for **editing** an existing playlist
+        function openEditModal(playlistName, startTime, endTime) {
+            document.getElementById("modalTitle").textContent = "Update Playlist";
+            document.getElementById("playlist_name").value = playlistName;
+            document.getElementById("editingPlaylistName").value = playlistName;
+            document.getElementById("start_time").value = startTime;
+            document.getElementById("end_time").value = endTime;
+
+            document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()");
+            document.getElementById("deleteButton").classList.remove("hidden"); // Show delete button
+
+            document.getElementById("playlistModal").style.display = "block";
+        }
+
+        function openModal() {
+            const modal = document.getElementById('playlistModal');
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('playlistModal');
+            modal.style.display = 'none';
+        }
+
+        async function createPlaylist() {
+            let playlistName = document.getElementById("playlist_name").value.trim();
+            let startTime = document.getElementById("start_time").value;
+            let endTime = document.getElementById("end_time").value;
+
+            try {
+                const response = await fetch("{{ url_for('playlist.create_playlist') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    closeModal(); // Close the modal on success
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert('An error occurred while processing your request.');
+            }
+        }
+
+        async function updatePlaylist() {
+            let oldName = document.getElementById("editingPlaylistName").value;
+            let newName = document.getElementById("playlist_name").value;
+            let startTime = document.getElementById("start_time").value;
+            let endTime = document.getElementById("end_time").value;
+
+            try {
+                const response = await fetch("{{ url_for('playlist.update_playlist', playlist_name='') }}" + oldName, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime })
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    closeModal(); // Close the modal after success
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert('An error occurred while processing your request.');
+            }
+        }
+
+        async function deletePlaylist() {
+            let name = document.getElementById("editingPlaylistName").value;
+            try {
+                const response = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, {
+                    method: "DELETE",
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    closeModal(); // Close the modal after success
+                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                    location.reload();
+                } else {
+                    showResponseModal('failure', `Error!  ${result.error}`);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert('An error occurred while processing your request.');
+            }
+        }
+
+        function populateTimeOptions() {
+            let startSelect = document.getElementById("start_time");
+            let endSelect = document.getElementById("end_time");
+
+            startSelect.innerHTML = "";
+            endSelect.innerHTML = "";
+
+            for (let hour = 0; hour < 24; hour++) { // 24-hour format (0-23)
+                for (let minutes of [0, 15, 30, 45]) {
+                    let time = hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
+                    startSelect.innerHTML += `<option value="${time}">${time}</option>`;
+                    endSelect.innerHTML += `<option value="${time}">${time}</option>`;
+                }
+            }
+            startSelect.innerHTML += `<option value="24:00">24:00</option>`;
+            endSelect.innerHTML += `<option value="24:00">24:00</option>`;
+        }
+
+        document.addEventListener("DOMContentLoaded", populateTimeOptions);
+
+        window.addEventListener("load", function () {
+            let storedMessage = sessionStorage.getItem("storedMessage");
+            if (storedMessage) {
+                let { type, text } = JSON.parse(storedMessage);
+                showResponseModal(type, text);
+                sessionStorage.removeItem("storedMessage"); // Clear stored message after displaying
+            }
+        });
+    </script>
 </head>
 <body>
-    <main id="main" role="main">
     <div class="frame">
+        <!-- Back Button -->
+        <button onclick="history.back()" class="back-button">← Back</button>
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    {% from 'macros/icons.html' import icon %}
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                        </svg>
-                        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                        </svg>
-                    </button>
-                    <div class="title-container">
-                        {{ icon('squares-four', 'app-icon') | safe }}
-                        <h1 class="app-title">Playlists</h1>
-                    </div>
+                <div class="title-container">
+                    <img src="{{ url_for('static', filename='icons/playlist.png') }}" alt="playlist icon" class="app-icon">
+                    <h1 class="app-title">Playlists</h1>
                 </div>
-                <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-                    
-                    {% from 'macros/icons.html' import icon %}
-                    <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgressGlobal()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
-                    <button class="header-button" id="newPlaylistBtn">New Playlist</button>
-                </div>
+                <button class="header-button" onclick="openCreateModal()">New Playlist</button>
             </div>
         </div>
         <div class="separator"></div>
-        <div class="status-bar" style="margin-bottom:8px;">
-            <div class="status-card">
-                <div class="status-title">Current time</div>
-                <div class="status-body"><span id="currentTimeValue">{{ device_now or '—' }}</span></div>
-            </div>
-            <div class="status-card">
-                <div class="status-title">Device refresh cadence</div>
-                <div class="status-body" style="gap:8px; justify-content:space-between;">
-                    <span id="deviceCadenceText">Every {{ device_cycle_minutes }} min</span>
-                    <button id="editDeviceCycleBtn" class="btn" aria-label="Edit device refresh cadence"><span class="btn-label">Edit</span></button>
-                </div>
-            </div>
-        </div>
-
-        {% set plugin_icon_map = {
-            'ai_image': 'magic-wand',
-            'ai_text': 'text-t',
-            'weather': 'cloud-sun',
-            'calendar': 'calendar-blank',
-            'clock': 'clock',
-            'newspaper': 'newspaper-clipping',
-            'apod': 'planet',
-            'unsplash': 'images-square',
-            'image_url': 'link-simple',
-            'image_upload': 'upload-simple',
-            'image_folder': 'folder-simple',
-            'screenshot': 'monitor',
-            'wpotd': 'book-open-text',
-            'comic': 'mask-happy'
-        } %}
 
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% for playlist in playlist_config.playlists %}
-            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
+            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}">
                     <div class="playlist-header">
-                        <span class="playlist-title" title="Cycle: {{ (playlist_timing.get(playlist.name).cycle_minutes if (playlist_timing and playlist_timing.get(playlist.name)) else device_cycle_minutes) }} min{% if playlist_timing and playlist_timing.get(playlist.name) and playlist_timing.get(playlist.name).next_at %}\nNext at: {{ playlist_timing.get(playlist.name).next_at }}{% endif %}">{{ playlist.name }}</span>
-                        <button class="edit-button edit-playlist-btn" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ (playlist.cycle_interval_seconds // 60) if playlist.cycle_interval_seconds is defined and playlist.cycle_interval_seconds is not none else '' }}">{{ icon('gear-six', 'action-icon') }}</button>
-                        <button class="header-button run-next-btn" title="Run next in this playlist" aria-label="Run next in playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">Run Next</button>
-                        <button class="delete-button delete-playlist-btn" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') }}</button>
+                        <span class="playlist-title">{{ playlist.name }}</span>
+                        <button class="edit-button" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')"><img src="{{ url_for('static', filename='icons/settings.png') }}" alt="edit playlist" class="action-icon"></button>
                     </div>
                     <!-- Plugin List -->
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}is-current{% endif %}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" {% if plugin_instance.refresh.interval is defined %}data-interval-sec="{{ plugin_instance.refresh.interval }}"{% endif %} {% if plugin_instance.latest_refresh_time %}data-latest-iso="{{ plugin_instance.latest_refresh_time }}"{% endif %}>
+                        <div class="plugin-item">
                             <div class="plugin-info" id="{{plugin_instance.name}}">
-                                {% from 'macros/icons.html' import icon %}
-                                {{ icon(plugin_icon_map.get(plugin_instance.plugin_id, 'images-square'), 'plugin-icon') | safe }}
+                                <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
                                 <span class="plugin-instance">{{ plugin_instance.name }}</span>
+
+                                <!-- Thumbnail preview - only show if image has been generated -->
+                                {% if plugin_instance.latest_refresh_time %}
+                                <div class="plugin-thumbnail-container" onclick="showThumbnailPreview('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}', '{{ plugin_instance.name }}')">
+                                    <img
+                                        src="{{ url_for('plugin.plugin_instance_image', playlist_name=playlist.name, plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
+                                        alt="Preview"
+                                        class="plugin-thumbnail"
+                                        title="Click to view full size"
+                                        onerror="this.parentElement.style.display='none';"
+                                    >
+                                </div>
+                                {% endif %}
 
                                 <!-- Check if the current plugin is the one being displayed -->
                                 {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
                                 <span class="displayed-now">Displayed Now</span>
-                                {% if metrics and metrics.request_ms is not none %}
-                                <span class="latest-refresh" style="margin-left:8px;">
-                                    {{ metrics.request_ms }} ms
-                                </span>
-                                {% endif %}
                                 {% endif %}
                                 <div id="loadingIndicator" class="loading-indicator small left-align"></div>
 
                             </div>
-                            <div class="plugin-thumb" data-frame-style="{{ plugin_instance.plugin_settings.selectedFrame if plugin_instance.plugin_settings and plugin_instance.plugin_settings.selectedFrame else '' }}" tabindex="0" role="button" aria-label="Open preview of {{ plugin_instance.name }}">
-                                <div class="img-skeleton" aria-hidden="true"></div>
-                                <img data-src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}?safe=1" alt="Preview of {{ plugin_instance.name }}" width="120" height="90" loading="lazy" style="display:none" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none'; this.previousElementSibling.style.display='none'">
-                            </div>
                             <div class="plugin-actions">
-                                <div class="timing-row">
-                                    {% if plugin_instance.refresh.interval is defined %}
-                                        {% if plugin_instance.latest_refresh_time %}
-                                            {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
-                                            <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">Refreshed {{ refresh_time }}</span>
-                                        {% else %}
-                                            <span class="latest-refresh">Pending first run</span>
-                                        {% endif %}
-                                    {% elif plugin_instance.refresh.scheduled is defined %}
-                                        <span class="latest-refresh">Scheduled {{ plugin_instance.refresh.scheduled }}</span>
-                                    {% endif %}
-                                    {% set eta = rotation_eta.get(playlist.name, {}).get(plugin_instance.name) if rotation_eta else None %}
-                                    {% if eta %}
-                                        {% set __h = (eta.minutes // 60) %}
-                                        {% set __m = (eta.minutes % 60) %}
-                                        <span class="latest-refresh">
-                                            Next in
-                                            {% if __h > 0 %} {{ __h }}h{% endif %}
-                                            {% if __m > 0 %} {{ __m }}m{% endif %}
-                                            • at {{ eta.at }}
-                                        </span>
-                                    {% endif %}
-                                </div>
+                                {% if plugin_instance.latest_refresh_time %}
+                                    {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
+                                    <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">
+                                        Refreshed {{ refresh_time }}
+                                    </span>
+                                {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="btn" title="Edit" aria-label="Edit {{ plugin_instance.name }}"><span class="btn-label">Edit</span></a>
-                                <button class="btn btn-primary plugin-display-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Display Now" aria-label="Display {{ plugin_instance.name }} now"><span class="btn-spinner" aria-hidden="true"></span><span class="btn-label">Display now</span></button>
-                                <button class="btn btn-danger delete-instance-btn" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}"><span class="btn-label">Delete</span></button>
-                                
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button">
+                                    <img src="{{ url_for('static', filename='icons/edit.png') }}" alt="edit plugin" class="action-icon">
+                                </a>
+                                <button class="edit-button" title="Display Now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
+                                    <img src="{{ url_for('static', filename='icons/display.png') }}" alt="display now" class="action-icon">
+                                </button>
+                                <button class="delete-button" title="Delete Plugin Instance" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
+                                    <img src="{{ url_for('static', filename='icons/remove.png') }}" alt="delete plugin" class="action-icon">
+                                </button>
                             </div>
                         </div>
                         {% endfor %}
@@ -158,53 +399,6 @@
             </div>
             {% endfor %}
         </div>
-    </div>
-
-    <div id="globalProgress" class="progress-block" style="display:none;">
-        <div class="progress-header">
-            <span id="globalProgressText">Preparing…</span>
-            <button type="button" class="progress-close" aria-label="Close progress" onclick="(function(){ const el = document.getElementById('globalProgress'); if (el) el.style.display='none'; })()">×</button>
-        </div>
-        <div class="progress-meta">
-            <span class="meta-item"><span>Now:</span> <span id="globalProgressClock" class="value">—</span></span>
-            <span class="meta-item"><span>Elapsed:</span> <span id="globalProgressElapsed" class="value">0s</span></span>
-        </div>
-        <div class="progress-bar"><div id="globalProgressBar" class="progress-fill" style="width: 10%;"></div></div>
-        <ol id="globalProgressList" class="progress-log" aria-live="polite"></ol>
-    </div>
-
-    <!-- Delete Confirmation Modal (Playlist) -->
-    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deletePlaylistTitle" style="display:none;">
-        <div class="modal-content">
-            <span class="close-button" onclick="closeDeletePlaylistModal()" aria-label="Close">×</span>
-            <h2 id="deletePlaylistTitle">Delete Playlist</h2>
-            <div class="separator"></div>
-            <p id="deletePlaylistText">Are you sure you want to delete this playlist?</p>
-            <div class="buttons-container" style="margin-top:12px;">
-                <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
-                <button type="button" class="action-button" onclick="closeDeletePlaylistModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal (Instance) -->
-    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteInstanceTitle" style="display:none;">
-        <div class="modal-content">
-            <span class="close-button" onclick="closeDeleteInstanceModal()" aria-label="Close">×</span>
-            <h2 id="deleteInstanceTitle">Delete Instance</h2>
-            <div class="separator"></div>
-            <p id="deleteInstanceText">Are you sure you want to delete this instance?</p>
-            <div class="buttons-container" style="margin-top:12px;">
-                <button type="button" class="action-button warn" id="confirmDeleteInstanceBtn">Delete</button>
-                <button type="button" class="action-button" onclick="closeDeleteInstanceModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Undo Snackbar -->
-    <div id="undoSnackbar" role="status" aria-live="polite">
-      <span id="undoText">Deleted.</span>
-      <button class="btn-link" id="undoBtn" aria-label="Undo delete">Undo</button>
     </div>
 
     <!-- Schedule Configuration Modal -->
@@ -218,17 +412,13 @@
 
                 <div class="form-group">
                     <label for="playlist_name" class="form-label">Playlist Name:</label>
-                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Enter playlist name" required class="form-input">
+                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Type something..." required class="form-input">
                 </div>
                 <div class="form-group">
                     <label for="start_time" class="form-label">Display from </label>
                     <select id="start_time" name="start_time" class="form-input"></select>
                     <span> - </span>
-                    <select id="end_time" name="end_time" class="form-input" aria-label="End time"></select>
-                </div>
-                <div class="form-group">
-                    <label for="cycle_minutes" class="form-label">Advance every (minutes):</label>
-                    <input type="number" id="cycle_minutes" name="cycle_minutes" class="form-input" min="0" placeholder="Leave empty to use device default">
+                    <select id="end_time" name="end_time" class="form-input"></select>
                 </div>
             </form>
             <div class="buttons-container">
@@ -238,35 +428,16 @@
         </div>
     </div>
 
-    <!-- Device cadence edit modal -->
-    <div id="deviceCycleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deviceCycleTitle" style="display:none;">
-        <div class="modal-content">
-            <span class="close-button" onclick="closeDeviceCycleModal()" aria-label="Close">×</span>
-            <h2 id="deviceCycleTitle">Device refresh cadence</h2>
-            <div class="separator"></div>
-            <form class="settings-form" onsubmit="event.preventDefault(); saveDeviceCycle();">
-                <div class="form-group">
-                    <label for="device_cycle_minutes" class="form-label">Every (minutes):</label>
-                    <input type="number" id="device_cycle_minutes" name="device_cycle_minutes" class="form-input" min="1" max="1440" required>
-                </div>
-            </form>
-            <div class="buttons-container">
-                <button type="button" class="action-button" onclick="saveDeviceCycle()">Save</button>
-                <button type="button" class="action-button" onclick="closeDeviceCycleModal()">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Image preview (lightbox) -->
-    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
-        <div class="modal-content">
-            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
-            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
-        </div>
-    </div>
-
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
-    </main>
+
+    <!-- Thumbnail Preview Modal -->
+    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal">
+        <div class="thumbnail-preview-content">
+            <span class="thumbnail-preview-close" onclick="closeThumbnailPreview()">×</span>
+            <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">
+            <div class="thumbnail-preview-info" id="thumbnailPreviewInfo"></div>
+        </div>
+    </div>
 </body>
 </html>

@@ -36,8 +36,12 @@
           </div>
           <div class="data-point-data">
             <div class="data-point-label">{{ dp.label }}</div>
-            <div class="data-point-measurement">{{ dp.measurement }}{% if dp.unit %}<span class="data-point-unit">{{ dp.unit }}</span>{% endif %}
-            </div>
+            <div class="data-point-measurement">
+			        {{ dp.measurement }}{% if dp.unit %}<span class="data-point-unit">{{ dp.unit }}</span>{% endif %}
+              {% if dp.label == "Wind" %}
+                <span class="wind-arrow-symbol" style="margin-right: 5px;">{{ dp.arrow }}</span>
+              {% endif %}
+		    	 </div>
           </div>
         </div>
       {% endfor %}
@@ -76,22 +80,12 @@
   {% endif %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{static_dir}}/scripts/chart.js" charset="UTF-8"></script>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const canvas = document.getElementById('hourlyTemperatureChart');
-    if (!canvas) {
-      // Chart canvas not found - chart feature may not be enabled
-      return;
-    }
-
     const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      // Could not get 2D context - canvas may not be supported
-      return;
-    }
-
     const rect = canvas.getBoundingClientRect();
 
     // Extract hourly temperature and labels from template variables
@@ -99,211 +93,185 @@
     const temperatures = [{% for hour in hourly_forecast %}{{ hour.temperature }}{% if not loop.last %}, {% endif %}{% endfor %}];
     const precipitation = [{% for hour in hourly_forecast %}{{ hour.precipitation * 100}}{% if not loop.last %}, {% endif %}{% endfor %}]; // Convert to percentage
     const rain = [{% for hour in hourly_forecast %}{{ hour.rain or 0 }}{% if not loop.last %}, {% endif %}{% endfor %}];
-
-    // Check if we have data to display
-    if (labels.length === 0 || temperatures.length === 0) {
-      // No hourly forecast data available for chart
-      return;
-    }
-
 	const units = document.getElementById('units-container').dataset.units;
 	const isImperial = units === "imperial";
 	const unit = isImperial ? "in" : "mm";
-	// Show labels whenever measurable rain is present
-	const threshold = 0.0;
+	const threshold = isImperial ? 0.0035 : 0.09;
 	
     // Find min and max temperatures
-    let minTemp = 0;
-    let maxTemp = 30;
-
-    if (temperatures.length > 0) {
-      minTemp = Math.min(...temperatures);
-      maxTemp = Math.max(...temperatures);
-    }
+    const minTemp = Math.min(...temperatures);
+    var maxTemp = Math.max(...temperatures);
 	
-    // Custom plugin for rain annotations
-    const annotationRainPlugin = {
+    Chart.register({
       id: 'annotationRain',
-      afterDatasetsDraw(chart, args, options) {
+      afterDatasetsDraw(chart, args, pluginOptions) {
         const { ctx } = chart;
-        const rainData = options.precipitationData || [];
+        const rainData = pluginOptions.precipitationData || [];
         const meta = chart.getDatasetMeta(1);
-
-        if (!meta || !meta.data) return;
 
         ctx.save();
         ctx.textAlign = 'center';
-        ctx.font = '10px Arial';
 
         meta.data.forEach((bar, i) => {
           const rainAmount = rainData[i];
           if (rainAmount && rainAmount > threshold) {
             const x = bar.x;
             const y = bar.y;
-            const base = bar.base;
-            const height = base - y;
-
-            let textY, unitY;
-
-            if (height < 25) {
-              textY = y - 10;
-              unitY = y - 3;
-            } else {
-              textY = y + 13;
-              unitY = y + 20;
-            }
+			const base = bar.base;
+			const height = base - y;
+			
+			let textY, unitY;
+			
+			if (height < 25) {
+			  textY = y - 10;
+			  unitY = y - 3;
+			} else {
+			  textY = y + 13;
+			  unitY = y + 20;
+			}
             ctx.fillStyle = "{{ plugin_settings.textColor }}";
             ctx.fillText(rainAmount.toFixed(2), x, textY);
-            ctx.fillText(unit, x, unitY);
+            ctx.fillText(unit, x, unitY); 
           }
         });
 
         ctx.restore();
       }
-    };
-
-    Chart.register(annotationRainPlugin);
+    });
 	
-    try {
-      const chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            type: 'line',
-            label: 'Hourly Temperature',
-            data: temperatures,
-            borderColor: 'rgba(241, 122, 36, 0.9)', // Line color
-            borderWidth: 2,
-            pointRadius: 0, // Hide points
-            fill: true, // Enable filling the area under the line
-            tension: 0.5
-          },
-          {
-            type: 'bar',
-            label: 'Precipitation Probability',
-            data: precipitation,
-            borderColor: 'rgba(26, 111, 176, 1)', // Semi-transparent blue
-            borderWidth: {
-              top: 2,
-              right: 0,
-              bottom: 0,
-              left: 0
-            },
-            yAxisID: 'y1',
-            barPercentage: 1.0, // Ensures full width
-            categoryPercentage: 1.0,  // Ensures full width
-            barThickness: 6,
-            fill: true, // Enable filling the area under the line
-          }
-        ]
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          type: 'line',
+          label: 'Hourly Temperature',
+          data: temperatures,
+          borderColor: 'rgba(241, 122, 36, 0.9)', // Line color
+          borderWidth: 2,
+          pointRadius: 0, // Hide points
+          fill: true, // Enable filling the area under the line
+          tension: 0.5
         },
-        options: {
-          animation: {
-            duration: 0, // general animation time
+        {
+          type: 'bar',
+          label: 'Precipitation Probability',
+          data: precipitation,
+          borderColor: 'rgba(26, 111, 176, 1)', // Semi-transparent blue
+          borderWidth: {
+            top: 2,
+            right: 0,
+            bottom: 0,
+            left: 0
           },
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              ticks: {
-                autoSkip: true,
-                padding: 0,
-                maxRotation: 0, // Prevent label rotation
-                minRotation: 0, // Prevent label rotation
-                color: "{{ plugin_settings.textColor }}",
-                font: {
-                  family: 'Jost'
-                }
-              },
-              grid: {
-                tickLength: 0,
-                display: false // Hide x-axis grid
-              },
-              offset: true,
-              gridLines: {
-                  drawBorder: false,
+          yAxisID: 'y1',
+          barPercentage: 1.0, // Ensures full width
+          categoryPercentage: 1.0,  // Ensures full width
+          fill: true, // Enable filling the area under the line
+        }
+      ]
+      },
+      options: {
+        animation: {
+          duration: 0, // general animation time
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            ticks: {
+              autoSkip: true,
+              padding: 0,
+              maxRotation: 0, // Prevent label rotation
+              minRotation: 0, // Prevent label rotation
+              color: "{{ plugin_settings.textColor }}",
+              font: {
+                family: 'Jost'
               }
             },
-            y: {
-              ticks: {
-                padding: 0,
-                color: "{{ plugin_settings.textColor }}",
-                font: {
-                  family: 'Jost'
-                },
-                autoSkip: false,
-                callback: function(value, index, values) {
-                  if (index === values.length-1) return maxTemp + "°";
-                  else if (index === 0) return minTemp + "°";
-                  else return '';
-                }
-              },
-              grid: { display: false },
-              min: minTemp,
-              max: maxTemp,
+            grid: {
+              tickLength: 0,
+              display: false // Hide x-axis grid
             },
-            y1: {
-              position: 'right',
-              grid: { display: false },
-              ticks: {
-                padding: 0,
-                color: "{{ plugin_settings.textColor }}",
-                font: {
-                  family: 'Jost'
-                },
-                autoSkip: false,
-                callback: function(value, index, values) {
-                  if (index === values.length - 1) return "100%";
-                  else if (index === 0) return "0%";
-                  else return '';
-                }
+            offset: true,
+            gridLines: {
+                drawBorder: false,
+            }
+          },
+          y: {
+            ticks: {
+              padding: 0,
+              color: "{{ plugin_settings.textColor }}",
+              font: {
+                family: 'Jost'
               },
-              min: 0,
-              max: 100,
-            }
+              autoSkip: false,
+              callback: function(value, index, values) {
+                if (index === values.length-1) return maxTemp + "°";
+                else if (index === 0) return minTemp + "°";
+                else return '';
+              }
+            },
+            grid: { display: false },
+            min: minTemp,
+            max: maxTemp,
           },
-          plugins: {
-            legend: { display: false },
-            {% if plugin_settings.displayRain == "true" %}
-            annotationRain: { precipitationData: rain }
-            {% endif %}
-          },
-          elements: {
-            line: {
-              borderJoinStyle: 'round' // Smoother line connection
-            }
+          y1: {
+            position: 'right',
+            grid: { display: false },
+            ticks: {
+              padding: 0,
+              color: "{{ plugin_settings.textColor }}",
+              font: {
+                family: 'Jost'
+              },
+              autoSkip: false,
+              callback: function(value, index, values) {
+                if (index === values.length - 1) return "100%";
+                else if (index === 0) return "0%";
+                else return '';
+              }
+            },
+            min: 0,
+            max: 100,
+          }
+        },
+        plugins: {
+          legend: { display: false },
+		  {% if plugin_settings.displayRain == "true" %}
+			annotationRain: { precipitationData: rain }
+	      {% endif %}
+        },
+        elements: {
+          line: {
+            borderJoinStyle: 'round' // Smoother line connection
           }
         }
-      });
-
-      // Only try to update gradients if chart was created successfully
-      if (chart && chart.scales && chart.scales['y']) {
-        // Now, after the chart is created, we can access the scales
-        const gradientStart = chart.scales['y'].getPixelForValue(maxTemp); // Max temperature
-        const gradientEnd = chart.scales['y'].getPixelForValue(minTemp);   // Min temperature
-
-        // Create gradient based on y-axis values
-        const tempGradient = ctx.createLinearGradient(0, gradientStart, 0, gradientEnd+10);
-        tempGradient.addColorStop(0, 'rgba(252,204,5, 0.95)'); // Top of the gradient (max temperature)
-        tempGradient.addColorStop(1, 'rgba(252,204,5, 0.01)'); // Bottom of the gradient (min temperature)
-
-        // Update the chart to apply the gradient
-        chart.data.datasets[0].backgroundColor = tempGradient;
-
-        // Create gradient based on y-axis values
-        const precipitationGradient = ctx.createLinearGradient(0, gradientStart, 0, gradientEnd);
-        precipitationGradient.addColorStop(0, 'rgba(26, 111, 176, 0.8)'); // Top of the gradient (max temperature)
-        precipitationGradient.addColorStop(1, 'rgba(194, 223, 246, 0)'); // Bottom of the gradient (min temperature)
-
-        chart.data.datasets[1].backgroundColor = precipitationGradient;
-
-        chart.update();
       }
-    } catch (error) {
-      // Chart creation failed - hide container and continue without chart
-      canvas.style.display = 'none';
-    }
+    });
+
+    chart.update();
+
+    // Now, after the chart is created, we can access the scales
+    const gradientStart = chart.scales['y'].getPixelForValue(maxTemp); // Max temperature
+    const gradientEnd = chart.scales['y'].getPixelForValue(minTemp);   // Min temperature
+
+    // Create gradient based on y-axis values
+    const tempGradient = ctx.createLinearGradient(0, gradientStart, 0, gradientEnd+10);
+    tempGradient.addColorStop(0, 'rgba(252,204,5, 0.95)'); // Top of the gradient (max temperature)
+    tempGradient.addColorStop(1, 'rgba(252,204,5, 0.01)'); // Bottom of the gradient (min temperature)
+
+    // Update the chart to apply the gradient
+    chart.data.datasets[0].backgroundColor = tempGradient;
+
+    // Create gradient based on y-axis values
+    const precipitationGradient = ctx.createLinearGradient(0, gradientStart, 0, gradientEnd);
+    precipitationGradient.addColorStop(0, 'rgba(26, 111, 176, 0.8)'); // Top of the gradient (max temperature)
+    precipitationGradient.addColorStop(1, 'rgba(194, 223, 246, 0)'); // Bottom of the gradient (min temperature)
+
+    chart.data.datasets[1].backgroundColor = precipitationGradient;
+
+    chart.update();
   });
 </script>
 {% endblock %}

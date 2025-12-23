@@ -15,7 +15,7 @@ Works on **macOS**, **Linux**, and **Windows** - no hardware needed!
 
 ```bash
 # 1. Clone and setup
-git clone https://github.com/mudmin/InkyPi.git
+git clone https://github.com/fatihak/InkyPi.git
 cd InkyPi
 
 # 2. Quick start (recommended)
@@ -24,7 +24,10 @@ cd InkyPi
 # Or manual setup
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 3. Install Python dependencies and vendor assets
 pip install -r install/requirements-dev.txt
+bash install/update_vendors.sh
 python src/inkypi.py --dev
 ```
 
@@ -33,7 +36,7 @@ python src/inkypi.py --dev
 ## What You Can Do
 
 - **Develop plugins** - Create new plugins without hardware (no Raspberry Pi, nor physical displays)
-- **Test UI changes** - Instant feedback on web interface modifications  
+- **Test UI changes** - Instant feedback on web interface modifications
 - **Debug issues** - Full error messages in terminal
 - **Verify rendering** - Check output in `mock_display_output/latest.png`
 - **Cross-platform development** - Works on macOS, Linux, Windows
@@ -41,11 +44,11 @@ python src/inkypi.py --dev
 ## Essential Commands
 
 ```bash
+source venv/bin/activate             # Activate virtual environment
 python src/inkypi.py --dev           # Start development server (full program)
 python src/inkypi.py --dev --web-only# Start web UI only (no background thread)
 python src/inkypi.py --dev --fast-dev# Fast cycle, skip startup image
 ./scripts/web_only.sh                # Scripted web-only startup
-source venv/bin/activate             # Activate virtual environment
 deactivate                           # Exit virtual environment
 ```
 
@@ -95,53 +98,6 @@ python scripts/plugin_validator.py clock   # validate a single plugin
   - `src/config/schemas/device_config.schema.json`
   - `src/config/schemas/plugin-info.schema.json`
 
-
-## Weather Plugin – NY Layout Iteration Plan
-
-### Goals
-- Match ESP32-style hierarchy and newspaper density
-- Preserve color icons and maximize chart prominence
-- Support quick iterations with mock rendering (no network)
-
-### Current Implementation Notes
-- Template: `src/plugins/weather/render/weather_ny.html`
-- Styles: `src/plugins/weather/render/weather_ny.css`
-- Mock rendering: `scripts/render_weather_mock.py`
-- Rendering executes JS via Playwright/Chromium in `utils/image_utils.take_screenshot_html`
-
-### Recent Improvements
-- Chart: now-line at current hour, min/max labels, emphasized rain bars when measurable, denser x‑ticks (every other label), disabled tooltip for clean static render, no animation for deterministic screenshots.
-- Layout: chart remains prominent (50% height) with `min-height` and `flex: 1`.
-
-### How to Test Quickly
-```bash
-# Standard
-python scripts/render_weather_mock.py --layout ny_color --units imperial
-
-# Variant A
-python scripts/render_weather_mock.py --variant A --out weather_variant_a.png
-
-# Variant B
-python scripts/render_weather_mock.py --variant B --out weather_variant_b.png
-
-# Composite 3/5/7 days
-python scripts/render_weather_mock.py --composite --out weather_composite.png
-```
-
-### Validation Criteria
-- Chart always visible and prominent; no clipping; labels legible
-- Alerts collapse to at most 2 pills with overflow "+N more"
-- Forecast grid adapts 7→5→3 columns with tight spacing
-- Icons remain color and high quality
-- Test suite passes with no regressions
-
-### Open Questions / Next Tweaks
-- Optional thin x-axis gridlines (every 3 hours) to aid scanning
-- Tiny point markers only at inflection points for the temperature line
-- Micro-typography: adjust header tracking and forecast day font size by 1px
-- Optional monochrome export for non-color e‑ink devices
-
-
 ## Testing Your Changes
 
 1. Configure a plugin through the web UI
@@ -151,3 +107,41 @@ python scripts/render_weather_mock.py --composite --out weather_composite.png
 5. BasePlugin notes:
    - Jinja environment is initialized even if a plugin lacks its own `render/` directory. Base templates under `plugins/base_plugin/render/` are always available.
    - If a plugin does not provide `settings.html`, the UI will include `base_plugin/settings.html` by default.
+
+## Other Requirements
+InkyPi relies on system packages for some features, which are normally installed via the `install.sh` script.
+
+For a local development instance you must manually manage these requirements.
+
+### Linux
+The required packages can be found in this file:
+
+https://github.com/fatihak/InkyPi/blob/main/install/debian-requirements.txt
+
+Use your favourite package manager (such as `apt`) to install them.
+
+### Windows & macOS
+The most important package is `chromium-headless-shell`, which is used to render HTML templates to PNG images.
+
+Chromium Headless Shell doesn't appear to be available for Windows and macOS, but the alternative Chrome Headless Shell is. Download a suitable release of `chrome-headless-shell` for your OS (i.e. win64 = Windows 11 64-bit, or mac-arm64 = Apple Silicon Mac) from here:
+
+https://googlechromelabs.github.io/chrome-for-testing/
+
+Unzip 'chrome-headless-shell-win64.zip' in the same parent folder as InkPi:
+
+![image showing the folder chrome-headless-shell-win64 in the same level as the folder InkyPi](images/chrome-headless-shell_location.png)
+
+And edit [src/utils/image_utls.py](https://github.com/fatihak/InkyPi/blob/9d9dbc9f338284f1663c2d706570c40cdd64535f/src/utils/image_utils.py#L111) to:
+
+#### Windows
+
+```python
+        command = [
+            "..\chrome-headless-shell-win64\chrome-headless-shell.exe",
+```
+#### macOS
+
+```python
+        command = [
+            "../chrome-headless-shell-mac-arm64/chrome-headless-shell",
+```

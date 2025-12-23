@@ -17,20 +17,6 @@ Certain plugins, like the AI Image plugin, require API credentials to function. 
     ```
 4. Save the file and exit the editor
 
-## Manage API Keys from the Web UI
-
-You can now manage your API keys directly from the InkyPi web UI:
-
-- Open the Settings page and click "Manage API Keys".
-- The page shows whether each key is configured. Values are masked (only last 4 characters shown).
-- Enter a new value to create or update a key. Use the Delete button to remove a key.
-- Keys are written to the `.env` file on the device and loaded at runtime. They are never stored in `device.json` or other configs.
-
-Notes:
-- In development, `.env` is expected at the project root (repo root).
-- In production (installed via `install/install.sh`), `.env` is located at `/usr/local/inkypi/.env` and is created with `0600` permissions. The systemd service also references this file via `EnvironmentFile`.
-- `.env` is git-ignored to prevent accidental commits.
-
 ## Open AI Key
 
 Required for the AI Image and AI Text Plugins
@@ -39,7 +25,7 @@ Required for the AI Image and AI Text Plugins
 - Crate a secret key from the API Keys tab in the Settings page
     - It is recommended to set up Auto recharge (found in the "Billing" tab)
     - Optionally set a Budge Limit in the Limits tab
-- Store your key in the .env file with the key OPEN_AI_SECRET
+- Store your key in the .env file with the key `OPEN_AI_SECRET`
     ```
     OPEN_AI_SECRET=your-key
     ```
@@ -54,12 +40,12 @@ Required for the Weather Plugin
     - Subscribe at [One Call API 3.0 Subscription](https://home.openweathermap.org/subscriptions/billing_info/onecall_30/base?key=base&service=onecall_30)
     - Follow the instructions to complete the subscription.
     - Navigate to [Your Subscriptions](https://home.openweathermap.org/subscriptions) and set "Calls per day (no more than)" to 1,000 to avoid exceeding the free limit
-- Store your api key in the .env file with the key OPEN_WEATHER_MAP_SECRET
+- Store your api key in the .env file with the key `OPEN_WEATHER_MAP_SECRET`
     ```
     OPEN_WEATHER_MAP_SECRET=your-key
     ```
 
-## NASA Astronomy Picture Of the Day key
+## NASA Astronomy Picture Of the Day Key
 
 Required for the APOD Plugin
 
@@ -67,12 +53,12 @@ Required for the APOD Plugin
    - Fill your First name, Last name, and e-mail address
 - The APOD plugin uses the [NASA APIs](https://api.nasa.gov/)
    - Free for up to 1,000 requests per hour
-- Store your api key in the .env file with the key NASA_SECRET
+- Store your api key in the .env file with the key `NASA_SECRET`
     ```
     NASA_SECRET=your-key
     ```
 
-## Unsplash
+## Unsplash Key
 
 Required for the Unsplash Plugin
  
@@ -80,4 +66,31 @@ Required for the Unsplash Plugin
 - Go to https://unsplash.com/oauth/applications 
 - Create an app and open it
 - Your KEY is listed as `Access Key`
-- Save your access key in `/.env` file as `UNSPLASH_ACCESS_KEY=`
+- Store your api key in the .env file with the key `UNSPLASH_ACCESS_KEY`
+    ```
+    UNSPLASH_ACCESS_KEY=your-key
+    ```
+
+## GitHub Key
+
+Required for the GitHub Plugin
+
+- Login to your Github profile https://github.com/settings/profile
+- Under Developer Settings, create a new Personal access token (classic)
+- Assign the `read:user` scope and generate the token
+- Store your api key in the .env file with the key `GITHUB_SECRET`
+    ```
+    GITHUB_SECRET=your-key
+    ```
+
+## Immich Key
+
+Required for the Image Album plugin for the Immich Provider
+
+- Login to your Immich instance https://my.immich.app/
+- Under Account Settings > API Keys, create a new API Key
+- Assign the `asset.read`, `asset.download`, and `album.read` permissions and generate the key
+- Store your api key in the .env file with the key `IMMICH_KEY`
+    ```
+    IMMICH_KEY=your-key
+    ```

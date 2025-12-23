@@ -1,25 +1,23 @@
 #!/bin/bash
 
-set -euo pipefail
-
 # =============================================================================
 # Script Name: install.sh
 # Description: This script automates the installatin of InkyPI and creation of
 #              the InkyPI service.
 #
-# Usage: ./install.sh [-W <waveshare_device>] [-v]
+# Usage: ./install.sh [-W <waveshare_device>]
 #        -W <waveshare_device> (optional) Install for a Waveshare device, 
 #                               specifying the device model type, e.g. epd7in3e.
-#        -v                    (optional) Verbose mode; stream output instead of spinner
 #
-#                               If -W is not specified then the Pimoroni Inky display
+#                               If not specified then the Pimoroni Inky display
 #                               is assumed.
 # =============================================================================
 
 # Formatting stuff
-bold=$(tput bold 2>/dev/null || true)
-normal=$(tput sgr0 2>/dev/null || true)
-red=$(tput setaf 1 2>/dev/null || true)
+bold=$(tput bold)
+normal=$(tput sgr0)
+red=$(tput setaf 1)
+green=$(tput setaf 2)
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
@@ -50,19 +48,13 @@ PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 WS_TYPE=""
 WS_REQUIREMENTS_FILE="$SCRIPT_DIR/ws-requirements.txt"
 
-# Verbose mode flag (0: spinner, 1: stream command output)
-VERBOSE=0
-
-# Parse the arguments, looking for -W (waveshare) and -v (verbose).
+# Parse the agumments, looking for the -W option.
 parse_arguments() {
-    while getopts ":W:v" opt; do
+    while getopts ":W:" opt; do
         case $opt in
             W) WS_TYPE=$OPTARG
                 echo "Optional parameter WS is set for Waveshare support.  Screen type is: $WS_TYPE"
                 ;;
-            v) VERBOSE=1
-               echo "Verbose mode enabled."
-               ;;
             \?) echo "Invalid option: -$OPTARG." >&2
                 exit 1
                 ;;
@@ -151,22 +143,18 @@ enable_interfaces(){
 show_loader() {
   local pid=$!
   local delay=0.1
-  local spinstr="|/-\\"
-  if [[ -z "$pid" ]]; then
-    printf "%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$1"
-    return
-  fi
-  printf "%s [%s] " "$1" "${spinstr:0:1}"
-  while ps -p "$pid" > /dev/null 2>&1; do
+  local spinstr='|/-\'
+  printf "$1 [${spinstr:0:1}] "
+  while ps a | awk '{print $1}' | grep -q "${pid}"; do
     local temp=${spinstr#?}
-    printf "\r%s [%s] " "$1" "${temp:0:1}"
-    spinstr=${temp}${spinstr%"$temp"}
-    sleep "$delay"
+    printf "\r$1 [${temp:0:1}] "
+    spinstr=${temp}${spinstr%"${temp}"}
+    sleep ${delay}
   done
-  if wait "$pid"; then
-    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$1"
+  if [[ $? -eq 0 ]]; then
+    printf "\r$1 [\e[32m\xE2\x9C\x94\e[0m]\n"
   else
-    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$1"
+    printf "\r$1 [\e[31m\xE2\x9C\x98\e[0m]\n"
   fi
 }
 
@@ -193,55 +181,42 @@ echo_blue() {
 
 install_debian_dependencies() {
   if [ -f "$APT_REQUIREMENTS_FILE" ]; then
-    if [[ "$VERBOSE" -eq 1 ]]; then
-      echo_header "Fetching available system dependency updates"
-      sudo apt-get update -y
-      echo_header "Installing system dependencies"
-      xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y
-    else
-      sudo apt-get update > /dev/null &
-      show_loader "Fetch available system dependencies updates. " 
-      xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null &
-      show_loader "Installing system dependencies. "
-    fi
+    sudo apt-get update > /dev/null &
+    show_loader "Fetch available system dependencies updates. " 
+
+    xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null &
+    show_loader "Installing system dependencies. "
   else
     echo "ERROR: System dependencies file $APT_REQUIREMENTS_FILE not found!"
     exit 1
   fi
 }
 
-setup_memory_management() {
+setup_zramswap_service() {
   echo "Enabling and starting zramswap service."
+  sudo apt-get install -y zram-tools > /dev/null
   echo -e "ALGO=zstd\nPERCENT=60" | sudo tee /etc/default/zramswap > /dev/null
   sudo systemctl enable --now zramswap
+}
 
+setup_earlyoom_service() {
   echo "Enabling and starting earlyoom service."
+  sudo apt-get install -y earlyoom > /dev/null
   sudo systemctl enable --now earlyoom
 }
 
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  if [[ "$VERBOSE" -eq 1 ]]; then
-    echo_header "Upgrading pip and core build tools (pip/setuptools/wheel)"
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir
-    echo_header "Installing python dependencies"
-    $VENV_PATH/bin/python -m pip install -r "$PIP_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir
-  else
-    $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel --retries 10 --timeout 60 --no-cache-dir > /dev/null 2>&1
-    $VENV_PATH/bin/python -m pip install -r "$PIP_REQUIREMENTS_FILE" -qq --retries 10 --timeout 60 --no-cache-dir > pip_install.log 2>&1 &
-    show_loader "\tInstalling python dependencies. "
-  fi
+  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel > /dev/null
+  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq > /dev/null &
+  show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    if [[ "$VERBOSE" -eq 1 ]]; then
-      $VENV_PATH/bin/python -m pip install -r "$WS_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir
-    else
-      $VENV_PATH/bin/python -m pip install -r "$WS_REQUIREMENTS_FILE" --retries 10 --timeout 60 --no-cache-dir > ws_pip_install.log 2>&1 &
-      show_loader "\tInstalling additional Waveshare python dependencies. "
-    fi
+    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE > ws_pip_install.log &
+    show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
 }
@@ -260,7 +235,7 @@ install_app_service() {
 
 install_executable() {
   echo "Adding executable to ${BINPATH}/$APPNAME"
-  cp "$SCRIPT_DIR"/inkypi "$BINPATH/"
+  cp $SCRIPT_DIR/inkypi $BINPATH/
   sudo chmod +x $BINPATH/$APPNAME
 }
 
@@ -271,7 +246,7 @@ install_config() {
 
   # Check and copy device.config if it doesn't exist
   if [ ! -f "$CONFIG_DIR/device.json" ]; then
-    cp "$CONFIG_BASE_DIR/device.json" "$CONFIG_DIR/" > /dev/null &
+    cp "$CONFIG_BASE_DIR/device.json" "$CONFIG_DIR/"
     show_loader "\tCopying device.config to $CONFIG_DIR"
   else
     echo_success "\tdevice.json already exists in $CONFIG_DIR"
@@ -323,35 +298,30 @@ copy_project() {
   # Check if an existing installation is present
   echo "Installing $APPNAME to $INSTALL_PATH"
   if [[ -d $INSTALL_PATH ]]; then
-    rm -rf "$INSTALL_PATH" > /dev/null &
+    rm -rf "$INSTALL_PATH" > /dev/null
     show_loader "\tRemoving existing installation found at $INSTALL_PATH"
   fi
 
   mkdir -p "$INSTALL_PATH"
 
-  ln -sf "$SRC_PATH" "$INSTALL_PATH/src" > /dev/null &
+  ln -sf "$SRC_PATH" "$INSTALL_PATH/src"
   show_loader "\tCreating symlink from $SRC_PATH to $INSTALL_PATH/src"
-
-  # Ensure a protected .env exists at the project root used by the service
-  if [ ! -f "$INSTALL_PATH/.env" ]; then
-    touch "$INSTALL_PATH/.env"
-    chmod 600 "$INSTALL_PATH/.env"
-    echo_success "\tCreated $INSTALL_PATH/.env with 0600 permissions"
-  else
-    chmod 600 "$INSTALL_PATH/.env" 2>/dev/null || true
-    echo_success "\tVerified permissions on $INSTALL_PATH/.env"
-  fi
 }
 
 # Get Raspberry Pi hostname
-  get_hostname() {
-    hostname
-  }
+get_hostname() {
+  echo "$(hostname)"
+}
 
 # Get Raspberry Pi IP address
 get_ip_address() {
   ip_address=$(hostname -I | awk '{print $1}')
   echo "$ip_address"
+}
+
+# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixe
+get_os_version() {
+  echo "$(lsb_release -sr)"
 }
 
 ask_for_reboot() {
@@ -363,7 +333,7 @@ ask_for_reboot() {
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
   echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/fatihak/InkyPi/issues"
 
-    read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
+  read -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
 
   if [[ "${userInput,,}" == "y" ]]; then
@@ -379,40 +349,36 @@ ask_for_reboot() {
   fi
 }
 
-# Simple step progress headings
-STEP=1
-step() { echo_header "[$STEP] $1"; STEP=$((STEP+1)); }
-
 # check if we have an argument for WS display support.  Parameter is not required
 # to maintain default INKY display support.
 parse_arguments "$@"
 check_permissions
-step "Stop existing service (if running)"
 stop_service
 # fetch the WS display driver if defined.
 if [[ -n "$WS_TYPE" ]]; then
-  step "Fetch Waveshare driver: $WS_TYPE"
   fetch_waveshare_driver
 fi
-step "Enable required interfaces (SPI/I2C and overlays)"
 enable_interfaces
-step "Install system dependencies"
 install_debian_dependencies
-step "Configure memory management (zramswap, earlyoom)"
-setup_memory_management
-step "Install application to $INSTALL_PATH"
+# check OS version for Bookworm to setup zramswap
+if [[ $(get_os_version) = "12" ]] ; then
+  echo "OS version is Bookworm - setting up zramswap"
+  setup_zramswap_service
+else
+  echo "OS version is not Bookworm - skipping zramswap setup."
+fi
+setup_earlyoom_service
 copy_project
-step "Create virtual environment and install Python packages"
 create_venv
-step "Install command shim to $BINPATH/$APPNAME"
 install_executable
-step "Install default config files"
 install_config
 # update the config file with additional WS if defined.
 if [[ -n "$WS_TYPE" ]]; then
-  step "Update config with Waveshare display type"
   update_config
 fi
-step "Install and enable systemd service"
 install_app_service
+
+echo "Update JS and CSS files"
+bash $SCRIPT_DIR/update_vendors.sh
+
 ask_for_reboot
