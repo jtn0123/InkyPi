@@ -1,5 +1,6 @@
 import random
 
+import pytest
 from PIL import Image
 
 
@@ -28,6 +29,7 @@ def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path):
     assert str(p4) not in result
 
 
+@pytest.mark.skip(reason="Tests grab_image function that was removed in upstream - functionality integrated into generate_image")
 def test_grab_image_basic_resize(tmp_path):
     from plugins.image_folder.image_folder import grab_image
 
@@ -39,6 +41,7 @@ def test_grab_image_basic_resize(tmp_path):
     assert out.size[0] <= 200 and out.size[1] <= 200
 
 
+@pytest.mark.skip(reason="Tests grab_image function that was removed in upstream - functionality integrated into generate_image")
 def test_grab_image_with_padding(tmp_path):
     from plugins.image_folder.image_folder import grab_image
 
