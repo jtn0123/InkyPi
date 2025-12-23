@@ -377,7 +377,8 @@ def test_fetch_image_src_missing_url():
             "query": {"pages": {"123": {"imageinfo": [{}]}}}  # Empty imageinfo
         }
 
-        with pytest.raises(RuntimeError, match="Image URL missing in response"):
+        # Upstream error message changed
+        with pytest.raises(RuntimeError, match="Failed to retrieve image URL"):
             p._fetch_image_src("File:Example.png")
 
 

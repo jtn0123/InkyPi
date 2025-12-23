@@ -49,6 +49,9 @@ def test_unsplash_decode_failure(device_config_dev, monkeypatch):
         def json(self):
             return {"urls": {"full": "https://example.com/x.jpg"}}
 
+        def raise_for_status(self):
+            pass  # No error
+
     monkeypatch.setattr("requests.get", lambda *a, **k: R(), raising=True)
 
     # Make grab_image return None (decode failure path)
