@@ -55,8 +55,8 @@ def test_weather_openweathermap_success(mock_http_get, client, monkeypatch):
 
     data = {
         "plugin_id": "weather",
-        "latitude": "0",
-        "longitude": "0",
+        "latitude": "40.7",
+        "longitude": "-74.0",
         "units": "metric",
         "weatherProvider": "OpenWeatherMap",
         "titleSelection": "location",
@@ -106,8 +106,8 @@ def test_weather_openmeteo_success(client, monkeypatch):
 
     data = {
         "plugin_id": "weather",
-        "latitude": "0",
-        "longitude": "0",
+        "latitude": "40.7",
+        "longitude": "-74.0",
         "units": "metric",
         "weatherProvider": "OpenMeteo",
         "customTitle": "My Weather",
