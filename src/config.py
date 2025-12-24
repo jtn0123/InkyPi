@@ -95,13 +95,19 @@ class Config:
         # 1) Explicit file from environment
         env_file = os.getenv("INKYPI_CONFIG_FILE")
         if env_file and os.path.isfile(env_file):
-            logger.info(f"Using config file from INKYPI_CONFIG_FILE: {env_file}")
+            logger.info(
+                "config_loaded: Using config from INKYPI_CONFIG_FILE",
+                extra={"source": "env", "path": env_file},
+            )
             return env_file
 
         # 2) Respect class attribute override (possibly set by CLI)
         class_override = getattr(type(self), "config_file", None)
         if class_override and os.path.isfile(class_override):
-            logger.info(f"Using config file from class override: {class_override}")
+            logger.info(
+                "config_loaded: Using config from class override",
+                extra={"source": "class_override", "path": class_override},
+            )
             return class_override
 
         # 3) INKYPI_ENV hint
@@ -109,17 +115,26 @@ class Config:
             os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
         ).lower()
         if env_mode in ("dev", "development") and os.path.isfile(dev_path):
-            logger.info(f"Using dev config due to INKYPI_ENV: {dev_path}")
+            logger.info(
+                "config_loaded: Using dev config due to INKYPI_ENV",
+                extra={"source": "env_mode", "path": dev_path, "mode": env_mode},
+            )
             return dev_path
 
         # 4) Prefer prod if it exists
         if os.path.isfile(prod_path):
-            logger.info(f"Using prod config: {prod_path}")
+            logger.info(
+                "config_loaded: Using prod config",
+                extra={"source": "file", "path": prod_path},
+            )
             return prod_path
 
         # 5) Fallback to dev if it exists
         if os.path.isfile(dev_path):
-            logger.info(f"Using dev config (fallback): {dev_path}")
+            logger.info(
+                "config_loaded: Using dev config as fallback",
+                extra={"source": "fallback", "path": dev_path},
+            )
             return dev_path
 
         # 6) Bootstrap from template if neither exists
@@ -130,8 +145,12 @@ class Config:
             os.makedirs(config_dir, exist_ok=True)
             shutil.copyfile(template_path, prod_path)
             logger.warning(
-                "No config found. Bootstrapped a new device.json from template: %s",
-                template_path,
+                "config_loaded: Bootstrapped new device.json from template",
+                extra={
+                    "source": "bootstrap",
+                    "path": prod_path,
+                    "template": template_path,
+                },
             )
             return prod_path
         except Exception as ex:

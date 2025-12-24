@@ -174,6 +174,19 @@ class RefreshTask:
         _t_req_start = perf_counter()
         # Correlate this refresh with a benchmark id so parallel stage events can attach
         benchmark_id = str(uuid4())
+        plugin_id = refresh_action.get_plugin_id()
+        instance_name = refresh_action.get_refresh_info().get("plugin_instance")
+
+        # Plugin lifecycle: generate_start
+        logger.info(
+            "plugin_lifecycle: generate_start",
+            extra={
+                "stage": "generate_start",
+                "plugin_id": plugin_id,
+                "instance": instance_name,
+                "refresh_id": benchmark_id,
+            },
+        )
         _t_gen_start = perf_counter()
         tracker: ProgressTracker
         with track_progress() as tracker:
@@ -189,6 +202,17 @@ class RefreshTask:
             except Exception:
                 pass
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+        # Plugin lifecycle: generate_complete
+        logger.info(
+            "plugin_lifecycle: generate_complete",
+            extra={
+                "stage": "generate_complete",
+                "plugin_id": plugin_id,
+                "instance": instance_name,
+                "duration_ms": generate_ms,
+                "refresh_id": benchmark_id,
+            },
+        )
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
         image_hash = compute_image_hash(image)
@@ -221,27 +245,48 @@ class RefreshTask:
                     "plugin_instance"
                 ),
             }
+            # Plugin lifecycle: display_start
+            logger.info(
+                "plugin_lifecycle: display_start",
+                extra={
+                    "stage": "display_start",
+                    "plugin_id": plugin_id,
+                    "instance": instance_name,
+                    "refresh_id": benchmark_id,
+                },
+            )
+            stage_t1 = perf_counter()
             try:
                 # Mark preprocess/display as stages around display_manager call
-                stage_t1 = perf_counter()
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                     history_meta=history_meta,
                 )
             except TypeError:
-                stage_t1 = perf_counter()
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                 )
             finally:
+                display_duration_ms = int((perf_counter() - stage_t1) * 1000)
+                # Plugin lifecycle: display_complete
+                logger.info(
+                    "plugin_lifecycle: display_complete",
+                    extra={
+                        "stage": "display_complete",
+                        "plugin_id": plugin_id,
+                        "instance": instance_name,
+                        "duration_ms": display_duration_ms,
+                        "refresh_id": benchmark_id,
+                    },
+                )
                 try:
                     save_stage_event(
                         self.device_config,
                         benchmark_id,
                         "display_pipeline",
-                        int((perf_counter() - stage_t1) * 1000),
+                        display_duration_ms,
                     )
                 except Exception:
                     pass

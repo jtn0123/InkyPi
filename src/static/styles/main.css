@@ -1671,6 +1671,40 @@ svg.icon-thin {
     width: auto;
 }
 
+/* Loading state for action buttons */
+.action-button.loading {
+    pointer-events: none;
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.action-button.loading::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    margin-top: -9px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: button-spin 0.8s linear infinite;
+    z-index: 1;
+}
+
+.action-button.loading span,
+.action-button.loading .button-text {
+    visibility: hidden;
+}
+
+@keyframes button-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* Secondary/outline variants for action buttons to keep consistency app-wide */
 .action-button.is-secondary {
     background-color: #2c66b1;

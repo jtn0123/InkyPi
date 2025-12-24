@@ -799,7 +799,8 @@
                 </div>
                 <div class="form-group">
                     <label for="instance" class="form-label">Instance Name:</label>
-                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required class="form-input">
+                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error">
+                    <span id="instance-error" class="validation-message" role="alert"></span>
                 </div>
                 <div class="form-group">
                     <label>Refresh</label>
@@ -808,8 +809,9 @@
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
                     <label for="refreshTypeInterval">Every</label>
-                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value">
-                    <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
+                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
+                    <span id="interval-error" class="validation-message" role="alert"></span>
+                    <select id="unit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
                         <option value="minute">Minute</option>
                         <option value="hour">Hour</option>
                         <option value="day">Day</option>

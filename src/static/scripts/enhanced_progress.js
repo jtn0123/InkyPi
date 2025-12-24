@@ -3,6 +3,40 @@
  * Provides detailed step-by-step progress tracking with timing information
  */
 
+/**
+ * HTTP status code to user-friendly error messages
+ */
+const HTTP_ERROR_MESSAGES = {
+    400: 'Invalid input. Please check your settings and try again.',
+    401: 'Authentication required. Please log in to continue.',
+    403: 'Access denied. You do not have permission to perform this action.',
+    404: 'The requested resource was not found.',
+    408: 'Request timed out. Please check your connection and try again.',
+    409: 'Conflict detected. The resource may have been modified.',
+    413: 'The file or data is too large. Please reduce the size and try again.',
+    415: 'Unsupported file format. Please use a different format.',
+    422: 'The request could not be processed. Please verify your input.',
+    429: 'Too many requests. Please wait a moment and try again.',
+    500: 'Server error. Please try again later.',
+    502: 'Service temporarily unavailable. Please try again.',
+    503: 'Service temporarily unavailable. Please try again later.',
+    504: 'Request timed out. The server took too long to respond.'
+};
+
+/**
+ * Get a user-friendly error message for an HTTP status code
+ * @param {number} statusCode - HTTP status code
+ * @param {string} fallbackMessage - Fallback message if status code not found
+ * @returns {string} User-friendly error message
+ */
+function getErrorMessage(statusCode, fallbackMessage = 'An error occurred. Please try again.') {
+    return HTTP_ERROR_MESSAGES[statusCode] || fallbackMessage;
+}
+
+// Expose globally
+window.getErrorMessage = getErrorMessage;
+window.HTTP_ERROR_MESSAGES = HTTP_ERROR_MESSAGES;
+
 class EnhancedProgressDisplay {
     constructor(progressElement, options = {}) {
         this.progressElement = progressElement;
@@ -415,4 +449,132 @@ window.createEnhancedProgress = function(containerId, options = {}) {
     }
 
     return new EnhancedProgressDisplay(container, options);
+};
+
+/**
+ * Button Loading State Utilities
+ * Provides functions to manage loading states on action buttons
+ */
+window.ButtonLoading = {
+    /**
+     * Set a button to loading state
+     * @param {HTMLElement|string} button - Button element or selector
+     */
+    start: function(button) {
+        const el = typeof button === 'string' ? document.querySelector(button) : button;
+        if (!el) return;
+
+        el.classList.add('loading');
+        el.disabled = true;
+        el.setAttribute('aria-busy', 'true');
+
+        // Store original text for restoration
+        if (!el.dataset.originalText) {
+            el.dataset.originalText = el.textContent;
+        }
+    },
+
+    /**
+     * Remove loading state from a button
+     * @param {HTMLElement|string} button - Button element or selector
+     */
+    stop: function(button) {
+        const el = typeof button === 'string' ? document.querySelector(button) : button;
+        if (!el) return;
+
+        el.classList.remove('loading');
+        el.disabled = false;
+        el.removeAttribute('aria-busy');
+    },
+
+    /**
+     * Toggle loading state on a button
+     * @param {HTMLElement|string} button - Button element or selector
+     * @param {boolean} loading - Whether to show loading state
+     */
+    toggle: function(button, loading) {
+        if (loading) {
+            this.start(button);
+        } else {
+            this.stop(button);
+        }
+    },
+
+    /**
+     * Execute an async operation with automatic loading state management
+     * @param {HTMLElement|string} button - Button element or selector
+     * @param {Function} asyncFn - Async function to execute
+     * @returns {Promise} - Result of the async function
+     */
+    withLoading: async function(button, asyncFn) {
+        this.start(button);
+        try {
+            return await asyncFn();
+        } finally {
+            this.stop(button);
+        }
+    }
+};
+
+/**
+ * Form validation state utilities
+ * Updates aria-invalid attributes on form fields
+ */
+window.FormValidation = {
+    /**
+     * Mark a field as invalid
+     * @param {HTMLElement|string} field - Field element or selector
+     * @param {string} errorMessage - Error message to display
+     */
+    setInvalid: function(field, errorMessage) {
+        const el = typeof field === 'string' ? document.querySelector(field) : field;
+        if (!el) return;
+
+        el.setAttribute('aria-invalid', 'true');
+        el.classList.add('error');
+
+        // Find and update associated error element
+        const errorId = el.getAttribute('aria-describedby');
+        if (errorId) {
+            const errorEl = document.getElementById(errorId);
+            if (errorEl) {
+                errorEl.textContent = errorMessage;
+                errorEl.classList.add('visible');
+            }
+        }
+    },
+
+    /**
+     * Mark a field as valid
+     * @param {HTMLElement|string} field - Field element or selector
+     */
+    setValid: function(field) {
+        const el = typeof field === 'string' ? document.querySelector(field) : field;
+        if (!el) return;
+
+        el.setAttribute('aria-invalid', 'false');
+        el.classList.remove('error');
+
+        // Clear associated error element
+        const errorId = el.getAttribute('aria-describedby');
+        if (errorId) {
+            const errorEl = document.getElementById(errorId);
+            if (errorEl) {
+                errorEl.textContent = '';
+                errorEl.classList.remove('visible');
+            }
+        }
+    },
+
+    /**
+     * Clear all validation states in a form
+     * @param {HTMLElement|string} form - Form element or selector
+     */
+    clearAll: function(form) {
+        const formEl = typeof form === 'string' ? document.querySelector(form) : form;
+        if (!formEl) return;
+
+        const fields = formEl.querySelectorAll('[aria-invalid]');
+        fields.forEach(field => this.setValid(field));
+    }
 };

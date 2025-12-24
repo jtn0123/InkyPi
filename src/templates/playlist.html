@@ -412,13 +412,14 @@
 
                 <div class="form-group">
                     <label for="playlist_name" class="form-label">Playlist Name:</label>
-                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Type something..." required class="form-input">
+                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Type something..." required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="playlist-name-error">
+                    <span id="playlist-name-error" class="validation-message" role="alert"></span>
                 </div>
                 <div class="form-group">
                     <label for="start_time" class="form-label">Display from </label>
-                    <select id="start_time" name="start_time" class="form-input"></select>
+                    <select id="start_time" name="start_time" class="form-input" aria-required="true"></select>
                     <span> - </span>
-                    <select id="end_time" name="end_time" class="form-input"></select>
+                    <select id="end_time" name="end_time" class="form-input" aria-required="true"></select>
                 </div>
             </form>
             <div class="buttons-container">

@@ -358,7 +358,8 @@
                     <div class="section-title">Basics</div>
                     <div class="form-group">
                         <label for="deviceName" class="form-label">Device Name</label>
-                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required class="form-input">
+                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
+                        <span id="deviceName-error" class="validation-message" role="alert"></span>
                     </div>
                     <div class="form-group nowrap">
                         <div class="form-group">
@@ -427,8 +428,9 @@
                             <label for="interval" class="form-label">Plugin Cycle Interval</label>
                             <span title="Determines how often the display switches to a new plugin.">ⓘ</span>
                             <span>Every</span>
-                            <input type="number" id="interval" name="interval" class="form-input" required min="1">
-                            <select id="unit" name="unit" class="form-input" required aria-label="Time unit">
+                            <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
+                            <span id="interval-settings-error" class="validation-message" role="alert"></span>
+                            <select id="unit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
                                 <option value="minute">Minute</option>
                                 <option value="hour">Hour</option>
                             </select>

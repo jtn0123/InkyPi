@@ -179,26 +179,47 @@ class HTTPCache:
 
             if entry is None:
                 self._stats.misses += 1
+                logger.debug(
+                    "cache_lookup: miss",
+                    extra={
+                        "url": url,
+                        "hit": False,
+                        "reason": "not_found",
+                    },
+                )
                 return None
 
             if entry.is_expired():
                 # Expired, remove it
+                ttl_remaining = entry.ttl_seconds - entry.age_seconds()
                 del self._cache[cache_key]
                 self._stats.expirations += 1
                 self._stats.misses += 1
                 logger.debug(
-                    "Cache expired | url=%s age=%.1fs", url, entry.age_seconds()
+                    "cache_lookup: expired",
+                    extra={
+                        "url": url,
+                        "hit": False,
+                        "reason": "expired",
+                        "age_s": round(entry.age_seconds(), 1),
+                        "ttl_remaining_s": round(ttl_remaining, 1),
+                    },
                 )
                 return None
 
             # Cache hit
             entry.hit_count += 1
             self._stats.hits += 1
+            ttl_remaining = entry.ttl_seconds - entry.age_seconds()
             logger.debug(
-                "Cache hit | url=%s age=%.1fs ttl=%.0fs",
-                url,
-                entry.age_seconds(),
-                entry.ttl_seconds,
+                "cache_lookup: hit",
+                extra={
+                    "url": url,
+                    "hit": True,
+                    "age_s": round(entry.age_seconds(), 1),
+                    "ttl_remaining_s": round(ttl_remaining, 1),
+                    "hit_count": entry.hit_count,
+                },
             )
             return entry.response
 
