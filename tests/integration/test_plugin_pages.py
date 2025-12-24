@@ -85,3 +85,106 @@ def test_instance_image_history_fallback(client, device_config_dev):
     resp2 = client.get("/instance_image/ai_text/ai_text_saved_settings")
     # Should either serve or 404 if environment cannot generate; accept 200 as success criteria
     assert resp2.status_code in (200, 404)
+
+
+def test_api_key_indicator_shows_missing_when_no_key(client, device_config_dev):
+    """Test that API key indicator shows 'missing' status when key is not present.
+
+    Regression test for: API key indicator showing warning even when keys are configured.
+    """
+    # Ensure no OpenAI key is present
+    device_config_dev.unset_env_key("OPEN_AI_SECRET")
+
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode('utf-8')
+
+    # Should show the missing indicator
+    assert 'class="api-key-indicator missing"' in body
+    assert 'API Required' in body or 'API Key required' in body
+
+
+def test_api_key_indicator_shows_configured_when_key_present(client, device_config_dev):
+    """Test that API key indicator shows 'configured' status when key is present.
+
+    Regression test for: API key indicator showing warning even when keys are configured.
+    """
+    # Set an OpenAI key
+    device_config_dev.set_env_key("OPEN_AI_SECRET", "test-key-123")
+
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode('utf-8')
+
+    # Should show the configured indicator
+    assert 'class="api-key-indicator configured"' in body
+    assert 'API Key is configured' in body or '✓' in body
+
+
+def test_plugin_latest_image_endpoint(client, device_config_dev):
+    """Test that /plugin_latest_image serves the most recent image for a plugin.
+
+    Regression test for: "Latest from this plugin" section not showing historical images.
+    """
+    import os
+    import json
+    from PIL import Image
+
+    # Create a fake history image and metadata
+    history_dir = device_config_dev.history_image_dir
+    os.makedirs(history_dir, exist_ok=True)
+
+    # Create test image
+    img = Image.new('RGB', (100, 100), color='red')
+    img_path = os.path.join(history_dir, 'display_20250115_120000.png')
+    img.save(img_path)
+
+    # Create metadata
+    metadata = {
+        'plugin_id': 'clock',
+        'plugin_instance': 'test_instance',
+        'refresh_time': '2025-01-15T12:00:00'
+    }
+    json_path = os.path.join(history_dir, 'display_20250115_120000.json')
+    with open(json_path, 'w') as f:
+        json.dump(metadata, f)
+
+    # Request latest image for this plugin
+    resp = client.get('/plugin_latest_image/clock')
+    assert resp.status_code == 200
+    assert resp.content_type.startswith('image/')
+
+    # Test with non-existent plugin
+    resp2 = client.get('/plugin_latest_image/nonexistent_plugin')
+    assert resp2.status_code == 404
+
+
+def test_plugin_latest_refresh_time_populated(client, device_config_dev):
+    """Test that plugin_latest_refresh template variable is populated correctly.
+
+    Regression test for: "Last generated" timestamp not showing for "Latest from this plugin".
+    """
+    import os
+    import json
+
+    # Create a fake history metadata
+    history_dir = device_config_dev.history_image_dir
+    os.makedirs(history_dir, exist_ok=True)
+
+    metadata = {
+        'plugin_id': 'clock',
+        'plugin_instance': 'test_instance',
+        'refresh_time': '2025-01-15T12:00:00'
+    }
+    json_path = os.path.join(history_dir, 'display_20250115_120000.json')
+    with open(json_path, 'w') as f:
+        json.dump(metadata, f)
+
+    # Visit plugin page
+    resp = client.get('/plugin/clock')
+    assert resp.status_code == 200
+    body = resp.data.decode('utf-8')
+
+    # The template should render the refresh time
+    # It's rendered via JavaScript, so we check that the variable is set
+    assert 'plugin_latest_refresh' in body or '2025-01-15' in body

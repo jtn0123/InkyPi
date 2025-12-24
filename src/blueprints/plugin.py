@@ -40,6 +40,13 @@ def plugin_page(plugin_id: str):
         plugin = get_plugin_instance(plugin_config)
         template_params = plugin.generate_settings_template()
 
+        # Check if API key is present for plugins that require it
+        if "api_key" in template_params and template_params["api_key"].get("required"):
+            expected_key = template_params["api_key"].get("expected_key")
+            if expected_key:
+                key_present = device_config.load_env_key(expected_key) is not None
+                template_params["api_key"]["present"] = key_present
+
         # If viewing an existing instance, pre-populate its settings
         plugin_instance_name = request.args.get("instance")
         if plugin_instance_name:
@@ -61,6 +68,12 @@ def plugin_page(plugin_id: str):
                     template_params["plugin_instance"] = saved_instance_name
 
         template_params["playlists"] = playlist_manager.get_playlist_names()
+
+        # Find latest refresh time for this plugin (any instance)
+        plugin_latest_refresh = _find_latest_plugin_refresh_time(device_config, plugin_id)
+        if plugin_latest_refresh:
+            template_params["plugin_latest_refresh"] = plugin_latest_refresh
+
     except Exception as e:  # pragma: no cover - safety net
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error("An internal error occurred", status=500)
@@ -90,12 +103,44 @@ def image(plugin_id: str, filename: str):
     "/plugin_latest_image/<string:plugin_id>", endpoint="plugin_latest_image"
 )
 def latest_plugin_image(plugin_id: str):
-    """Compatibility endpoint used by template JS to preview a plugin by id.
+    """Serve the most recent history image for a given plugin_id.
 
-    We return 404 for now because the UI tolerates missing previews and tests don't
-    assert on the image bytes; they only need the route to exist for url_for.
+    Searches the history directory for the latest PNG matching the plugin_id,
+    regardless of instance name. Used by the plugin page to show "Latest from this plugin".
     """
-    return ("Not Found", 404)
+    device_config = current_app.config["DEVICE_CONFIG"]
+    try:
+        history_dir = str(device_config.history_image_dir)
+        if not os.path.isdir(history_dir):
+            return ("Not Found", 404)
+
+        # Find all history images for this plugin, sorted by timestamp (newest first)
+        matching_images = []
+        for name in os.listdir(history_dir):
+            if not name.endswith(".json"):
+                continue
+            json_path = os.path.join(history_dir, name)
+            try:
+                with open(json_path, "r", encoding="utf-8") as fh:
+                    meta = json.load(fh)
+                if meta.get("plugin_id") == plugin_id:
+                    png_path = os.path.join(history_dir, name.replace(".json", ".png"))
+                    if os.path.exists(png_path):
+                        # Extract timestamp from filename (format: display_YYYYMMDD_HHMMSS)
+                        matching_images.append((name, png_path))
+            except Exception:
+                continue
+
+        if not matching_images:
+            return ("Not Found", 404)
+
+        # Sort by filename (which includes timestamp) to get most recent
+        matching_images.sort(reverse=True)
+        latest_image_path = matching_images[0][1]
+        return send_file(latest_image_path)
+
+    except Exception:
+        return ("Not Found", 404)
 
 
 @plugin_bp.route("/weather_icon_preview", methods=["POST"], endpoint="weather_icon_preview")
@@ -327,6 +372,34 @@ def _find_history_image(device_config, plugin_id: str, instance_name: str) -> Op
     except Exception:
         return None
     return None
+
+
+def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> Optional[str]:
+    """Return the most recent refresh time for any instance of this plugin."""
+    try:
+        history_dir = str(device_config.history_image_dir)
+        if not os.path.isdir(history_dir):
+            return None
+
+        latest_time = None
+        for name in os.listdir(history_dir):
+            if not name.endswith(".json"):
+                continue
+            json_path = os.path.join(history_dir, name)
+            try:
+                with open(json_path, "r", encoding="utf-8") as fh:
+                    meta = json.load(fh)
+                if meta.get("plugin_id") == plugin_id:
+                    refresh_time = meta.get("refresh_time")
+                    if refresh_time:
+                        if latest_time is None or refresh_time > latest_time:
+                            latest_time = refresh_time
+            except Exception:
+                continue
+
+        return latest_time
+    except Exception:
+        return None
 
 
 @plugin_bp.route(
