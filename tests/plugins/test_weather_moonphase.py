@@ -54,12 +54,15 @@ def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch)
     monkeypatch.setattr(Weather, "get_open_meteo_data", lambda self, lat, lon, units, d: mock_weather)
     monkeypatch.setattr(Weather, "get_open_meteo_air_quality", lambda self, lat, lon: mock_aqi)
 
-    # Provide deterministic moon phase result
-    monkeypatch.setattr(Weather, "_compute_moon_phase", lambda self, dt: ("fullmoon", 50.0))
+    # Provide deterministic moon phase result (upstream uses astral library)
+    from astral import moon
+    monkeypatch.setattr(moon, "phase", lambda dt: 14.75)  # Full moon phase age
 
     with patch.object(w, "render_image", return_value=object()) as mock_render:
         result = w.generate_image(settings, device_config_dev)
         assert result is not None
         template_params = mock_render.call_args[0][3]
-        assert template_params["forecast"][0]["moon_phase_pct"] == "50"
+        # Full moon (phase_age ~14.75) results in ~100% illumination
+        assert int(template_params["forecast"][0]["moon_phase_pct"]) >= 95
         assert template_params["forecast"][0]["moon_phase_icon"]
+        assert "fullmoon" in template_params["forecast"][0]["moon_phase_icon"]

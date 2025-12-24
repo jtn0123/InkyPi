@@ -31,11 +31,3 @@
 </p>
 
 4. Click Yes to apply OS customization options and confirm
-
-## Configure API Keys
-
-After installation, open the web UI and navigate to Settings → "Manage API Keys" to configure any required credentials (OpenAI, OpenWeatherMap, NASA APOD, Unsplash).
-
-- The installer creates `/usr/local/inkypi/.env` with `0600` permissions. Keys you enter in the UI are stored there and used at runtime.
-- The systemd service references this file via `EnvironmentFile=/usr/local/inkypi/.env`.
-- The `.env` file is not part of the repository and is git-ignored by default.

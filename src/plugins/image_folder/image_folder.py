@@ -1,79 +1,33 @@
-import logging  # Needed for module-level logger
+from plugins.base_plugin.base_plugin import BasePlugin
+from PIL import Image, ImageOps, ImageColor
+import logging
 import os
 import random
 
-from PIL import Image, ImageFilter, ImageOps
-from PIL.Image import Resampling
-
-from plugins.base_plugin.base_plugin import BasePlugin
-from utils.image_utils import load_image_from_path
-
-LANCZOS = Resampling.LANCZOS
+from utils.image_utils import pad_image_blur
 
 logger = logging.getLogger(__name__)
 
-
-def list_files_in_folder(folder_path: str) -> list[str]:
+def list_files_in_folder(folder_path):
     """Return a list of image file paths in the given folder, excluding hidden files."""
-    image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp")
-    return [
-        os.path.join(folder_path, f)
-        for f in os.listdir(folder_path)
-        if (
-            os.path.isfile(os.path.join(folder_path, f))
-            and f.lower().endswith(image_extensions)
-            and not f.startswith(".")
-        )
-    ]
+    image_extensions = ('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heif', '.heic')
+    image_files = []
+    for root, dirs, files in os.walk(folder_path):
+        for f in files:
+            if f.lower().endswith(image_extensions) and not f.startswith('.'):
+                image_files.append(os.path.join(root, f))
 
-
-def grab_image(
-    image_path: str, dimensions: tuple[int, int], pad_image: bool
-) -> Image.Image | None:
-    """Load an image from disk, auto-orient it, and resize to fit within the specified dimensions, preserving aspect ratio."""
-    try:
-        loaded = load_image_from_path(image_path)
-        if loaded is None:
-            raise RuntimeError("Failed to load image from path")
-        assert isinstance(loaded, Image.Image)
-        transposed = ImageOps.exif_transpose(loaded)  # Correct orientation using EXIF
-        if transposed is None:
-            raise RuntimeError("Failed to transpose image orientation")
-        img: Image.Image = transposed
-        # ImageOps.contain can return None for some modes; ensure non-None for mypy
-        contained = ImageOps.contain(img, dimensions, LANCZOS)
-        if contained is None:
-            raise RuntimeError("Failed to process image")
-        img = contained
-
-        if pad_image:
-            bkg = ImageOps.fit(img, dimensions)
-            bkg = bkg.filter(ImageFilter.BoxBlur(8))
-            img_size = img.size
-            bkg.paste(
-                img,
-                (
-                    (dimensions[0] - img_size[0]) // 2,
-                    (dimensions[1] - img_size[1]) // 2,
-                ),
-            )
-            img = bkg
-        return img
-    except Exception as e:
-        logger.error(f"Error loading image from {image_path}: {e}")
-        return None
-
+    return image_files
 
 class ImageFolder(BasePlugin):
     def generate_image(self, settings, device_config):
-        folder_path = settings.get("folder_path")
-        pad_image = settings.get("padImage", False)
+        folder_path = settings.get('folder_path')
         if not folder_path:
             raise RuntimeError("Folder path is required.")
-
+        
         if not os.path.exists(folder_path):
             raise RuntimeError(f"Folder does not exist: {folder_path}")
-
+        
         if not os.path.isdir(folder_path):
             raise RuntimeError(f"Path is not a directory: {folder_path}")
 
@@ -88,12 +42,24 @@ class ImageFolder(BasePlugin):
             raise RuntimeError(f"No image files found in folder: {folder_path}")
 
         image_url = random.choice(image_files)
-
         logger.info(f"Random image selected {image_url}")
 
-        image = grab_image(image_url, dimensions, pad_image)
+        img = None
+        try:
+            img = Image.open(image_url)
+            img = ImageOps.exif_transpose(img)  # Correct orientation using EXIF
 
-        if not image:
+            if settings.get('padImage') == "true":
+                if settings.get('backgroundOption', 'blur') == "blur":
+                    img = pad_image_blur(img, dimensions)
+                else:
+                    background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
+                    img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
+
+        except Exception as e:
+            logger.error(f"Error loading image from {image_url}: {e}")
+
+        if not img:
             raise RuntimeError("Failed to load image, please check logs.")
 
-        return image
+        return img

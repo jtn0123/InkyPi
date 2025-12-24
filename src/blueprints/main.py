@@ -71,6 +71,43 @@ def preview_image():
     return send_file(path, mimetype="image/png", conditional=True)
 
 
+@main_bp.route("/api/current_image")
+def get_current_image():
+    """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
+    from flask import request
+
+    device_config = current_app.config["DEVICE_CONFIG"]
+    image_path = device_config.current_image_file
+
+    if not os.path.exists(image_path):
+        return jsonify({"error": "Image not found"}), 404
+
+    # Get the file's last modified time (truncate to seconds to match HTTP header precision)
+    file_mtime = int(os.path.getmtime(image_path))
+    last_modified = datetime.fromtimestamp(file_mtime)
+
+    # Check If-Modified-Since header
+    if_modified_since = request.headers.get("If-Modified-Since")
+    if if_modified_since:
+        try:
+            # Parse the If-Modified-Since header
+            client_mtime = datetime.strptime(if_modified_since, "%a, %d %b %Y %H:%M:%S %Z")
+            client_mtime_seconds = int(client_mtime.timestamp())
+
+            # Compare (both now in seconds, no sub-second precision)
+            if client_mtime_seconds >= file_mtime:
+                # File hasn't been modified since client's cached version
+                return "", 304  # Not Modified
+        except (ValueError, OSError):
+            pass  # If parsing fails, proceed to send the file
+
+    # Send the image with Last-Modified header
+    response = send_file(image_path, mimetype="image/png")
+    response.headers["Last-Modified"] = last_modified.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @main_bp.route("/refresh-info")
 def refresh_info():
     device_config = current_app.config["DEVICE_CONFIG"]

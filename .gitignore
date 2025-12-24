@@ -22,7 +22,6 @@ var/
 wheels/
 share/python-wheels/
 *.egg-info/
-*.egg-info
 .installed.cfg
 *.egg
 MANIFEST
@@ -195,3 +194,10 @@ benchmarks.db
 # Coverage/Reports (ensure not committed)
 htmlcov/
 coverage.xml
+
+# IDE files
+.idea
+
+# Static Files added by install/update_vendors.sh
+/src/static/scripts/
+/src/static/styles/

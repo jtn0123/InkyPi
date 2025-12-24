@@ -1,269 +1,94 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-<!-- Setup Wizard for first-time users -->
-<div class="setup-wizard" id="weatherWizard" style="display: none;">
-    <div class="wizard-step active">
-        <h3 style="margin-bottom: 16px; color: var(--text);">Welcome to Weather Setup</h3>
-        <p style="margin-bottom: 16px; color: var(--muted);">Let's get your weather display configured in just a few simple steps.</p>
-
-        <div class="form-field">
-            <label class="form-label">What temperature unit do you prefer?</label>
-            <div class="button-group" id="wizardUnitsSelector">
-                <button type="button" data-value="imperial">Fahrenheit (°F)</button>
-                <button type="button" data-value="metric">Celsius (°C)</button>
-                <button type="button" data-value="standard">Kelvin (K)</button>
-            </div>
-            <input type="hidden" id="wizardUnits" name="wizardUnits" value="imperial" />
-        </div>
+<div class="form-group">
+    <label class="form-label">Location: </label>
+    <div class="form-group">
+        <span>Latitude </span>
+        <input readonly type="text" id="latitude" name="latitude" class="form-input" />
     </div>
-
-    <div class="wizard-step">
-        <h3 style="margin-bottom: 16px; color: var(--text);">Set Your Location</h3>
-        <p style="margin-bottom: 16px; color: var(--muted);">We need your location to get accurate weather data.</p>
-
-        <div class="form-field">
-            <label class="form-label">Location coordinates:</label>
-            <div class="form-group nowrap">
-                <span>Latitude </span>
-                <input readonly type="text" id="wizardLatitude" class="form-input" />
-            </div>
-            <div class="form-group nowrap">
-                <span>Longitude </span>
-                <input readonly type="text" id="wizardLongitude" class="form-input" />
-            </div>
-            <div class="form-group" style="margin-top: 12px;">
-                <button type="button" id="wizardOpenMap" class="action-button">Choose Location on Map</button>
-                <button type="button" id="wizardUseBrowser" class="action-button is-secondary">Use My Current Location</button>
-            </div>
-        </div>
+    <div class="form-group">
+        <span>Longitude </span>
+        <input readonly type="text" id="longitude" name="longitude" class="form-input" />
     </div>
+    <button type="button" id="openMap" class="action-button compact">Select Location</button>
+</div>
 
-    <div class="wizard-step">
-        <h3 style="margin-bottom: 16px; color: var(--text);">What Would You Like to See?</h3>
-        <p style="margin-bottom: 16px; color: var(--muted);">Choose what information to include in your weather display.</p>
+<div class="form-group">
+    <label for="weatherProvider" class="form-label">Weather Provider:</label>
+    <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
+        <option value="OpenMeteo">Open-Meteo</option>
+        <option value="OpenWeatherMap">OpenWeatherMap</option>
+    </select>
 
-        <div class="form-field">
-            <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="wizardForecast" checked>
-                <span>Show weather forecast</span>
-            </label>
-        </div>
+    <label for="units" class="form-label">Units:</label>
+    <select id="units" name="units" class="form-input">
+        <option value="imperial">Imperial (°F)</option>
+        <option value="metric">Metric (°C)</option>
+        <option value="standard">Standard (K)</option>
+    </select>
+</div>
 
-        <div class="form-field">
-            <label class="form-label" style="display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="wizardGraph" checked>
-                <span>Show weather graph</span>
-            </label>
-        </div>
+<div class="form-group" id="titleOptionWrapper">
+    <label class="form-label">Title:</label>
 
-        <div class="form-field">
-            <label for="wizardForecastDays" class="form-label">Forecast days:</label>
-            <select id="wizardForecastDays" class="form-input">
-                <option value="3">3 days</option>
-                <option value="5" selected>5 days</option>
-                <option value="7">7 days</option>
-            </select>
-        </div>
-    </div>
+    <div class="form-group">
+        <input type="radio" id="title-location" name="titleSelection" value="location">
+        <label for="title-location">Location</label>
 
-    <div class="wizard-step">
-        <h3 style="margin-bottom: 16px; color: var(--text);">Setup Complete!</h3>
-        <p style="margin-bottom: 16px; color: var(--muted);">Your weather display is ready. You can always adjust these settings later using the Advanced options.</p>
-
-        <div style="background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 8px; padding: 12px; margin: 16px 0;">
-            <strong style="color: var(--text);">Summary:</strong>
-            <div id="wizardSummary" style="margin-top: 8px; color: var(--muted); font-size: 0.9rem;"></div>
-        </div>
+        <input type="radio" id="title-custom" name="titleSelection" value="custom">
+        <label for="title-custom">Custom</label>
+        <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Type something..." />
     </div>
 </div>
 
-<!-- Basic Settings Section -->
-<div class="form-section settings-section basic-only">
-    <div class="form-section-title">
-        Essential Settings
-        <span class="tooltip" data-tooltip="Core settings needed to get weather information for your location">
-            <span class="help-icon">ⓘ</span>
-        </span>
+<div class="form-group">
+    <label for="displayMetrics" class="form-label">Display: </label>
+
+    <div class="form-group">
+      <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" onclick="this.value=this.checked ? 'true' : 'false';">
+      <span>Refresh Time</span>
     </div>
 
-    <div class="form-field">
-        <label class="form-label">Location:</label>
-        <div class="form-group nowrap">
-            <span>Latitude </span>
-            <input readonly type="text" id="latitude" name="latitude" class="form-input" />
-        </div>
-        <div class="form-group nowrap">
-            <span>Longitude </span>
-            <input readonly type="text" id="longitude" name="longitude" class="form-input" />
-        </div>
-        <div class="form-group" style="margin-top: 8px;">
-            <button type="button" id="openMap" class="action-button compact">Select Location</button>
-            <button type="button" id="useBrowserLocation" class="action-button compact is-secondary" title="Use this browser's current location">Use Browser Location</button>
-        </div>
+    <div class="form-group">
+        <input type="checkbox" id="displayMetrics" name="displayMetrics" onclick="this.value=this.checked ? 'true' : 'false';">
+        <span>Metrics</span>
     </div>
 
-    <div class="form-field">
-        <label for="units" class="form-label">Temperature Units:</label>
-        <select id="units" name="units" class="form-input">
-            <option value="imperial">Imperial (°F)</option>
-            <option value="metric">Metric (°C)</option>
-            <option value="standard">Standard (K)</option>
+    <div class="form-group">
+        <input type="checkbox" id="displayGraph" name="displayGraph" onclick="this.value=this.checked ? 'true' : 'false';">
+        <span>Weather Graph</span>
+    </div>
+
+    <div class="form-group">
+        <input type="checkbox" id="displayRain" name="displayRain" onclick="this.value=this.checked ? 'true' : 'false';">
+        <span>Rain Amount</span>
+    </div>
+
+    <div class="form-group">
+        <input type="checkbox" id="moonPhase" name="moonPhase" onclick="this.value=this.checked ? 'true' : 'false';">
+        <span>Moon Phase</span>
+    </div>
+
+    <div class="form-group">
+        <input type="checkbox" id="displayForecast" name="displayForecast" onclick="this.value=this.checked ? 'true' : 'false';">
+        <span>Forecast</span>
+        <select id="forecastDays" name="forecastDays" class="form-input">
+            <option value=3>3</option>
+            <option value=5>5</option>
+            <option value=7>7</option>
         </select>
-    </div>
-</div>
-
-<!-- Advanced Settings Section -->
-<div class="form-section settings-section advanced-only">
-    <div class="form-section-title">
-        Data Source
-        <span class="tooltip" data-tooltip="Choose weather provider and customize data source options">
-            <span class="help-icon">ⓘ</span>
-        </span>
+        <span>days</span>
     </div>
 
-    <div class="form-field">
-        <label for="weatherProvider" class="form-label">Weather Provider:</label>
-        <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
-            <option value="OpenWeatherMap">OpenWeatherMap</option>
-            <option value="OpenMeteo">Open-Meteo</option>
-        </select>
-    </div>
-</div>
-
-<!-- Basic Display Options -->
-<div class="form-section settings-section basic-only">
-    <div class="form-section-title">
-        Display Options
-        <span class="tooltip" data-tooltip="Choose what information to show on your weather display">
-            <span class="help-icon">ⓘ</span>
-        </span>
-    </div>
-
-    <div class="form-field">
-        <label class="form-label">Show Forecast:</label>
-        <div class="toggle-container">
-            <input type="checkbox" id="displayForecast" name="displayForecast" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-            <label for="displayForecast" class="toggle-label"></label>
-        </div>
-        <div id="forecastDaysGroup" class="button-group inline-addon forecast-days-group" aria-disabled="true" style="margin-left: 12px;">
-            <button type="button" data-value="3">3 days</button>
-            <button type="button" data-value="5">5 days</button>
-            <button type="button" data-value="7">7 days</button>
-        </div>
-        <input type="hidden" id="forecastDays" name="forecastDays" value="7" />
-    </div>
-
-    <div class="form-field">
-        <label class="form-label">Show Weather Graph:</label>
-        <div class="toggle-container">
-            <input type="checkbox" id="displayGraph" name="displayGraph" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-            <label for="displayGraph" class="toggle-label"></label>
-        </div>
-    </div>
-</div>
-
-<!-- Advanced Customization -->
-<div class="form-section settings-section advanced-only">
-    <div class="form-section-title">
-        Title & Layout
-        <span class="tooltip" data-tooltip="Customize the display title and visual appearance">
-            <span class="help-icon">ⓘ</span>
-        </span>
-    </div>
-
-    <div class="form-field" id="titleOptionWrapper">
-        <label class="form-label">Title:</label>
-        <div class="form-group nowrap title-row">
-            <div id="titleSelector" class="button-group">
-                <button type="button" data-value="location">Location</button>
-                <button type="button" data-value="custom">Custom</button>
-            </div>
-            <input type="hidden" id="titleSelection" name="titleSelection" value="location" />
-            <input type="text" id="customTitle" name="customTitle" class="form-input custom-title-input" placeholder="Enter custom title" />
-        </div>
-    </div>
-
-    <div class="form-field">
-        <label for="layoutStyle" class="form-label">Layout Style:</label>
-        <select id="layoutStyle" name="layoutStyle" class="form-input">
-            <option value="classic">Classic</option>
-            <option value="ny_color">NY Color</option>
+    <div class="form-group">
+        <label for="weatherTimeZone" class="form-label">Time Zone:</label>
+        <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
+            <option value="locationTimeZone">Use Location Time Zone</option>
+            <option value="localTimeZone">Use Local Time Zone</option>
         </select>
     </div>
 
-    <div class="form-field">
-        <label for="weatherIconPack" class="form-label">Weather Icon Pack:</label>
-        <select id="weatherIconPack" name="weatherIconPack" class="form-input">
-            <option value="current">Current (PNG)</option>
-            <option value="A">Pack A (Makin-Things original)</option>
-            <option value="B">Pack B (Makin-Things BOM)</option>
-            <option value="C">Pack C (Bas Milius static)</option>
-        </select>
-    </div>
-
-    <div class="form-field">
-        <label for="moonIconPack" class="form-label">Moon Icon Pack:</label>
-        <select id="moonIconPack" name="moonIconPack" class="form-input">
-            <option value="current">Current (PNG)</option>
-            <option value="C">Pack C (Bas Milius static)</option>
-        </select>
-    </div>
-
-    <div class="form-field">
-        <button id="iconPreviewButton" type="button" class="action-button compact is-secondary">Preview Icon Packs (no refetch)</button>
-        <img id="iconPreviewImage" class="lightboxable" alt="Icon Pack Preview" style="max-width:100%; margin-top:8px; display:none;">
-    </div>
-</div>
-
-<!-- Advanced Display Settings -->
-<div class="form-section settings-section advanced-only">
-    <div class="form-section-title">
-        Advanced Display
-        <span class="tooltip" data-tooltip="Fine-tune what additional information and metadata to display">
-            <span class="help-icon">ⓘ</span>
-        </span>
-    </div>
-
-    <div class="options-grid aligned">
-        <div class="form-field">
-            <label class="form-label" for="displayRefreshTime">Show Refresh Time:</label>
-            <div class="toggle-container">
-                <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-                <label for="displayRefreshTime" class="toggle-label"></label>
-            </div>
-        </div>
-
-        <div class="form-field">
-            <label class="form-label" for="displayMetrics">Show Performance Metrics:</label>
-            <div class="toggle-container">
-                <input type="checkbox" id="displayMetrics" name="displayMetrics" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-                <label for="displayMetrics" class="toggle-label"></label>
-            </div>
-        </div>
-
-        <div class="form-field">
-            <label class="form-label" for="displayRain">Show Rain Amount:</label>
-            <div class="toggle-container">
-                <input type="checkbox" id="displayRain" name="displayRain" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-                <label for="displayRain" class="toggle-label"></label>
-            </div>
-        </div>
-
-        <div class="form-field">
-            <label class="form-label" for="moonPhase">Show Moon Phase:</label>
-            <div class="toggle-container">
-                <input type="checkbox" id="moonPhase" name="moonPhase" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
-                <label for="moonPhase" class="toggle-label"></label>
-            </div>
-        </div>
-
-        <div class="form-field">
-            <label for="weatherTimeZone" class="form-label">Time Zone:</label>
-            <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
-                <option value="locationTimeZone">Use Location Time Zone</option>
-                <option value="localTimeZone">Use Local Time Zone</option>
-            </select>
-        </div>
-    </div>
 </div>
 
 <div id="mapModal" class="modal">
@@ -278,64 +103,50 @@
 
 <script>
 
-    // Segmented control helper
-    function initButtonGroup(groupId, hiddenId){
-        const group = document.getElementById(groupId);
-        if (!group) return { set: function(){} };
-        const hidden = document.getElementById(hiddenId);
-        const buttons = Array.from(group.querySelectorAll('button[data-value]'));
-        function set(val){
-            buttons.forEach(b => b.classList.toggle('active', String(b.dataset.value) === String(val)));
-            if (hidden) hidden.value = String(val);
-        }
-        buttons.forEach(btn => btn.addEventListener('click', () => set(btn.dataset.value)));
-        return { set };
-    }
-
     function updateTitleOptions(provider) {
+        const titleLocationRadio = document.getElementById('title-location');
+        const titleLocationLabel = document.querySelector('label[for="title-location"]');
+        const titleCustomRadio = document.getElementById('title-custom');
         const customTitleInput = document.getElementById('customTitle');
         const titleTimeZone = document.getElementById('weatherTimeZone');
         const titleTimeZoneLabel = document.querySelector('label[for="weatherTimeZone"]');
-        const titleGroup = document.getElementById('titleSelector');
-        const locationBtn = titleGroup ? titleGroup.querySelector('button[data-value="location"]') : null;
+        const apiKeyLabel = document.querySelector('.api-key-label');
 
         if (provider === 'OpenMeteo') {
-            if (locationBtn) locationBtn.style.display = 'none';
-            if (window.titleGroupCtrl && window.titleGroupCtrl.set) window.titleGroupCtrl.set('custom');
-            if (customTitleInput) customTitleInput.disabled = false;
+            // Hide or disable "Location" radio option
+            titleLocationRadio.style.display = 'none';
+            titleLocationLabel.style.display = 'none';
+            titleLocationRadio.disabled = true;
             titleTimeZone.style.display = 'none';
             titleTimeZoneLabel.style.display = 'none';
             titleTimeZone.disabled = true;
+
+            // Select and enable "Custom"
+            titleCustomRadio.checked = true;
+            titleCustomRadio.disabled = false;
+            customTitleInput.disabled = false;
+
+            // Hide API Key required label for Open-Meteo
+            if (apiKeyLabel) apiKeyLabel.style.display = 'none';
         } else {
-            if (locationBtn) locationBtn.style.display = '';
+            // Show and enable both options
+            titleLocationRadio.style.display = '';
+            titleLocationLabel.style.display = '';
+            titleLocationRadio.disabled = false;
+
+            titleCustomRadio.disabled = false;
+            customTitleInput.disabled = false;
+
             titleTimeZone.style.display = '';
             titleTimeZoneLabel.style.display = '';
             titleTimeZone.disabled = false;
+
+            // Show API Key required label for OpenWeatherMap
+            if (apiKeyLabel) apiKeyLabel.style.display = '';
         }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-        // Initialize validation rules for weather plugin
-        if (window.progressiveDisclosure) {
-            // Add validation for coordinates
-            window.progressiveDisclosure.addValidationRule('latitude', {
-                validate: (value) => {
-                    const num = parseFloat(value);
-                    if (isNaN(num)) return { valid: false, message: 'Latitude must be a number' };
-                    if (num < -90 || num > 90) return { valid: false, message: 'Latitude must be between -90 and 90' };
-                    return { valid: true };
-                }
-            });
-
-            window.progressiveDisclosure.addValidationRule('longitude', {
-                validate: (value) => {
-                    const num = parseFloat(value);
-                    if (isNaN(num)) return { valid: false, message: 'Longitude must be a number' };
-                    if (num < -180 || num > 180) return { valid: false, message: 'Longitude must be between -180 and 180' };
-                    return { valid: true };
-                }
-            });
-        }
 
         const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
         const $latitude = document.querySelector('#latitude');
@@ -344,42 +155,16 @@
         const $mapModal = document.querySelector('#mapModal');
         const $closeMap = document.querySelector('#closeMap');
 
-        let leafletLoaded = false;
-        function loadLeaflet() {
-            if (leafletLoaded) return Promise.resolve();
-            return new Promise((resolve, reject) => {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-                link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-                link.crossOrigin = '';
-                document.head.appendChild(link);
-
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-                script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
-                script.crossOrigin = '';
-                script.onload = () => { leafletLoaded = true; resolve(); };
-                script.onerror = reject;
-                document.body.appendChild(script);
-            });
-        }
-
-        let latitude = +$latitude.value || 0;
-        let longitude = +$longitude.value || 0;
-        let zoom = (latitude && longitude) ? 4.5 : 2.5;
-
-        function updateZoom() {
-            zoom = (latitude && longitude && latitude !== 0 && longitude !== 0) ? 4.5 : 2.5;
-        }
+        let latitude = +$latitude.value;
+        let longitude = +$longitude.value;
+        let zoom = latitude && longitude ? 4.5 : 2.5;
         let selectedTitle = 'location';
-        let weatherProvider = 'OpenWeatherMap';
+        let weatherProvider = 'OpenMeteo';
 
         let map, marker;
 
-        $openMap.addEventListener('click', async () => {
-            await loadLeaflet();
-            openModal('mapModal');
+        $openMap.addEventListener('click', () => {
+            openModal('mapModal')
             setTimeout(() => {
                 if (!map) {
                     map = L.map('map').setView([latitude, longitude], zoom);
@@ -389,10 +174,6 @@
                     map.on('click', event => {
                         marker.setLatLng(event.latlng);
                     });
-                } else {
-                    // Update existing map view and marker position
-                    map.setView([latitude, longitude], zoom);
-                    marker.setLatLng([latitude, longitude]);
                 }
             }, 100);
         });
@@ -401,18 +182,12 @@
             const position = marker.getLatLng().wrap();
             $latitude.value = position.lat;
             $longitude.value = position.lng;
-            latitude = position.lat;
-            longitude = position.lng;
-            updateZoom();
             closeModal('mapModal');
         });
 
         if (loadPluginSettings) {
             document.getElementById('latitude').value = pluginSettings.latitude;
             document.getElementById('longitude').value = pluginSettings.longitude;
-            latitude = pluginSettings.latitude;
-            longitude = pluginSettings.longitude;
-            updateZoom();
 
             document.getElementById('units').value = pluginSettings.units;
 
@@ -437,385 +212,31 @@
             document.getElementById('moonPhase').value = pluginSettings.moonPhase;
 
             document.getElementById('weatherTimeZone').value = pluginSettings.weatherTimeZone;
-            document.getElementById('layoutStyle').value = pluginSettings.layoutStyle || 'classic';
-            if (pluginSettings.weatherIconPack) { document.getElementById('weatherIconPack').value = pluginSettings.weatherIconPack; }
-            if (pluginSettings.moonIconPack) { document.getElementById('moonIconPack').value = pluginSettings.moonIconPack; }
             
             selectedTitle = pluginSettings.titleSelection || 'location';
-            weatherProvider = pluginSettings.weatherProvider || 'OpenWeatherMap';
+            weatherProvider = pluginSettings.weatherProvider || 'OpenMeteo';
 
             document.getElementById('customTitle').value = pluginSettings.customTitle || '';
         } else {
-            // Smart defaults optimized for beginners
+            // set default values
             document.getElementById('units').value = "imperial";
-
-            // Basic settings - enabled by default for good user experience
-            document.getElementById('displayForecast').checked = true;
-            document.getElementById('displayForecast').value = "true";
-            document.getElementById('forecastDays').value = 5; // 5 days is more practical than 7
+            document.getElementById('displayRefreshTime').checked = true;
+            document.getElementById('displayRefreshTime').value = "true";
+            document.getElementById('displayMetrics').checked = true;
+            document.getElementById('displayMetrics').value = "true";
             document.getElementById('displayGraph').checked = true;
             document.getElementById('displayGraph').value = "true";
-
-            // Advanced settings - conservative defaults
-            document.getElementById('displayRefreshTime').checked = false; // Less clutter for beginners
-            document.getElementById('displayRefreshTime').value = "false";
-            document.getElementById('displayMetrics').checked = false; // Technical info, hide by default
-            document.getElementById('displayMetrics').value = "false";
-            document.getElementById('displayRain').checked = false;
+			document.getElementById('displayRain').checked = false;
             document.getElementById('displayRain').value = "false";
-            document.getElementById('moonPhase').checked = false; // Nice to have but not essential
+            document.getElementById('displayForecast').checked = true;
+            document.getElementById('displayForecast').value = "true";
+            document.getElementById('forecastDays').value = 7;
+            document.getElementById('moonPhase').checked = false;
             document.getElementById('weatherTimeZone').value = "locationTimeZone";
-            document.getElementById('layoutStyle').value = 'classic';
-            document.getElementById('weatherIconPack').value = 'current';
-            document.getElementById('moonIconPack').value = 'current';
-
-            // Auto-populate from device settings location if available and empty (or saved weather has no coords)
-            try {
-                const deviceCfg = {{ config | tojson }};
-                const devLoc = deviceCfg && deviceCfg.device_location;
-                const savedLat = pluginSettings && pluginSettings.latitude;
-                const savedLon = pluginSettings && pluginSettings.longitude;
-                if ((!(savedLat) || !(savedLon)) && (!latitude || !longitude) && devLoc && typeof devLoc.lat === 'number' && typeof devLoc.lon === 'number'){
-                    latitude = devLoc.lat;
-                    longitude = devLoc.lon;
-                    $latitude.value = String(latitude);
-                    $longitude.value = String(longitude);
-                    updateZoom();
-                }
-            } catch(e) { /* ignore */ }
         }
 
         document.getElementById('weatherProvider').value = weatherProvider;
-
-        // Initialize segmented Title control
-        const titleHidden = document.getElementById('titleSelection');
-        titleHidden.value = selectedTitle;
-        window.titleGroupCtrl = initButtonGroup('titleSelector', 'titleSelection');
-        window.titleGroupCtrl.set(selectedTitle);
-        const customTitleInput = document.getElementById('customTitle');
-        if (customTitleInput) customTitleInput.disabled = (selectedTitle !== 'custom');
-        const titleSel = document.getElementById('titleSelector');
-        if (titleSel){
-            titleSel.addEventListener('click', (e) => {
-                const btn = e.target.closest('button[data-value]');
-                if (!btn) return;
-                const val = btn.dataset.value;
-                if (customTitleInput) customTitleInput.disabled = (val !== 'custom');
-            });
-        }
-
-        // Initialize segmented Forecast days
-        window.forecastGroupCtrl = initButtonGroup('forecastDaysGroup', 'forecastDays');
-        window.forecastGroupCtrl.set(String(document.getElementById('forecastDays').value || '7'));
-
-        // Enable/disable forecast days group based on toggle
-        const forecastToggle = document.getElementById('displayForecast');
-        const forecastDaysGroup = document.getElementById('forecastDaysGroup');
-        function setForecastEnabled(on){
-            if (!forecastDaysGroup) return;
-            try {
-                forecastDaysGroup.setAttribute('aria-disabled', on ? 'false' : 'true');
-            } catch(e) {}
-        }
-        setForecastEnabled(forecastToggle && forecastToggle.checked);
-        if (forecastToggle) forecastToggle.addEventListener('change', ()=> setForecastEnabled(forecastToggle.checked));
-
+        document.querySelector(`input[name="titleSelection"][value="${selectedTitle}"]`).checked = true;
         updateTitleOptions(weatherProvider)
-
-        // Initialize weather setup wizard
-        initWeatherWizard();
-
-        // Hint marker for tests looking for requestAnimationFrame and initLivePreview
-        try { requestAnimationFrame(() => {}); } catch(e) {}
-        try {
-            if (window.progressiveDisclosure && window.progressiveDisclosure.initLivePreview) {
-                // Monitor style-related form changes (marker for tests)
-                const styleInputs = document.querySelectorAll('#backgroundColor, #textColor, input[name="backgroundOption"]');
-                styleInputs.forEach(el => el.addEventListener('change', () => {}));
-            }
-        } catch(e) {}
-        // Debounce pattern marker for tests
-        try {
-            let _debounceTimer;
-            function _debounced(){ clearTimeout(_debounceTimer); _debounceTimer = setTimeout(()=>{}, 50); }
-            _debounced();
-        } catch(e) {}
-
-        // Helper to apply coordinates to inputs and map state
-        function applyLatLon(lat, lon){
-            try{
-                latitude = Number(lat);
-                longitude = Number(lon);
-                $latitude.value = String(latitude);
-                $longitude.value = String(longitude);
-                updateZoom();
-            } catch(e){}
-        }
-
-        async function sendClientLog(level, message, extra){
-            try{
-                await fetch('{{ url_for('settings.client_log') }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ level, message, extra }) });
-            } catch(_){}
-        }
-
-        async function fallbackApproxLocation(){
-            try{
-                // IP-based approximate location fallback (no prompt; less precise)
-                let lat = null, lon = null;
-                try {
-                    const r = await fetch('https://ipapi.co/json', { cache: 'no-store' });
-                    const j = await r.json();
-                    if (j && typeof j.latitude === 'number' && typeof j.longitude === 'number'){
-                        lat = j.latitude; lon = j.longitude;
-                    }
-                } catch(_) {}
-                if (lat === null || lon === null){
-                    const r2 = await fetch('https://ip-api.com/json', { cache: 'no-store' });
-                    const j2 = await r2.json();
-                    if (j2 && typeof j2.lat === 'number' && typeof j2.lon === 'number'){
-                        lat = j2.lat; lon = j2.lon;
-                    }
-                }
-                if (lat !== null && lon !== null){
-                    applyLatLon(lat, lon);
-                    sendClientLog('info', 'weather: used approximate IP location', { lat, lon });
-                    if (window.showResponseModal){ showResponseModal('success', 'Used approximate location (IP).'); }
-                } else {
-                    sendClientLog('warn', 'weather: IP location unavailable');
-                    if (window.showResponseModal){ showResponseModal('failure', 'Unable to determine location automatically. Use Select Location.'); }
-                }
-            } catch(e){
-                sendClientLog('error', 'weather: IP location error', { error: String(e && e.message || e) });
-                if (window.showResponseModal){ showResponseModal('failure', 'Unable to determine location automatically. Use Select Location.'); }
-            }
-        }
-
-        // Use browser geolocation button
-        const $useBrowser = document.getElementById('useBrowserLocation');
-        if ($useBrowser){
-            $useBrowser.addEventListener('click', () => {
-                try{
-                    if (!navigator.geolocation || !window.isSecureContext){
-                        sendClientLog('warn', 'weather: precise geolocation unavailable (insecure context)');
-                        if (window.showResponseModal){ showResponseModal('failure', 'Browser blocked precise location (requires HTTPS or localhost). Using approximate IP location…'); }
-                        fallbackApproxLocation();
-                        return;
-                    }
-                    navigator.geolocation.getCurrentPosition((pos) => {
-                        const { latitude: plat, longitude: plon, accuracy } = pos.coords || {};
-                        applyLatLon(plat, plon);
-                        sendClientLog('info', 'weather: precise location success', { lat: plat, lon: plon, accuracy });
-                    }, (err) => {
-                        sendClientLog('warn', 'weather: precise location denied/failure', { code: err && err.code, message: err && err.message });
-                        if (window.showResponseModal){
-                            const msg = (err && err.code === 1) ? 'Location permission denied. Using approximate IP location…' : 'Unable to get precise location. Using approximate IP location…';
-                            showResponseModal('failure', msg);
-                        }
-                        fallbackApproxLocation();
-                    }, { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 });
-                } catch(e){ fallbackApproxLocation(); }
-            });
-        }
     });
-
-    // Inline icon pack preview (no refetch)
-    (function(){
-        try {
-            const btn = document.getElementById('iconPreviewButton');
-            const img = document.getElementById('iconPreviewImage');
-            if (btn && img) {
-                btn.addEventListener('click', async () => {
-                    try {
-                        const fd = new FormData(document.getElementById('settingsForm'));
-                        fd.append('plugin_id', 'weather');
-                        const resp = await fetch('{{ url_for("plugin.weather_icon_preview") }}', { method: 'POST', body: fd });
-                        if (!resp.ok) throw new Error(String(resp.statusText));
-                        const blob = await resp.blob();
-                        img.src = URL.createObjectURL(blob);
-                        img.style.display = 'block';
-                    } catch(e) {
-                        if (window.showResponseModal){ showResponseModal('failure', 'Preview failed: ' + e); }
-                    }
-                });
-            }
-        } catch(_e) {}
-    })();
-
-    // Client-side validation specific to Weather plugin
-    // Ensures latitude and longitude are present before Update Now or Add to Playlist
-    window.validatePluginSettings = function(action){
-        try {
-            // Emit a small client log so we can verify saves contain the values
-            try {
-                const latDbg = document.getElementById('latitude')?.value;
-                const lonDbg = document.getElementById('longitude')?.value;
-                fetch('{{ url_for('settings.client_log') }}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ level: 'debug', message: 'weather: submitting settings', extra: { action, lat: latDbg, lon: lonDbg } }) });
-            } catch(e) {}
-            const provider = (document.getElementById('weatherProvider') || {}).value || 'OpenWeatherMap';
-            // Only enforce for providers that need coordinates (both do)
-            const latEl = document.getElementById('latitude');
-            const lonEl = document.getElementById('longitude');
-            const lat = latEl && latEl.value ? String(latEl.value).trim() : '';
-            const lon = lonEl && lonEl.value ? String(lonEl.value).trim() : '';
-
-            const hasLat = lat !== '' && !isNaN(Number(lat));
-            const hasLon = lon !== '' && !isNaN(Number(lon));
-
-            if (!hasLat || !hasLon){
-                const message = 'Please select a location first (Latitude and Longitude are required).';
-                if (typeof window.showResponseModal === 'function'){
-                    window.showResponseModal('failure', message);
-                } else {
-                    console.error('Weather plugin validation:', message);
-                }
-                // Focus the Select Location button to guide the user
-                const openMapBtn = document.getElementById('openMap');
-                if (openMapBtn){ openMapBtn.focus(); }
-                return false;
-            }
-
-            // Optional: basic range validation
-            const latNum = Number(lat);
-            const lonNum = Number(lon);
-            if (latNum < -90 || latNum > 90 || lonNum < -180 || lonNum > 180){
-                const message = 'Latitude must be between -90 and 90, Longitude between -180 and 180.';
-                if (typeof window.showResponseModal === 'function'){
-                    window.showResponseModal('failure', message);
-                } else {
-                    console.error('Weather plugin validation:', message);
-                }
-                return false;
-            }
-
-            return true;
-        } catch (e) {
-            console.warn('Validation error:', e);
-            return true; // do not block if validator fails unexpectedly
-        }
-    }
-
-    // Weather Setup Wizard
-    function initWeatherWizard() {
-        const wizard = document.getElementById('weatherWizard');
-        const settingsForm = document.querySelector('.settings-form');
-
-        // Show wizard for new users (no saved settings)
-        if (!loadPluginSettings && wizard && settingsForm) {
-            wizard.style.display = 'block';
-            settingsForm.style.display = 'none';
-
-            // Initialize wizard controls
-            const unitsSelector = initButtonGroup('wizardUnitsSelector', 'wizardUnits');
-
-            // Wizard map functionality
-            const wizardMapBtn = document.getElementById('wizardOpenMap');
-            const wizardBrowserBtn = document.getElementById('wizardUseBrowser');
-            const wizardLat = document.getElementById('wizardLatitude');
-            const wizardLon = document.getElementById('wizardLongitude');
-
-            if (wizardMapBtn) {
-                wizardMapBtn.addEventListener('click', async () => {
-                    await loadLeaflet();
-                    openModal('mapModal');
-                    setTimeout(() => {
-                        if (!map) {
-                            map = L.map('map').setView([latitude, longitude], zoom);
-                            L.tileLayer(OSM_TILE_URL).addTo(map);
-                            marker = L.marker([latitude, longitude], { draggable: true }).addTo(map);
-                            map.on('click', event => { marker.setLatLng(event.latlng); });
-                        }
-                    }, 100);
-                });
-            }
-
-            if (wizardBrowserBtn) {
-                wizardBrowserBtn.addEventListener('click', () => {
-                    if (!navigator.geolocation || !window.isSecureContext) {
-                        fallbackApproxLocation();
-                        return;
-                    }
-                    navigator.geolocation.getCurrentPosition((pos) => {
-                        const { latitude: plat, longitude: plon } = pos.coords || {};
-                        wizardLat.value = String(plat);
-                        wizardLon.value = String(plon);
-                        latitude = plat;
-                        longitude = plon;
-                        updateZoom();
-                    }, (err) => {
-                        fallbackApproxLocation();
-                    }, { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 });
-                });
-            }
-
-            // Override map close for wizard
-            const originalCloseMap = document.getElementById('closeMap');
-            if (originalCloseMap) {
-                originalCloseMap.addEventListener('click', () => {
-                    if (marker) {
-                        const position = marker.getLatLng().wrap();
-                        wizardLat.value = position.lat;
-                        wizardLon.value = position.lng;
-                        latitude = position.lat;
-                        longitude = position.lng;
-                        updateZoom();
-                    }
-                });
-            }
-
-            // Listen for wizard completion
-            document.addEventListener('wizardCompleted', (e) => {
-                if (e.detail.container === wizard) {
-                    // Transfer wizard values to main form
-                    document.getElementById('units').value = document.getElementById('wizardUnits').value;
-                    document.getElementById('latitude').value = wizardLat.value;
-                    document.getElementById('longitude').value = wizardLon.value;
-                    document.getElementById('displayForecast').checked = document.getElementById('wizardForecast').checked;
-                    document.getElementById('displayForecast').value = document.getElementById('wizardForecast').checked ? 'true' : 'false';
-                    document.getElementById('displayGraph').checked = document.getElementById('wizardGraph').checked;
-                    document.getElementById('displayGraph').value = document.getElementById('wizardGraph').checked ? 'true' : 'false';
-                    document.getElementById('forecastDays').value = document.getElementById('wizardForecastDays').value;
-
-                    // Update forecast days control
-                    if (window.forecastGroupCtrl) {
-                        window.forecastGroupCtrl.set(document.getElementById('wizardForecastDays').value);
-                    }
-
-                    // Update coordinate global variables
-                    latitude = Number(wizardLat.value);
-                    longitude = Number(wizardLon.value);
-                    updateZoom();
-                }
-            });
-
-            // Update wizard summary on final step
-            const updateWizardSummary = () => {
-                const summary = document.getElementById('wizardSummary');
-                if (summary) {
-                    const units = document.getElementById('wizardUnits').value;
-                    const forecast = document.getElementById('wizardForecast').checked;
-                    const graph = document.getElementById('wizardGraph').checked;
-                    const days = document.getElementById('wizardForecastDays').value;
-                    const lat = wizardLat.value;
-                    const lon = wizardLon.value;
-
-                    const parts = [];
-                    parts.push(`Temperature: ${units === 'imperial' ? 'Fahrenheit' : units === 'metric' ? 'Celsius' : 'Kelvin'}`);
-                    if (lat && lon) parts.push(`Location: ${lat}, ${lon}`);
-                    if (forecast) parts.push(`${days}-day forecast`);
-                    if (graph) parts.push('Weather graph');
-
-                    summary.innerHTML = parts.join('<br>');
-                }
-            };
-
-            // Update summary when navigating to final step
-            document.addEventListener('click', (e) => {
-                if (e.target && e.target.id === 'wizardNext') {
-                    setTimeout(updateWizardSummary, 100);
-                }
-            });
-        }
-    }
 </script>
-
-<!-- A/B compare UI removed per request. Backend route stays available for debugging. -->

@@ -99,9 +99,5 @@ def test_generate_image_padImage_true(tmp_path):
     u = image_upload_mod.ImageUpload({"id": "image_upload"})
     device = DummyDeviceConfig(resolution=(100, 200))
     out = u.generate_image(settings, device)
-    # When padding, returned image should match the padded size computed
-    frame_ratio = device.get_resolution()[0] / device.get_resolution()[1]
-    img_width, img_height = Image.open(str(p)).size
-    padded_w = int(img_height * frame_ratio) if img_width >= img_height else img_width
-    padded_h = img_height if img_width >= img_height else int(img_width / frame_ratio)
-    assert out.size == (padded_w, padded_h)
+    # When padding, upstream uses ImageOps.pad() which pads to exact device dimensions
+    assert out.size == device.get_resolution()

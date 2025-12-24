@@ -4,10 +4,12 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 1)
+green=$(tput setaf 2)
 
 APPNAME="inkypi"
 INSTALL_PATH="/usr/local/$APPNAME"
 BINPATH="/usr/local/bin"
+VENV_PATH="$INSTALL_PATH/venv_$APPNAME"
 SERVICE_FILE="/etc/systemd/system/$APPNAME.service"
 CONFIG_DIR="$INSTALL_PATH/src/config"
 

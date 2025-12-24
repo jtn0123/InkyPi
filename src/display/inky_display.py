@@ -1,11 +1,12 @@
 import logging
-
+from inky.auto import auto
 from display.abstract_display import AbstractDisplay
+
 
 logger = logging.getLogger(__name__)
 
-
 class InkyDisplay(AbstractDisplay):
+
     """
     Handles the Inky e-paper display.
 
@@ -14,8 +15,9 @@ class InkyDisplay(AbstractDisplay):
 
     The Inky display driver supports auto configuration.
     """
-
+   
     def initialize_display(self):
+        
         """
         Initializes the Inky display device.
 
@@ -24,26 +26,23 @@ class InkyDisplay(AbstractDisplay):
         Raises:
             ValueError: If the resolution cannot be retrieved or stored.
         """
-
-        # Import here so tests can monkeypatch `inky.auto` before this resolves
-        from inky.auto import auto as detect_display  # type: ignore[import-not-found]
-
-        self.inky_display = detect_display()
+        
+        self.inky_display = auto()
         self.inky_display.set_border(self.inky_display.BLACK)
 
         # store display resolution in device config
         if not self.device_config.get_config("resolution"):
             self.device_config.update_value(
                 "resolution",
-                [int(self.inky_display.width), int(self.inky_display.height)],
-                write=True,
-            )
+                [int(self.inky_display.width), int(self.inky_display.height)], 
+                write=True)
 
-    def display_image(self, image, image_settings=None):
+    def display_image(self, image, image_settings=[]):
+        
         """
         Displays the provided image on the Inky display.
 
-        The image has been processed by adjusting orientation and resizing
+        The image has been processed by adjusting orientation and resizing 
         before being sent to the display.
 
         Args:
@@ -56,9 +55,8 @@ class InkyDisplay(AbstractDisplay):
 
         logger.info("Displaying image to Inky display.")
         if not image:
-            raise ValueError("No image provided.")
+            raise ValueError(f"No image provided.")
 
         # Display the image on the Inky display
         self.inky_display.set_image(image)
         self.inky_display.show()
-        _ = image_settings  # acknowledge optional parameter for API compatibility
