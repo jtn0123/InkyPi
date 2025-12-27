@@ -22,7 +22,8 @@ def _current_dt(device_config):
 
         return now_device_tz(device_config)
     except Exception:
-        return datetime.utcnow()
+        from datetime import timezone
+        return datetime.now(timezone.utc)
 
 
 @main_bp.route("/")
@@ -284,12 +285,8 @@ def display_next():
     except Exception:
         pass
 
-    # Persist a refresh event for the dev path if request_ms is still None, compute it now
+    # Persist a refresh event for the dev path
     try:
-        if request_ms is None:
-            from time import perf_counter as _pc
-
-            request_ms = int((_pc() - _t_gen_start) * 1000)
         ri = device_config.get_refresh_info()
         cpu_percent = memory_percent = None
         try:

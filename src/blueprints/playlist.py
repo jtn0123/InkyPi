@@ -302,7 +302,7 @@ def update_playlist(playlist_name):
         playlist_name, new_name, start_time, end_time
     )
     if not result:
-        return json_error("Failed to delete playlist", status=500)
+        return json_error("Failed to update playlist", status=500)
     # Apply cycle override if provided
     try:
         if cycle_minutes is not None:

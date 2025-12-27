@@ -60,7 +60,7 @@ class Comic(BasePlugin):
             y_bottom_bound = height - img.height - bottom_padding
             
             x = (width - img.width) // 2
-            y = y = min(max(y_middle, y_top_bound), y_bottom_bound)
+            y = min(max(y_middle, y_top_bound), y_bottom_bound)
             
             background.paste(img, (x, y))
 
