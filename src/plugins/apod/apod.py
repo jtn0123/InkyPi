@@ -59,7 +59,13 @@ class Apod(BasePlugin):
 
         try:
             img_data = requests.get(image_url)
-            image = Image.open(BytesIO(img_data.content))
+            if not 200 <= img_data.status_code < 300:
+                logger.error(f"Failed to fetch APOD image: status {img_data.status_code}")
+                raise RuntimeError("Failed to fetch APOD image.")
+            with Image.open(BytesIO(img_data.content)) as img:
+                image = img.copy()
+        except RuntimeError:
+            raise
         except Exception as e:
             logger.error(f"Failed to load APOD image: {str(e)}")
             raise RuntimeError("Failed to load APOD image.")

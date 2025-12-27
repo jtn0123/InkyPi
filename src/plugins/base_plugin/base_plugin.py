@@ -6,7 +6,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_utils import take_screenshot_html
-import os
 from time import perf_counter
 from utils.progress import record_step, start_step, update_step, complete_step, fail_step
 import base64

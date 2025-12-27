@@ -69,10 +69,12 @@ class Weather(BasePlugin):
         return template_params
 
     def generate_image(self, settings, device_config):
-        lat = float(settings.get('latitude'))
-        long = float(settings.get('longitude'))
-        if not lat or not long:
+        lat_str = settings.get('latitude')
+        long_str = settings.get('longitude')
+        if lat_str is None or long_str is None or lat_str == '' or long_str == '':
             raise RuntimeError("Latitude and Longitude are required.")
+        lat = float(lat_str)
+        long = float(long_str)
 
         units = settings.get('units')
         if not units or units not in ['metric', 'imperial', 'standard']:
@@ -135,9 +137,12 @@ class Weather(BasePlugin):
         return image
 
     def parse_weather_data(self, weather_data, aqi_data, tz, units, time_format, lat):
-        current = weather_data.get("current")
+        current = weather_data.get("current", {})
         dt = datetime.fromtimestamp(current.get('dt'), tz=timezone.utc).astimezone(tz)
-        current_icon = current.get("weather")[0].get("icon")
+        weather_list = current.get("weather", [])
+        if not weather_list:
+            raise RuntimeError("Weather data missing 'weather' field")
+        current_icon = weather_list[0].get("icon", "01d")
         icon_codes_to_preserve = ["01", "02", "10"]
         icon_code = current_icon[:2]
         current_suffix = current_icon[-1]
@@ -190,14 +195,14 @@ class Weather(BasePlugin):
         if weather_code in [0]:   # Clear sky
             icon = "01d"
         elif weather_code in [1]: # Mainly clear
-            icon = "022d"
+            icon = "02d"
         elif weather_code in [2]: # Partly cloudy
             icon = "02d"
         elif weather_code in [3]: # Overcast
             icon = "04d"
         elif weather_code in [51, 61, 80]: # Drizzle, showers, rain: Light
-            icon = "51d"          
-        elif weather_code in [53, 63, 81]: # Drizzle, showers, rain: Moderatr
+            icon = "51d"
+        elif weather_code in [53, 63, 81]: # Drizzle, showers, rain: Moderate
             icon = "53d"
         elif weather_code in [55, 65, 82]: # Drizzle, showers, rain: Heavy
             icon = "09d"
@@ -225,8 +230,6 @@ class Weather(BasePlugin):
         if is_day == 0:
             if icon == "01d":
                 icon = "01n"      # Clear sky night
-            elif icon == "022d":
-                icon = "022n"     # Mainly clear night
             elif icon == "02d":
                 icon = "02n"      # Partly cloudy night                
             elif icon == "10d":
@@ -430,7 +433,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunrise.png')
             })
         else:
-            logging.error(f"Sunrise not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
+            logger.info("Sunrise not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
 
         sunset_epoch = weather.get('current', {}).get("sunset")
         if sunset_epoch:
@@ -442,7 +445,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunset.png')
             })
         else:
-            logging.error(f"Sunset not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
+            logger.info("Sunset not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods.")
 
         wind_deg = weather.get('current', {}).get("wind_deg", 0)
         wind_arrow = self.get_wind_arrow(wind_deg)
@@ -528,7 +531,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunrise.png')
             })
         else:
-            logging.error(f"Sunrise not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
+            logger.info("Sunrise not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
 
         # Sunset
         sunset_times = daily_data.get('sunset', [])
@@ -541,7 +544,7 @@ class Weather(BasePlugin):
                 "icon": self.get_plugin_dir('icons/sunset.png')
             })
         else:
-            logging.error(f"Sunset not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
+            logger.info("Sunset not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods.")
 
         # Wind
         wind_speed = current_data.get("windspeed", 0)
@@ -679,7 +682,7 @@ class Weather(BasePlugin):
         url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
         response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve weather data: {response.content}")
+            logger.error("Failed to retrieve weather data: %s", response.content)
             raise RuntimeError("Failed to retrieve weather data.")
 
         return response.json()
@@ -689,7 +692,7 @@ class Weather(BasePlugin):
         response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to get air quality data: {response.content}")
+            logger.error("Failed to get air quality data: %s", response.content)
             raise RuntimeError("Failed to retrieve air quality data.")
 
         return response.json()
@@ -699,10 +702,14 @@ class Weather(BasePlugin):
         response = requests.get(url)
 
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to get location: {response.content}")
+            logger.error(f"Failed to get location: {response.content}")
             raise RuntimeError("Failed to retrieve location.")
 
-        location_data = response.json()[0]
+        location_list = response.json()
+        if not location_list:
+            logger.warning("Geocoding returned empty result for lat=%s, long=%s", lat, long)
+            return "Unknown Location"
+        location_data = location_list[0]
         location_str = f"{location_data.get('name')}, {location_data.get('state', location_data.get('country'))}"
 
         return location_str
@@ -713,7 +720,7 @@ class Weather(BasePlugin):
         response = requests.get(url)
         
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve Open-Meteo weather data: {response.content}")
+            logger.error("Failed to retrieve Open-Meteo weather data: %s", response.content)
             raise RuntimeError("Failed to retrieve Open-Meteo weather data.")
         
         return response.json()
@@ -722,7 +729,7 @@ class Weather(BasePlugin):
         url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
         response = requests.get(url)
         if not 200 <= response.status_code < 300:
-            logging.error(f"Failed to retrieve Open-Meteo air quality data: {response.content}")
+            logger.error("Failed to retrieve Open-Meteo air quality data: %s", response.content)
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
         
         return response.json()

@@ -46,8 +46,11 @@ class ImageFolder(BasePlugin):
 
         img = None
         try:
-            img = Image.open(image_url)
-            img = ImageOps.exif_transpose(img)  # Correct orientation using EXIF
+            with Image.open(image_url) as opened_img:
+                img = ImageOps.exif_transpose(opened_img)  # Correct orientation using EXIF
+                # Make a copy since we're in a context manager
+                if img is opened_img:
+                    img = img.copy()
 
             if settings.get('padImage') == "true":
                 if settings.get('backgroundOption', 'blur') == "blur":

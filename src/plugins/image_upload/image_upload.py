@@ -15,7 +15,8 @@ class ImageUpload(BasePlugin):
             raise RuntimeError("No images provided.")
         # Open the image using Pillow
         try:
-            image = Image.open(image_locations[img_index])
+            with Image.open(image_locations[img_index]) as img:
+                image = img.copy()
         except Exception as e:
             logger.error(f"Failed to read image file: {str(e)}")
             raise RuntimeError("Failed to read image file.")

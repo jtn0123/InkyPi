@@ -269,7 +269,8 @@ class Config:
         # Ensure directory exists and file is present with safe permissions
         os.makedirs(os.path.dirname(env_path), exist_ok=True)
         if not os.path.exists(env_path):
-            open(env_path, "a").close()
+            with open(env_path, "a"):
+                pass  # Create empty file
             try:
                 os.chmod(env_path, 0o600)
             except Exception:
