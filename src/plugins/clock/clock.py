@@ -221,7 +221,7 @@ class Clock(BasePlugin):
             hour_str = "0" + hour_str
         minute_str = str(minute)
         if zero_pad and minute < 10:
-            minute_str = "0" + str(minute_str)
+            minute_str = "0" + minute_str
         return f"{hour_str}:{minute_str}"
 
     @staticmethod

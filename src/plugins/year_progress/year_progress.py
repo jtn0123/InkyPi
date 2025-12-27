@@ -1,6 +1,6 @@
 from plugins.base_plugin.base_plugin import BasePlugin
 from PIL import Image
-from datetime import datetime, timezone
+from datetime import datetime
 import logging
 import pytz
 
@@ -15,9 +15,9 @@ class YearProgress(BasePlugin):
         dimensions = device_config.get_resolution()
         if device_config.get_config("orientation") == "vertical":
             dimensions = dimensions[::-1]
-        
-        timezone = device_config.get_config("timezone", default="America/New_York")
-        tz = pytz.timezone(timezone)
+
+        tz_name = device_config.get_config("timezone", default="America/New_York")
+        tz = pytz.timezone(tz_name)
         current_time = datetime.now(tz)
 
         start_of_year = datetime(current_time.year, 1, 1, tzinfo=tz)

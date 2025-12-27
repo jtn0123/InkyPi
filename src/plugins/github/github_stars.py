@@ -7,13 +7,14 @@ def stars_generate_image(plugin_instance, settings, device_config):
     username = settings.get('githubUsername')
     repository = settings.get('githubRepository')
 
+    if not username or not repository:
+        raise RuntimeError("GitHub username and repository are required.")
+
     dimensions = device_config.get_resolution()
     if device_config.get_config("orientation") == "vertical":
         dimensions = dimensions[::-1]
 
     github_repository = username + "/" + repository
-    if not github_repository:
-        raise RuntimeError("GitHub repository is required.")
 
     try:
         stars = fetch_stars(github_repository)
@@ -35,15 +36,14 @@ def stars_generate_image(plugin_instance, settings, device_config):
     )
 
 def fetch_stars(github_repository):
-    global data
     url = f"https://api.github.com/repos/{github_repository}"
     headers = {"Accept": "application/json"}
 
     response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        data = response.json()
-    else:
+    if response.status_code != 200:
         logger.error(f"GitHub Stars Plugin: Error: {response.status_code} - {response.text}")
+        raise RuntimeError(f"GitHub API error: {response.status_code}")
 
+    data = response.json()
     return data['stargazers_count']
 

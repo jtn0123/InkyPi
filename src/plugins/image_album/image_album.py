@@ -20,16 +20,16 @@ class ImmichProvider:
         self.orientation = orientation
         self.headers = {"x-api-key": self.key}
 
-    def get_album_id(self, album: str) -> str:
+    def get_album_id(self, album_name: str) -> str:
         r = requests.get(f"{self.base_url}/api/albums", headers=self.headers)
         r.raise_for_status()
         albums = r.json()
-        album = [a for a in albums if a["albumName"] == album][0]
+        matching = [a for a in albums if a["albumName"] == album_name]
 
-        if album is None:
-            raise RuntimeError(f"Album {album} not found.")
+        if not matching:
+            raise RuntimeError(f"Album {album_name} not found.")
 
-        return album["id"]
+        return matching[0]["id"]
 
     def get_asset_ids(self, album_id: str) -> list[str]:
         all_items = []
@@ -67,7 +67,8 @@ class ImmichProvider:
         logger.info(f"Downloading image {asset_id}")
         r = requests.get(f"{self.base_url}/api/assets/{asset_id}/original", headers=self.headers)
         r.raise_for_status()
-        return Image.open(BytesIO(r.content))
+        with Image.open(BytesIO(r.content)) as img:
+            return img.copy()
 
 
 class ImageAlbum(BasePlugin):
