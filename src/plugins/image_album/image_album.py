@@ -67,8 +67,9 @@ class ImmichProvider:
         logger.info(f"Downloading image {asset_id}")
         r = requests.get(f"{self.base_url}/api/assets/{asset_id}/original", headers=self.headers)
         r.raise_for_status()
-        with Image.open(BytesIO(r.content)) as img:
-            return img.copy()
+        img = Image.open(BytesIO(r.content))
+        img = ImageOps.exif_transpose(img)
+        return img
 
 
 class ImageAlbum(BasePlugin):
