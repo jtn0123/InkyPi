@@ -764,7 +764,8 @@
                 <button type="button" onclick="handleAction()" class="action-button left" aria-describedby="update-now-help">Update Now</button>
                 <button type="button" onclick="handleAction('save_settings')" class="action-button center" aria-describedby="save-settings-help">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" onclick="handleAction('update_instance')" class="action-button right" aria-describedby="update-instance-help">Update Instance</button>
+                    <button type="button" onclick="handleAction('update_instance')" class="action-button">Save</button>
+                    <button type="button" onclick="openModal('scheduleModal')" class="action-button right">Save As...</button>
                 {% else %}
                     <button type="button" onclick="openModal('scheduleModal')" class="action-button right" aria-describedby="add-playlist-help">Add to Playlist</button>
                 {% endif %}
