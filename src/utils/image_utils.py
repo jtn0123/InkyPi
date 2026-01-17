@@ -3,17 +3,7 @@ import logging
 import os
 import shutil
 import subprocess
-import tempfile
-from collections.abc import Callable
-from io import BytesIO
-from typing import Any
-
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-from PIL.Image import Resampling
-
-from utils.http_utils import http_get
-
-LANCZOS = Resampling.LANCZOS
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +162,95 @@ def apply_image_enhancement(img, image_settings=None):
 
     return img
 
+def compute_image_hash(image):
+    """Compute SHA-256 hash of an image."""
+    image = image.convert("RGB")
+    img_bytes = image.tobytes()
+    return hashlib.sha256(img_bytes).hexdigest()
+
+def take_screenshot_html(html_str, dimensions, timeout_ms=None):
+    image = None
+    try:
+        # Create a temporary HTML file
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as html_file:
+            html_file.write(html_str.encode("utf-8"))
+            html_file_path = html_file.name
+
+        image = take_screenshot(html_file_path, dimensions, timeout_ms)
+
+        # Remove html file
+        os.remove(html_file_path)
+
+    except Exception as e:
+        logger.error(f"Failed to take screenshot: {str(e)}")
+
+    return image
+
+def _find_chromium_binary():
+    """Find the first available Chromium-based binary in system PATH."""
+    candidates = ["chromium-headless-shell", "chromium", "chrome"]
+    for candidate in candidates:
+        path = shutil.which(candidate)
+        if path:
+            logger.debug(f"Found browser binary: {candidate} at {path}")
+            return candidate
+    return None
+
+
+def take_screenshot(target, dimensions, timeout_ms=None):
+    image = None
+    try:
+        # Find available browser binary
+        browser = _find_chromium_binary()
+        if not browser:
+            logger.error("No Chromium-based browser found. Install chromium, chromium-headless-shell, or chrome.")
+            return None
+
+        # Create a temporary output file for the screenshot
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
+            img_file_path = img_file.name
+
+        command = [
+            browser,
+            target,
+            "--headless",
+            f"--screenshot={img_file_path}",
+            f"--window-size={dimensions[0]},{dimensions[1]}",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--use-gl=swiftshader",
+            "--hide-scrollbars",
+            "--in-process-gpu",
+            "--js-flags=--jitless",
+            "--disable-zero-copy",
+            "--disable-gpu-memory-buffer-compositor-resources",
+            "--disable-extensions",
+            "--disable-plugins",
+            "--mute-audio",
+            "--renderer-process-limit=1",
+            "--no-zygote",
+            "--no-sandbox"
+        ]
+        if timeout_ms:
+            command.append(f"--timeout={timeout_ms}")
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+        # Check if the process failed or the output file is missing
+        if result.returncode != 0 or not os.path.exists(img_file_path):
+            logger.error(f"Failed to take screenshot (return code: {result.returncode})")
+            return None
+
+        # Load the image using PIL
+        with Image.open(img_file_path) as img:
+            image = img.copy()
+
+        # Remove image files
+        os.remove(img_file_path)
+
+    except Exception as e:
+        logger.error(f"Failed to take screenshot: {str(e)}")
+
+    return image
 
 def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
     bkg = ImageOps.fit(img, dimensions)

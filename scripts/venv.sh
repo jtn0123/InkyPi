@@ -1,42 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-VENV_DIR=".venv"
+VENV_DIR="${VENV_DIR:-.venv}"
 REQUIREMENTS_FILE="install/requirements-dev.txt"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}" 2>/dev/null)" && cd .. && pwd)"
-SRC_DIR="src"
-SRC_ABS="${REPO_ROOT}/${SRC_DIR}"
-
-# Provide a python shim if python is missing but python3 exists
-if ! command -v python >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
-    python() { command python3 "$@"; }
-fi
-
-setup_pythonpath() {
-    local entry
-    # Order matters for tests: repo root then src (prepending builds reversed order)
-    PYTHONPATH_ENTRIES=("$SRC_ABS" "$REPO_ROOT")
-    for entry in "${PYTHONPATH_ENTRIES[@]}"; do
-        case ":${PYTHONPATH:-}:" in
-            *":${entry}:"*) ;;
-            *)
-                PYTHONPATH="${entry}${PYTHONPATH:+:$PYTHONPATH}"
-                ;;
-        esac
-    done
-
-    export PYTHONPATH
-    export SRC_DIR=$SRC_DIR
-}
-
-if [ "${INKYPI_PYTHONPATH_ONLY:-}" = "1" ]; then
-    setup_pythonpath
-    # Exit appropriately whether sourced or executed
-    if (return 0 2>/dev/null); then
-        return 0
-    else
-        exit 0
-    fi
-fi
+SRC_DIR="$(realpath src)"
 
 if [ ! -d "$VENV_DIR" ]; then
     echo "Creating virtual environment in $VENV_DIR..."
@@ -47,8 +13,9 @@ if [ ! -d "$VENV_DIR" ]; then
 fi
 
 echo "Activating virtual environment..."
-# shellcheck source=/dev/null
-if ! source "$VENV_DIR/bin/activate"; then
+source $VENV_DIR/bin/activate
+
+if [ -z "$VIRTUAL_ENV" ]; then
     echo "Failed to activate virtual environment."
     exit 1
 fi
