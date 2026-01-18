@@ -1,16 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
-import logging
-import logging.config
-import os
-import secrets
-import warnings
-
-from flask import Flask, request, g
-from time import perf_counter
-from jinja2 import ChoiceLoader, FileSystemLoader
-from waitress import serve  # type: ignore
+from utils.app_utils import generate_startup_image
+from flask import Flask, request, send_from_directory
 from werkzeug.serving import is_running_from_reloader
 
 from blueprints.main import main_bp
@@ -82,6 +74,15 @@ When imported, values are derived from environment variables only. The
 ``main`` function performs CLI parsing and updates these globals when invoked.
 """
 
+# Add route for custom JavaScript files
+@app.route('/js/<path:filename>')
+def custom_js(filename):
+    js_dir = os.path.join(os.path.dirname(__file__), 'js')
+    return send_from_directory(js_dir, filename)
+
+device_config = Config()
+display_manager = DisplayManager(device_config)
+refresh_task = RefreshTask(device_config, display_manager)
 
 def _env_dev_mode() -> bool:
     env_mode = (
@@ -490,15 +491,16 @@ if __name__ == "__main__":
 
     try:
         # Run the Flask app
+        app.secret_key = str(random.randint(100000,999999))
 
         # Get local IP address for display (only in dev mode when running on non-Pi)
         if DEV_MODE:
             local_ip = get_ip_address()
             if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
+            except:
+                pass  # Ignore if we can't get the IP
 
-        serve(created_app, host="0.0.0.0", port=PORT, threads=1)
+        serve(app, host="0.0.0.0", port=PORT, threads=1)
     finally:
-        refresh_task_obj = created_app.config.get("REFRESH_TASK")
-        if refresh_task_obj is not None:
-            refresh_task_obj.stop()
+        refresh_task.stop()

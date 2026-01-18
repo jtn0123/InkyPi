@@ -40,12 +40,10 @@ def plugin_page(plugin_id: str):
         plugin = get_plugin_instance(plugin_config)
         template_params = plugin.generate_settings_template()
 
-        # Check if API key is present for plugins that require it
-        if "api_key" in template_params and template_params["api_key"].get("required"):
-            expected_key = template_params["api_key"].get("expected_key")
-            if expected_key:
-                key_present = device_config.load_env_key(expected_key) is not None
-                template_params["api_key"]["present"] = key_present
+                # add plugin instance settings to the template to prepopulate
+                template_params["plugin_settings"] = plugin_instance.settings
+                template_params["plugin_instance"] = plugin_instance_name
+                template_params["refresh_settings"] = plugin_instance.refresh
 
         # If viewing an existing instance, pre-populate its settings
         plugin_instance_name = request.args.get("instance")
@@ -190,18 +188,40 @@ def update_plugin_instance(instance_name: str):
     try:
         form_data = parse_form(request.form)
         if not instance_name:
-            raise APIError("Instance name is required", status=400)
-        plugin_settings = form_data
-        plugin_settings.update(handle_request_files(request.files, request.form))
+            raise RuntimeError("Instance name is required")
 
-        plugin_id = plugin_settings.pop("plugin_id")
+        plugin_id = form_data.pop("plugin_id")
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             return json_error(
                 f"Plugin instance: {instance_name} does not exist", status=500
             )
 
-        plugin_instance.settings = plugin_settings
+        # Handle refresh settings if provided
+        refresh_settings_json = form_data.pop("refresh_settings", None)
+        if refresh_settings_json:
+            from utils.time_utils import calculate_seconds
+            refresh_settings = json.loads(refresh_settings_json)
+            refresh_type = refresh_settings.get('refreshType')
+
+            if refresh_type == "interval":
+                unit = refresh_settings.get('unit')
+                interval = refresh_settings.get('interval')
+                if unit and interval:
+                    refresh_interval_seconds = calculate_seconds(int(interval), unit)
+                    plugin_instance.refresh = {"interval": refresh_interval_seconds}
+            elif refresh_type == "scheduled":
+                refresh_time = refresh_settings.get('refreshTime')
+                if refresh_time:
+                    plugin_instance.refresh = {"scheduled": refresh_time}
+
+        # Only update plugin settings if there's actual data (not just refresh settings)
+        plugin_settings = form_data
+        plugin_settings.update(handle_request_files(request.files, request.form))
+
+        if plugin_settings:  # Only update if there are actual plugin settings
+            plugin_instance.settings = plugin_settings
+
         device_config.write_config()
     except APIError as e:
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
