@@ -74,12 +74,6 @@ When imported, values are derived from environment variables only. The
 ``main`` function performs CLI parsing and updates these globals when invoked.
 """
 
-# Add route for custom JavaScript files
-@app.route('/js/<path:filename>')
-def custom_js(filename):
-    js_dir = os.path.join(os.path.dirname(__file__), 'js')
-    return send_from_directory(js_dir, filename)
-
 device_config = Config()
 display_manager = DisplayManager(device_config)
 refresh_task = RefreshTask(device_config, display_manager)
