@@ -189,11 +189,8 @@ def parse_form(request_form):
             request_dict[key] = request_form.getlist(key)
     return request_dict
 
-
-def handle_request_files(request_files, form_data=None):
-    if form_data is None:
-        form_data = {}
-    allowed_file_extensions = {"png", "jpg", "jpeg", "gif", "webp"}
+def handle_request_files(request_files, form_data={}):
+    allowed_file_extensions = {'pdf', 'png', 'avif', 'jpg', 'jpeg', 'gif', 'webp', 'heif', 'heic'}
     file_location_map = {}
     # handle existing file locations being provided as part of the form data
     # Some request file objects (e.g., test doubles) may not implement .keys().
