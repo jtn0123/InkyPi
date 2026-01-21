@@ -72,9 +72,10 @@ def plugin_page(plugin_id: str):
         if plugin_latest_refresh:
             template_params["plugin_latest_refresh"] = plugin_latest_refresh
 
-    except Exception as e:  # pragma: no cover - safety net
-        logger.exception("EXCEPTION CAUGHT: %s", e)
-        return json_error("An internal error occurred", status=500)
+    # Security check to prevent directory traversal
+    safe_path = os.path.abspath(os.path.join(plugin_dir, filename))
+    if not safe_path.startswith(os.path.abspath(plugins_dir)):
+        return "Invalid path", 403
 
     return render_template(
         "plugin.html",
