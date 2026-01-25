@@ -7,71 +7,8 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
-
-def load_image_from_bytes(
-    content: bytes, image_open: Callable[[Any], Image.Image] | None = None
-) -> Image.Image | None:
-    """Safely load an image from raw bytes and return a detached copy.
-
-    Uses a context-managed open to ensure decoder resources are released,
-    returning a fully materialized copy of the image.
-    """
-    try:
-        opener = image_open or Image.open
-        with opener(BytesIO(content)) as _img:
-            img: Image.Image = _img
-            return img.copy()
-    except Exception as e:
-        logger.error(f"Failed to decode image from bytes: {e}")
-        return None
-
-
-def process_image_from_bytes(
-    content: bytes,
-    processor: Callable[[Image.Image], Image.Image | None],
-    image_open: Callable[[Any], Image.Image] | None = None,
-) -> Image.Image | None:
-    """Open an image from bytes and process it within a managed context.
-
-    This avoids holding the underlying stream open after processing without
-    forcing a copy of the original image. Returns the processor's result or
-    None on failure.
-    """
-    try:
-        opener = image_open or Image.open
-        with opener(BytesIO(content)) as _img:
-            result = processor(_img)
-            return result
-    except Exception as e:
-        logger.error(f"Failed to process image from bytes: {e}")
-        return None
-
-
-def load_image_from_path(
-    path: str, image_open: Callable[[str], Image.Image] | None = None
-) -> Image.Image | None:
-    """Safely load an image from a filesystem path and return a detached copy."""
-    try:
-        opener = image_open or Image.open
-        with opener(path) as _img:
-            img: Image.Image = _img
-            return img.copy()
-    except Exception as e:
-        logger.error(f"Failed to open image file '{path}': {e}")
-        return None
-
-
-def get_image(image_url, timeout_seconds: float = 10.0):
-    try:
-        try:
-            response = http_get(image_url, timeout=timeout_seconds)
-        except TypeError:
-            # Fallback for tests that simulate environments without timeout support
-            response = http_get(image_url)
-    except Exception as e:
-        logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
-        return None
-
+def get_image(image_url):
+    response = requests.get(image_url, timeout=30)
     img = None
     if 200 <= response.status_code < 300 or response.status_code == 304:
         # Use standardized loader

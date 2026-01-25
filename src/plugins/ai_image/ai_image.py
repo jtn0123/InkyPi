@@ -105,9 +105,8 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         if model in ["dall-e-3", "dall-e-2"]:
             image_url = response.data[0].url
-            img_response = requests.get(image_url)
-            with Image.open(BytesIO(img_response.content)) as opened_img:
-                img = opened_img.copy()
+            response = requests.get(image_url, timeout=30)
+            img = Image.open(BytesIO(response.content))
         elif model == "gpt-image-1":
             image_base64 = response.data[0].b64_json
             image_bytes = base64.b64decode(image_base64)

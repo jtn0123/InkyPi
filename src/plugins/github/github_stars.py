@@ -39,8 +39,10 @@ def fetch_stars(github_repository):
     url = f"https://api.github.com/repos/{github_repository}"
     headers = {"Accept": "application/json"}
 
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
+    response = requests.get(url, headers=headers, timeout=30)
+    if response.status_code == 200:
+        data = response.json()
+    else:
         logger.error(f"GitHub Stars Plugin: Error: {response.status_code} - {response.text}")
         raise RuntimeError(f"GitHub API error: {response.status_code}")
 
