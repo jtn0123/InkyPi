@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class RefreshTask:
-    """Handles the logic for refreshing the display using a backgroud thread."""
+    """Handles the logic for refreshing the display using a background thread."""
 
     def __init__(self, device_config, display_manager):
         self.device_config = device_config
@@ -66,10 +66,26 @@ class RefreshTask:
     def _run(self):
         """Background thread loop coordinating refresh operations.
 
-        The method waits for either the configured interval or a manual trigger,
-        selects the appropriate :class:`RefreshAction`, performs the refresh,
-        and updates refresh metadata. Threading primitives are handled in helper
-        methods to keep the flow readable.
+        This function runs in a loop, sleeping for a configured duration (`plugin_cycle_interval_seconds`) or until
+        manually triggered via `manual_update()`. Determines the next plugin to refresh based on active playlists and
+        updates the display accordingly.
+
+        Workflow:
+        1. Waits for the configured sleep duration or until notified of a manual update.
+        2. Checks if a manual update has been requested:
+        - If so, refreshes the specified plugin immediately.
+        3. Otherwise, determines the next plugin to refresh based on the active playlist and generates an image.
+        4. Compares the image hash with the last displayed image hash.
+        - If the image has changed, updates the display.
+        - If the image is the same, skips the refresh.
+        5. Updates the refresh metadata in the device configuration.
+        6. Repeats the process until `stop()` is called.
+
+        Handles any exceptions that occur during the refresh process and ensures the refresh event is set 
+        to indicate completion.
+
+        Exceptions:
+        - Captures and logs any unexpected errors during execution to prevent the thread from exiting.
         """
         while True:
             try:
