@@ -296,39 +296,25 @@ def display_next():
             memory_percent = psutil.virtual_memory().percent
         except Exception:
             pass
-        save_refresh_event(
-            device_config,
-            {
-                "refresh_id": getattr(ri, "benchmark_id", benchmark_id),
-                "ts": None,
-                "plugin_id": plugin_instance.plugin_id,
-                "instance": plugin_instance.name,
-                "playlist": playlist.name,
-                "used_cached": False,
-                "request_ms": request_ms,
-                "generate_ms": generate_ms,
-                "preprocess_ms": getattr(ri, "preprocess_ms", None),
-                "display_ms": getattr(ri, "display_ms", None),
-                "cpu_percent": cpu_percent,
-                "memory_percent": memory_percent,
-                "notes": "display_next_dev",
-            },
-        )
-    except Exception:
-        pass
+    
+    # Send the file with Last-Modified header
+    response = send_file(image_path, mimetype='image/png')
+    response.headers['Last-Modified'] = last_modified.strftime('%a, %d %b %Y %H:%M:%S GMT')
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
 
-    return (
-        jsonify(
-            {
-                "success": True,
-                "message": "Display updated",
-                "metrics": {
-                    "request_ms": request_ms,
-                    "generate_ms": generate_ms,
-                    "preprocess_ms": preprocess_ms,
-                    "display_ms": display_ms,
-                },
-            }
-        ),
-        200,
-    )
+
+@main_bp.route('/api/plugin_order', methods=['POST'])
+def save_plugin_order():
+    """Save the custom plugin order."""
+    device_config = current_app.config['DEVICE_CONFIG']
+
+    data = request.get_json() or {}
+    order = data.get('order', [])
+
+    if not isinstance(order, list):
+        return jsonify({"error": "Order must be a list"}), 400
+
+    device_config.set_plugin_order(order)
+
+    return jsonify({"success": True})

@@ -4,10 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config.name }}</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
+    <script>
+        (function() {
+            const theme = localStorage.getItem('inkypi-theme') || 
+                         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (theme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+        let lastModified = null;
+        const refreshIntervalMs = 3 * 1000;
+
+        async function refreshImage() {
+            const img = document.querySelector('.image-container img');
+            if (!img) return;
+
+            try {
+                const headers = {};
+                if (lastModified) {
+                    headers['If-Modified-Since'] = lastModified;
+                }
+
+                const response = await fetch('{{ url_for("main.get_current_image") }}', { headers });
+                
+                if (response.status === 304) {
+                    return;
+                }
+
+                if (!response.ok) {
+                    console.error('Failed to fetch image:', response.status);
+                    return;
+                }
+
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                
+                img.src = objectUrl;
+                lastModified = response.headers.get('Last-Modified');
+            } catch (error) {
+                console.error('Error refreshing image:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshImage();
+            setInterval(refreshImage, refreshIntervalMs);
+        });
+    </script>
+    <script src="{{ url_for('static', filename='scripts/image_modal.js') }}"></script>
 </head>
-<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-<script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-<script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
 <body>
     <!-- Skip navigation for accessibility -->
     <a href="#main-content" class="skip-nav">Skip to main content</a>
@@ -17,23 +63,16 @@
         <!-- Page Title -->
         <header class="header">
             <h1>{{ config.name }}</h1>
-            <div class="header-icons">
-                <div class="nav-icons">
-                    {% from 'macros/icons.html' import icon %}
-                    <a href="{{ url_for('history.history_page') }}" class="settings-button" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('playlist.playlists') }}" class="settings-button" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('settings.settings_page') }}" class="settings-button" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
-                </div>
-                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme">
-                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                    </svg>
-                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                    </svg>
-                </button>
-            </div>
+            <button class="settings-button dark-mode-toggle" title="Toggle Dark Mode" aria-label="Toggle Dark Mode"></button>
+            <a href="{{ url_for('apikeys.apikeys_page') }}" class="settings-button" title="API Keys">
+                <span style="font-size: 20px;">🔑</span>
+            </a>
+            <a href="{{ url_for('playlist.playlists') }}" class="settings-button">
+                <img src="{{ url_for('static', filename='icons/playlist.png') }}" title="Playlists" alt="playlists icon" class="icon-image">
+            </a>
+            <a href="{{ url_for('settings.settings_page') }}" class="settings-button">
+                <img src="{{ url_for('static', filename='icons/settings.png') }}" title="Settings" alt="settings icon" class="icon-image">
+            </a>
         </header>
 
         <!-- Main content area -->
@@ -52,74 +91,175 @@
             <div id="imageMetaContent"></div>
         </div>
 
-        <!-- Consolidated status row: Now + Next in a single compact row -->
-        <div id="statusRow" class="image-meta status-row" style="margin-top: 8px; {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}display:none;{% endif %}">
-            <div class="status-meta" id="nowShowingBlock" style="{% if not refresh_info.plugin_id %}display:none;{% endif %}">
-                <strong>Now showing:</strong>
-                <span id="nsPlugin">{{ refresh_info.plugin_id or '' }}</span>
-                {% if refresh_info.plugin_instance %}
-                (<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)
-                {% else %}
-                <span id="nsInstance" style="display:none;"></span>
-                {% endif %}
-                {% if refresh_info.playlist %}
-                • <span id="nsPlaylist">{{ refresh_info.playlist }}</span>
-                {% else %}
-                <span id="nsPlaylist" style="display:none;"></span>
-                {% endif %}
-            </div>
-            <div class="status-divider" aria-hidden="true"></div>
-            <div class="status-meta" id="nextUpBlock" style="{% if not next_up or not next_up.plugin_id %}display:none;{% endif %}">
-                <strong>Next up:</strong>
-                <span id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</span>
-                {% if next_up and next_up.plugin_instance %}
-                (<span id="nuInstance">{{ next_up.plugin_instance }}</span>)
-                {% else %}
-                <span id="nuInstance" style="display:none;"></span>
-                {% endif %}
-                {% if next_up and next_up.playlist %}
-                • <span id="nuPlaylist">{{ next_up.playlist }}</span>
-                {% else %}
-                <span id="nuPlaylist" style="display:none;"></span>
-                {% endif %}
-                <button id="displayNextBtn" class="action-button compact" style="margin-left:8px;" onclick="displayNextNow()">Display Next</button>
+        <!-- Separator -->
+        <div class="separator"></div>
+
+        <div class="plugins-header">
+            <h2 class="plugins-title">Plugins</h2>
+            <div class="plugins-controls">
+                <button class="sort-toggle" id="sortToggle" title="Reorder plugins">Sort</button>
+                <button class="view-toggle" id="viewToggle" title="Switch view">List</button>
             </div>
         </div>
 
-        </main>
+        <div class="sort-hint" id="sortHint">Drag plugins to reorder. Click "Save" when done.</div>
 
-        <!-- Plugin navigation section -->
-        <section aria-label="Available plugins">
-            <h2 class="plugins-title compact">Plugins</h2>
-        {% set icon_map = {
-            'ai_text': 'text-t',
-            'ai_image': 'magic-wand',
-            'weather': 'cloud-sun',
-            'calendar': 'calendar-blank',
-            'clock': 'clock',
-            'newspaper': 'newspaper-clipping',
-            'apod': 'planet',
-            'unsplash': 'images-square',
-            'image_url': 'link-simple',
-            'image_upload': 'upload-simple',
-            'image_folder': 'folder-simple',
-            'screenshot': 'monitor',
-            'wpotd': 'book-open-text',
-            'comic': 'mask-happy'
-        } %}
-            <div class="button-grid">
-                {% for plugin in plugins %}
-                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="icon-button"
-                   title="{{ plugin.display_name }}"
-                   aria-label="Open {{ plugin.display_name }} plugin settings">
-                    {% set ph = icon_map.get(plugin.id, 'image') %}
-                    {% from 'macros/icons.html' import icon %}
-                    {{ icon(ph, 'icon-image') | safe }}
-                    <span class="sr-only">{{ plugin.display_name }}</span>
-                </a>
-                {% endfor %}
-            </div>
-        </section>
+        <div class="plugins-container" id="pluginsContainer">
+            {% for plugin in plugins %}
+            <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}"
+               class="plugin-item"
+               data-plugin-id="{{ plugin.id }}"
+               title="{{ plugin.display_name }}"
+               draggable="false">
+                <img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}"
+                     alt="{{ plugin.display_name }}"
+                     class="icon-image">
+                <span class="plugin-name">{{ plugin.display_name }}</span>
+            </a>
+            {% endfor %}
+        </div>
+
+        <script>
+            // View mode (grid/list)
+            const viewToggle = document.getElementById('viewToggle');
+            const pluginsContainer = document.getElementById('pluginsContainer');
+            let currentView = localStorage.getItem('inkypi-plugins-view') || 'grid';
+
+            function updateView() {
+                if (currentView === 'list') {
+                    pluginsContainer.classList.add('list-view');
+                    viewToggle.textContent = 'Grid';
+                } else {
+                    pluginsContainer.classList.remove('list-view');
+                    viewToggle.textContent = 'List';
+                }
+            }
+
+            viewToggle.addEventListener('click', () => {
+                currentView = currentView === 'grid' ? 'list' : 'grid';
+                localStorage.setItem('inkypi-plugins-view', currentView);
+                updateView();
+            });
+
+            updateView();
+
+            // Sort mode
+            const sortToggle = document.getElementById('sortToggle');
+            const sortHint = document.getElementById('sortHint');
+            let isSorting = false;
+            let draggedItem = null;
+
+            function enableSorting() {
+                isSorting = true;
+                sortToggle.classList.add('active');
+                sortToggle.textContent = 'Save';
+                sortHint.classList.add('visible');
+                pluginsContainer.classList.add('sorting');
+
+                document.querySelectorAll('.plugin-item').forEach(item => {
+                    item.draggable = true;
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragend', handleDragEnd);
+                    item.addEventListener('dragover', handleDragOver);
+                    item.addEventListener('dragleave', handleDragLeave);
+                    item.addEventListener('drop', handleDrop);
+                    item.addEventListener('click', preventClick);
+                });
+            }
+
+            function disableSorting() {
+                isSorting = false;
+                sortToggle.classList.remove('active');
+                sortToggle.textContent = 'Sort';
+                sortHint.classList.remove('visible');
+                pluginsContainer.classList.remove('sorting');
+
+                document.querySelectorAll('.plugin-item').forEach(item => {
+                    item.draggable = false;
+                    item.removeEventListener('dragstart', handleDragStart);
+                    item.removeEventListener('dragend', handleDragEnd);
+                    item.removeEventListener('dragover', handleDragOver);
+                    item.removeEventListener('dragleave', handleDragLeave);
+                    item.removeEventListener('drop', handleDrop);
+                    item.removeEventListener('click', preventClick);
+                });
+
+                // Save order
+                savePluginOrder();
+            }
+
+            function preventClick(e) {
+                if (isSorting) {
+                    e.preventDefault();
+                }
+            }
+
+            function handleDragStart(e) {
+                draggedItem = this;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.plugin-item').forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (this !== draggedItem) {
+                    this.classList.add('drag-over');
+                }
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+
+                if (this !== draggedItem) {
+                    const items = Array.from(pluginsContainer.children);
+                    const draggedIndex = items.indexOf(draggedItem);
+                    const targetIndex = items.indexOf(this);
+
+                    if (draggedIndex < targetIndex) {
+                        this.parentNode.insertBefore(draggedItem, this.nextSibling);
+                    } else {
+                        this.parentNode.insertBefore(draggedItem, this);
+                    }
+                }
+            }
+
+            async function savePluginOrder() {
+                const order = Array.from(pluginsContainer.children).map(item => item.dataset.pluginId);
+                try {
+                    const response = await fetch('{{ url_for("main.save_plugin_order") }}', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order: order })
+                    });
+                    if (!response.ok) {
+                        console.error('Failed to save plugin order');
+                    }
+                } catch (error) {
+                    console.error('Error saving plugin order:', error);
+                }
+            }
+
+            sortToggle.addEventListener('click', () => {
+                if (isSorting) {
+                    disableSorting();
+                } else {
+                    enableSorting();
+                }
+            });
+        </script>
     </div>
 <script>
     // Periodically refresh the preview image by cache-busting the URL

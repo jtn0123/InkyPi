@@ -13,8 +13,14 @@ from config import Config
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
-from utils.app_utils import generate_startup_image, get_ip_address
-from utils.http_utils import APIError, json_error, json_internal_error, wants_json
+from blueprints.main import main_bp
+from blueprints.settings import settings_bp
+from blueprints.plugin import plugin_bp
+from blueprints.playlist import playlist_bp
+from blueprints.apikeys import apikeys_bp
+from jinja2 import ChoiceLoader, FileSystemLoader
+from plugins.plugin_registry import load_plugins
+from waitress import serve
 
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
@@ -98,6 +104,12 @@ FAST_DEV = os.getenv("INKYPI_FAST_DEV", "").strip().lower() in (
     "yes",
 )
 
+# Register Blueprints
+app.register_blueprint(main_bp)
+app.register_blueprint(settings_bp)
+app.register_blueprint(plugin_bp)
+app.register_blueprint(playlist_bp)
+app.register_blueprint(apikeys_bp)
 
 def _env_port() -> int:
     env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
