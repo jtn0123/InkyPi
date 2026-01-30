@@ -67,12 +67,22 @@ def is_connected():
         conn = socket.create_connection(("8.8.8.8", 53), timeout=2)
     except OSError:
         return False
+
+def get_font(font_name, font_size=50, font_weight="normal"):
+    if font_name in FONT_FAMILIES:
+        font_variants = FONT_FAMILIES[font_name]
+
+        font_entry = next((entry for entry in font_variants if entry["font-weight"] == font_weight), None)
+        if font_entry is None:
+            font_entry = font_variants[0]  # Default to first available variant
+
+        if font_entry:
+            font_path = resolve_path(os.path.join("static", "fonts", font_entry["file"]))
+            return ImageFont.truetype(font_path, font_size)
+        else:
+            logger.warning(f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}")
     else:
-        try:
-            conn.close()
-        except Exception:
-            pass
-        return True
+        logger.warning(f"Requested font not found: font_name={font_name}")
 
 
 def get_font(
@@ -275,20 +285,11 @@ def handle_request_files(request_files, form_data={}):
                 with Image.open(bio) as img_verify:
                     img_verify.verify()  # Verify header/decoder
             except Exception as e:
-                raise RuntimeError(f"Invalid image upload: {e}")
-
-            # Re-open with standardized helper to apply orientation and save
-            img = load_image_from_bytes(content, image_open=Image.open)
-            if img is None:
-                raise RuntimeError("Failed to open image for processing")
-            img = ImageOps.exif_transpose(img)
-            if img is None:
-                raise RuntimeError("Failed to transpose image for processing")
-            img.save(file_path)
-        except Exception as e:
-            # Fail hard on invalid image data
-            logger.error(f"Failed to process uploaded file '{file_name}': {e}")
-            raise
+                logger.warning(f"EXIF processing error for {file_name}: {e}")
+                file.save(file_path)
+        else:
+            # Directly save non-JPEG files
+            file.save(file_path)
 
         if is_list:
             file_location_map.setdefault(key, [])

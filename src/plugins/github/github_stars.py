@@ -44,7 +44,7 @@ def fetch_stars(github_repository):
         data = response.json()
     else:
         logger.error(f"GitHub Stars Plugin: Error: {response.status_code} - {response.text}")
-        raise RuntimeError(f"GitHub API error: {response.status_code}")
+        data = {"stargazers_count": 0}
 
     data = response.json()
     return data['stargazers_count']
