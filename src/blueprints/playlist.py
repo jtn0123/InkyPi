@@ -93,6 +93,7 @@ def playlists():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
     refresh_info = device_config.get_refresh_info()
+    plugins_list = device_config.get_plugins()
 
     # Include latest metrics for badge rendering
     metrics = None
@@ -192,12 +193,7 @@ def playlists():
         "playlist.html",
         playlist_config=playlist_manager.to_dict(),
         refresh_info=refresh_info.to_dict(),
-        metrics=metrics,
-        device_now=now_str,
-        device_tz_offset_min=tz_off_min,
-        device_cycle_minutes=device_cycle_minutes,
-        playlist_timing=playlist_timing,
-        rotation_eta=rotation_eta,
+        plugins={p["id"]: p for p in plugins_list}
     )
 
 
