@@ -176,8 +176,8 @@ class ImageAlbum(BasePlugin):
                 img = pad_image_blur(img, dimensions)
             else:
                 background_color = ImageColor.getcolor(
-                    settings.get('backgroundColor') or "#ffffff",
-                    "RGB"
+                    settings.get('backgroundColor') or "white",
+                    img.mode
                 )
                 img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
         # else: loader already resized to fit with proper aspect ratio

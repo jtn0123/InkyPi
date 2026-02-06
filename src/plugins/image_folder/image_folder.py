@@ -72,7 +72,7 @@ class ImageFolder(BasePlugin):
                 if background_option == "blur":
                     img = pad_image_blur(img, dimensions)
                 else:
-                    background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
+                    background_color = ImageColor.getcolor(settings.get('backgroundColor') or "white", img.mode)
                     img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
             else:
                 # No padding requested, scale to fit dimensions (crop to preserve aspect ratio)

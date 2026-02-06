@@ -87,7 +87,7 @@ class ImageUpload(BasePlugin):
             if background_option == "blur":
                 image = pad_image_blur(image, dimensions)
             else:
-                background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
+                background_color = ImageColor.getcolor(settings.get('backgroundColor') or "white", image.mode)
                 image = ImageOps.pad(image, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
 
         logger.info("=== Image Upload Plugin: Image generation complete ===")
