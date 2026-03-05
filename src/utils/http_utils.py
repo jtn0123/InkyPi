@@ -81,7 +81,7 @@ def json_error(
     code: int | str | None = None,
     details: dict[str, Any] | None = None,
 ):
-    payload: dict[str, Any] = {"error": message}
+    payload: dict[str, Any] = {"success": False, "error": message}
     if code is not None:
         payload["code"] = code
     if details is not None:

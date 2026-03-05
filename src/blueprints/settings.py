@@ -4,17 +4,20 @@ import logging
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 import shlex
+from typing import Any
 
 import pytz
-from flask import Blueprint, Response, current_app, jsonify, render_template, request
+from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
 
 from utils.http_utils import json_error, json_internal_error
+from utils.progress_events import get_progress_bus, to_sse
 from utils.time_utils import calculate_seconds, get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
@@ -53,6 +56,49 @@ _RATE_LIMIT_MAX_REQUESTS = 120
 DEV_LOG_BUFFER_SIZE = 1000
 _dev_log_buffer: deque = deque(maxlen=DEV_LOG_BUFFER_SIZE)
 _dev_log_lock = threading.Lock()
+
+
+def _benchmarks_enabled() -> bool:
+    return os.getenv("INKYPI_BENCHMARK_API_ENABLED", "true").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def _get_bench_db_path() -> str:
+    from benchmarks.benchmark_storage import _get_db_path
+
+    return _get_db_path(current_app.config["DEVICE_CONFIG"])
+
+
+def _ensure_bench_schema(conn: sqlite3.Connection) -> None:
+    from benchmarks.benchmark_storage import _ensure_schema
+
+    _ensure_schema(conn)
+
+
+def _window_since_seconds(window: str | None) -> float:
+    now = time.time()
+    if not window:
+        return now - 24 * 3600
+    val = (window or "").strip().lower()
+    if val.endswith("h"):
+        return now - (int(val[:-1]) * 3600)
+    if val.endswith("m"):
+        return now - (int(val[:-1]) * 60)
+    if val.endswith("d"):
+        return now - (int(val[:-1]) * 86400)
+    return now - 24 * 3600
+
+
+def _pct(values: list[int], p: float) -> int | None:
+    if not values:
+        return None
+    values = sorted(values)
+    idx = max(0, min(len(values) - 1, int(round((len(values) - 1) * p))))
+    return int(values[idx])
 
 
 class DevModeLogHandler(logging.Handler):
@@ -383,6 +429,308 @@ def update_status():
         return json_internal_error("update status", details={"error": str(e)})
 
 
+@settings_bp.route("/api/benchmarks/summary")
+def benchmarks_summary():
+    if not _benchmarks_enabled():
+        return json_error("Benchmarks API disabled", status=404)
+    try:
+        since = _window_since_seconds(request.args.get("window", "24h"))
+        conn = sqlite3.connect(_get_bench_db_path())
+        conn.row_factory = sqlite3.Row
+        _ensure_bench_schema(conn)
+        rows = conn.execute(
+            """
+            SELECT request_ms, generate_ms, preprocess_ms, display_ms
+            FROM refresh_events
+            WHERE ts >= ?
+            ORDER BY ts DESC
+            """,
+            (since,),
+        ).fetchall()
+        conn.close()
+        req = [int(r["request_ms"]) for r in rows if r["request_ms"] is not None]
+        gen = [int(r["generate_ms"]) for r in rows if r["generate_ms"] is not None]
+        pre = [int(r["preprocess_ms"]) for r in rows if r["preprocess_ms"] is not None]
+        dsp = [int(r["display_ms"]) for r in rows if r["display_ms"] is not None]
+        return jsonify(
+            {
+                "success": True,
+                "count": len(rows),
+                "summary": {
+                    "request_ms": {"p50": _pct(req, 0.5), "p95": _pct(req, 0.95)},
+                    "generate_ms": {"p50": _pct(gen, 0.5), "p95": _pct(gen, 0.95)},
+                    "preprocess_ms": {"p50": _pct(pre, 0.5), "p95": _pct(pre, 0.95)},
+                    "display_ms": {"p50": _pct(dsp, 0.5), "p95": _pct(dsp, 0.95)},
+                },
+            }
+        )
+    except Exception as e:
+        return json_internal_error("benchmarks summary", details={"error": str(e)})
+
+
+@settings_bp.route("/api/benchmarks/refreshes")
+def benchmarks_refreshes():
+    if not _benchmarks_enabled():
+        return json_error("Benchmarks API disabled", status=404)
+    try:
+        limit = max(1, min(200, int(request.args.get("limit", "50"))))
+        cursor = request.args.get("cursor")
+        since = _window_since_seconds(request.args.get("window", "24h"))
+        conn = sqlite3.connect(_get_bench_db_path())
+        conn.row_factory = sqlite3.Row
+        _ensure_bench_schema(conn)
+        if cursor:
+            rows = conn.execute(
+                """
+                SELECT id, ts, refresh_id, plugin_id, instance, playlist, used_cached,
+                       request_ms, generate_ms, preprocess_ms, display_ms
+                FROM refresh_events
+                WHERE ts >= ? AND id < ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (since, int(cursor), limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, ts, refresh_id, plugin_id, instance, playlist, used_cached,
+                       request_ms, generate_ms, preprocess_ms, display_ms
+                FROM refresh_events
+                WHERE ts >= ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (since, limit),
+            ).fetchall()
+        conn.close()
+        next_cursor = str(rows[-1]["id"]) if rows else None
+        return jsonify(
+            {
+                "success": True,
+                "items": [dict(r) for r in rows],
+                "next_cursor": next_cursor,
+            }
+        )
+    except Exception as e:
+        return json_internal_error("benchmarks refreshes", details={"error": str(e)})
+
+
+@settings_bp.route("/api/benchmarks/plugins")
+def benchmarks_plugins():
+    if not _benchmarks_enabled():
+        return json_error("Benchmarks API disabled", status=404)
+    try:
+        since = _window_since_seconds(request.args.get("window", "24h"))
+        conn = sqlite3.connect(_get_bench_db_path())
+        conn.row_factory = sqlite3.Row
+        _ensure_bench_schema(conn)
+        rows = conn.execute(
+            """
+            SELECT plugin_id,
+                   COUNT(*) AS runs,
+                   AVG(request_ms) AS request_avg,
+                   AVG(generate_ms) AS generate_avg,
+                   AVG(display_ms) AS display_avg
+            FROM refresh_events
+            WHERE ts >= ?
+            GROUP BY plugin_id
+            ORDER BY runs DESC
+            """,
+            (since,),
+        ).fetchall()
+        conn.close()
+        items = []
+        for r in rows:
+            items.append(
+                {
+                    "plugin_id": r["plugin_id"],
+                    "runs": int(r["runs"] or 0),
+                    "request_avg": int(round(r["request_avg"])) if r["request_avg"] is not None else None,
+                    "generate_avg": int(round(r["generate_avg"])) if r["generate_avg"] is not None else None,
+                    "display_avg": int(round(r["display_avg"])) if r["display_avg"] is not None else None,
+                }
+            )
+        return jsonify({"success": True, "items": items})
+    except Exception as e:
+        return json_internal_error("benchmarks plugins", details={"error": str(e)})
+
+
+@settings_bp.route("/api/benchmarks/stages")
+def benchmarks_stages():
+    if not _benchmarks_enabled():
+        return json_error("Benchmarks API disabled", status=404)
+    refresh_id = request.args.get("refresh_id")
+    if not refresh_id:
+        return json_error(
+            "refresh_id is required",
+            status=422,
+            code="validation_error",
+            details={"field": "refresh_id"},
+        )
+    try:
+        conn = sqlite3.connect(_get_bench_db_path())
+        conn.row_factory = sqlite3.Row
+        _ensure_bench_schema(conn)
+        rows = conn.execute(
+            """
+            SELECT id, ts, stage, duration_ms, extra_json
+            FROM stage_events
+            WHERE refresh_id = ?
+            ORDER BY id ASC
+            """,
+            (refresh_id,),
+        ).fetchall()
+        conn.close()
+        return jsonify({"success": True, "items": [dict(r) for r in rows]})
+    except Exception as e:
+        return json_internal_error("benchmarks stages", details={"error": str(e)})
+
+
+@settings_bp.route("/api/progress/stream")
+def progress_stream():
+    if os.getenv("INKYPI_PROGRESS_SSE_ENABLED", "true").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return json_error("Progress SSE disabled", status=404)
+
+    bus = get_progress_bus()
+    try:
+        last_seq = int(request.args.get("last_seq", "0"))
+    except Exception:
+        last_seq = 0
+
+    @stream_with_context
+    def gen():
+        # Backfill
+        for ev in bus.recent(limit=100):
+            if int(ev.get("seq", 0)) > last_seq:
+                yield to_sse(str(ev.get("state", "event")), ev)
+        local_seq = last_seq
+        while True:
+            events = bus.wait_for(local_seq, timeout_s=15.0)
+            if not events:
+                yield ": keep-alive\n\n"
+                continue
+            for ev in events:
+                local_seq = max(local_seq, int(ev.get("seq", 0)))
+                yield to_sse(str(ev.get("state", "event")), ev)
+
+    return Response(gen(), mimetype="text/event-stream")
+
+
+@settings_bp.route("/api/health/plugins")
+def health_plugins():
+    try:
+        rt = current_app.config["REFRESH_TASK"]
+        health = rt.get_health_snapshot() if hasattr(rt, "get_health_snapshot") else {}
+        try:
+            window_min = int(os.getenv("INKYPI_HEALTH_WINDOW_MIN", "1440") or "1440")
+        except Exception:
+            window_min = 1440
+        if isinstance(health, dict) and window_min > 0:
+            cutoff = datetime.now() - timedelta(minutes=window_min)
+            filtered = {}
+            for plugin_id, item in health.items():
+                last_seen = item.get("last_seen") if isinstance(item, dict) else None
+                if not last_seen:
+                    filtered[plugin_id] = item
+                    continue
+                try:
+                    dt = datetime.fromisoformat(last_seen)
+                except Exception:
+                    filtered[plugin_id] = item
+                    continue
+                if dt >= cutoff:
+                    filtered[plugin_id] = item
+            health = filtered
+        return jsonify({"success": True, "items": health})
+    except Exception as e:
+        return json_internal_error("health plugins", details={"error": str(e)})
+
+
+@settings_bp.route("/api/health/system")
+def health_system():
+    try:
+        data: dict[str, Any] = {"success": True}
+        try:
+            import psutil  # type: ignore
+
+            data["cpu_percent"] = psutil.cpu_percent(interval=None)
+            data["memory_percent"] = psutil.virtual_memory().percent
+            data["disk_percent"] = psutil.disk_usage("/").percent
+            data["uptime_seconds"] = int(time.time() - psutil.boot_time())
+        except Exception:
+            data["cpu_percent"] = None
+            data["memory_percent"] = None
+            data["disk_percent"] = None
+            data["uptime_seconds"] = None
+        return jsonify(data)
+    except Exception as e:
+        return json_internal_error("health system", details={"error": str(e)})
+
+
+@settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
+def plugin_isolation():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    isolated = device_config.get_config("isolated_plugins", default=[])
+    if not isinstance(isolated, list):
+        isolated = []
+
+    if request.method == "GET":
+        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+    body = request.get_json(silent=True) or {}
+    plugin_id = body.get("plugin_id")
+    if not plugin_id:
+        return json_error(
+            "plugin_id is required",
+            status=422,
+            code="validation_error",
+            details={"field": "plugin_id"},
+        )
+
+    if request.method == "POST":
+        if plugin_id not in isolated:
+            isolated.append(plugin_id)
+            device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
+        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+    # DELETE
+    isolated = [p for p in isolated if p != plugin_id]
+    device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
+    return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+
+@settings_bp.route("/settings/safe_reset", methods=["POST"])
+def safe_reset():
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        config = device_config.get_config().copy()
+        keep = {
+            "playlist_config": config.get("playlist_config"),
+            "plugins_enabled": config.get("plugins_enabled"),
+            "name": config.get("name"),
+            "timezone": config.get("timezone"),
+            "time_format": config.get("time_format"),
+            "display_type": config.get("display_type"),
+            "resolution": config.get("resolution"),
+            "orientation": config.get("orientation"),
+            "preview_size_mode": config.get("preview_size_mode"),
+        }
+        # Reset selected runtime controls to safe defaults while preserving plugins/playlists.
+        keep["plugin_cycle_interval_seconds"] = 3600
+        keep["log_system_stats"] = False
+        keep["isolated_plugins"] = []
+        device_config.update_config(keep)
+        return jsonify({"success": True, "message": "Safe reset applied."})
+    except Exception as e:
+        return json_internal_error("safe reset", details={"error": str(e)})
+
+
 @settings_bp.route("/settings")
 def settings_page():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -577,20 +925,43 @@ def save_settings():
             form_data.get("timeFormat"),
         )
         if not unit or unit not in ["minute", "hour"]:
-            return json_error("Plugin cycle interval unit is required", status=400)
+            return json_error(
+                "Plugin cycle interval unit is required",
+                status=422,
+                code="validation_error",
+                details={"field": "unit"},
+            )
         if not interval or not interval.isnumeric():
-            return json_error("Refresh interval is required", status=400)
+            return json_error(
+                "Refresh interval is required",
+                status=422,
+                code="validation_error",
+                details={"field": "interval"},
+            )
         if not form_data.get("timezoneName"):
-            return json_error("Time Zone is required", status=400)
+            return json_error(
+                "Time Zone is required",
+                status=422,
+                code="validation_error",
+                details={"field": "timezoneName"},
+            )
         if not time_format or time_format not in ["12h", "24h"]:
-            return json_error("Time format is required", status=400)
+            return json_error(
+                "Time format is required",
+                status=422,
+                code="validation_error",
+                details={"field": "timeFormat"},
+            )
         previous_interval_seconds = device_config.get_config(
             "plugin_cycle_interval_seconds"
         )
         plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
         if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
             return json_error(
-                "Plugin cycle interval must be less than 24 hours", status=400
+                "Plugin cycle interval must be less than 24 hours",
+                status=422,
+                code="validation_error",
+                details={"field": "interval"},
             )
 
         settings = {
@@ -618,7 +989,7 @@ def save_settings():
             refresh_task = current_app.config["REFRESH_TASK"]
             refresh_task.signal_config_change()
     except RuntimeError as e:
-        return json_error(str(e), status=500)
+        return json_error("An internal error occurred", status=500, code="internal_error")
     except Exception:
         logger.exception("Error saving device settings")
         return json_internal_error(

@@ -174,7 +174,7 @@ def test_update_now_exception_handling(client, flask_app, monkeypatch):
 
     resp = client.post("/update_now", data={"plugin_id": "ai_text"})
     assert resp.status_code == 500
-    assert "An error occurred" in resp.get_json().get("error", "")
+    assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
 def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch):

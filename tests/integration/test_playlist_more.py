@@ -39,7 +39,7 @@ def test_add_plugin_validation_errors(client):
         ),
     }
     r1 = client.post("/add_plugin", data=bad_name)
-    assert r1.status_code == 400
+    assert r1.status_code == 422
     assert "alphanumeric characters and spaces" in r1.get_json().get("error", "")
 
     missing_type = {
@@ -53,7 +53,7 @@ def test_add_plugin_validation_errors(client):
         ),
     }
     r2 = client.post("/add_plugin", data=missing_type)
-    assert r2.status_code == 400
+    assert r2.status_code == 422
     assert "Refresh type is required" in r2.get_json().get("error", "")
 
 
@@ -185,7 +185,7 @@ def test_add_plugin_missing_playlist_name(client):
         ),
     }
     resp = client.post("/add_plugin", data=payload)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Playlist name is required" in resp.get_json().get("error", "")
 
 
@@ -202,7 +202,7 @@ def test_add_plugin_missing_instance_name(client):
         ),
     }
     resp = client.post("/add_plugin", data=payload)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Instance name is required" in resp.get_json().get("error", "")
 
 
@@ -219,7 +219,7 @@ def test_add_plugin_missing_refresh_unit(client):
         ),
     }
     resp = client.post("/add_plugin", data=payload)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Refresh interval unit is required" in resp.get_json().get("error", "")
 
 
@@ -236,7 +236,7 @@ def test_add_plugin_missing_refresh_interval(client):
         ),
     }
     resp = client.post("/add_plugin", data=payload)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Refresh interval is required" in resp.get_json().get("error", "")
 
 
@@ -252,7 +252,7 @@ def test_add_plugin_missing_refresh_time_scheduled(client):
         ),
     }
     resp = client.post("/add_plugin", data=payload)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Refresh time is required" in resp.get_json().get("error", "")
 
 

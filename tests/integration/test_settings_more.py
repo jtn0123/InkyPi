@@ -215,7 +215,7 @@ def test_save_settings_validation_missing_timezone(client):
             "contrast": "1.0",
         },
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Time Zone is required" in resp.get_json().get("error", "")
 
 
@@ -234,7 +234,7 @@ def test_save_settings_validation_missing_time_format(client):
             "contrast": "1.0",
         },
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 422
     assert "Time format is required" in resp.get_json().get("error", "")
 
 
@@ -260,7 +260,9 @@ def test_save_settings_exception_handling(client, flask_app, monkeypatch):
         },
     )
     assert resp.status_code == 500
-    assert "test" in resp.get_json().get("error", "")
+    body = resp.get_json()
+    assert body.get("error") == "An internal error occurred"
+    assert body.get("code") == "internal_error"
 
 
 def test_shutdown_route_reboot(client, monkeypatch):

@@ -90,7 +90,7 @@ def test_update_device_settings_route(client, device_config_dev):
         "timezone": "America/New_York",
         "time_format": "12h"
     })
-    assert resp.status_code in [200, 400, 405, 302]
+    assert resp.status_code in [200, 400, 405, 422, 302]
 
 
 def test_update_display_settings_route(client, device_config_dev):
@@ -99,7 +99,7 @@ def test_update_display_settings_route(client, device_config_dev):
         "orientation": "horizontal",
         "inverted": "false"
     })
-    assert resp.status_code in [200, 400, 405, 302]
+    assert resp.status_code in [200, 400, 405, 422, 302]
 
 
 def test_update_network_settings_route(client, device_config_dev):
@@ -107,7 +107,7 @@ def test_update_network_settings_route(client, device_config_dev):
     resp = client.post("/settings/network", data={
         "device_name": "inkypi-test"
     })
-    assert resp.status_code in [200, 400, 405, 302]
+    assert resp.status_code in [200, 400, 405, 422, 302]
 
 
 def test_settings_page_sections(client, device_config_dev):

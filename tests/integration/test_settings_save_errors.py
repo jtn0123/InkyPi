@@ -4,7 +4,7 @@
 def test_save_settings_missing_fields(client):
     # missing unit, interval, timezone, timeFormat
     resp = client.post("/save_settings", data={})
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_save_settings_invalid_unit(client):
@@ -23,7 +23,7 @@ def test_save_settings_invalid_unit(client):
         "contrast": "1.0",
     }
     resp = client.post("/save_settings", data=data)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_save_settings_invalid_interval_and_bounds(client):
@@ -43,12 +43,12 @@ def test_save_settings_invalid_interval_and_bounds(client):
         "contrast": "1.0",
     }
     resp = client.post("/save_settings", data=data)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
     # too large interval
     data["interval"] = "200000"  # minutes -> > 24h
     resp = client.post("/save_settings", data=data)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_save_settings_missing_timezone_and_bad_time_format(client):
@@ -66,14 +66,14 @@ def test_save_settings_missing_timezone_and_bad_time_format(client):
     }
     # Missing timezone
     resp = client.post("/save_settings", data=base)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
     # Bad time format
     data2 = dict(base)
     data2["timezoneName"] = "UTC"
     data2["timeFormat"] = "13h"
     resp = client.post("/save_settings", data=data2)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_save_settings_success_triggers_config_change_signal(client, monkeypatch):

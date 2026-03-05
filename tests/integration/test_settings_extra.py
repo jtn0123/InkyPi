@@ -19,7 +19,7 @@ def test_save_settings_zero_interval_rejected(client):
         "contrast": "1.0",
     }
     resp = client.post("/save_settings", data=data)
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_shutdown_reboot_path(client, monkeypatch):
