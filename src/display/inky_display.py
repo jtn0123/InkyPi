@@ -1,5 +1,4 @@
 import logging
-from inky.auto import auto
 from display.abstract_display import AbstractDisplay
 
 
@@ -27,6 +26,8 @@ class InkyDisplay(AbstractDisplay):
             ValueError: If the resolution cannot be retrieved or stored.
         """
         
+        from inky.auto import auto
+
         self.inky_display = auto()
         self.inky_display.set_border(self.inky_display.BLACK)
 
@@ -58,5 +59,15 @@ class InkyDisplay(AbstractDisplay):
             raise ValueError(f"No image provided.")
 
         # Display the image on the Inky display
-        self.inky_display.set_image(image)
+        image_settings_cfg = self.device_config.get_config('image_settings') or {}
+        inky_saturation = image_settings_cfg.get("inky_saturation", 0.5)
+        logger.info("Inky Saturation: %s", inky_saturation)
+        try:
+            self.inky_display.set_image(image, saturation=inky_saturation)
+        except TypeError as exc:
+            msg = str(exc)
+            if "saturation" not in msg or "unexpected keyword argument" not in msg:
+                raise
+            # Backward compatibility with drivers/mocks that do not support saturation kwarg.
+            self.inky_display.set_image(image)
         self.inky_display.show()

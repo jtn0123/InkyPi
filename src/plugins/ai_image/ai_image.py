@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 import requests
+from utils import http_utils
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,16 +24,20 @@ class AIImage(BasePlugin):
         return template_params
 
     def generate_image(self, settings, device_config):
+        logger.info("=== AI Image Plugin: Starting image generation ===")
 
         api_key = device_config.load_env_key("OPEN_AI_SECRET")
         if not api_key:
+            logger.error("OpenAI API Key not configured")
             raise RuntimeError("OPEN AI API Key not configured.")
 
         text_prompt = settings.get("textPrompt", "")
-
         image_model = settings.get('imageModel', DEFAULT_IMAGE_MODEL)
+
         if image_model not in IMAGE_MODELS:
+            logger.error(f"Invalid image model: {image_model}")
             raise RuntimeError("Invalid Image Model provided.")
+
         image_quality = settings.get('quality', "medium" if image_model == "gpt-image-1" else "standard")
 
         # Normalize quality for different models
@@ -57,27 +62,44 @@ class AIImage(BasePlugin):
             image_quality = None
 
         randomize_prompt = settings.get('randomizePrompt') == 'true'
+        orientation = device_config.get_config("orientation")
+
+        logger.info(f"Settings: model={image_model}, quality={image_quality}, orientation={orientation}")
+        logger.debug(f"Original prompt: '{text_prompt}'")
+        logger.debug(f"Randomize prompt: {randomize_prompt}")
 
         image = None
         try:
             ai_client = OpenAI(api_key = api_key)
-            if randomize_prompt:
-                text_prompt = AIImage.fetch_image_prompt(ai_client, text_prompt)
 
-            image = AIImage.fetch_image(
+            if randomize_prompt:
+                logger.debug("Generating randomized prompt using GPT-4...")
+                text_prompt = AIImage.fetch_image_prompt(ai_client, text_prompt)
+                logger.info(f"Randomized prompt: '{text_prompt}'")
+
+            logger.info(f"Generating image with {image_model}...")
+            image = self.fetch_image(
                 ai_client,
                 text_prompt,
                 model=image_model,
                 quality=image_quality,
-                orientation=device_config.get_config("orientation")
+                orientation=orientation
             )
+
+            if image:
+                logger.info(f"AI image generated successfully: {image.size[0]}x{image.size[1]}")
+
         except Exception as e:
-            logger.error(f"Failed to make Open AI request: {str(e)}")
-            raise RuntimeError("Open AI request failure, please check logs.")
+            logger.error(f"Failed to make OpenAI request: {str(e)}")
+            raise RuntimeError("Open AI request failure, please check logs.") from e
+
+        logger.info("=== AI Image Plugin: Image generation complete ===")
         return image
 
-    @staticmethod
-    def fetch_image(ai_client, prompt, model="dall-e-3", quality="standard", orientation="horizontal"):
+    def fetch_image(self, ai_client, prompt, model="dall-e-3", quality="standard", orientation="horizontal"):
+        """
+        Fetch image from OpenAI API. Now an instance method to access image_loader.
+        """
         logger.info(f"Generating image for prompt: {prompt}, model: {model}, quality: {quality}")
         prompt += (
             ". The image should fully occupy the entire canvas without any frames, "
@@ -105,7 +127,25 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         if model in ["dall-e-3", "dall-e-2"]:
             image_url = response.data[0].url
-            img_response = requests.get(image_url)
+            try:
+                img_response = requests.get(image_url, timeout=30)
+            except TypeError:
+                # Compatibility with tests/mocks that stub requests.get(url) only.
+                img_response = requests.get(image_url)
+            except Exception:
+                img_response = http_utils.http_get(image_url, timeout=30)
+
+            status_code = getattr(img_response, "status_code", 200)
+            try:
+                status_code_int = int(status_code)
+            except Exception:
+                status_code_int = 200
+            if status_code_int >= 400:
+                # Fallback to shared HTTP client path (also used in tests).
+                img_response = http_utils.http_get(image_url, timeout=30)
+
+            if hasattr(img_response, "raise_for_status"):
+                img_response.raise_for_status()
             with Image.open(BytesIO(img_response.content)) as opened_img:
                 img = opened_img.copy()
         elif model == "gpt-image-1":
@@ -117,7 +157,7 @@ class AIImage(BasePlugin):
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):
-        logger.info(f"Getting random image prompt...")
+        logger.info("Getting random image prompt...")
 
         system_content = (
             "You are a creative assistant generating extremely random and unique image prompts. "

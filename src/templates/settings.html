@@ -495,6 +495,21 @@
                             <span id="brightness-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
                             <input type="range" id="brightness" name="brightness" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" oninput="updateSliderValue(this)" />
                         </div>
+                        {% if device_settings.get('display_type', 'inky') == 'inky' %}
+                        <div class="form-group">
+                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation:</label>
+                            <span id="inky_saturation-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
+                            <input
+                                type="range"
+                                id="inky_saturation"
+                                name="inky_saturation"
+                                class="form-input slider-max-width"
+                                min="0" max="1" step="0.05"
+                                value="{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}"
+                                oninput="updateSliderValue(this)"
+                            />
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

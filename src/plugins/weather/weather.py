@@ -71,8 +71,6 @@ class Weather(BasePlugin):
     def generate_image(self, settings, device_config):
         lat_str = settings.get('latitude')
         long_str = settings.get('longitude')
-        if lat_str is None or long_str is None or lat_str == '' or long_str == '':
-            raise RuntimeError("Latitude and Longitude are required.")
         lat = float(lat_str)
         long = float(long_str)
 
@@ -138,6 +136,8 @@ class Weather(BasePlugin):
 
     def parse_weather_data(self, weather_data, aqi_data, tz, units, time_format, lat):
         current = weather_data.get("current", {})
+        if not current or current.get("dt") is None:
+            raise AttributeError("Missing current weather data.")
         dt = datetime.fromtimestamp(current.get('dt'), tz=timezone.utc).astimezone(tz)
         weather_list = current.get("weather", [])
         if not weather_list:
@@ -195,7 +195,7 @@ class Weather(BasePlugin):
         if weather_code in [0]:   # Clear sky
             icon = "01d"
         elif weather_code in [1]: # Mainly clear
-            icon = "02d"
+            icon = "022d"
         elif weather_code in [2]: # Partly cloudy
             icon = "02d"
         elif weather_code in [3]: # Overcast

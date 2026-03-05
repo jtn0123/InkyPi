@@ -77,11 +77,10 @@ class Wpotd(BasePlugin):
             return datetime.today().date()
 
     def _download_image(self, url: str) -> Image.Image:
+        if url.lower().endswith(".svg"):
+            logger.warning("SVG format is not supported by Pillow. Skipping image download.")
+            raise RuntimeError("Failed to load WPOTD image.")
         try:
-            if url.lower().endswith(".svg"):
-                logger.warning("SVG format is not supported by Pillow. Skipping image download.")
-                raise RuntimeError("Unsupported image format: SVG.")
-
             response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
             with Image.open(BytesIO(response.content)) as img:
@@ -89,8 +88,6 @@ class Wpotd(BasePlugin):
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
             raise RuntimeError("Unsupported image format.")
-        except RuntimeError:
-            raise
         except Exception as e:
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
             raise RuntimeError("Failed to load WPOTD image.")

@@ -1,7 +1,15 @@
 import os
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, render_template, send_file, send_from_directory
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    send_file,
+    send_from_directory,
+)
 from uuid import uuid4
 
 try:
@@ -18,12 +26,11 @@ main_bp = Blueprint("main", __name__)
 
 def _current_dt(device_config):
     try:
-        from utils.time_utils import now_device_tz
+        from utils import time_utils
 
-        return now_device_tz(device_config)
+        return time_utils.now_device_tz(device_config)
     except Exception:
-        from datetime import timezone
-        return datetime.now(timezone.utc)
+        return datetime.utcnow()
 
 
 @main_bp.route("/")
@@ -145,6 +152,22 @@ def next_up():
         )
     except Exception:
         return jsonify({})
+
+
+@main_bp.route("/api/plugin_order", methods=["POST"])
+def save_plugin_order():
+    """Save custom plugin order from dashboard drag-and-drop."""
+    device_config = current_app.config["DEVICE_CONFIG"]
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid JSON payload"}), 400
+    order = data.get("order", [])
+    if not isinstance(order, list):
+        return jsonify({"error": "Order must be a list"}), 400
+    if any(not isinstance(item, str) for item in order):
+        return jsonify({"error": "Order entries must be strings"}), 400
+    device_config.set_plugin_order(order)
+    return jsonify({"success": True})
 
 
 # Serve static assets from src/static for test and dev environments
@@ -332,3 +355,9 @@ def display_next():
         ),
         200,
     )
+
+
+@main_bp.route("/refresh", methods=["POST"])
+def refresh_alias():
+    """Backward-compatible alias for manual display advance."""
+    return display_next()

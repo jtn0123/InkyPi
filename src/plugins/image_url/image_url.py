@@ -18,6 +18,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None
 
+
 class ImageURL(BasePlugin):
     def generate_image(self, settings, device_config):
         url = settings.get('url')

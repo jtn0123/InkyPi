@@ -2,11 +2,11 @@
 
 # =============================================================================
 # Script Name: install.sh
-# Description: This script automates the installatin of InkyPI and creation of
+# Description: This script automates the installation of InkyPI and creation of
 #              the InkyPI service.
 #
 # Usage: ./install.sh [-W <waveshare_device>]
-#        -W <waveshare_device> (optional) Install for a Waveshare device, 
+#        -W <waveshare_device> (optional) Install for a Waveshare device,
 #                               specifying the device model type, e.g. epd7in3e.
 #
 #                               If not specified then the Pimoroni Inky display
@@ -17,7 +17,6 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 1)
-green=$(tput setaf 2)
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
@@ -40,7 +39,7 @@ SERVICE_FILE_TARGET="/etc/systemd/system/$SERVICE_FILE"
 APT_REQUIREMENTS_FILE="$SCRIPT_DIR/debian-requirements.txt"
 PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
-# 
+#
 # Additional requirements for Waveshare support.
 #
 # empty means no WS support required, otherwise we expect the type of display
@@ -48,7 +47,7 @@ PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 WS_TYPE=""
 WS_REQUIREMENTS_FILE="$SCRIPT_DIR/ws-requirements.txt"
 
-# Parse the agumments, looking for the -W option.
+# Parse the arguments, looking for the -W option.
 parse_arguments() {
     while getopts ":W:" opt; do
         case $opt in
@@ -106,14 +105,22 @@ fetch_waveshare_driver() {
 
 enable_interfaces(){
   echo "Enabling interfaces required for $APPNAME"
+  local config_txt="/boot/firmware/config.txt"
+  if [[ ! -f "$config_txt" ]]; then
+    config_txt="/boot/config.txt"
+  fi
+  if [[ ! -f "$config_txt" ]]; then
+    echo_error "ERROR: config.txt not found at /boot/firmware/config.txt or /boot/config.txt"
+    exit 1
+  fi
   #enable spi
-  sudo sed -i 's/^dtparam=spi=.*/dtparam=spi=on/' /boot/config.txt
-  sudo sed -i 's/^#dtparam=spi=.*/dtparam=spi=on/' /boot/config.txt
+  sudo sed -i 's/^dtparam=spi=.*/dtparam=spi=on/' "$config_txt"
+  sudo sed -i 's/^#dtparam=spi=.*/dtparam=spi=on/' "$config_txt"
   sudo raspi-config nonint do_spi 0
   echo_success "\tSPI Interface has been enabled."
   #enable i2c
-  sudo sed -i 's/^dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' /boot/config.txt
-  sudo sed -i 's/^#dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' /boot/config.txt
+  sudo sed -i 's/^dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' "$config_txt"
+  sudo sed -i 's/^#dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' "$config_txt"
   sudo raspi-config nonint do_i2c 0
   echo_success "\tI2C Interface has been enabled."
 
@@ -123,8 +130,8 @@ enable_interfaces(){
     # are enabled in the config.txt file.  This is different to INKY which
     # only needs one line set.n
     echo "Enabling both CS lines for SPI interface in config.txt"
-    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-2cs' /boot/firmware/config.txt; then
-        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-2cs' /boot/firmware/config.txt
+    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-2cs' "$config_txt"; then
+        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-2cs' "$config_txt"
     else
         echo "dtoverlay for spi0-2cs already specified"
     fi
@@ -132,8 +139,8 @@ enable_interfaces(){
     # TODO - check if really need the dtparam set for INKY as this seems to be 
     # only for the older screens (as per INKY docs)
     echo "Enabling single CS line for SPI interface in config.txt"
-    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-0cs' /boot/firmware/config.txt; then
-        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-0cs' /boot/firmware/config.txt
+    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-0cs' "$config_txt"; then
+        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-0cs' "$config_txt"
     else
         echo "dtoverlay for spi0-0cs already specified"
     fi
@@ -142,19 +149,20 @@ enable_interfaces(){
 
 show_loader() {
   local pid=$!
+  local message="$1"
   local delay=0.1
-  local spinstr='|/-\'
-  printf "$1 [${spinstr:0:1}] "
-  while ps a | awk '{print $1}' | grep -q "${pid}"; do
+  local spinstr="|/-\\"
+  printf "%s [%s] " "$message" "${spinstr:0:1}"
+  while kill -0 "$pid" 2>/dev/null; do
     local temp=${spinstr#?}
-    printf "\r$1 [${temp:0:1}] "
+    printf "\r%s [%s] " "$message" "${temp:0:1}"
     spinstr=${temp}${spinstr%"${temp}"}
-    sleep ${delay}
+    sleep "${delay}"
   done
-  if [[ $? -eq 0 ]]; then
-    printf "\r$1 [\e[32m\xE2\x9C\x94\e[0m]\n"
+  if wait "$pid"; then
+    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$message"
   else
-    printf "\r$1 [\e[31m\xE2\x9C\x98\e[0m]\n"
+    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$message"
   fi
 }
 
@@ -208,14 +216,14 @@ setup_earlyoom_service() {
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel > /dev/null
-  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq > /dev/null &
+  "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel > /dev/null
+  "$VENV_PATH/bin/python" -m pip install -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
   show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE > ws_pip_install.log &
+    "$VENV_PATH/bin/python" -m pip install -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
     show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
@@ -235,8 +243,8 @@ install_app_service() {
 
 install_executable() {
   echo "Adding executable to ${BINPATH}/$APPNAME"
-  cp $SCRIPT_DIR/inkypi $BINPATH/
-  sudo chmod +x $BINPATH/$APPNAME
+  cp "$SCRIPT_DIR/inkypi" "$BINPATH/"
+  sudo chmod +x "$BINPATH/$APPNAME"
 }
 
 install_config() {
@@ -280,9 +288,9 @@ update_config() {
 
 stop_service() {
     echo "Checking if $SERVICE_FILE is running"
-    if /usr/bin/systemctl is-active --quiet $SERVICE_FILE
+    if /usr/bin/systemctl is-active --quiet "$SERVICE_FILE"
     then
-      /usr/bin/systemctl stop $SERVICE_FILE > /dev/null &
+      /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
       show_loader "Stopping $APPNAME service"
     else  
       echo_success "\t$SERVICE_FILE not running"
@@ -294,10 +302,10 @@ start_service() {
   sudo systemctl start $SERVICE_FILE
 }
 
-copy_project() {
+install_src() {
   # Check if an existing installation is present
   echo "Installing $APPNAME to $INSTALL_PATH"
-  if [[ -d $INSTALL_PATH ]]; then
+  if [[ -d "$INSTALL_PATH" ]]; then
     rm -rf "$INSTALL_PATH" > /dev/null
     show_loader "\tRemoving existing installation found at $INSTALL_PATH"
   fi
@@ -308,24 +316,34 @@ copy_project() {
   show_loader "\tCreating symlink from $SRC_PATH to $INSTALL_PATH/src"
 }
 
+install_cli() {
+  rm -rf "$INSTALL_PATH/cli"
+  mkdir -p "$INSTALL_PATH/cli"
+  cp -a "$SCRIPT_DIR/cli/." "$INSTALL_PATH/cli/"
+  sudo chmod +x "$INSTALL_PATH/cli/"*
+}
+
 # Get Raspberry Pi hostname
 get_hostname() {
-  echo "$(hostname)"
+  hostname
 }
 
 # Get Raspberry Pi IP address
 get_ip_address() {
+  local ip_address
   ip_address=$(hostname -I | awk '{print $1}')
   echo "$ip_address"
 }
 
 # Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixe
 get_os_version() {
-  echo "$(lsb_release -sr)"
+  lsb_release -sr
 }
 
 ask_for_reboot() {
   # Get hostname and IP address
+  local hostname
+  local ip_address
   hostname=$(get_hostname)
   ip_address=$(get_ip_address)
   echo_header "$(echo_success "${APPNAME^^} Installation Complete!")"
@@ -333,7 +351,7 @@ ask_for_reboot() {
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
   echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/fatihak/InkyPi/issues"
 
-  read -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
+  read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
 
   if [[ "${userInput,,}" == "y" ]]; then
@@ -368,7 +386,8 @@ else
   echo "OS version is not Bookworm - skipping zramswap setup."
 fi
 setup_earlyoom_service
-copy_project
+install_src
+install_cli
 create_venv
 install_executable
 install_config
@@ -379,6 +398,6 @@ fi
 install_app_service
 
 echo "Update JS and CSS files"
-bash $SCRIPT_DIR/update_vendors.sh
+bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
 
 ask_for_reboot

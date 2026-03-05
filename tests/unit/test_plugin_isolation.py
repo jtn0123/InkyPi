@@ -130,13 +130,19 @@ def test_multiple_plugins_concurrent_execution_with_failures(
         results = []
         errors = []
 
+        # Ensure at least one bad plugin failure is observed, regardless of
+        # thread scheduling in the concurrent section below.
+        with pytest.raises(RuntimeError, match="Bad plugin failure"):
+            task.manual_update(ManualRefresh("bad", {}))
+        errors.append("bad_error_precheck")
+
         def run_plugin(plugin_id, iterations):
             for i in range(iterations):
                 try:
                     refresh = ManualRefresh(plugin_id, {})
                     task.manual_update(refresh)
                     results.append(f"{plugin_id}_success_{i}")
-                except Exception as e:
+                except Exception:
                     errors.append(f"{plugin_id}_error_{i}")
                 time.sleep(0.02)
 

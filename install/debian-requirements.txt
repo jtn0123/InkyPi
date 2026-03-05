@@ -12,3 +12,5 @@ zram-tools
 earlyoom
 swig
 liblgpio-dev
+libheif-dev
+jq

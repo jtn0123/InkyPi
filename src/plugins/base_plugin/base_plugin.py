@@ -6,6 +6,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_utils import take_screenshot_html
+from utils.image_loader import AdaptiveImageLoader
 from time import perf_counter
 from utils.progress import record_step, start_step, update_step, complete_step, fail_step
 import base64
@@ -30,6 +31,9 @@ class BasePlugin:
 
     def __init__(self, config, **dependencies):
         self.config = config
+
+        # Initialize adaptive image loader for device-aware image processing
+        self.image_loader = AdaptiveImageLoader()
 
         self.render_dir = self.get_plugin_dir("render")
         # Always initialize Jinja environment so plugins without their own

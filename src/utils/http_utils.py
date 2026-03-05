@@ -89,7 +89,11 @@ def json_error(
     rid = _get_or_set_request_id()
     if rid is not None:
         payload["request_id"] = rid
-    return jsonify(payload), status
+    try:
+        return jsonify(payload), status
+    except RuntimeError:
+        # Allow utility-level calls outside Flask application/request contexts.
+        return payload, status
 
 
 def json_success(message: str | None = None, status: int = 200, **payload: Any):
@@ -100,7 +104,10 @@ def json_success(message: str | None = None, status: int = 200, **payload: Any):
     rid = _get_or_set_request_id()
     if rid is not None:
         body["request_id"] = rid
-    return jsonify(body), status
+    try:
+        return jsonify(body), status
+    except RuntimeError:
+        return body, status
 
 
 def json_internal_error(
