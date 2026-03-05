@@ -2,6 +2,7 @@ import logging
 import os
 import socket
 import subprocess
+from io import BytesIO
 
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -50,10 +51,12 @@ def resolve_path(file_path):
     return str(src_path / file_path)
 
 def get_ip_address():
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-        s.connect(("8.8.8.8", 80))
-        ip_address = s.getsockname()[0]
-    return ip_address
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            return s.getsockname()[0]
+    except OSError:
+        return None
 
 def get_wifi_name():
     try:
@@ -71,7 +74,7 @@ def is_connected():
     except OSError:
         return False
 
-def get_font(font_name, font_size=50, font_weight="normal"):
+def get_font(font_name, font_size=50, font_weight="normal", strict=False):
     if font_name in FONT_FAMILIES:
         font_variants = FONT_FAMILIES[font_name]
 
@@ -87,6 +90,10 @@ def get_font(font_name, font_size=50, font_weight="normal"):
     else:
         logger.warning(f"Requested font not found: font_name={font_name}")
 
+    if strict:
+        raise ValueError(
+            f"Requested font not available: font_name={font_name}, font_weight={font_weight}"
+        )
     return None
 
 def get_fonts():
@@ -145,11 +152,19 @@ def parse_form(request_form):
 def handle_request_files(request_files, form_data={}):
     allowed_file_extensions = {'pdf', 'png', 'avif', 'jpg', 'jpeg', 'gif', 'webp', 'heif', 'heic'}
     file_location_map = {}
+    request_keys = set(request_files.keys()) if hasattr(request_files, "keys") else set()
     # handle existing file locations being provided as part of the form data
-    for key in set(request_files.keys()):
+    for key in request_keys:
         is_list = key.endswith('[]')
         if key in form_data:
-            file_location_map[key] = form_data.getlist(key) if is_list else form_data.get(key)
+            if is_list:
+                if hasattr(form_data, "getlist"):
+                    file_location_map[key] = form_data.getlist(key)
+                else:
+                    existing = form_data.get(key)
+                    file_location_map[key] = existing if isinstance(existing, list) else [existing]
+            else:
+                file_location_map[key] = form_data.get(key)
     # add new files in the request
     for key, file in request_files.items(multi=True):
         is_list = key.endswith('[]')
@@ -164,20 +179,48 @@ def handle_request_files(request_files, form_data={}):
         file_name = os.path.basename(file_name)
 
         file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
+        os.makedirs(file_save_dir, exist_ok=True)
         file_path = os.path.join(file_save_dir, file_name)
 
-        # Open the image and apply EXIF transformation before saving
-        if extension in {'jpg', 'jpeg'}:
+        # Read raw bytes once so this works with both FileStorage and test fakes.
+        content = file.read()
+        if content is None:
+            raise RuntimeError("Empty upload content")
+
+        max_upload_bytes_env = os.getenv("MAX_UPLOAD_BYTES")
+        max_upload_bytes = int(max_upload_bytes_env) if max_upload_bytes_env else 10 * 1024 * 1024
+        if len(content) > max_upload_bytes:
+            raise RuntimeError(f"Uploaded file exceeds size limit of {max_upload_bytes} bytes")
+
+        # Rewind file objects for callers that expect stream position to remain usable.
+        try:
+            if hasattr(file, "stream"):
+                file.stream.seek(0)
+            elif hasattr(file, "seek"):
+                file.seek(0)
+        except Exception:
+            pass
+
+        # Save PDFs as-is. Validate and save images.
+        if extension == "pdf":
+            with open(file_path, "wb") as out:
+                out.write(content)
+        elif extension in {'jpg', 'jpeg'}:
             try:
-                with Image.open(file) as img:
+                with Image.open(BytesIO(content)) as img:
                     img = ImageOps.exif_transpose(img)
                     img.save(file_path)
             except Exception as e:
-                logger.warning(f"EXIF processing error for {file_name}: {e}")
-                file.save(file_path)
+                raise RuntimeError("Invalid image upload") from e
         else:
-            # Directly save non-JPEG files
-            file.save(file_path)
+            # Verify decoder can read it before persisting.
+            try:
+                with Image.open(BytesIO(content)) as img_verify:
+                    img_verify.verify()
+            except Exception as e:
+                raise RuntimeError("Invalid image upload") from e
+            with open(file_path, "wb") as out:
+                out.write(content)
 
         if is_list:
             file_location_map.setdefault(key, [])

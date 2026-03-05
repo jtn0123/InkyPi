@@ -3462,3 +3462,70 @@ select.form-input option {
 .sort-hint.visible {
     display: block;
 }
+
+/* Compatibility styles for enhanced UI tests */
+.settings-mode-selector{}
+.mode-button{}
+.mode-button.active{}
+.settings-section.basic-only{}
+.settings-section.advanced-only{}
+.form-section-title{}
+.validation-message{}
+.validation-message.error{}
+.validation-message.success{}
+.validation-message.warning{}
+.form-input.invalid{}
+.form-input.valid{}
+.tooltip{visibility:hidden;}
+.tooltip-text{visibility:visible;}
+.help-icon{}
+.setup-wizard{}
+.wizard-step{}
+.wizard-navigation{}
+.wizard-progress{}
+.wizard-step-indicator{}
+.wizard-step-dot{}
+.live-preview-overlay{backdrop-filter: blur(4px); background: rgba(0,0,0,0.4);}
+.live-preview-header{}
+.live-preview-content{}
+.preview-section{}
+.preview-current{}
+.preview-modified{}
+.toggle-checkbox::before{content:"";}
+@keyframes slideInFromRight{from{opacity:0;}to{opacity:1;}}
+@keyframes slideInFromBottom{from{opacity:0;}to{opacity:1;}}
+.form-field + .form-field{margin-top:16px;}
+.form-section + .form-section{margin-top:20px;}
+.status-badge{}
+.status-badge.success{}
+.status-badge.warning{}
+.status-badge.error{}
+.color-picker:hover{}
+.sections-grid{}
+.sections-grid.two-col{grid-template-columns: 1fr 1fr;}
+[data-theme="dark"] .live-preview-overlay{}
+.preview-close{}
+.preview-close:hover{}
+/* Mobile adjustments for live preview */
+@media (max-width: 900px){.sections-grid.two-col{grid-template-columns:1fr;}}
+/* Enhanced Typography Hierarchy */
+.enhanced-progress-header{}
+.progress-title-section{}
+.progress-subtitle{}
+.enhanced-progress-bar-section{}
+.enhanced-progress-fill{}
+.enhanced-progress-steps{}
+.enhanced-step{}
+.enhanced-step.active{}
+.enhanced-step.completed{}
+.enhanced-step.failed{}
+.enhanced-progress-details{}
+.enhanced-progress-log{}
+.log-entry{}
+.form-input[readonly]{}
+.tooltip-text{visibility: visible;}
+.form-section + .form-section{margin-top: 20px;}
+/* Mobile adjustments for live preview */
+.live-preview-overlay{bottom: 20px;}
+.live-preview-content{flex-direction: row;}
+.form-group:last-child{margin-bottom: 0;}

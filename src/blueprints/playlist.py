@@ -202,9 +202,14 @@ def create_playlist():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    data = request.json
+    data = request.get_json(silent=True)
     if data is None:
-        return json_error("Invalid JSON data", status=400)
+        form_data = request.form.to_dict()
+        # Keep form compatibility for UI submits, but reject arbitrary non-JSON payloads.
+        if any(k in form_data for k in ("playlist_name", "start_time", "end_time")):
+            data = form_data
+        else:
+            return ("Unsupported media type", 415)
     playlist_name = data.get("playlist_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")

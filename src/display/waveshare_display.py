@@ -23,7 +23,13 @@ def split_image_for_bi_color_epd(image):
     palette_img = Image.new('P', (1, 1))
     palette_img.putpalette(palette_data)
 
-    indexed_img = image.quantize(palette=palette_img, dither=Image.Dither.FLOYDSTEINBERG)
+    # Quantize with an RGB source image; mode "1" and some others are not
+    # compatible with palette quantization in all Pillow versions.
+    source = image.convert("RGB") if image.mode != "RGB" else image
+    indexed_img = source.quantize(
+        palette=palette_img,
+        dither=Image.Dither.FLOYDSTEINBERG,
+    )
     black_layer = indexed_img.point(lambda p: 0 if p == 0 else 1, mode='1')
     red_layer = indexed_img.point(lambda p: 0 if p == 2 else 1, mode='1')
     return black_layer, red_layer

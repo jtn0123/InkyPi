@@ -60,5 +60,9 @@ class InkyDisplay(AbstractDisplay):
         # Display the image on the Inky display
         inky_saturation = self.device_config.get_config('image_settings').get("inky_saturation", 0.5)
         logger.info(f"Inky Saturation: {inky_saturation}")
-        self.inky_display.set_image(image, saturation=inky_saturation)
+        try:
+            self.inky_display.set_image(image, saturation=inky_saturation)
+        except TypeError:
+            # Backward compatibility with drivers/mocks that do not support saturation kwarg.
+            self.inky_display.set_image(image)
         self.inky_display.show()

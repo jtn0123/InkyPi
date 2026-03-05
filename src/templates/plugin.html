@@ -4,25 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ plugin.display_name }} Settings</title>
-    <script>
-        (function() {
-            const theme = localStorage.getItem('inkypi-theme') ||
-                         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            if (theme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            }
-        })();
-    </script>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/dark_mode.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
-    <!-- Select2 CSS -->
-    <link href="{{ url_for('static', filename='styles/select2.min.css') }}" rel="stylesheet" />
-    <!-- jQuery -->
-    <script src="{{ url_for('static', filename='scripts/jquery.min.js') }}"></script>
-    <!-- Select2 JS -->
-    <script src="{{ url_for('static', filename='scripts/select2.min.js') }}"></script>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}?v={{ range(1000000)|random }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}?v={{ range(1000000)|random }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}?v={{ range(1000000)|random }}"></script>
+    
 
     <script>
         const pluginSettings = {{ plugin_settings | tojson if plugin_settings else {} }};
@@ -31,56 +19,90 @@
         // Treat either editing an instance or having saved (non-instance) settings as "load settings"
         const loadPluginSettings = (pluginInstanceName != '') || hasPluginSettings;
         const styleSettings = {{ style_settings | default(false) | tojson }};
-        const refreshSettings = {{ refresh_settings | tojson if refresh_settings else {} }};
+        const previewUrl = '{{ url_for("main.preview_image") }}';
+        const refreshInfoUrl = '{{ url_for("main.refresh_info") }}';
+        const instancePreviewUrl = (pluginId, instanceName) => {
+            if (!pluginId || !instanceName) return null;
+            return '{{ url_for("plugin.plugin_instance_image", plugin_id="__PID__", instance_name="__INST__") }}'
+                .replace('__PID__', encodeURIComponent(pluginId))
+                .replace('__INST__', encodeURIComponent(instanceName));
+        };
+        const latestPluginUrl = (pluginId) => {
+            if (!pluginId) return null;
+            return '{{ url_for("plugin.plugin_latest_image", plugin_id="__PID__") }}'
+                .replace('__PID__', encodeURIComponent(pluginId));
+        };
 
         let uploadedFiles = {};
 
-        // Initialize refresh settings managers
-        let editRefreshManager = null;
-        {% if plugin_instance %}
-        editRefreshManager = createRefreshSettingsManager('refreshSettingsModal', 'edit');
-        {% endif %}
-
-        async function saveRefreshSettings() {
-            if (!editRefreshManager) return;
-
-            await editRefreshManager.submit(async (formData) => {
-                const data = new FormData();
-                data.append("plugin_id", "{{ plugin.id }}");
-                data.append("refresh_settings", JSON.stringify(formData));
-
-                const response = await fetch("{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName, {
-                    method: 'PUT',
-                    body: data
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    showResponseModal('success', `Success! ${result.message}`);
-                } else {
-                    throw new Error(result.error || 'Failed to update refresh settings');
+        const PROGRESS_PAGE_CTX = { page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null };
+        function buildProgressKey(ctx){
+            try {
+                if (ctx && ctx.page === 'plugin'){
+                    const pid = ctx.pluginId || {{ plugin.id|tojson }};
+                    const inst = ctx.instance || '';
+                    return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || '_'}`;
                 }
-            });
+            } catch(e){}
+            return 'INKYPI_LAST_PROGRESS';
         }
-
-        async function handleAction(action) {
-            const loadingIndicator = document.getElementById('loadingIndicator');
-            loadingIndicator.style.display = 'block';
-
-            // Gather plugin settings form data
-            const form = document.getElementById('settingsForm');
-            const scheduleForm = document.getElementById('scheduleForm');
-
-            const formData = new FormData(form);
-            let url = '{{ url_for("plugin.update_now") }}';
-            let method = 'POST';
-            let clearFormOnSubmit = false;
-
-            // Add uploaded files to the form under its key
-            Object.keys(uploadedFiles).forEach(key => {
-                if (uploadedFiles[key].length > 0) {
-                    uploadedFiles[key].forEach(file => {
-                        formData.append(key, file);
+        function saveLastProgressSnapshot(context){
+            try {
+                const list = document.getElementById('requestProgressList');
+                const textEl = document.getElementById('requestProgressText');
+                function extractLine(li){
+                    try {
+                        const t = li.querySelector('time');
+                        const txt = li.textContent || '';
+                        const tt = t ? (t.textContent || '') : '';
+                        return tt && txt.startsWith(tt) ? txt.slice(tt.length).trimStart() : txt.trim();
+                    } catch(e){ return (li.textContent || '').trim(); }
+                }
+                const lines = Array.from(list ? list.querySelectorAll('li') : [], extractLine);
+                const data = {
+                    finishedAtIso: new Date().toISOString(),
+                    summary: textEl ? textEl.textContent : 'Done',
+                    lines,
+                    ctx: context || PROGRESS_PAGE_CTX
+                };
+                const key = buildProgressKey(data.ctx);
+                localStorage.setItem(key, JSON.stringify(data));
+                // Also store a global fallback
+                localStorage.setItem('INKYPI_LAST_PROGRESS', JSON.stringify(data));
+            } catch(e){}
+        }
+        function showLastProgress(){
+            try {
+                const keys = [
+                    buildProgressKey(PROGRESS_PAGE_CTX),
+                    `INKYPI_LAST_PROGRESS:plugin:${ {{ plugin.id|tojson }} }:_`,
+                    'INKYPI_LAST_PROGRESS'
+                ];
+                let data = null;
+                for (const k of keys){
+                    const raw = localStorage.getItem(k);
+                    if (raw){ data = JSON.parse(raw); break; }
+                }
+                if (!data) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
+                const progress = document.getElementById('requestProgress');
+                const textEl = document.getElementById('requestProgressText');
+                const clockEl = document.getElementById('requestProgressClock');
+                const elapsedEl = document.getElementById('requestProgressElapsed');
+                const list = document.getElementById('requestProgressList');
+                const bar = document.getElementById('requestProgressBar');
+                if (list) {
+                    list.innerHTML = '';
+                    const stripLeadingTime = (s) => {
+                        try { return s.replace(/^\s*\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?\s*/i, ''); } catch(_) { return s; }
+                    };
+                    data.lines.forEach(rawLine => {
+                        const line = stripLeadingTime(rawLine);
+                        const li = document.createElement('li');
+                        const ts = document.createElement('time');
+                        ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
+                        li.appendChild(ts);
+                        li.appendChild(document.createTextNode(' ' + line));
+                        list.appendChild(li);
                     });
                 }
                 if (textEl) textEl.textContent = data.summary || 'Last run';
@@ -237,22 +259,15 @@
         }
 
         function openModal(modal_id) {
-            // Handle refresh settings modal specially with the manager
-            if (modal_id === 'refreshSettingsModal' && editRefreshManager) {
-                editRefreshManager.open({ refreshSettings });
-                return;
-            }
-
-            // Generic modal opening for other modals
             const modal = document.getElementById(modal_id);
-            if (modal) modal.style.display = 'block';
+            modal.style.display = 'block';
         }
-
+    
         function closeModal(modal_id) {
             const modal = document.getElementById(modal_id);
-            if (modal) modal.style.display = 'none';
+            modal.style.display = 'none';
         }
-
+    
         // Close modal if the user clicks outside the modal content
         window.onclick = function (event) {
             const modal = document.getElementById('scheduleModal');
@@ -270,8 +285,6 @@
         }
 
         function selectedFrame(element) {
-            if (!element) return; // Guard clause for null element
-
             // Remove the selected class from any previously selected option
             const previousSelection = document.querySelector('.image-option.selected');
             if (previousSelection) {
@@ -513,8 +526,6 @@
                 if (leftMarginInput) leftMarginInput.value = defaultMargin;
                 if (rightMarginInput) rightMarginInput.value = defaultMargin;
             }
-
-            // Setup interactive refresh settings for edit mode (removed - now handled in openModal)
         });
     </script>
 </head>
@@ -528,17 +539,104 @@
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
-            <div class="header-content">
-                <div class="title-container">
-                    <img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">
-                    <h1 class="app-title">{{ plugin.display_name }}</h1>
-                    {% if api_key and api_key.required %}<span class="api-key-label" title="{{api_key.service}} (Set {{api_key.expected_key}} in .env)">Requires API Key</span>{% endif %}
-                </div>
-                {% if plugin_instance %}
-                    <button class="header-button" onclick="openModal('refreshSettingsModal')">Refresh Settings</button>
-                {% endif %}
+            <div class="app-identity">
+                {% from 'macros/icons.html' import icon %}
+                <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
+                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
+                    </svg>
+                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
+                    </svg>
+                </button>
+                {% set plugin_icon_map = {
+                    'ai_image': 'magic-wand',
+                    'ai_text': 'text-t',
+                    'weather': 'cloud-sun',
+                    'calendar': 'calendar-blank',
+                    'clock': 'clock',
+                    'newspaper': 'newspaper-clipping',
+                    'apod': 'planet',
+                    'unsplash': 'images-square',
+                    'image_url': 'link-simple',
+                    'image_upload': 'upload-simple',
+                    'image_folder': 'folder-simple',
+                    'screenshot': 'monitor',
+                    'wpotd': 'book-open-text',
+                    'comic': 'mask-happy'
+                } %}
+                {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
+                {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
+                <h1 class="app-title">{{ plugin.display_name }}</h1>
             </div>
-            <div id="loadingIndicator" class="loading-indicator"></div>
+            <div class="header-controls">
+                <!-- API Key Status Indicator -->
+                {% if api_key and api_key.required %}
+                    {% if api_key.present %}
+                    <div class="api-key-indicator configured" id="apiKeyIndicator" title="{{ api_key.service }} API Key is configured">
+                        <span class="api-key-icon">✓</span>
+                        <span class="api-key-text">API</span>
+                    </div>
+                    {% else %}
+                    <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" title="{{ api_key.service }} API Key required - Click to configure">
+                        <span class="api-key-icon">⚠</span>
+                        <span class="api-key-text">API Required</span>
+                    </a>
+                    {% endif %}
+                {% endif %}
+
+                
+                {% from 'macros/icons.html' import icon %}
+                <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                <div id="loadingIndicator" class="loading-indicator"></div>
+            </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- Status: current display vs this plugin instance -->
+        {% set fit = (config.get('preview_size_mode') == 'fit') %}
+        <div class="status-bar">
+            <!-- Compact current display thumbnail on the left -->
+            <div class="status-card compact">
+                <div class="status-title">Current display</div>
+                <div class="status-body">
+                    <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
+                        <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}"
+                             {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
+                        <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>
+                    </div>
+                    <div class="status-meta compact">
+                        <span class="label">Updated</span>
+                        <span id="currentDisplayTime" class="value">—</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Full, non-cropped plugin instance preview on the right -->
+            <div class="status-card instance">
+                <div class="status-title">{% if plugin_instance %}This plugin instance{% else %}Latest from this plugin{% endif %}</div>
+                <div class="status-body">
+                    <div class="img-skeleton" aria-hidden="true" style="width:100%;"></div>
+                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
+                    <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
+                        {% if plugin_instance %}
+                        No saved image found for this instance yet.
+                        {% if plugin_instance_playlist %}
+                        <div style="margin-top:6px;"><button type="button" class="action-button compact" aria-label="Display this instance now" onclick="displayInstanceNow()">Display Instance</button></div>
+                        {% endif %}
+                        {% else %}
+                        No images generated yet. Use "Update Now" to create one.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="status-meta">
+                    <span class="label">Last generated</span>
+                    <span id="instanceLastTime" class="value">—</span>
+                </div>
+            </div>
         </div>
         <div class="separator"></div>
 
@@ -575,7 +673,7 @@
                     </button>
                     <div class="settings-container collapsible-content">
                         <div class="form-group">
-
+                            
                             <div class="form-group nowrap">
                                 <label class="form-label">Frame:</label>
                                 <div id="frame-selection" class="image-grid">
@@ -614,8 +712,8 @@
                                     <input type="number" class="form-input" id="rightMargin" name="rightMargin" min="0" max="100" step="5">px
                                 </div>
                             </div>
-                        </div>
-
+                        </div>    
+                        
                         <!-- Background Color Option -->
                         <div class="form-group">
                             <label class="form-label">Background:</label>
@@ -639,10 +737,10 @@
                                 </div>
                             </div>
                         </div>
-
+                        
                         <!-- Hidden input fields to store existing file data -->
                         <div id="hiddenFileInput"></div>
-
+                        
                         <!-- Text Color Picker -->
                         <div class="form-group">
                             <label for="textColor" class="form-label">Text Color:</label>
@@ -666,8 +764,7 @@
                 <button type="button" onclick="handleAction()" class="action-button left" aria-describedby="update-now-help">Update Now</button>
                 <button type="button" onclick="handleAction('save_settings')" class="action-button center" aria-describedby="save-settings-help">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" onclick="handleAction('update_instance')" class="action-button">Save</button>
-                    <button type="button" onclick="openModal('scheduleModal')" class="action-button right">Save As...</button>
+                    <button type="button" onclick="handleAction('update_instance')" class="action-button right" aria-describedby="update-instance-help">Update Instance</button>
                 {% else %}
                     <button type="button" onclick="openModal('scheduleModal')" class="action-button right" aria-describedby="add-playlist-help">Add to Playlist</button>
                 {% endif %}
@@ -684,24 +781,6 @@
 
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
-
-    <!-- Refresh Settings Modal (for editing existing instances) -->
-    {% if plugin_instance %}
-    <div id="refreshSettingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close-button" onclick="closeModal('refreshSettingsModal')">×</span>
-            <h2>Refresh Settings</h2>
-            <div class="separator"></div>
-            <form id="refreshSettingsForm" class="settings-form">
-                {% set prefix = "edit" %}
-                {% include 'refresh_settings_form.html' %}
-            </form>
-            <div class="buttons-container">
-                <button type="button" onclick="saveRefreshSettings()" class="action-button">Save</button>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Schedule Configuration Modal -->
     <div id="scheduleModal" class="modal">
@@ -723,10 +802,26 @@
                     <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error">
                     <span id="instance-error" class="validation-message" role="alert"></span>
                 </div>
-
-                {% set prefix = "add" %}
-                {% include 'refresh_settings_form.html' %}
-
+                <div class="form-group">
+                    <label>Refresh</label>
+                    <span title="Determines how often the data and image should be refreshed.">ⓘ</span>
+                </div>
+                <div class="form-group nowrap">
+                    <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
+                    <label for="refreshTypeInterval">Every</label>
+                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
+                    <span id="interval-error" class="validation-message" role="alert"></span>
+                    <select id="unit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
+                        <option value="minute">Minute</option>
+                        <option value="hour">Hour</option>
+                        <option value="day">Day</option>
+                    </select>
+                </div>
+                <div class="form-group nowrap">
+                    <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
+                    <label for="refreshTypeScheduled">Daily at</label>
+                    <input id="scheduled" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
+                </div>
             </form>
             <div class="buttons-container">
                 <button type="button" onclick="handleAction('add_to_playlist')" class="action-button">Save</button>

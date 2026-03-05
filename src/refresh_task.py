@@ -391,6 +391,13 @@ class RefreshTask:
             return metrics
         else:
             logger.warning("Background refresh task is not running, unable to do a manual update")
+            # Preserve compatibility for direct/manual callers that pre-seed
+            # refresh_result before the worker has ever been started.
+            exc = self.refresh_result.get("exception")
+            if exc is not None and self.thread is None:
+                if isinstance(exc, BaseException):
+                    raise exc
+                raise RuntimeError(str(exc))
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated)."""

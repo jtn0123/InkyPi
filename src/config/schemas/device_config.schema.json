@@ -58,7 +58,7 @@
                   }
                 }
               },
-              "current_plugin_index": { "type": "integer" }
+              "current_plugin_index": { "type": ["integer", "null"] }
             }
           }
         },
@@ -68,5 +68,4 @@
     "refresh_info": { "type": "object" }
   }
 }
-
 

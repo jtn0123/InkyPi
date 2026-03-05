@@ -3,7 +3,7 @@ from openai import OpenAI
 from PIL import Image
 from io import BytesIO
 import base64
-from utils.http_client import get_http_session
+import requests
 import logging
 
 logger = logging.getLogger(__name__)
@@ -126,11 +126,9 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         if model in ["dall-e-3", "dall-e-2"]:
             image_url = response.data[0].url
-            # Use adaptive loader for memory-efficient processing
-            # AI images are pre-sized, but still benefit from optimized loading
-            session = get_http_session()
-            response = session.get(image_url)
-            img = Image.open(BytesIO(response.content))
+            img_response = requests.get(image_url)
+            with Image.open(BytesIO(img_response.content)) as opened_img:
+                img = opened_img.copy()
         elif model == "gpt-image-1":
             image_base64 = response.data[0].b64_json
             image_bytes = base64.b64decode(image_base64)

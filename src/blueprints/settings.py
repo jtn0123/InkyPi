@@ -628,6 +628,28 @@ def save_settings():
     return jsonify({"success": True, "message": "Saved settings."})
 
 
+# Legacy route aliases used by older UI/tests.
+@settings_bp.route("/settings/device", methods=["GET", "POST"])
+def save_device_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
+
+
+@settings_bp.route("/settings/display", methods=["GET", "POST"])
+def save_display_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
+
+
+@settings_bp.route("/settings/network", methods=["GET", "POST"])
+def save_network_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
+
+
 @settings_bp.route("/settings/client_log", methods=["POST"])
 def client_log():
     """Accept lightweight client logs and emit them to server logs.
