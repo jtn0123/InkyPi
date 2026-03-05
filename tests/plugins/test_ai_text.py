@@ -29,7 +29,10 @@ def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatc
     }
     resp = client.post("/update_now", data=data)
     assert resp.status_code == 500
-    assert b"Text Model is required" in resp.data
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "internal_error"
+    assert body["error"] == "An internal error occurred"
 
 
 def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypatch):
@@ -45,7 +48,10 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
     }
     resp = client.post("/update_now", data=data)
     assert resp.status_code == 500
-    assert b"Text Prompt is required" in resp.data
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "internal_error"
+    assert body["error"] == "An internal error occurred"
 
 
 @patch('plugins.ai_text.ai_text.OpenAI')
@@ -65,7 +71,10 @@ def test_ai_text_generate_image_openai_error(mock_openai, client, flask_app, mon
     }
     resp = client.post("/update_now", data=data)
     assert resp.status_code == 500
-    assert b"Open AI request failure" in resp.data
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "internal_error"
+    assert body["error"] == "An internal error occurred"
 
 
 @pytest.mark.parametrize("orientation,resolution", [("vertical", (400, 300)), ("horizontal", (800, 480))])
@@ -135,7 +144,10 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
     }
     resp = client.post("/update_now", data=data)
     assert resp.status_code == 500
-    assert b"API Key not configured" in resp.data or b"Open AI" in resp.data
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "internal_error"
+    assert body["error"] == "An internal error occurred"
 
 
 @patch('plugins.ai_text.ai_text.OpenAI')
