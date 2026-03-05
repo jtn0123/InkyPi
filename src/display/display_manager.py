@@ -1,9 +1,11 @@
 import fnmatch
 import json
 import logging
+import os
+from datetime import datetime
 
-from utils.image_utils import resize_image, change_orientation, apply_image_enhancement
 from display.mock_display import MockDisplay
+from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +56,35 @@ class DisplayManager:
         else:
             raise ValueError(f"Unsupported display type: {display_type}")
 
-    def display_image(self, image, image_settings=None):
+    def _save_history_entry(self, processed_image, history_meta=None):
+        """Persist a processed image snapshot and optional JSON sidecar metadata."""
+        history_dir = getattr(self.device_config, "history_image_dir", None)
+        if not history_dir:
+            return
+        try:
+            os.makedirs(history_dir, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_name = f"display_{ts}"
+            png_path = os.path.join(history_dir, f"{base_name}.png")
+            # Avoid clobbering snapshots generated in the same second.
+            if os.path.exists(png_path):
+                suffix = datetime.now().strftime("%f")
+                base_name = f"{base_name}_{suffix}"
+                png_path = os.path.join(history_dir, f"{base_name}.png")
+
+            processed_image.save(png_path)
+            meta_payload = dict(history_meta or {})
+            meta_payload.setdefault("refresh_time", datetime.now().isoformat())
+            with open(
+                os.path.join(history_dir, f"{base_name}.json"),
+                "w",
+                encoding="utf-8",
+            ) as fh:
+                json.dump(meta_payload, fh)
+        except Exception:
+            logger.exception("Failed to persist history snapshot")
+
+    def display_image(self, image, image_settings=None, history_meta=None):
 
         """
         Delegates image rendering to the appropriate display instance.
@@ -72,15 +102,34 @@ class DisplayManager:
         if not hasattr(self, "display"):
             raise ValueError("No valid display instance initialized.")
         
-        # Save the image
+        # Save the raw image
         logger.info(f"Saving image to {self.device_config.current_image_file}")
         image.save(self.device_config.current_image_file)
 
         # Resize and adjust orientation
-        image = change_orientation(image, self.device_config.get_config("orientation"))
-        image = resize_image(image, self.device_config.get_resolution(), image_settings)
-        if self.device_config.get_config("inverted_image"): image = image.rotate(180)
-        image = apply_image_enhancement(image, self.device_config.get_config("image_settings"))
+        image = change_orientation(
+            image, self.device_config.get_config("orientation")
+        )
+        image = resize_image(
+            image, self.device_config.get_resolution(), image_settings
+        )
+        if self.device_config.get_config("inverted_image"):
+            image = image.rotate(180)
+        image = apply_image_enhancement(
+            image, self.device_config.get_config("image_settings")
+        )
+        image.save(self.device_config.processed_image_file)
+        self._save_history_entry(image, history_meta=history_meta)
 
         # Pass to the concrete instance to render to the device.
         self.display.display_image(image, image_settings)
+
+    def display_preprocessed_image(self, image_path):
+        """Display an already-processed image file without applying transforms again."""
+        from PIL import Image
+
+        with Image.open(image_path) as img:
+            image = img.copy()
+        image.save(self.device_config.current_image_file)
+        image.save(self.device_config.processed_image_file)
+        self.display.display_image(image, [])

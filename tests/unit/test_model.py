@@ -223,3 +223,18 @@ def test_playlist_wraparound_is_active():
 def test_get_time_range_minutes_wraparound():
     p = Playlist("Late Night", "23:00", "02:00")
     assert p.get_time_range_minutes() == 180
+
+
+def test_plugin_instance_only_show_when_fresh_respected():
+    tz = pytz.UTC
+    now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
+    pi = PluginInstance(
+        "x",
+        "inst",
+        {},
+        {"interval": 3600},
+        latest_refresh_time=(now - timedelta(seconds=60)).isoformat(),
+        only_show_when_fresh=True,
+    )
+    assert pi.should_refresh(now) is False
+    assert pi.is_show_eligible(now) is False

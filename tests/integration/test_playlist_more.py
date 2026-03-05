@@ -58,10 +58,10 @@ def test_add_plugin_validation_errors(client):
 
 
 def test_create_playlist_error_paths(client):
-    # End time must be > start time
+    # Equal times should be rejected
     resp = client.post(
         "/create_playlist",
-        json={"playlist_name": "Bad", "start_time": "09:00", "end_time": "08:00"},
+        json={"playlist_name": "Bad", "start_time": "09:00", "end_time": "09:00"},
     )
     assert resp.status_code == 400
 
@@ -326,7 +326,7 @@ def test_create_playlist_exception_handling(client, flask_app, monkeypatch):
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
-def test_update_playlist_end_before_start(client):
+def test_update_playlist_rejects_equal_start_end(client):
     # First create a playlist
     client.post(
         "/create_playlist",
@@ -335,12 +335,24 @@ def test_update_playlist_end_before_start(client):
 
     resp = client.put(
         "/update_playlist/Test",
-        json={"new_name": "Updated", "start_time": "10:00", "end_time": "09:00"},
+        json={"new_name": "Updated", "start_time": "10:00", "end_time": "10:00"},
     )
     assert resp.status_code == 400
-    assert "End time must be greater than start time" in resp.get_json().get(
+    assert "cannot be the same" in resp.get_json().get(
         "error", ""
     )
+
+
+def test_update_playlist_allows_overnight_window(client):
+    client.post(
+        "/create_playlist",
+        json={"playlist_name": "Overnight", "start_time": "06:00", "end_time": "09:00"},
+    )
+    resp = client.put(
+        "/update_playlist/Overnight",
+        json={"new_name": "Overnight", "start_time": "22:00", "end_time": "05:00"},
+    )
+    assert resp.status_code == 200
 
 
 def test_delete_playlist_missing_name(client):

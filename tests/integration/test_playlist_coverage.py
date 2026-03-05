@@ -2,8 +2,7 @@
 
 import json
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import MagicMock
 
 # --- update_device_cycle endpoint tests ---
 
@@ -121,6 +120,14 @@ def test_create_playlist_24hour_end_time(client):
     assert resp.status_code == 200
 
 
+def test_create_playlist_overnight_window(client):
+    resp = client.post(
+        "/create_playlist",
+        json={"playlist_name": "Late", "start_time": "22:00", "end_time": "05:00"},
+    )
+    assert resp.status_code == 200
+
+
 # --- update_playlist overlapping times tests ---
 
 
@@ -163,6 +170,11 @@ def test_update_playlist_overlapping_with_other(client):
     )
     assert resp.status_code == 400
     assert "overlaps" in resp.get_json().get("error", "").lower()
+
+
+def test_update_playlist_invalid_json_payload(client):
+    resp = client.put("/update_playlist/Any", data="not-json", content_type="text/plain")
+    assert resp.status_code == 400
 
 
 def test_update_playlist_cycle_minutes_override(client, flask_app):
@@ -352,9 +364,7 @@ def test_format_relative_time_no_timezone_raises():
     """Naive datetime without timezone raises ValueError."""
     from blueprints.playlist import format_relative_time
 
-    naive_dt = datetime.now().isoformat()  # no tzinfo
-    # This should work since datetime.now() on modern Python includes local TZ
-    # But explicitly test with a naive ISO string
+    # Explicitly pass a naive ISO string (no timezone suffix).
     try:
         format_relative_time("2024-01-15T10:00:00")  # naive - no TZ
         assert False, "Expected ValueError"

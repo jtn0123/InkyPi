@@ -2,18 +2,51 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-from flask import Blueprint, current_app, jsonify, render_template, request, has_app_context
+from flask import (
+    Blueprint,
+    current_app,
+    has_app_context,
+    render_template,
+    request,
+)
 
+from refresh_task import PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import calculate_seconds, now_device_tz
-from refresh_task import PlaylistRefresh
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
 
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
 _eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
+
+
+def _to_minutes(time_str: str) -> int:
+    if time_str == "24:00":
+        return 24 * 60
+    hour, minute = map(int, time_str.split(":"))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise ValueError("Invalid time")
+    return hour * 60 + minute
+
+
+def _segments(start_min: int, end_min: int) -> list[tuple[int, int]]:
+    if start_min == end_min:
+        return []
+    if start_min < end_min:
+        return [(start_min, end_min)]
+    return [(start_min, 24 * 60), (0, end_min)]
+
+
+def _windows_overlap(
+    start_a: int, end_a: int, start_b: int, end_b: int
+) -> bool:
+    for a0, a1 in _segments(start_a, end_a):
+        for b0, b1 in _segments(start_b, end_b):
+            if a0 < b1 and b0 < a1:
+                return True
+    return False
 
 
 @playlist_bp.route("/add_plugin", methods=["POST"])
@@ -225,7 +258,13 @@ def playlists():
         "playlist.html",
         playlist_config=playlist_manager.to_dict(),
         refresh_info=refresh_info.to_dict(),
-        plugins={p["id"]: p for p in plugins_list}
+        plugins={p["id"]: p for p in plugins_list},
+        metrics=metrics,
+        now_str=now_str,
+        tz_off_min=tz_off_min,
+        device_cycle_minutes=device_cycle_minutes,
+        playlist_timing=playlist_timing,
+        rotation_eta=rotation_eta,
     )
 
 
@@ -252,8 +291,13 @@ def create_playlist():
         return json_error("Playlist name is required", status=400)
     if not start_time or not end_time:
         return json_error("Start time and End time are required", status=400)
-    if end_time <= start_time:
-        return json_error("End time must be greater than start time", status=400)
+    try:
+        start_min = _to_minutes(start_time)
+        end_min = _to_minutes(end_time)
+    except Exception:
+        return json_error("Invalid start/end time format", status=400)
+    if start_min == end_min:
+        return json_error("Start time and End time cannot be the same", status=400)
 
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
@@ -264,15 +308,14 @@ def create_playlist():
 
         # Prevent overlapping time windows
         try:
-            new_start = datetime.strptime(start_time, "%H:%M")
-            new_end = datetime.strptime(end_time, "%H:%M") if end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+            new_start = _to_minutes(start_time)
+            new_end = _to_minutes(end_time)
             for pl in playlist_manager.playlists:
                 if getattr(pl, 'name', '') == 'Default':
                     continue
-                ps = datetime.strptime(pl.start_time, "%H:%M")
-                pe = datetime.strptime(pl.end_time, "%H:%M") if pl.end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
-                # overlap if start < other_end and other_start < end
-                if new_start < pe and ps < new_end:
+                ps = _to_minutes(pl.start_time)
+                pe = _to_minutes(pl.end_time)
+                if _windows_overlap(new_start, new_end, ps, pe):
                     return json_error("Playlist time range overlaps with existing playlist", status=400)
         except Exception:
             # best-effort, fallback to allow
@@ -302,7 +345,9 @@ def update_playlist(playlist_name):
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return json_error("Invalid JSON data", status=400)
 
     new_name = data.get("new_name")
     start_time = data.get("start_time")
@@ -310,8 +355,13 @@ def update_playlist(playlist_name):
     cycle_minutes = data.get("cycle_minutes")  # optional override
     if not new_name or not start_time or not end_time:
         return json_error("Missing required fields", status=400)
-    if end_time <= start_time:
-        return json_error("End time must be greater than start time", status=400)
+    try:
+        start_min = _to_minutes(start_time)
+        end_min = _to_minutes(end_time)
+    except Exception:
+        return json_error("Invalid start/end time format", status=400)
+    if start_min == end_min:
+        return json_error("Start time and End time cannot be the same", status=400)
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -319,16 +369,16 @@ def update_playlist(playlist_name):
 
     # Prevent overlapping (exclude the playlist being updated)
     try:
-        new_start = datetime.strptime(start_time, "%H:%M")
-        new_end = datetime.strptime(end_time, "%H:%M") if end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
+        new_start = _to_minutes(start_time)
+        new_end = _to_minutes(end_time)
         for pl in playlist_manager.playlists:
             if pl.name == playlist_name:
                 continue
             if getattr(pl, 'name', '') == 'Default':
                 continue
-            ps = datetime.strptime(pl.start_time, "%H:%M")
-            pe = datetime.strptime(pl.end_time, "%H:%M") if pl.end_time != "24:00" else datetime.strptime("00:00", "%H:%M") + timedelta(days=1)
-            if new_start < pe and ps < new_end:
+            ps = _to_minutes(pl.start_time)
+            pe = _to_minutes(pl.end_time)
+            if _windows_overlap(new_start, new_end, ps, pe):
                 return json_error("Playlist time range overlaps with existing playlist", status=400)
     except Exception:
         pass

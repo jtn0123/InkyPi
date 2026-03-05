@@ -3,7 +3,7 @@ import types
 
 import pytest
 from PIL import Image
-from typing import Any
+
 
 def make_image(w=320, h=240, color="white"):
     return Image.new("RGB", (w, h), color)
@@ -130,3 +130,43 @@ def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
     dm = DisplayManager(device_config_dev)
     assert dm.display.__class__.__name__ == "FakeWS"
 
+
+def test_display_manager_writes_history_sidecar(device_config_dev):
+    device_config_dev.update_value("display_type", "mock")
+    import json
+    from pathlib import Path
+
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+    dm.display_image(
+        make_image(200, 100),
+        history_meta={"plugin_id": "clock", "plugin_instance": "A"},
+    )
+
+    history_dir = Path(device_config_dev.history_image_dir)
+    pngs = sorted(history_dir.glob("display_*.png"))
+    jsons = sorted(history_dir.glob("display_*.json"))
+    assert pngs
+    assert jsons
+    with open(jsons[-1], encoding="utf-8") as fh:
+        payload = json.load(fh)
+    assert payload["plugin_id"] == "clock"
+    assert payload["plugin_instance"] == "A"
+    assert "refresh_time" in payload
+
+
+def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path):
+    device_config_dev.update_value("display_type", "mock")
+    from pathlib import Path
+
+    from display.display_manager import DisplayManager
+
+    img_path = tmp_path / "preprocessed.png"
+    make_image(100, 50).save(img_path)
+
+    dm = DisplayManager(device_config_dev)
+    dm.display_preprocessed_image(str(img_path))
+
+    assert Path(device_config_dev.current_image_file).exists()
+    assert Path(device_config_dev.processed_image_file).exists()

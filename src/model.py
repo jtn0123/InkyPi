@@ -565,7 +565,9 @@ class PluginInstance:
                     # Ignore malformed snooze value
                     pass
 
-            # Only-fresh behavior removed: triggering display will generate or reuse as configured
+            if self.only_show_when_fresh and not self.should_refresh(current_time):
+                return False
+
             return True
         except Exception:
             return True

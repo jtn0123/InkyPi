@@ -4,14 +4,14 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
 from time import perf_counter, sleep
+from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
-from utils.progress_events import get_progress_bus
 from utils.progress import ProgressTracker, track_progress
+from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
-from uuid import uuid4
 
 try:
     # Optional import; code must continue if unavailable
@@ -269,6 +269,8 @@ class RefreshTask:
             {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
         )
         used_cached = image_hash == latest_refresh.image_hash
+        display_duration_ms = None
+        preprocess_ms = None
         if not used_cached:
             logger.info(f"Updating display. | refresh_info: {refresh_info}")
             history_meta = {
@@ -296,11 +298,6 @@ class RefreshTask:
                     image,
                     image_settings=plugin.config.get("image_settings", []),
                     history_meta=history_meta,
-                )
-            except TypeError:
-                self.display_manager.display_image(
-                    image,
-                    image_settings=plugin.config.get("image_settings", []),
                 )
             finally:
                 display_duration_ms = int((perf_counter() - stage_t1) * 1000)
@@ -330,12 +327,9 @@ class RefreshTask:
             )
 
         request_ms = int((perf_counter() - _t_req_start) * 1000)
-        dm_info = getattr(self.device_config, "refresh_info", None)
-        display_ms = getattr(dm_info, "display_ms", None) if dm_info else None
-        preprocess_ms = getattr(dm_info, "preprocess_ms", None) if dm_info else None
         metrics = {
             "request_ms": request_ms,
-            "display_ms": display_ms,
+            "display_ms": display_duration_ms,
             "generate_ms": generate_ms,
             "preprocess_ms": preprocess_ms,
             "steps": tracker.get_steps(),
@@ -363,7 +357,7 @@ class RefreshTask:
                     "request_ms": request_ms,
                     "generate_ms": generate_ms,
                     "preprocess_ms": preprocess_ms,
-                    "display_ms": display_ms,
+                    "display_ms": display_duration_ms,
                     "cpu_percent": cpu_percent,
                     "memory_percent": memory_percent,
                     "notes": None,
@@ -421,7 +415,27 @@ class RefreshTask:
 
                 self.condition.notify_all()  # Wake the thread to process manual update
 
-            self.refresh_event.wait()
+            wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "300") or "300")
+            completed = self.refresh_event.wait(timeout=max(0.0, wait_s))
+            if not completed:
+                timeout_exc = TimeoutError(
+                    f"Manual update timed out after {int(wait_s)}s"
+                )
+                self._update_plugin_health(
+                    plugin_id=refresh_action.get_plugin_id(),
+                    instance=refresh_action.get_refresh_info().get("plugin_instance"),
+                    ok=False,
+                    metrics=None,
+                    error=str(timeout_exc),
+                )
+                self.progress_bus.publish(
+                    {
+                        "state": "error",
+                        "plugin_id": refresh_action.get_plugin_id(),
+                        "error": str(timeout_exc),
+                    }
+                )
+                raise timeout_exc
             metrics = self.refresh_result.get("metrics")
             exc = self.refresh_result.get("exception")
             if exc is not None:
@@ -462,20 +476,26 @@ class RefreshTask:
 
         last_exc: Exception | None = None
         for attempt in range(1, attempts + 1):
+            ex = ThreadPoolExecutor(max_workers=1)
+            fut = None
             try:
-                with ThreadPoolExecutor(max_workers=1) as ex:
-                    fut = ex.submit(
-                        refresh_action.execute, plugin, self.device_config, current_dt
-                    )
-                    image = fut.result(timeout=timeout_s)
+                fut = ex.submit(
+                    refresh_action.execute, plugin, self.device_config, current_dt
+                )
+                image = fut.result(timeout=timeout_s)
+                ex.shutdown(wait=False, cancel_futures=False)
                 if image is None:
                     raise RuntimeError("Plugin returned None image")
                 return image
             except FutureTimeoutError:
+                if fut is not None:
+                    fut.cancel()
+                ex.shutdown(wait=False, cancel_futures=True)
                 last_exc = TimeoutError(
                     f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
                 )
             except Exception as exc:
+                ex.shutdown(wait=False, cancel_futures=True)
                 last_exc = exc
 
             if attempt < attempts:

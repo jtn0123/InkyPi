@@ -1,7 +1,7 @@
 import os
 
-import pytest
 from PIL import Image
+
 
 def test_history_page_lists_images(client, device_config_dev):
     # Create two history images
@@ -96,6 +96,13 @@ def test_history_security_blocks_path_traversal_on_delete(client):
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
 
+def test_history_security_blocks_prefix_bypass_path(client):
+    # Attempt sibling-directory prefix bypass like history/../history_evil/*
+    resp = client.post(
+        "/history/delete", json={"filename": "../history_evil/should_not_delete.png"}
+    )
+    assert resp.status_code == 400
+
 def test_history_storage_endpoint_values(client, monkeypatch):
     # Monkeypatch shutil.disk_usage to return known numbers for precise assertions
     class Usage:
@@ -149,6 +156,16 @@ def test_history_redisplay_errors(client):
     # Traversal attempt
     resp = client.post("/history/redisplay", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
+
+def test_history_redisplay_success(client, device_config_dev):
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_020000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+
+    resp = client.post("/history/redisplay", json={"filename": fname})
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
 
 def test_history_delete_errors(client):
     # Missing filename
@@ -284,10 +301,12 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
     assert result == []
 
 def test_history_delete_exception_handling(client, flask_app, monkeypatch):
-    import os.path
+    import blueprints.history as history_mod
 
     monkeypatch.setattr(
-        os.path, "normpath", lambda p: (_ for _ in ()).throw(Exception("test"))
+        history_mod,
+        "_resolve_history_path",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(Exception("test")),
     )
 
     resp = client.post("/history/delete", json={"filename": "test.png"})

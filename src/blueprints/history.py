@@ -97,6 +97,15 @@ def _list_history_images(history_dir: str) -> list[dict]:
     return result
 
 
+def _resolve_history_path(history_dir: str, filename: str) -> str:
+    """Resolve a requested filename under history_dir and enforce containment."""
+    base_dir = os.path.abspath(history_dir)
+    candidate = os.path.abspath(os.path.join(base_dir, filename))
+    if os.path.commonpath([base_dir, candidate]) != base_dir:
+        raise ValueError("invalid filename")
+    return candidate
+
+
 @history_bp.route("/history")
 def history_page():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -167,8 +176,9 @@ def history_redisplay():
             return json_error("filename is required", status=400)
 
         # Prevent path traversal; only allow files within the history dir
-        safe_path = os.path.normpath(os.path.join(history_dir, filename))
-        if not safe_path.startswith(os.path.abspath(history_dir)):
+        try:
+            safe_path = _resolve_history_path(history_dir, filename)
+        except ValueError:
             return json_error("invalid filename", status=400)
         if not os.path.exists(safe_path):
             return json_error("file not found", status=404)
@@ -192,11 +202,22 @@ def history_delete():
         filename = data.get("filename")
         if not filename:
             return json_error("filename is required", status=400)
-        safe_path = os.path.normpath(os.path.join(history_dir, filename))
-        if not safe_path.startswith(os.path.abspath(history_dir)):
+        try:
+            safe_path = _resolve_history_path(history_dir, filename)
+        except ValueError:
             return json_error("invalid filename", status=400)
         if os.path.exists(safe_path):
             os.remove(safe_path)
+            # Remove matching sidecar on png/json deletions.
+            base, ext = os.path.splitext(safe_path)
+            if ext.lower() == ".png":
+                sidecar = f"{base}.json"
+                if os.path.exists(sidecar):
+                    os.remove(sidecar)
+            elif ext.lower() == ".json":
+                sidecar = f"{base}.png"
+                if os.path.exists(sidecar):
+                    os.remove(sidecar)
         return jsonify({"success": True, "message": "Deleted"}), 200
     except Exception:
         logger.exception("Error deleting history image")
@@ -216,7 +237,7 @@ def history_clear():
         count = 0
         for f in os.listdir(history_dir):
             p = os.path.join(history_dir, f)
-            if os.path.isfile(p) and f.lower().endswith(".png"):
+            if os.path.isfile(p) and f.lower().endswith((".png", ".json")):
                 os.remove(p)
                 count += 1
         return jsonify({"success": True, "message": f"Cleared {count} images"}), 200
