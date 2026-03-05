@@ -29,20 +29,37 @@ def add_plugin():
         playlist = refresh_settings.get("playlist")
         instance_name = refresh_settings.get("instance_name")
         if not playlist:
-            return json_error("Playlist name is required", status=400)
+            return json_error(
+                "Playlist name is required",
+                status=422,
+                code="validation_error",
+                details={"field": "playlist"},
+            )
         if not instance_name or not instance_name.strip():
-            return json_error("Instance name is required", status=400)
+            return json_error(
+                "Instance name is required",
+                status=422,
+                code="validation_error",
+                details={"field": "instance_name"},
+            )
         if not all(
             char.isalpha() or char.isspace() or char.isnumeric()
             for char in instance_name
         ):
             return json_error(
                 "Instance name can only contain alphanumeric characters and spaces",
-                status=400,
+                status=422,
+                code="validation_error",
+                details={"field": "instance_name"},
             )
         refresh_type = refresh_settings.get("refreshType")
         if not refresh_type or refresh_type not in ["interval", "scheduled"]:
-            return json_error("Refresh type is required", status=400)
+            return json_error(
+                "Refresh type is required",
+                status=422,
+                code="validation_error",
+                details={"field": "refreshType"},
+            )
 
         existing = playlist_manager.find_plugin(plugin_id, instance_name)
         if existing:
@@ -55,15 +72,30 @@ def add_plugin():
                 "interval"
             )
             if not unit or unit not in ["minute", "hour", "day"]:
-                return json_error("Refresh interval unit is required", status=400)
+                return json_error(
+                    "Refresh interval unit is required",
+                    status=422,
+                    code="validation_error",
+                    details={"field": "unit"},
+                )
             if not interval:
-                return json_error("Refresh interval is required", status=400)
+                return json_error(
+                    "Refresh interval is required",
+                    status=422,
+                    code="validation_error",
+                    details={"field": "interval"},
+                )
             refresh_interval_seconds = calculate_seconds(int(interval), unit)
             refresh_config = {"interval": refresh_interval_seconds}
         else:
             refresh_time = refresh_settings.get("refreshTime")
             if not refresh_settings.get("refreshTime"):
-                return json_error("Refresh time is required", status=400)
+                return json_error(
+                    "Refresh time is required",
+                    status=422,
+                    code="validation_error",
+                    details={"field": "refreshTime"},
+                )
             refresh_config = {"scheduled": refresh_time}
 
         plugin_settings.update(handle_request_files(request.files))

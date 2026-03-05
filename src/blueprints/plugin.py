@@ -27,6 +27,17 @@ plugin_bp = Blueprint("plugin", __name__)
 PLUGINS_DIR = resolve_path("plugins")
 
 
+def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
+    resp = send_file(path)
+    try:
+        ttl = int(os.getenv(ttl_env, "300") or "300")
+    except Exception:
+        ttl = 300
+    ttl = max(0, ttl)
+    resp.headers["Cache-Control"] = f"public, max-age={ttl}"
+    return resp
+
+
 @plugin_bp.route("/plugin/<plugin_id>")
 def plugin_page(plugin_id: str):
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -96,7 +107,7 @@ def image(plugin_id: str, filename: str):
         return abort(404)
     if not os.path.exists(full_path):
         return abort(404)
-    return send_file(full_path)
+    return _cacheable_send_file(full_path, ttl_env="INKYPI_STATIC_PLUGIN_ASSET_TTL_S")
 
 
 @plugin_bp.route(
@@ -137,7 +148,7 @@ def latest_plugin_image(plugin_id: str):
         # Sort by filename (which includes timestamp) to get most recent
         matching_images.sort(reverse=True)
         latest_image_path = matching_images[0][1]
-        return send_file(latest_image_path)
+        return _cacheable_send_file(latest_image_path)
 
     except Exception:
         return ("Not Found", 404)
@@ -190,11 +201,23 @@ def update_plugin_instance(instance_name: str):
     try:
         form_data = parse_form(request.form)
         if not instance_name:
-            raise APIError("Instance name is required", status=400)
+            raise APIError(
+                "Instance name is required",
+                status=422,
+                code="validation_error",
+                details={"field": "instance_name"},
+            )
         plugin_settings = form_data
         plugin_settings.update(handle_request_files(request.files, request.form))
 
-        plugin_id = plugin_settings.pop("plugin_id")
+        plugin_id = plugin_settings.pop("plugin_id", None)
+        if not plugin_id:
+            raise APIError(
+                "plugin_id is required",
+                status=422,
+                code="validation_error",
+                details={"field": "plugin_id"},
+            )
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             return json_error(
@@ -255,7 +278,14 @@ def update_now():
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
-        plugin_id = plugin_settings.pop("plugin_id")
+        plugin_id = plugin_settings.pop("plugin_id", None)
+        if not plugin_id:
+            return json_error(
+                "plugin_id is required",
+                status=422,
+                code="validation_error",
+                details={"field": "plugin_id"},
+            )
 
         if refresh_task.running:
             metrics = refresh_task.manual_update(ManualRefresh(plugin_id, plugin_settings))
@@ -293,7 +323,7 @@ def update_now():
             return jsonify({"success": True, "message": "Display updated", "metrics": metrics}), 200
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
-        return json_error(f"An error occurred: {str(e)}", status=500)
+        return json_error("An internal error occurred", status=500, code="internal_error")
 
 
 
@@ -307,7 +337,12 @@ def save_plugin_settings():
         plugin_settings.update(handle_request_files(request.files))
         plugin_id = plugin_settings.pop("plugin_id", None)
         if not plugin_id:
-            return json_error("Missing plugin_id", status=400)
+            return json_error(
+                "plugin_id is required",
+                status=422,
+                code="validation_error",
+                details={"field": "plugin_id"},
+            )
         return _save_plugin_settings_common(
             plugin_id=plugin_id,
             plugin_settings=plugin_settings,
@@ -445,7 +480,7 @@ def instance_image(plugin_id: str, instance_name: str):
 
     # Serve if already exists
     if os.path.exists(path):
-        return send_file(path)
+        return _cacheable_send_file(path)
 
     # Try to generate and persist
     try:
@@ -458,10 +493,10 @@ def instance_image(plugin_id: str, instance_name: str):
         plugin = get_plugin_instance(plugin_config)
         image = plugin.generate_image(plugin_inst.settings, device_config)
         image.save(path)
-        return send_file(path)
+        return _cacheable_send_file(path)
     except Exception:
         # Fallback to most recent matching history image
         hist = _find_history_image(device_config, plugin_id, instance_name)
         if hist and os.path.exists(hist):
-            return send_file(hist)
+            return _cacheable_send_file(hist)
         return ("Not Found", 404)

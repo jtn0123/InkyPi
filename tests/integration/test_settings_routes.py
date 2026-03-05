@@ -11,7 +11,7 @@ def test_get_settings_page(client):
 def test_save_settings_validation_errors(client):
     # Missing required fields
     resp = client.post("/save_settings", data={})
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_save_settings_success_triggers_interval_update(client, flask_app, monkeypatch):
