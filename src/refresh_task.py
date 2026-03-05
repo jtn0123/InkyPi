@@ -1,12 +1,14 @@
 import logging
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from datetime import datetime
-from time import perf_counter
+from time import perf_counter, sleep
 
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from utils.image_utils import compute_image_hash, load_image_from_path
+from utils.progress_events import get_progress_bus
 from utils.progress import ProgressTracker, track_progress
 from utils.time_utils import now_device_tz
 from uuid import uuid4
@@ -41,6 +43,8 @@ class RefreshTask:
         self.refresh_event = threading.Event()
         self.refresh_event.set()
         self.refresh_result = {}
+        self.progress_bus = get_progress_bus()
+        self.plugin_health: dict[str, dict] = {}
 
     def start(self):
         """Starts the background thread for refreshing the display."""
@@ -186,6 +190,12 @@ class RefreshTask:
             )
             return None, False, {}
 
+        isolated_plugins = self.device_config.get_config("isolated_plugins", default=[])
+        if isinstance(isolated_plugins, list) and refresh_action.get_plugin_id() in isolated_plugins:
+            raise RuntimeError(
+                f"Plugin '{refresh_action.get_plugin_id()}' is currently isolated/disabled."
+            )
+
         plugin = get_plugin_instance(plugin_config)
         _t_req_start = perf_counter()
         # Correlate this refresh with a benchmark id so parallel stage events can attach
@@ -207,7 +217,15 @@ class RefreshTask:
         tracker: ProgressTracker
         with track_progress() as tracker:
             stage_t0 = perf_counter()
-            image = refresh_action.execute(plugin, self.device_config, current_dt)
+            self.progress_bus.publish(
+                {
+                    "state": "running",
+                    "plugin_id": plugin_id,
+                    "instance": instance_name,
+                    "refresh_id": benchmark_id,
+                }
+            )
+            image = self._execute_with_policy(refresh_action, plugin, current_dt)
             try:
                 save_stage_event(
                     self.device_config,
@@ -353,6 +371,22 @@ class RefreshTask:
             )
         except Exception:
             pass
+        self._update_plugin_health(
+            plugin_id=plugin_id,
+            instance=instance_name,
+            ok=True,
+            metrics=metrics,
+            error=None,
+        )
+        self.progress_bus.publish(
+            {
+                "state": "done",
+                "plugin_id": plugin_id,
+                "instance": instance_name,
+                "refresh_id": benchmark_id,
+                "metrics": metrics,
+            }
+        )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
     def _update_refresh_info(self, refresh_info, metrics, used_cached):
@@ -375,6 +409,12 @@ class RefreshTask:
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
         if self.running:
             with self.condition:
+                self.progress_bus.publish(
+                    {
+                        "state": "queued",
+                        "plugin_id": refresh_action.get_plugin_id(),
+                    }
+                )
                 self.manual_update_request = refresh_action
                 self.refresh_result = {}
                 self.refresh_event.clear()
@@ -385,6 +425,20 @@ class RefreshTask:
             metrics = self.refresh_result.get("metrics")
             exc = self.refresh_result.get("exception")
             if exc is not None:
+                self._update_plugin_health(
+                    plugin_id=refresh_action.get_plugin_id(),
+                    instance=refresh_action.get_refresh_info().get("plugin_instance"),
+                    ok=False,
+                    metrics=None,
+                    error=str(exc),
+                )
+                self.progress_bus.publish(
+                    {
+                        "state": "error",
+                        "plugin_id": refresh_action.get_plugin_id(),
+                        "error": str(exc),
+                    }
+                )
                 if isinstance(exc, BaseException):
                     raise exc
                 raise RuntimeError(str(exc))
@@ -398,6 +452,82 @@ class RefreshTask:
                 if isinstance(exc, BaseException):
                     raise exc
                 raise RuntimeError(str(exc))
+
+    def _execute_with_policy(self, refresh_action, plugin, current_dt: datetime):
+        plugin_id = refresh_action.get_plugin_id()
+        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
+        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
+        timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
+        attempts = max(1, retries + 1)
+
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                with ThreadPoolExecutor(max_workers=1) as ex:
+                    fut = ex.submit(
+                        refresh_action.execute, plugin, self.device_config, current_dt
+                    )
+                    image = fut.result(timeout=timeout_s)
+                if image is None:
+                    raise RuntimeError("Plugin returned None image")
+                return image
+            except FutureTimeoutError:
+                last_exc = TimeoutError(
+                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+                )
+            except Exception as exc:
+                last_exc = exc
+
+            if attempt < attempts:
+                sleep(max(0.0, backoff_ms / 1000.0))
+                self.progress_bus.publish(
+                    {
+                        "state": "step",
+                        "plugin_id": plugin_id,
+                        "step": f"retry {attempt}/{attempts - 1}",
+                    }
+                )
+
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
+
+    def _update_plugin_health(
+        self,
+        plugin_id: str,
+        instance: str | None,
+        ok: bool,
+        metrics: dict | None,
+        error: str | None,
+    ) -> None:
+        now_iso = datetime.now().isoformat()
+        entry = self.plugin_health.get(plugin_id, {})
+        entry.setdefault("success_count", 0)
+        entry.setdefault("failure_count", 0)
+        entry.setdefault("retry_count", 0)
+        entry.setdefault("timeout_count", 0)
+        entry["instance"] = instance
+        entry["last_seen"] = now_iso
+        if ok:
+            entry["status"] = "green"
+            entry["last_success_at"] = now_iso
+            entry["last_error"] = None
+            entry["success_count"] = int(entry.get("success_count", 0)) + 1
+            if metrics:
+                entry["last_metrics"] = metrics
+        else:
+            msg = error or "unknown error"
+            entry["status"] = "red"
+            entry["last_failure_at"] = now_iso
+            entry["last_error"] = msg
+            entry["failure_count"] = int(entry.get("failure_count", 0)) + 1
+            if "timed out" in msg.lower():
+                entry["timeout_count"] = int(entry.get("timeout_count", 0)) + 1
+            entry["retry_count"] = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
+        self.plugin_health[plugin_id] = entry
+
+    def get_health_snapshot(self) -> dict:
+        return dict(self.plugin_health)
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated)."""
