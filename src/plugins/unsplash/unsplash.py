@@ -4,6 +4,7 @@ from io import BytesIO
 import requests
 import logging
 import random
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,12 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         return None
 
 class Unsplash(BasePlugin):
+    def _request_timeout(self) -> float:
+        try:
+            return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))
+        except Exception:
+            return 20.0
+
     def generate_image(self, settings, device_config):
         access_key = device_config.load_env_key("UNSPLASH_ACCESS_KEY")
         if not access_key:
@@ -56,7 +63,7 @@ class Unsplash(BasePlugin):
             params['orientation'] = orientation
 
         try:
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=self._request_timeout())
             response.raise_for_status()
             data = response.json()
             if search_query:

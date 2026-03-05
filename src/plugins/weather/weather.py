@@ -58,6 +58,12 @@ OPEN_METEO_UNIT_PARAMS = {
 }
 
 class Weather(BasePlugin):
+    def _request_timeout(self) -> float:
+        try:
+            return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))
+        except Exception:
+            return 20.0
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {
@@ -609,7 +615,7 @@ class Weather(BasePlugin):
 
         # Visibility
         current_visibility = "N/A"
-        unit_label = "ft" if units == "imperial" else "km"
+        unit_label = "mi" if units == "imperial" else "km"
         visibility_hourly_times = hourly_data.get('time', [])
         visibility_values = hourly_data.get('visibility', [])
         for i, time_str in enumerate(visibility_hourly_times):
@@ -617,8 +623,8 @@ class Weather(BasePlugin):
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
                     visibility = visibility_values[i]
                     if units == "imperial":
-                        current_visibility = int(round(visibility, 0))
-                        unit_label = "ft"
+                        current_visibility = round(float(visibility) / 1609.344, 1)
+                        unit_label = "mi"
                     else:
                         current_visibility = round(visibility / 1000, 1)
                         unit_label = "km"
@@ -628,7 +634,7 @@ class Weather(BasePlugin):
                 continue
 
         visibility_str = f">{current_visibility}" if isinstance(current_visibility, (int, float)) and (
-            (units == "imperial" and current_visibility >= 32808) or 
+            (units == "imperial" and current_visibility >= 6.2) or
             (units != "imperial" and current_visibility >= 10)
         ) else current_visibility
 
@@ -680,7 +686,7 @@ class Weather(BasePlugin):
 
     def get_weather_data(self, api_key, units, lat, long):
         url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
-        response = requests.get(url)
+        response = requests.get(url, timeout=self._request_timeout())
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve weather data: %s", response.content)
             raise RuntimeError("Failed to retrieve weather data.")
@@ -689,7 +695,7 @@ class Weather(BasePlugin):
 
     def get_air_quality(self, api_key, lat, long):
         url = AIR_QUALITY_URL.format(lat=lat, long=long, api_key=api_key)
-        response = requests.get(url)
+        response = requests.get(url, timeout=self._request_timeout())
 
         if not 200 <= response.status_code < 300:
             logger.error("Failed to get air quality data: %s", response.content)
@@ -699,7 +705,7 @@ class Weather(BasePlugin):
 
     def get_location(self, api_key, lat, long):
         url = GEOCODING_URL.format(lat=lat, long=long, api_key=api_key)
-        response = requests.get(url)
+        response = requests.get(url, timeout=self._request_timeout())
 
         if not 200 <= response.status_code < 300:
             logger.error(f"Failed to get location: {response.content}")
@@ -717,7 +723,7 @@ class Weather(BasePlugin):
     def get_open_meteo_data(self, lat, long, units, forecast_days):
         unit_params = OPEN_METEO_UNIT_PARAMS[units]
         url = OPEN_METEO_FORECAST_URL.format(lat=lat, long=long, forecast_days=forecast_days) + f"&{unit_params}"
-        response = requests.get(url)
+        response = requests.get(url, timeout=self._request_timeout())
         
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve Open-Meteo weather data: %s", response.content)
@@ -727,7 +733,7 @@ class Weather(BasePlugin):
 
     def get_open_meteo_air_quality(self, lat, long):
         url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
-        response = requests.get(url)
+        response = requests.get(url, timeout=self._request_timeout())
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve Open-Meteo air quality data: %s", response.content)
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
