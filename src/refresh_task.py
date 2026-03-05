@@ -1,7 +1,10 @@
+import io
 import logging
+import multiprocessing
 import os
 import threading
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime
 from time import perf_counter, sleep
 from uuid import uuid4
@@ -26,6 +29,81 @@ except Exception:  # pragma: no cover
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class ManualUpdateRequest:
+    request_id: str
+    refresh_action: "RefreshAction"
+    done: threading.Event = field(default_factory=threading.Event)
+    metrics: dict | None = None
+    exception: BaseException | None = None
+
+
+def _get_mp_context():
+    try:
+        return multiprocessing.get_context("fork")
+    except ValueError:
+        return multiprocessing.get_context()
+
+
+def _restore_child_config(device_config):
+    from config import Config
+
+    Config.config_file = device_config.config_file
+    Config.current_image_file = device_config.current_image_file
+    Config.processed_image_file = device_config.processed_image_file
+    Config.plugin_image_dir = device_config.plugin_image_dir
+    Config.history_image_dir = device_config.history_image_dir
+    return Config()
+
+
+def _remote_exception(error_type: str, error_message: str) -> BaseException:
+    exc_types = {
+        "RuntimeError": RuntimeError,
+        "ValueError": ValueError,
+        "TimeoutError": TimeoutError,
+        "KeyError": KeyError,
+        "TypeError": TypeError,
+        "FileNotFoundError": FileNotFoundError,
+    }
+    exc_cls = exc_types.get(error_type, RuntimeError)
+    return exc_cls(error_message)
+
+
+def _execute_refresh_attempt_worker(
+    result_queue,
+    plugin_config: dict,
+    refresh_action,
+    device_config,
+    current_dt: datetime,
+):
+    try:
+        child_config = _restore_child_config(device_config)
+        plugin = get_plugin_instance(plugin_config)
+        image = refresh_action.execute(plugin, child_config, current_dt)
+        plugin_meta = None
+        if hasattr(plugin, "get_latest_metadata"):
+            plugin_meta = plugin.get_latest_metadata()
+        if image is None:
+            raise RuntimeError("Plugin returned None image")
+        image_bytes = io.BytesIO()
+        image.save(image_bytes, format="PNG")
+        result_queue.put(
+            {
+                "ok": True,
+                "image_bytes": image_bytes.getvalue(),
+                "plugin_meta": plugin_meta,
+            }
+        )
+    except Exception as exc:
+        result_queue.put(
+            {
+                "ok": False,
+                "error_type": exc.__class__.__name__,
+                "error_message": str(exc),
+            }
+        )
+
+
 class RefreshTask:
     """Handles the logic for refreshing the display using a background thread."""
 
@@ -37,12 +115,7 @@ class RefreshTask:
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
         self.running = False
-        # None until a manual refresh is requested; then set to a RefreshAction
-        self.manual_update_request = None
-
-        self.refresh_event = threading.Event()
-        self.refresh_event.set()
-        self.refresh_result = {}
+        self.manual_update_requests: deque[ManualUpdateRequest] = deque()
         self.progress_bus = get_progress_bus()
         self.plugin_health: dict[str, dict] = {}
 
@@ -60,6 +133,10 @@ class RefreshTask:
         """Stops the refresh task by notifying the background thread to exit."""
         with self.condition:
             self.running = False
+            while self.manual_update_requests:
+                request = self.manual_update_requests.popleft()
+                request.exception = RuntimeError("Refresh task stopped before request completed")
+                request.done.set()
             self.condition.notify_all()  # Wake the thread to let it exit
         if self.thread:
             logger.info("Stopping refresh task")
@@ -92,32 +169,33 @@ class RefreshTask:
         - Captures and logs any unexpected errors during execution to prevent the thread from exiting.
         """
         while True:
+            result = None
             try:
                 result = self._wait_for_trigger()
                 if result is None:
                     break
 
-                playlist_manager, latest_refresh, current_dt, manual_action = result
-                refresh_action = self._select_refresh_action(
-                    playlist_manager, latest_refresh, current_dt, manual_action
+                playlist_manager, latest_refresh, current_dt, manual_request = result
+                refresh_action, request_id = self._select_refresh_action(
+                    playlist_manager, latest_refresh, current_dt, manual_request
                 )
 
                 if refresh_action:
-                    self.refresh_result = {}
-                    self.refresh_event.clear()
-
                     refresh_info, used_cached, metrics = self._perform_refresh(
-                        refresh_action, latest_refresh, current_dt
+                        refresh_action, latest_refresh, current_dt, request_id=request_id
                     )
-                    self.refresh_result["metrics"] = metrics
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
+                    if manual_request is not None:
+                        manual_request.metrics = metrics
+                        manual_request.done.set()
 
             except Exception as e:
                 logger.exception("Exception during refresh")
-                self.refresh_result["exception"] = e  # Capture exception
-            finally:
-                self.refresh_event.set()
+                if result is not None and result[-1] is not None:
+                    manual_request = result[-1]
+                    manual_request.exception = e
+                    manual_request.done.set()
 
     def _wait_for_trigger(self):
         """Wait for the next refresh trigger while holding the condition lock.
@@ -133,20 +211,21 @@ class RefreshTask:
             sleep_time = self.device_config.get_config(
                 "plugin_cycle_interval_seconds", default=60 * 60
             )
-            self.condition.wait(timeout=sleep_time)
+            if not self.manual_update_requests:
+                self.condition.wait(timeout=sleep_time)
             if not self.running:
                 return None
 
             playlist_manager = self.device_config.get_playlist_manager()
             latest_refresh = self.device_config.get_refresh_info()
             current_dt = self._get_current_datetime()
-            manual_action = self.manual_update_request
-            if manual_action is not None:
-                self.manual_update_request = None
-            return playlist_manager, latest_refresh, current_dt, manual_action
+            manual_request = None
+            if self.manual_update_requests:
+                manual_request = self.manual_update_requests.popleft()
+            return playlist_manager, latest_refresh, current_dt, manual_request
 
     def _select_refresh_action(
-        self, playlist_manager, latest_refresh, current_dt, manual_action
+        self, playlist_manager, latest_refresh, current_dt, manual_request
     ):
         """Determine which refresh action to perform.
 
@@ -157,9 +236,11 @@ class RefreshTask:
             No locks are held during execution.
         """
         refresh_action = None
-        if manual_action is not None:
+        request_id = None
+        if manual_request is not None:
             logger.info("Manual update requested")
-            refresh_action = manual_action
+            refresh_action = manual_request.refresh_action
+            request_id = manual_request.request_id
         else:
             if self.device_config.get_config("log_system_stats"):
                 self.log_system_stats()
@@ -171,9 +252,9 @@ class RefreshTask:
             )
             if plugin_instance:
                 refresh_action = PlaylistRefresh(playlist, plugin_instance)
-        return refresh_action
+        return refresh_action, request_id
 
-    def _perform_refresh(self, refresh_action, latest_refresh, current_dt):
+    def _perform_refresh(self, refresh_action, latest_refresh, current_dt, request_id=None):
         """Execute the refresh action and update the display if needed.
 
         Returns a tuple ``(refresh_info, used_cached, metrics)`` where
@@ -196,10 +277,9 @@ class RefreshTask:
                 f"Plugin '{refresh_action.get_plugin_id()}' is currently isolated/disabled."
             )
 
-        plugin = get_plugin_instance(plugin_config)
         _t_req_start = perf_counter()
         # Correlate this refresh with a benchmark id so parallel stage events can attach
-        benchmark_id = str(uuid4())
+        benchmark_id = request_id or str(uuid4())
         plugin_id = refresh_action.get_plugin_id()
         instance_name = refresh_action.get_refresh_info().get("plugin_instance")
 
@@ -211,6 +291,7 @@ class RefreshTask:
                 "plugin_id": plugin_id,
                 "instance": instance_name,
                 "refresh_id": benchmark_id,
+                "request_id": request_id,
             },
         )
         _t_gen_start = perf_counter()
@@ -223,9 +304,15 @@ class RefreshTask:
                     "plugin_id": plugin_id,
                     "instance": instance_name,
                     "refresh_id": benchmark_id,
+                    "request_id": request_id,
                 }
             )
-            image = self._execute_with_policy(refresh_action, plugin, current_dt)
+            image, plugin_meta = self._execute_with_policy(
+                refresh_action,
+                plugin_config,
+                current_dt,
+                request_id=request_id,
+            )
             try:
                 save_stage_event(
                     self.device_config,
@@ -245,6 +332,7 @@ class RefreshTask:
                 "instance": instance_name,
                 "duration_ms": generate_ms,
                 "refresh_id": benchmark_id,
+                "request_id": request_id,
             },
         )
         if image is None:
@@ -252,18 +340,8 @@ class RefreshTask:
         image_hash = compute_image_hash(image)
 
         refresh_info = refresh_action.get_refresh_info()
-        try:
-            plugin_meta = None
-            if hasattr(plugin, "get_latest_metadata"):
-                plugin_meta = plugin.get_latest_metadata()
-            if plugin_meta:
-                refresh_info.update({"plugin_meta": plugin_meta})
-        except Exception as exc:
-            logger.warning(
-                "Error getting latest metadata for plugin %s: %s",
-                refresh_action.get_plugin_id(),
-                exc,
-            )
+        if plugin_meta:
+            refresh_info.update({"plugin_meta": plugin_meta})
 
         refresh_info.update(
             {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
@@ -289,6 +367,7 @@ class RefreshTask:
                     "plugin_id": plugin_id,
                     "instance": instance_name,
                     "refresh_id": benchmark_id,
+                    "request_id": request_id,
                 },
             )
             stage_t1 = perf_counter()
@@ -296,7 +375,7 @@ class RefreshTask:
                 # Mark preprocess/display as stages around display_manager call
                 self.display_manager.display_image(
                     image,
-                    image_settings=plugin.config.get("image_settings", []),
+                    image_settings=plugin_config.get("image_settings", []),
                     history_meta=history_meta,
                 )
             finally:
@@ -310,6 +389,7 @@ class RefreshTask:
                         "instance": instance_name,
                         "duration_ms": display_duration_ms,
                         "refresh_id": benchmark_id,
+                        "request_id": request_id,
                     },
                 )
                 try:
@@ -378,6 +458,7 @@ class RefreshTask:
                 "plugin_id": plugin_id,
                 "instance": instance_name,
                 "refresh_id": benchmark_id,
+                "request_id": request_id,
                 "metrics": metrics,
             }
         )
@@ -402,22 +483,26 @@ class RefreshTask:
     def manual_update(self, refresh_action):
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
         if self.running:
+            request = ManualUpdateRequest(str(uuid4()), refresh_action)
             with self.condition:
                 self.progress_bus.publish(
                     {
                         "state": "queued",
                         "plugin_id": refresh_action.get_plugin_id(),
+                        "request_id": request.request_id,
                     }
                 )
-                self.manual_update_request = refresh_action
-                self.refresh_result = {}
-                self.refresh_event.clear()
-
+                self.manual_update_requests.append(request)
                 self.condition.notify_all()  # Wake the thread to process manual update
 
             wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "300") or "300")
-            completed = self.refresh_event.wait(timeout=max(0.0, wait_s))
+            completed = request.done.wait(timeout=max(0.0, wait_s))
             if not completed:
+                with self.condition:
+                    try:
+                        self.manual_update_requests.remove(request)
+                    except ValueError:
+                        pass
                 timeout_exc = TimeoutError(
                     f"Manual update timed out after {int(wait_s)}s"
                 )
@@ -432,12 +517,13 @@ class RefreshTask:
                     {
                         "state": "error",
                         "plugin_id": refresh_action.get_plugin_id(),
+                        "request_id": request.request_id,
                         "error": str(timeout_exc),
                     }
                 )
                 raise timeout_exc
-            metrics = self.refresh_result.get("metrics")
-            exc = self.refresh_result.get("exception")
+            metrics = request.metrics
+            exc = request.exception
             if exc is not None:
                 self._update_plugin_health(
                     plugin_id=refresh_action.get_plugin_id(),
@@ -450,6 +536,7 @@ class RefreshTask:
                     {
                         "state": "error",
                         "plugin_id": refresh_action.get_plugin_id(),
+                        "request_id": request.request_id,
                         "error": str(exc),
                     }
                 )
@@ -459,44 +546,83 @@ class RefreshTask:
             return metrics
         else:
             logger.warning("Background refresh task is not running, unable to do a manual update")
-            # Preserve compatibility for direct/manual callers that pre-seed
-            # refresh_result before the worker has ever been started.
-            exc = self.refresh_result.get("exception")
-            if exc is not None and self.thread is None:
-                if isinstance(exc, BaseException):
-                    raise exc
-                raise RuntimeError(str(exc))
 
-    def _execute_with_policy(self, refresh_action, plugin, current_dt: datetime):
+    def _execute_with_policy(self, refresh_action, plugin_config, current_dt: datetime, request_id=None):
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
         timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
         attempts = max(1, retries + 1)
 
-        last_exc: Exception | None = None
+        last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
-            ex = ThreadPoolExecutor(max_workers=1)
-            fut = None
+            ctx = _get_mp_context()
+            result_queue = ctx.Queue(maxsize=1)
+            proc = ctx.Process(
+                target=_execute_refresh_attempt_worker,
+                args=(
+                    result_queue,
+                    plugin_config,
+                    refresh_action,
+                    self.device_config,
+                    current_dt,
+                ),
+                daemon=True,
+            )
             try:
-                fut = ex.submit(
-                    refresh_action.execute, plugin, self.device_config, current_dt
-                )
-                image = fut.result(timeout=timeout_s)
-                ex.shutdown(wait=False, cancel_futures=False)
-                if image is None:
-                    raise RuntimeError("Plugin returned None image")
-                return image
-            except FutureTimeoutError:
-                if fut is not None:
-                    fut.cancel()
-                ex.shutdown(wait=False, cancel_futures=True)
+                proc.start()
+                proc.join(timeout=timeout_s)
+                if proc.is_alive():
+                    proc.terminate()
+                    proc.join(timeout=1)
+                    if proc.is_alive():
+                        proc.kill()
+                        proc.join(timeout=1)
+                    last_exc = TimeoutError(
+                        f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+                    )
+                else:
+                    try:
+                        payload = result_queue.get_nowait()
+                    except Exception:
+                        payload = None
+                    if not payload:
+                        if proc.exitcode == 0:
+                            raise RuntimeError(
+                                f"Plugin '{plugin_id}' exited without returning a result"
+                            )
+                        raise RuntimeError(
+                            f"Plugin '{plugin_id}' exited with code {proc.exitcode}"
+                        )
+                    if payload.get("ok"):
+                        from PIL import Image
+
+                        image = Image.open(io.BytesIO(payload["image_bytes"]))
+                        return image.copy(), payload.get("plugin_meta")
+                    last_exc = _remote_exception(
+                        str(payload.get("error_type") or "RuntimeError"),
+                        str(payload.get("error_message") or "unknown error"),
+                    )
+            except TimeoutError:
                 last_exc = TimeoutError(
                     f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
                 )
             except Exception as exc:
-                ex.shutdown(wait=False, cancel_futures=True)
                 last_exc = exc
+            finally:
+                try:
+                    result_queue.close()
+                except Exception:
+                    pass
+                try:
+                    result_queue.join_thread()
+                except Exception:
+                    pass
+
+            if isinstance(last_exc, TimeoutError):
+                last_exc = TimeoutError(
+                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+                )
 
             if attempt < attempts:
                 sleep(max(0.0, backoff_ms / 1000.0))
@@ -504,6 +630,7 @@ class RefreshTask:
                     {
                         "state": "step",
                         "plugin_id": plugin_id,
+                        "request_id": request_id,
                         "step": f"retry {attempt}/{attempts - 1}",
                     }
                 )

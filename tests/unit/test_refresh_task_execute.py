@@ -11,7 +11,7 @@ def _dummy_plugin(device_config):
     return DummyPlugin()
 
 
-def test_manual_refresh_uses_execute(device_config_dev, monkeypatch):
+def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
     """Ensure ManualRefresh is executed via the unified execute method."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
@@ -29,10 +29,10 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch):
     )
 
     refresh = ManualRefresh("dummy", {})
-    called = {"val": False}
+    marker = tmp_path / "manual-execute.txt"
 
     def fake_execute(self, plugin, device_config, current_dt):
-        called["val"] = True
+        marker.write_text("called", encoding="utf-8")
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(refresh, "execute", fake_execute.__get__(refresh, ManualRefresh))
@@ -40,12 +40,12 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch):
     try:
         task.start()
         task.manual_update(refresh)
-        assert called["val"]
+        assert marker.read_text(encoding="utf-8") == "called"
     finally:
         task.stop()
 
 
-def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch):
+def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
     """Ensure PlaylistRefresh is executed via the unified execute method."""
     from display.display_manager import DisplayManager
     from refresh_task import PlaylistRefresh, RefreshTask
@@ -87,17 +87,22 @@ def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch):
 
     monkeypatch.setattr(task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask))
 
-    called = {"val": False}
+    marker = tmp_path / "playlist-execute.txt"
 
     def fake_execute(self, plugin, device_config, current_dt):
-        called["val"] = True
-        task.running = False
+        marker.write_text("called", encoding="utf-8")
         return Image.new("RGB", device_config.get_resolution(), "white")
 
     monkeypatch.setattr(PlaylistRefresh, "execute", fake_execute, raising=True)
 
-    task.start()
-    task.thread.join(timeout=1)
-    assert called["val"]
-    task.stop()
+    try:
+        task.start()
+        for _ in range(20):
+            if marker.exists():
+                break
+            import time
 
+            time.sleep(0.05)
+        assert marker.read_text(encoding="utf-8") == "called"
+    finally:
+        task.stop()

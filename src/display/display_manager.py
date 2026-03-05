@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 try:
     from display.inky_display import InkyDisplay
 except ImportError:
+    InkyDisplay = None
     logger.info("Inky display not available, hardware support disabled")
 
 try:
     from display.waveshare_display import WaveshareDisplay
 except ImportError:
+    WaveshareDisplay = None
     logger.info("Waveshare display not available, hardware support disabled")
 
 class DisplayManager:
@@ -44,8 +46,16 @@ class DisplayManager:
         if display_type == "mock":
             self.display = MockDisplay(device_config)
         elif display_type == "inky":
+            if InkyDisplay is None:
+                raise RuntimeError(
+                    "Display type 'inky' requested but the Inky hardware driver is unavailable."
+                )
             self.display = InkyDisplay(device_config)
         elif fnmatch.fnmatch(display_type, "epd*in*"):  
+            if WaveshareDisplay is None:
+                raise RuntimeError(
+                    f"Display type '{display_type}' requested but the Waveshare driver is unavailable."
+                )
             # derived from waveshare epd - we assume here that will be consistent
             # otherwise we will have to enshring the manufacturer in the 
             # display_type and then have a display_model parameter.  Will leave
@@ -104,7 +114,10 @@ class DisplayManager:
         
         # Save the raw image
         logger.info(f"Saving image to {self.device_config.current_image_file}")
-        image.save(self.device_config.current_image_file)
+        try:
+            image.save(self.device_config.current_image_file)
+        except Exception:
+            logger.exception("Failed to save current image preview")
 
         # Resize and adjust orientation
         image = change_orientation(
@@ -118,7 +131,10 @@ class DisplayManager:
         image = apply_image_enhancement(
             image, self.device_config.get_config("image_settings")
         )
-        image.save(self.device_config.processed_image_file)
+        try:
+            image.save(self.device_config.processed_image_file)
+        except Exception:
+            logger.exception("Failed to save processed image preview")
         self._save_history_entry(image, history_meta=history_meta)
 
         # Pass to the concrete instance to render to the device.

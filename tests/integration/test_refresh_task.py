@@ -205,19 +205,26 @@ def test_refresh_task_image_already_displayed(device_config_dev, monkeypatch):
 def test_refresh_task_manual_update_exception_handling(device_config_dev, monkeypatch):
     """Test exception handling in manual update."""
     from display.display_manager import DisplayManager
-    from refresh_task import RefreshTask
+    from refresh_task import ManualRefresh, RefreshTask
 
     display_manager = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, display_manager)
+    monkeypatch.setattr(
+        task,
+        "_perform_refresh",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("test error")),
+        raising=True,
+    )
 
-    # Mock refresh result with exception
-    task.refresh_result = {"exception": RuntimeError("test error")}
-
-    # This should trigger the exception re-raising logic
-    exc = task.refresh_result.get("exception")
-    if exc is not None:
-        if isinstance(exc, BaseException):
-            pass  # This covers the exception re-raising
+    task.start()
+    try:
+        try:
+            task.manual_update(ManualRefresh("ai_text", {}))
+            assert False, "expected exception"
+        except RuntimeError as exc:
+            assert "test error" in str(exc)
+    finally:
+        task.stop()
 
 
 def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
@@ -564,19 +571,25 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
     assert calls["display"] == 0
 
 
-def test_manual_update_propagates_exception(device_config_dev):
+def test_manual_update_propagates_exception(device_config_dev, monkeypatch):
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
+    monkeypatch.setattr(
+        task,
+        "_perform_refresh",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+        raising=True,
+    )
 
-    # Arrange a manual result with an exception and ensure it is re-raised
-    task.refresh_result = {"exception": RuntimeError("boom")}
-    task.refresh_event.set()  # simulate completion
-
+    task.start()
     try:
-        task.manual_update(ManualRefresh("ai_text", {}))
-        assert False, "expected exception"
-    except RuntimeError as e:
-        assert "boom" in str(e)
+        try:
+            task.manual_update(ManualRefresh("ai_text", {}))
+            assert False, "expected exception"
+        except RuntimeError as e:
+            assert "boom" in str(e)
+    finally:
+        task.stop()

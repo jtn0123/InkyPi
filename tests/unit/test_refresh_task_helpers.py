@@ -16,7 +16,7 @@ def _dummy_plugin(device_config):
 
 def test_wait_for_trigger_returns_manual_refresh(device_config_dev, monkeypatch):
     from display.display_manager import DisplayManager
-    from refresh_task import ManualRefresh, RefreshTask
+    from refresh_task import ManualRefresh, ManualUpdateRequest, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -24,10 +24,11 @@ def test_wait_for_trigger_returns_manual_refresh(device_config_dev, monkeypatch)
     monkeypatch.setattr(task.condition, "wait", lambda timeout=None: None)
 
     manual = ManualRefresh("dummy", {})
-    task.manual_update_request = manual
-    pm, latest, dt, action = task._wait_for_trigger()
-    assert action is manual
-    assert task.manual_update_request is None
+    request = ManualUpdateRequest("req-1", manual)
+    task.manual_update_requests.append(request)
+    pm, latest, dt, queued = task._wait_for_trigger()
+    assert queued is request
+    assert not task.manual_update_requests
 
 
 def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
@@ -58,7 +59,10 @@ def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
         return fake_playlist, fake_plugin
 
     monkeypatch.setattr(task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask))
-    action = task._select_refresh_action(None, None, task._get_current_datetime(), None)
+    action, request_id = task._select_refresh_action(
+        None, None, task._get_current_datetime(), None
+    )
+    assert request_id is None
     assert isinstance(action, PlaylistRefresh)
     assert action.playlist is fake_playlist
     assert action.plugin_instance is fake_plugin
@@ -66,13 +70,19 @@ def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
 
 def test_select_refresh_action_manual(device_config_dev):
     from display.display_manager import DisplayManager
-    from refresh_task import ManualRefresh, RefreshTask
+    from refresh_task import ManualRefresh, ManualUpdateRequest, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
     manual = ManualRefresh("dummy", {})
-    action = task._select_refresh_action(None, None, task._get_current_datetime(), manual)
+    action, request_id = task._select_refresh_action(
+        None,
+        None,
+        task._get_current_datetime(),
+        ManualUpdateRequest("req-1", manual),
+    )
     assert action is manual
+    assert request_id == "req-1"
 
 
 def test_perform_refresh_skips_when_cached(device_config_dev, monkeypatch):

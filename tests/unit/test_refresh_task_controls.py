@@ -17,21 +17,19 @@ def test_manual_update_raises_exception_from_thread(device_config_dev, monkeypat
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
-
-    # Start the task with a stub _run that immediately processes and raises
-    def fake_run():
-        with task.condition:
-            # simulate thread started and waiting
-            pass
-        # emulate a manual_update being processed and failing
-        task.refresh_result = {"exception": RuntimeError("boom")}
-        task.refresh_event.set()
-        task.running = False
-
-    monkeypatch.setattr(task, "_run", fake_run, raising=True)
-    task.start()
+    monkeypatch.setattr(
+        task,
+        "_perform_refresh",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+        raising=True,
+    )
 
     try:
-        task.manual_update(ManualRefresh("ai_text", {}))
+        task.start()
+        try:
+            task.manual_update(ManualRefresh("ai_text", {}))
+            assert False, "expected exception"
+        except RuntimeError as exc:
+            assert "boom" in str(exc)
     finally:
         task.stop()

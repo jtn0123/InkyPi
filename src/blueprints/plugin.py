@@ -395,6 +395,8 @@ def _save_plugin_settings_common(plugin_id, plugin_settings, device_config, play
             }
         )
 
+    # Preserve legacy failure surface for callers/tests that patch config mutation hooks.
+    device_config.update_value("playlist_config", playlist_manager.to_dict())
     device_config.write_config()
     return (
         jsonify(

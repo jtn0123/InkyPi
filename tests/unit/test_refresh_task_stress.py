@@ -149,28 +149,25 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
     slow_plugin_started = threading.Event()
     slow_plugin_can_finish = threading.Event()
 
-    class SlowPlugin:
-        config = {"image_settings": []}
+    def fake_perform(refresh_action, latest_refresh, current_dt, request_id=None):
+        slow_plugin_started.set()
+        slow_plugin_can_finish.wait(timeout=2)
+        return (
+            {"refresh_type": "Manual Update", "plugin_id": "slow", "refresh_time": current_dt.isoformat(), "image_hash": "hash"},
+            False,
+            {"request_ms": 1},
+        )
 
-        def generate_image(self, settings, device_config):
-            slow_plugin_started.set()
-            # Wait until we're told to finish (or timeout)
-            slow_plugin_can_finish.wait(timeout=2)
-            return Image.new("RGB", device_config.get_resolution(), "white")
-
-    slow_plugin = SlowPlugin()
-    dummy_cfg = {"id": "slow", "class": "Slow"}
-    monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
-    monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: slow_plugin, raising=True
-    )
+    monkeypatch.setattr(task, "_perform_refresh", fake_perform, raising=True)
 
     try:
         task.start()
 
         # Trigger a manual update
-        refresh = ManualRefresh("slow", {})
-        task.manual_update(refresh)
+        refresh_thread = threading.Thread(
+            target=lambda: task.manual_update(ManualRefresh("slow", {}))
+        )
+        refresh_thread.start()
 
         # Wait for the slow plugin to start
         assert slow_plugin_started.wait(timeout=1), "Plugin didn't start"
@@ -180,6 +177,7 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
 
         # Allow plugin to finish
         slow_plugin_can_finish.set()
+        refresh_thread.join(timeout=2)
 
         # Verify task stopped
         assert not task.running
@@ -196,26 +194,23 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
     task = RefreshTask(device_config_dev, dm)
 
     processed_order = []
-
-    class OrderTrackingPlugin:
-        config = {"image_settings": []}
-
-        def __init__(self, plugin_id):
-            self.plugin_id = plugin_id
-
-        def generate_image(self, settings, device_config):
-            processed_order.append(self.plugin_id)
-            return Image.new("RGB", device_config.get_resolution(), "white")
-
-    plugins = {f"plugin{i}": OrderTrackingPlugin(f"plugin{i}") for i in range(5)}
-
-    def get_plugin_instance(cfg):
-        return plugins[cfg["id"]]
-
-    dummy_cfg_func = lambda pid: {"id": pid, "class": "Test"}
-    monkeypatch.setattr(device_config_dev, "get_plugin", dummy_cfg_func)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", get_plugin_instance, raising=True
+        task,
+        "_perform_refresh",
+        lambda refresh_action, latest_refresh, current_dt, request_id=None: (
+            processed_order.append(refresh_action.get_plugin_id())
+            or (
+                {
+                    "refresh_type": "Manual Update",
+                    "plugin_id": refresh_action.get_plugin_id(),
+                    "refresh_time": current_dt.isoformat(),
+                    "image_hash": refresh_action.get_plugin_id(),
+                },
+                False,
+                {"request_ms": 1},
+            )
+        ),
+        raising=True,
     )
 
     try:
@@ -232,14 +227,7 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
         # Wait for all to process
         time.sleep(1)
 
-        # Note: Due to threading, exact order isn't guaranteed, but
-        # all plugins should have been called
-        assert len(processed_order) >= 1, "At least one update should process"
-        # Verify all plugins were eventually called
-        assert set(processed_order) == set(expected_order), (
-            f"Expected all plugins to be called. "
-            f"Expected: {expected_order}, Got: {processed_order}"
-        )
+        assert processed_order == expected_order
 
     finally:
         task.stop()
@@ -253,22 +241,24 @@ def test_exception_during_refresh_does_not_crash_task(
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    class FailingPlugin:
-        config = {"image_settings": []}
-        call_count = 0
+    calls = {"count": 0}
 
-        def generate_image(self, settings, device_config):
-            self.call_count += 1
-            if self.call_count == 1:
-                raise RuntimeError("Simulated plugin failure")
-            return Image.new("RGB", device_config.get_resolution(), "white")
+    def fake_perform(refresh_action, latest_refresh, current_dt, request_id=None):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("Simulated plugin failure")
+        return (
+            {
+                "refresh_type": "Manual Update",
+                "plugin_id": refresh_action.get_plugin_id(),
+                "refresh_time": current_dt.isoformat(),
+                "image_hash": "hash",
+            },
+            False,
+            {"request_ms": 1},
+        )
 
-    failing_plugin = FailingPlugin()
-    dummy_cfg = {"id": "failing", "class": "Failing"}
-    monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
-    monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: failing_plugin, raising=True
-    )
+    monkeypatch.setattr(task, "_perform_refresh", fake_perform, raising=True)
 
     try:
         task.start()
@@ -288,14 +278,14 @@ def test_exception_during_refresh_does_not_crash_task(
         assert metrics is not None
 
         # Verify both calls were made
-        assert failing_plugin.call_count == 2
+        assert calls["count"] == 2
 
     finally:
         task.stop()
 
 
-def test_refresh_result_populated_after_update(device_config_dev, mock_plugin, monkeypatch):
-    """Test that refresh_result is properly populated after manual update."""
+def test_manual_update_returns_metrics_after_update(device_config_dev, mock_plugin, monkeypatch):
+    """Test that manual updates return per-request metrics."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -309,15 +299,9 @@ def test_refresh_result_populated_after_update(device_config_dev, mock_plugin, m
         task.start()
 
         refresh = ManualRefresh("test", {})
-        task.manual_update(refresh)
-
-        # Wait for refresh to complete
-        completed = task.refresh_event.wait(timeout=2)
-        assert completed, "Refresh did not complete in time"
-
-        # Check that refresh_result contains metrics
-        assert "metrics" in task.refresh_result
-        assert isinstance(task.refresh_result["metrics"], dict)
+        metrics = task.manual_update(refresh)
+        assert isinstance(metrics, dict)
+        assert "request_ms" in metrics
 
     finally:
         task.stop()

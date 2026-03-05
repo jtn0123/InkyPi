@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import shutil
+import tempfile
+import threading
 from typing import Any, cast
 
 from dotenv import load_dotenv, set_key, unset_key
@@ -52,6 +54,7 @@ class Config:
     history_image_dir = os.path.join(BASE_DIR, "static", "images", "history")
 
     def __init__(self):
+        self._config_lock = threading.RLock()
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
 
@@ -204,10 +207,27 @@ class Config:
     def write_config(self):
         """Updates the cached config from the model objects and writes to the config file."""
         logger.debug(f"Writing device config to {self.config_file}")
-        self.update_value("playlist_config", self.playlist_manager.to_dict())
-        self.update_value("refresh_info", self.refresh_info.to_dict())
-        with open(self.config_file, "w") as outfile:
-            json.dump(self.config, outfile, indent=4)
+        with self._config_lock:
+            self.config["playlist_config"] = self.playlist_manager.to_dict()
+            self.config["refresh_info"] = self.refresh_info.to_dict()
+            config_dir = os.path.dirname(self.config_file) or "."
+            fd, tmp_path = tempfile.mkstemp(
+                dir=config_dir,
+                prefix=".device.",
+                suffix=".tmp",
+            )
+            try:
+                with os.fdopen(fd, "w") as outfile:
+                    json.dump(self.config, outfile, indent=4)
+                    outfile.flush()
+                    os.fsync(outfile.fileno())
+                os.replace(tmp_path, self.config_file)
+            finally:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     def get_config(self, key=None, default=None):
         """Gets the value of a specific configuration key or returns the entire config if none provided.
@@ -260,12 +280,14 @@ class Config:
 
     def update_config(self, config):
         """Updates the config with the new values provided and writes to the config file."""
-        self.config.update(config)
+        with self._config_lock:
+            self.config.update(config)
         self.write_config()
 
     def update_value(self, key, value, write=False):
         """Updates a specific key in the configuration with a new value and optionally writes it to the config file."""
-        self.config[key] = value
+        with self._config_lock:
+            self.config[key] = value
         if write:
             self.write_config()
 

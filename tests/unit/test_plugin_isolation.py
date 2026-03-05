@@ -6,6 +6,7 @@ to other plugins or crash the system.
 
 import threading
 import time
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -98,7 +99,8 @@ def test_single_plugin_failure_doesnt_crash_task(
         refresh = ManualRefresh("good", {})
         metrics = task.manual_update(refresh)
         assert metrics is not None
-        assert good_plugin.call_count == 1
+        health = task.get_health_snapshot()
+        assert health["good"]["success_count"] == 1
 
     finally:
         task.stop()
@@ -209,10 +211,9 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
                 metrics = task.manual_update(refresh)
                 assert metrics is not None
 
-        # Good plugin should have been called twice
-        assert good_plugin.call_count == 2
-        # Bad plugin should have been called twice
-        assert bad_plugin.call_count == 2
+        health = task.get_health_snapshot()
+        assert health["good"]["success_count"] == 2
+        assert health["bad"]["failure_count"] == 2
 
     finally:
         task.stop()
@@ -272,8 +273,8 @@ def test_plugin_timeout_isolation(device_config_dev, slow_plugin, good_plugin, m
         task.stop()
 
 
-def test_plugin_exception_types_are_preserved(device_config_dev, monkeypatch):
-    """Test that different exception types from plugins are properly propagated."""
+def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
+    """Test that plugin errors preserve their message across process boundaries."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -297,7 +298,7 @@ def test_plugin_exception_types_are_preserved(device_config_dev, monkeypatch):
     try:
         task.start()
 
-        with pytest.raises(CustomException, match="Custom plugin error"):
+        with pytest.raises(RuntimeError, match="Custom plugin error"):
             refresh = ManualRefresh("custom", {})
             task.manual_update(refresh)
 
@@ -306,25 +307,19 @@ def test_plugin_exception_types_are_preserved(device_config_dev, monkeypatch):
 
 
 def test_plugin_state_isolation(device_config_dev, monkeypatch):
-    """Test that plugin instances maintain separate state."""
+    """Test that plugin health tracking remains isolated per plugin."""
 
-    class StatefulPlugin:
+    class StatelessPlugin:
         config = {"image_settings": []}
 
         def __init__(self, plugin_id):
             self.plugin_id = plugin_id
-            self.counter = 0
 
         def generate_image(self, settings, device_config):
-            self.counter += 1
             return Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
 
-    plugin1 = StatefulPlugin("plugin1")
-    plugin2 = StatefulPlugin("plugin2")
-    plugins = {"plugin1": plugin1, "plugin2": plugin2}
-
     def get_plugin_instance(cfg):
-        return plugins[cfg["id"]]
+        return StatelessPlugin(cfg["id"])
 
     def get_plugin(pid):
         return {"id": pid, "class": "Stateful"}
@@ -349,33 +344,37 @@ def test_plugin_state_isolation(device_config_dev, monkeypatch):
         refresh = ManualRefresh("plugin2", {})
         task.manual_update(refresh)
 
-        # Verify state isolation
-        assert plugin1.counter == 2
-        assert plugin2.counter == 1
+        health = task.get_health_snapshot()
+        assert health["plugin1"]["success_count"] == 2
+        assert health["plugin2"]["success_count"] == 1
 
     finally:
         task.stop()
 
 
-def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch):
+def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_path):
     """Test that resources are cleaned up even when plugins fail."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
+    allocated_path = tmp_path / "allocated.txt"
+    cleaned_path = tmp_path / "cleaned.txt"
 
     class ResourceTrackingPlugin:
         config = {"image_settings": []}
-        resources_allocated = 0
-        resources_cleaned = 0
+
+        def _increment(self, path: Path):
+            count = int(path.read_text(encoding="utf-8")) if path.exists() else 0
+            path.write_text(str(count + 1), encoding="utf-8")
 
         def generate_image(self, settings, device_config):
             try:
-                self.resources_allocated += 1
+                self._increment(allocated_path)
                 # Simulate resource allocation
                 img = Image.new("RGB", device_config.get_resolution(), color=(128, 128, 128))
                 # Simulate failure
                 raise RuntimeError("Simulated failure after resource allocation")
             finally:
                 # Cleanup should happen even on failure
-                self.resources_cleaned += 1
+                self._increment(cleaned_path)
 
             return img
 
@@ -400,8 +399,8 @@ def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch):
                 task.manual_update(refresh)
 
         # Verify cleanup happened every time
-        assert tracking_plugin.resources_allocated == 3
-        assert tracking_plugin.resources_cleaned == 3
+        assert allocated_path.read_text(encoding="utf-8") == "3"
+        assert cleaned_path.read_text(encoding="utf-8") == "3"
 
     finally:
         task.stop()
