@@ -177,6 +177,7 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
     device_config_dev, bad_plugin, good_plugin, monkeypatch
 ):
     """Test that a plugin failure doesn't pollute state for subsequent plugins."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -358,6 +359,7 @@ def test_plugin_state_isolation(device_config_dev, monkeypatch):
 
 def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch):
     """Test that resources are cleaned up even when plugins fail."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
     class ResourceTrackingPlugin:
         config = {"image_settings": []}
