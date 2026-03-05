@@ -165,6 +165,7 @@ cython_debug/
 
 # Development artifacts
 # Generated previews and history should not be committed
+tmp/
 mock_display_output/
 src/static/images/current_image.png
 src/static/images/processed_image.png
