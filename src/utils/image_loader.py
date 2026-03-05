@@ -9,6 +9,7 @@ and high-performance strategies on capable devices (Pi 3/4).
 from PIL import Image, ImageOps
 from io import BytesIO
 from utils.http_client import get_http_session
+import requests
 import logging
 import gc
 import psutil
@@ -357,4 +358,3 @@ class AdaptiveImageLoader:
         logger.debug(f"Resizing from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}")
 
         return ImageOps.fit(img, dimensions, method=Image.LANCZOS)
-
