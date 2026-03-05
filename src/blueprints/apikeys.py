@@ -69,9 +69,11 @@ def apikeys_page():
     ]
     
     return render_template(
-        'apikeys.html',
+        'api_keys.html',
         entries=template_entries,
-        env_exists=os.path.exists(env_path)
+        env_exists=os.path.exists(env_path),
+        api_keys_mode="generic",
+        masked={},
     )
 
 

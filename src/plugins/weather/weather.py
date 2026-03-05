@@ -650,7 +650,8 @@ class Weather(BasePlugin):
         for i, time_str in enumerate(aqi_hourly_times):
             try:
                 if datetime.fromisoformat(time_str).astimezone(tz).hour == current_time.hour:
-                    current_aqi = round(aqi_values[i], 1)
+                    if i < len(aqi_values):
+                        current_aqi = round(aqi_values[i], 1)
                     break
             except ValueError:
                 logger.warning(f"Could not parse time string {time_str} for AQI.")

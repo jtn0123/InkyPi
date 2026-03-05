@@ -55,6 +55,7 @@ class Config:
 
     def __init__(self):
         self._config_lock = threading.RLock()
+        self._resolve_runtime_paths()
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
 
@@ -78,6 +79,23 @@ class Config:
         self.plugins_list = self.read_plugins_list()
         self.playlist_manager = self.load_playlist_manager()
         self.refresh_info = self.load_refresh_info()
+
+    def _resolve_runtime_paths(self):
+        runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip()
+        if not runtime_dir:
+            self.current_image_file = type(self).current_image_file
+            self.processed_image_file = type(self).processed_image_file
+            self.plugin_image_dir = type(self).plugin_image_dir
+            self.history_image_dir = type(self).history_image_dir
+            return
+
+        runtime_images_dir = os.path.join(runtime_dir, "images")
+        self.current_image_file = os.path.join(runtime_images_dir, "current_image.png")
+        self.processed_image_file = os.path.join(
+            runtime_images_dir, "processed_image.png"
+        )
+        self.plugin_image_dir = os.path.join(runtime_images_dir, "plugins")
+        self.history_image_dir = os.path.join(runtime_images_dir, "history")
 
     def _determine_config_path(self):
         """Determine which device config file to load.

@@ -129,6 +129,7 @@ def flask_app(device_config_dev, monkeypatch):
 
     from blueprints.history import history_bp
     from blueprints.main import main_bp
+    from blueprints.apikeys import apikeys_bp
     from blueprints.playlist import playlist_bp
     from blueprints.plugin import plugin_bp
     from blueprints.settings import settings_bp
@@ -171,6 +172,7 @@ def flask_app(device_config_dev, monkeypatch):
 
     # Register routes
     app.register_blueprint(main_bp)
+    app.register_blueprint(apikeys_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)

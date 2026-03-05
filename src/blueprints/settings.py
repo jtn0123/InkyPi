@@ -857,7 +857,12 @@ def api_keys_page():
         "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
     }
     masked = {k: mask(v) for k, v in keys.items()}
-    return render_template("api_keys.html", masked=masked)
+    return render_template(
+        "api_keys.html",
+        api_keys_mode="managed",
+        entries=[],
+        masked=masked,
+    )
 
 
 @settings_bp.route("/settings/save_api_keys", methods=["POST"])

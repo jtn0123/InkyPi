@@ -167,6 +167,7 @@ cython_debug/
 # Generated previews and history should not be committed
 tmp/
 mock_display_output/
+runtime/
 src/static/images/current_image.png
 src/static/images/processed_image.png
 src/static/images/history/

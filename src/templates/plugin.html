@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ plugin.display_name }} Settings</title>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}?v={{ range(1000000)|random }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}?v={{ range(1000000)|random }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}?v={{ range(1000000)|random }}"></script>
-    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}?v={{ range(1000000)|random }}"></script>
-    <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}?v={{ range(1000000)|random }}"></script>
-    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}?v={{ range(1000000)|random }}"></script>
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}"></script>
     
 
     <script>
@@ -799,6 +799,8 @@
         <div class="progress-bar"><div id="requestProgressBar" class="progress-fill" style="width: 10%;"></div></div>
         <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
+    <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_page.js') }}"></script>
     <script>
         // Lightbox + native-size toggle behavior for plugin page previews (uses shared Lightbox)
         (function(){
@@ -897,6 +899,37 @@
                     }, 3000);
                 }, 100);
             }
+        });
+    </script>
+    <script>
+        window.__INKYPI_PLUGIN_BOOT__ = {
+            deviceFrameUrl: {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }},
+            displayInstancePayload: {
+                playlist_name: {{ (plugin_instance_playlist or '') | tojson }},
+                plugin_id: {{ plugin.id | tojson }},
+                plugin_instance: {{ (plugin_instance or '') | tojson }},
+            },
+            displayInstanceUrl: {{ url_for("plugin.display_plugin_instance") | tojson }},
+            instanceImageUrl: {% if plugin_instance %}{{ url_for("plugin.plugin_instance_image", plugin_id=plugin.id, instance_name=plugin_instance) | tojson }}{% else %}null{% endif %},
+            lastRefresh: {{ (plugin_instance_last_refresh or plugin_latest_refresh or '') | tojson }},
+            latestPluginImageUrl: {{ url_for("plugin.plugin_latest_image", plugin_id=plugin.id) | tojson }},
+            loadPluginSettings: {{ (((plugin_instance | default('')) != '') or ((plugin_settings | default({})) | length > 0)) | tojson }},
+            pluginId: {{ plugin.id | tojson }},
+            pluginSettings: {{ (plugin_settings | default({})) | tojson }},
+            previewUrl: {{ url_for("main.preview_image") | tojson }},
+            progressContext: { page: "plugin", pluginId: {{ plugin.id | tojson }}, instance: {{ (plugin_instance | default(None)) | tojson }} },
+            refreshInfoUrl: {{ url_for("main.refresh_info") | tojson }},
+            resolution: {{ resolution | tojson }},
+            styleSettings: {{ style_settings | default(false) | tojson }},
+            urls: {
+                add_to_playlist: {{ url_for('playlist.add_plugin') | tojson }},
+                save_settings: {{ url_for("plugin.save_plugin_settings") | tojson }},
+                update_instance: {{ (url_for('plugin.update_plugin_instance', instance_name='') ~ (plugin_instance or '')) | tojson }},
+                update_now: {{ url_for("plugin.update_now") | tojson }},
+            },
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+            window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
         });
     </script>
     </main>

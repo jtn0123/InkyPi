@@ -14,6 +14,7 @@ from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
 
 from blueprints.main import main_bp
+from blueprints.apikeys import apikeys_bp
 from blueprints.playlist import playlist_bp
 from blueprints.plugin import plugin_bp
 from blueprints.settings import settings_bp
@@ -292,6 +293,7 @@ def create_app():
 
     # Register Blueprints
     app.register_blueprint(main_bp)
+    app.register_blueprint(apikeys_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)

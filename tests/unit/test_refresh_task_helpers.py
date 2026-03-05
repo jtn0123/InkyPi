@@ -143,3 +143,40 @@ def test_update_refresh_info_persists(device_config_dev, monkeypatch):
     assert ri.image_hash == "abc"
     assert ri.used_cached is False
     assert called["val"]
+
+
+def test_update_plugin_health_tracks_retained_display(device_config_dev):
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    task._update_plugin_health(
+        plugin_id="dummy",
+        instance="inst",
+        ok=False,
+        metrics={"retained_display": True},
+        error="timed out",
+    )
+
+    snapshot = task.get_health_snapshot()
+    assert snapshot["dummy"]["retained_display"] is True
+    assert snapshot["dummy"]["timeout_count"] == 1
+
+
+def test_stale_display_path_prefers_processed_image(device_config_dev, tmp_path):
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    processed = tmp_path / "processed.png"
+    processed.write_bytes(b"x")
+    current = tmp_path / "current.png"
+    current.write_bytes(b"y")
+    device_config_dev.processed_image_file = str(processed)
+    device_config_dev.current_image_file = str(current)
+
+    assert task._stale_display_path() == str(processed)

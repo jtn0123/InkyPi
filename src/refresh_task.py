@@ -307,12 +307,41 @@ class RefreshTask:
                     "request_id": request_id,
                 }
             )
-            image, plugin_meta = self._execute_with_policy(
-                refresh_action,
-                plugin_config,
-                current_dt,
-                request_id=request_id,
-            )
+            try:
+                image, plugin_meta = self._execute_with_policy(
+                    refresh_action,
+                    plugin_config,
+                    current_dt,
+                    request_id=request_id,
+                )
+            except Exception as exc:
+                retain_path = self._stale_display_path()
+                logger.error(
+                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error=%s",
+                    plugin_id,
+                    instance_name,
+                    bool(retain_path),
+                    exc,
+                )
+                self._update_plugin_health(
+                    plugin_id=plugin_id,
+                    instance=instance_name,
+                    ok=False,
+                    metrics={"retained_display": bool(retain_path)},
+                    error=str(exc),
+                )
+                self.progress_bus.publish(
+                    {
+                        "state": "error",
+                        "plugin_id": plugin_id,
+                        "instance": instance_name,
+                        "refresh_id": benchmark_id,
+                        "request_id": request_id,
+                        "error": str(exc),
+                        "retained_display": bool(retain_path),
+                    }
+                )
+                raise
             try:
                 save_stage_event(
                     self.device_config,
@@ -372,12 +401,37 @@ class RefreshTask:
             )
             stage_t1 = perf_counter()
             try:
-                # Mark preprocess/display as stages around display_manager call
                 self.display_manager.display_image(
                     image,
                     image_settings=plugin_config.get("image_settings", []),
                     history_meta=history_meta,
                 )
+            except Exception as exc:
+                logger.error(
+                    "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
+                    plugin_id,
+                    instance_name,
+                    exc,
+                )
+                self._update_plugin_health(
+                    plugin_id=plugin_id,
+                    instance=instance_name,
+                    ok=False,
+                    metrics={"retained_display": bool(self._stale_display_path())},
+                    error=str(exc),
+                )
+                self.progress_bus.publish(
+                    {
+                        "state": "error",
+                        "plugin_id": plugin_id,
+                        "instance": instance_name,
+                        "refresh_id": benchmark_id,
+                        "request_id": request_id,
+                        "error": str(exc),
+                        "retained_display": bool(self._stale_display_path()),
+                    }
+                )
+                raise
             finally:
                 display_duration_ms = int((perf_counter() - stage_t1) * 1000)
                 # Plugin lifecycle: display_complete
@@ -464,6 +518,15 @@ class RefreshTask:
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
+    def _stale_display_path(self) -> str | None:
+        for path in (
+            getattr(self.device_config, "processed_image_file", None),
+            getattr(self.device_config, "current_image_file", None),
+        ):
+            if path and os.path.exists(path):
+                return path
+        return None
+
     def _update_refresh_info(self, refresh_info, metrics, used_cached):
         """Persist the latest refresh information to the device config.
 
@@ -525,13 +588,6 @@ class RefreshTask:
             metrics = request.metrics
             exc = request.exception
             if exc is not None:
-                self._update_plugin_health(
-                    plugin_id=refresh_action.get_plugin_id(),
-                    instance=refresh_action.get_refresh_info().get("plugin_instance"),
-                    ok=False,
-                    metrics=None,
-                    error=str(exc),
-                )
                 self.progress_bus.publish(
                     {
                         "state": "error",
@@ -556,6 +612,13 @@ class RefreshTask:
 
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
+            logger.info(
+                "plugin_lifecycle: attempt_start | plugin_id=%s attempt=%s attempts=%s timeout_s=%s",
+                plugin_id,
+                attempt,
+                attempts,
+                timeout_s,
+            )
             ctx = _get_mp_context()
             result_queue = ctx.Queue(maxsize=1)
             proc = ctx.Process(
@@ -598,6 +661,11 @@ class RefreshTask:
                         from PIL import Image
 
                         image = Image.open(io.BytesIO(payload["image_bytes"]))
+                        logger.info(
+                            "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
+                            plugin_id,
+                            attempt,
+                        )
                         return image.copy(), payload.get("plugin_meta")
                     last_exc = _remote_exception(
                         str(payload.get("error_type") or "RuntimeError"),
@@ -625,6 +693,14 @@ class RefreshTask:
                 )
 
             if attempt < attempts:
+                logger.warning(
+                    "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    backoff_ms,
+                    last_exc,
+                )
                 sleep(max(0.0, backoff_ms / 1000.0))
                 self.progress_bus.publish(
                     {
@@ -660,6 +736,7 @@ class RefreshTask:
             entry["last_success_at"] = now_iso
             entry["last_error"] = None
             entry["success_count"] = int(entry.get("success_count", 0)) + 1
+            entry["retained_display"] = False
             if metrics:
                 entry["last_metrics"] = metrics
         else:
@@ -671,6 +748,9 @@ class RefreshTask:
             if "timed out" in msg.lower():
                 entry["timeout_count"] = int(entry.get("timeout_count", 0)) + 1
             entry["retry_count"] = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
+            entry["retained_display"] = bool((metrics or {}).get("retained_display"))
+            if metrics:
+                entry["last_metrics"] = metrics
         self.plugin_health[plugin_id] = entry
 
     def get_health_snapshot(self) -> dict:

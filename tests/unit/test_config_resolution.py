@@ -101,3 +101,23 @@ def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
     # Assert
     assert cfg.get_config("name") == "Bootstrapped"
     assert os.path.isfile(os.path.join(str(tmp_src), "config", "device.json"))
+
+
+def test_runtime_dir_overrides_output_paths(monkeypatch, tmp_path):
+    import config as config_mod
+
+    cfg_path = tmp_path / "device.json"
+    _write_min_config(str(cfg_path), name="RuntimeDirSelected")
+    runtime_dir = tmp_path / "runtime"
+
+    monkeypatch.setenv("INKYPI_RUNTIME_DIR", str(runtime_dir))
+    monkeypatch.setattr(config_mod.Config, "config_file", str(cfg_path))
+
+    cfg = config_mod.Config()
+
+    assert cfg.current_image_file == str(runtime_dir / "images" / "current_image.png")
+    assert cfg.processed_image_file == str(
+        runtime_dir / "images" / "processed_image.png"
+    )
+    assert cfg.plugin_image_dir == str(runtime_dir / "images" / "plugins")
+    assert cfg.history_image_dir == str(runtime_dir / "images" / "history")
