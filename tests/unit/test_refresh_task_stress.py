@@ -249,6 +249,7 @@ def test_exception_during_refresh_does_not_crash_task(
     device_config_dev, monkeypatch
 ):
     """Test that exceptions during refresh are captured and re-raised but don't crash the background thread."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
