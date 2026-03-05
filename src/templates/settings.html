@@ -469,6 +469,37 @@
                     </div>
                 </div>
 
+                <!-- Observability & Recovery -->
+                <div class="collapsible">
+                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                        Observability & Recovery <span class="collapsible-icon">▼</span>
+                    </button>
+                    <div class="settings-container collapsible-content">
+                        <div class="form-group nowrap">
+                            <button type="button" class="action-button compact" onclick="refreshBenchmarks()">Refresh Benchmark Summary</button>
+                            <button type="button" class="action-button compact warn" onclick="safeReset()">Safe Reset</button>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
+                            <input id="isolatePluginInput" type="text" class="form-input" placeholder="e.g. weather" />
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <button type="button" class="action-button compact warn" onclick="isolatePlugin()">Isolate</button>
+                                <button type="button" class="action-button compact" onclick="unIsolatePlugin()">Unisolate</button>
+                                <button type="button" class="action-button compact" onclick="refreshIsolation()">Refresh List</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div id="benchSummary" class="logs-viewer" style="min-height:120px;">Benchmark summary loading...</div>
+                        </div>
+                        <div class="form-group">
+                            <div id="healthSummary" class="logs-viewer" style="min-height:120px;">Health summary loading...</div>
+                        </div>
+                        <div class="form-group">
+                            <div id="isolationSummary" class="logs-viewer" style="min-height:80px;">Isolation list loading...</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Image Settings -->
                 <div class="collapsible">
                     <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
@@ -661,6 +692,122 @@
                 showResponseModal('failure', 'Import failed');
             }
         }
+
+        async function refreshBenchmarks(){
+            try {
+                const [summaryResp, pluginsResp] = await Promise.all([
+                    fetch('/api/benchmarks/summary?window=24h', { cache: 'no-store' }),
+                    fetch('/api/benchmarks/plugins?window=24h', { cache: 'no-store' }),
+                ]);
+                const s = await summaryResp.json();
+                const p = await pluginsResp.json();
+                const out = [];
+                out.push('Benchmark Summary (24h)');
+                out.push(JSON.stringify(s.summary || {}, null, 2));
+                out.push('');
+                out.push('Per-plugin Averages');
+                out.push(JSON.stringify((p.items || []).slice(0, 10), null, 2));
+                document.getElementById('benchSummary').textContent = out.join('\n');
+            } catch (e) {
+                document.getElementById('benchSummary').textContent = 'Failed to load benchmark summary';
+            }
+        }
+
+        async function refreshHealth(){
+            try {
+                const [pluginsResp, systemResp] = await Promise.all([
+                    fetch('/api/health/plugins', { cache: 'no-store' }),
+                    fetch('/api/health/system', { cache: 'no-store' }),
+                ]);
+                const p = await pluginsResp.json();
+                const s = await systemResp.json();
+                const out = [];
+                out.push('System Health');
+                out.push(JSON.stringify(s, null, 2));
+                out.push('');
+                out.push('Plugin Health');
+                out.push(JSON.stringify(p.items || {}, null, 2));
+                document.getElementById('healthSummary').textContent = out.join('\n');
+            } catch (e) {
+                document.getElementById('healthSummary').textContent = 'Failed to load health data';
+            }
+        }
+
+        async function refreshIsolation(){
+            try {
+                const resp = await fetch('/settings/isolation', { cache: 'no-store' });
+                const data = await resp.json();
+                document.getElementById('isolationSummary').textContent = JSON.stringify(data, null, 2);
+            } catch (e) {
+                document.getElementById('isolationSummary').textContent = 'Failed to load isolation list';
+            }
+        }
+
+        async function isolatePlugin(){
+            const pluginId = document.getElementById('isolatePluginInput')?.value?.trim();
+            if (!pluginId) return;
+            try {
+                await fetch('/settings/isolation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ plugin_id: pluginId }),
+                });
+                await refreshIsolation();
+                await refreshHealth();
+            } catch (e) {}
+        }
+
+        async function unIsolatePlugin(){
+            const pluginId = document.getElementById('isolatePluginInput')?.value?.trim();
+            if (!pluginId) return;
+            try {
+                await fetch('/settings/isolation', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ plugin_id: pluginId }),
+                });
+                await refreshIsolation();
+                await refreshHealth();
+            } catch (e) {}
+        }
+
+        async function safeReset(){
+            try {
+                const resp = await fetch('/settings/safe_reset', { method: 'POST' });
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showResponseModal('success', data.message || 'Safe reset complete');
+                    await refreshHealth();
+                } else {
+                    showResponseModal('failure', data.error || 'Safe reset failed');
+                }
+            } catch (e) {
+                showResponseModal('failure', 'Safe reset failed');
+            }
+        }
+
+        function initProgressSSE(){
+            try {
+                if (!window.EventSource) return;
+                const es = new EventSource('/api/progress/stream');
+                es.addEventListener('error', () => {
+                    // fallback already exists via logs polling
+                });
+                es.addEventListener('done', () => {
+                    refreshHealth();
+                });
+                es.addEventListener('error', () => {
+                    refreshHealth();
+                });
+            } catch (e) {}
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshBenchmarks();
+            refreshHealth();
+            refreshIsolation();
+            initProgressSSE();
+        });
     </script>
 </body>
 </html>
