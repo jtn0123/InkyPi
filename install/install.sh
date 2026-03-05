@@ -106,14 +106,22 @@ fetch_waveshare_driver() {
 
 enable_interfaces(){
   echo "Enabling interfaces required for $APPNAME"
+  local config_txt="/boot/firmware/config.txt"
+  if [[ ! -f "$config_txt" ]]; then
+    config_txt="/boot/config.txt"
+  fi
+  if [[ ! -f "$config_txt" ]]; then
+    echo_error "ERROR: config.txt not found at /boot/firmware/config.txt or /boot/config.txt"
+    exit 1
+  fi
   #enable spi
-  sudo sed -i 's/^dtparam=spi=.*/dtparam=spi=on/' /boot/firmware/config.txt
-  sudo sed -i 's/^#dtparam=spi=.*/dtparam=spi=on/' /boot/firmware/config.txt
+  sudo sed -i 's/^dtparam=spi=.*/dtparam=spi=on/' "$config_txt"
+  sudo sed -i 's/^#dtparam=spi=.*/dtparam=spi=on/' "$config_txt"
   sudo raspi-config nonint do_spi 0
   echo_success "\tSPI Interface has been enabled."
   #enable i2c
-  sudo sed -i 's/^dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' /boot/firmware/config.txt
-  sudo sed -i 's/^#dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' /boot/firmware/config.txt
+  sudo sed -i 's/^dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' "$config_txt"
+  sudo sed -i 's/^#dtparam=i2c_arm=.*/dtparam=i2c_arm=on/' "$config_txt"
   sudo raspi-config nonint do_i2c 0
   echo_success "\tI2C Interface has been enabled."
 
@@ -123,8 +131,8 @@ enable_interfaces(){
     # are enabled in the config.txt file.  This is different to INKY which
     # only needs one line set.n
     echo "Enabling both CS lines for SPI interface in config.txt"
-    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-2cs' /boot/firmware/config.txt; then
-        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-2cs' /boot/firmware/config.txt
+    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-2cs' "$config_txt"; then
+        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-2cs' "$config_txt"
     else
         echo "dtoverlay for spi0-2cs already specified"
     fi
@@ -132,8 +140,8 @@ enable_interfaces(){
     # TODO - check if really need the dtparam set for INKY as this seems to be 
     # only for the older screens (as per INKY docs)
     echo "Enabling single CS line for SPI interface in config.txt"
-    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-0cs' /boot/firmware/config.txt; then
-        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-0cs' /boot/firmware/config.txt
+    if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-0cs' "$config_txt"; then
+        sed -i '/^dtparam=spi=on/a dtoverlay=spi0-0cs' "$config_txt"
     else
         echo "dtoverlay for spi0-0cs already specified"
     fi
@@ -309,7 +317,9 @@ install_src() {
 }
 
 install_cli() {
-  cp -r "$SCRIPT_DIR/cli" "$INSTALL_PATH/"
+  rm -rf "$INSTALL_PATH/cli"
+  mkdir -p "$INSTALL_PATH/cli"
+  cp -a "$SCRIPT_DIR/cli/." "$INSTALL_PATH/cli/"
   sudo chmod +x "$INSTALL_PATH/cli/"*
 }
 

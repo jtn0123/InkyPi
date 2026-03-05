@@ -365,7 +365,8 @@
                 data.append('plugin_id', currentEditPluginId);
                 data.append('refresh_settings', JSON.stringify(formData));
 
-                const response = await fetch("{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + currentEditInstance, {
+                const encodedInstance = encodeURIComponent(currentEditInstance);
+                const response = await fetch("{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + encodedInstance, {
                     method: 'PUT',
                     body: data
                 });
@@ -415,7 +416,13 @@
 
                                 <!-- Thumbnail preview - only show if image has been generated -->
                                 {% if plugin_instance.latest_refresh_time %}
-                                <div class="plugin-thumbnail-container" onclick="showThumbnailPreview('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}', '{{ plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
+                                <div class="plugin-thumbnail-container"
+                                     onclick='showThumbnailPreview(
+                                         {{ playlist.name | tojson }},
+                                         {{ plugin_instance.plugin_id | tojson }},
+                                         {{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) | tojson }},
+                                         {{ plugin_instance.name | tojson }}
+                                     )'>
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', playlist_name=playlist.name, plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
                                         alt="Preview"
@@ -498,7 +505,7 @@
     <!-- Refresh Settings Modal -->
     <div id="refreshSettingsModal" class="modal">
         <div class="modal-content">
-            <span class="close-button" onclick="closeRefreshModal()">×</span>
+            <button class="close-button" type="button" aria-label="Close" onclick="closeRefreshModal()">×</button>
             <h2>Refresh Settings</h2>
             <div class="separator"></div>
             <form id="refreshSettingsForm" class="settings-form">

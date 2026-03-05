@@ -13,7 +13,13 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         response = requests.get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
         img = Image.open(BytesIO(response.content))
-        return img.resize(dimensions, Image.LANCZOS)
+        try:
+            return img.resize(dimensions, Image.LANCZOS)
+        finally:
+            try:
+                img.close()
+            except Exception:
+                pass
     except Exception as e:
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None

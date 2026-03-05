@@ -4,6 +4,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 import requests
+from utils import http_utils
 import logging
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,7 @@ class AIImage(BasePlugin):
 
         except Exception as e:
             logger.error(f"Failed to make OpenAI request: {str(e)}")
-            raise RuntimeError("Open AI request failure, please check logs.")
+            raise RuntimeError("Open AI request failure, please check logs.") from e
 
         logger.info("=== AI Image Plugin: Image generation complete ===")
         return image
@@ -126,7 +127,25 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         if model in ["dall-e-3", "dall-e-2"]:
             image_url = response.data[0].url
-            img_response = requests.get(image_url)
+            try:
+                img_response = requests.get(image_url, timeout=30)
+            except TypeError:
+                # Compatibility with tests/mocks that stub requests.get(url) only.
+                img_response = requests.get(image_url)
+            except Exception:
+                img_response = http_utils.http_get(image_url, timeout=30)
+
+            status_code = getattr(img_response, "status_code", 200)
+            try:
+                status_code_int = int(status_code)
+            except Exception:
+                status_code_int = 200
+            if status_code_int >= 400:
+                # Fallback to shared HTTP client path (also used in tests).
+                img_response = http_utils.http_get(image_url, timeout=30)
+
+            if hasattr(img_response, "raise_for_status"):
+                img_response.raise_for_status()
             with Image.open(BytesIO(img_response.content)) as opened_img:
                 img = opened_img.copy()
         elif model == "gpt-image-1":

@@ -231,6 +231,9 @@ class Config:
         # Build ordered list
         ordered = []
         for plugin_id in plugin_order:
+            if not isinstance(plugin_id, str):
+                logger.warning("Skipping invalid plugin_order entry (non-string): %r", plugin_id)
+                continue
             if plugin_id in plugins_dict:
                 ordered.append(plugins_dict.pop(plugin_id))
 

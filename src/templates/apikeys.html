@@ -214,7 +214,7 @@
                     <div class="apikey-row" data-existing="true">
                         <input type="text" class="apikey-key" value="{{ entry.key }}" placeholder="KEY_NAME" readonly>
                         <input type="text" class="apikey-value masked" value="{{ entry.masked }}" placeholder="(unchanged)" readonly>
-                        <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete">×</button>
+                        <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete" aria-label="Delete API key">×</button>
                     </div>
                     {% endfor %}
                 {% else %}
@@ -273,7 +273,7 @@
             row.innerHTML = `
                 <input type="text" class="apikey-key" value="${key}" placeholder="KEY_NAME">
                 <input type="text" class="apikey-value" value="${value}" placeholder="Enter value">
-                <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete">×</button>
+                <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete" aria-label="Delete API key">×</button>
             `;
             list.appendChild(row);
             

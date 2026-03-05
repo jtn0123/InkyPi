@@ -147,9 +147,10 @@ python scripts/plugin_validator.py clock   # validate a single plugin
 InkyPi relies on system packages for some features, which are normally installed via the `install.sh` script. **(Skip if using devbox method)**
 
 ### Linux
+
 **(Skip this section if using devbox method)**
 
-The required packages can be found in this file: 
+The required packages can be found in this file:
 
 https://github.com/fatihak/InkyPi/blob/main/install/debian-requirements.txt
 
@@ -157,15 +158,15 @@ Use your favourite package manager (such as `apt`) to install them.
 
 ### Chromium or Google Chrome browser
 
-InkyPi uses `--headless` mode to rendering HTML templates to PNG images using a Chrome-like browser.  
+InkyPi uses `--headless` mode to render HTML templates to PNGs using a Chrome-like browser.
 
-Different platforms have different available browser packages, refer to the recommended packages in the table below: 
+Different platforms have different available browser packages; refer to the table below:
 
 | Platform | Recommended Package | Notes |
 | --- | --- | --- |
-| Raspbian / Debian | chromium-headless-shell | chromium or google-chrome will also work if in PATH  |
-| All other Linux | chromium | devbox method installs chromium on Linux, as `chromium-headless-shell` is usually not packaged |
-| macOS | Google Chrome | chromium on macOS / aarch64 is not considered stable,<br>For devbox method, Google Chrome must be installed at its default location: <br>`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`|
-| Windows | Chromium or Google Chrome | devbox method installs chromium on WSL2,<br>if using native Windows (not devbox via WSL2), chromium or google-chrome should also work if in PATH | 
+| Raspbian / Debian | chromium-headless-shell | chromium or google-chrome also works when available in `PATH` |
+| All other Linux | chromium | devbox installs chromium on Linux; `chromium-headless-shell` is usually unavailable |
+| macOS | Google Chrome | chromium on macOS/aarch64 is not considered stable; for devbox, install Chrome at `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` |
+| Windows | Chromium or Google Chrome | devbox installs chromium on WSL2; on native Windows (without WSL2), chromium or google-chrome should be in `PATH` |
 
-InkyPi will search for a Chrome-like browser in the project's PATH (if using devbox method) and your system's PATH in that order. 
+InkyPi will search for a Chrome-like browser in the project's `PATH` (when using devbox) and then your system `PATH`.

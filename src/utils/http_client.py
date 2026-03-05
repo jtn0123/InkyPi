@@ -17,12 +17,15 @@ Usage:
 
 import requests
 import logging
+import threading
 from typing import Optional
+from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 # Global session instance (singleton)
 _HTTP_SESSION: Optional[requests.Session] = None
+_HTTP_SESSION_LOCK = threading.Lock()
 
 
 def get_http_session() -> requests.Session:
@@ -35,27 +38,33 @@ def get_http_session() -> requests.Session:
     """
     global _HTTP_SESSION
 
-    if _HTTP_SESSION is None:
-        logger.debug("Initializing shared HTTP session with connection pooling")
-        _HTTP_SESSION = requests.Session()
+    with _HTTP_SESSION_LOCK:
+        if _HTTP_SESSION is None:
+            logger.debug("Initializing shared HTTP session with connection pooling")
+            _HTTP_SESSION = requests.Session()
 
-        # Set common headers for all InkyPi requests
-        _HTTP_SESSION.headers.update({
-            'User-Agent': 'InkyPi/1.0 (https://github.com/fatihak/InkyPi/)'
-        })
+            # Set common headers for all InkyPi requests
+            _HTTP_SESSION.headers.update({
+                'User-Agent': 'InkyPi/1.0 (https://github.com/fatihak/InkyPi/)'
+            })
 
-        # Configure connection pool
-        # Max 10 connections per host (reasonable for e-ink device)
-        adapter = requests.adapters.HTTPAdapter(
-            pool_connections=10,
-            pool_maxsize=10,
-            max_retries=3,
-            pool_block=False
-        )
-        _HTTP_SESSION.mount('http://', adapter)
-        _HTTP_SESSION.mount('https://', adapter)
+            # Configure connection pool with retries for transient network and 5xx/429 responses.
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=0.5,
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=frozenset(["GET", "HEAD", "OPTIONS"]),
+            )
+            adapter = requests.adapters.HTTPAdapter(
+                pool_connections=10,
+                pool_maxsize=10,
+                max_retries=retry_strategy,
+                pool_block=False
+            )
+            _HTTP_SESSION.mount('http://', adapter)
+            _HTTP_SESSION.mount('https://', adapter)
 
-        logger.debug("HTTP session initialized successfully")
+            logger.debug("HTTP session initialized successfully")
 
     return _HTTP_SESSION
 
@@ -67,8 +76,8 @@ def close_http_session():
     """
     global _HTTP_SESSION
 
-    if _HTTP_SESSION is not None:
-        logger.debug("Closing shared HTTP session")
-        _HTTP_SESSION.close()
-        _HTTP_SESSION = None
-
+    with _HTTP_SESSION_LOCK:
+        if _HTTP_SESSION is not None:
+            logger.debug("Closing shared HTTP session")
+            _HTTP_SESSION.close()
+            _HTTP_SESSION = None

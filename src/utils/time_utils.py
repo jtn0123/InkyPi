@@ -58,14 +58,22 @@ def parse_cron_field(field: str, min_val: int, max_val: int) -> set[int]:
     values: set[int] = set()
     for part in field.split(","):
         part = part.strip()
+        if not part:
+            continue
         if "-" in part:
             start_s, end_s = part.split("-", 1)
-            start, end = int(start_s), int(end_s)
+            try:
+                start, end = int(start_s), int(end_s)
+            except ValueError:
+                continue
             if start > end:
                 start, end = end, start
             values.update(v for v in range(start, end + 1) if min_val <= v <= max_val)
         else:
-            value = int(part)
+            try:
+                value = int(part)
+            except ValueError:
+                continue
             if min_val <= value <= max_val:
                 values.add(value)
     return values
@@ -84,6 +92,8 @@ def get_next_occurrence(cron_expr: str, now: datetime | None = None) -> datetime
         return None
 
     minute_f, hour_f, dom_f, month_f, dow_f = parts
+    dom_is_wildcard = dom_f.strip() == "*"
+    dow_is_wildcard = dow_f.strip() == "*"
     minutes = parse_cron_field(minute_f, 0, 59)
     hours = parse_cron_field(hour_f, 0, 23)
     dom = parse_cron_field(dom_f, 1, 31)
@@ -99,13 +109,17 @@ def get_next_occurrence(cron_expr: str, now: datetime | None = None) -> datetime
             continue
         if candidate.hour not in hours:
             continue
-        if candidate.day not in dom:
-            continue
         if candidate.month not in months:
             continue
+        dom_match = candidate.day in dom
         # Python Monday=0..Sunday=6, cron Sunday=0. Map to cron style.
         cron_dow = (candidate.weekday() + 1) % 7
-        if cron_dow not in dow:
-            continue
+        dow_match = cron_dow in dow
+        if dom_is_wildcard or dow_is_wildcard:
+            if not (dom_match and dow_match):
+                continue
+        else:
+            if not (dom_match or dow_match):
+                continue
         return candidate
     return None

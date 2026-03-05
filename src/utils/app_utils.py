@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import socket
 import subprocess
 from io import BytesIO
@@ -35,7 +36,7 @@ FONT_FAMILIES = {
 }
 
 FONTS = {
-    "ds-gigi": "DS-DIGI.TTF",
+    "ds-digi": "DS-DIGI.TTF",
     "napoli": "Napoli.ttf",
     "jost": "Jost.ttf",
     "jost-semibold": "Jost-SemiBold.ttf"
@@ -60,35 +61,43 @@ def get_ip_address():
 
 def get_wifi_name():
     try:
-        output = subprocess.check_output(['iwgetid', '-r']).decode('utf-8').strip()
+        iwgetid_bin = shutil.which("iwgetid") or "/sbin/iwgetid"
+        if not os.path.isabs(iwgetid_bin):
+            return None
+        output = subprocess.check_output([iwgetid_bin, '-r']).decode('utf-8').strip()
         return output
-    except subprocess.CalledProcessError:
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 def is_connected():
     """Check if the Raspberry Pi has an internet connection."""
+    sock = None
     try:
         # Try to connect to Google's public DNS server
-        socket.create_connection(("8.8.8.8", 53), timeout=2)
+        sock = socket.create_connection(("8.8.8.8", 53), timeout=2)
         return True
     except OSError:
         return False
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                pass
 
 def get_font(font_name, font_size=50, font_weight="normal", strict=False):
-    if font_name in FONT_FAMILIES:
-        font_variants = FONT_FAMILIES[font_name]
-
-        font_entry = next((entry for entry in font_variants if entry["font-weight"] == font_weight), None)
+    font_variants = FONT_FAMILIES.get(font_name)
+    if not font_variants:
+        logger.warning(f"Requested font not found: font_name={font_name}")
+    else:
+        font_entry = next(
+            (entry for entry in font_variants if entry["font-weight"] == font_weight),
+            None,
+        )
         if font_entry is None:
             font_entry = font_variants[0]  # Default to first available variant
-
-        if font_entry:
-            font_path = resolve_path(os.path.join("static", "fonts", font_entry["file"]))
-            return ImageFont.truetype(font_path, font_size)
-        else:
-            logger.warning(f"Requested font weight not found: font_name={font_name}, font_weight={font_weight}")
-    else:
-        logger.warning(f"Requested font not found: font_name={font_name}")
+        font_path = resolve_path(os.path.join("static", "fonts", font_entry["file"]))
+        return ImageFont.truetype(font_path, font_size)
 
     if strict:
         raise ValueError(
@@ -133,12 +142,13 @@ def generate_startup_image(dimensions=(800,480)):
     image_draw.text((width/2, y_text), text, anchor="mm", fill=text_color, font=get_font("Jost", text_font_size))
 
     # Draw the IP on a line below
-    ip_text = f"or http://{ip}"
     ip_text_font_size = width * 0.032
-    bbox = image_draw.textbbox((0, 0), text, font=get_font("Jost", text_font_size))
-    text_height = bbox[3] - bbox[1]
-    ip_y = y_text + text_height * 1.35
-    image_draw.text((width/2, ip_y), ip_text, anchor="mm", fill=text_color, font=get_font("Jost", ip_text_font_size))
+    if ip:
+        ip_text = f"or http://{ip}"
+        bbox = image_draw.textbbox((0, 0), text, font=get_font("Jost", text_font_size))
+        text_height = bbox[3] - bbox[1]
+        ip_y = y_text + text_height * 1.35
+        image_draw.text((width/2, ip_y), ip_text, anchor="mm", fill=text_color, font=get_font("Jost", ip_text_font_size))
 
     return image
 
@@ -149,7 +159,9 @@ def parse_form(request_form):
             request_dict[key] = request_form.getlist(key)
     return request_dict
 
-def handle_request_files(request_files, form_data={}):
+def handle_request_files(request_files, form_data=None):
+    if form_data is None:
+        form_data = {}
     allowed_file_extensions = {'pdf', 'png', 'avif', 'jpg', 'jpeg', 'gif', 'webp', 'heif', 'heic'}
     file_location_map = {}
     request_keys = set(request_files.keys()) if hasattr(request_files, "keys") else set()
@@ -199,7 +211,7 @@ def handle_request_files(request_files, form_data={}):
             elif hasattr(file, "seek"):
                 file.seek(0)
         except Exception:
-            pass
+            logger.debug("Failed to rewind file stream", exc_info=True)
 
         # Save PDFs as-is. Validate and save images.
         if extension == "pdf":

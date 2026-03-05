@@ -10,6 +10,9 @@ apikeys_bp = Blueprint("apikeys", __name__)
 # Path to .env file
 def get_env_path():
     """Get path to .env file in the project root."""
+    project_dir = os.environ.get("PROJECT_DIR")
+    if project_dir:
+        return os.path.join(project_dir, ".env")
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     return os.path.join(base_dir, '.env')
 
@@ -34,6 +37,8 @@ def write_env_file(filepath, entries):
             f.write("# InkyPi API Keys and Secrets\n")
             f.write("# Managed via web interface\n\n")
             for key, value in entries:
+                if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
+                    raise ValueError(f"Invalid control character in value for key: {key}")
                 # Quote values with spaces or special characters
                 if ' ' in value or '"' in value or "'" in value:
                     value = f'"{value}"'
@@ -74,8 +79,12 @@ def apikeys_page():
 def save_apikeys():
     """Save API keys to .env file."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Invalid JSON payload"}), 400
         entries = data.get('entries', [])
+        if not isinstance(entries, list):
+            return jsonify({"error": "Invalid entries format"}), 400
         
         # Load existing values for keys marked as keepExisting
         env_path = get_env_path()
@@ -100,6 +109,8 @@ def save_apikeys():
             else:
                 # Use provided value
                 value = entry.get('value', '').strip()
+            if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
+                return jsonify({"error": f"Invalid characters in value for key: {key}"}), 400
             
             valid_entries.append((key, value))
         

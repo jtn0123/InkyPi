@@ -158,10 +158,14 @@ def next_up():
 def save_plugin_order():
     """Save custom plugin order from dashboard drag-and-drop."""
     device_config = current_app.config["DEVICE_CONFIG"]
-    data = request.get_json() or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Invalid JSON payload"}), 400
     order = data.get("order", [])
     if not isinstance(order, list):
         return jsonify({"error": "Order must be a list"}), 400
+    if any(not isinstance(item, str) for item in order):
+        return jsonify({"error": "Order entries must be strings"}), 400
     device_config.set_plugin_order(order)
     return jsonify({"success": True})
 

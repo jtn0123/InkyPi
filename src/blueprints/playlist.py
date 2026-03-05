@@ -210,6 +210,8 @@ def create_playlist():
             data = form_data
         else:
             return ("Unsupported media type", 415)
+    if not isinstance(data, dict):
+        return json_error("Invalid JSON data", status=400)
     playlist_name = data.get("playlist_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")

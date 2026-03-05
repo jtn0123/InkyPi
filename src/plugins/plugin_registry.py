@@ -60,12 +60,20 @@ def load_plugins(plugins_config):
 
         plugin_dir = plugins_module_path / plugin_id
         if not plugin_dir.is_dir():
-            logger.error(f"Could not find plugin directory {plugin_dir} for '{plugin_id}', skipping.")
+            logger.error(
+                "Could not find plugin directory %s for '%s', skipping.",
+                plugin_dir,
+                plugin_id,
+            )
             continue
 
         module_path = plugin_dir / f"{plugin_id}.py"
         if not module_path.is_file():
-            logger.error(f"Could not find module path {module_path} for '{plugin_id}', skipping.")
+            logger.error(
+                "Could not find module path %s for '%s', skipping.",
+                module_path,
+                plugin_id,
+            )
             continue
 
         # In dev mode, instances will be re-created on demand to enable hot reload.

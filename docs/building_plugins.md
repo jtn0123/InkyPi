@@ -68,7 +68,7 @@ If your plugin requires user configuration through the web UI, you’ll need to 
         "display_name": "Clock",    # The name shown in the web UI for the plugin.
         "id": "clock",              # A unique identifier for the plugin (use lowercase and avoid spaces)
         "class": "Clock",           # The name of your plugin’s Python class.
-        "repository": ""            # GitHub Repositry URL, if the plugin will be published as a third party plugin.
+        "repository": ""            # GitHub Repository URL, if the plugin will be published as a third-party plugin.
     }
     ```
 - Plugins will be loaded on startup if the folder contains a `plugin-info.json`
@@ -157,9 +157,9 @@ For reference, see the Weather and AI Text plugins.
 3. This function uses the Chromium Browser in headless mode to load the HTML file and capture a screenshot.
 
 
-## Publishing a third party plugin
+## Publishing a third-party plugin
 
-To publish your plugin as a third party plugin for others to install, you'll need to create a new repository. See [Creating a new repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository) in the GitHub documentation.
+To publish your plugin as a third-party plugin for others to install, you'll need to create a new repository. See [Creating a new repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-new-repository) in the GitHub documentation.
 
 Note: It’s recommended to name your repository `InkyPi-{plugin_name}` so it’s easy to discover via GitHub search.
 
@@ -182,7 +182,6 @@ Your repository must include:
 
 ---
 
-See [InkyPi-Plugin-Template](https://github.com/fatihak/InkyPi-Plugin-Template) for a sample template of a third party plugin.
+See [InkyPi-Plugin-Template](https://github.com/fatihak/InkyPi-Plugin-Template) for a sample template of a third-party plugin.
 
 Once you're done, feel free to add your plugin to the [3rd Party Plugin List](https://github.com/fatihak/InkyPi/wiki/3rd-Party-Plugins) and share it in the [🙌 Show and Tell Discussion Board](https://github.com/fatihak/InkyPi/discussions/categories/show-and-tell).
-

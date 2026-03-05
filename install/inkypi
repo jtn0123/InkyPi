@@ -22,7 +22,7 @@ usage() {
 
 run_app() {
     source "$VENV_PATH/bin/activate"
-    exec python -u "$(realpath "$PROGRAM_PATH/src/inkypi.py")"
+    exec python -u "$(realpath "$PROGRAM_PATH/src/inkypi.py")" "$@"
 }
 
 run_plugin_cli() {
@@ -30,13 +30,16 @@ run_plugin_cli() {
 }
 
 case "$command" in
-    run)
-        run_app
+    ""|run)
+        run_app "$@"
+        ;;
+    -*)
+        run_app "$command" "$@"
         ;;
     plugin)
         run_plugin_cli "$@"
         ;;
-    ""|-h|--help|help)
+    -h|--help|help)
         usage
         exit 0
         ;;
@@ -46,4 +49,3 @@ case "$command" in
         exit 1
         ;;
 esac
-

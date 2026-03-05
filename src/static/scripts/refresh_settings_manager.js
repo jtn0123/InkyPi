@@ -134,7 +134,7 @@ class RefreshSettingsManager {
      * @returns {{refreshType: string, interval?: string, unit?: string, refreshTime?: string}}
      */
     getFormData() {
-        const refreshType = document.querySelector(`input[name="refreshType"]:checked`)?.value;
+        const refreshType = this.modal.querySelector(`input[name="refreshType"]:checked`)?.value;
         const data = { refreshType };
 
         if (refreshType === 'interval') {
@@ -246,4 +246,3 @@ function createRefreshSettingsManager(modalId, prefix) {
     }
     return manager;
 }
-

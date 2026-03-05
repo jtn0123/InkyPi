@@ -305,42 +305,14 @@ def save_plugin_settings():
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
-        plugin_id = plugin_settings.pop("plugin_id")
-
-        # Ensure Default playlist exists
-        default_playlist_name = "Default"
-        playlist = playlist_manager.get_playlist(default_playlist_name)
-        if not playlist:
-            playlist_manager.add_playlist(default_playlist_name)
-            playlist = playlist_manager.get_playlist(default_playlist_name)
-
-        # Use a standard saved-settings instance name
-        instance_name = f"{plugin_id}_saved_settings"
-
-        existing_instance = playlist.find_plugin(plugin_id, instance_name)
-        if existing_instance:
-            existing_instance.settings = plugin_settings
-        else:
-            plugin_dict = {
-                "plugin_id": plugin_id,
-                "refresh": {"interval": 3600},  # default 1 hour
-                "plugin_settings": plugin_settings,
-                "name": instance_name,
-            }
-            playlist.add_plugin(plugin_dict)
-
-        device_config.write_config()
-
-        # Include hint text that UI/tests look for
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Settings saved. Add to Playlist to schedule this instance.",
-                    "instance_name": instance_name,
-                }
-            ),
-            200,
+        plugin_id = plugin_settings.pop("plugin_id", None)
+        if not plugin_id:
+            return json_error("Missing plugin_id", status=400)
+        return _save_plugin_settings_common(
+            plugin_id=plugin_id,
+            plugin_settings=plugin_settings,
+            device_config=device_config,
+            playlist_manager=playlist_manager,
         )
     except Exception as e:
         logger.exception("Error saving plugin settings: %s", e)
@@ -356,44 +328,49 @@ def save_plugin_settings_alias(plugin_id: str):
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
-        plugin_settings["plugin_id"] = plugin_id
-        request_like = dict(plugin_settings)
-        plugin_id_from_request = request_like.pop("plugin_id")
-
-        default_playlist_name = "Default"
-        playlist = playlist_manager.get_playlist(default_playlist_name)
-        if not playlist:
-            playlist_manager.add_playlist(default_playlist_name)
-            playlist = playlist_manager.get_playlist(default_playlist_name)
-
-        instance_name = f"{plugin_id_from_request}_saved_settings"
-        existing_instance = playlist.find_plugin(plugin_id_from_request, instance_name)
-        if existing_instance:
-            existing_instance.settings = request_like
-        else:
-            playlist.add_plugin(
-                {
-                    "plugin_id": plugin_id_from_request,
-                    "refresh": {"interval": 3600},
-                    "plugin_settings": request_like,
-                    "name": instance_name,
-                }
-            )
-
-        device_config.write_config()
-        return (
-            jsonify(
-                {
-                    "success": True,
-                    "message": "Settings saved. Add to Playlist to schedule this instance.",
-                    "instance_name": instance_name,
-                }
-            ),
-            200,
+        return _save_plugin_settings_common(
+            plugin_id=plugin_id,
+            plugin_settings=plugin_settings,
+            device_config=device_config,
+            playlist_manager=playlist_manager,
         )
-    except Exception as e:
-        logger.exception("Error saving plugin settings (alias): %s", e)
+    except Exception:
+        logger.exception("Error saving plugin settings (alias)")
         return json_error("An internal error occurred", status=500)
+
+
+def _save_plugin_settings_common(plugin_id, plugin_settings, device_config, playlist_manager):
+    default_playlist_name = "Default"
+    playlist = playlist_manager.get_playlist(default_playlist_name)
+    if not playlist:
+        playlist_manager.add_playlist(default_playlist_name)
+        playlist = playlist_manager.get_playlist(default_playlist_name)
+
+    instance_name = f"{plugin_id}_saved_settings"
+    existing_instance = playlist.find_plugin(plugin_id, instance_name)
+    if existing_instance:
+        existing_instance.settings = plugin_settings
+    else:
+        playlist.add_plugin(
+            {
+                "plugin_id": plugin_id,
+                "refresh": {"interval": 3600},
+                "plugin_settings": plugin_settings,
+                "name": instance_name,
+            }
+        )
+
+    device_config.write_config()
+    return (
+        jsonify(
+            {
+                "success": True,
+                "message": "Settings saved. Add to Playlist to schedule this instance.",
+                "instance_name": instance_name,
+            }
+        ),
+        200,
+    )
 
 
 def _find_history_image(device_config, plugin_id: str, instance_name: str) -> Optional[str]:

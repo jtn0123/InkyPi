@@ -34,9 +34,23 @@
     const selectUnit = document.getElementById('{{ prefix }}-unit');
 
     if (groupInterval && groupScheduled) {
+      const updateModeRequirements = () => {
+        const intervalMode = radioInterval.checked;
+        inputInterval.required = intervalMode;
+        if (selectUnit) {
+          selectUnit.required = intervalMode;
+          selectUnit.disabled = !intervalMode;
+        }
+        inputInterval.disabled = !intervalMode;
+
+        inputScheduled.required = !intervalMode;
+        inputScheduled.disabled = intervalMode;
+      };
+
       // Helper to activate a group
       const activateGroup = (radio, input) => {
         radio.checked = true;
+        updateModeRequirements();
         // Focus after a short delay to ensure radio updates visually
         setTimeout(() => input.focus(), 0);
       };
@@ -57,12 +71,23 @@
       radioScheduled.addEventListener('click', () => activateGroup(radioScheduled, inputScheduled));
 
       // Focusing inputs → auto-select their radio
-      inputInterval.addEventListener('focus', () => (radioInterval.checked = true));
-      inputScheduled.addEventListener('focus', () => (radioScheduled.checked = true));
+      inputInterval.addEventListener('focus', () => {
+        radioInterval.checked = true;
+        updateModeRequirements();
+      });
+      inputScheduled.addEventListener('focus', () => {
+        radioScheduled.checked = true;
+        updateModeRequirements();
+      });
       if (selectUnit) {
-        selectUnit.addEventListener('focus', () => (radioInterval.checked = true));
+        selectUnit.addEventListener('focus', () => {
+          radioInterval.checked = true;
+          updateModeRequirements();
+        });
       }
+      radioInterval.addEventListener('change', updateModeRequirements);
+      radioScheduled.addEventListener('change', updateModeRequirements);
+      updateModeRequirements();
     }
   });
 </script>
-

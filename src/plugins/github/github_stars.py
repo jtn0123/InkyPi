@@ -40,12 +40,16 @@ def fetch_stars(github_repository):
     headers = {"Accept": "application/json"}
 
     response = requests.get(url, headers=headers, timeout=30)
-    if response.status_code == 200:
+    if response.status_code != 200:
+        logger.error(
+            "GitHub Stars Plugin: Error: %s - %s",
+            response.status_code,
+            response.text,
+        )
+        return 0
+    try:
         data = response.json()
-    else:
-        logger.error(f"GitHub Stars Plugin: Error: {response.status_code} - {response.text}")
-        data = {"stargazers_count": 0}
-
-    data = response.json()
-    return data['stargazers_count']
-
+    except ValueError as e:
+        logger.error("GitHub Stars Plugin: Invalid JSON response: %s", e)
+        return 0
+    return int(data.get('stargazers_count', 0) or 0)

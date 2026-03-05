@@ -58,7 +58,8 @@ class InkyDisplay(AbstractDisplay):
             raise ValueError(f"No image provided.")
 
         # Display the image on the Inky display
-        inky_saturation = self.device_config.get_config('image_settings').get("inky_saturation", 0.5)
+        image_settings_cfg = self.device_config.get_config('image_settings') or {}
+        inky_saturation = image_settings_cfg.get("inky_saturation", 0.5)
         logger.info(f"Inky Saturation: {inky_saturation}")
         try:
             self.inky_display.set_image(image, saturation=inky_saturation)

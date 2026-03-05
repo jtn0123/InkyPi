@@ -61,7 +61,9 @@ update_app_service() {
 }
 
 update_cli() {
-  cp -r "$SCRIPT_DIR/cli" "$INSTALL_PATH/"
+  rm -rf "$INSTALL_PATH/cli"
+  mkdir -p "$INSTALL_PATH/cli"
+  cp -a "$SCRIPT_DIR/cli/." "$INSTALL_PATH/cli/"
   sudo chmod +x "$INSTALL_PATH/cli/"*
 }
 
