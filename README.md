@@ -102,6 +102,23 @@ To update your InkyPi with the latest code changes, follow these steps:
     ```
 This process ensures that any new updates, including code changes and additional dependencies, are properly applied without requiring a full reinstallation.
 
+## Contributing Workflow
+
+- Base new work from `origin/main`.
+- Keep PRs focused and feature-scoped; avoid long-lived branch drift.
+- For parent-fork sync work (`fatihak/InkyPi`), prefer cherry-pick by feature area and run plugin flow smoke tests after each batch.
+- Use the PR template checklist for base-branch, sync, and compatibility verification before merging.
+
+## Runtime Feature Flags
+
+- `INKYPI_PLUGIN_RETRY_MAX` (default `1`)
+- `INKYPI_PLUGIN_RETRY_BACKOFF_MS` (default `500`)
+- `INKYPI_PLUGIN_TIMEOUT_S` (default `60`)
+- `INKYPI_BENCHMARK_API_ENABLED` (default `true`)
+- `INKYPI_PROGRESS_SSE_ENABLED` (default `true`)
+- `INKYPI_RENDER_CACHE_TTL_S` (default `300`)
+- `INKYPI_HEALTH_WINDOW_MIN` (default `1440`)
+
 ## Uninstall
 To install InkyPi, simply run the following command:
 
