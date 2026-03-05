@@ -44,10 +44,10 @@ setup_earlyoom_service() {
 update_app_service() {
   echo "Updating $APPNAME systemd service."
   if [ -f "$SERVICE_FILE_SOURCE" ]; then
-    cp "$SERVICE_FILE_SOURCE" "$SERVICE_FILE_TARGET"
+    sudo cp "$SERVICE_FILE_SOURCE" "$SERVICE_FILE_TARGET"
     echo "Restarting $APPNAME service."
     sudo systemctl daemon-reload
-    sudo systemctl restart $SERVICE_FILE
+    sudo systemctl restart "$SERVICE_FILE"
   else
     echo_error "ERROR: Service file $SERVICE_FILE_SOURCE not found!"
     exit 1
