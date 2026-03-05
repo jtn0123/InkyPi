@@ -68,9 +68,30 @@
         function toggleCollapsible(button) {
             const content = button.nextElementSibling;
             const icon = button.querySelector(".collapsible-icon");
-            button.classList.toggle("active");
-            content.style.display = content.style.display === "block" ? "none" : "block";
-            icon.textContent = content.style.display === "block" ? "▲" : "▼";
+            const isOpen = content.style.display === "block";
+            button.classList.toggle("active", !isOpen);
+            button.setAttribute("aria-expanded", String(!isOpen));
+            content.style.display = isOpen ? "none" : "block";
+            icon.textContent = isOpen ? "▼" : "▲";
+        }
+
+        function toggleAllCollapsibles(open) {
+            document.querySelectorAll(".collapsible-header").forEach((button) => {
+                const content = button.nextElementSibling;
+                const icon = button.querySelector(".collapsible-icon");
+                button.classList.toggle("active", open);
+                button.setAttribute("aria-expanded", String(open));
+                if (content) content.style.display = open ? "block" : "none";
+                if (icon) icon.textContent = open ? "▲" : "▼";
+            });
+        }
+
+        function jumpToSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            if (!section) return;
+            section.scrollIntoView({ behavior: "smooth", block: "start" });
+            section.classList.add("section-focus");
+            setTimeout(() => section.classList.remove("section-focus"), 1000);
         }
 
         async function handleShutdown(reboot) {
@@ -178,6 +199,13 @@
             if (!viewer) return;
             viewer.style.boxShadow = `0 0 0 2px var(--accent)`;
             setTimeout(() => { viewer.style.boxShadow = ''; }, 500);
+        }
+
+        function setPanelLoading(id, loading) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.toggle('loading-panel', !!loading);
+            el.setAttribute('aria-busy', loading ? 'true' : 'false');
         }
 
         async function fetchAndRenderLogs() {
@@ -317,7 +345,8 @@
     </script>
 </head>
 <body>
-    <main>
+    <a href="#settings-main" class="skip-nav">Skip to settings content</a>
+    <main id="settings-main">
     <div class="settings-grid">
     <div class="frame settings-panel">
         {% from 'macros/icons.html' import icon %}
@@ -350,11 +379,21 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div class="section-nav" role="navigation" aria-label="Settings sections">
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-basics')">Basics</button>
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-time-locale')">Time & Locale</button>
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-display-cycle')">Display Cycle</button>
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-backup-restore')">Backup</button>
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-observability')">Observability</button>
+            <button type="button" class="status-chip info" onclick="jumpToSection('section-image-settings')">Image</button>
+            <button type="button" class="status-chip" onclick="toggleAllCollapsibles(true)">Expand all</button>
+            <button type="button" class="status-chip" onclick="toggleAllCollapsibles(false)">Collapse all</button>
+        </div>
         <!-- Settings Content -->
         <form class="settings-form">
             <div id="settings-container">
                 <!-- Basics -->
-                <div class="section">
+                <div class="section" id="section-basics">
                     <div class="section-title">Basics</div>
                     <div class="form-group">
                         <label for="deviceName" class="form-label">Device Name</label>
@@ -387,8 +426,8 @@
                 </div>
 
                 <!-- Time & Locale -->
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                <div class="collapsible" id="section-time-locale">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Time & Locale <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
@@ -419,8 +458,8 @@
                 </div>
 
                 <!-- Plugin cycle & system -->
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                <div class="collapsible" id="section-display-cycle">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Display Cycle & System <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
@@ -447,8 +486,8 @@
                 </div>
 
                 <!-- Backup & Restore -->
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                <div class="collapsible" id="section-backup-restore">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Backup & Restore <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
@@ -470,14 +509,19 @@
                 </div>
 
                 <!-- Observability & Recovery -->
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                <div class="collapsible" id="section-observability">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Observability & Recovery <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
                         <div class="form-group nowrap">
                             <button type="button" class="action-button compact" onclick="refreshBenchmarks()">Refresh Benchmark Summary</button>
                             <button type="button" class="action-button compact warn" onclick="safeReset()">Safe Reset</button>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-chip success">Health API</span>
+                            <span class="status-chip info">Benchmarks API</span>
+                            <span class="status-chip warning">Recovery Tools</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
@@ -488,21 +532,26 @@
                                 <button type="button" class="action-button compact" onclick="refreshIsolation()">Refresh List</button>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <div id="benchSummary" class="logs-viewer" style="min-height:120px;">Benchmark summary loading...</div>
+                        <div class="sections-grid two-col">
+                            <div class="form-group">
+                                <label class="form-label">Benchmark Summary</label>
+                                <div id="benchSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:120px;">Benchmark summary loading...</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Health Summary</label>
+                                <div id="healthSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:120px;">Health summary loading...</div>
+                            </div>
                         </div>
                         <div class="form-group">
-                            <div id="healthSummary" class="logs-viewer" style="min-height:120px;">Health summary loading...</div>
-                        </div>
-                        <div class="form-group">
-                            <div id="isolationSummary" class="logs-viewer" style="min-height:80px;">Isolation list loading...</div>
+                            <label class="form-label">Isolation Summary</label>
+                            <div id="isolationSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:80px;">Isolation list loading...</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Image Settings -->
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                <div class="collapsible" id="section-image-settings">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Image Settings <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
@@ -649,6 +698,12 @@
             collapsibleSections.forEach(section => {
                 section.style.display = 'block';
             });
+            document.querySelectorAll('.collapsible-header').forEach((button) => {
+                button.classList.add('active');
+                button.setAttribute('aria-expanded', 'true');
+                const icon = button.querySelector('.collapsible-icon');
+                if (icon) icon.textContent = '▲';
+            });
         });
         async function exportConfig(){
             const include = document.getElementById('includeKeys')?.checked;
@@ -694,6 +749,7 @@
         }
 
         async function refreshBenchmarks(){
+            setPanelLoading('benchSummary', true);
             try {
                 const [summaryResp, pluginsResp] = await Promise.all([
                     fetch('/api/benchmarks/summary?window=24h', { cache: 'no-store' }),
@@ -710,10 +766,13 @@
                 document.getElementById('benchSummary').textContent = out.join('\n');
             } catch (e) {
                 document.getElementById('benchSummary').textContent = 'Failed to load benchmark summary';
+            } finally {
+                setPanelLoading('benchSummary', false);
             }
         }
 
         async function refreshHealth(){
+            setPanelLoading('healthSummary', true);
             try {
                 const [pluginsResp, systemResp] = await Promise.all([
                     fetch('/api/health/plugins', { cache: 'no-store' }),
@@ -730,16 +789,21 @@
                 document.getElementById('healthSummary').textContent = out.join('\n');
             } catch (e) {
                 document.getElementById('healthSummary').textContent = 'Failed to load health data';
+            } finally {
+                setPanelLoading('healthSummary', false);
             }
         }
 
         async function refreshIsolation(){
+            setPanelLoading('isolationSummary', true);
             try {
                 const resp = await fetch('/settings/isolation', { cache: 'no-store' });
                 const data = await resp.json();
                 document.getElementById('isolationSummary').textContent = JSON.stringify(data, null, 2);
             } catch (e) {
                 document.getElementById('isolationSummary').textContent = 'Failed to load isolation list';
+            } finally {
+                setPanelLoading('isolationSummary', false);
             }
         }
 

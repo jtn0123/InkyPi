@@ -212,9 +212,11 @@
         function toggleCollapsible(button) {
             const content = button.nextElementSibling;
             const icon = button.querySelector(".collapsible-icon");
-            button.classList.toggle("active");
-            content.style.display = content.style.display === "block" ? "none" : "block";
-            icon.textContent = content.style.display === "block" ? "▲" : "▼";
+            const isOpen = content.style.display === "block";
+            button.classList.toggle("active", !isOpen);
+            button.setAttribute("aria-expanded", String(!isOpen));
+            content.style.display = isOpen ? "none" : "block";
+            icon.textContent = isOpen ? "▼" : "▲";
         }
 
         function selectedFrame(element) {
@@ -529,6 +531,22 @@
 
         <div class="separator"></div>
 
+        <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
+            <span class="status-chip info">Plugin: {{ plugin.id }}</span>
+            {% if plugin_instance %}
+            <span class="status-chip success">Editing instance</span>
+            {% else %}
+            <span class="status-chip warning">New playlist instance</span>
+            {% endif %}
+            {% if api_key and api_key.required %}
+                {% if api_key.present %}
+                <span class="status-chip success">API key configured</span>
+                {% else %}
+                <span class="status-chip error">API key missing</span>
+                {% endif %}
+            {% endif %}
+        </div>
+
         <!-- Status: current display vs this plugin instance -->
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="status-bar">
@@ -601,7 +619,7 @@
                 <!-- Collapsible Style Settings Section -->
                 {% if style_settings %}
                 <div class="collapsible">
-                    <button type="button" class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
                         Style <span class="collapsible-icon">▼</span>
                     </button>
                     <div class="settings-container collapsible-content">
@@ -742,9 +760,9 @@
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
                     <label for="refreshTypeInterval">Every</label>
-                    <input type="number" id="interval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
+                    <input type="number" id="scheduleInterval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
                     <span id="interval-error" class="validation-message" role="alert"></span>
-                    <select id="unit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
+                    <select id="scheduleUnit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
                         <option value="minute">Minute</option>
                         <option value="hour">Hour</option>
                         <option value="day">Day</option>
@@ -753,7 +771,7 @@
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
                     <label for="refreshTypeScheduled">Daily at</label>
-                    <input id="scheduled" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
+                    <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
                 </div>
             </form>
             <div class="buttons-container">

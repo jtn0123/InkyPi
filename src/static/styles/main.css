@@ -1235,6 +1235,98 @@ body {
 .status-meta .label { color: var(--muted); font-size: 0.85rem; }
 .status-meta .value { color: var(--text); font-size: 0.95rem; font-weight: 600; }
 
+.section-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 10px 0;
+}
+
+.section-focus {
+    animation: sectionFocusPulse 700ms ease-out;
+}
+
+@keyframes sectionFocusPulse {
+    0% { box-shadow: 0 0 0 0 rgba(36, 221, 189, 0.35); }
+    100% { box-shadow: 0 0 0 10px rgba(36, 221, 189, 0); }
+}
+
+.status-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    border: 1px solid var(--surface-border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.status-chip.success {
+    background: rgba(56, 161, 105, 0.12);
+    border-color: rgba(56, 161, 105, 0.35);
+    color: var(--success);
+}
+
+.status-chip.warning {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #8a5a00;
+}
+
+[data-theme="dark"] .status-chip.warning {
+    color: #ffd084;
+}
+
+.status-chip.info {
+    background: rgba(66, 153, 225, 0.12);
+    border-color: rgba(66, 153, 225, 0.35);
+    color: #1f4f87;
+}
+
+[data-theme="dark"] .status-chip.info {
+    color: #9aceff;
+}
+
+.status-chip.error {
+    background: rgba(229, 62, 62, 0.12);
+    border-color: rgba(229, 62, 62, 0.35);
+    color: #b62d2d;
+}
+
+[data-theme="dark"] .status-chip.error {
+    color: #ff9a9a;
+}
+
+.loading-panel {
+    position: relative;
+    color: transparent;
+    border: 1px solid var(--surface-border);
+    background: linear-gradient(
+        90deg,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 25%,
+        var(--skeleton-highlight, rgba(0,0,0,0.10)) 37%,
+        var(--skeleton-base, rgba(0,0,0,0.06)) 63%
+    );
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.loading-panel::after {
+    content: "Loading…";
+    position: absolute;
+    inset: auto 10px 8px 10px;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.plugin-mode-row {
+    margin: 2px 0 10px 0;
+}
+
 /* Compact meta styling when inside status-body */
 .status-meta.compact {
     margin-top: 0;
@@ -1579,6 +1671,15 @@ svg.icon-thin {
     .img-skeleton {
         animation: none;
         background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .loading-panel {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .section-focus {
+        animation: none;
     }
 }
 
@@ -3202,6 +3303,15 @@ select.form-input option {
   .header-button.icon svg {
     width: var(--icon-lg);
     height: var(--icon-lg);
+  }
+
+  .section-nav {
+    gap: 6px;
+  }
+
+  .section-nav .status-chip {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 
