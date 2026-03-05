@@ -10,12 +10,19 @@ from PIL import Image
 from io import BytesIO
 import requests
 import logging
+import os
 from random import randint
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class Apod(BasePlugin):
+    def _request_timeout(self) -> float:
+        try:
+            return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))
+        except Exception:
+            return 20.0
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {
@@ -44,7 +51,11 @@ class Apod(BasePlugin):
         elif settings.get("customDate"):
             params["date"] = settings["customDate"]
 
-        response = requests.get("https://api.nasa.gov/planetary/apod", params=params)
+        response = requests.get(
+            "https://api.nasa.gov/planetary/apod",
+            params=params,
+            timeout=self._request_timeout(),
+        )
 
         if response.status_code != 200:
             logger.error(f"NASA API error: {response.text}")
@@ -58,7 +69,7 @@ class Apod(BasePlugin):
         image_url = data.get("hdurl") or data.get("url")
 
         try:
-            img_data = requests.get(image_url)
+            img_data = requests.get(image_url, timeout=self._request_timeout())
             if not 200 <= img_data.status_code < 300:
                 logger.error(f"Failed to fetch APOD image: status {img_data.status_code}")
                 raise RuntimeError("Failed to fetch APOD image.")
