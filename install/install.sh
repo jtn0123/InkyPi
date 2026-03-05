@@ -17,7 +17,6 @@
 bold=$(tput bold)
 normal=$(tput sgr0)
 red=$(tput setaf 1)
-green=$(tput setaf 2)
 
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
@@ -150,19 +149,20 @@ enable_interfaces(){
 
 show_loader() {
   local pid=$!
+  local message="$1"
   local delay=0.1
-  local spinstr='|/-\'
-  printf "$1 [${spinstr:0:1}] "
-  while ps a | awk '{print $1}' | grep -q "${pid}"; do
+  local spinstr="|/-\\"
+  printf "%s [%s] " "$message" "${spinstr:0:1}"
+  while kill -0 "$pid" 2>/dev/null; do
     local temp=${spinstr#?}
-    printf "\r$1 [${temp:0:1}] "
+    printf "\r%s [%s] " "$message" "${temp:0:1}"
     spinstr=${temp}${spinstr%"${temp}"}
-    sleep ${delay}
+    sleep "${delay}"
   done
-  if [[ $? -eq 0 ]]; then
-    printf "\r$1 [\e[32m\xE2\x9C\x94\e[0m]\n"
+  if wait "$pid"; then
+    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$message"
   else
-    printf "\r$1 [\e[31m\xE2\x9C\x98\e[0m]\n"
+    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$message"
   fi
 }
 
@@ -216,14 +216,14 @@ setup_earlyoom_service() {
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  $VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel > /dev/null
-  $VENV_PATH/bin/python -m pip install -r $PIP_REQUIREMENTS_FILE -qq > /dev/null &
+  "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel > /dev/null
+  "$VENV_PATH/bin/python" -m pip install -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
   show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    $VENV_PATH/bin/python -m pip install -r $WS_REQUIREMENTS_FILE > ws_pip_install.log &
+    "$VENV_PATH/bin/python" -m pip install -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
     show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
@@ -243,8 +243,8 @@ install_app_service() {
 
 install_executable() {
   echo "Adding executable to ${BINPATH}/$APPNAME"
-  cp $SCRIPT_DIR/inkypi $BINPATH/
-  sudo chmod +x $BINPATH/$APPNAME
+  cp "$SCRIPT_DIR/inkypi" "$BINPATH/"
+  sudo chmod +x "$BINPATH/$APPNAME"
 }
 
 install_config() {
@@ -288,9 +288,9 @@ update_config() {
 
 stop_service() {
     echo "Checking if $SERVICE_FILE is running"
-    if /usr/bin/systemctl is-active --quiet $SERVICE_FILE
+    if /usr/bin/systemctl is-active --quiet "$SERVICE_FILE"
     then
-      /usr/bin/systemctl stop $SERVICE_FILE > /dev/null &
+      /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
       show_loader "Stopping $APPNAME service"
     else  
       echo_success "\t$SERVICE_FILE not running"
@@ -305,7 +305,7 @@ start_service() {
 install_src() {
   # Check if an existing installation is present
   echo "Installing $APPNAME to $INSTALL_PATH"
-  if [[ -d $INSTALL_PATH ]]; then
+  if [[ -d "$INSTALL_PATH" ]]; then
     rm -rf "$INSTALL_PATH" > /dev/null
     show_loader "\tRemoving existing installation found at $INSTALL_PATH"
   fi
@@ -325,22 +325,25 @@ install_cli() {
 
 # Get Raspberry Pi hostname
 get_hostname() {
-  echo "$(hostname)"
+  hostname
 }
 
 # Get Raspberry Pi IP address
 get_ip_address() {
+  local ip_address
   ip_address=$(hostname -I | awk '{print $1}')
   echo "$ip_address"
 }
 
 # Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixe
 get_os_version() {
-  echo "$(lsb_release -sr)"
+  lsb_release -sr
 }
 
 ask_for_reboot() {
   # Get hostname and IP address
+  local hostname
+  local ip_address
   hostname=$(get_hostname)
   ip_address=$(get_ip_address)
   echo_header "$(echo_success "${APPNAME^^} Installation Complete!")"
@@ -348,7 +351,7 @@ ask_for_reboot() {
   echo_header "[•] After your Pi is rebooted, you can access the web UI by going to $(echo_blue "'$hostname.local'") or $(echo_blue "'$ip_address'") in your browser."
   echo_header "[•] If you encounter any issues or have suggestions, please submit them here: https://github.com/fatihak/InkyPi/issues"
 
-  read -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
+  read -r -p "Would you like to restart your Raspberry Pi now? [Y/N] " userInput
   userInput="${userInput^^}"
 
   if [[ "${userInput,,}" == "y" ]]; then
@@ -395,6 +398,6 @@ fi
 install_app_service
 
 echo "Update JS and CSS files"
-bash $SCRIPT_DIR/update_vendors.sh > /dev/null
+bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
 
 ask_for_reboot

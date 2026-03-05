@@ -21,6 +21,7 @@ usage() {
 }
 
 run_app() {
+    # shellcheck source=/dev/null
     source "$VENV_PATH/bin/activate"
     exec python -u "$(realpath "$PROGRAM_PATH/src/inkypi.py")" "$@"
 }
@@ -33,15 +34,15 @@ case "$command" in
     ""|run)
         run_app "$@"
         ;;
+    -h|--help|help)
+        usage
+        exit 0
+        ;;
     -*)
         run_app "$command" "$@"
         ;;
     plugin)
         run_plugin_cli "$@"
-        ;;
-    -h|--help|help)
-        usage
-        exit 0
         ;;
     *)
         echo "Unknown command: $command"
