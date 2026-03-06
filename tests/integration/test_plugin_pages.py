@@ -23,6 +23,44 @@ def test_plugin_page_apod(client):
     assert b"/preview" in resp.data
 
 
+def test_weather_plugin_second_pass_polish(client):
+    resp = client.get("/plugin/weather")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert "settings-card-title\">Location" in body
+    assert "toggle-list" in body
+    assert "radio-segment" in body
+    assert "settings-map" in body
+
+
+def test_todo_list_plugin_uses_svg_delete_icon(client):
+    resp = client.get("/plugin/todo_list")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert "dynamic-list-toolbar" in body
+    assert "ph-trash" in body
+    assert "remove.png" not in body
+
+
+def test_url_based_plugins_use_warning_callouts(client):
+    for plugin_id in ("rss", "screenshot", "image_url"):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "settings-callout warning" in body
+
+
+def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
+    resp = client.get("/plugin/github")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert 'id="repositoryGroup" hidden' in body
+    assert 'id="repositoryGroup" style="display: none;"' not in body
+
+
 def test_preview_size_mode_native_on_plugin(client, device_config_dev):
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/plugin/ai_text")

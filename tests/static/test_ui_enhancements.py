@@ -178,6 +178,16 @@ def test_main_css_contains_theme_variables(client):
 
     # Check for dark theme support
     assert "[data-theme=\"dark\"]" in css_content
+    assert "--primary:" in css_content
+    assert "--primary-hover:" in css_content
+    assert "--text-muted:" in css_content
+    assert "--text-secondary:" in css_content
+    assert "--modal-overlay:" in css_content
+    assert "--modal-bg:" in css_content
+    assert "--border-color:" in css_content
+    assert "--shadow-medium:" in css_content
+    assert "--close-btn-color:" in css_content
+    assert "--close-btn-hover:" in css_content
 
 
 def test_main_css_contains_spacing_improvements(client):
@@ -368,6 +378,8 @@ def test_main_css_contains_enhanced_progress_styles(client):
     assert ".enhanced-progress-details" in css_content
     assert ".enhanced-progress-log" in css_content
     assert ".log-entry" in css_content
+    assert "var(--primary)" in css_content
+    assert "var(--text-muted)" in css_content
 
 
 def test_main_css_contains_api_validation_styles(client):
@@ -397,6 +409,21 @@ def test_main_css_contains_api_validation_styles(client):
 
     # Check for spin animation
     assert "@keyframes spin" in css_content
+    assert "var(--primary-bg)" in css_content
+    assert "var(--text-muted)" in css_content
+
+
+def test_main_css_contains_top_level_theme_normalization_helpers(client):
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+    css_content = resp.get_data(as_text=True)
+
+    assert ".storage-meter" in css_content
+    assert ".storage-meter-fill" in css_content
+    assert ".logs-icon" in css_content
+    assert ".playlist-thumbnail-modal" in css_content
+    assert ".playlist-thumbnail-content" in css_content
+    assert ".playlist-thumbnail-info" in css_content
 
 
 def test_main_css_contains_operation_status_styles(client):

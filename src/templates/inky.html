@@ -18,7 +18,7 @@
         {% from 'macros/icons.html' import icon %}
         <div class="app-header">
             <div class="header-content">
-                <div style="display:flex;align-items:center;gap:10px;">
+                <div class="header-identity">
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}
                         <h1 class="app-title">{{ config.name }}</h1>
@@ -41,6 +41,20 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div class="page-intro">
+            <div class="page-intro-body">
+                <p class="page-subtitle">Preview the current display, inspect what is showing now and next, and jump directly into the plugins that drive the device.</p>
+            </div>
+            <div class="page-summary">
+                <span class="status-chip info">{{ plugins|length }} plugins</span>
+                {% if refresh_info.playlist %}
+                <span class="status-chip">Playlist: {{ refresh_info.playlist }}</span>
+                {% endif %}
+                {% if refresh_info.plugin_id %}
+                <span class="status-chip">{{ refresh_info.plugin_id }}</span>
+                {% endif %}
+            </div>
+        </div>
 
         <!-- Main content area -->
         <main id="main-content" role="main">
@@ -103,15 +117,21 @@
             'weather': 'cloud-sun',
             'calendar': 'calendar-blank',
             'clock': 'clock',
+            'countdown': 'hourglass',
+            'github': 'github-logo',
+            'image_album': 'images-square',
             'newspaper': 'newspaper-clipping',
             'apod': 'planet',
+            'rss': 'newspaper-clipping',
+            'todo_list': 'list-checks',
             'unsplash': 'images-square',
             'image_url': 'link-simple',
             'image_upload': 'upload-simple',
             'image_folder': 'folder-simple',
             'screenshot': 'monitor',
             'wpotd': 'book-open-text',
-            'comic': 'mask-happy'
+            'comic': 'mask-happy',
+            'year_progress': 'chart-line-up'
         } %}
             <div class="plugins-container dashboard-grid">
                 {% for plugin in plugins %}

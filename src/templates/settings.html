@@ -19,7 +19,7 @@
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
-                <div style="display:flex;align-items:center;gap:10px;">
+                <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -45,6 +45,16 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div class="page-intro">
+            <div class="page-intro-body">
+                <p class="page-subtitle">Manage device behavior, scheduling, recovery tools, and image processing from one control surface.</p>
+            </div>
+            <div class="page-summary">
+                <span class="status-chip info">{{ device_settings.name }}</span>
+                <span class="status-chip">{{ device_settings.orientation | capitalize }}</span>
+                <span class="status-chip">{{ device_settings.timezone }}</span>
+            </div>
+        </div>
         <div class="section-nav" role="navigation" aria-label="Settings sections">
             <button type="button" class="status-chip info" onclick="jumpToSection('section-basics')">Basics</button>
             <button type="button" class="status-chip info" onclick="jumpToSection('section-time-locale')">Time & Locale</button>
@@ -272,10 +282,10 @@
             <div class="header-content logs-header">
                 <div class="title-container">
                     <!-- Inline SVG log icon (document-like) to differentiate from gear -->
-                    <svg class="app-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="#333" stroke-width="1.6" fill="#fff"/>
-                        <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="#333" stroke-width="1.6"/>
-                        <path d="M8 12h8M8 16h8M8 20h8" stroke="#2c66b1" stroke-width="1.6"/>
+                    <svg class="app-icon logs-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path class="icon-fill" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6"/>
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="1.6"/>
+                        <path class="icon-accent" d="M8 12h8M8 16h8M8 20h8" stroke="currentColor" stroke-width="1.6"/>
                     </svg>
                     <h1 class="app-title">Logs</h1>
                 </div>

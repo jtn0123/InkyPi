@@ -1,24 +1,29 @@
-
-<div class="form-group">
-    <label for="githubType" class="form-label">Type:</label>
-    <select id="githubType" name="githubType" class="form-input" onchange="updateGitHubInputs()">
-        <option value="contributions">Contributions</option>
-        <option value="sponsors">Sponsors</option>
-        <option value="stars">Stars</option>
-    </select>
+<div class="settings-card">
+    <div class="settings-card-title">Source</div>
+    <div class="options-grid">
+        <div class="form-group">
+            <label for="githubType" class="form-label">Metric</label>
+            <select id="githubType" name="githubType" class="form-input" onchange="updateGitHubInputs()">
+                <option value="contributions">Contributions</option>
+                <option value="sponsors">Sponsors</option>
+                <option value="stars">Stars</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="githubUsername" class="form-label">GitHub Username</label>
+            <input type="text" id="githubUsername" name="githubUsername" placeholder="octocat" required class="form-input">
+        </div>
+        <div class="form-group" id="repositoryGroup" hidden>
+            <label for="githubRepository" class="form-label">Repository</label>
+            <input type="text" id="githubRepository" name="githubRepository" placeholder="owner/repo" class="form-input">
+            <span class="field-note">Required when tracking stars.</span>
+        </div>
+    </div>
 </div>
 
-<div class="form-group">
-    <div class="form-group">
-        <label for="githubUsername" class="form-label">GitHub Username:</label>
-        <input type="text" id="githubUsername" name="githubUsername" placeholder="GitHub Username" required class="form-input">
-    </div>
-    <div class="form-group" id="repositoryGroup" style="display: none;">
-        <label for="githubRepository" class="form-label">Repository:</label>
-        <input type="text" id="githubRepository" name="githubRepository" placeholder="GitHub Repository" class="form-input">
-    </div>
-    <div class="form-group" id="colorGroup">
-        <label for="contributionColor[]" class="form-label">Grid Colors:</label>
+<div class="settings-card" id="colorGroup">
+    <div class="settings-card-title">Contribution Grid Colors</div>
+    <div class="options-grid">
         <input type="color" name="contributionColor[]" class="color-picker">
         <input type="color" name="contributionColor[]" class="color-picker">
         <input type="color" name="contributionColor[]" class="color-picker">
@@ -35,13 +40,13 @@
         const colorGroup = document.getElementById('colorGroup');
 
         if (type === 'stars') {
-            repositoryGroup.style.display = 'block';
+            repositoryGroup.hidden = false;
             repositoryInput.required = true;
-            colorGroup.style.display = 'none';
+            colorGroup.hidden = true;
         } else {
-            repositoryGroup.style.display = 'none';
+            repositoryGroup.hidden = true;
             repositoryInput.required = false;
-            colorGroup.style.display = type === 'contributions' ? 'block' : 'none';
+            colorGroup.hidden = type !== 'contributions';
         }
     }
 

@@ -1,108 +1,138 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-<div class="form-group">
-    <label class="form-label">Location: </label>
-    <div class="form-group">
-        <span>Latitude </span>
-        <input readonly type="text" id="latitude" name="latitude" class="form-input" />
-    </div>
-    <div class="form-group">
-        <span>Longitude </span>
-        <input readonly type="text" id="longitude" name="longitude" class="form-input" />
+<div class="settings-card">
+    <div class="settings-card-title">Location</div>
+    <div class="inline-readonly-grid">
+        <div class="form-group">
+            <label for="latitude" class="form-label">Latitude</label>
+            <input readonly type="text" id="latitude" name="latitude" class="form-input" />
+        </div>
+        <div class="form-group">
+            <label for="longitude" class="form-label">Longitude</label>
+            <input readonly type="text" id="longitude" name="longitude" class="form-input" />
+        </div>
     </div>
     <button type="button" id="openMap" class="action-button compact">Select Location</button>
 </div>
 
-<div class="form-group">
-    <label for="weatherProvider" class="form-label">Weather Provider:</label>
-    <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
-        <option value="OpenMeteo">Open-Meteo</option>
-        <option value="OpenWeatherMap">OpenWeatherMap</option>
-    </select>
-
-    <label for="units" class="form-label">Units:</label>
-    <select id="units" name="units" class="form-input">
-        <option value="imperial">Imperial (°F)</option>
-        <option value="metric">Metric (°C)</option>
-        <option value="standard">Standard (K)</option>
-    </select>
-</div>
-
-<div class="form-group" id="titleOptionWrapper">
-    <label class="form-label">Title:</label>
-
-    <div class="form-group">
-        <input type="radio" id="title-location" name="titleSelection" value="location">
-        <label for="title-location">Location</label>
-
-        <input type="radio" id="title-custom" name="titleSelection" value="custom">
-        <label for="title-custom">Custom</label>
-        <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Type something..." />
+<div class="settings-card">
+    <div class="settings-card-title">Data</div>
+    <div class="options-grid">
+        <div class="form-group">
+            <label for="weatherProvider" class="form-label">Weather Provider</label>
+            <select id="weatherProvider" name="weatherProvider" class="form-input" onchange="updateTitleOptions(this.value)">
+                <option value="OpenMeteo">Open-Meteo</option>
+                <option value="OpenWeatherMap">OpenWeatherMap</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="units" class="form-label">Units</label>
+            <select id="units" name="units" class="form-input">
+                <option value="imperial">Imperial (°F)</option>
+                <option value="metric">Metric (°C)</option>
+                <option value="standard">Standard (K)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="weatherTimeZone" class="form-label">Time Zone</label>
+            <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
+                <option value="locationTimeZone">Use Location Time Zone</option>
+                <option value="localTimeZone">Use Local Time Zone</option>
+            </select>
+        </div>
     </div>
 </div>
 
-<div class="form-group">
-    <label for="displayMetrics" class="form-label">Display: </label>
-
-    <div class="form-group">
-      <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" onclick="this.value=this.checked ? 'true' : 'false';">
-      <span>Refresh Time</span>
+<div class="settings-card" id="titleOptionWrapper">
+    <div class="settings-card-title">Title</div>
+    <div class="radio-segment">
+        <label class="radio-option" for="title-location">
+            <input type="radio" id="title-location" name="titleSelection" value="location">
+            <span>Location</span>
+        </label>
+        <label class="radio-option" for="title-custom">
+            <input type="radio" id="title-custom" name="titleSelection" value="custom">
+            <span>Custom</span>
+        </label>
     </div>
-
     <div class="form-group">
-        <input type="checkbox" id="displayMetrics" name="displayMetrics" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Metrics</span>
+        <label for="customTitle" class="form-label">Custom Title</label>
+        <input type="text" id="customTitle" name="customTitle" class="form-input" placeholder="Custom forecast title" />
     </div>
+</div>
 
-    <div class="form-group">
-        <input type="checkbox" id="displayGraph" name="displayGraph" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Weather Graph</span>
+<div class="settings-card">
+    <div class="settings-card-title">Display</div>
+    <div class="toggle-list">
+        <div class="toggle-item">
+            <div class="toggle-item-text"><span class="toggle-item-label">Refresh Time</span></div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayRefreshTime" name="displayRefreshTime" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+        </div>
+        <div class="toggle-item">
+            <div class="toggle-item-text"><span class="toggle-item-label">Metrics</span></div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayMetrics" name="displayMetrics" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+        </div>
+        <div class="toggle-item">
+            <div class="toggle-item-text"><span class="toggle-item-label">Weather Graph</span></div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayGraph" name="displayGraph" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+        </div>
+        <div class="toggle-item">
+            <div class="toggle-item-text"><span class="toggle-item-label">Rain Amount</span></div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayRain" name="displayRain" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+        </div>
+        <div class="toggle-item">
+            <div class="toggle-item-text"><span class="toggle-item-label">Moon Phase</span></div>
+            <label class="toggle-container">
+                <input type="checkbox" id="moonPhase" name="moonPhase" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+        </div>
+        <div class="toggle-item inline-controls">
+            <div class="toggle-item-text">
+                <span class="toggle-item-label">Graph Icons</span>
+                <span class="toggle-item-hint">Show graph icons at a fixed interval.</span>
+            </div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayGraphIcons" name="displayGraphIcons" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+            <select id="graphIconStep" name="graphIconStep" class="form-input">
+                <option value="1">Every 1 hour</option>
+                <option value="2" selected>Every 2 hours</option>
+                <option value="4">Every 4 hours</option>
+                <option value="6">Every 6 hours</option>
+                <option value="12">Every 12 hours</option>
+            </select>
+        </div>
+        <div class="toggle-item inline-controls">
+            <div class="toggle-item-text">
+                <span class="toggle-item-label">Forecast</span>
+                <span class="toggle-item-hint">Show a multi-day forecast summary.</span>
+            </div>
+            <label class="toggle-container">
+                <input type="checkbox" id="displayForecast" name="displayForecast" class="toggle-checkbox" onclick="this.value=this.checked ? 'true' : 'false';">
+                <span class="toggle-label"></span>
+            </label>
+            <select id="forecastDays" name="forecastDays" class="form-input">
+                <option value="3">3 days</option>
+                <option value="5">5 days</option>
+                <option value="7">7 days</option>
+            </select>
+        </div>
     </div>
-
-    <div class="form-group">
-        <input type="checkbox" id="displayRain" name="displayRain" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Rain Amount</span>
-    </div>
-	
-
-    <div class="form-group">
-        <input type="checkbox" id="moonPhase" name="moonPhase" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Moon Phase</span>
-    </div>
-	
-	<div class="form-group">
-		<input type="checkbox" id="displayGraphIcons" name="displayGraphIcons" onclick="this.value=this.checked ? 'true' : 'false';">
-		<span>Graph icons every</span>
-		<select id="graphIconStep" name="graphIconStep" class="form-input">
-			<option value="1">1</option>
-			<option value="2" selected>2</option>
-			<option value="4">4</option>
-			<option value="6">6</option>
-			<option value="12">12</option>
-		</select>
-		<span>hours</span>
-	</div>
-
-    <div class="form-group">
-        <input type="checkbox" id="displayForecast" name="displayForecast" onclick="this.value=this.checked ? 'true' : 'false';">
-        <span>Forecast</span>
-        <select id="forecastDays" name="forecastDays" class="form-input">
-            <option value=3>3</option>
-            <option value=5>5</option>
-            <option value=7>7</option>
-        </select>
-        <span>days</span>
-    </div>
-
-    <div class="form-group">
-        <label for="weatherTimeZone" class="form-label">Time Zone:</label>
-        <select id="weatherTimeZone" name="weatherTimeZone" class="form-input">
-            <option value="locationTimeZone">Use Location Time Zone</option>
-            <option value="localTimeZone">Use Local Time Zone</option>
-        </select>
-    </div>
-
 </div>
 
 <div id="mapModal" class="modal">
@@ -110,7 +140,7 @@
         <span class="close-button" onclick="closeModal('mapModal')">×</span>
         <h2 id="modalTitle">Select Location</h2>
         <div class="separator"></div>
-        <div id="map" style="width: 100%; height: 200px; margin: 10px 0px;"></div>
+        <div id="map" class="settings-map"></div>
         <button id="closeMap" class="action-button">Save</button>
     </div>
 </div>

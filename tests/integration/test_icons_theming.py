@@ -65,8 +65,11 @@ def test_playlist_icons_present(icons_csp_env, client):
     html = _html(client, "/playlist")
     # Header playlists icon
     assert _has_icon(html, "ph-squares-four", "app-icon")
+    assert 'id="themeToggle"' in html
+    assert "/static/icons/playlist.png" not in html
     # Action buttons
     assert _has_icon(html, "ph-pencil-simple", "action-icon")
+    assert _has_icon(html, "ph-clock", "action-icon")
     assert _has_icon(html, "ph-monitor", "action-icon")
     assert _has_icon(html, "ph-trash", "action-icon")
 
@@ -87,6 +90,14 @@ def test_history_icon_present(icons_csp_env, client):
 def test_api_keys_icon_present(icons_csp_env, client):
     html = _html(client, "/settings/api-keys")
     assert _has_icon(html, "ph-gear-six", "app-icon")
+    assert _has_icon(html, "ph-info", "icon-image")
+
+
+def test_settings_logs_icon_uses_themeable_strokes(icons_csp_env, client):
+    html = _html(client, "/settings")
+    assert 'class="app-icon logs-icon"' in html
+    assert 'stroke="#333"' not in html
+    assert 'fill="#fff"' not in html
 
 
 def test_csp_allows_unpkg(icons_csp_env, client):
@@ -98,5 +109,3 @@ def test_csp_allows_unpkg(icons_csp_env, client):
     # Allow either CDN present or not; if icons are purely local, unpkg may be absent
     # if "https://unpkg.com" not in csp:
     #     pytest.skip("CDN not required when using local inline SVGs")
-
-
