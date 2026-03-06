@@ -6,8 +6,8 @@
 
 <div class="dynamic-list" data-repeater-list data-max-items="3">
     {% for idx in range(item_count) %}
-    <div class="dynamic-list-item">
-        <div class="dynamic-list-toolbar">
+    <div class="dynamic-list-item compact-repeater compact-repeater-text">
+        <div class="dynamic-list-toolbar compact-repeater-toolbar">
             <input
                 type="text"
                 name="list-title[]"
@@ -21,8 +21,8 @@
         </div>
         <textarea
             name="list[]"
-            class="form-input"
-            rows="6"
+            class="form-input dynamic-list-textarea"
+            rows="5"
             placeholder="Enter tasks, one per line"
         >{{ list_items[idx] if idx < (list_items | length) else '' }}</textarea>
     </div>

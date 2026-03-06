@@ -5,6 +5,7 @@ def test_plugin_page_ai_text(client):
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b"AI Text" in resp.data
+    assert b"ai_text" in resp.data
     # preview image present
     assert b"/preview" in resp.data
 

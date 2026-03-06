@@ -82,9 +82,9 @@
                         </div>
                         <div class="playlist-toolbar">
                             <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
-                            <button class="edit-button edit-playlist-btn" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}</button>
-                            <button class="delete-button delete-playlist-btn" type="button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}</button>
-                            <button class="playlist-toggle-button" type="button" data-playlist-toggle aria-expanded="false">Open</button>
+                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
+                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Details" data-expanded-label="Collapse" aria-expanded="false">Details</button>
                         </div>
                     </div>
                     <div class="playlist-card-body" data-playlist-body>

@@ -13,6 +13,16 @@
 <body>
     <main class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
+        {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
+        {% if api_keys_mode == 'managed' %}
+            {% set key_summary.provider_count = 4 %}
+            {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+        {% else %}
+            {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
+        {% endif %}
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
@@ -42,7 +52,8 @@
                 <p class="page-subtitle">Store service credentials in one place. Existing values stay masked so you can update only the keys that changed.</p>
             </div>
             <div class="page-summary">
-                <span class="status-chip info">{{ entries|length if entries is defined else 4 }} providers</span>
+                <span id="providerCountSummary" class="status-chip info">{{ key_summary.provider_count }} providers</span>
+                <span id="configuredCountSummary" class="status-chip success">{{ key_summary.configured_count }} configured</span>
                 <span class="status-chip">{{ api_keys_mode | capitalize }}</span>
             </div>
         </div>
@@ -51,8 +62,10 @@
         <form id="apiKeysForm" class="settings-form">
             <div class="settings-container api-keys-grid">
                 <div class="form-group api-key-card">
-                    <label class="form-label">OpenAI</label>
-                    <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
+                    <div class="api-key-card-head">
+                        <label class="form-label">OpenAI</label>
+                        <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
+                    </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
                         {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input">×</button>{% endif %}
@@ -60,8 +73,10 @@
                     </div>
                 </div>
                 <div class="form-group api-key-card">
-                    <label class="form-label">OpenWeatherMap</label>
-                    <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
+                    <div class="api-key-card-head">
+                        <label class="form-label">OpenWeatherMap</label>
+                        <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
+                    </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
                         {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input">×</button>{% endif %}
@@ -69,8 +84,10 @@
                     </div>
                 </div>
                 <div class="form-group api-key-card">
-                    <label class="form-label">NASA APOD</label>
-                    <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
+                    <div class="api-key-card-head">
+                        <label class="form-label">NASA APOD</label>
+                        <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
+                    </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
                         {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input">×</button>{% endif %}
@@ -78,8 +95,10 @@
                     </div>
                 </div>
                 <div class="form-group api-key-card">
-                    <label class="form-label">Unsplash</label>
-                    <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
+                    <div class="api-key-card-head">
+                        <label class="form-label">Unsplash</label>
+                        <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
+                    </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
                         {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input">×</button>{% endif %}

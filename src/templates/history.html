@@ -34,7 +34,6 @@
                 </div>
                 <div class="header-actions history-toolbar">
                     <button id="historyRefreshBtn" class="header-button" type="button">Refresh</button>
-                    <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
                 </div>
             </div>
         </div>
@@ -50,27 +49,6 @@
                 {% endif %}
             </div>
         </div>
-        {% if metrics %}
-        <div class="metric-strip">
-            <div class="metric-pill">
-                <span class="metric-pill-label">Request</span>
-                <span class="metric-pill-value">{{ metrics.request_ms or '-' }} ms</span>
-            </div>
-            <div class="metric-pill">
-                <span class="metric-pill-label">Generate</span>
-                <span class="metric-pill-value">{{ metrics.generate_ms or '-' }} ms</span>
-            </div>
-            <div class="metric-pill">
-                <span class="metric-pill-label">Preprocess</span>
-                <span class="metric-pill-value">{{ metrics.preprocess_ms or '-' }} ms</span>
-            </div>
-            <div class="metric-pill">
-                <span class="metric-pill-label">Display</span>
-                <span class="metric-pill-value">{{ metrics.display_ms or '-' }} ms</span>
-            </div>
-        </div>
-        <div class="separator"></div>
-        {% endif %}
         <div id="storage-block" class="storage-card" {% if not storage or storage.pct_free is none %}hidden{% endif %}>
             <div class="storage-card-head">
                 <div>
@@ -89,6 +67,44 @@
                 <div id="storage-bar-inner" class="storage-meter-fill" style="width:{% if storage and storage.pct_free is not none %}{{ storage.pct_free }}%{% else %}0%{% endif %}"></div>
             </div>
         </div>
+        {% if metrics and (metrics.request_ms is not none or metrics.generate_ms is not none or metrics.preprocess_ms is not none or metrics.display_ms is not none) %}
+        <div class="metric-strip compact">
+            {% if metrics.request_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Request</span>
+                <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.generate_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Generate</span>
+                <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.preprocess_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Preprocess</span>
+                <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.display_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Display</span>
+                <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if images|length > 0 %}
+        <div class="danger-zone history-danger-zone">
+            <div>
+                <h3>Reset cache</h3>
+                <p>Remove all saved history images from this device when you want to reclaim local storage quickly.</p>
+            </div>
+            <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
+        </div>
+        {% endif %}
+        <div class="separator"></div>
 
         {% if images|length == 0 %}
             <div class="empty-state compact">
@@ -104,25 +120,27 @@
                     <div class="img-skeleton" aria-hidden="true"></div>
                     <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" loading="lazy">
                 </a>
-                <div class="history-meta">
-                    <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
-                    <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
-                    {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
-                    <div class="history-sub">
-                        <span>Source:</span>
-                        <span>
-                            {% if img.meta.refresh_type %}{{ img.meta.refresh_type }}{% endif %}
-                            {% if img.meta.plugin_id %} • {{ img.meta.plugin_id }}{% endif %}
-                            {% if img.meta.playlist %} • {{ img.meta.playlist }}{% endif %}
-                            {% if img.meta.plugin_instance %} • {{ img.meta.plugin_instance }}{% endif %}
-                        </span>
+                <div class="history-card-body">
+                    <div class="history-meta">
+                        <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
+                        <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
+                        {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
+                        <div class="history-sub">
+                            <span>Source:</span>
+                            <span>
+                                {% if img.meta.refresh_type %}{{ img.meta.refresh_type }}{% endif %}
+                                {% if img.meta.plugin_id %} • {{ img.meta.plugin_id }}{% endif %}
+                                {% if img.meta.playlist %} • {{ img.meta.playlist }}{% endif %}
+                                {% if img.meta.plugin_instance %} • {{ img.meta.plugin_instance }}{% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                </div>
-                <div class="history-actions">
-                    <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}">Display</button>
-                    <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
-                    <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}">Delete</button>
+                    <div class="history-actions">
+                        <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}">Display</button>
+                        <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
+                        <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}">Delete</button>
+                    </div>
                 </div>
             </div>
             {% endfor %}

@@ -205,13 +205,16 @@
 
   function createCalendarEntry(url, color) {
     const entry = document.createElement("div");
-    entry.className = "dynamic-list-item";
+    entry.className = "dynamic-list-item compact-repeater compact-repeater-calendar";
     entry.innerHTML = `
-      <div class="dynamic-list-toolbar">
+      <div class="dynamic-list-toolbar compact-repeater-toolbar">
         <input type="text" name="calendarURLs[]" class="form-input" placeholder="Calendar URL" required>
         <button type="button" class="remove-btn icon-button" aria-label="Remove calendar"><i class="ph ph-trash ph-thin action-icon" aria-hidden="true"></i></button>
       </div>
-      <input type="color" name="calendarColors[]" class="color-picker">
+      <label class="dynamic-list-color-group">
+        <span>Color</span>
+        <input type="color" name="calendarColors[]" class="color-picker">
+      </label>
     `;
     entry.querySelector("input[name='calendarURLs[]']").value = url || "";
     entry.querySelector("input[name='calendarColors[]']").value = color || "#007BFF";
@@ -245,13 +248,13 @@
 
   function createTodoEntry(title, body) {
     const entry = document.createElement("div");
-    entry.className = "dynamic-list-item";
+    entry.className = "dynamic-list-item compact-repeater compact-repeater-text";
     entry.innerHTML = `
-      <div class="dynamic-list-toolbar">
+      <div class="dynamic-list-toolbar compact-repeater-toolbar">
         <input type="text" name="list-title[]" class="form-input" placeholder="List title">
         <button type="button" class="remove-btn icon-button" aria-label="Remove list"><i class="ph ph-trash ph-thin action-icon" aria-hidden="true"></i></button>
       </div>
-      <textarea name="list[]" class="form-input" rows="6" placeholder="Enter tasks, one per line"></textarea>
+      <textarea name="list[]" class="form-input dynamic-list-textarea" rows="5" placeholder="Enter tasks, one per line"></textarea>
     `;
     entry.querySelector("input[name='list-title[]']").value = title || "";
     entry.querySelector("textarea[name='list[]']").value = body || "";

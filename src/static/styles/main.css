@@ -1303,6 +1303,8 @@ body {
 
 .plugin-mode-row {
     margin: 2px 0 10px 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
 }
 
 /* Compact meta styling when inside status-body */
@@ -2961,6 +2963,17 @@ body.modal-open {
     justify-content: flex-end;
 }
 
+.playlist-secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.action-button-label {
+    display: none;
+}
+
 .playlist-summary-row {
     display: flex;
     flex-wrap: wrap;
@@ -3060,6 +3073,18 @@ body.modal-open {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.title-stack {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.app-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.2;
 }
 
 .header-identity {
@@ -3586,6 +3611,12 @@ body.modal-open {
   gap: 10px;
 }
 
+.api-key-card-head {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
 .api-key-card .form-label {
   font-size: 1rem;
 }
@@ -3794,6 +3825,12 @@ body.modal-open {
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
+.history-card-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
 .history-thumb {
   position: relative;
   display: block;
@@ -3871,6 +3908,10 @@ body.modal-open {
 
 .history-actions .btn-danger:hover {
   background: var(--danger-hover);
+}
+
+.metric-strip.compact .metric-pill {
+  padding: 12px;
 }
 
 .section-nav {
@@ -4159,6 +4200,12 @@ body.modal-open {
   padding: 12px;
 }
 
+.compact-repeater {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
 .dynamic-list-toolbar {
   display: flex;
   justify-content: space-between;
@@ -4169,6 +4216,29 @@ body.modal-open {
 
 .dynamic-list-toolbar .form-input {
   flex: 1;
+}
+
+.compact-repeater-toolbar {
+  align-items: stretch;
+  margin-bottom: 0;
+}
+
+.compact-repeater-toolbar .remove-btn {
+  flex: 0 0 44px;
+  min-height: 44px;
+}
+
+.dynamic-list-color-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dynamic-list-textarea {
+  min-height: 112px;
 }
 
 .settings-map {
@@ -4964,6 +5034,24 @@ main[data-page-shell="workflow"] .frame {
     justify-content: center;
   }
 
+  .header-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .title-stack {
+    gap: 0;
+  }
+
+  .app-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .plugin-mode-row {
+    margin: 0 0 8px;
+    gap: 6px;
+  }
+
   .workflow-layout {
     display: block;
   }
@@ -5007,6 +5095,10 @@ main[data-page-shell="workflow"] .frame {
     line-height: 1.45;
   }
 
+  .workflow-section-header p {
+    font-size: 0.88rem;
+  }
+
   .status-bar {
     grid-template-columns: 1fr;
     gap: 10px;
@@ -5031,17 +5123,33 @@ main[data-page-shell="workflow"] .frame {
   }
 
   .playlist-toolbar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .playlist-toolbar .run-next-btn {
     grid-column: 1 / -1;
   }
 
+  .playlist-secondary-button,
   .playlist-toggle-button {
     display: inline-flex;
     justify-content: center;
     align-items: center;
+    min-height: 44px;
+  }
+
+  .playlist-secondary-button {
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 9px 12px;
+  }
+
+  .playlist-secondary-button .action-button-label {
+    display: inline;
+    font-size: 0.82rem;
+    font-weight: 700;
   }
 
   .playlist-card-body {
@@ -5110,8 +5218,42 @@ main[data-page-shell="workflow"] .frame {
     grid-column: 1 / -1;
   }
 
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-card {
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+
+  .history-thumb {
+    aspect-ratio: 1 / 1.2;
+  }
+
+  .history-name {
+    font-size: 0.94rem;
+  }
+
+  .history-sub {
+    font-size: 0.8rem;
+  }
+
   .api-key-actions {
     gap: 8px;
+  }
+
+  .api-key-card {
+    gap: 8px;
+  }
+
+  .api-key-status {
+    font-size: 0.8rem;
+  }
+
+  .api-key-actions .delete-button-danger {
+    align-self: flex-start;
   }
 
   .modal-content,
@@ -5143,6 +5285,18 @@ main[data-page-shell="workflow"] .frame {
   .history-toolbar,
   .logs-actions {
     grid-template-columns: 1fr;
+  }
+
+  .metric-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .history-card {
+    grid-template-columns: 1fr;
+  }
+
+  .history-thumb {
+    aspect-ratio: 4 / 3;
   }
 
   .plugins-container {

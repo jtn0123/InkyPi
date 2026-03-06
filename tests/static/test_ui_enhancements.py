@@ -120,6 +120,9 @@ def test_main_css_contains_workflow_and_management_shells(client):
     assert ".playlist-toggle-button" in css_content
     assert ".modal-sheet" in css_content
     assert "body.modal-open" in css_content
+    assert ".title-stack" in css_content
+    assert ".history-card-body" in css_content
+    assert ".compact-repeater" in css_content
 
 
 def test_primary_templates_reduce_inline_handlers():

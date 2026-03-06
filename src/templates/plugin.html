@@ -72,7 +72,10 @@
                 } %}
                 {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
                 {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
-                <h1 class="app-title">{{ plugin.display_name }}</h1>
+                <div class="title-stack">
+                    <h1 class="app-title">{{ plugin.display_name }}</h1>
+                    <span class="app-subtitle">{{ plugin.id }}</span>
+                </div>
             </div>
             <div class="header-controls">
                 <!-- API Key Status Indicator -->
@@ -100,15 +103,14 @@
         <div class="separator"></div>
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
-            <span class="status-chip info">Plugin: {{ plugin.id }}</span>
             {% if plugin_instance %}
-            <span class="status-chip success">Editing instance</span>
+            <span class="status-chip success">Instance</span>
             {% else %}
-            <span class="status-chip warning">New playlist instance</span>
+            <span class="status-chip warning">Draft</span>
             {% endif %}
             {% if api_key and api_key.required %}
                 {% if api_key.present %}
-                <span class="status-chip success">API key configured</span>
+                <span class="status-chip success">API ready</span>
                 {% else %}
                 <span class="status-chip error">API key missing</span>
                 {% endif %}

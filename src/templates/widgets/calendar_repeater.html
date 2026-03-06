@@ -5,8 +5,8 @@
 
 <div class="dynamic-list" data-repeater-list>
     {% for idx in range(calendar_urls | length) %}
-    <div class="dynamic-list-item">
-        <div class="dynamic-list-toolbar">
+    <div class="dynamic-list-item compact-repeater compact-repeater-calendar">
+        <div class="dynamic-list-toolbar compact-repeater-toolbar">
             <input
                 type="text"
                 name="calendarURLs[]"
@@ -19,7 +19,10 @@
                 {{ icon('trash', 'action-icon') | safe }}
             </button>
         </div>
-        <input type="color" name="calendarColors[]" class="color-picker" value="{{ calendar_colors[idx] if idx < (calendar_colors | length) else '#007BFF' }}">
+        <label class="dynamic-list-color-group">
+            <span>Color</span>
+            <input type="color" name="calendarColors[]" class="color-picker" value="{{ calendar_colors[idx] if idx < (calendar_colors | length) else '#007BFF' }}">
+        </label>
     </div>
     {% endfor %}
 </div>

@@ -79,6 +79,18 @@ def test_history_page_contains_storage_block(client):
     # Should include server-rendered text placeholders or values
     assert "Storage available" in body
 
+
+def test_history_page_moves_clear_action_to_reset_cache(client, device_config_dev):
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, "display_20250101_000700.png"))
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "Reset cache" in body
+    assert 'id="historyClearBtn"' in body
+
 def test_history_image_route_serves_png(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
