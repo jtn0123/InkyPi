@@ -11,9 +11,6 @@
 <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
 <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}"></script>
 <body>
-    <!-- Skip navigation for accessibility -->
-    <a href="#main-content" class="skip-nav">Skip to main content</a>
-
     <!-- Subtle frame container -->
     <div class="frame">
         {% from 'macros/icons.html' import icon %}
@@ -59,53 +56,67 @@
 
         <!-- Main content area -->
         <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
-            <!-- Display the current image (auto-refreshing preview) -->
-            {% set fit = (config.get('preview_size_mode') == 'fit') %}
-            <div class="image-container {% if not fit %}native{% endif %}">
-                <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
-                <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display image for {{ config.name }}"
-                     width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
-                     data-native-width="{{ config.resolution[0] }}" data-native-height="{{ config.resolution[1] }}">
-            </div>
+            <div class="dashboard-hero">
+                <section class="dashboard-stage">
+                    <div class="dashboard-stage-header">
+                        <div>
+                            <h2>Current Display</h2>
+                            <p class="dashboard-stage-copy">Double-click the preview to toggle native pixels. Tap the image to inspect it in the lightbox.</p>
+                        </div>
+                        <span class="status-chip info">{{ config.resolution[0] }}×{{ config.resolution[1] }}</span>
+                    </div>
+                    {% set fit = (config.get('preview_size_mode') == 'fit') %}
+                    <div class="image-container {% if not fit %}native{% endif %}">
+                        <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display image for {{ config.name }}"
+                             width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
+                             data-native-width="{{ config.resolution[0] }}" data-native-height="{{ config.resolution[1] }}">
+                    </div>
+                </section>
 
-        <!-- Optional metadata about the current plugin/image (e.g., WPOTD) -->
-        <div id="imageMeta" class="image-meta dashboard-meta" hidden>
-            <div id="imageMetaContent"></div>
-        </div>
+                <aside class="dashboard-overview">
+                    <div id="statusRow" class="dashboard-status-card" {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}hidden{% endif %}>
+                        <div id="nowShowingBlock" class="dashboard-status-meta" {% if not refresh_info.plugin_id %}hidden{% endif %}>
+                            <h3>Now showing:</h3>
+                            <div>
+                                <strong id="nsPlugin">{{ refresh_info.plugin_id or '' }}</strong>
+                                {% if refresh_info.plugin_instance %}
+                                <span>(<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)</span>
+                                {% else %}
+                                <span id="nsInstance" hidden></span>
+                                {% endif %}
+                            </div>
+                            {% if refresh_info.playlist %}
+                            <div>Playlist: <span id="nsPlaylist">{{ refresh_info.playlist }}</span></div>
+                            {% else %}
+                            <span id="nsPlaylist" hidden></span>
+                            {% endif %}
+                        </div>
+                        <div id="nextUpBlock" class="dashboard-status-meta" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
+                            <h3>Next up:</h3>
+                            <div>
+                                <strong id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</strong>
+                                {% if next_up and next_up.plugin_instance %}
+                                <span>(<span id="nuInstance">{{ next_up.plugin_instance }}</span>)</span>
+                                {% else %}
+                                <span id="nuInstance" hidden></span>
+                                {% endif %}
+                            </div>
+                            {% if next_up and next_up.playlist %}
+                            <div>Playlist: <span id="nuPlaylist">{{ next_up.playlist }}</span></div>
+                            {% else %}
+                            <span id="nuPlaylist" hidden></span>
+                            {% endif %}
+                            <button id="displayNextBtn" class="action-button compact">Display Next</button>
+                        </div>
+                    </div>
 
-        <!-- Consolidated status row: Now + Next in a single compact row -->
-        <div id="statusRow" class="image-meta status-row dashboard-status-row" {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}hidden{% endif %}>
-            <div class="status-meta" id="nowShowingBlock" {% if not refresh_info.plugin_id %}hidden{% endif %}>
-                <strong>Now showing:</strong>
-                <span id="nsPlugin">{{ refresh_info.plugin_id or '' }}</span>
-                {% if refresh_info.plugin_instance %}
-                (<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)
-                {% else %}
-                <span id="nsInstance" hidden></span>
-                {% endif %}
-                {% if refresh_info.playlist %}
-                • <span id="nsPlaylist">{{ refresh_info.playlist }}</span>
-                {% else %}
-                <span id="nsPlaylist" hidden></span>
-                {% endif %}
+                    <div id="imageMeta" class="dashboard-status-card dashboard-meta" hidden>
+                        <h3>Image details</h3>
+                        <div id="imageMetaContent" class="dashboard-status-meta"></div>
+                    </div>
+                </aside>
             </div>
-            <div class="status-divider" aria-hidden="true"></div>
-            <div class="status-meta" id="nextUpBlock" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
-                <strong>Next up:</strong>
-                <span id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</span>
-                {% if next_up and next_up.plugin_instance %}
-                (<span id="nuInstance">{{ next_up.plugin_instance }}</span>)
-                {% else %}
-                <span id="nuInstance" hidden></span>
-                {% endif %}
-                {% if next_up and next_up.playlist %}
-                • <span id="nuPlaylist">{{ next_up.playlist }}</span>
-                {% else %}
-                <span id="nuPlaylist" hidden></span>
-                {% endif %}
-                <button id="displayNextBtn" class="action-button compact">Display Next</button>
-            </div>
-        </div>
 
         </main>
 

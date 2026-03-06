@@ -111,6 +111,9 @@ def test_main_css_contains_workflow_and_management_shells(client):
 
     assert ".workflow-layout" in css_content
     assert ".workflow-mode-bar" in css_content
+    assert ".dashboard-hero" in css_content
+    assert ".settings-grid" in css_content
+    assert ".logs-viewer" in css_content
     assert ".settings-console-layout" in css_content
     assert ".settings-side-nav" in css_content
     assert ".danger-zone" in css_content
@@ -120,9 +123,10 @@ def test_primary_templates_reduce_inline_handlers():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2] / "src" / "templates"
-    for template_name in ("plugin.html", "settings.html", "inky.html"):
+    for template_name in ("plugin.html", "settings.html", "inky.html", "history.html", "api_keys.html"):
         content = (root / template_name).read_text()
         assert "onclick=" not in content
+        assert "skip-nav" not in content
 
 
 def test_main_css_contains_enhanced_button_styles(client):

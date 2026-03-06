@@ -55,8 +55,8 @@
                     <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" onclick="clearField('openai-input')">×</button>{% endif %}
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>{% endif %}
+                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input">×</button>{% endif %}
+                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_AI_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
                 <div class="form-group api-key-card">
@@ -64,8 +64,8 @@
                     <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" onclick="clearField('openweather-input')">×</button>{% endif %}
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>{% endif %}
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input">×</button>{% endif %}
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_WEATHER_MAP_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
                 <div class="form-group api-key-card">
@@ -73,8 +73,8 @@
                     <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
-                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" onclick="clearField('nasa-input')">×</button>{% endif %}
-                        {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('NASA_SECRET')">Delete</button>{% endif %}
+                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input">×</button>{% endif %}
+                        {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="NASA_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
                 <div class="form-group api-key-card">
@@ -82,8 +82,8 @@
                     <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" onclick="clearField('unsplash-input')">×</button>{% endif %}
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>{% endif %}
+                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input">×</button>{% endif %}
+                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="UNSPLASH_ACCESS_KEY">Delete</button>{% endif %}
                     </div>
                 </div>
             </div>
@@ -96,7 +96,7 @@
                     <div class="apikey-row" data-existing="true">
                         <input type="text" class="apikey-key" value="{{ entry.key }}" placeholder="KEY_NAME" readonly>
                         <input type="text" class="apikey-value masked" value="{{ entry.masked }}" placeholder="(unchanged)" readonly>
-                        <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete" aria-label="Delete API key">×</button>
+                        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete API key">×</button>
                     </div>
                     {% endfor %}
                 {% else %}
@@ -108,12 +108,12 @@
                 {% endif %}
             </div>
             <div class="add-buttons-grid">
-                <button type="button" class="btn-add" onclick="addRow()"><span>+</span> Add API Key</button>
-                <button type="button" class="btn-preset" data-key="OPEN_WEATHER_MAP_SECRET" onclick="addPreset(this)">OPEN_WEATHER_MAP_SECRET</button>
-                <button type="button" class="btn-preset" data-key="OPEN_AI_SECRET" onclick="addPreset(this)">OPEN_AI_SECRET</button>
-                <button type="button" class="btn-preset" data-key="NASA_SECRET" onclick="addPreset(this)">NASA_SECRET</button>
-                <button type="button" class="btn-preset" data-key="UNSPLASH_ACCESS_KEY" onclick="addPreset(this)">UNSPLASH_ACCESS_KEY</button>
-                <button type="button" class="btn-preset" data-key="GITHUB_SECRET" onclick="addPreset(this)">GITHUB_SECRET</button>
+                <button type="button" id="addApiKeyBtn" class="btn-add"><span>+</span> Add API Key</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET">OPEN_WEATHER_MAP_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET">OPEN_AI_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET">NASA_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY">UNSPLASH_ACCESS_KEY</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET">GITHUB_SECRET</button>
             </div>
         </div>
         {% endif %}
@@ -127,7 +127,7 @@
         </div>
 
         <div class="buttons-container">
-            <button type="button" onclick="saveKeys()" class="action-button">Save</button>
+            <button type="button" id="saveApiKeysBtn" class="action-button">Save</button>
         </div>
     </div>
 
