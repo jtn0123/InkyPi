@@ -110,14 +110,16 @@ class ProgressiveDisclosure {
     // Enhanced form validation system
     setupValidation() {
         document.addEventListener('input', (e) => {
-            if (e.target.matches('.form-input')) {
-                this.validateField(e.target);
+            const target = e.target;
+            if (target instanceof Element && target.matches('.form-input')) {
+                this.validateField(target);
             }
         });
 
         document.addEventListener('blur', (e) => {
-            if (e.target.matches('.form-input')) {
-                this.validateField(e.target);
+            const target = e.target;
+            if (target instanceof Element && target.matches('.form-input')) {
+                this.validateField(target);
             }
         });
     }
@@ -189,14 +191,16 @@ class ProgressiveDisclosure {
     // Tooltip system
     setupTooltips() {
         document.addEventListener('mouseenter', (e) => {
-            if (e.target.matches('[data-tooltip]')) {
-                this.showTooltip(e.target);
+            const target = e.target;
+            if (target instanceof Element && target.matches('[data-tooltip]')) {
+                this.showTooltip(target);
             }
         }, true);
 
         document.addEventListener('mouseleave', (e) => {
-            if (e.target.matches('[data-tooltip]')) {
-                this.hideTooltip(e.target);
+            const target = e.target;
+            if (target instanceof Element && target.matches('[data-tooltip]')) {
+                this.hideTooltip(target);
             }
         }, true);
     }
@@ -408,7 +412,8 @@ class ProgressiveDisclosure {
 
         // Also monitor button group changes (forecast days)
         document.addEventListener('click', (e) => {
-            if (e.target.matches('.button-group button[data-value]')) {
+            const target = e.target;
+            if (target instanceof Element && target.matches('.button-group button[data-value]')) {
                 setTimeout(showLivePreview, 100);
             }
         });

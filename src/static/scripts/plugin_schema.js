@@ -102,13 +102,18 @@
   function bindStandardEvents(root) {
     root.addEventListener("change", (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
-      if (target.matches("input[type='checkbox'].toggle-checkbox")) {
+      if (!(target instanceof Element)) return;
+      if (
+        typeof target.matches === "function" &&
+        target.matches("input[type='checkbox'].toggle-checkbox")
+      ) {
         target.value = target.checked ? target.dataset.checkedValue || "true" : target.dataset.uncheckedValue || "true";
       }
       if (
-        target.matches("input, select, textarea") ||
-        target.closest("input, select, textarea")
+        (typeof target.matches === "function" &&
+          target.matches("input, select, textarea")) ||
+        (typeof target.closest === "function" &&
+          target.closest("input, select, textarea"))
       ) {
         applyDependentOptions(root);
         applyVisibility(root);

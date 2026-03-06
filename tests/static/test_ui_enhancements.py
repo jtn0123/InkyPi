@@ -127,6 +127,8 @@ def test_primary_templates_reduce_inline_handlers():
         content = (root / template_name).read_text()
         assert "onclick=" not in content
         assert "skip-nav" not in content
+        assert "Skip to main content" not in content
+        assert "Skip to settings content" not in content
 
 
 def test_main_css_contains_enhanced_button_styles(client):

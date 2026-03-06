@@ -49,7 +49,7 @@ def fill_form_and_extract(page):
     return page.evaluate(
         """
         () => {
-          const form = document.querySelector('#pluginForm');
+          const form = document.querySelector('#settingsForm, #pluginForm');
           if (!form) return null;
           const today = new Date().toISOString().slice(0, 10);
           for (const element of Array.from(form.elements)) {
@@ -85,11 +85,60 @@ def fill_form_and_extract(page):
     )
 
 
+def stub_external_assets(page):
+    page.route(
+        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+        lambda route: route.fulfill(status=200, content_type="text/css", body=""),
+    )
+    page.route(
+        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/javascript",
+            body="""
+              (() => {
+                function chain() { return this; }
+                function markerFactory() {
+                  return {
+                    addTo: chain,
+                    bindPopup: chain,
+                    openPopup: chain,
+                    setLatLng: chain,
+                  };
+                }
+                window.L = {
+                  map() {
+                    return {
+                      setView: chain,
+                      on: chain,
+                      off: chain,
+                      fitBounds: chain,
+                      addLayer: chain,
+                      removeLayer: chain,
+                      invalidateSize: chain,
+                      closePopup: chain,
+                    };
+                  },
+                  tileLayer() {
+                    return { addTo: chain };
+                  },
+                  marker: markerFactory,
+                  latLng(lat, lng) {
+                    return { lat, lng };
+                  },
+                };
+              })();
+            """,
+        ),
+    )
+
+
 def create_plugin_scenarios(base_url: str, plugin_id: str) -> list[Scenario]:
     scenarios = [Scenario("default", f"/plugin/{plugin_id}")]
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
+        stub_external_assets(page)
         page.goto(f"{base_url}/plugin/{plugin_id}", wait_until="domcontentloaded", timeout=30000)
         page.wait_for_timeout(600)
         payload = fill_form_and_extract(page)
@@ -213,6 +262,87 @@ def collect_dom_issues(page, route_name: str):
     )
 
 
+def create_runtime_tracker(page, base_url: str):
+    tracker = {
+        "console_errors": [],
+        "page_errors": [],
+        "request_failures": [],
+        "response_failures": [],
+    }
+    page.on("pageerror", lambda exc: tracker["page_errors"].append(str(exc)))
+
+    def handle_console(msg):
+        if msg.type != "error":
+            return
+        text = msg.text
+        if "integrity" in text and "leaflet" in text.lower():
+            return
+        tracker["console_errors"].append(text)
+
+    page.on("console", handle_console)
+    page.on(
+        "requestfailed",
+        lambda request: tracker["request_failures"].append(
+            {
+                "url": request.url,
+                "resource_type": request.resource_type,
+                "failure": request.failure or "",
+            }
+        )
+        if request.url.startswith(base_url)
+        and request.resource_type in {"document", "script", "stylesheet", "xhr", "fetch"}
+        else None,
+    )
+    page.on(
+        "response",
+        lambda response: tracker["response_failures"].append(
+            {
+                "url": response.url,
+                "status": response.status,
+                "resource_type": response.request.resource_type,
+            }
+        )
+        if response.url.startswith(base_url)
+        and response.status >= 400
+        and response.request.resource_type in {"document", "script", "stylesheet", "xhr", "fetch"}
+        else None,
+    )
+    return tracker
+
+
+def collect_runtime_issues(tracker):
+    issues = []
+    if tracker["page_errors"]:
+        issues.append(
+            {
+                "severity": "P1",
+                "text": f"Uncaught page errors detected: {tracker['page_errors'][:3]}",
+            }
+        )
+    if tracker["console_errors"]:
+        issues.append(
+            {
+                "severity": "P1",
+                "text": f"Console errors detected: {tracker['console_errors'][:3]}",
+            }
+        )
+    if tracker["request_failures"]:
+        issues.append(
+            {
+                "severity": "P1",
+                "text": f"Critical request failures detected: {tracker['request_failures'][:3]}",
+            }
+        )
+    if tracker["response_failures"]:
+        issues.append(
+            {
+                "severity": "P1",
+                "text": f"Critical HTTP failures detected: {tracker['response_failures'][:3]}",
+            }
+        )
+    return issues
+
+
 def capture_route(browser, base_url: str, route_name: str, route_path: str, output_dir: Path):
     matrix = []
     for viewport_name, cfg in VIEWPORTS.items():
@@ -224,12 +354,15 @@ def capture_route(browser, base_url: str, route_name: str, route_path: str, outp
             device_scale_factor=2 if cfg["mobile"] else 1,
         )
         scoped_page = context.new_page()
+        stub_external_assets(scoped_page)
+        tracker = create_runtime_tracker(scoped_page, base_url)
         screenshot_path = output_dir / f"{route_name}__{viewport_name}.png"
         try:
             scoped_page.goto(f"{base_url}{route_path}", wait_until="commit", timeout=15000)
             scoped_page.wait_for_timeout(1200)
             scoped_page.screenshot(path=str(screenshot_path), full_page=True, timeout=5000)
             issues = collect_dom_issues(scoped_page, route_name)
+            issues.extend(collect_runtime_issues(tracker))
         except PlaywrightTimeoutError:
             issues = [
                 {
