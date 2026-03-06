@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from PIL import Image, ImageOps, ImageColor
 import logging
 import os
@@ -20,6 +21,51 @@ def list_files_in_folder(folder_path):
     return image_files
 
 class ImageFolder(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                field(
+                    "folder_path",
+                    label="Folder Path",
+                    placeholder="/home/pi/Pictures",
+                    required=True,
+                    hint="Any nested image files inside this folder are eligible for random selection.",
+                ),
+            ),
+            section(
+                "Display",
+                row(
+                    field(
+                        "padImage",
+                        "checkbox",
+                        label="Scale to Fit",
+                        hint="Keep the full image visible and pad the background instead of cropping to fill the screen.",
+                        checked_value="false",
+                        unchecked_value="true",
+                        submit_unchecked=True,
+                    ),
+                    field(
+                        "backgroundOption",
+                        "radio_segment",
+                        label="Background",
+                        default="blur",
+                        options=[
+                            option("blur", "Blur"),
+                            option("color", "Color"),
+                        ],
+                    ),
+                    field(
+                        "backgroundColor",
+                        "color",
+                        label="Background Color",
+                        default="#ffffff",
+                        visible_if={"field": "backgroundOption", "equals": "color"},
+                    ),
+                ),
+            ),
+        )
+
     def generate_image(self, settings, device_config):
         logger.info("=== Image Folder Plugin: Starting image generation ===")
 

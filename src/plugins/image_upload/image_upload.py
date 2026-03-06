@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
 from PIL import Image, ImageOps, ImageColor
 import logging
 import random
@@ -10,6 +11,56 @@ logger = logging.getLogger(__name__)
 
 
 class ImageUpload(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Display Options",
+                row(
+                    field(
+                        "padImage",
+                        "checkbox",
+                        label="Scale to Fit",
+                        hint="Pad smaller images to match the display aspect ratio.",
+                        checked_value="false",
+                        unchecked_value="true",
+                        submit_unchecked=True,
+                    ),
+                    field(
+                        "randomize",
+                        "checkbox",
+                        label="Random Order",
+                        hint="Shuffle uploaded images during playback.",
+                        checked_value="true",
+                        unchecked_value="false",
+                        submit_unchecked=True,
+                    ),
+                ),
+                row(
+                    field(
+                        "backgroundOption",
+                        "radio_segment",
+                        label="Background Fill",
+                        default="blur",
+                        options=[
+                            option("blur", "Blur"),
+                            option("color", "Solid Color"),
+                        ],
+                    ),
+                    field(
+                        "backgroundColor",
+                        "color",
+                        label="Background Color",
+                        default="#ffffff",
+                        visible_if={"field": "backgroundOption", "equals": "color"},
+                    ),
+                ),
+            ),
+            section(
+                "Images",
+                widget("image-upload-list", template="widgets/image_upload_list.html"),
+            ),
+        )
+
     def open_image(self, img_index: int, image_locations: list) -> Image:
         if not image_locations:
             raise RuntimeError("No images provided.")

@@ -1,0 +1,24 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div class="inline-readonly-grid">
+    <div class="form-group">
+        <label for="latitude" class="form-label">Latitude</label>
+        <input readonly type="text" id="latitude" name="latitude" class="form-input" value="{{ plugin_settings.get('latitude', '') if plugin_settings else '' }}">
+    </div>
+    <div class="form-group">
+        <label for="longitude" class="form-label">Longitude</label>
+        <input readonly type="text" id="longitude" name="longitude" class="form-input" value="{{ plugin_settings.get('longitude', '') if plugin_settings else '' }}">
+    </div>
+</div>
+<button type="button" id="openMap" class="action-button compact">Select Location</button>
+
+<div id="mapModal" class="modal">
+    <div class="modal-content">
+        <span class="close-button" aria-label="Close">×</span>
+        <h2>Select Location</h2>
+        <div class="separator"></div>
+        <div id="map" class="settings-map"></div>
+        <button id="closeMap" type="button" class="action-button">Save</button>
+    </div>
+</div>

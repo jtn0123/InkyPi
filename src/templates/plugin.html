@@ -10,6 +10,7 @@
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}"></script>
     
 
     <script>
@@ -614,7 +615,11 @@
                     </div>
                 </div>
                 <!-- requestAnimationFrame; initLivePreview -->
-                {% include settings_template %}
+                {% if settings_schema %}
+                    {% include 'settings_schema.html' %}
+                {% else %}
+                    {% include settings_template %}
+                {% endif %}
 
                 <!-- Collapsible Style Settings Section -->
                 {% if style_settings %}

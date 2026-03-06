@@ -201,5 +201,7 @@ coverage.xml
 .idea
 
 # Static Files added by install/update_vendors.sh
-/src/static/scripts/
+/src/static/scripts/*
+!/src/static/scripts/
+!/src/static/scripts/plugin_schema.js
 /src/static/styles/

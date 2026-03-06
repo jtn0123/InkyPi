@@ -22,6 +22,7 @@ Flow:
 """
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, schema, section
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 import requests
@@ -37,6 +38,39 @@ class Wpotd(BasePlugin):
     SESSION = requests.Session()
     HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
     API_URL = "https://en.wikipedia.org/w/api.php"
+
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                callout(
+                    "If the date field is blank, the plugin uses today’s picture. That makes it safe to add to playlists without constant edits.",
+                ),
+                field(
+                    "randomizeWpotd",
+                    "checkbox",
+                    label="Randomize Date",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                ),
+                field(
+                    "customDate",
+                    "date",
+                    label="Date",
+                    visible_if={"field": "randomizeWpotd", "equals": "false"},
+                ),
+                field(
+                    "shrinkToFitWpotd",
+                    "checkbox",
+                    label="Shrink Image To Fit",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                    default="true",
+                ),
+            )
+        )
 
     def generate_settings_template(self) -> Dict[str, Any]:
         template_params = super().generate_settings_template()

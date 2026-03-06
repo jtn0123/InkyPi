@@ -1,0 +1,236 @@
+{% from 'macros/icons.html' import icon %}
+
+{% macro field_value(field, plugin_settings) -%}
+    {%- if plugin_settings and field.name in plugin_settings and plugin_settings[field.name] not in (none, '') -%}
+        {{- plugin_settings[field.name] -}}
+    {%- else -%}
+        {{- field.default | default('') -}}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro is_checked(field, plugin_settings) -%}
+    {%- set value = field_value(field, plugin_settings) | string | lower -%}
+    {{- value in ('true', '1', 'yes', 'on') -}}
+{%- endmacro %}
+
+{% macro is_visible(item, plugin_settings) -%}
+    {%- set visible_if = item.visible_if if item.visible_if is defined else none -%}
+    {%- if not visible_if -%}
+        {{- true -}}
+    {%- else -%}
+        {%- set actual = field_value({'name': visible_if.get('field')}, plugin_settings) | string -%}
+        {%- set operator = visible_if.get('operator', 'equals') -%}
+        {%- if operator == 'equals' -%}
+            {{- actual == (visible_if.get('equals', '') | string) -}}
+        {%- elif operator == 'not_equals' -%}
+            {{- actual != (visible_if.get('equals', '') | string) -}}
+        {%- elif operator == 'not_empty' -%}
+            {{- actual | trim != '' -}}
+        {%- elif operator == 'in' -%}
+            {{- actual in (visible_if.get('values', []) | map('string') | list) -}}
+        {%- else -%}
+            {{- true -}}
+        {%- endif -%}
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro render_options(options, selected_value) -%}
+    {% for opt in options %}
+        <option value="{{ opt.value }}" {% if (selected_value | string) == (opt.value | string) %}selected{% endif %}>{{ opt.label }}</option>
+    {% endfor %}
+{%- endmacro %}
+
+{% macro render_field(field, plugin_settings) -%}
+    {% set current_value = field_value(field, plugin_settings) %}
+    {% set visible_if = field.visible_if if field.visible_if is defined else none %}
+    {% set visible_if_equals = visible_if.get('equals') if visible_if else none %}
+    {% set visible_if_values = visible_if.get('values') if visible_if else none %}
+    {% set wrapper_classes = ['schema-field'] %}
+    {% set initially_visible = is_visible(field, plugin_settings) == 'True' %}
+    {% if field.class_name is defined %}{% set _ = wrapper_classes.append(field.class_name) %}{% endif %}
+    <div
+        class="{{ wrapper_classes | join(' ') }}"
+        {% if field.wrapper_id %}id="{{ field.wrapper_id }}"{% endif %}
+        {% if not initially_visible %}hidden{% endif %}
+        {% if visible_if %}
+        data-visible-if-field="{{ visible_if.get('field') }}"
+        data-visible-if-operator="{{ visible_if.get('operator', 'equals') }}"
+        {% if visible_if_equals is not none %}data-visible-if-equals="{{ visible_if_equals }}"{% endif %}
+        {% if visible_if_values is not none %}data-visible-if-values='{{ visible_if_values | tojson }}'{% endif %}
+        {% endif %}
+    >
+        {% if field.type == 'hidden' %}
+        <input type="hidden" id="{{ field.id | default(field.name) }}" name="{{ field.name }}" value="{{ current_value }}">
+        {% elif field.type == 'checkbox' %}
+        <div class="toggle-item{% if field.inline_controls %} inline-controls{% endif %}">
+            <div class="toggle-item-text">
+                <label class="toggle-item-label" for="{{ field.id | default(field.name) }}">{{ field.label }}</label>
+                {% if field.hint %}<span class="toggle-item-hint">{{ field.hint }}</span>{% endif %}
+            </div>
+            <label class="toggle-container">
+                <input
+                    type="checkbox"
+                    id="{{ field.id | default(field.name) }}"
+                    name="{{ field.name }}"
+                    class="toggle-checkbox"
+                    value="{{ field.checked_value | default('true') }}"
+                    data-checked-value="{{ field.checked_value | default('true') }}"
+                    data-unchecked-value="{{ field.unchecked_value | default('false') }}"
+                    {% if is_checked(field, plugin_settings) %}checked{% endif %}
+                >
+                <span class="toggle-label"></span>
+            </label>
+            {% if field.submit_unchecked %}
+            <input type="hidden" name="{{ field.name }}" value="{{ field.unchecked_value | default('false') }}">
+            {% endif %}
+        </div>
+        {% elif field.type == 'radio_segment' %}
+        <div class="settings-card">
+            <div class="settings-card-title">{{ field.label }}</div>
+            {% if field.hint %}<p class="field-note">{{ field.hint }}</p>{% endif %}
+            <div class="radio-segment">
+                {% for opt in field.options %}
+                <label class="radio-option" for="{{ field.id | default(field.name) }}-{{ loop.index }}">
+                    <input
+                        type="radio"
+                        id="{{ field.id | default(field.name) }}-{{ loop.index }}"
+                        name="{{ field.name }}"
+                        value="{{ opt.value }}"
+                        {% if (current_value | string) == (opt.value | string) %}checked{% endif %}
+                    >
+                    <span>{{ opt.label }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% elif field.type == 'textarea' %}
+        <div class="form-group">
+            <label for="{{ field.id | default(field.name) }}" class="form-label">{{ field.label }}</label>
+            <textarea
+                id="{{ field.id | default(field.name) }}"
+                name="{{ field.name }}"
+                class="form-input"
+                rows="{{ field.rows | default(4) }}"
+                {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+                {% if field.required %}required{% endif %}
+            >{{ current_value }}</textarea>
+            {% if field.hint %}<small class="field-note">{{ field.hint }}</small>{% endif %}
+        </div>
+        {% elif field.type == 'select' %}
+        {% set resolved_options = field.options | default([]) %}
+        {% if field.options_by_value %}
+            {% set source_field = field.options_source %}
+            {% set source_value = plugin_settings.get(source_field) if plugin_settings and source_field in plugin_settings else field.options_source_default | default('') %}
+            {% set resolved_options = field.options_by_value.get(source_value, field.fallback_options | default(resolved_options)) %}
+        {% endif %}
+        <div class="form-group">
+            <label for="{{ field.id | default(field.name) }}" class="form-label">{{ field.label }}</label>
+            <select
+                id="{{ field.id | default(field.name) }}"
+                name="{{ field.name }}"
+                class="form-input"
+                {% if field.options_by_value %}
+                data-options-source-field="{{ field.options_source }}"
+                data-options-map='{{ field.options_by_value | tojson }}'
+                data-current-value="{{ current_value }}"
+                {% if field.fallback_options %}data-fallback-options='{{ field.fallback_options | tojson }}'{% endif %}
+                {% endif %}
+                {% if field.required %}required{% endif %}
+            >
+                {{ render_options(resolved_options, current_value) }}
+            </select>
+            {% if field.hint %}<small class="field-note">{{ field.hint }}</small>{% endif %}
+        </div>
+        {% elif field.type == 'color' %}
+        <div class="form-group">
+            <label for="{{ field.id | default(field.name) }}" class="form-label">{{ field.label }}</label>
+            <input
+                type="color"
+                id="{{ field.id | default(field.name) }}"
+                name="{{ field.name }}"
+                class="color-picker"
+                value="{{ current_value or field.default | default('#ffffff') }}"
+            >
+            {% if field.hint %}<small class="field-note">{{ field.hint }}</small>{% endif %}
+        </div>
+        {% else %}
+        <div class="form-group">
+            <label for="{{ field.id | default(field.name) }}" class="form-label">{{ field.label }}</label>
+            <input
+                type="{{ field.type }}"
+                id="{{ field.id | default(field.name) }}"
+                name="{{ field.name }}"
+                value="{{ current_value }}"
+                class="form-input"
+                {% if field.placeholder %}placeholder="{{ field.placeholder }}"{% endif %}
+                {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+                {% if field.max is defined %}max="{{ field.max }}"{% endif %}
+                {% if field.step is defined %}step="{{ field.step }}"{% endif %}
+                {% if field.required %}required{% endif %}
+                {% if field.list %}list="{{ field.list.id }}"{% endif %}
+            >
+            {% if field.list %}
+            <datalist id="{{ field.list.id }}">
+                {% for opt in field.list.options %}
+                <option value="{{ opt.value }}"></option>
+                {% endfor %}
+            </datalist>
+            {% endif %}
+            {% if field.hint %}<small class="field-note">{{ field.hint }}</small>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+{%- endmacro %}
+
+{% macro render_item(item, plugin_settings) -%}
+    {% if item.kind == 'callout' %}
+    <div class="settings-callout{% if item.tone == 'warning' %} warning{% endif %}">
+        {{ icon(item.icon | default('info'), 'icon-image') | safe }}
+        <div>
+            {% if item.title %}<p><strong>{{ item.title }}</strong></p>{% endif %}
+            <p>{{ item.text }}</p>
+        </div>
+    </div>
+    {% elif item.kind == 'row' %}
+    <div class="schema-row{% if item.class_name %} {{ item.class_name }}{% endif %}">
+        {% for child in item["items"] %}
+            {{ render_item(child, plugin_settings) }}
+        {% endfor %}
+    </div>
+    {% elif item.kind == 'widget' %}
+    {% set widget_visible_if = item.visible_if if item.visible_if is defined else none %}
+    {% set widget_visible_if_equals = widget_visible_if.get('equals') if widget_visible_if else none %}
+    {% set widget_visible_if_values = widget_visible_if.get('values') if widget_visible_if else none %}
+    {% set widget_visible = is_visible(item, plugin_settings) == 'True' %}
+    <div
+        class="schema-widget schema-widget-{{ item.widget_type }}{% if item.class_name %} {{ item.class_name }}{% endif %}"
+        data-hybrid-widget="{{ item.widget_type }}"
+        {% if not widget_visible %}hidden{% endif %}
+        {% if item.config is defined %}data-widget-config='{{ item.config | tojson }}'{% endif %}
+        {% if widget_visible_if %}
+        data-visible-if-field="{{ widget_visible_if.get('field') }}"
+        data-visible-if-operator="{{ widget_visible_if.get('operator', 'equals') }}"
+        {% if widget_visible_if_equals is not none %}data-visible-if-equals="{{ widget_visible_if_equals }}"{% endif %}
+        {% if widget_visible_if_values is not none %}data-visible-if-values='{{ widget_visible_if_values | tojson }}'{% endif %}
+        {% endif %}
+    >
+        {% include item.template %}
+    </div>
+    {% elif item.kind == 'field' %}
+        {{ render_field(item, plugin_settings) }}
+    {% endif %}
+{%- endmacro %}
+
+<div class="settings-schema" data-settings-schema>
+    {% for section in settings_schema.sections %}
+    <section class="settings-card schema-section">
+        <div class="settings-card-title">{{ section.title }}</div>
+        {% if section.description %}<p class="field-note">{{ section.description }}</p>{% endif %}
+        <div class="schema-section-body">
+            {% for item in section["items"] %}
+                {{ render_item(item, plugin_settings | default({})) }}
+            {% endfor %}
+        </div>
+    </section>
+    {% endfor %}
+</div>

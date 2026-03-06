@@ -1,0 +1,39 @@
+<div class="schema-row">
+    <div class="form-group">
+        <label for="newspaper" class="form-label">Newspaper</label>
+        <input
+            type="text"
+            id="newspaper"
+            name="newspaperName"
+            class="form-input"
+            list="newspaperList"
+            placeholder="Search newspaper title"
+            value="{{ plugin_settings.get('newspaperName', '') if plugin_settings else '' }}"
+        >
+        <datalist id="newspaperList">
+            {% for newspaper in newspapers %}
+            <option value="{{ newspaper.name }}"></option>
+            {% endfor %}
+        </datalist>
+        <input type="hidden" id="newspaperSlug" name="newspaperSlug" value="{{ plugin_settings.get('newspaperSlug', '') if plugin_settings else '' }}">
+    </div>
+    <div class="form-group">
+        <label for="locationSearch" class="form-label">Location</label>
+        <input
+            type="text"
+            id="locationSearch"
+            name="locationSearch"
+            class="form-input"
+            list="locationOptions"
+            placeholder="Search city or country"
+            value="{{ plugin_settings.get('locationSearch', '') if plugin_settings else '' }}"
+        >
+        <datalist id="locationOptions">
+            {% set unique_locations = newspapers | map(attribute='city') | unique | list | sort %}
+            {% for location in unique_locations %}
+            {% set country = (newspapers | selectattr('city', 'equalto', location) | list)[0].country %}
+            <option value="{{ location }}, {{ country }}"></option>
+            {% endfor %}
+        </datalist>
+    </div>
+</div>

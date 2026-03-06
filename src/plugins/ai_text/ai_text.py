@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.app_utils import resolve_path
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,45 @@ import os
 logger = logging.getLogger(__name__)
 
 class AIText(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Prompt",
+                row(
+                    field(
+                        "title",
+                        label="Title",
+                        placeholder="Daily brief",
+                        hint="Optional heading shown above the generated response.",
+                    ),
+                    field(
+                        "textModel",
+                        "select",
+                        label="Text Model",
+                        default="gpt-4o-mini",
+                        options=[
+                            option("gpt-4o-mini", "GPT-4o mini"),
+                            option("gpt-4o", "GPT-4o"),
+                            option("gpt-4.1", "GPT-4.1"),
+                            option("gpt-4.1-mini", "GPT-4.1 mini"),
+                            option("gpt-4.1-nano", "GPT-4.1 nano"),
+                            option("gpt-5", "GPT-5"),
+                            option("gpt-5-mini", "GPT-5 mini"),
+                            option("gpt-5-nano", "GPT-5 nano"),
+                        ],
+                    ),
+                ),
+                field(
+                    "textPrompt",
+                    "textarea",
+                    label="Prompt",
+                    placeholder="Summarize today's top AI news in 70 words.",
+                    required=True,
+                    rows=4,
+                ),
+            )
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {

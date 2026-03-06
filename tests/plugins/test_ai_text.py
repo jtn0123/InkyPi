@@ -14,6 +14,7 @@ def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
     assert template["api_key"]["service"] == "OpenAI"
     assert template["api_key"]["expected_key"] == "OPEN_AI_SECRET"
     assert template["style_settings"] is True
+    assert "settings_schema" in template
 
 
 def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatch):

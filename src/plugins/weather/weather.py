@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
 from PIL import Image
 import os
 import requests
@@ -58,6 +59,117 @@ OPEN_METEO_UNIT_PARAMS = {
 }
 
 class Weather(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Location",
+                widget("weather-map", template="widgets/weather_map.html"),
+            ),
+            section(
+                "Data",
+                row(
+                    field(
+                        "weatherProvider",
+                        "select",
+                        label="Weather Provider",
+                        default="OpenMeteo",
+                        options=[
+                            option("OpenMeteo", "Open-Meteo"),
+                            option("OpenWeatherMap", "OpenWeatherMap"),
+                        ],
+                    ),
+                    field(
+                        "units",
+                        "select",
+                        label="Units",
+                        default="imperial",
+                        options=[
+                            option("imperial", "Imperial (°F)"),
+                            option("metric", "Metric (°C)"),
+                            option("standard", "Standard (K)"),
+                        ],
+                    ),
+                    field(
+                        "weatherTimeZone",
+                        "select",
+                        label="Time Zone",
+                        default="locationTimeZone",
+                        options=[
+                            option("locationTimeZone", "Use Location Time Zone"),
+                            option("localTimeZone", "Use Local Time Zone"),
+                        ],
+                        visible_if={"field": "weatherProvider", "equals": "OpenWeatherMap"},
+                    ),
+                ),
+            ),
+            section(
+                "Title",
+                row(
+                    field(
+                        "titleSelection",
+                        "radio_segment",
+                        label="Title Source",
+                        default="location",
+                        options=[
+                            option("location", "Location"),
+                            option("custom", "Custom"),
+                        ],
+                        visible_if={"field": "weatherProvider", "equals": "OpenWeatherMap"},
+                    ),
+                    field(
+                        "customTitle",
+                        label="Custom Title",
+                        placeholder="Custom forecast title",
+                        visible_if={"field": "titleSelection", "equals": "custom"},
+                    ),
+                ),
+            ),
+            section(
+                "Display",
+                row(
+                    field("displayRefreshTime", "checkbox", label="Refresh Time", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field("displayMetrics", "checkbox", label="Metrics", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field("displayGraph", "checkbox", label="Weather Graph", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                ),
+                row(
+                    field("displayRain", "checkbox", label="Rain Amount", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field("moonPhase", "checkbox", label="Moon Phase", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                ),
+                row(
+                    field("displayGraphIcons", "checkbox", label="Graph Icons", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "graphIconStep",
+                        "select",
+                        label="Graph Icon Interval",
+                        default="2",
+                        options=[
+                            option("1", "Every 1 hour"),
+                            option("2", "Every 2 hours"),
+                            option("4", "Every 4 hours"),
+                            option("6", "Every 6 hours"),
+                            option("12", "Every 12 hours"),
+                        ],
+                        visible_if={"field": "displayGraphIcons", "equals": "true"},
+                    ),
+                ),
+                row(
+                    field("displayForecast", "checkbox", label="Forecast", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "forecastDays",
+                        "select",
+                        label="Forecast Days",
+                        default="5",
+                        options=[
+                            option("3", "3 days"),
+                            option("5", "5 days"),
+                            option("7", "7 days"),
+                        ],
+                        visible_if={"field": "displayForecast", "equals": "true"},
+                    ),
+                ),
+            ),
+        )
+
     def _request_timeout(self) -> float:
         try:
             return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))

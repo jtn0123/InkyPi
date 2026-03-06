@@ -4,6 +4,7 @@ from random import choice
 from PIL import Image, ImageColor, ImageOps
 from utils.http_client import get_http_session
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.image_utils import pad_image_blur
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,76 @@ class ImmichProvider:
 
 
 class ImageAlbum(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                row(
+                    field(
+                        "albumProvider",
+                        "select",
+                        label="Album Provider",
+                        default="Immich",
+                        options=[option("Immich", "Immich")],
+                    ),
+                    field(
+                        "url",
+                        label="Base URL",
+                        placeholder="https://immich.example.com",
+                        required=True,
+                    ),
+                ),
+                field(
+                    "album",
+                    label="Album Name",
+                    placeholder="Family Photos",
+                    required=True,
+                ),
+            ),
+            section(
+                "Display",
+                row(
+                    field(
+                        "padImage",
+                        "checkbox",
+                        label="Scale to Fit",
+                        hint="Keep the full image visible and pad the background instead of cropping to fill the screen.",
+                        checked_value="false",
+                        unchecked_value="true",
+                        submit_unchecked=True,
+                    ),
+                    field(
+                        "randomize",
+                        "checkbox",
+                        label="Random Order",
+                        hint="Preserve random image selection when supported by the source provider.",
+                        checked_value="true",
+                        unchecked_value="false",
+                        submit_unchecked=True,
+                    ),
+                ),
+                row(
+                    field(
+                        "backgroundOption",
+                        "radio_segment",
+                        label="Background",
+                        default="blur",
+                        options=[
+                            option("blur", "Blur"),
+                            option("color", "Color"),
+                        ],
+                    ),
+                    field(
+                        "backgroundColor",
+                        "color",
+                        label="Background Color",
+                        default="#ffffff",
+                        visible_if={"field": "backgroundOption", "equals": "color"},
+                    ),
+                ),
+            ),
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {

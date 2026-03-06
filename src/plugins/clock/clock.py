@@ -1,6 +1,7 @@
 import os
 from utils.app_utils import resolve_path, get_font
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, row, schema, section, widget
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from io import BytesIO
 import logging
@@ -42,6 +43,21 @@ DEFAULT_TIMEZONE = "US/Eastern"
 DEFAULT_CLOCK_FACE = "Gradient Clock"
 
 class Clock(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Clock Face",
+                widget("clock-face-picker", template="widgets/clock_face_picker.html"),
+            ),
+            section(
+                "Colors",
+                row(
+                    field("primaryColor", "color", label="Primary Color", default=CLOCK_FACES[0]["primary_color"]),
+                    field("secondaryColor", "color", label="Secondary Color", default=CLOCK_FACES[0]["secondary_color"]),
+                ),
+            ),
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['clock_faces'] = CLOCK_FACES

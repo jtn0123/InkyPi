@@ -23,15 +23,70 @@ def test_plugin_page_apod(client):
     assert b"/preview" in resp.data
 
 
+def test_schema_backed_plugin_pages_use_shared_renderer(client):
+    for plugin_id in (
+        "ai_text",
+        "ai_image",
+        "apod",
+        "comic",
+        "countdown",
+        "unsplash",
+        "image_folder",
+        "image_album",
+    ):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert 'data-settings-schema' in body
+
+
+def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
+    for plugin_id in (
+        "image_url",
+        "rss",
+        "screenshot",
+        "wpotd",
+        "github",
+        "clock",
+        "newspaper",
+        "calendar",
+        "todo_list",
+        "weather",
+        "image_upload",
+    ):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert 'data-settings-schema' in body
+
+
+def test_ai_image_page_uses_shared_select_dependency_renderer(client):
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'data-options-source-field="imageModel"' in body
+    assert "toggleQualityDropdown" not in body
+
+
+def test_apod_page_uses_shared_visibility_rules(client):
+    resp = client.get("/plugin/apod")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'data-visible-if-field="randomizeApod"' in body
+    assert "toggleDateField" not in body
+
+
 def test_weather_plugin_second_pass_polish(client):
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
 
     assert "settings-card-title\">Location" in body
-    assert "toggle-list" in body
+    assert "settings-card-title\">Display" in body
+    assert "toggle-item" in body
     assert "radio-segment" in body
     assert "settings-map" in body
+    assert 'data-hybrid-widget="weather-map"' in body
 
 
 def test_todo_list_plugin_uses_svg_delete_icon(client):
@@ -57,8 +112,11 @@ def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
 
-    assert 'id="repositoryGroup" hidden' in body
+    assert 'id="repositoryGroup"' in body
+    repository_group = body.split('id="repositoryGroup"', 1)[1][:200]
+    assert "hidden" in repository_group
     assert 'id="repositoryGroup" style="display: none;"' not in body
+    assert 'data-visible-if-field="githubType"' in body
 
 
 def test_preview_size_mode_native_on_plugin(client, device_config_dev):

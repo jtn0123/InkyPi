@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, option, row, schema, section
 from PIL import Image
 from io import BytesIO
 import requests
@@ -26,6 +27,75 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
         return None
 
 class Unsplash(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Search",
+                callout(
+                    "Leave the search query blank to fetch a random image, or add a query and collections to narrow the selection.",
+                    title="Unsplash Source",
+                ),
+                field(
+                    "search_query",
+                    label="Search Query",
+                    placeholder="mountains at sunrise",
+                    hint="Optional. If blank, InkyPi fetches a random image.",
+                ),
+                field(
+                    "collections",
+                    label="Collections",
+                    placeholder="1234,5678",
+                    hint="Optional. Use comma-separated Unsplash collection IDs.",
+                ),
+            ),
+            section(
+                "Filters",
+                row(
+                    field(
+                        "content_filter",
+                        "select",
+                        label="Content Filter",
+                        default="low",
+                        options=[
+                            option("low", "Avoid nudity and violence"),
+                            option("high", "No filtering"),
+                        ],
+                    ),
+                    field(
+                        "color",
+                        "select",
+                        label="Color",
+                        default="",
+                        options=[
+                            option("", "Any"),
+                            option("black_and_white", "Black and White"),
+                            option("black", "Black"),
+                            option("white", "White"),
+                            option("yellow", "Yellow"),
+                            option("orange", "Orange"),
+                            option("red", "Red"),
+                            option("purple", "Purple"),
+                            option("magenta", "Magenta"),
+                            option("green", "Green"),
+                            option("teal", "Teal"),
+                            option("blue", "Blue"),
+                        ],
+                    ),
+                    field(
+                        "orientation",
+                        "select",
+                        label="Orientation",
+                        default="",
+                        options=[
+                            option("", "Any"),
+                            option("landscape", "Landscape"),
+                            option("portrait", "Portrait"),
+                        ],
+                    ),
+                ),
+            ),
+        )
+
     def _request_timeout(self) -> float:
         try:
             return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))

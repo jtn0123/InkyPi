@@ -1,4 +1,5 @@
 from ..base_plugin.base_plugin import BasePlugin
+from ..base_plugin.settings_schema import field, option, row, schema, section, widget
 from .github_contributions import contributions_generate_image
 from .github_sponsors import sponsors_generate_image
 from .github_stars import stars_generate_image
@@ -8,6 +9,47 @@ logger = logging.getLogger(__name__)
 
 
 class GitHub(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                row(
+                    field(
+                        "githubType",
+                        "select",
+                        label="Metric",
+                        default="contributions",
+                        options=[
+                            option("contributions", "Contributions"),
+                            option("sponsors", "Sponsors"),
+                            option("stars", "Stars"),
+                        ],
+                    ),
+                    field(
+                        "githubUsername",
+                        label="GitHub Username",
+                        placeholder="octocat",
+                        required=True,
+                    ),
+                    field(
+                        "githubRepository",
+                        label="Repository",
+                        placeholder="owner/repo",
+                        wrapper_id="repositoryGroup",
+                        visible_if={"field": "githubType", "equals": "stars"},
+                    ),
+                ),
+            ),
+            section(
+                "Contribution Grid Colors",
+                widget(
+                    "github-colors",
+                    template="widgets/github_colors.html",
+                    visible_if={"field": "githubType", "equals": "contributions"},
+                ),
+            ),
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {

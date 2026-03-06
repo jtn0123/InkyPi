@@ -3946,6 +3946,32 @@ select.form-input option {
   margin-bottom: 10px;
 }
 
+.settings-schema {
+  display: grid;
+  gap: 14px;
+}
+
+.schema-section {
+  display: grid;
+  gap: 12px;
+}
+
+.schema-section-body {
+  display: grid;
+  gap: 12px;
+}
+
+.schema-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.schema-field {
+  min-width: 0;
+}
+
 .settings-callout {
   display: flex;
   gap: 10px;

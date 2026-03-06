@@ -1,0 +1,18 @@
+<div class="form-group">
+    <label class="form-label">Clock Face</label>
+    <div id="clock-face-selection" class="image-grid">
+        {% for face in clock_faces %}
+        <button
+            type="button"
+            class="image-option"
+            data-face-name="{{ face.name }}"
+            data-primary-color="{{ face.primary_color }}"
+            data-secondary-color="{{ face.secondary_color }}"
+            aria-label="Select {{ face.name }}"
+        >
+            <img src="{{ url_for('plugin.image', plugin_id='clock', filename=face.icon) }}" alt="{{ face.name }}">
+        </button>
+        {% endfor %}
+    </div>
+    <input type="hidden" id="selected-clock-face" name="selectedClockFace" value="{{ plugin_settings.get('selectedClockFace', clock_faces[0].name) if plugin_settings else clock_faces[0].name }}">
+</div>

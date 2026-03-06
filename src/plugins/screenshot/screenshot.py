@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, schema, section
 from PIL import Image
 from utils.image_utils import take_screenshot
 import logging
@@ -6,6 +7,23 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Screenshot(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Capture",
+                field(
+                    "url",
+                    label="URL",
+                    placeholder="https://example.com",
+                    required=True,
+                ),
+                callout(
+                    "Only use trusted URLs. Slow or heavily scripted sites may fail to render before the screenshot timeout.",
+                    tone="warning",
+                ),
+            )
+        )
+
     def generate_image(self, settings, device_config):
 
         url = settings.get('url')

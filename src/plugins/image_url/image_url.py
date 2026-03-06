@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, schema, section
 from PIL import Image
 from io import BytesIO
 import requests
@@ -20,6 +21,23 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
 
 
 class ImageURL(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                field(
+                    "url",
+                    label="Image URL",
+                    placeholder="https://example.com/image.jpg",
+                    required=True,
+                ),
+                callout(
+                    "Use trusted image URLs only. Remote images can fail if the source is slow, blocked, or returns unsupported formats.",
+                    tone="warning",
+                ),
+            )
+        )
+
     def generate_image(self, settings, device_config):
         url = settings.get('url')
         if not url:

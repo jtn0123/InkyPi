@@ -269,6 +269,7 @@ def test_apod_settings_template():
     assert template["api_key"]["expected_key"] == "NASA_SECRET"
     assert template["api_key"]["required"] is True
     assert template["style_settings"] is False
+    assert "settings_schema" in template
 
 def test_apod_image_download_timeout(device_config_dev, monkeypatch):
     """Test APOD plugin with image download timeout."""
@@ -330,4 +331,3 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
             image_call = mock_requests.call_args_list[1]
             assert image_call[0][0] == "http://example.com/low_res.png"
             assert result is not None
-
