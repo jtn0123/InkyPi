@@ -24,6 +24,21 @@ TOP_LEVEL_MARKERS = {
     "api_keys": "#saveApiKeysBtn",
 }
 
+TOP_LEVEL_PRIMARY_ACTIONS = {
+    "home": "#themeToggle",
+    "settings": "#saveSettingsBtn",
+    "history": "#historyRefreshBtn",
+    "playlist": "#newPlaylistBtn",
+    "api_keys": "#saveApiKeysBtn",
+}
+
+MOBILE_VIEWPORTS = (
+    {"width": 360, "height": 800, "label": "phone_360"},
+    {"width": 390, "height": 844, "label": "phone_390"},
+)
+
+MOBILE_PLUGIN_IDS = ("calendar", "weather", "todo_list", "image_upload", "ai_text")
+
 PLUGIN_IDS = discover_plugin_ids(Path(__file__).resolve().parents[2])
 CRITICAL_RESPONSE_TYPES = {"document", "script", "stylesheet", "xhr", "fetch"}
 
@@ -189,6 +204,52 @@ def _assert_plugin_page_ready(page, plugin_id: str):
         assert page.locator("#fileNames").count() == 1
 
 
+def _new_page(browser, viewport: dict, theme: str):
+    page = browser.new_page(viewport={"width": viewport["width"], "height": viewport["height"]})
+    page.add_init_script(
+        script=f"""
+        (() => {{
+            try {{
+                localStorage.setItem("theme", {theme!r});
+                localStorage.setItem("inkypi-theme", {theme!r});
+            }} catch (e) {{}}
+        }})();
+        """
+    )
+    return page
+
+
+def _assert_no_horizontal_overflow(page):
+    widths = page.evaluate(
+        """
+        () => ({
+            innerWidth: window.innerWidth,
+            clientWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+        })
+        """
+    )
+    assert widths["scrollWidth"] <= widths["clientWidth"] + 2, widths
+
+
+def _assert_action_visible(page, selector: str):
+    locator = page.locator(selector).first
+    locator.scroll_into_view_if_needed()
+    box = locator.bounding_box()
+    viewport = page.viewport_size or {"width": 0, "height": 0}
+    assert box is not None
+    assert box["x"] >= -1
+    assert box["x"] + box["width"] <= viewport["width"] + 1
+    assert box["y"] + box["height"] <= viewport["height"] + 160
+
+
+def _maybe_capture_baseline(page, screenshot_dir: Path, name: str):
+    if os.getenv("CAPTURE_MOBILE_SCREENSHOTS", "").lower() not in ("1", "true"):
+        return
+    screenshot_dir.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(screenshot_dir / f"{_slug(name)}.png"), full_page=True)
+
+
 def _open_and_check(page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path):
     runtime = _attach_runtime_collectors(page, base_url)
     page.goto(f"{base_url}{route_path}", wait_until="domcontentloaded", timeout=30000)
@@ -247,5 +308,74 @@ def test_plugin_pages_boot_cleanly(live_server, tmp_path, plugin_id):
             )
             _assert_plugin_page_ready(page, plugin_id)
             _assert_clean_runtime(page, runtime, screenshot_dir, f"plugin_{plugin_id}")
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("viewport", MOBILE_VIEWPORTS, ids=lambda item: item["label"])
+@pytest.mark.parametrize("theme", ("light", "dark"))
+def test_top_level_tabs_phone_layout(live_server, tmp_path, viewport, theme):
+    from playwright.sync_api import sync_playwright
+
+    screenshot_dir = _artifact_dir(tmp_path)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            for route_name, route_path in TOP_LEVEL_ROUTES:
+                page = _new_page(browser, viewport, theme)
+                runtime = _open_and_check(page, live_server, route_name, route_path, screenshot_dir)
+                page.wait_for_selector(TOP_LEVEL_MARKERS[route_name], timeout=10000)
+                _assert_no_horizontal_overflow(page)
+                _assert_action_visible(page, TOP_LEVEL_PRIMARY_ACTIONS[route_name])
+                _maybe_capture_baseline(
+                    page,
+                    screenshot_dir,
+                    f"mobile_{route_name}_{theme}_{viewport['label']}",
+                )
+                _assert_clean_runtime(page, runtime, screenshot_dir, f"mobile_{route_name}_{theme}_{viewport['label']}")
+                page.close()
+        finally:
+            browser.close()
+
+
+@pytest.mark.parametrize("viewport", MOBILE_VIEWPORTS, ids=lambda item: item["label"])
+@pytest.mark.parametrize("theme", ("light", "dark"))
+@pytest.mark.parametrize("plugin_id", MOBILE_PLUGIN_IDS)
+def test_plugin_pages_phone_layout(live_server, tmp_path, viewport, theme, plugin_id):
+    from playwright.sync_api import sync_playwright
+
+    screenshot_dir = _artifact_dir(tmp_path)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = _new_page(browser, viewport, theme)
+            runtime = _open_and_check(
+                page,
+                live_server,
+                f"mobile_plugin_{plugin_id}",
+                f"/plugin/{plugin_id}",
+                screenshot_dir,
+            )
+            _assert_plugin_page_ready(page, plugin_id)
+            page.wait_for_selector("[data-workflow-mode='configure']")
+            page.wait_for_selector("[data-workflow-mode='preview']")
+            page.locator("[data-workflow-mode='preview']").click()
+            page.wait_for_timeout(200)
+            assert page.locator("[data-workflow-panel='preview'].active").count() == 1
+            _assert_no_horizontal_overflow(page)
+            _assert_action_visible(page, "[data-workflow-mode='preview']")
+            _maybe_capture_baseline(
+                page,
+                screenshot_dir,
+                f"mobile_plugin_{plugin_id}_{theme}_{viewport['label']}",
+            )
+            _assert_clean_runtime(
+                page,
+                runtime,
+                screenshot_dir,
+                f"mobile_plugin_{plugin_id}_{theme}_{viewport['label']}",
+            )
         finally:
             browser.close()

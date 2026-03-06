@@ -8,374 +8,27 @@
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
-    <style>
-        /* Plugin Instance Thumbnail */
-        .plugin-thumbnail-container {
-            position: relative;
-            cursor: pointer;
-            margin-left: 8px;
-        }
-
-        .plugin-thumbnail {
-            width: 40px;
-            height: 40px;
-            object-fit: cover;
-            border: 2px solid var(--surface-border);
-            border-radius: 4px;
-            transition: transform 0.2s ease, border-color 0.2s ease;
-        }
-
-        .plugin-thumbnail:hover {
-            transform: scale(1.1);
-            border-color: var(--accent);
-        }
-
-        /* Thumbnail Preview Modal */
-        .thumbnail-preview-modal {
-            display: none;
-            position: fixed;
-            z-index: 1001;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            backdrop-filter: blur(3px);
-        }
-
-        .thumbnail-preview-content {
-            position: relative;
-            margin: 5% auto;
-            padding: 20px;
-            width: 90%;
-            max-width: 800px;
-            border-radius: 12px;
-        }
-
-        .thumbnail-preview-content img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-        }
-
-        .thumbnail-preview-close {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 35px;
-            font-weight: bold;
-            color: var(--close-btn-color);
-            cursor: pointer;
-            transition: color 0.3s ease;
-        }
-
-        .thumbnail-preview-close:hover,
-        .thumbnail-preview-close:focus {
-            color: var(--close-btn-hover);
-        }
-
-        .thumbnail-preview-info {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: var(--bg-primary);
-            border-radius: 6px;
-            color: var(--text-secondary);
-            font-size: 14px;
-        }
-    </style>
     <script>
-        async function deletePluginInstance(playlistName, pluginId, pluginInstance) {
-            try {
-                const response = await fetch("{{ url_for('plugin.delete_plugin_instance') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        playlist_name: playlistName,
-                        plugin_id: pluginId,
-                        plugin_instance: pluginInstance
-                    })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        function showThumbnailPreview(playlistName, pluginId, pluginName, instanceName) {
-            const modal = document.getElementById('thumbnailPreviewModal');
-            const img = document.getElementById('thumbnailPreviewImage');
-            const info = document.getElementById('thumbnailPreviewInfo');
-
-            const imageUrl = `/plugin_instance_image/${encodeURIComponent(playlistName)}/${encodeURIComponent(pluginId)}/${encodeURIComponent(instanceName)}`;
-            img.src = imageUrl;
-            info.textContent = `Plugin: ${pluginName} | Instance: ${instanceName}`;
-            modal.style.display = 'block';
-        }
-
-        function closeThumbnailPreview() {
-            const modal = document.getElementById('thumbnailPreviewModal');
-            modal.style.display = 'none';
-        }
-
-        // Close modal when clicking outside the image
-        window.onclick = function(event) {
-            const thumbnailModal = document.getElementById('thumbnailPreviewModal');
-            const refreshModal = document.getElementById('refreshSettingsModal');
-            if (event.target === thumbnailModal) {
-                closeThumbnailPreview();
-            }
-            if (event.target === refreshModal) {
-                closeRefreshModal();
-            }
-        }
-
-        async function displayPluginInstance(playlistName, pluginId, pluginInstance) {
-            const loadingIndicator = document.getElementById(pluginInstance)?.querySelector('.loading-indicator');
-            loadingIndicator.style.display = 'block';
-            try {
-                const response = await fetch("{{ url_for('plugin.display_plugin_instance') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        playlist_name: playlistName,
-                        plugin_id: pluginId,
-                        plugin_instance: pluginInstance
-                    })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An error occurred while processing your request.');
-            } finally {
-                // Hide loading indicator after the action is complete
-                loadingIndicator.style.display = 'none';
-            }
-        }
-
-        // Open modal for **creating** a new playlist
-        function openCreateModal() {
-            document.getElementById("modalTitle").textContent = "New Playlist";
-            document.getElementById("playlist_name").value = "";
-            document.getElementById("editingPlaylistName").value = ""; // Empty value means it's new
-            document.getElementById("start_time").value = "00:00";
-            document.getElementById("end_time").value = "24:00";
-
-            document.getElementById("saveButton").setAttribute("onclick", "createPlaylist()");
-            document.getElementById("deleteButton").classList.add("hidden"); // Hide delete button
-
-            document.getElementById("playlistModal").style.display = "block";
-        }
-
-        // Open modal for **editing** an existing playlist
-        function openEditModal(playlistName, startTime, endTime) {
-            document.getElementById("modalTitle").textContent = "Update Playlist";
-            document.getElementById("playlist_name").value = playlistName;
-            document.getElementById("editingPlaylistName").value = playlistName;
-            document.getElementById("start_time").value = startTime;
-            document.getElementById("end_time").value = endTime;
-
-            document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()");
-            document.getElementById("deleteButton").classList.remove("hidden"); // Show delete button
-
-            document.getElementById("playlistModal").style.display = "block";
-        }
-
-        function openModal() {
-            const modal = document.getElementById('playlistModal');
-            modal.style.display = 'block';
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('playlistModal');
-            modal.style.display = 'none';
-        }
-
-        async function createPlaylist() {
-            let playlistName = document.getElementById("playlist_name").value.trim();
-            let startTime = document.getElementById("start_time").value;
-            let endTime = document.getElementById("end_time").value;
-
-            try {
-                const response = await fetch("{{ url_for('playlist.create_playlist') }}", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal on success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        async function updatePlaylist() {
-            let oldName = document.getElementById("editingPlaylistName").value;
-            let newName = document.getElementById("playlist_name").value;
-            let startTime = document.getElementById("start_time").value;
-            let endTime = document.getElementById("end_time").value;
-
-            try {
-                const response = await fetch("{{ url_for('playlist.update_playlist', playlist_name='') }}" + oldName, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime })
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal after success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        async function deletePlaylist() {
-            let name = document.getElementById("editingPlaylistName").value;
-            try {
-                const response = await fetch("{{ url_for('playlist.delete_playlist', playlist_name='') }}" + name, {
-                    method: "DELETE",
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    closeModal(); // Close the modal after success
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                alert('An error occurred while processing your request.');
-            }
-        }
-
-        function populateTimeOptions() {
-            let startSelect = document.getElementById("start_time");
-            let endSelect = document.getElementById("end_time");
-
-            startSelect.innerHTML = "";
-            endSelect.innerHTML = "";
-
-            for (let hour = 0; hour < 24; hour++) { // 24-hour format (0-23)
-                for (let minutes of [0, 15, 30, 45]) {
-                    let time = hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
-                    startSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                    endSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                }
-            }
-            startSelect.innerHTML += `<option value="24:00">24:00</option>`;
-            endSelect.innerHTML += `<option value="24:00">24:00</option>`;
-        }
-
-        document.addEventListener("DOMContentLoaded", populateTimeOptions);
-
-        window.addEventListener("load", function () {
-            let storedMessage = sessionStorage.getItem("storedMessage");
-            if (storedMessage) {
-                let { type, text } = JSON.parse(storedMessage);
-                showResponseModal(type, text);
-                sessionStorage.removeItem("storedMessage"); // Clear stored message after displaying
-            }
-
-            // Add event listeners for refresh settings buttons
-            document.querySelectorAll('.refresh-settings-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const playlistName = this.dataset.playlist;
-                    const pluginId = this.dataset.pluginId;
-                    const instanceName = this.dataset.instance;
-                    const refreshSettings = JSON.parse(this.dataset.refresh);
-                    openRefreshModal(playlistName, pluginId, instanceName, refreshSettings);
-                });
-            });
-        });
-
-        // Global variables to track the plugin being edited
-        let currentEditPlaylist = '';
-        let currentEditPluginId = '';
-        let currentEditInstance = '';
-
-        // Initialize refresh settings manager
-        const playlistRefreshManager = createRefreshSettingsManager('refreshSettingsModal', 'modal');
-
-        // Function to open refresh settings modal from playlist view
-        function openRefreshModal(playlistName, pluginId, instanceName, refreshSettings) {
-            currentEditPlaylist = playlistName;
-            currentEditPluginId = pluginId;
-            currentEditInstance = instanceName;
-
-            playlistRefreshManager.open({ refreshSettings });
-        }
-
-        function closeRefreshModal() {
-            playlistRefreshManager.close();
-        }
-
-        async function saveRefreshSettings() {
-            await playlistRefreshManager.submit(async (formData) => {
-                const data = new FormData();
-                data.append('plugin_id', currentEditPluginId);
-                data.append('refresh_settings', JSON.stringify(formData));
-
-                const encodedInstance = encodeURIComponent(currentEditInstance);
-                const response = await fetch("{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + encodedInstance, {
-                    method: 'PUT',
-                    body: data
-                });
-
-                const result = await response.json();
-                if (response.ok) {
-                    sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                    location.reload();
-                } else {
-                    throw new Error(result.error || 'Failed to update refresh settings');
-                }
-            });
-        }
+        window.PLAYLIST_CTX = {
+            create_playlist_url: {{ url_for('playlist.create_playlist') | tojson }},
+            delete_playlist_base_url: {{ url_for('playlist.delete_playlist', playlist_name='') | tojson }},
+            delete_plugin_instance_url: {{ url_for('plugin.delete_plugin_instance') | tojson }},
+            device_cycle_minutes: {{ device_cycle_minutes | tojson }},
+            device_tz_offset_min: {{ tz_off_min | tojson }},
+            display_next_url: {{ url_for('playlist.display_next_in_playlist') | tojson }},
+            display_plugin_instance_url: {{ url_for('plugin.display_plugin_instance') | tojson }},
+            reorder_url: {{ url_for('playlist.reorder_plugins') | tojson }},
+            update_device_cycle_url: {{ url_for('playlist.update_device_cycle') | tojson }},
+            update_instance_base_url: {{ url_for('plugin.update_plugin_instance', instance_name='') | tojson }},
+            update_playlist_base_url: {{ url_for('playlist.update_playlist', playlist_name='') | tojson }},
+        };
     </script>
+    <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
 </head>
 <body>
     {% from 'macros/icons.html' import icon %}
     <main class="page-shell page-shell-dashboard" data-page-shell="dashboard">
-    <div class="frame">
-        <!-- Back Button -->
-        <a href="{{ url_for('main.main_page') }}" class="back-button">← Back</a>
+    <div class="frame playlist-frame">
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
@@ -408,17 +61,33 @@
                 {% if playlist_config.active_playlist %}
                 <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
                 {% endif %}
+                <span class="status-chip">Device cadence: {{ device_cycle_minutes }} min</span>
             </div>
         </div>
 
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% for playlist in playlist_config.playlists %}
-            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
+            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header">
+                        <div class="playlist-heading">
                         <span class="playlist-title">{{ playlist.name }}</span>
-                        <button class="edit-button edit-playlist-btn" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}</button>
+                        <div class="playlist-summary-row">
+                            <span class="status-chip info">{{ playlist.plugins | length }} items</span>
+                            {% if playlist.name == playlist_config.active_playlist %}
+                            <span class="status-chip success">Active</span>
+                            {% endif %}
+                            <span class="playlist-summary-copy">{{ playlist.start_time }} - {{ playlist.end_time }}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
+                        </div>
+                        </div>
+                        <div class="playlist-toolbar">
+                            <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
+                            <button class="edit-button edit-playlist-btn" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}</button>
+                            <button class="delete-button delete-playlist-btn" type="button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}</button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-toggle aria-expanded="false">Open</button>
+                        </div>
                     </div>
+                    <div class="playlist-card-body" data-playlist-body>
                     <!-- Plugin List -->
                     {% if playlist.plugins %}
                     <div class="plugin-list">
@@ -435,12 +104,13 @@
                                      data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
                                      data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
                                      data-thumbnail-instance="{{ plugin_instance.name }}">
+                                    <div class="img-skeleton" aria-hidden="true"></div>
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', playlist_name=playlist.name, plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
                                         alt="Preview"
                                         class="plugin-thumbnail"
                                         title="Click to view full size"
-                                        onerror="this.parentElement.style.display='none';"
+                                        loading="lazy"
                                     >
                                 </div>
                                 {% endif %}
@@ -488,14 +158,15 @@
                         <p>Add instances from a plugin page, then return here to schedule and reorder them.</p>
                     </div>
                     {% endif %}
+                    </div>
             </div>
             {% endfor %}
         </div>
     </div>
 
     <!-- Schedule Configuration Modal -->
-    <div id="playlistModal" class="modal">
-        <div class="modal-content">
+    <div id="playlistModal" class="modal" hidden>
+        <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">×</button>
             <h2 id="modalTitle">New Playlist</h2>
             <div class="separator"></div>
@@ -513,6 +184,10 @@
                     <span> - </span>
                     <select id="end_time" name="end_time" class="form-input" aria-required="true"></select>
                 </div>
+                <div class="form-group">
+                    <label for="cycle_minutes" class="form-label">Cycle override (minutes)</label>
+                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" placeholder="Use device default if blank" class="form-input">
+                </div>
             </form>
             <div class="buttons-container">
                 <button type="button" class="action-button" id="saveButton">Save</button>
@@ -522,8 +197,8 @@
     </div>
 
     <!-- Refresh Settings Modal -->
-    <div id="refreshSettingsModal" class="modal">
-        <div class="modal-content">
+    <div id="refreshSettingsModal" class="modal" hidden>
+        <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">×</button>
             <h2>Refresh Settings</h2>
             <div class="separator"></div>
@@ -541,7 +216,7 @@
     {% include 'response_modal.html' %}
 
     <!-- Thumbnail Preview Modal -->
-    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal">
+    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" hidden>
         <div class="thumbnail-preview-content playlist-thumbnail-content">
             <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">×</button>
             <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">

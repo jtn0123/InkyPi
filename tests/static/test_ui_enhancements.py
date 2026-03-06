@@ -117,15 +117,19 @@ def test_main_css_contains_workflow_and_management_shells(client):
     assert ".settings-console-layout" in css_content
     assert ".settings-side-nav" in css_content
     assert ".danger-zone" in css_content
+    assert ".playlist-toggle-button" in css_content
+    assert ".modal-sheet" in css_content
+    assert "body.modal-open" in css_content
 
 
 def test_primary_templates_reduce_inline_handlers():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2] / "src" / "templates"
-    for template_name in ("plugin.html", "settings.html", "inky.html", "history.html", "api_keys.html"):
+    for template_name in ("plugin.html", "settings.html", "inky.html", "history.html", "api_keys.html", "playlist.html"):
         content = (root / template_name).read_text()
         assert "onclick=" not in content
+        assert "window.onclick" not in content
         assert "skip-nav" not in content
         assert "Skip to main content" not in content
         assert "Skip to settings content" not in content

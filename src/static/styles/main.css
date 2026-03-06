@@ -2144,6 +2144,10 @@ select.form-input option {
     background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent background */
 }
 
+body.modal-open {
+    overflow: hidden;
+}
+
 .modal-content {
     background-color: #ffffff;
     margin: 15% auto; /* Center the modal */
@@ -2153,6 +2157,11 @@ select.form-input option {
     max-width: 400px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
     animation: fadeIn 0.22s ease-out;
+}
+
+.modal-sheet {
+    background: var(--modal-bg);
+    border: 1px solid var(--panel-border);
 }
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content { max-width: 95vw; width: auto; margin: 5vh auto; background: var(--surface); animation: zoomIn 0.2s ease-out; }
@@ -2906,6 +2915,7 @@ select.form-input option {
     align-items: center;
     width: 100%;
     padding: 20px 25px 10px 25px;
+    gap: 14px;
 }
 
 /* Playlist Item */
@@ -2934,6 +2944,52 @@ select.form-input option {
     font-size: 1.2rem;
     font-weight: 600;
     color: var(--text);
+}
+
+.playlist-heading {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.playlist-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.playlist-summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.playlist-summary-copy {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.playlist-card-body {
+    display: grid;
+    gap: 12px;
+}
+
+.playlist-toggle-button {
+    border: 1px solid var(--panel-border);
+    background: var(--panel-bg);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.playlist-toggle-button:hover {
+    border-color: var(--accent);
 }
 
 /* Consistent action icon sizing */
@@ -2984,6 +3040,11 @@ select.form-input option {
 .playlist-thumbnail-info {
     background-color: var(--bg-primary);
     color: var(--text-secondary);
+}
+
+.playlist-frame {
+  max-width: 980px;
+  margin: 0 auto;
 }
 
 .header-content {
@@ -4666,10 +4727,6 @@ main[data-page-shell="workflow"] .frame {
         grid-template-columns: 1fr;
     }
 
-    .dashboard-overview {
-        order: -1;
-    }
-
     .dashboard-stage .image-container img {
         max-height: min(46vh, 22rem);
     }
@@ -4729,6 +4786,387 @@ main[data-page-shell="workflow"] .frame {
     .dashboard-status-card .header-button {
         justify-self: stretch;
     }
+}
+
+/* Phone-first mobile hardening */
+@media (max-width: 768px) {
+  .frame,
+  .playlist-frame,
+  .api-keys-frame {
+    width: min(100%, 100vw - 16px);
+    margin: 8px auto;
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .app-header,
+  .header-content,
+  .header-identity,
+  .header-actions,
+  .page-intro,
+  .page-summary,
+  .history-toolbar,
+  .playlist-header,
+  .playlist-toolbar,
+  .workflow-action-group,
+  .buttons-container,
+  .inline-action-row,
+  .logs-actions,
+  .logs-filters {
+    width: 100%;
+  }
+
+  .header-content,
+  .app-header,
+  .playlist-header,
+  .dashboard-stage-header,
+  .storage-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions,
+  .playlist-toolbar,
+  .history-toolbar,
+  .logs-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .page-intro {
+    gap: 10px;
+  }
+
+  .page-summary {
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    flex-wrap: nowrap;
+  }
+
+  .page-summary .status-chip {
+    flex: 0 0 auto;
+  }
+
+  .dashboard-hero,
+  .workflow-layout,
+  .settings-grid,
+  .settings-console-layout,
+  .sections-grid.two-col,
+  .api-keys-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-stage,
+  .dashboard-status-card,
+  .storage-card,
+  .workflow-action-panel,
+  .api-key-card,
+  .playlist-item,
+  .history-card {
+    padding: 14px;
+  }
+
+  .dashboard-stage {
+    gap: 12px;
+  }
+
+  .dashboard-stage .image-container img {
+    max-height: min(42vh, 18rem);
+  }
+
+  .dashboard-overview {
+    gap: 10px;
+  }
+
+  .plugins-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .plugins-container .plugin-item {
+    padding: 16px 10px 14px;
+    min-height: 120px;
+  }
+
+  .plugin-name {
+    min-height: 2.7em;
+  }
+
+  .settings-grid {
+    gap: 14px;
+  }
+
+  .settings-console-layout {
+    gap: 12px;
+  }
+
+  .settings-side-nav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 6px;
+    border: 1px solid var(--panel-border);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .settings-side-link {
+    flex: 0 0 auto;
+    min-width: max-content;
+    border-radius: 999px;
+    padding: 10px 14px;
+    text-align: center;
+  }
+
+  .settings-console-main,
+  .settings-console-panel.active {
+    display: grid;
+    gap: 12px;
+  }
+
+  .logs-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .logs-viewer,
+  .diagnostics-panel,
+  .diagnostics-panel-sm {
+    max-height: min(42vh, 22rem);
+    min-height: 180px;
+  }
+
+  .settings-panel > .buttons-container,
+  .api-keys-frame .buttons-container {
+    position: sticky;
+    bottom: 8px;
+    z-index: 6;
+    padding-top: 8px;
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+  }
+
+  .workflow-mode-bar {
+    position: sticky;
+    top: 8px;
+    z-index: 6;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .workflow-mode-tab {
+    justify-content: center;
+  }
+
+  .workflow-layout {
+    display: block;
+  }
+
+  .workflow-main-panel,
+  .workflow-side-panel {
+    display: none;
+  }
+
+  .workflow-main-panel.active,
+  .workflow-side-panel.active {
+    display: grid;
+    gap: 14px;
+  }
+
+  .workflow-side-panel {
+    margin-top: 14px;
+  }
+
+  .workflow-action-panel {
+    position: sticky;
+    bottom: 8px;
+    z-index: 7;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--text) 12%, transparent);
+    background: color-mix(in srgb, var(--panel-bg) 94%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .workflow-device-toggle {
+    font-size: 0.92rem;
+  }
+
+  .workflow-action-group {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-help {
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .status-bar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .status-card.compact .image-container,
+  .status-card.instance .status-body img {
+    max-width: 100%;
+  }
+
+  .playlist-list {
+    gap: 12px;
+  }
+
+  .playlist-item {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .playlist-header {
+    padding: 14px;
+  }
+
+  .playlist-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .playlist-toolbar .run-next-btn {
+    grid-column: 1 / -1;
+  }
+
+  .playlist-toggle-button {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .playlist-card-body {
+    padding: 0 14px 14px;
+  }
+
+  .playlist-item.mobile-collapsed .playlist-card-body {
+    display: none;
+  }
+
+  .plugin-item {
+    padding: 12px 0;
+    border-top-width: 1px;
+  }
+
+  .plugin-info {
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .plugin-instance {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .plugin-thumbnail-container {
+    margin-left: 0;
+    width: 100%;
+    max-width: 180px;
+  }
+
+  .plugin-thumbnail-container .img-skeleton,
+  .plugin-thumbnail {
+    width: 100%;
+    height: auto;
+    min-height: 100px;
+  }
+
+  .plugin-actions {
+    width: 100%;
+    justify-content: stretch;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .plugin-actions .latest-refresh {
+    width: 100%;
+  }
+
+  .edit-button,
+  .delete-button,
+  .plugin-actions .edit-button,
+  .plugin-actions .delete-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .history-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .history-actions .btn:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .api-key-actions {
+    gap: 8px;
+  }
+
+  .modal-content,
+  .thumbnail-preview-content {
+    width: min(100vw - 12px, 100%);
+    max-width: none;
+    margin: auto auto 0;
+    border-radius: 20px 20px 0 0;
+    max-height: min(88vh, 44rem);
+    overflow-y: auto;
+  }
+
+  .modal {
+    align-items: flex-end;
+  }
+}
+
+@media (max-width: 430px) {
+  .frame,
+  .playlist-frame,
+  .api-keys-frame {
+    width: min(100%, 100vw - 8px);
+    margin: 4px auto;
+    padding: 12px;
+  }
+
+  .header-actions,
+  .playlist-toolbar,
+  .history-toolbar,
+  .logs-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .plugins-container {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .plugin-item,
+  .history-card,
+  .api-key-card {
+    border-radius: 14px;
+  }
+
+  .settings-side-nav {
+    top: 4px;
+  }
+
+  .workflow-action-panel {
+    bottom: 4px;
+    padding: 12px;
+  }
+
+  .page-summary {
+    margin-right: -2px;
+  }
 }
 
 /* Compatibility styles for enhanced UI tests */
