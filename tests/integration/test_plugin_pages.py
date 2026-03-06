@@ -123,7 +123,7 @@ def test_preview_size_mode_native_on_plugin(client, device_config_dev):
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
-    assert b'style="width: ' in resp.data and b"height: " in resp.data
+    assert b'data-native-width="' in resp.data and b'data-native-height="' in resp.data
 
 
 def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
@@ -131,6 +131,7 @@ def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b'id="previewImage" style=' not in resp.data
+    assert b'data-page-shell="workflow"' in resp.data
 
 
 def test_plugin_page_status_bar_present(client):

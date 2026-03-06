@@ -4,6 +4,8 @@
 def test_playlist_page_renders(client):
     resp = client.get("/playlist")
     assert resp.status_code == 200
+    assert b'data-page-shell="dashboard"' in resp.data
+    assert b'id="newPlaylistBtn"' in resp.data
 
 
 def test_create_update_delete_playlist_flow(client):

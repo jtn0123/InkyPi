@@ -12,7 +12,7 @@
 </head>
 <body>
     <a href="#settings-main" class="skip-nav">Skip to settings content</a>
-    <main id="settings-main">
+    <main id="settings-main" class="page-shell page-shell-management" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
         {% from 'macros/icons.html' import icon %}
@@ -38,9 +38,6 @@
                 <div class="header-actions header-actions-flex">
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
-                    <button class="header-button" onclick="startUpdate()">Update InkyPi</button>
-                    <button class="header-button is-warning" onclick="handleShutdown(true)">Reboot</button>
-                    <button class="header-button is-danger" onclick="handleShutdown(false)">Shutdown</button>
                 </div>
             </div>
         </div>
@@ -55,19 +52,18 @@
                 <span class="status-chip">{{ device_settings.timezone }}</span>
             </div>
         </div>
-        <div class="section-nav" role="navigation" aria-label="Settings sections">
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-basics')">Basics</button>
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-time-locale')">Time & Locale</button>
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-display-cycle')">Display Cycle</button>
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-backup-restore')">Backup</button>
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-observability')">Observability</button>
-            <button type="button" class="status-chip info" onclick="jumpToSection('section-image-settings')">Image</button>
-            <button type="button" class="status-chip" onclick="toggleAllCollapsibles(true)">Expand all</button>
-            <button type="button" class="status-chip" onclick="toggleAllCollapsibles(false)">Collapse all</button>
-        </div>
+        <div class="settings-console-layout">
+        <nav class="settings-side-nav" role="navigation" aria-label="Settings groups">
+            <button type="button" class="settings-side-link active" data-settings-tab="device">Device</button>
+            <button type="button" class="settings-side-link" data-settings-tab="scheduling">Scheduling</button>
+            <button type="button" class="settings-side-link" data-settings-tab="image">Image Processing</button>
+            <button type="button" class="settings-side-link" data-settings-tab="maintenance">Maintenance</button>
+        </nav>
+        <div class="settings-console-main">
         <!-- Settings Content -->
         <form class="settings-form">
             <div id="settings-container">
+                <section class="settings-console-panel active" data-settings-panel="device">
                 <!-- Basics -->
                 <div class="section" id="section-basics">
                     <div class="section-title">Basics</div>
@@ -103,10 +99,10 @@
 
                 <!-- Time & Locale -->
                 <div class="collapsible" id="section-time-locale">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Time & Locale <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
                         <div class="form-group nowrap">
                             <label for="timezone" class="form-label">Time Zone</label>
                             <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.timezone }}" />
@@ -119,7 +115,7 @@
                         <div class="form-group nowrap">
                             <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
                             <label class="toggle-container">
-                                <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox" onchange="toggleUseDeviceLocation(this)">
+                                <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox">
                                 <span class="toggle-label"></span>
                             </label>
                         </div>
@@ -132,16 +128,18 @@
                         </div>
                     </div>
                 </div>
+                </section>
 
                 <!-- Plugin cycle & system -->
+                <section class="settings-console-panel" data-settings-panel="scheduling">
                 <div class="collapsible" id="section-display-cycle">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Display Cycle & System <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <label for="interval" class="form-label">Plugin Cycle Interval</label>
-                            <span title="Determines how often the display switches to a new plugin.">ⓘ</span>
+                            <span class="help-icon" title="Determines how often the display switches to a new plugin.">i</span>
                             <span>Every</span>
                             <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
                             <span id="interval-settings-error" class="validation-message" role="alert"></span>
@@ -160,15 +158,17 @@
                         </div>
                     </div>
                 </div>
+                </section>
 
                 <!-- Backup & Restore -->
+                <section class="settings-console-panel" data-settings-panel="maintenance">
                 <div class="collapsible" id="section-backup-restore">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Backup & Restore <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
-                            <button type="button" class="action-button compact" onclick="exportConfig()">Download Backup</button>
+                            <button type="button" id="exportConfigBtn" class="action-button compact">Download Backup</button>
                         </div>
                         <div class="form-group nowrap">
                             <label class="form-label" for="includeKeys">Include API keys</label>
@@ -179,20 +179,25 @@
                         </div>
                         <div class="form-group">
                             <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
-                            <button type="button" class="action-button compact warn" onclick="importConfig()">Restore from File</button>
+                            <button type="button" id="importConfigBtn" class="action-button compact warn">Restore from File</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Observability & Recovery -->
                 <div class="collapsible" id="section-observability">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Observability & Recovery <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
+                        <div class="diagnostics-strip">
+                            <div class="metric-pill"><span class="metric-pill-label">Logs</span><span class="metric-pill-value">Live</span></div>
+                            <div class="metric-pill"><span class="metric-pill-label">Health</span><span class="metric-pill-value">System + plugins</span></div>
+                            <div class="metric-pill"><span class="metric-pill-label">Recovery</span><span class="metric-pill-value">Scoped actions</span></div>
+                        </div>
                         <div class="form-group nowrap">
-                            <button type="button" class="action-button compact" onclick="refreshBenchmarks()">Refresh Benchmark Summary</button>
-                            <button type="button" class="action-button compact warn" onclick="safeReset()">Safe Reset</button>
+                            <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh Benchmark Summary</button>
+                            <button type="button" id="safeResetBtn" class="action-button compact warn">Safe Reset</button>
                         </div>
                         <div class="status-row">
                             <span class="status-chip success">Health API</span>
@@ -202,54 +207,67 @@
                         <div class="form-group">
                             <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
                             <input id="isolatePluginInput" type="text" class="form-input" placeholder="e.g. weather" />
-                            <div style="display:flex; gap:8px; margin-top:8px;">
-                                <button type="button" class="action-button compact warn" onclick="isolatePlugin()">Isolate</button>
-                                <button type="button" class="action-button compact" onclick="unIsolatePlugin()">Unisolate</button>
-                                <button type="button" class="action-button compact" onclick="refreshIsolation()">Refresh List</button>
+                            <div class="inline-action-row">
+                                <button type="button" id="isolatePluginBtn" class="action-button compact warn">Isolate</button>
+                                <button type="button" id="unIsolatePluginBtn" class="action-button compact">Unisolate</button>
+                                <button type="button" id="refreshIsolationBtn" class="action-button compact">Refresh List</button>
                             </div>
                         </div>
                         <div class="sections-grid two-col">
                             <div class="form-group">
                                 <label class="form-label">Benchmark Summary</label>
-                                <div id="benchSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:120px;">Benchmark summary loading...</div>
+                                <div id="benchSummary" class="logs-viewer loading-panel diagnostics-panel" aria-busy="true">Benchmark summary loading...</div>
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Health Summary</label>
-                                <div id="healthSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:120px;">Health summary loading...</div>
+                                <div id="healthSummary" class="logs-viewer loading-panel diagnostics-panel" aria-busy="true">Health summary loading...</div>
                             </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Isolation Summary</label>
-                            <div id="isolationSummary" class="logs-viewer loading-panel" aria-busy="true" style="min-height:80px;">Isolation list loading...</div>
+                            <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-busy="true">Isolation list loading...</div>
+                        </div>
+                        <div class="danger-zone">
+                            <div>
+                                <h3>Maintenance Actions</h3>
+                                <p>Use these only for lifecycle operations on the device itself.</p>
+                            </div>
+                            <div class="inline-action-row">
+                                <button type="button" id="startUpdateBtn" class="action-button">Update InkyPi</button>
+                                <button type="button" id="rebootBtn" class="action-button is-warning">Reboot</button>
+                                <button type="button" id="shutdownBtn" class="action-button is-danger">Shutdown</button>
+                            </div>
                         </div>
                     </div>
                 </div>
+                </section>
 
                 <!-- Image Settings -->
+                <section class="settings-console-panel" data-settings-panel="image">
                 <div class="collapsible" id="section-image-settings">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Image Settings <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <label for="saturation" class="form-label form-label-min-width">Saturation:</label>
                             <span id="saturation-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
-                            <input type="range" id="saturation" name="saturation" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" oninput="updateSliderValue(this)" />
+                            <input type="range" id="saturation" name="saturation" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
                         </div>
                         <div class="form-group">
                             <label for="contrast" class="form-label form-label-min-width">Contrast:</label>
                             <span id="contrast-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
-                            <input type="range" id="contrast" name="contrast" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" oninput="updateSliderValue(this)" />
+                            <input type="range" id="contrast" name="contrast" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
                          </div>
                         <div class="form-group">
                             <label for="sharpness" class="form-label form-label-min-width">Sharpness:</label>
                             <span id="sharpness-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
-                            <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" oninput="updateSliderValue(this)" />
+                            <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
                         </div>
                         <div class="form-group">
                             <label for="brightness" class="form-label form-label-min-width">Brightness:</label>
                             <span id="brightness-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
-                            <input type="range" id="brightness" name="brightness" class="form-input slider-max-width" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" oninput="updateSliderValue(this)" />
+                            <input type="range" id="brightness" name="brightness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
                         </div>
                         {% if device_settings.get('display_type', 'inky') == 'inky' %}
                         <div class="form-group">
@@ -259,21 +277,23 @@
                                 type="range"
                                 id="inky_saturation"
                                 name="inky_saturation"
-                                class="form-input slider-max-width"
+                                class="form-input slider-max-width settings-slider"
                                 min="0" max="1" step="0.05"
                                 value="{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}"
-                                oninput="updateSliderValue(this)"
                             />
                         </div>
                         {% endif %}
                     </div>
                 </div>
+                </section>
             </div>
         </form>
  
         <!-- Buttons -->
         <div class="buttons-container">
-            <button type="button" onclick="handleAction()" class="action-button">Save</button>
+            <button type="button" id="saveSettingsBtn" class="action-button">Save</button>
+        </div>
+        </div>
         </div>
     </div>
     <!-- Live Logs Section -->

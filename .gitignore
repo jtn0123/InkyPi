@@ -204,4 +204,5 @@ coverage.xml
 /src/static/scripts/*
 !/src/static/scripts/
 !/src/static/scripts/plugin_schema.js
+!/src/static/scripts/dashboard_page.js
 /src/static/styles/

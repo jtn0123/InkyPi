@@ -173,6 +173,11 @@ def collect_dom_issues(page, route_name: str):
             issues.push({ severity: 'P3', text: `${inlineStyles} inline style attributes are still present on the page.` });
           }
 
+          const inlineHandlers = document.querySelectorAll('[onclick]').length;
+          if (inlineHandlers > 0) {
+            issues.push({ severity: 'P2', text: `${inlineHandlers} inline click handlers are still present on the page.` });
+          }
+
           const genericPlaceholders = Array.from(document.querySelectorAll('input[placeholder], textarea[placeholder]'))
             .filter((field) => /type something/i.test(field.getAttribute('placeholder') || '')).length;
           if (genericPlaceholders) {
@@ -190,6 +195,15 @@ def collect_dom_issues(page, route_name: str):
 
           if (routeName.startsWith('plugin_') && !document.querySelector('[data-settings-schema]')) {
             issues.push({ severity: 'P2', text: 'Plugin page is still using the legacy handwritten settings body.' });
+          }
+
+          if (!document.querySelector('[data-page-shell]')) {
+            issues.push({ severity: 'P2', text: 'Shared page-shell marker is missing from the rendered page.' });
+          }
+
+          const primaryActions = document.querySelectorAll('.action-button.primary, .workflow-action-group .action-button.primary');
+          if (primaryActions.length > 1) {
+            issues.push({ severity: 'P2', text: 'More than one primary call-to-action is visible in the current action area.' });
           }
 
           return issues;

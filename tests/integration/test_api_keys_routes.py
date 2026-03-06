@@ -5,6 +5,7 @@ from pathlib import Path
 def test_api_keys_page_loads(client):
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
+    assert b'data-page-shell="management"' in resp.data
 
 
 def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):

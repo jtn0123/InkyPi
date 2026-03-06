@@ -9,19 +9,20 @@ def test_main_page(client):
 
 
 def test_preview_size_mode_native_on_home(client, device_config_dev, monkeypatch):
-    # native: expect inline width/height styles present
+    # native: expect native sizing metadata present for controller-driven preview sizing
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/")
     assert resp.status_code == 200
-    assert b'style="width: ' in resp.data and b"height: " in resp.data
+    assert b'data-native-width="' in resp.data and b'data-native-height="' in resp.data
 
 
 def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
-    # fit: expect no explicit inline width/height
+    # fit: expect no explicit inline width/height style and still retain metadata
     device_config_dev.update_value("preview_size_mode", "fit", write=True)
     resp = client.get("/")
     assert resp.status_code == 200
     assert b'id="previewImage" style=' not in resp.data
+    assert b'data-native-width="' in resp.data
 
 
 def test_preview_404_when_no_image(client):
@@ -80,6 +81,7 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
     assert b"weather" in resp.data
     assert b"Home Weather" in resp.data
     assert b"Default" in resp.data
+    assert b'data-page-shell="dashboard"' in resp.data
 
 
 def test_next_up_endpoint_and_ssr(client, device_config_dev):

@@ -235,17 +235,19 @@
     }
 
     function openCreateModal() {
+        const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "New Playlist";
         document.getElementById("playlist_name").value = "";
         document.getElementById("editingPlaylistName").value = "";
         document.getElementById("start_time").value = "00:00";
         document.getElementById("end_time").value = "24:00";
-        document.getElementById("saveButton").setAttribute("onclick", "createPlaylist()")
+        if (modal) modal.dataset.mode = "create";
         document.getElementById("deleteButton").classList.add("hidden");
-        document.getElementById("playlistModal").style.display = "block";
+        if (modal) modal.style.display = "block";
     }
 
     function openEditModal(playlistName, startTime, endTime, cycleMinutes) {
+        const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "Update Playlist";
         document.getElementById("playlist_name").value = playlistName;
         document.getElementById("editingPlaylistName").value = playlistName;
@@ -253,9 +255,9 @@
         document.getElementById("end_time").value = endTime;
         const cycleInput = document.getElementById('cycle_minutes');
         if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
-        document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()")
+        if (modal) modal.dataset.mode = "edit";
         document.getElementById("deleteButton").classList.remove("hidden");
-        document.getElementById("playlistModal").style.display = "block";
+        if (modal) modal.style.display = "block";
     }
 
     function openModal() { const modal = document.getElementById('playlistModal'); modal.style.display = 'block'; }
@@ -396,6 +398,18 @@
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
         if (newBtn){ newBtn.addEventListener('click', () => openCreateModal()); }
+        const saveBtn = document.getElementById('saveButton');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                const mode = document.getElementById("playlistModal")?.dataset.mode || "create";
+                if (mode === "edit") updatePlaylist(); else createPlaylist();
+            });
+        }
+        document.getElementById('deleteButton')?.addEventListener('click', deletePlaylist);
+        document.getElementById('closePlaylistModalBtn')?.addEventListener('click', closeModal);
+        document.getElementById('closeRefreshModalBtn')?.addEventListener('click', () => window.closeRefreshModal && window.closeRefreshModal());
+        document.getElementById('saveRefreshSettingsBtn')?.addEventListener('click', () => window.saveRefreshSettings && window.saveRefreshSettings());
+        document.getElementById('closeThumbnailPreviewBtn')?.addEventListener('click', () => window.closeThumbnailPreview && window.closeThumbnailPreview());
         document.querySelectorAll('.edit-playlist-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const el = e.currentTarget;
@@ -428,6 +442,19 @@
             btn.addEventListener('click', (e) => {
                 const t = e.currentTarget;
                 displayPluginInstance(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
+            });
+        });
+        document.querySelectorAll('.plugin-thumbnail-container').forEach(box => {
+            box.addEventListener('click', (event) => {
+                const t = event.currentTarget;
+                if (window.showThumbnailPreview) {
+                    window.showThumbnailPreview(
+                        t.getAttribute('data-thumbnail-playlist'),
+                        t.getAttribute('data-thumbnail-plugin'),
+                        t.getAttribute('data-thumbnail-display-name'),
+                        t.getAttribute('data-thumbnail-instance')
+                    );
+                }
             });
         });
         

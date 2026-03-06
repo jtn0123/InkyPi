@@ -103,6 +103,28 @@ def test_main_css_contains_live_preview_styles(client):
     assert ".preview-modified" in css_content
 
 
+def test_main_css_contains_workflow_and_management_shells(client):
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    assert ".workflow-layout" in css_content
+    assert ".workflow-mode-bar" in css_content
+    assert ".settings-console-layout" in css_content
+    assert ".settings-side-nav" in css_content
+    assert ".danger-zone" in css_content
+
+
+def test_primary_templates_reduce_inline_handlers():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "src" / "templates"
+    for template_name in ("plugin.html", "settings.html", "inky.html"):
+        content = (root / template_name).read_text()
+        assert "onclick=" not in content
+
+
 def test_main_css_contains_enhanced_button_styles(client):
     """Test that main.css contains enhanced button styling."""
     resp = client.get("/static/styles/main.css")

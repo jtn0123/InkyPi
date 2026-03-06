@@ -3399,6 +3399,27 @@ select.form-input option {
     gap: 8px 12px;
   }
 
+  .workflow-layout,
+  .settings-console-layout,
+  .diagnostics-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-side-nav {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workflow-mode-bar {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .workflow-action-group,
+  .inline-action-row {
+    flex-direction: column;
+  }
+
   /* Stack form elements on very small screens */
   .form-group.nowrap {
     flex-direction: column;
@@ -4112,6 +4133,212 @@ select.form-input option {
   border-radius: var(--border-radius-md);
   overflow: hidden;
   border: 1px solid var(--panel-border);
+}
+
+.page-shell {
+  width: 100%;
+}
+
+.workflow-frame {
+  gap: var(--spacing-md);
+}
+
+.workflow-mode-bar {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  align-self: flex-start;
+}
+
+.workflow-mode-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workflow-mode-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.workflow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.workflow-main-panel,
+.workflow-side-panel,
+.settings-console-main {
+  min-width: 0;
+}
+
+.workflow-side-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.workflow-section-header {
+  display: grid;
+  gap: 4px;
+}
+
+.workflow-section-header h2 {
+  font-size: 1.05rem;
+}
+
+.workflow-section-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.workflow-meta {
+  margin-top: 8px;
+}
+
+.workflow-meta-row + .workflow-meta-row {
+  margin-top: 6px;
+}
+
+.workflow-action-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--border-radius-md);
+}
+
+.workflow-device-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.workflow-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workflow-help {
+  margin-top: 0;
+}
+
+.status-placeholder-actions {
+  margin-top: 8px;
+}
+
+.instance-preview-skeleton,
+.lightbox-preview-image {
+  width: 100%;
+  display: block;
+}
+
+.lightbox-preview-image {
+  max-width: 92vw;
+  max-height: 85vh;
+  margin: 0 auto;
+}
+
+.progress-fill-seeded {
+  width: 10%;
+}
+
+.settings-console-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.settings-side-nav {
+  display: grid;
+  gap: 8px;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+
+.settings-side-link {
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text);
+  border-radius: var(--border-radius-md);
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.settings-side-link.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg));
+}
+
+.settings-console-panel {
+  display: none;
+  gap: 16px;
+}
+
+.settings-console-panel.active {
+  display: grid;
+}
+
+.diagnostics-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inline-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.diagnostics-panel {
+  min-height: 120px;
+}
+
+.diagnostics-panel-sm {
+  min-height: 80px;
+}
+
+.danger-zone {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: var(--border-radius-md);
+  border: 1px solid color-mix(in srgb, var(--error) 35%, var(--panel-border));
+  background: color-mix(in srgb, var(--error) 6%, var(--panel-bg));
+}
+
+.danger-zone h3 {
+  margin: 0;
+}
+
+.dashboard-meta {
+  margin-top: 8px;
+}
+
+.dashboard-status-row {
+  margin-top: 8px;
+}
+
+main[data-page-shell="dashboard"] .frame,
+main[data-page-shell="management"] .frame,
+main[data-page-shell="workflow"] .frame {
+  gap: 16px;
 }
 
 /* Plugin Grid/List View Styles */

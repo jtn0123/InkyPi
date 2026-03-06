@@ -372,9 +372,10 @@
 </head>
 <body>
     {% from 'macros/icons.html' import icon %}
+    <main class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         <!-- Back Button -->
-        <button onclick="history.back()" class="back-button">← Back</button>
+        <a href="{{ url_for('main.main_page') }}" class="back-button">← Back</a>
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
@@ -394,7 +395,7 @@
                         <h1 class="app-title">Playlists</h1>
                     </div>
                 </div>
-                <button class="header-button" onclick="openCreateModal()">New Playlist</button>
+                <button id="newPlaylistBtn" class="header-button" type="button">New Playlist</button>
             </div>
         </div>
         <div class="separator"></div>
@@ -413,16 +414,16 @@
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% for playlist in playlist_config.playlists %}
-            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}">
+            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}">
                     <div class="playlist-header">
                         <span class="playlist-title">{{ playlist.name }}</span>
-                        <button class="edit-button" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" onclick="openEditModal('{{ playlist.name }}', '{{ playlist.start_time }}','{{ playlist.end_time }}')">{{ icon('pencil-simple', 'action-icon') | safe }}</button>
+                        <button class="edit-button edit-playlist-btn" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}</button>
                     </div>
                     <!-- Plugin List -->
                     {% if playlist.plugins %}
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item">
+                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}">
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
                                 <span class="plugin-instance">{{ plugin_instance.name }}</span>
@@ -430,12 +431,10 @@
                                 <!-- Thumbnail preview - only show if image has been generated -->
                                 {% if plugin_instance.latest_refresh_time %}
                                 <div class="plugin-thumbnail-container"
-                                     onclick='showThumbnailPreview(
-                                         {{ playlist.name | tojson }},
-                                         {{ plugin_instance.plugin_id | tojson }},
-                                         {{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) | tojson }},
-                                         {{ plugin_instance.name | tojson }}
-                                     )'>
+                                     data-thumbnail-playlist="{{ playlist.name }}"
+                                     data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
+                                     data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
+                                     data-thumbnail-instance="{{ plugin_instance.name }}">
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', playlist_name=playlist.name, plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
                                         alt="Preview"
@@ -472,10 +471,10 @@
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
                                 </button>
-                                <button class="edit-button" type="button" title="Display Now" aria-label="Display {{ plugin_instance.name }} now" onclick="displayPluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
+                                <button class="edit-button plugin-display-btn" type="button" title="Display Now" aria-label="Display {{ plugin_instance.name }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                 </button>
-                                <button class="delete-button" type="button" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}" onclick="deletePluginInstance('{{ playlist.name }}', '{{ plugin_instance.plugin_id }}','{{ plugin_instance.name }}')">
+                                <button class="delete-button delete-instance-btn" type="button" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
                                     {{ icon('trash', 'action-icon') | safe }}
                                 </button>
                             </div>
@@ -497,7 +496,7 @@
     <!-- Schedule Configuration Modal -->
     <div id="playlistModal" class="modal">
         <div class="modal-content">
-            <span class="close-button" onclick="closeModal()">×</span>
+            <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">×</button>
             <h2 id="modalTitle">New Playlist</h2>
             <div class="separator"></div>
             <form id="scheduleForm" class="settings-form">
@@ -505,7 +504,7 @@
 
                 <div class="form-group">
                     <label for="playlist_name" class="form-label">Playlist Name:</label>
-                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Type something..." required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="playlist-name-error">
+                    <input type="text" id="playlist_name" name="playlist_name" placeholder="Playlist name" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="playlist-name-error">
                     <span id="playlist-name-error" class="validation-message" role="alert"></span>
                 </div>
                 <div class="form-group">
@@ -517,7 +516,7 @@
             </form>
             <div class="buttons-container">
                 <button type="button" class="action-button" id="saveButton">Save</button>
-                <button type="button" class="action-button warn hidden" id="deleteButton" onclick="deletePlaylist()">Delete</button>
+                <button type="button" class="action-button warn hidden" id="deleteButton">Delete</button>
             </div>
         </div>
     </div>
@@ -525,7 +524,7 @@
     <!-- Refresh Settings Modal -->
     <div id="refreshSettingsModal" class="modal">
         <div class="modal-content">
-            <button class="close-button" type="button" aria-label="Close" onclick="closeRefreshModal()">×</button>
+            <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">×</button>
             <h2>Refresh Settings</h2>
             <div class="separator"></div>
             <form id="refreshSettingsForm" class="settings-form">
@@ -533,7 +532,7 @@
                 {% include 'refresh_settings_form.html' %}
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" onclick="saveRefreshSettings()">Save</button>
+                <button type="button" class="action-button" id="saveRefreshSettingsBtn">Save</button>
             </div>
         </div>
     </div>
@@ -544,10 +543,11 @@
     <!-- Thumbnail Preview Modal -->
     <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal">
         <div class="thumbnail-preview-content playlist-thumbnail-content">
-            <span class="thumbnail-preview-close" onclick="closeThumbnailPreview()">×</span>
+            <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">×</button>
             <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">
             <div class="thumbnail-preview-info playlist-thumbnail-info" id="thumbnailPreviewInfo"></div>
         </div>
     </div>
+    </main>
 </body>
 </html>
