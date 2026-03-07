@@ -70,12 +70,28 @@ class DisplayManager:
     # limit are pruned after each new save. Override via INKYPI_HISTORY_MAX_ENTRIES.
     HISTORY_MAX_ENTRIES = int(os.getenv("INKYPI_HISTORY_MAX_ENTRIES", "500") or "500")
 
+    # Approximate count of history entries to avoid scanning the directory on
+    # every save.  Reset to None to force a recount on the next prune cycle.
+    _history_count_estimate = None
+
     def _prune_history(self, history_dir):
-        """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES."""
+        """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
+
+        Uses an in-memory count estimate to skip the directory scan when the
+        count is clearly below the limit.  The estimate is refreshed whenever
+        an actual scan is performed.
+        """
+        if (
+            self._history_count_estimate is not None
+            and self._history_count_estimate < self.HISTORY_MAX_ENTRIES
+        ):
+            self._history_count_estimate += 1
+            return
         try:
             png_files = sorted(
                 (f for f in os.listdir(history_dir) if f.endswith(".png")),
             )
+            self._history_count_estimate = len(png_files)
             excess = len(png_files) - self.HISTORY_MAX_ENTRIES
             if excess <= 0:
                 return
@@ -87,6 +103,7 @@ class DisplayManager:
                         os.remove(path)
                     except FileNotFoundError:
                         pass
+            self._history_count_estimate = len(png_files) - excess
             logger.info("Pruned %d old history entries (max %d)", excess, self.HISTORY_MAX_ENTRIES)
         except OSError:
             logger.debug("Could not prune history directory", exc_info=True)
@@ -107,7 +124,7 @@ class DisplayManager:
                 base_name = f"{base_name}_{suffix}"
                 png_path = os.path.join(history_dir, f"{base_name}.png")
 
-            processed_image.save(png_path)
+            processed_image.save(png_path, optimize=True)
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save history snapshot image")
             return
@@ -145,7 +162,7 @@ class DisplayManager:
         # Save the raw image
         logger.info(f"Saving image to {self.device_config.current_image_file}")
         try:
-            image.save(self.device_config.current_image_file)
+            image.save(self.device_config.current_image_file, optimize=True)
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save current image preview")
 
@@ -162,7 +179,7 @@ class DisplayManager:
             image, self.device_config.get_config("image_settings")
         )
         try:
-            image.save(self.device_config.processed_image_file)
+            image.save(self.device_config.processed_image_file, optimize=True)
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save processed image preview")
         self._save_history_entry(image, history_meta=history_meta)
@@ -176,6 +193,6 @@ class DisplayManager:
 
         with Image.open(image_path) as img:
             image = img.copy()
-        image.save(self.device_config.current_image_file)
-        image.save(self.device_config.processed_image_file)
+        image.save(self.device_config.current_image_file, optimize=True)
+        image.save(self.device_config.processed_image_file, optimize=True)
         self.display.display_image(image, [])
