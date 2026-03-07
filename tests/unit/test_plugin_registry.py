@@ -6,11 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from plugins.plugin_registry import PLUGIN_CLASSES, get_plugin_instance, load_plugins
+from plugins.plugin_registry import (
+    PLUGIN_CLASSES,
+    _PLUGIN_CONFIGS,
+    get_plugin_instance,
+    get_registered_plugin_ids,
+    load_plugins,
+)
 
 
 def test_load_and_get_plugin_instance():
     PLUGIN_CLASSES.clear()
+    _PLUGIN_CONFIGS.clear()
     plugins = [
         {"id": "ai_text", "class": "AIText"},
         {"id": "ai_image", "class": "AIImage"},
@@ -18,12 +25,15 @@ def test_load_and_get_plugin_instance():
     ]
 
     load_plugins(plugins)
-    assert "ai_text" in PLUGIN_CLASSES
-    assert "ai_image" in PLUGIN_CLASSES
-    assert "apod" in PLUGIN_CLASSES
+    registered = get_registered_plugin_ids()
+    assert "ai_text" in registered
+    assert "ai_image" in registered
+    assert "apod" in registered
 
     inst = get_plugin_instance(plugins[0])
     assert inst.get_plugin_id() == "ai_text"
+    # After first access, instance should be cached
+    assert "ai_text" in PLUGIN_CLASSES
 
 
 def _repo_root() -> Path:

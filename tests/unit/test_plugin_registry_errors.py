@@ -1,7 +1,13 @@
 # pyright: reportMissingImports=false
 import logging
 
-from plugins.plugin_registry import PLUGIN_CLASSES, get_plugin_instance, load_plugins
+from plugins.plugin_registry import (
+    PLUGIN_CLASSES,
+    _PLUGIN_CONFIGS,
+    get_plugin_instance,
+    get_registered_plugin_ids,
+    load_plugins,
+)
 
 
 def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
@@ -10,14 +16,16 @@ def test_load_plugins_skips_disabled_and_missing_paths(monkeypatch, tmp_path):
     (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
 
     PLUGIN_CLASSES.clear()
+    _PLUGIN_CONFIGS.clear()
     plugins = [
         {"id": "nonexistent", "class": "X"},
         {"id": "skipme", "class": "X", "disabled": True},
     ]
     load_plugins(plugins)
 
-    assert "nonexistent" not in PLUGIN_CLASSES
-    assert "skipme" not in PLUGIN_CLASSES
+    registered = get_registered_plugin_ids()
+    assert "nonexistent" not in registered
+    assert "skipme" not in registered
 
 
 def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
@@ -25,6 +33,7 @@ def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
     (tmp_path / "plugins").mkdir(parents=True, exist_ok=True)
 
     PLUGIN_CLASSES.clear()
+    _PLUGIN_CONFIGS.clear()
     plugins = [{"id": "missing", "class": "X"}]
     with caplog.at_level(logging.ERROR, logger="plugins.plugin_registry"):
         load_plugins(plugins)
@@ -38,6 +47,7 @@ def test_load_plugins_logs_error_for_missing_dir(monkeypatch, tmp_path, caplog):
 
 def test_get_plugin_instance_raises_for_unregistered():
     PLUGIN_CLASSES.clear()
+    _PLUGIN_CONFIGS.clear()
     try:
         get_plugin_instance({"id": "unknown"})
         assert False, "Expected ValueError"

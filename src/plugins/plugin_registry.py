@@ -11,6 +11,7 @@ from utils.app_utils import resolve_path
 logger = logging.getLogger("plugins.plugin_registry")
 PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
+_PLUGIN_CONFIGS = {}
 _LAST_HOT_RELOAD: dict | None = None
 
 
@@ -51,6 +52,11 @@ def _load_single_plugin_instance(plugin_config):
 
 
 def load_plugins(plugins_config):
+    """Validate plugin directories and register configs for lazy loading.
+
+    Plugin modules are not imported until first use via get_plugin_instance(),
+    reducing startup memory and time on low-resource devices.
+    """
     plugins_module_path = Path(resolve_path(PLUGINS_DIR))
     for plugin in plugins_config:
         plugin_id = plugin.get("id")
@@ -76,14 +82,9 @@ def load_plugins(plugins_config):
             )
             continue
 
-        # In dev mode, instances will be re-created on demand to enable hot reload.
-        # In non-dev, pre-load and cache instances for performance.
-        if not _is_dev_mode():
-            try:
-                PLUGIN_CLASSES[plugin_id] = _load_single_plugin_instance(plugin)
-            except Exception:
-                # Error already logged by loader; continue to next plugin
-                continue
+        # Store config for lazy loading; actual import deferred to get_plugin_instance()
+        _PLUGIN_CONFIGS[plugin_id] = plugin
+        logger.debug(f"Registered plugin '{plugin_id}' for lazy loading")
 
 
 def get_plugin_instance(plugin_config):
@@ -98,8 +99,19 @@ def get_plugin_instance(plugin_config):
     if instance:
         return instance
 
-    # Match legacy behavior: if a plugin wasn't preloaded, treat as unregistered
+    # Lazy load: import and cache on first use
+    stored_config = _PLUGIN_CONFIGS.get(plugin_id)
+    if stored_config:
+        instance = _load_single_plugin_instance(stored_config)
+        PLUGIN_CLASSES[plugin_id] = instance
+        return instance
+
     raise ValueError(f"Plugin '{plugin_id}' is not registered.")
+
+
+def get_registered_plugin_ids():
+    """Return the set of plugin IDs that are registered (loaded or pending lazy load)."""
+    return set(PLUGIN_CLASSES) | set(_PLUGIN_CONFIGS)
 
 
 def pop_hot_reload_info():
