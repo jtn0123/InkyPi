@@ -1,10 +1,35 @@
 (function () {
   function createDashboardPage(config) {
     let lastImageHash = config.imageHash;
+    const desktopPreviewQuery =
+      window.matchMedia &&
+      window.matchMedia("(hover: hover) and (pointer: fine)");
 
     function setHidden(node, hidden) {
       if (!node) return;
       node.hidden = hidden;
+    }
+
+    function canUseNativePreview() {
+      return !!(desktopPreviewQuery && desktopPreviewQuery.matches);
+    }
+
+    function syncPreviewMode(container, previewImg) {
+      if (!container || !previewImg) return;
+      const allowNative = canUseNativePreview();
+      container.classList.toggle("native-preview-enabled", allowNative);
+      if (!allowNative && container.classList.contains("native")) {
+        container.classList.remove("native");
+        previewImg.style.width = "";
+        previewImg.style.height = "";
+      }
+
+      const copy = document.getElementById("dashboardStageCopy");
+      if (copy) {
+        copy.textContent = allowNative
+          ? "Click the preview to inspect it in the lightbox. On desktop, double-click to toggle native pixels."
+          : "Tap the preview to inspect it in the lightbox.";
+      }
     }
 
     function renderMeta(info) {
@@ -120,9 +145,13 @@
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
       const container = previewImg && previewImg.parentElement;
+      const hidePreviewSkeleton = () => setHidden(previewSkel, true);
       if (previewImg) {
-        previewImg.addEventListener("load", () => setHidden(previewSkel, true));
-        previewImg.addEventListener("error", () => setHidden(previewSkel, true));
+        previewImg.addEventListener("load", hidePreviewSkeleton);
+        previewImg.addEventListener("error", hidePreviewSkeleton);
+        if (previewImg.complete && previewImg.naturalWidth > 0) {
+          hidePreviewSkeleton();
+        }
         previewImg.addEventListener("click", () => {
           if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt);
         });
@@ -130,7 +159,9 @@
       if (previewImg && container) {
         const nativeWidth = previewImg.dataset.nativeWidth || config.resolution[0];
         const nativeHeight = previewImg.dataset.nativeHeight || config.resolution[1];
+        syncPreviewMode(container, previewImg);
         previewImg.addEventListener("dblclick", (event) => {
+          if (!canUseNativePreview()) return;
           event.preventDefault();
           container.classList.toggle("native");
           if (container.classList.contains("native")) {
@@ -141,6 +172,10 @@
             previewImg.style.height = "";
           }
         });
+        if (desktopPreviewQuery && typeof desktopPreviewQuery.addEventListener === "function") {
+          desktopPreviewQuery.addEventListener("change", () => syncPreviewMode(container, previewImg));
+        }
+        window.addEventListener("resize", () => syncPreviewMode(container, previewImg));
       }
     }
 

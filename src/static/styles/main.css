@@ -4335,19 +4335,40 @@ body.modal-open {
 
 .dashboard-stage .image-container {
   width: 100%;
-  max-width: 100%;
+  max-width: min(100%, 50rem);
+  margin: 0 auto;
   padding: 0;
+  aspect-ratio: 5 / 3;
+  min-height: unset;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
 }
 
 .dashboard-stage .image-container img {
   width: 100%;
-  max-width: min(100%, 28rem);
-  max-height: min(55vh, 30rem);
+  max-width: 100%;
+  height: 100%;
+  max-height: none;
   object-fit: contain;
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-stage .image-container .img-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
   border-radius: 10px;
 }
 
 .dashboard-stage .image-container.native {
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
   max-height: min(58vh, 32rem);
   overflow: auto;
   padding-bottom: 4px;
@@ -4355,7 +4376,17 @@ body.modal-open {
 
 .dashboard-stage .image-container.native img {
   width: auto;
+  height: auto;
+  width: auto;
   max-width: none;
+}
+
+.dashboard-stage .image-container:not(.native-preview-enabled) {
+  overflow: hidden;
+}
+
+.dashboard-stage .image-container:not(.native-preview-enabled) img {
+  cursor: zoom-in;
 }
 
 .settings-grid {
@@ -4797,13 +4828,27 @@ main[data-page-shell="workflow"] .frame {
         grid-template-columns: 1fr;
     }
 
-    .dashboard-stage .image-container img {
-        max-height: min(46vh, 22rem);
-    }
+  .dashboard-stage .image-container img {
+    max-height: none;
+  }
 
-    .dashboard-stage .image-container.native {
-        max-height: min(48vh, 24rem);
-    }
+  .dashboard-stage .image-container {
+    max-width: 100%;
+  }
+
+  .dashboard-stage .image-container.native {
+    max-height: min(48vh, 24rem);
+  }
+
+  .dashboard-stage .image-container.native,
+  .dashboard-stage .image-container.native-preview-enabled {
+    overflow: hidden;
+  }
+
+  .dashboard-stage .image-container.native img {
+    width: 100%;
+    max-width: min(100%, 28rem);
+  }
 
     .status-row {
         flex-direction: column;
