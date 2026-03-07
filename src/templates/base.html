@@ -6,7 +6,7 @@
     <title>{% block title %}InkyPi{% endblock %}</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/main.css') }}">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>
 <body>
