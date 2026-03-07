@@ -400,4 +400,7 @@ install_app_service
 echo "Update JS and CSS files"
 bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
 
+echo "Building minified CSS bundle"
+"$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify > /dev/null && echo_success "CSS bundle built."
+
 ask_for_reboot
