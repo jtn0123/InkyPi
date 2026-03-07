@@ -231,6 +231,7 @@ jobs:
         env:
           INKYPI_ENV: dev
           INKYPI_NO_REFRESH: ${{ matrix.mode == 'web-only' && '1' || '0' }}
+          INKYPI_PLUGIN_TIMEOUT_S: '120'
           PYTHONPATH: src
         run: |
           if [ "${{ matrix.mode }}" = "web-only" ]; then
@@ -252,7 +253,7 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/health/plugins >/dev/null
           curl -fsS http://127.0.0.1:8080/api/benchmarks/summary >/dev/null
           curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/update_now >/dev/null
+          curl -fsS --max-time 130 -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/update_now >/dev/null
           kill $PID 2>/dev/null || true
 
   browser-smoke:
