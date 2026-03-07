@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, option, row, schema, section
 from PIL import Image
 from io import BytesIO
 import feedparser
@@ -17,6 +18,47 @@ FONT_SIZES = {
 }
 
 class Rss(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Feed",
+                row(
+                    field("title", label="Title", placeholder="News Digest", required=True),
+                    field(
+                        "includeImages",
+                        "checkbox",
+                        label="Include Images",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
+                    field(
+                        "fontSize",
+                        "select",
+                        label="Font Size",
+                        default="normal",
+                        options=[
+                            option("x-small", "Extra Small"),
+                            option("small", "Small"),
+                            option("normal", "Normal"),
+                            option("large", "Large"),
+                            option("x-large", "Extra Large"),
+                        ],
+                    ),
+                ),
+                field(
+                    "feedUrl",
+                    label="RSS Feed URL",
+                    placeholder="https://example.com/feed.xml",
+                    required=True,
+                ),
+                callout(
+                    "Only use trusted RSS feeds. Untrusted URLs can introduce security and reliability risks.",
+                    tone="warning",
+                ),
+            )
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['style_settings'] = True

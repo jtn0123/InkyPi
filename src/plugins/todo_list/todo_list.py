@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
 from PIL import Image
 from io import BytesIO
 import requests
@@ -15,6 +16,47 @@ FONT_SIZES = {
 }
 
 class TodoList(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "List Settings",
+                row(
+                    field("title", label="Title", placeholder="Tasks"),
+                    field(
+                        "listStyle",
+                        "select",
+                        label="List Style",
+                        default="disc",
+                        options=[
+                            option("disc", "Disc (●)"),
+                            option("square", "Square (◼)"),
+                            option("'\\25C6  '", "Diamond (◆)"),
+                            option("decimal", "Decimal"),
+                            option("lower-roman", "Roman Numeral"),
+                            option("lower-alpha", "Alphabetical"),
+                        ],
+                    ),
+                    field(
+                        "fontSize",
+                        "select",
+                        label="Font Size",
+                        default="normal",
+                        options=[
+                            option("x-small", "Extra Small"),
+                            option("small", "Small"),
+                            option("normal", "Normal"),
+                            option("large", "Large"),
+                            option("x-large", "Extra Large"),
+                        ],
+                    ),
+                ),
+            ),
+            section(
+                "Lists",
+                widget("todo-repeater", template="widgets/todo_repeater.html"),
+            ),
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['style_settings'] = True

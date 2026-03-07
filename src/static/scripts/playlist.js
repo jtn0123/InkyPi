@@ -13,6 +13,29 @@
 
 (function(){
     const C = window.PLAYLIST_CTX || {};
+    const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
+    const state = {
+        expandedPlaylist: null,
+        currentEditPlaylist: "",
+        currentEditPluginId: "",
+        currentEditInstance: "",
+    };
+    let playlistRefreshManager = null;
+
+    function syncModalOpenState(){
+        const openModal = document.querySelector('.modal.is-open, .thumbnail-preview-modal.is-open');
+        document.body.classList.toggle('modal-open', !!openModal);
+    }
+
+    function setModalOpen(modalId, open){
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        modal.hidden = !open;
+        modal.style.display = open ? 'flex' : 'none';
+        modal.classList.toggle('is-open', open);
+        syncModalOpenState();
+    }
+
     function buildProgressKey(ctx){
         try {
             if (ctx && ctx.page === 'playlist'){
@@ -23,6 +46,126 @@
             }
         } catch(e){}
         return 'INKYPI_LAST_PROGRESS';
+    }
+
+    function setPlaylistExpanded(item, expanded){
+        const body = item?.querySelector('[data-playlist-body]');
+        const toggle = item?.querySelector('[data-playlist-toggle]');
+        if (!item || !body || !toggle) return;
+
+        if (!mobileQuery.matches){
+            body.hidden = false;
+            item.classList.add('mobile-expanded');
+            item.classList.remove('mobile-collapsed');
+            toggle.textContent = 'Open';
+            toggle.setAttribute('aria-expanded', 'true');
+            return;
+        }
+
+        body.hidden = !expanded;
+        item.classList.toggle('mobile-expanded', expanded);
+        item.classList.toggle('mobile-collapsed', !expanded);
+        toggle.textContent = expanded ? 'Hide' : 'Open';
+        toggle.setAttribute('aria-expanded', String(expanded));
+        if (expanded){
+            state.expandedPlaylist = item.getAttribute('data-playlist-name');
+        }
+    }
+
+    function syncPlaylistCards(){
+        const items = Array.from(document.querySelectorAll('[data-playlist-card]'));
+        if (!items.length) return;
+        if (!mobileQuery.matches){
+            items.forEach((item) => setPlaylistExpanded(item, true));
+            return;
+        }
+        const preferred = state.expandedPlaylist
+            || items.find((item) => item.classList.contains('active'))?.getAttribute('data-playlist-name')
+            || items[0].getAttribute('data-playlist-name');
+        items.forEach((item) => {
+            const isExpanded = item.getAttribute('data-playlist-name') === preferred;
+            setPlaylistExpanded(item, isExpanded);
+        });
+    }
+
+    function togglePlaylistCard(button){
+        const item = button.closest('[data-playlist-card]');
+        if (!item) return;
+        const willExpand = item.classList.contains('mobile-collapsed') || !mobileQuery.matches;
+        if (mobileQuery.matches && willExpand){
+            document.querySelectorAll('[data-playlist-card]').forEach((card) => {
+                if (card !== item) setPlaylistExpanded(card, false);
+            });
+        }
+        setPlaylistExpanded(item, willExpand);
+    }
+
+    function showThumbnailPreview(playlistName, pluginId, pluginName, instanceName) {
+        const img = document.getElementById('thumbnailPreviewImage');
+        const info = document.getElementById('thumbnailPreviewInfo');
+        if (!img || !info) return;
+        img.src = `/plugin_instance_image/${encodeURIComponent(playlistName)}/${encodeURIComponent(pluginId)}/${encodeURIComponent(instanceName)}`;
+        info.textContent = `Plugin: ${pluginName} | Instance: ${instanceName}`;
+        setModalOpen('thumbnailPreviewModal', true);
+    }
+
+    function closeThumbnailPreview() {
+        setModalOpen('thumbnailPreviewModal', false);
+    }
+
+    function openRefreshModal(playlistName, pluginId, instanceName, refreshSettings) {
+        state.currentEditPlaylist = playlistName;
+        state.currentEditPluginId = pluginId;
+        state.currentEditInstance = instanceName;
+        if (!playlistRefreshManager && typeof window.createRefreshSettingsManager === 'function') {
+            playlistRefreshManager = window.createRefreshSettingsManager('refreshSettingsModal', 'modal');
+        }
+        if (playlistRefreshManager) {
+            playlistRefreshManager.open({ refreshSettings });
+            const modal = document.getElementById('refreshSettingsModal');
+            if (modal) {
+                modal.hidden = false;
+                modal.classList.add('is-open');
+                syncModalOpenState();
+            }
+        } else {
+            setModalOpen('refreshSettingsModal', true);
+        }
+    }
+
+    function closeRefreshModal() {
+        if (playlistRefreshManager) {
+            playlistRefreshManager.close();
+            const modal = document.getElementById('refreshSettingsModal');
+            if (modal) {
+                modal.hidden = true;
+                modal.classList.remove('is-open');
+                syncModalOpenState();
+            }
+        } else {
+            setModalOpen('refreshSettingsModal', false);
+        }
+    }
+
+    async function saveRefreshSettings() {
+        if (!playlistRefreshManager) return;
+        await playlistRefreshManager.submit(async (formData) => {
+            const data = new FormData();
+            data.append('plugin_id', state.currentEditPluginId);
+            data.append('refresh_settings', JSON.stringify(formData));
+            const encodedInstance = encodeURIComponent(state.currentEditInstance);
+            const response = await fetch(C.update_instance_base_url + encodedInstance, {
+                method: 'PUT',
+                body: data
+            });
+            const result = await response.json();
+            if (response.ok) {
+                sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
+                location.reload();
+            } else {
+                throw new Error(result.error || 'Failed to update refresh settings');
+            }
+        });
     }
 
     // Drag-and-drop reordering support
@@ -235,17 +378,21 @@
     }
 
     function openCreateModal() {
+        const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "New Playlist";
         document.getElementById("playlist_name").value = "";
         document.getElementById("editingPlaylistName").value = "";
         document.getElementById("start_time").value = "00:00";
         document.getElementById("end_time").value = "24:00";
-        document.getElementById("saveButton").setAttribute("onclick", "createPlaylist()")
+        const cycleInput = document.getElementById('cycle_minutes');
+        if (cycleInput) cycleInput.value = "";
+        if (modal) modal.dataset.mode = "create";
         document.getElementById("deleteButton").classList.add("hidden");
-        document.getElementById("playlistModal").style.display = "block";
+        setModalOpen("playlistModal", true);
     }
 
     function openEditModal(playlistName, startTime, endTime, cycleMinutes) {
+        const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "Update Playlist";
         document.getElementById("playlist_name").value = playlistName;
         document.getElementById("editingPlaylistName").value = playlistName;
@@ -253,13 +400,13 @@
         document.getElementById("end_time").value = endTime;
         const cycleInput = document.getElementById('cycle_minutes');
         if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
-        document.getElementById("saveButton").setAttribute("onclick", "updatePlaylist()")
+        if (modal) modal.dataset.mode = "edit";
         document.getElementById("deleteButton").classList.remove("hidden");
-        document.getElementById("playlistModal").style.display = "block";
+        setModalOpen("playlistModal", true);
     }
 
-    function openModal() { const modal = document.getElementById('playlistModal'); modal.style.display = 'block'; }
-    function closeModal() { const modal = document.getElementById('playlistModal'); modal.style.display = 'none'; }
+    function openModal() { setModalOpen('playlistModal', true); }
+    function closeModal() { setModalOpen('playlistModal', false); }
 
     // Device cadence modal helpers
     function openDeviceCycleModal(){
@@ -271,8 +418,7 @@
         if (m) m.style.display = 'block';
     }
     function closeDeviceCycleModal(){
-        const m = document.getElementById('deviceCycleModal');
-        if (m) m.style.display = 'none';
+        setModalOpen('deviceCycleModal', false);
     }
     async function saveDeviceCycle(){
         const input = document.getElementById('device_cycle_minutes');
@@ -396,6 +542,21 @@
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
         if (newBtn){ newBtn.addEventListener('click', () => openCreateModal()); }
+        document.querySelectorAll('[data-playlist-toggle]').forEach((button) => {
+            button.addEventListener('click', () => togglePlaylistCard(button));
+        });
+        const saveBtn = document.getElementById('saveButton');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                const mode = document.getElementById("playlistModal")?.dataset.mode || "create";
+                if (mode === "edit") updatePlaylist(); else createPlaylist();
+            });
+        }
+        document.getElementById('deleteButton')?.addEventListener('click', deletePlaylist);
+        document.getElementById('closePlaylistModalBtn')?.addEventListener('click', closeModal);
+        document.getElementById('closeRefreshModalBtn')?.addEventListener('click', closeRefreshModal);
+        document.getElementById('saveRefreshSettingsBtn')?.addEventListener('click', saveRefreshSettings);
+        document.getElementById('closeThumbnailPreviewBtn')?.addEventListener('click', closeThumbnailPreview);
         document.querySelectorAll('.edit-playlist-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const el = e.currentTarget;
@@ -428,6 +589,34 @@
             btn.addEventListener('click', (e) => {
                 const t = e.currentTarget;
                 displayPluginInstance(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
+            });
+        });
+        document.querySelectorAll('.plugin-thumbnail-container').forEach(box => {
+            box.addEventListener('click', (event) => {
+                const t = event.currentTarget;
+                showThumbnailPreview(
+                    t.getAttribute('data-thumbnail-playlist'),
+                    t.getAttribute('data-thumbnail-plugin'),
+                    t.getAttribute('data-thumbnail-display-name'),
+                    t.getAttribute('data-thumbnail-instance')
+                );
+            });
+            box.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    box.click();
+                }
+            });
+        });
+        document.querySelectorAll('.plugin-thumbnail').forEach((img) => {
+            img.addEventListener('load', () => {
+                const skeleton = img.previousElementSibling;
+                if (skeleton) skeleton.style.display = 'none';
+                img.hidden = false;
+            });
+            img.addEventListener('error', () => {
+                const container = img.closest('.plugin-thumbnail-container');
+                if (container) container.hidden = true;
             });
         });
         
@@ -500,6 +689,15 @@
             setInterval(renderNextIn, 60000);
             renderNextIn();
         } catch(e) { /* ignore */ }
+        syncPlaylistCards();
+        if (mobileQuery && typeof mobileQuery.addEventListener === 'function'){
+            mobileQuery.addEventListener('change', syncPlaylistCards);
+        }
+        window.addEventListener('click', (event) => {
+            if (event.target?.id === 'playlistModal') closeModal();
+            if (event.target?.id === 'refreshSettingsModal') closeRefreshModal();
+            if (event.target?.id === 'thumbnailPreviewModal') closeThumbnailPreview();
+        });
     }
 
     if (document.readyState === 'loading'){
@@ -558,6 +756,11 @@
         } catch(e){}
     }
     window.showLastProgressGlobal = showLastProgressGlobal;
+    window.showThumbnailPreview = showThumbnailPreview;
+    window.closeThumbnailPreview = closeThumbnailPreview;
+    window.openRefreshModal = openRefreshModal;
+    window.closeRefreshModal = closeRefreshModal;
+    window.saveRefreshSettings = saveRefreshSettings;
 
     window.openCreateModal = openCreateModal;
     window.openEditModal = openEditModal;

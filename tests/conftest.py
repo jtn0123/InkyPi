@@ -2,9 +2,11 @@
 import json
 import os
 import sys
+import threading
 
 import pytest
 from PIL import Image
+from werkzeug.serving import make_server
 
 # Ensure both project root (for `src.*` imports) and src/ (for top-level `utils`, `display`) are on sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -15,6 +17,7 @@ if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
 # Auto-skip UI/a11y tests when Playwright browsers are unavailable
+_require_browser_smoke = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
 try:  # pragma: no cover - best effort detection
     from playwright.sync_api import sync_playwright
 
@@ -26,9 +29,19 @@ try:  # pragma: no cover - best effort detection
         except Exception:
             _has_browser = False
     if not _has_browser:
+        if _require_browser_smoke:
+            raise RuntimeError(
+                "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
+                "Install browsers with `playwright install chromium`."
+            )
         os.environ.setdefault("SKIP_A11Y", "true")
         os.environ.setdefault("SKIP_UI", "true")
 except Exception:
+    if _require_browser_smoke:
+        raise RuntimeError(
+            "REQUIRE_BROWSER_SMOKE=1 but Playwright is unavailable. "
+            "Install dev dependencies and `playwright install chromium`."
+        )
     os.environ.setdefault("SKIP_A11Y", "true")
     os.environ.setdefault("SKIP_UI", "true")
 
@@ -234,3 +247,18 @@ def flask_app(device_config_dev, monkeypatch):
 @pytest.fixture()
 def client(flask_app):
     return flask_app.test_client()
+
+
+@pytest.fixture()
+def live_server(flask_app, free_tcp_port_factory):
+    host = "127.0.0.1"
+    port = free_tcp_port_factory()
+    server = make_server(host, port, flask_app, threaded=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)

@@ -111,14 +111,28 @@ class BasePlugin:
         except Exception:
             return self.to_file_url(path)
 
-    def generate_settings_template(self):
-        template_params = {"settings_template": "base_plugin/settings.html", "style_settings": True}
+    def build_settings_schema(self):
+        """Return a declarative settings schema for shared rendering.
 
-        settings_path = self.get_plugin_dir("settings.html")
-        if Path(settings_path).is_file():
-            template_params["settings_template"] = (
-                f"{self.get_plugin_id()}/settings.html"
-            )
+        Plugins can override this instead of shipping a bespoke settings.html
+        when their UI can be expressed with the shared field system.
+        """
+        return None
+
+    def generate_settings_template(self):
+        template_params = {"style_settings": True}
+
+        settings_schema = self.build_settings_schema()
+        if settings_schema:
+            template_params["settings_schema"] = settings_schema
+        else:
+            template_params["settings_template"] = "base_plugin/settings.html"
+
+            settings_path = self.get_plugin_dir("settings.html")
+            if Path(settings_path).is_file():
+                template_params["settings_template"] = (
+                    f"{self.get_plugin_id()}/settings.html"
+                )
 
         template_params["frame_styles"] = FRAME_STYLES
         return template_params

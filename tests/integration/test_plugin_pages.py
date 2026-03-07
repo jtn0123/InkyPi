@@ -5,6 +5,7 @@ def test_plugin_page_ai_text(client):
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b"AI Text" in resp.data
+    assert b"ai_text" in resp.data
     # preview image present
     assert b"/preview" in resp.data
 
@@ -23,11 +24,107 @@ def test_plugin_page_apod(client):
     assert b"/preview" in resp.data
 
 
+def test_schema_backed_plugin_pages_use_shared_renderer(client):
+    for plugin_id in (
+        "ai_text",
+        "ai_image",
+        "apod",
+        "comic",
+        "countdown",
+        "unsplash",
+        "image_folder",
+        "image_album",
+    ):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert 'data-settings-schema' in body
+
+
+def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
+    for plugin_id in (
+        "image_url",
+        "rss",
+        "screenshot",
+        "wpotd",
+        "github",
+        "clock",
+        "newspaper",
+        "calendar",
+        "todo_list",
+        "weather",
+        "image_upload",
+    ):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert 'data-settings-schema' in body
+
+
+def test_ai_image_page_uses_shared_select_dependency_renderer(client):
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'data-options-source-field="imageModel"' in body
+    assert "toggleQualityDropdown" not in body
+
+
+def test_apod_page_uses_shared_visibility_rules(client):
+    resp = client.get("/plugin/apod")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'data-visible-if-field="randomizeApod"' in body
+    assert "toggleDateField" not in body
+
+
+def test_weather_plugin_second_pass_polish(client):
+    resp = client.get("/plugin/weather")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert "settings-card-title\">Location" in body
+    assert "settings-card-title\">Display" in body
+    assert "toggle-item" in body
+    assert "radio-segment" in body
+    assert "settings-map" in body
+    assert 'data-hybrid-widget="weather-map"' in body
+
+
+def test_todo_list_plugin_uses_svg_delete_icon(client):
+    resp = client.get("/plugin/todo_list")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert "dynamic-list-toolbar" in body
+    assert "ph-trash" in body
+    assert "remove.png" not in body
+
+
+def test_url_based_plugins_use_warning_callouts(client):
+    for plugin_id in ("rss", "screenshot", "image_url"):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        assert "settings-callout warning" in body
+
+
+def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
+    resp = client.get("/plugin/github")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert 'id="repositoryGroup"' in body
+    repository_group = body.split('id="repositoryGroup"', 1)[1][:200]
+    assert "hidden" in repository_group
+    assert 'id="repositoryGroup" style="display: none;"' not in body
+    assert 'data-visible-if-field="githubType"' in body
+
+
 def test_preview_size_mode_native_on_plugin(client, device_config_dev):
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
-    assert b'style="width: ' in resp.data and b"height: " in resp.data
+    assert b'data-native-width="' in resp.data and b'data-native-height="' in resp.data
 
 
 def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
@@ -35,6 +132,7 @@ def test_preview_size_mode_fit_on_plugin(client, device_config_dev):
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 200
     assert b'id="previewImage" style=' not in resp.data
+    assert b'data-page-shell="workflow"' in resp.data
 
 
 def test_plugin_page_status_bar_present(client):

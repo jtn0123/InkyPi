@@ -1,0 +1,29 @@
+{% from 'macros/icons.html' import icon %}
+
+{% set calendar_urls = plugin_settings.get('calendarURLs[]', ['']) if plugin_settings else [''] %}
+{% set calendar_colors = plugin_settings.get('calendarColors[]', ['#007BFF']) if plugin_settings else ['#007BFF'] %}
+
+<div class="dynamic-list" data-repeater-list>
+    {% for idx in range(calendar_urls | length) %}
+    <div class="dynamic-list-item compact-repeater compact-repeater-calendar">
+        <div class="dynamic-list-toolbar compact-repeater-toolbar">
+            <input
+                type="text"
+                name="calendarURLs[]"
+                class="form-input"
+                placeholder="Calendar URL"
+                value="{{ calendar_urls[idx] }}"
+                required
+            >
+            <button type="button" class="remove-btn icon-button" aria-label="Remove calendar">
+                {{ icon('trash', 'action-icon') | safe }}
+            </button>
+        </div>
+        <label class="dynamic-list-color-group">
+            <span>Color</span>
+            <input type="color" name="calendarColors[]" class="color-picker" value="{{ calendar_colors[idx] if idx < (calendar_colors | length) else '#007BFF' }}">
+        </label>
+    </div>
+    {% endfor %}
+</div>
+<button type="button" class="action-button compact is-secondary" data-repeater-add>Add Calendar</button>

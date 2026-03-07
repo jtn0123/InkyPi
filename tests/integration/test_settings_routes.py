@@ -6,6 +6,8 @@ def test_get_settings_page(client):
     assert resp.status_code == 200
     # Basic UI markers
     assert b"Settings" in resp.data or b"Time Zone" in resp.data
+    assert b'data-page-shell="management"' in resp.data
+    assert b'data-settings-tab="device"' in resp.data
 
 
 def test_save_settings_validation_errors(client):

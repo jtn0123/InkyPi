@@ -103,6 +103,41 @@ def test_main_css_contains_live_preview_styles(client):
     assert ".preview-modified" in css_content
 
 
+def test_main_css_contains_workflow_and_management_shells(client):
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+
+    css_content = resp.get_data(as_text=True)
+
+    assert ".workflow-layout" in css_content
+    assert ".workflow-mode-bar" in css_content
+    assert ".dashboard-hero" in css_content
+    assert ".settings-grid" in css_content
+    assert ".logs-viewer" in css_content
+    assert ".settings-console-layout" in css_content
+    assert ".settings-side-nav" in css_content
+    assert ".danger-zone" in css_content
+    assert ".playlist-toggle-button" in css_content
+    assert ".modal-sheet" in css_content
+    assert "body.modal-open" in css_content
+    assert ".title-stack" in css_content
+    assert ".history-card-body" in css_content
+    assert ".compact-repeater" in css_content
+
+
+def test_primary_templates_reduce_inline_handlers():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "src" / "templates"
+    for template_name in ("plugin.html", "settings.html", "inky.html", "history.html", "api_keys.html", "playlist.html"):
+        content = (root / template_name).read_text()
+        assert "onclick=" not in content
+        assert "window.onclick" not in content
+        assert "skip-nav" not in content
+        assert "Skip to main content" not in content
+        assert "Skip to settings content" not in content
+
+
 def test_main_css_contains_enhanced_button_styles(client):
     """Test that main.css contains enhanced button styling."""
     resp = client.get("/static/styles/main.css")
@@ -178,6 +213,16 @@ def test_main_css_contains_theme_variables(client):
 
     # Check for dark theme support
     assert "[data-theme=\"dark\"]" in css_content
+    assert "--primary:" in css_content
+    assert "--primary-hover:" in css_content
+    assert "--text-muted:" in css_content
+    assert "--text-secondary:" in css_content
+    assert "--modal-overlay:" in css_content
+    assert "--modal-bg:" in css_content
+    assert "--border-color:" in css_content
+    assert "--shadow-medium:" in css_content
+    assert "--close-btn-color:" in css_content
+    assert "--close-btn-hover:" in css_content
 
 
 def test_main_css_contains_spacing_improvements(client):
@@ -368,6 +413,8 @@ def test_main_css_contains_enhanced_progress_styles(client):
     assert ".enhanced-progress-details" in css_content
     assert ".enhanced-progress-log" in css_content
     assert ".log-entry" in css_content
+    assert "var(--primary)" in css_content
+    assert "var(--text-muted)" in css_content
 
 
 def test_main_css_contains_api_validation_styles(client):
@@ -397,6 +444,21 @@ def test_main_css_contains_api_validation_styles(client):
 
     # Check for spin animation
     assert "@keyframes spin" in css_content
+    assert "var(--primary-bg)" in css_content
+    assert "var(--text-muted)" in css_content
+
+
+def test_main_css_contains_top_level_theme_normalization_helpers(client):
+    resp = client.get("/static/styles/main.css")
+    assert resp.status_code == 200
+    css_content = resp.get_data(as_text=True)
+
+    assert ".storage-meter" in css_content
+    assert ".storage-meter-fill" in css_content
+    assert ".logs-icon" in css_content
+    assert ".playlist-thumbnail-modal" in css_content
+    assert ".playlist-thumbnail-content" in css_content
+    assert ".playlist-thumbnail-info" in css_content
 
 
 def test_main_css_contains_operation_status_styles(client):

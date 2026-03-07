@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from PIL import Image, ImageDraw, ImageFont
 import logging
 
@@ -8,6 +9,44 @@ from utils.app_utils import get_font
 logger = logging.getLogger(__name__)
 
 class Comic(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                row(
+                    field(
+                        "comic",
+                        "select",
+                        label="Comic",
+                        default="XKCD",
+                        options=[option(comic, comic) for comic in COMICS],
+                    ),
+                    field(
+                        "fontSize",
+                        "select",
+                        label="Caption Size",
+                        default="14",
+                        options=[
+                            option("12", "12"),
+                            option("14", "14"),
+                            option("16", "16"),
+                            option("18", "18"),
+                            option("20", "20"),
+                        ],
+                    ),
+                ),
+                field(
+                    "titleCaption",
+                    "checkbox",
+                    label="Show Title and Caption",
+                    hint="Display the comic title at the top and caption at the bottom when available.",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                ),
+            )
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['comics'] = list(COMICS)

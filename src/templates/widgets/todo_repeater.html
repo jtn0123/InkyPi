@@ -1,0 +1,31 @@
+{% from 'macros/icons.html' import icon %}
+
+{% set list_titles = plugin_settings.get('list-title[]', ['']) if plugin_settings else [''] %}
+{% set list_items = plugin_settings.get('list[]', ['']) if plugin_settings else [''] %}
+{% set item_count = [list_titles | length, list_items | length, 1] | max %}
+
+<div class="dynamic-list" data-repeater-list data-max-items="3">
+    {% for idx in range(item_count) %}
+    <div class="dynamic-list-item compact-repeater compact-repeater-text">
+        <div class="dynamic-list-toolbar compact-repeater-toolbar">
+            <input
+                type="text"
+                name="list-title[]"
+                class="form-input"
+                placeholder="List title"
+                value="{{ list_titles[idx] if idx < (list_titles | length) else '' }}"
+            >
+            <button type="button" class="remove-btn icon-button" aria-label="Remove list">
+                {{ icon('trash', 'action-icon') | safe }}
+            </button>
+        </div>
+        <textarea
+            name="list[]"
+            class="form-input dynamic-list-textarea"
+            rows="5"
+            placeholder="Enter tasks, one per line"
+        >{{ list_items[idx] if idx < (list_items | length) else '' }}</textarea>
+    </div>
+    {% endfor %}
+</div>
+<button type="button" class="action-button compact is-secondary" data-repeater-add>Add List</button>

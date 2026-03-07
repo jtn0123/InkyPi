@@ -1,10 +1,11 @@
 <div class="form-group">
     <label for="url" class="form-label">Image URL:</label>
-    <input type="text" id="url" name="url" placeholder="Type something..." required class="form-input">
+    <input type="text" id="url" name="url" placeholder="https://example.com/image.jpg" required class="form-input">
 </div>
 
-<div class="form-group">
-    <span style="color: var(--text-primary);">Warning: Do not run with untrusted URLs, as it may pose a security risk. This may also fail if the image takes too long to load.</span>
+<div class="settings-callout warning">
+    {{ icon('info', 'icon-image') | safe }}
+    <span>Use trusted image URLs only. Remote images can fail if the source is slow, blocked, or returns unsupported formats.</span>
 </div>
 
 <script>

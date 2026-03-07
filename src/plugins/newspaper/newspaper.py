@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, schema, section, widget
 from datetime import datetime, timedelta
 from utils.image_utils import get_image
 from PIL import Image
@@ -9,6 +10,17 @@ logger = logging.getLogger(__name__)
 
 FREEDOM_FORUM_URL = "https://cdn.freedomforum.org/dfp/jpg{}/lg/{}.jpg"
 class Newspaper(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Source",
+                callout(
+                    "Search by newspaper title or narrow by location. The linked inputs keep the selected edition and its slug in sync.",
+                ),
+                widget("newspaper-search", template="widgets/newspaper_search.html"),
+            )
+        )
+
     def generate_image(self, settings, device_config):
         newspaper_slug = settings.get('newspaperSlug')
 

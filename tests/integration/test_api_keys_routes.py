@@ -5,6 +5,19 @@ from pathlib import Path
 def test_api_keys_page_loads(client):
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'data-page-shell="management"' in body
+    assert "4 providers" in body
+
+
+def test_api_keys_page_shows_configured_count(client, device_config_dev):
+    device_config_dev.set_env_key("NASA_SECRET", "nasa-test-key")
+    device_config_dev.set_env_key("OPEN_AI_SECRET", "openai-test-key")
+
+    resp = client.get("/settings/api-keys")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "2 configured" in body
 
 
 def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):

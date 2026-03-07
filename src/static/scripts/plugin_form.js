@@ -21,11 +21,11 @@
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
     function tickClock(){ try { if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.elapsed) state.els.elapsed.textContent = fmtElapsed(Date.now() - state.t0); } catch(e){} }
-    function setStep(text, pct){ if (state.els.block) state.els.block.style.display = 'block'; if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') state.els.bar.style.width = pct + '%';
+    function setStep(text, pct){ if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') state.els.bar.style.width = pct + '%';
       if (state.els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); state.els.list.appendChild(li); try { state.els.list.scrollTop = state.els.list.scrollHeight; } catch(e){} }
     }
     function start(){ state.t0 = Date.now(); try { if (state.els.list) state.els.list.innerHTML = ''; if (state.els.elapsed) state.els.elapsed.textContent = '0s'; if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.bar) state.els.bar.style.width = '10%'; } catch(e){} tickClock(); state.clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
-    function stop(){ try { if (state.clockTimer) clearInterval(state.clockTimer); } catch(e){} setTimeout(() => { if (state.els.block) state.els.block.style.display = 'none'; }, 2000); }
+    function stop(){ try { if (state.clockTimer) clearInterval(state.clockTimer); } catch(e){} setTimeout(() => { if (state.els.block) { state.els.block.style.display = 'none'; state.els.block.hidden = true; } }, 2000); }
     return { setStep, start, stop };
   }
 
@@ -90,5 +90,4 @@
     sendForm
   };
 })();
-
 

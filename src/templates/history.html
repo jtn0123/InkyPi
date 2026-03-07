@@ -8,85 +8,15 @@
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
-    <script>
-        async function redisplay(filename) {
-            const btn = document.getElementById('btn-' + filename);
-            if (btn) btn.disabled = true;
-            try {
-                const resp = await fetch("{{ url_for('history.history_redisplay') }}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filename })
-                });
-                const result = await resp.json();
-                if (!resp.ok) {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                } else {
-                    showResponseModal('success', `Success! ${result.message}`);
-                }
-            } catch (e) {
-                console.error(e);
-                showResponseModal('failure', 'Failed to redisplay image. Please try again.');
-            } finally {
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        async function deleteImage(filename) {
-            openDeleteHistoryModal(filename);
-        }
-
-        async function clearHistory() { openClearAllHistoryModal(); }
-
-        // Delete modals for History page
-        function openDeleteHistoryModal(filename){
-            const text = document.getElementById('deleteHistoryText');
-            text.textContent = `Delete this image '${filename}'?`;
-            document.getElementById('deleteHistoryModal').style.display = 'block';
-            const btn = document.getElementById('confirmDeleteHistoryBtn');
-            btn.onclick = async function(){
-                try {
-                    const resp = await fetch("{{ url_for('history.history_delete') }}", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename }) });
-                    const result = await resp.json();
-                    if (!resp.ok) {
-                        showResponseModal('failure', `Error!  ${result.error}`);
-                    } else {
-                        sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                        location.reload();
-                    }
-                } catch (e) { console.error(e); showResponseModal('failure', 'Failed to delete image'); }
-                closeDeleteHistoryModal();
-            }
-        }
-        function closeDeleteHistoryModal(){ document.getElementById('deleteHistoryModal').style.display = 'none'; }
-
-        function openClearAllHistoryModal(){
-            document.getElementById('clearHistoryModal').style.display = 'block';
-            const btn = document.getElementById('confirmClearHistoryBtn');
-            btn.onclick = async function(){
-                try {
-                    const resp = await fetch("{{ url_for('history.history_clear') }}", { method: 'POST' });
-                    const result = await resp.json();
-                    if (!resp.ok) {
-                        showResponseModal('failure', `Error!  ${result.error}`);
-                    } else {
-                        sessionStorage.setItem("storedMessage", JSON.stringify({ type: "success", text: `Success! ${result.message}` }));
-                        location.reload();
-                    }
-                } catch (e) { console.error(e); showResponseModal('failure', 'Failed to clear history'); }
-                closeClearHistoryModal();
-            }
-        }
-        function closeClearHistoryModal(){ document.getElementById('clearHistoryModal').style.display = 'none'; }
-    </script>
+    <script src="{{ url_for('static', filename='scripts/history_page.js') }}"></script>
 </head>
 <body>
-    <main>
+    <main class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon %}
         <div class="app-header">
             <div class="header-content">
-                <div style="display:flex;align-items:center;gap:10px;">
+                <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -102,27 +32,30 @@
                         <h1 class="app-title">History</h1>
                     </div>
                 </div>
-                <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
-                    <button class="header-button" onclick="location.reload()">Refresh</button>
-                    <button class="header-button" style="background-color: #c4515b;" onclick="clearHistory()">Clear All</button>
+                <div class="header-actions history-toolbar">
+                    <button id="historyRefreshBtn" class="header-button" type="button">Refresh</button>
                 </div>
             </div>
         </div>
         <div class="separator"></div>
-        {% if metrics %}
-        <div style="padding:8px 16px; font-size: 13px; color: var(--text);">
-            <strong>Last Request:</strong>
-            <span>Request {{ metrics.request_ms or '-' }} ms</span>
-            <span>• Generate {{ metrics.generate_ms or '-' }} ms</span>
-            <span>• Preprocess {{ metrics.preprocess_ms or '-' }} ms</span>
-            <span>• Display {{ metrics.display_ms or '-' }} ms</span>
+        <div class="page-intro">
+            <div class="page-intro-body">
+                <p class="page-subtitle">Review generated images, redisplay successful renders, and clean up storage when the local cache grows too large.</p>
+            </div>
+            <div class="page-summary">
+                <span class="status-chip info">{{ images|length }} items</span>
+                {% if storage and storage.pct_free is not none %}
+                <span class="status-chip">{{ storage.pct_free|round(1) }}% free</span>
+                {% endif %}
+            </div>
         </div>
-        <div class="separator"></div>
-        {% endif %}
-        <div id="storage-block" style="padding: 12px 16px; {% if not storage or storage.pct_free is none %}display:none;{% endif %}">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <div style="font-size:14px;color:var(--text);font-weight:600;">Storage available</div>
-                <div id="storage-text" style="font-size:13px;color:var(--muted);">
+        <div id="storage-block" class="storage-card" {% if not storage or storage.pct_free is none %}hidden{% endif %}>
+            <div class="storage-card-head">
+                <div>
+                    <div class="storage-card-title">Storage available</div>
+                    <div class="storage-card-copy">Track remaining local capacity before the history cache starts competing with new renders.</div>
+                </div>
+                <div id="storage-text" class="storage-card-copy">
                     {% if storage and storage.pct_free is not none %}
                         {{ storage.pct_free|round(2) }}% free • {{ storage.free_gb }} GB remaining of {{ storage.total_gb }} GB total
                     {% else %}
@@ -130,78 +63,84 @@
                     {% endif %}
                 </div>
             </div>
-            <div style="background:#e6e6e6;border-radius:8px;height:14px;overflow:hidden;">
-                <div id="storage-bar-inner" style="background:linear-gradient(90deg,#5bd07a,#3aa35a);height:100%;width:{% if storage and storage.pct_free is not none %}{{ storage.pct_free }}%{% else %}0%{% endif %}"></div>
+            <div class="storage-meter">
+                <div id="storage-bar-inner" class="storage-meter-fill" style="width:{% if storage and storage.pct_free is not none %}{{ storage.pct_free }}%{% else %}0%{% endif %}"></div>
             </div>
         </div>
-
-        <script>
-            async function updateStorage() {
-                try {
-                    const resp = await fetch("{{ url_for('history.history_storage') }}");
-                    const data = await resp.json();
-                    if (!resp.ok) return;
-                    const block = document.getElementById('storage-block');
-                    const text = document.getElementById('storage-text');
-                    const inner = document.getElementById('storage-bar-inner');
-                    block.style.display = '';
-                    const pct = (data.pct_free !== null && data.pct_free !== undefined) ? data.pct_free : 0;
-                    text.textContent = `${pct}% free • ${data.free_gb} GB remaining of ${data.total_gb} GB total`;
-                    inner.style.width = `${pct}%`;
-                } catch (e) {
-                    console.error('Failed to update storage', e);
-                }
-            }
-
-            // Update storage on initial load
-            document.addEventListener('DOMContentLoaded', function() {
-                updateStorage();
-                // If we have a stored message (from a delete/clear action), show it
-                const stored = sessionStorage.getItem('storedMessage');
-                if (stored) {
-                    try {
-                        const m = JSON.parse(stored);
-                        if (m && m.type && m.text) showResponseModal(m.type, m.text);
-                    } catch (e) {}
-                    sessionStorage.removeItem('storedMessage');
-                }
-            });
-
-            // Expose function for other actions to refresh storage after operations
-            window.updateHistoryStorage = updateStorage;
-
-
-        </script>
+        {% if metrics and (metrics.request_ms is not none or metrics.generate_ms is not none or metrics.preprocess_ms is not none or metrics.display_ms is not none) %}
+        <div class="metric-strip compact">
+            {% if metrics.request_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Request</span>
+                <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.generate_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Generate</span>
+                <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.preprocess_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Preprocess</span>
+                <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
+            </div>
+            {% endif %}
+            {% if metrics.display_ms is not none %}
+            <div class="metric-pill">
+                <span class="metric-pill-label">Display</span>
+                <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if images|length > 0 %}
+        <div class="danger-zone history-danger-zone">
+            <div>
+                <h3>Reset cache</h3>
+                <p>Remove all saved history images from this device when you want to reclaim local storage quickly.</p>
+            </div>
+            <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
+        </div>
+        {% endif %}
+        <div class="separator"></div>
 
         {% if images|length == 0 %}
-            <p>No history yet.</p>
+            <div class="empty-state compact">
+                <div class="empty-state-icon">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</div>
+                <p>No history yet.</p>
+                <p>Your generated images will appear here after the first successful render.</p>
+            </div>
         {% else %}
         <div class="history-grid">
             {% for img in images %}
             <div class="history-card">
                 <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" aria-label="Preview {{ img.filename }}">
                     <div class="img-skeleton" aria-hidden="true"></div>
-                    <img src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.previousElementSibling.style.display='none'">
+                    <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" loading="lazy">
                 </a>
-                <div class="history-meta">
-                    <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
-                    <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
-                    {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
-                    <div class="history-sub">
-                        <span>Source:</span>
-                        <span>
-                            {% if img.meta.refresh_type %}{{ img.meta.refresh_type }}{% endif %}
-                            {% if img.meta.plugin_id %} • {{ img.meta.plugin_id }}{% endif %}
-                            {% if img.meta.playlist %} • {{ img.meta.playlist }}{% endif %}
-                            {% if img.meta.plugin_instance %} • {{ img.meta.plugin_instance }}{% endif %}
-                        </span>
+                <div class="history-card-body">
+                    <div class="history-meta">
+                        <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
+                        <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
+                        {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
+                        <div class="history-sub">
+                            <span>Source:</span>
+                            <span>
+                                {% if img.meta.refresh_type %}{{ img.meta.refresh_type }}{% endif %}
+                                {% if img.meta.plugin_id %} • {{ img.meta.plugin_id }}{% endif %}
+                                {% if img.meta.playlist %} • {{ img.meta.playlist }}{% endif %}
+                                {% if img.meta.plugin_instance %} • {{ img.meta.plugin_instance }}{% endif %}
+                            </span>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                </div>
-                <div class="history-actions">
-                    <button id="btn-{{ img.filename }}" class="btn btn-primary" onclick="redisplay('{{ img.filename }}')">Display</button>
-                    <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
-                    <button class="btn btn-danger" onclick="deleteImage('{{ img.filename }}')">Delete</button>
+                    <div class="history-actions">
+                        <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}">Display</button>
+                        <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
+                        <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}">Delete</button>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -209,59 +148,46 @@
         {% endif %}
     </div>
 
-    <!-- Image preview (lightbox) for history thumbnails -->
-    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
-        <div class="modal-content">
-            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
-            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
-        </div>
-    </div>
-
-    <script>
-        // Bind history thumbnails to shared Lightbox
-        document.addEventListener('click', function(ev){
-            const a = ev.target.closest('a.history-thumb');
-            if (!a) return;
-            if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
-            ev.preventDefault();
-            const img = a.querySelector('img');
-            const url = a.href;
-            const alt = a.getAttribute('aria-label') || (img && img.alt) || 'Preview';
-            if (window.Lightbox) window.Lightbox.open(url, alt);
-        });
-    </script>
-
     <!-- Delete image modal -->
-    <div id="deleteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteHistoryTitle" style="display:none;">
+    <div id="deleteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteHistoryTitle" hidden>
         <div class="modal-content">
-            <span class="close-button" onclick="closeDeleteHistoryModal()" aria-label="Close">×</span>
+            <button type="button" id="closeDeleteHistoryModalBtn" class="close-button" aria-label="Close">×</button>
             <h2 id="deleteHistoryTitle">Delete Image</h2>
             <div class="separator"></div>
             <p id="deleteHistoryText">Are you sure you want to delete?</p>
-            <div class="buttons-container" style="margin-top:12px;">
+            <div class="buttons-container">
                 <button type="button" class="action-button warn" id="confirmDeleteHistoryBtn">Delete</button>
-                <button type="button" class="action-button" onclick="closeDeleteHistoryModal()">Cancel</button>
+                <button type="button" class="action-button" id="cancelDeleteHistoryBtn">Cancel</button>
             </div>
         </div>
     </div>
 
     <!-- Clear all history modal -->
-    <div id="clearHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clearHistoryTitle" style="display:none;">
+    <div id="clearHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clearHistoryTitle" hidden>
         <div class="modal-content">
-            <span class="close-button" onclick="closeClearHistoryModal()" aria-label="Close">×</span>
+            <button type="button" id="closeClearHistoryModalBtn" class="close-button" aria-label="Close">×</button>
             <h2 id="clearHistoryTitle">Clear All History</h2>
             <div class="separator"></div>
             <p>Are you sure you want to clear all history images?</p>
-            <div class="buttons-container" style="margin-top:12px;">
+            <div class="buttons-container">
                 <button type="button" class="action-button warn" id="confirmClearHistoryBtn">Clear</button>
-                <button type="button" class="action-button" onclick="closeClearHistoryModal()">Cancel</button>
+                <button type="button" class="action-button" id="cancelClearHistoryBtn">Cancel</button>
             </div>
         </div>
     </div>
 
     {% include 'response_modal.html' %}
     </main>
+    <script>
+        window.__INKYPI_HISTORY_BOOT__ = {
+            clearUrl: {{ url_for('history.history_clear') | tojson }},
+            deleteUrl: {{ url_for('history.history_delete') | tojson }},
+            redisplayUrl: {{ url_for('history.history_redisplay') | tojson }},
+            storageUrl: {{ url_for('history.history_storage') | tojson }},
+        };
+        document.addEventListener('DOMContentLoaded', () => {
+            window.InkyPiHistoryPage.create(window.__INKYPI_HISTORY_BOOT__).init();
+        });
+    </script>
 </body>
 </html>
-
-

@@ -19,6 +19,20 @@ def test_generate_settings_template_defaults(monkeypatch):
     assert isinstance(template["frame_styles"], list)
 
 
+def test_generate_settings_template_uses_schema_when_available():
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    class SchemaPlugin(BasePlugin):
+        def build_settings_schema(self):
+            return {"version": 1, "sections": [{"title": "Demo", "items": []}]}
+
+    p = SchemaPlugin({"id": "ai_text"})
+    template = p.generate_settings_template()
+
+    assert "settings_schema" in template
+    assert "settings_template" not in template
+
+
 def test_render_image_with_base_template(monkeypatch, tmp_path):
     # This test verifies that render_image works even if the plugin has no custom render dir
     # by relying on the autouse fixture that patches take_screenshot_html to a fake image.
@@ -279,5 +293,4 @@ def test_render_image_with_screenshot_timeout(monkeypatch):
 
     assert out is not None
     assert captured_timeout[0] == 5000
-
 

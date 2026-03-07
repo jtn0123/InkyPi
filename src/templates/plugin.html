@@ -10,466 +10,34 @@
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}"></script>
     
 
     <script>
-        const pluginSettings = {{ plugin_settings | tojson if plugin_settings else {} }};
-        const pluginInstanceName ='{{ plugin_instance }}';
+        const pluginSettings = window.pluginSettings = {{ (plugin_settings | default({})) | tojson }};
+        const pluginInstanceName = window.pluginInstanceName = {{ (plugin_instance | default('')) | tojson }};
         const hasPluginSettings = !!(pluginSettings && Object.keys(pluginSettings).length);
-        // Treat either editing an instance or having saved (non-instance) settings as "load settings"
-        const loadPluginSettings = (pluginInstanceName != '') || hasPluginSettings;
-        const styleSettings = {{ style_settings | default(false) | tojson }};
-        const previewUrl = '{{ url_for("main.preview_image") }}';
-        const refreshInfoUrl = '{{ url_for("main.refresh_info") }}';
-        const instancePreviewUrl = (pluginId, instanceName) => {
+        const loadPluginSettings = window.loadPluginSettings = (pluginInstanceName !== '') || hasPluginSettings;
+        const styleSettings = window.styleSettings = {{ style_settings | default(false) | tojson }};
+        const previewUrl = window.previewUrl = {{ url_for("main.preview_image") | tojson }};
+        const refreshInfoUrl = window.refreshInfoUrl = {{ url_for("main.refresh_info") | tojson }};
+        const instancePreviewUrl = window.instancePreviewUrl = (pluginId, instanceName) => {
             if (!pluginId || !instanceName) return null;
-            return '{{ url_for("plugin.plugin_instance_image", plugin_id="__PID__", instance_name="__INST__") }}'
+            return {{ url_for("plugin.plugin_instance_image", plugin_id="__PID__", instance_name="__INST__") | tojson }}
                 .replace('__PID__', encodeURIComponent(pluginId))
                 .replace('__INST__', encodeURIComponent(instanceName));
         };
-        const latestPluginUrl = (pluginId) => {
+        const latestPluginUrl = window.latestPluginUrl = (pluginId) => {
             if (!pluginId) return null;
-            return '{{ url_for("plugin.plugin_latest_image", plugin_id="__PID__") }}'
+            return {{ url_for("plugin.plugin_latest_image", plugin_id="__PID__") | tojson }}
                 .replace('__PID__', encodeURIComponent(pluginId));
         };
-
-        let uploadedFiles = {};
-
-        const PROGRESS_PAGE_CTX = { page: 'plugin', pluginId: {{ plugin.id|tojson }}, instance: pluginInstanceName || null };
-        function buildProgressKey(ctx){
-            try {
-                if (ctx && ctx.page === 'plugin'){
-                    const pid = ctx.pluginId || {{ plugin.id|tojson }};
-                    const inst = ctx.instance || '';
-                    return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || '_'}`;
-                }
-            } catch(e){}
-            return 'INKYPI_LAST_PROGRESS';
-        }
-        function saveLastProgressSnapshot(context){
-            try {
-                const list = document.getElementById('requestProgressList');
-                const textEl = document.getElementById('requestProgressText');
-                function extractLine(li){
-                    try {
-                        const t = li.querySelector('time');
-                        const txt = li.textContent || '';
-                        const tt = t ? (t.textContent || '') : '';
-                        return tt && txt.startsWith(tt) ? txt.slice(tt.length).trimStart() : txt.trim();
-                    } catch(e){ return (li.textContent || '').trim(); }
-                }
-                const lines = Array.from(list ? list.querySelectorAll('li') : [], extractLine);
-                const data = {
-                    finishedAtIso: new Date().toISOString(),
-                    summary: textEl ? textEl.textContent : 'Done',
-                    lines,
-                    ctx: context || PROGRESS_PAGE_CTX
-                };
-                const key = buildProgressKey(data.ctx);
-                localStorage.setItem(key, JSON.stringify(data));
-                // Also store a global fallback
-                localStorage.setItem('INKYPI_LAST_PROGRESS', JSON.stringify(data));
-            } catch(e){}
-        }
-        function showLastProgress(){
-            try {
-                const keys = [
-                    buildProgressKey(PROGRESS_PAGE_CTX),
-                    `INKYPI_LAST_PROGRESS:plugin:${ {{ plugin.id|tojson }} }:_`,
-                    'INKYPI_LAST_PROGRESS'
-                ];
-                let data = null;
-                for (const k of keys){
-                    const raw = localStorage.getItem(k);
-                    if (raw){ data = JSON.parse(raw); break; }
-                }
-                if (!data) { try { showResponseModal('failure', 'No recent progress to show'); } catch(_){} return; }
-                const progress = document.getElementById('requestProgress');
-                const textEl = document.getElementById('requestProgressText');
-                const clockEl = document.getElementById('requestProgressClock');
-                const elapsedEl = document.getElementById('requestProgressElapsed');
-                const list = document.getElementById('requestProgressList');
-                const bar = document.getElementById('requestProgressBar');
-                if (list) {
-                    list.innerHTML = '';
-                    const stripLeadingTime = (s) => {
-                        try { return s.replace(/^\s*\d{1,2}:\d{2}(?::\d{2})?\s*(AM|PM)?\s*/i, ''); } catch(_) { return s; }
-                    };
-                    data.lines.forEach(rawLine => {
-                        const line = stripLeadingTime(rawLine);
-                        const li = document.createElement('li');
-                        const ts = document.createElement('time');
-                        ts.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
-                        li.appendChild(ts);
-                        li.appendChild(document.createTextNode(' ' + line));
-                        list.appendChild(li);
-                    });
-                }
-                if (textEl) textEl.textContent = data.summary || 'Last run';
-                if (clockEl) clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
-                if (elapsedEl) elapsedEl.textContent = '—';
-                if (bar) bar.style.width = '100%';
-                if (progress) progress.style.display = 'block';
-            } catch(e){}
-        }
-
-        async function handleAction(action) {
-            // Allow plugin-specific client-side validation
-            try {
-                if (typeof window.validatePluginSettings === 'function') {
-                    const isValid = window.validatePluginSettings(action);
-                    if (!isValid) { return; }
-                }
-            } catch (e) { console.warn('Plugin validation threw an error:', e); }
-
-            const urls = {
-                update_now: '{{ url_for("plugin.update_now") }}',
-                add_to_playlist: '{{ url_for('playlist.add_plugin') }}',
-                update_instance: "{{ url_for('plugin.update_plugin_instance', instance_name='') }}" + pluginInstanceName,
-                save_settings: '{{ url_for("plugin.save_plugin_settings") }}'
-            };
-            if (!window.PluginForm || typeof window.PluginForm.sendForm !== 'function') {
-                if (window.showResponseModal) {
-                    showResponseModal('failure', 'Plugin form module failed to load. Refresh and try again.');
-                }
-                return;
-            }
-            const response = await window.PluginForm.sendForm({
-                action,
-                urls,
-                uploadedFiles,
-                onAfterSuccess: () => {
-                    setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 250);
-                    closeModal('scheduleModal');
-                }
-            });
-            const { success } = response || {};
-            // Persist progress snapshot after each run
-            try { saveLastProgressSnapshot(PROGRESS_PAGE_CTX); } catch(e){}
-        }
-        async function refreshPreviewImage(){
-            const img = document.getElementById('previewImage');
-            const skel = document.getElementById('previewSkeleton');
-            if (img){ if (skel) skel.style.display=''; img.src = previewUrl + '?t=' + Date.now(); }
-            // Update current display timestamp/meta
-            try {
-                const res = await fetch(refreshInfoUrl);
-                const info = await res.json();
-                // Update current display timestamp
-                const ts = info && info.refresh_time ? new Date(info.refresh_time) : null;
-                const currTime = document.getElementById('currentDisplayTime');
-                if (currTime) currTime.textContent = ts ? ts.toLocaleString() : '—';
-                // Update optional plugin meta (generic across plugins)
-                const metaDiv = document.getElementById('pluginMeta');
-                const metaContent = document.getElementById('pluginMetaContent');
-                try {
-                    if (info && info.plugin_meta) {
-                        const m = info.plugin_meta || {};
-                        const pid = info.plugin_id || '';
-                        const date = m.date ? (new Date(m.date).toISOString().slice(0,10)) : '';
-                        const title = m.title || '';
-                        const caption = m.caption || '';
-                        const expl = m.explanation || '';
-                        const link = m.page_url || m.description_url || '';
-                        let label = '';
-                        if (pid === 'wpotd') label = 'Wikipedia Picture of the Day:';
-                        else if (pid === 'apod') label = 'NASA APOD:';
-                        else if (pid === 'newspaper') label = 'Newspaper:';
-                        let html = '';
-                        if (date || label) html += `<div><strong>${label || pid} </strong>${date}</div>`;
-                        if (title) html += `<div style=\"margin-top:4px;\"><em>${title}</em></div>`;
-                        if (caption) html += `<div style=\"margin-top:4px;\">${caption}</div>`;
-                        if (expl) html += `<div style=\"margin-top:4px;\">${expl}</div>`;
-                        if (link) html += `<div style=\"margin-top:4px;\"><a href=\"${link}\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div>`;
-                        if (html) { metaContent.innerHTML = html; metaDiv.style.display = 'block'; }
-                        else { metaDiv.style.display = 'none'; metaContent.textContent=''; }
-                    } else {
-                        metaDiv.style.display = 'none';
-                        metaContent.textContent = '';
-                    }
-                } catch (e) { metaDiv.style.display = 'none'; metaContent.textContent = ''; }
-            } catch (e) { /* ignore */ }
-        }
-
-        function openModal(modal_id) {
-            const modal = document.getElementById(modal_id);
-            modal.style.display = 'block';
-        }
-    
-        function closeModal(modal_id) {
-            const modal = document.getElementById(modal_id);
-            modal.style.display = 'none';
-        }
-    
-        // Close modal if the user clicks outside the modal content
-        window.onclick = function (event) {
-            const modal = document.getElementById('scheduleModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
-            }
-        };
-
-        function toggleCollapsible(button) {
-            const content = button.nextElementSibling;
-            const icon = button.querySelector(".collapsible-icon");
-            const isOpen = content.style.display === "block";
-            button.classList.toggle("active", !isOpen);
-            button.setAttribute("aria-expanded", String(!isOpen));
-            content.style.display = isOpen ? "none" : "block";
-            icon.textContent = isOpen ? "▼" : "▲";
-        }
-
-        function selectedFrame(element) {
-            // Remove the selected class from any previously selected option
-            const previousSelection = document.querySelector('.image-option.selected');
-            if (previousSelection) {
-                previousSelection.classList.remove('selected');
-            }
-
-            // Add the selected class to the clicked option
-            element.classList.add('selected');
-
-            // Update the hidden input with the selected frame
-            const selectedFaceName = element.getAttribute('data-face-name');
-            document.getElementById('selected-frame').value = selectedFaceName;
-        }
-
-        function showFileName() {
-            const fileInput = document.getElementById('imageUpload');
-            const fileNameDisplay = document.getElementById('fileName');
-            const fileNameText = document.getElementById('fileNameText');
-            const uploadButtonLabel = document.getElementById('uploadButtonLabel');
-            const removeFileButton = document.getElementById('removeFileButton');
-            const file = fileInput.files[0];
-
-            if (file) {
-                fileNameText.textContent = `${file.name}`;
-                fileNameDisplay.style.display = 'flex';  // Show the file name and remove button
-                uploadButtonLabel.style.display = 'none';  // Hide the upload button label
-            } else {
-                fileNameDisplay.style.display = 'none';  // Hide if no file is selected
-                uploadButtonLabel.style.display = 'block';  // Show the upload button label
-            }
-        }
-
-        function removeFile() {
-            const fileInput = document.getElementById('imageUpload');
-            const fileNameDisplay = document.getElementById('fileName');
-            const uploadButtonLabel = document.getElementById('uploadButtonLabel');
-
-            fileInput.value = '';  // Clear the file input
-            fileNameDisplay.style.display = 'none';  // Hide the file name and remove button
-            uploadButtonLabel.style.display = 'block';  // Show the upload button label
-
-            const hiddenElement = document.getElementById(`hidden-file-name`);
-            if (hiddenElement) {
-                hiddenElement.remove();
-            }
-        }
-
-        // populate form values from plugin settings
-        document.addEventListener('DOMContentLoaded', () => {
-            // Populate top status bar previews and timestamps
-            (function initStatusBar(){
-                const pluginId = '{{ plugin.id }}';
-                const instanceName = pluginInstanceName;
-                const instImgEl = document.getElementById('instancePreviewImage');
-                const instTimeEl = document.getElementById('instanceLastTime');
-
-                if (instImgEl) {
-                    let imageUrl = null;
-
-                    // First try instance-specific image if we have an instance name
-                    if (instanceName && instanceName.trim()) {
-                        imageUrl = instancePreviewUrl(pluginId, instanceName);
-                    }
-
-                    // If no instance or instance image fails, try latest plugin image
-                    if (!imageUrl) {
-                        imageUrl = latestPluginUrl(pluginId);
-                    }
-
-                    if (imageUrl) {
-                        instImgEl.src = imageUrl + '?t=' + Date.now();
-
-                        // Add error handler to fallback to latest plugin image if instance image fails
-                        instImgEl.onerror = function() {
-                            if (instanceName && instanceName.trim() && imageUrl.includes('instance_image')) {
-                                // Instance image failed, try latest plugin image
-                                const fallbackUrl = latestPluginUrl(pluginId);
-                                if (fallbackUrl && fallbackUrl !== imageUrl) {
-                                    this.src = fallbackUrl + '?t=' + Date.now();
-                                    // Update the error handler to show fallback on second failure
-                                    this.onerror = function() {
-                                        this.style.display='none';
-                                        this.previousElementSibling.style.display='none';
-                                        document.getElementById('instancePreviewFallback').style.display='block';
-                                    };
-                                    return;
-                                }
-                            }
-                            // Show fallback placeholder
-                            this.style.display='none';
-                            this.previousElementSibling.style.display='none';
-                            document.getElementById('instancePreviewFallback').style.display='block';
-                        };
-                    } else {
-                        // No image URL available, show fallback immediately
-                        instImgEl.style.display = 'none';
-                        const skeleton = instImgEl.previousElementSibling;
-                        if (skeleton) skeleton.style.display = 'none';
-                        const fallback = document.getElementById('instancePreviewFallback');
-                        if (fallback) fallback.style.display = 'block';
-                    }
-                }
-
-                const lastStr = '{{ plugin_instance_last_refresh or plugin_latest_refresh or '' }}';
-                if (instTimeEl) {
-                    instTimeEl.textContent = lastStr ? new Date(lastStr).toLocaleString() : '—';
-                }
-                // Also initialize current display timestamp
-                refreshPreviewImage();
-            })();
-
-            // Function to refresh instance preview image with fallback logic
-            window.refreshInstancePreview = function() {
-                const pluginId = '{{ plugin.id }}';
-                const instanceName = pluginInstanceName;
-                const instImgEl = document.getElementById('instancePreviewImage');
-
-                if (!instImgEl) return;
-
-                // Reset display state
-                const skeleton = instImgEl.previousElementSibling;
-                const fallback = document.getElementById('instancePreviewFallback');
-                if (skeleton) skeleton.style.display = '';
-                if (fallback) fallback.style.display = 'none';
-                instImgEl.style.display = '';
-
-                let imageUrl = null;
-
-                // First try instance-specific image if we have an instance name
-                if (instanceName && instanceName.trim()) {
-                    imageUrl = instancePreviewUrl(pluginId, instanceName);
-                }
-
-                // If no instance, use latest plugin image
-                if (!imageUrl) {
-                    imageUrl = latestPluginUrl(pluginId);
-                }
-
-                if (imageUrl) {
-                    instImgEl.src = imageUrl + '?t=' + Date.now();
-
-                    // Add error handler to fallback to latest plugin image if instance image fails
-                    instImgEl.onerror = function() {
-                        if (instanceName && instanceName.trim() && imageUrl.includes('instance_image')) {
-                            // Instance image failed, try latest plugin image
-                            const fallbackUrl = latestPluginUrl(pluginId);
-                            if (fallbackUrl && fallbackUrl !== imageUrl) {
-                                this.src = fallbackUrl + '?t=' + Date.now();
-                                // Update the error handler to show fallback on second failure
-                                this.onerror = function() {
-                                    this.style.display='none';
-                                    if (skeleton) skeleton.style.display='none';
-                                    if (fallback) fallback.style.display='block';
-                                };
-                                return;
-                            }
-                        }
-                        // Show fallback placeholder
-                        this.style.display='none';
-                        if (skeleton) skeleton.style.display='none';
-                        if (fallback) fallback.style.display='block';
-                    };
-                }
-            };
-            if (!styleSettings){
-                return;
-            }
-            if (loadPluginSettings) {
-                if (pluginSettings.topMargin) {
-                    document.getElementById('topMargin').value = pluginSettings.topMargin;
-                }
-                if (pluginSettings.bottomMargin) {
-                    document.getElementById('bottomMargin').value = pluginSettings.bottomMargin;
-                }
-                if (pluginSettings.leftMargin) {
-                    document.getElementById('leftMargin').value = pluginSettings.leftMargin;
-                }
-                if (pluginSettings.rightMargin) {
-                    document.getElementById('rightMargin').value = pluginSettings.rightMargin;
-                }
-                // Populate background options (color or image)
-                if (pluginSettings.backgroundOption) {
-                    document.querySelector(`input[name="backgroundOption"][value="${pluginSettings.backgroundOption}"]`).checked = true;
-                }
-
-                // Set background color
-                if (pluginSettings.backgroundColor) {
-                    document.getElementById('backgroundColor').value = pluginSettings.backgroundColor;
-                }
-
-                // Populate text color
-                if (pluginSettings.textColor) {
-                    document.getElementById('textColor').value = pluginSettings.textColor;
-                }
-
-                // Handle background image selection
-                const fileNameDisplay = document.getElementById('fileName');
-                const fileNameText = document.getElementById('fileNameText');
-                const uploadButtonLabel = document.getElementById('uploadButtonLabel');
-
-                if (pluginSettings.backgroundImageFile) {
-                    const filePath = pluginSettings.backgroundImageFile
-                    const fileName = filePath.split('/').pop();
-
-                    // display the file name
-                    fileNameText.textContent = fileName;
-                    fileNameDisplay.style.display = 'flex';
-                    uploadButtonLabel.style.display = 'none';
-
-                    // create a hidden input for the existing file
-                    const hiddenInput = document.createElement("input");
-                    hiddenInput.type = "hidden";
-                    hiddenInput.name = "backgroundImageFile";
-                    hiddenInput.value = filePath;
-                    hiddenInput.id = `hidden-file-name`;
-                    hiddenInput.setAttribute('delete-on-submit', '');
-                    document.getElementById("hiddenFileInput").appendChild(hiddenInput);
-                } else {
-                    fileNameDisplay.style.display = 'none';
-                    uploadButtonLabel.style.display = 'block';
-                }
-
-                let selectedFrameOption = document.querySelector(`.image-option[data-face-name="${pluginSettings.selectedFrame}"]`);
-                selectedFrame(selectedFrameOption);
-            } else {
-                // set default values
-                let selectedFrameOption = document.querySelector('.image-option');
-                selectedFrame(selectedFrameOption);
-
-                // Set default margins when creating a new instance
-                const defaultMargin = "5";
-                const topMarginInput = document.getElementById('topMargin');
-                const bottomMarginInput = document.getElementById('bottomMargin');
-                const leftMarginInput = document.getElementById('leftMargin');
-                const rightMarginInput = document.getElementById('rightMargin');
-
-                if (topMarginInput) topMarginInput.value = defaultMargin;
-                if (bottomMarginInput) bottomMarginInput.value = defaultMargin;
-                if (leftMarginInput) leftMarginInput.value = defaultMargin;
-                if (rightMarginInput) rightMarginInput.value = defaultMargin;
-            }
-        });
+        const uploadedFiles = window.uploadedFiles = window.uploadedFiles || {};
     </script>
 </head>
 <body>
-    <!-- Skip navigation for accessibility -->
-    <a href="#main-content" class="skip-nav">Skip to main content</a>
-
-    <main id="main-content" role="main">
-    <div class="frame">
+    <main id="main-content" role="main" class="page-shell page-shell-workflow" data-page-shell="workflow">
+    <div class="frame workflow-frame">
         {% from 'macros/icons.html' import icon %}
 
         <!-- Plugin Title and Icon -->
@@ -504,7 +72,10 @@
                 } %}
                 {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
                 {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
-                <h1 class="app-title">{{ plugin.display_name }}</h1>
+                <div class="title-stack">
+                    <h1 class="app-title">{{ plugin.display_name }}</h1>
+                    <span class="app-subtitle">{{ plugin.id }}</span>
+                </div>
             </div>
             <div class="header-controls">
                 <!-- API Key Status Indicator -->
@@ -524,7 +95,7 @@
 
                 
                 {% from 'macros/icons.html' import icon %}
-                <button class="header-button icon" type="button" title="Last progress" aria-label="Show last progress" onclick="showLastProgress()">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Show last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
                 <div id="loadingIndicator" class="loading-indicator"></div>
             </div>
         </div>
@@ -532,79 +103,43 @@
         <div class="separator"></div>
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
-            <span class="status-chip info">Plugin: {{ plugin.id }}</span>
             {% if plugin_instance %}
-            <span class="status-chip success">Editing instance</span>
+            <span class="status-chip success">Instance</span>
             {% else %}
-            <span class="status-chip warning">New playlist instance</span>
+            <span class="status-chip warning">Draft</span>
             {% endif %}
             {% if api_key and api_key.required %}
                 {% if api_key.present %}
-                <span class="status-chip success">API key configured</span>
+                <span class="status-chip success">API ready</span>
                 {% else %}
                 <span class="status-chip error">API key missing</span>
                 {% endif %}
             {% endif %}
         </div>
 
-        <!-- Status: current display vs this plugin instance -->
-        {% set fit = (config.get('preview_size_mode') == 'fit') %}
-        <div class="status-bar">
-            <!-- Compact current display thumbnail on the left -->
-            <div class="status-card compact">
-                <div class="status-title">Current display</div>
-                <div class="status-body">
-                    <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
-                        <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
-                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}"
-                             {% if not fit %}style="width: {{ resolution[0] }}px; height: {{ resolution[1] }}px;"{% endif %}>
-                        <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>
-                    </div>
-                    <div class="status-meta compact">
-                        <span class="label">Updated</span>
-                        <span id="currentDisplayTime" class="value">—</span>
-                    </div>
-                </div>
-            </div>
-            <!-- Full, non-cropped plugin instance preview on the right -->
-            <div class="status-card instance">
-                <div class="status-title">{% if plugin_instance %}This plugin instance{% else %}Latest from this plugin{% endif %}</div>
-                <div class="status-body">
-                    <div class="img-skeleton" aria-hidden="true" style="width:100%;"></div>
-                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy" onload="this.previousElementSibling.style.display='none'" onerror="this.style.display='none';this.previousElementSibling.style.display='none';document.getElementById('instancePreviewFallback').style.display='block'">
-                    <div id="instancePreviewFallback" class="status-placeholder" style="display:none;">
-                        {% if plugin_instance %}
-                        No saved image found for this instance yet.
-                        {% if plugin_instance_playlist %}
-                        <div style="margin-top:6px;"><button type="button" class="action-button compact" aria-label="Display this instance now" onclick="displayInstanceNow()">Display Instance</button></div>
-                        {% endif %}
-                        {% else %}
-                        No images generated yet. Use "Update Now" to create one.
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="status-meta">
-                    <span class="label">Last generated</span>
-                    <span id="instanceLastTime" class="value">—</span>
-                </div>
-            </div>
+        <div class="workflow-mode-bar" role="tablist" aria-label="Plugin workflow">
+            <button id="configureModeBtn" class="workflow-mode-tab active" type="button" role="tab" aria-selected="true" data-workflow-mode="configure">Configure</button>
+            <button id="previewModeBtn" class="workflow-mode-tab" type="button" role="tab" aria-selected="false" data-workflow-mode="preview">Preview &amp; Apply</button>
         </div>
-        <div class="separator"></div>
 
-        <div id="pluginMeta" class="image-meta" style="display:none; margin-top: 8px;"><div id="pluginMetaContent"></div></div>
-
-        <!-- Plugin settings form -->
-        <form id="settingsForm" class="settings-form" onsubmit="return false;" aria-label="Plugin settings for {{ plugin.display_name }}">
+        {% set fit = (config.get('preview_size_mode') == 'fit') %}
+        <div class="workflow-layout" data-workflow-layout>
+        <section class="workflow-main-panel" data-workflow-panel="configure">
+        <form id="settingsForm" class="settings-form workflow-settings-form" aria-label="Plugin settings for {{ plugin.display_name }}">
             <div class="settings-container">
+                <div class="workflow-section-header">
+                    <h2>Configuration</h2>
+                    <p>Adjust content and presentation settings before generating a new preview.</p>
+                </div>
                 <!-- Progressive Disclosure placeholders for test visibility -->
-                <div class="settings-mode-selector" style="display:none">
+                <div class="settings-mode-selector" hidden>
                     <button type="button" class="mode-button">Basic Setup</button>
                     <button type="button" class="mode-button">Advanced Options</button>
                 </div>
-                <div class="validation-message error" style="display:none">Error</div>
-                <div class="validation-message success" style="display:none">OK</div>
-                <div class="validation-message warning" style="display:none">Warn</div>
-                <div class="setup-wizard" style="display:none">
+                <div class="validation-message error" hidden>Error</div>
+                <div class="validation-message success" hidden>OK</div>
+                <div class="validation-message warning" hidden>Warn</div>
+                <div class="setup-wizard" hidden>
                     <div class="wizard-navigation">
                         <div class="wizard-progress">
                             <div class="wizard-step-indicator"></div>
@@ -613,27 +148,24 @@
                         <button id="wizardNext" type="button">Next</button>
                     </div>
                 </div>
-                <!-- requestAnimationFrame; initLivePreview -->
-                {% include settings_template %}
+                {% if settings_schema %}
+                    {% include 'settings_schema.html' %}
+                {% else %}
+                    {% include settings_template %}
+                {% endif %}
 
-                <!-- Collapsible Style Settings Section -->
                 {% if style_settings %}
                 <div class="collapsible">
-                    <button type="button" class="collapsible-header" aria-expanded="false" onclick="toggleCollapsible(this)">
+                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Style <span class="collapsible-icon">▼</span>
                     </button>
-                    <div class="settings-container collapsible-content">
+                    <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
-                            
                             <div class="form-group nowrap">
                                 <label class="form-label">Frame:</label>
                                 <div id="frame-selection" class="image-grid">
                                     {% for frame in frame_styles %}
-                                    <div
-                                        class="image-option"
-                                        data-face-name="{{ frame.name }}"
-                                        onclick="selectedFrame(this)"
-                                    >
+                                    <div class="image-option" data-face-name="{{ frame.name }}" data-frame-option tabindex="0" role="button">
                                         <img
                                             src="{{ url_for('plugin.image', plugin_id='base_plugin', filename=frame.icon) }}"
                                             alt="{{ frame.name }}"
@@ -663,9 +195,8 @@
                                     <input type="number" class="form-input" id="rightMargin" name="rightMargin" min="0" max="100" step="5">px
                                 </div>
                             </div>
-                        </div>    
-                        
-                        <!-- Background Color Option -->
+                        </div>
+
                         <div class="form-group">
                             <label class="form-label">Background:</label>
                             <div class="form-group nowrap">
@@ -681,18 +212,16 @@
                                     Image
                                 </label>
                                 <label for="imageUpload" class="form-input file-upload-label" id="uploadButtonLabel">Upload Image</label>
-                                <input type="file" clear-on-submit id="imageUpload" name="backgroundImageFile" accept="image/*" class="file-upload-input" onchange="showFileName()">
-                                <div id="fileName" class="file-name" style="display: none;">
+                                <input type="file" clear-on-submit id="imageUpload" name="backgroundImageFile" accept="image/*" class="file-upload-input" data-background-upload>
+                                <div id="fileName" class="file-name" hidden>
                                     <span id="fileNameText"></span>
-                                    <button type="button" id="removeFileButton" class="remove-btn" onclick="removeFile()">X</button>
+                                    <button type="button" id="removeFileButton" class="remove-btn">X</button>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Hidden input fields to store existing file data -->
+
                         <div id="hiddenFileInput"></div>
-                        
-                        <!-- Text Color Picker -->
+
                         <div class="form-group">
                             <label for="textColor" class="form-label">Text Color:</label>
                             <input type="color" id="textColor" name="textColor" class="color-picker" value="#000000">
@@ -702,32 +231,84 @@
                 {% endif %}
             </div>
 
-            <!-- Hidden input to pass plugin id -->
             <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
             {% if plugin_instance %}
             <input type="hidden" name="instance_name" value="{{ plugin_instance }}">
             {% endif %}
+        </form>
+        </section>
 
-            <div class="buttons-container" style="align-items:center;flex-wrap:wrap;">
-                <label class="form-label" for="toggleDeviceFrame" style="display:flex;align-items:center;gap:6px;min-width:fit-content;">
-                    <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
-                </label>
-                <button type="button" onclick="handleAction()" class="action-button left" aria-describedby="update-now-help">Update Now</button>
-                <button type="button" onclick="handleAction('save_settings')" class="action-button center" aria-describedby="save-settings-help">Save Settings</button>
+        <aside class="workflow-side-panel" data-workflow-panel="preview">
+        <div class="workflow-section-header">
+            <h2>Preview &amp; Apply</h2>
+            <p>Review the current display, compare this plugin output, then apply or schedule it.</p>
+        </div>
+        <div class="status-bar">
+            <!-- Compact current display thumbnail on the left -->
+            <div class="status-card compact">
+                <div class="status-title">Current display</div>
+                <div class="status-body">
+                    <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
+                        <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}" data-native-width="{{ resolution[0] }}" data-native-height="{{ resolution[1] }}">
+                        <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>
+                    </div>
+                    <div class="status-meta compact">
+                        <span class="label">Updated</span>
+                        <span id="currentDisplayTime" class="value">—</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Full, non-cropped plugin instance preview on the right -->
+            <div class="status-card instance">
+                <div class="status-title">{% if plugin_instance %}This plugin instance{% else %}Latest from this plugin{% endif %}</div>
+                <div class="status-body">
+                    <div class="img-skeleton instance-preview-skeleton" aria-hidden="true"></div>
+                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy">
+                    <div id="instancePreviewFallback" class="status-placeholder" hidden>
+                        {% if plugin_instance %}
+                        No saved image found for this instance yet.
+                        {% if plugin_instance_playlist %}
+                        <div class="status-placeholder-actions"><button type="button" id="displayInstanceBtn" class="action-button compact" aria-label="Display this instance now">Display Instance</button></div>
+                        {% endif %}
+                        {% else %}
+                        No images generated yet. Use "Update Now" to create one.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="status-meta">
+                    <span class="label">Last generated</span>
+                    <span id="instanceLastTime" class="value">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="separator"></div>
+
+        <div id="pluginMeta" class="image-meta workflow-meta" hidden><div id="pluginMetaContent"></div></div>
+
+        <div class="workflow-action-panel">
+            <label class="workflow-device-toggle" for="toggleDeviceFrame">
+                <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
+            </label>
+            <div class="workflow-action-group">
+                <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help">Update Preview</button>
+                <button type="button" data-plugin-action="save_settings" class="action-button is-secondary" aria-describedby="save-settings-help">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" onclick="handleAction('update_instance')" class="action-button right" aria-describedby="update-instance-help">Update Instance</button>
+                    <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help">Update Instance</button>
                 {% else %}
-                    <button type="button" onclick="openModal('scheduleModal')" class="action-button right" aria-describedby="add-playlist-help">Add to Playlist</button>
+                    <button type="button" data-open-modal="scheduleModal" class="action-button compact" aria-describedby="add-playlist-help">Add to Playlist</button>
                 {% endif %}
             </div>
-            <div class="form-help" style="margin-top:8px;">
+            <div class="form-help workflow-help">
                 <div id="update-now-help" class="sr-only">Generate and display image immediately with current settings</div>
                 <div id="save-settings-help" class="sr-only">Save settings for future use without generating image</div>
                 <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
                 <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist</div>
                 <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.</p>
             </div>
-        </form>
+        </div>
+        </aside>
+        </div>
     </div>
 
     <!-- Success/Error Modal -->
@@ -736,7 +317,7 @@
     <!-- Schedule Configuration Modal -->
     <div id="scheduleModal" class="modal">
         <div class="modal-content">
-            <span class="close-button" onclick="closeModal('scheduleModal')">×</span>
+            <button class="close-button" type="button" data-close-modal="scheduleModal" aria-label="Close">×</button>
             <h2>Add to Playlist</h2>
             <div class="separator"></div>
             <form id="scheduleForm" class="settings-form">
@@ -755,7 +336,7 @@
                 </div>
                 <div class="form-group">
                     <label>Refresh</label>
-                    <span title="Determines how often the data and image should be refreshed.">ⓘ</span>
+                    <span class="help-icon" title="Determines how often the data and image should be refreshed.">i</span>
                 </div>
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
@@ -775,132 +356,32 @@
                 </div>
             </form>
             <div class="buttons-container">
-                <button type="button" onclick="handleAction('add_to_playlist')" class="action-button">Save</button>
+                <button type="button" data-plugin-action="add_to_playlist" class="action-button">Save</button>
             </div>
         </div>
     </div>
     
     <!-- Image preview (lightbox) for plugin page -->
-    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" style="display:none;">
+    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" hidden>
         <div class="modal-content">
-            <span class="close-button" onclick="Lightbox.close()" aria-label="Close">×</span>
-            <img id="imagePreviewImg" alt="Large preview" style="max-width:92vw; max-height:85vh; display:block; margin:0 auto;"/>
+            <button class="close-button" type="button" data-lightbox-close aria-label="Close">×</button>
+            <img id="imagePreviewImg" alt="Large preview" class="lightbox-preview-image"/>
         </div>
     </div>
-    <div id="requestProgress" class="progress-block" style="display:none;">
+    <div id="requestProgress" class="progress-block" hidden>
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>
-            <button type="button" class="progress-close" aria-label="Close progress" onclick="(function(){ const el = document.getElementById('requestProgress'); if (el) el.style.display='none'; })()">×</button>
+            <button id="closeProgressBtn" type="button" class="progress-close" aria-label="Close progress">×</button>
         </div>
         <div class="progress-meta">
             <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
             <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
         </div>
-        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill" style="width: 10%;"></div></div>
+        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill progress-fill-seeded"></div></div>
         <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_page.js') }}"></script>
-    <script>
-        // Lightbox + native-size toggle behavior for plugin page previews (uses shared Lightbox)
-        (function(){
-            const previewImg = document.getElementById('previewImage');
-            const instanceImg = document.getElementById('instancePreviewImage');
-            const container = previewImg && previewImg.parentElement;
-            const nativeWidth = {{ resolution[0] }};
-            const nativeHeight = {{ resolution[1] }};
-
-            if (previewImg){
-                // Single click opens lightbox
-                previewImg.addEventListener('click', function(){ if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt); });
-                // Double click toggles native size in-page (retains previous behavior)
-                if (container){
-                    previewImg.addEventListener('dblclick', function(e){
-                        e.preventDefault();
-                        if (container.classList.contains('native')) {
-                            container.classList.remove('native');
-                            previewImg.removeAttribute('style');
-                        } else {
-                            container.classList.add('native');
-                            previewImg.style.width = nativeWidth + 'px';
-                            previewImg.style.height = nativeHeight + 'px';
-                        }
-                    });
-                }
-            }
-            if (instanceImg){
-                instanceImg.style.cursor = 'zoom-in';
-                instanceImg.addEventListener('click', function(){ if (instanceImg.src && instanceImg.style.display !== 'none' && window.Lightbox){ window.Lightbox.open(instanceImg.src, instanceImg.alt); } });
-            }
-
-            // Delegate: any image with class .lightboxable opens in lightbox
-            document.addEventListener('click', function(e){
-                const img = e.target.closest('img.lightboxable');
-                if (!img) return;
-                if (img.src && window.Lightbox) {
-                    e.preventDefault();
-                    window.Lightbox.open(img.src, img.alt || 'Preview');
-                }
-            });
-
-            // Device frame overlay toggle
-            const toggle = document.getElementById('toggleDeviceFrame');
-            const overlay = document.getElementById('deviceFrameOverlay');
-            if (toggle && overlay){
-                try { overlay.style.backgroundImage = "url('" + {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }} + "')"; } catch(e) {}
-                toggle.addEventListener('change', function(){
-                    const parent = document.getElementById('currentPreviewContainer');
-                    if (this.checked) parent.classList.add('show-frame'); else parent.classList.remove('show-frame');
-                });
-            }
-        })();
-    </script>
-    <script>
-        async function displayInstanceNow(){
-            try {
-                const payload = {
-                    playlist_name: '{{ plugin_instance_playlist or '' }}',
-                    plugin_id: '{{ plugin.id }}',
-                    plugin_instance: '{{ plugin_instance or '' }}'
-                };
-                const resp = await fetch('{{ url_for("plugin.display_plugin_instance") }}', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await resp.json();
-                if (!resp.ok) {
-                    showResponseModal('failure', `Error!  ${result.error}`);
-                } else {
-                    showResponseModal('success', `Success! ${result.message}`);
-                    // give backend a moment, then refresh both previews
-                    setTimeout(() => { refreshPreviewImage(); refreshInstancePreview(); }, 400);
-                }
-            } catch (e){
-                console.error(e);
-                showResponseModal('failure', 'Failed to display instance');
-            }
-        }
-    </script>
-
-    <script>
-        // Auto-collapse API key indicator after 3 seconds
-        document.addEventListener('DOMContentLoaded', function() {
-            const apiIndicator = document.getElementById('apiKeyIndicator');
-            if (apiIndicator) {
-                // Add auto-collapse class to trigger animation
-                setTimeout(() => {
-                    apiIndicator.classList.add('auto-collapse');
-
-                    // After animation completes, add collapsed class for hover behavior
-                    setTimeout(() => {
-                        apiIndicator.classList.remove('auto-collapse');
-                        apiIndicator.classList.add('collapsed');
-                    }, 3000);
-                }, 100);
-            }
-        });
-    </script>
     <script>
         window.__INKYPI_PLUGIN_BOOT__ = {
             deviceFrameUrl: {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }},

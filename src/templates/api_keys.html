@@ -11,11 +11,21 @@
     {% from 'macros/icons.html' import icon %}
 </head>
 <body>
-    <main>
+    <main class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
+        {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
+        {% if api_keys_mode == 'managed' %}
+            {% set key_summary.provider_count = 4 %}
+            {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+        {% else %}
+            {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
+        {% endif %}
         <div class="app-header">
             <div class="header-content">
-                <div style="display:flex;align-items:center;gap:10px;">
+                <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
                         <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -37,45 +47,63 @@
             </div>
         </div>
         <div class="separator"></div>
+        <div class="page-intro">
+            <div class="page-intro-body">
+                <p class="page-subtitle">Store service credentials in one place. Existing values stay masked so you can update only the keys that changed.</p>
+            </div>
+            <div class="page-summary">
+                <span id="providerCountSummary" class="status-chip info">{{ key_summary.provider_count }} providers</span>
+                <span id="configuredCountSummary" class="status-chip success">{{ key_summary.configured_count }} configured</span>
+                <span class="status-chip">{{ api_keys_mode | capitalize }}</span>
+            </div>
+        </div>
 
         {% if api_keys_mode == 'managed' %}
         <form id="apiKeysForm" class="settings-form">
             <div class="settings-container api-keys-grid">
-                <div class="form-group">
-                    <label class="form-label">OpenAI</label>
-                    <div id="openai-status">Configured: {{ 'Yes (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'No' }}</div>
-                    <div class="input-container">
+                <div class="form-group api-key-card">
+                    <div class="api-key-card-head">
+                        <label class="form-label">OpenAI</label>
+                        <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
+                    </div>
+                    <div class="input-container api-key-actions">
                         <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" onclick="clearField('openai-input')">×</button>{% endif %}
+                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input">×</button>{% endif %}
+                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_AI_SECRET">Delete</button>{% endif %}
                     </div>
-                    {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_AI_SECRET')">Delete</button>{% endif %}
                 </div>
-                <div class="form-group">
-                    <label class="form-label">OpenWeatherMap</label>
-                    <div id="openweather-status">Configured: {{ 'Yes (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'No' }}</div>
-                    <div class="input-container">
+                <div class="form-group api-key-card">
+                    <div class="api-key-card-head">
+                        <label class="form-label">OpenWeatherMap</label>
+                        <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
+                    </div>
+                    <div class="input-container api-key-actions">
                         <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" onclick="clearField('openweather-input')">×</button>{% endif %}
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input">×</button>{% endif %}
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_WEATHER_MAP_SECRET">Delete</button>{% endif %}
                     </div>
-                    {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('OPEN_WEATHER_MAP_SECRET')">Delete</button>{% endif %}
                 </div>
-                <div class="form-group">
-                    <label class="form-label">NASA APOD</label>
-                    <div id="nasa-status">Configured: {{ 'Yes (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'No' }}</div>
-                    <div class="input-container">
+                <div class="form-group api-key-card">
+                    <div class="api-key-card-head">
+                        <label class="form-label">NASA APOD</label>
+                        <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
+                    </div>
+                    <div class="input-container api-key-actions">
                         <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
-                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" onclick="clearField('nasa-input')">×</button>{% endif %}
+                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input">×</button>{% endif %}
+                        {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="NASA_SECRET">Delete</button>{% endif %}
                     </div>
-                    {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('NASA_SECRET')">Delete</button>{% endif %}
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Unsplash</label>
-                    <div id="unsplash-status">Configured: {{ 'Yes (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'No' }}</div>
-                    <div class="input-container">
-                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" onclick="clearField('unsplash-input')">×</button>{% endif %}
+                <div class="form-group api-key-card">
+                    <div class="api-key-card-head">
+                        <label class="form-label">Unsplash</label>
+                        <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
                     </div>
-                    {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" onclick="deleteKey('UNSPLASH_ACCESS_KEY')">Delete</button>{% endif %}
+                    <div class="input-container api-key-actions">
+                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
+                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input">×</button>{% endif %}
+                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="UNSPLASH_ACCESS_KEY">Delete</button>{% endif %}
+                    </div>
                 </div>
             </div>
         </form>
@@ -87,30 +115,30 @@
                     <div class="apikey-row" data-existing="true">
                         <input type="text" class="apikey-key" value="{{ entry.key }}" placeholder="KEY_NAME" readonly>
                         <input type="text" class="apikey-value masked" value="{{ entry.masked }}" placeholder="(unchanged)" readonly>
-                        <button type="button" class="btn-delete" onclick="deleteRow(this)" title="Delete" aria-label="Delete API key">×</button>
+                        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete API key">×</button>
                     </div>
                     {% endfor %}
                 {% else %}
                     <div class="empty-state" id="empty-state">
-                        <div class="empty-state-icon">🔐</div>
+                        <div class="empty-state-icon">{{ icon('key', 'icon-image') | safe }}</div>
                         <p>No API keys configured yet.</p>
                         <p>Add keys below to enable plugin features.</p>
                     </div>
                 {% endif %}
             </div>
             <div class="add-buttons-grid">
-                <button type="button" class="btn-add" onclick="addRow()"><span>+</span> Add API Key</button>
-                <button type="button" class="btn-preset" data-key="OPEN_WEATHER_MAP_SECRET" onclick="addPreset(this)">OPEN_WEATHER_MAP_SECRET</button>
-                <button type="button" class="btn-preset" data-key="OPEN_AI_SECRET" onclick="addPreset(this)">OPEN_AI_SECRET</button>
-                <button type="button" class="btn-preset" data-key="NASA_SECRET" onclick="addPreset(this)">NASA_SECRET</button>
-                <button type="button" class="btn-preset" data-key="UNSPLASH_ACCESS_KEY" onclick="addPreset(this)">UNSPLASH_ACCESS_KEY</button>
-                <button type="button" class="btn-preset" data-key="GITHUB_SECRET" onclick="addPreset(this)">GITHUB_SECRET</button>
+                <button type="button" id="addApiKeyBtn" class="btn-add"><span>+</span> Add API Key</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET">OPEN_WEATHER_MAP_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET">OPEN_AI_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET">NASA_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY">UNSPLASH_ACCESS_KEY</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET">GITHUB_SECRET</button>
             </div>
         </div>
         {% endif %}
 
         <div class="info-banner">
-            <span class="info-banner-icon">ℹ️</span>
+            <span class="info-banner-icon">{{ icon('info', 'icon-image') | safe }}</span>
             <span class="info-banner-text">
                 API keys are stored in the <code>.env</code> file on the device.
                 Existing values remain masked. Some plugins may require a restart after changes.
@@ -118,7 +146,7 @@
         </div>
 
         <div class="buttons-container">
-            <button type="button" onclick="saveKeys()" class="action-button">Save</button>
+            <button type="button" id="saveApiKeysBtn" class="action-button">Save</button>
         </div>
     </div>
 

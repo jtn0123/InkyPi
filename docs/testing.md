@@ -23,6 +23,10 @@ PYTHONPATH=$(pwd)/src pytest --cov=src --cov-report=term-missing
 Notes:
 - Tests auto-mock Chromium image capture with a fixture; no browser required.
 - Network calls to external APIs are mocked in plugin tests.
+- Browser smoke coverage is separate and requires Playwright Chromium:
+  - `playwright install chromium`
+  - `PYTHONPATH=$(pwd)/src REQUIRE_BROWSER_SMOKE=1 pytest tests/integration/test_browser_smoke.py -q`
+- If a removed UI element such as the old skip link still appears in the browser after code changes, refresh the page or restart the app; stale server/browser state can mask template updates.
 
 ---
 
@@ -75,7 +79,7 @@ Server-side normalization:
 
 ### CI
 
-GitHub Actions runs tests and coverage across Python 3.10–3.12. Workflow file: `.github/workflows/tests.yml`.
+GitHub Actions runs the pytest matrix and a required browser-smoke job. Workflow file: `.github/workflows/ci.yml`.
 
 ---
 
@@ -84,5 +88,4 @@ GitHub Actions runs tests and coverage across Python 3.10–3.12. Workflow file:
 1) Place tests under `tests/` (unit, integration, or plugin subfolders).
 2) Reuse fixtures from `conftest.py`.
 3) Mock external APIs and I/O. Keep tests deterministic and fast.
-
 

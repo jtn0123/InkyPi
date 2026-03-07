@@ -1,36 +1,48 @@
-<div class="form-group">
-    <div class="form-group">
-        <label for="padImage" class="form-label">Scale to Fit:</label>
-        <div class="toggle-container">
-            <input type="checkbox" id="padImage" name="padImage" class="toggle-checkbox" value="false">
-            <label for="padImage" class="toggle-label"></label>
+<div class="settings-card">
+    <div class="settings-card-title">Display Options</div>
+    <div class="toggle-list">
+        <div class="toggle-item">
+            <div class="toggle-item-text">
+                <span class="toggle-item-label">Scale to Fit</span>
+                <span class="toggle-item-hint">Pad smaller images to match the display aspect ratio.</span>
+            </div>
+            <div class="toggle-container">
+                <input type="checkbox" id="padImage" name="padImage" class="toggle-checkbox" value="false">
+                <label for="padImage" class="toggle-label"></label>
+            </div>
+            <input type="hidden" name="padImage" value="true">
         </div>
-        <!-- Hidden input ensures 'true' is always sent when unchecked -->
-        <input type="hidden" name="padImage" value="true">
+        <div class="toggle-item">
+            <div class="toggle-item-text">
+                <span class="toggle-item-label">Random Order</span>
+                <span class="toggle-item-hint">Shuffle uploaded images during playback.</span>
+            </div>
+            <div class="toggle-container">
+                <input type="checkbox" id="randomize" name="randomize" class="toggle-checkbox" value="false"
+                    onclick="this.value = this.checked ? 'true' : 'false'">
+                <label for="randomize" class="toggle-label"></label>
+            </div>
+        </div>
     </div>
     <div class="form-group">
-        <label for="randomize" class="form-label">Random Order:</label>
-        <div class="toggle-container">
-            <input type="checkbox" id="randomize" name="randomize" class="toggle-checkbox" value="false"
-                onclick="this.value = this.checked ? 'true' : 'false'">
-            <label for="randomize" class="toggle-label"></label>
-        </div>
-    </div>
-
-    <div class="form-group">
-        <label class="form-label" for="backgroundOption">Background:</label>
-        <div class="form-group">
-            <input type="radio" id="backgroundOption" name="backgroundOption" value="blur">
-            <label>Blur</label>
-            <input type="radio" id="backgroundOption" name="backgroundOption" value="color">
-            <label>Color</label>
+        <label class="form-label" for="backgroundColor">Background Fill</label>
+        <div class="radio-segment">
+            <label class="radio-option">
+                <input type="radio" name="backgroundOption" value="blur">
+                <span>Blur</span>
+            </label>
+            <label class="radio-option">
+                <input type="radio" name="backgroundOption" value="color">
+                <span>Solid Color</span>
+            </label>
             <input type="color" id="backgroundColor" name="backgroundColor" value="#ffffff" class="color-picker"/>
         </div>
     </div>
 </div>
 
-<div class="form-group">
-    <label for="imageUpload" class="form-input file-upload-label">Choose Image</label>
+<div class="settings-card">
+    <div class="settings-card-title">Images</div>
+    <label for="imageUpload" class="form-input file-upload-label">Choose Images</label>
     <input type="file" clear-on-submit id="imageUpload" name="imageFiles[]" accept="image/*" multiple
            class="file-upload-input" onchange="addFiles()">
 </div>

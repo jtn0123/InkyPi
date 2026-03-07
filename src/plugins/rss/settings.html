@@ -1,7 +1,7 @@
 <div class="form-group">
     <div class="form-group">
         <label for="title" class="form-label">Title:</label>
-        <input type="text" id="title" name="title" placeholder="Type something..." required class="form-input">
+        <input type="text" id="title" name="title" placeholder="News Digest" required class="form-input">
     </div>
     <div class="form-group">
         <label for="includeImages" class="form-label">Include Images:</label>
@@ -24,13 +24,14 @@
 </div>
 <div class="form-group">
     <div class="form-group">
-        <label for="feedUrl" class="form-label">RSS Feed Url:</label>
-        <input type="text" id="feedUrl" name="feedUrl" placeholder="Type something..." required class="form-input">
+        <label for="feedUrl" class="form-label">RSS Feed URL:</label>
+        <input type="text" id="feedUrl" name="feedUrl" placeholder="https://example.com/feed.xml" required class="form-input">
     </div>
 </div>
 
-<div class="form-group">
-    <span style="color: var(--text-primary);">Warning: Do not run with untrusted URLs, as it may pose a security risk.</span>
+<div class="settings-callout warning">
+    {{ icon('info', 'icon-image') | safe }}
+    <span>Only use trusted RSS feeds. Untrusted URLs can introduce security and reliability risks.</span>
 </div>
 
 <script>

@@ -470,6 +470,7 @@ def test_ai_image_generate_settings_template():
     assert template["api_key"]["service"] == "OpenAI"
     assert template["api_key"]["expected_key"] == "OPEN_AI_SECRET"
     assert template["api_key"]["required"] is True
+    assert "settings_schema" in template
 
 def test_fetch_image_prompt_api_error_handling():
     """Test fetch_image_prompt with malformed API response."""

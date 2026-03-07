@@ -1,0 +1,639 @@
+(function () {
+  function createSettingsPage(config) {
+    const ui = window.InkyPiUI || {};
+    const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
+    const state = {
+      logsAutoScroll: true,
+      logsWrap: true,
+      lastLogsRaw: "",
+      updateTimer: null,
+      attachGeo: false,
+      activeTab: "device",
+    };
+
+    function populateIntervalFields() {
+      const intervalInput = document.getElementById("interval");
+      const unitSelect = document.getElementById("unit");
+      const seconds = config.pluginCycleIntervalSeconds;
+      if (!intervalInput || !unitSelect || seconds == null) return;
+      const intervalInMinutes = Math.floor(seconds / 60);
+      const intervalInHours = Math.floor(seconds / 3600);
+      if (intervalInHours > 0) {
+        intervalInput.value = String(intervalInHours);
+        unitSelect.value = "hour";
+      } else {
+        intervalInput.value = String(intervalInMinutes);
+        unitSelect.value = "minute";
+      }
+    }
+
+    async function handleAction() {
+      const form = document.querySelector(".settings-form");
+      const formData = new FormData(form);
+      try {
+        if (state.attachGeo && navigator.geolocation) {
+          const pos = await new Promise((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              enableHighAccuracy: true,
+              maximumAge: 60000,
+              timeout: 4000,
+            })
+          );
+          if (pos && pos.coords) {
+            formData.set("deviceLat", String(pos.coords.latitude));
+            formData.set("deviceLon", String(pos.coords.longitude));
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const response = await fetch(config.saveSettingsUrl, {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json();
+        if (response.ok) {
+          showResponseModal("success", `Success! ${result.message}`);
+        } else {
+          showResponseModal("failure", `Error! ${result.error}`);
+          form.reset();
+        }
+      } catch (error) {
+        showResponseModal(
+          "failure",
+          "An error occurred while processing your request. Please try again."
+        );
+      }
+    }
+
+    async function handleShutdown(reboot) {
+      showResponseModal(
+        "success",
+        reboot
+          ? "The system is rebooting. The UI will be unavailable until the reboot is complete."
+          : "The system is shutting down. The UI will remain unavailable until it is manually restarted."
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await fetch(config.shutdownUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reboot }),
+      });
+    }
+
+    function toggleUseDeviceLocation(cb) {
+      state.attachGeo = !!(cb && cb.checked);
+    }
+
+    function prefKey(key) {
+      return `logs_${key}`;
+    }
+
+    function isErrorLine(line) {
+      return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
+    }
+
+    function isWarnLine(line) {
+      return /\bWARNING\b/i.test(line);
+    }
+
+    function updateLastUpdated() {
+      const el = document.getElementById("logsUpdated");
+      if (el) {
+        el.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      }
+    }
+
+    function isViewerAtBottom(viewer) {
+      return (
+        viewer.scrollHeight - viewer.scrollTop - viewer.clientHeight < 8
+      );
+    }
+
+    function applyLogFiltersAndRender() {
+      const viewer = document.getElementById("logsViewer");
+      if (!viewer) return;
+
+      const filterInput = document.getElementById("logsFilter");
+      const levelSelect = document.getElementById("logsLevel");
+      const maxLinesInput = document.getElementById("logsMaxLines");
+
+      const filterText = (filterInput && filterInput.value || "").toLowerCase();
+      const level = (levelSelect && levelSelect.value) || "all";
+      const maxLines = Math.max(
+        50,
+        parseInt((maxLinesInput && maxLinesInput.value) || "500", 10)
+      );
+      const atBottom = isViewerAtBottom(viewer);
+
+      let lines = (state.lastLogsRaw || "").split("\n");
+      if (filterText) {
+        lines = lines.filter((line) =>
+          line.toLowerCase().includes(filterText)
+        );
+      }
+      if (level === "errors") {
+        lines = lines.filter(isErrorLine);
+      } else if (level === "warn_errors") {
+        lines = lines.filter((line) => isErrorLine(line) || isWarnLine(line));
+      }
+      if (lines.length > maxLines) {
+        lines = lines.slice(-maxLines);
+      }
+
+      viewer.textContent = lines.join("\n");
+      if (state.logsAutoScroll || atBottom) {
+        viewer.scrollTop = viewer.scrollHeight;
+      }
+    }
+
+    function flashLogsViewer() {
+      const viewer = document.getElementById("logsViewer");
+      if (!viewer) return;
+      viewer.style.boxShadow = "0 0 0 2px var(--accent)";
+      setTimeout(() => {
+        viewer.style.boxShadow = "";
+      }, 500);
+    }
+
+    async function fetchAndRenderLogs() {
+      const hoursSelect = document.getElementById("logsHours");
+      const viewer = document.getElementById("logsViewer");
+      if (!viewer) return;
+      try {
+        const filterInput = document.getElementById("logsFilter");
+        const levelSelect = document.getElementById("logsLevel");
+        const maxLinesInput = document.getElementById("logsMaxLines");
+        const params = new URLSearchParams();
+        params.set("hours", String(hoursSelect ? hoursSelect.value : "2"));
+        if (levelSelect) params.set("level", levelSelect.value || "all");
+        if (filterInput && filterInput.value) {
+          params.set("contains", filterInput.value);
+        }
+        if (maxLinesInput) {
+          params.set(
+            "limit",
+            String(Math.max(50, parseInt(maxLinesInput.value || "500", 10)))
+          );
+        }
+        const resp = await fetch(`${config.logsUrl}?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const data = await resp.json();
+        state.lastLogsRaw =
+          data && Array.isArray(data.lines) ? data.lines.join("\n") : "";
+        updateLastUpdated();
+        applyLogFiltersAndRender();
+        flashLogsViewer();
+      } catch (e) {
+        console.error("Failed to fetch logs", e);
+      }
+    }
+
+    function toggleLogsAutoScroll() {
+      state.logsAutoScroll = !state.logsAutoScroll;
+      const btn = document.getElementById("logsAutoScrollBtn");
+      if (btn) {
+        btn.textContent = state.logsAutoScroll
+          ? "Auto-Scroll: On"
+          : "Auto-Scroll: Off";
+      }
+      ui.savePref && ui.savePref("", prefKey("autoScroll"), state.logsAutoScroll);
+    }
+
+    function onLogsControlsChanged() {
+      const hours = document.getElementById("logsHours");
+      const maxLines = document.getElementById("logsMaxLines");
+      if (hours && ui.savePref) ui.savePref("", prefKey("hours"), hours.value);
+      if (maxLines && ui.savePref) {
+        ui.savePref("", prefKey("maxLines"), maxLines.value);
+      }
+      fetchAndRenderLogs();
+    }
+
+    function onLogsFilterChanged() {
+      const filterInput = document.getElementById("logsFilter");
+      const levelSelect = document.getElementById("logsLevel");
+      if (filterInput && ui.savePref) {
+        ui.savePref("", prefKey("filter"), filterInput.value || "");
+      }
+      if (levelSelect && ui.savePref) {
+        ui.savePref("", prefKey("level"), levelSelect.value || "all");
+      }
+      applyLogFiltersAndRender();
+    }
+
+    async function manualLogsRefresh() {
+      const btn = document.getElementById("logsRefreshBtn");
+      const updated = document.getElementById("logsUpdated");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Refreshing...";
+      }
+      if (updated) updated.textContent = "Refreshing...";
+      try {
+        await fetchAndRenderLogs();
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Refresh";
+        }
+      }
+    }
+
+    function copyLogsToClipboard() {
+      const viewer = document.getElementById("logsViewer");
+      if (!viewer) return;
+      navigator.clipboard?.writeText(viewer.textContent || "").catch(() => {});
+    }
+
+    function clearLogsView() {
+      const viewer = document.getElementById("logsViewer");
+      if (viewer) viewer.textContent = "";
+    }
+
+    function toggleLogsWrap() {
+      state.logsWrap = !state.logsWrap;
+      const viewer = document.getElementById("logsViewer");
+      const btn = document.getElementById("logsWrapBtn");
+      if (viewer) viewer.style.whiteSpace = state.logsWrap ? "pre-wrap" : "pre";
+      if (btn) btn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
+      ui.savePref && ui.savePref("", prefKey("wrap"), state.logsWrap);
+    }
+
+    async function startUpdate() {
+      const btns = document.querySelectorAll(".header-actions .header-button");
+      try {
+        btns.forEach((btn) => {
+          btn.disabled = true;
+        });
+        const resp = await fetch(config.startUpdateUrl, { method: "POST" });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", data.error || "Failed to start update");
+          return;
+        }
+        showResponseModal("success", data.message || "Update started.");
+        if (state.updateTimer) clearInterval(state.updateTimer);
+        state.updateTimer = setInterval(async () => {
+          try {
+            await fetchAndRenderLogs();
+            const sresp = await fetch(config.updateStatusUrl);
+            const sdata = await sresp.json();
+            if (!sdata || !sdata.running) {
+              clearInterval(state.updateTimer);
+              state.updateTimer = null;
+              setTimeout(fetchAndRenderLogs, 500);
+            }
+          } catch (e) {
+            clearInterval(state.updateTimer);
+            state.updateTimer = null;
+          }
+        }, 2000);
+      } catch (e) {
+        showResponseModal("failure", "Failed to start update");
+      } finally {
+        btns.forEach((btn) => {
+          btn.disabled = false;
+        });
+      }
+    }
+
+    async function exportConfig() {
+      const include = document.getElementById("includeKeys")?.checked;
+      const url = `${config.exportSettingsUrl}?include_keys=${include ? "1" : "0"}`;
+      try {
+        const resp = await fetch(url, { cache: "no-store" });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", "Export failed");
+          return;
+        }
+        const blob = new Blob([JSON.stringify(data.data, null, 2)], {
+          type: "application/json",
+        });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `inkypi_backup_${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showResponseModal("success", "Backup downloaded");
+      } catch (e) {
+        showResponseModal("failure", "Export failed");
+      }
+    }
+
+    async function importConfig() {
+      const fileInput = document.getElementById("importFile");
+      const file = fileInput && fileInput.files && fileInput.files[0];
+      if (!file) {
+        showResponseModal("failure", "Choose a backup file first");
+        return;
+      }
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const resp = await fetch(config.importSettingsUrl, {
+          method: "POST",
+          body: form,
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", data.error || "Import failed");
+          return;
+        }
+        showResponseModal("success", data.message || "Import complete");
+      } catch (e) {
+        showResponseModal("failure", "Import failed");
+      }
+    }
+
+    async function refreshBenchmarks() {
+      ui.setPanelLoading && ui.setPanelLoading("benchSummary", true);
+      try {
+        const [summaryResp, pluginsResp] = await Promise.all([
+          fetch("/api/benchmarks/summary?window=24h", { cache: "no-store" }),
+          fetch("/api/benchmarks/plugins?window=24h", { cache: "no-store" }),
+        ]);
+        const summary = await summaryResp.json();
+        const plugins = await pluginsResp.json();
+        const output = [
+          "Benchmark Summary (24h)",
+          JSON.stringify(summary.summary || {}, null, 2),
+          "",
+          "Per-plugin Averages",
+          JSON.stringify((plugins.items || []).slice(0, 10), null, 2),
+        ];
+        document.getElementById("benchSummary").textContent = output.join("\n");
+      } catch (e) {
+        document.getElementById("benchSummary").textContent =
+          "Failed to load benchmark summary";
+      } finally {
+        ui.setPanelLoading && ui.setPanelLoading("benchSummary", false);
+      }
+    }
+
+    async function refreshHealth() {
+      ui.setPanelLoading && ui.setPanelLoading("healthSummary", true);
+      try {
+        const [pluginsResp, systemResp] = await Promise.all([
+          fetch("/api/health/plugins", { cache: "no-store" }),
+          fetch("/api/health/system", { cache: "no-store" }),
+        ]);
+        const plugins = await pluginsResp.json();
+        const system = await systemResp.json();
+        const output = [
+          "System Health",
+          JSON.stringify(system, null, 2),
+          "",
+          "Plugin Health",
+          JSON.stringify(plugins.items || {}, null, 2),
+        ];
+        document.getElementById("healthSummary").textContent = output.join("\n");
+      } catch (e) {
+        document.getElementById("healthSummary").textContent =
+          "Failed to load health data";
+      } finally {
+        ui.setPanelLoading && ui.setPanelLoading("healthSummary", false);
+      }
+    }
+
+    async function refreshIsolation() {
+      ui.setPanelLoading && ui.setPanelLoading("isolationSummary", true);
+      try {
+        const resp = await fetch("/settings/isolation", { cache: "no-store" });
+        const data = await resp.json();
+        document.getElementById("isolationSummary").textContent = JSON.stringify(
+          data,
+          null,
+          2
+        );
+      } catch (e) {
+        document.getElementById("isolationSummary").textContent =
+          "Failed to load isolation list";
+      } finally {
+        ui.setPanelLoading && ui.setPanelLoading("isolationSummary", false);
+      }
+    }
+
+    async function isolatePlugin() {
+      const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
+      if (!pluginId) return;
+      await fetch("/settings/isolation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plugin_id: pluginId }),
+      });
+      await refreshIsolation();
+      await refreshHealth();
+    }
+
+    async function unIsolatePlugin() {
+      const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
+      if (!pluginId) return;
+      await fetch("/settings/isolation", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plugin_id: pluginId }),
+      });
+      await refreshIsolation();
+      await refreshHealth();
+    }
+
+    async function safeReset() {
+      try {
+        const resp = await fetch("/settings/safe_reset", { method: "POST" });
+        const data = await resp.json();
+        if (resp.ok && data.success) {
+          showResponseModal("success", data.message || "Safe reset complete");
+          await refreshHealth();
+        } else {
+          showResponseModal("failure", data.error || "Safe reset failed");
+        }
+      } catch (e) {
+        showResponseModal("failure", "Safe reset failed");
+      }
+    }
+
+    function initProgressSSE() {
+      try {
+        if (!window.EventSource) return;
+        const es = new EventSource("/api/progress/stream");
+        const refresh = () => refreshHealth();
+        es.addEventListener("done", refresh);
+        es.addEventListener("error", refresh);
+      } catch (e) {}
+    }
+
+    function initializeLogsControls() {
+      const hours = document.getElementById("logsHours");
+      const autoBtn = document.getElementById("logsAutoScrollBtn");
+      const filterInput = document.getElementById("logsFilter");
+      const levelSelect = document.getElementById("logsLevel");
+      const maxLinesInput = document.getElementById("logsMaxLines");
+      const refreshBtn = document.getElementById("logsRefreshBtn");
+      const copyBtn = document.getElementById("logsCopyBtn");
+      const clearBtn = document.getElementById("logsClearBtn");
+      const wrapBtn = document.getElementById("logsWrapBtn");
+      const viewer = document.getElementById("logsViewer");
+
+      if (filterInput && ui.loadPref) {
+        filterInput.value = ui.loadPref("", prefKey("filter"), "");
+      }
+      if (levelSelect && ui.loadPref) {
+        levelSelect.value = ui.loadPref("", prefKey("level"), "all");
+      }
+      if (hours && ui.loadPref) {
+        hours.value = ui.loadPref("", prefKey("hours"), "2");
+      }
+      if (maxLinesInput && ui.loadPref) {
+        maxLinesInput.value = ui.loadPref("", prefKey("maxLines"), "500");
+      }
+
+      state.logsAutoScroll =
+        (ui.loadPref && ui.loadPref("", prefKey("autoScroll"), "true")) ===
+        "true";
+      state.logsWrap =
+        (ui.loadPref && ui.loadPref("", prefKey("wrap"), "true")) === "true";
+      if (autoBtn) {
+        autoBtn.textContent = state.logsAutoScroll
+          ? "Auto-Scroll: On"
+          : "Auto-Scroll: Off";
+      }
+      if (wrapBtn) {
+        wrapBtn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
+      }
+      if (viewer) {
+        viewer.style.whiteSpace = state.logsWrap ? "pre-wrap" : "pre";
+      }
+
+      if (hours) hours.addEventListener("change", onLogsControlsChanged);
+      if (autoBtn) autoBtn.addEventListener("click", toggleLogsAutoScroll);
+      if (filterInput && ui.debounce) {
+        filterInput.addEventListener(
+          "input",
+          ui.debounce(onLogsFilterChanged, 200)
+        );
+      }
+      if (levelSelect) levelSelect.addEventListener("change", onLogsFilterChanged);
+      if (maxLinesInput) {
+        maxLinesInput.addEventListener("change", onLogsFilterChanged);
+      }
+      if (refreshBtn) refreshBtn.addEventListener("click", manualLogsRefresh);
+      if (copyBtn) copyBtn.addEventListener("click", copyLogsToClipboard);
+      if (clearBtn) clearBtn.addEventListener("click", clearLogsView);
+      if (wrapBtn) wrapBtn.addEventListener("click", toggleLogsWrap);
+      fetchAndRenderLogs();
+    }
+
+    function initializeCollapsibles() {
+      if (ui.setCollapsibles) {
+        ui.setCollapsibles(true, ".collapsible-header");
+      }
+    }
+
+    function setActiveTab(tab) {
+      state.activeTab = tab;
+      document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+        const isActive = button.dataset.settingsTab === tab;
+        button.classList.toggle("active", isActive);
+        if (isActive && mobileQuery.matches) {
+          button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+        }
+      });
+      document.querySelectorAll("[data-settings-panel]").forEach((panel) => {
+        const isActive = panel.dataset.settingsPanel === tab;
+        panel.classList.toggle("active", isActive);
+        panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+      });
+      initializeMobilePanelState();
+    }
+
+    function initializeTabs() {
+      document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+        button.addEventListener("click", () => setActiveTab(button.dataset.settingsTab));
+      });
+      setActiveTab("device");
+    }
+
+    function initializeMobilePanelState() {
+      if (!mobileQuery.matches) return;
+      const panel = document.querySelector(`[data-settings-panel="${state.activeTab}"]`);
+      if (!panel) return;
+      const openSection = panel.querySelector(".collapsible-content:not([hidden])");
+      if (openSection) return;
+      const firstToggle = panel.querySelector("[data-collapsible-toggle]");
+      if (firstToggle && firstToggle.getAttribute("aria-expanded") !== "true" && ui.toggleCollapsible) {
+        ui.toggleCollapsible(firstToggle);
+      }
+    }
+
+    function bindButtons() {
+      document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
+        button.addEventListener("click", () => ui.toggleCollapsible && ui.toggleCollapsible(button));
+      });
+      document.getElementById("saveSettingsBtn")?.addEventListener("click", handleAction);
+      document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
+      document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
+      document.getElementById("refreshBenchmarksBtn")?.addEventListener("click", refreshBenchmarks);
+      document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
+      document.getElementById("isolatePluginBtn")?.addEventListener("click", isolatePlugin);
+      document.getElementById("unIsolatePluginBtn")?.addEventListener("click", unIsolatePlugin);
+      document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
+      document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
+      document.getElementById("rebootBtn")?.addEventListener("click", () => handleShutdown(true));
+      document.getElementById("shutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
+        toggleUseDeviceLocation(event.currentTarget);
+      });
+      document.querySelectorAll(".settings-slider").forEach((slider) => {
+        slider.addEventListener("input", () => {
+          const valueDisplay = document.getElementById(`${slider.id}-value`);
+          if (valueDisplay) valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
+        });
+      });
+    }
+
+    function init() {
+      populateIntervalFields();
+      bindButtons();
+      initializeTabs();
+      initializeLogsControls();
+      initializeCollapsibles();
+      refreshBenchmarks();
+      refreshHealth();
+      refreshIsolation();
+      initProgressSSE();
+      if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
+        mobileQuery.addEventListener("change", () => setActiveTab(state.activeTab));
+      }
+    }
+
+    Object.assign(window, {
+      exportConfig,
+      handleAction,
+      handleShutdown,
+      importConfig,
+      isolatePlugin,
+      jumpToSection: ui.jumpToSection,
+      manualLogsRefresh,
+      refreshBenchmarks,
+      refreshHealth,
+      refreshIsolation,
+      safeReset,
+      startUpdate,
+      toggleUseDeviceLocation,
+      unIsolatePlugin,
+      updateSliderValue(slider) {
+        const valueDisplay = document.getElementById(`${slider.id}-value`);
+        if (valueDisplay) {
+          valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
+        }
+      },
+    });
+
+    return { init };
+  }
+
+  window.InkyPiSettingsPage = { create: createSettingsPage };
+})();

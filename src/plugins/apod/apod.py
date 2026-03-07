@@ -6,6 +6,7 @@ For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 """
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import callout, field, schema, section
 from PIL import Image
 from io import BytesIO
 import requests
@@ -17,6 +18,34 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class Apod(BasePlugin):
+    def build_settings_schema(self):
+        today = datetime.today().strftime("%Y-%m-%d")
+        return schema(
+            section(
+                "Source",
+                callout(
+                    "Pick a specific APOD date or enable randomization to explore past entries from NASA's archive.",
+                    title="NASA APOD",
+                ),
+                field(
+                    "randomizeApod",
+                    "checkbox",
+                    label="Randomize Date",
+                    hint="When enabled, InkyPi chooses a random APOD date instead of using the date field below.",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                ),
+                field(
+                    "customDate",
+                    "date",
+                    label="Date",
+                    default=today,
+                    visible_if={"field": "randomizeApod", "equals": "false"},
+                ),
+            )
+        )
+
     def _request_timeout(self) -> float:
         try:
             return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))

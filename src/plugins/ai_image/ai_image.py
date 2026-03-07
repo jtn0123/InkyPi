@@ -1,4 +1,5 @@
 from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from openai import OpenAI
 from PIL import Image
 from io import BytesIO
@@ -14,6 +15,66 @@ DEFAULT_IMAGE_MODEL = "dall-e-3"
 DEFAULT_IMAGE_QUALITY = "standard"
 
 class AIImage(BasePlugin):
+    def build_settings_schema(self):
+        return schema(
+            section(
+                "Prompt",
+                field(
+                    "textPrompt",
+                    label="Prompt",
+                    placeholder="A surreal breakfast floating through a neon sky.",
+                    required=True,
+                ),
+                field(
+                    "randomizePrompt",
+                    "checkbox",
+                    label="Randomize Prompt",
+                    hint="Use the current prompt as a seed and let the model remix it before generating the image.",
+                    submit_unchecked=True,
+                    checked_value="true",
+                    unchecked_value="false",
+                ),
+            ),
+            section(
+                "Generation",
+                row(
+                    field(
+                        "imageModel",
+                        "select",
+                        label="Image Model",
+                        default=DEFAULT_IMAGE_MODEL,
+                        options=[
+                            option("dall-e-3", "DALL·E 3"),
+                            option("dall-e-2", "DALL·E 2"),
+                            option("gpt-image-1", "GPT Image 1"),
+                        ],
+                    ),
+                    field(
+                        "quality",
+                        "select",
+                        label="Quality",
+                        default=DEFAULT_IMAGE_QUALITY,
+                        options_source="imageModel",
+                        options_source_default=DEFAULT_IMAGE_MODEL,
+                        options_by_value={
+                            "dall-e-3": [
+                                option("hd", "HD"),
+                                option("standard", "Standard"),
+                            ],
+                            "dall-e-2": [
+                                option("standard", "Standard"),
+                            ],
+                            "gpt-image-1": [
+                                option("high", "High"),
+                                option("medium", "Medium"),
+                                option("low", "Low"),
+                            ],
+                        },
+                    ),
+                ),
+            ),
+        )
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
         template_params['api_key'] = {

@@ -35,22 +35,51 @@ def test_plugin_add_to_playlist_flow(client):
                 try { window.__requests__.push({url: (url && url.toString ? url.toString() : String(url)), body: opts.body, method: (opts && opts.method) || 'GET'}); } catch(e){};
                 return Promise.resolve(ok());
             };
+
+            // Wire up modal open/close and plugin-action handlers
+            // (plugin_page.js normally does this but isn't loaded in set_content)
+            document.querySelectorAll("[data-open-modal]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const modal = document.getElementById(btn.dataset.openModal);
+                    if (modal) modal.style.display = "flex";
+                });
+            });
+            document.querySelectorAll("[data-close-modal]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const modal = document.getElementById(btn.dataset.closeModal);
+                    if (modal) modal.style.display = "none";
+                });
+            });
+            document.querySelectorAll("[data-plugin-action]").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const action = btn.dataset.pluginAction;
+                    const form = document.getElementById("settingsForm");
+                    const scheduleForm = document.getElementById("scheduleForm");
+                    const formData = new FormData(form);
+                    if (action === "add_to_playlist" && scheduleForm) {
+                        const sd = new FormData(scheduleForm);
+                        const obj = {}; for (const [k,v] of sd.entries()) obj[k] = v;
+                        formData.append("refresh_settings", JSON.stringify(obj));
+                    }
+                    fetch("/add_plugin", { method: "POST", body: formData });
+                });
+            });
         """)
 
         # Open Add to Playlist modal and fill fields (scope to the modal)
         page.click("text=Add to Playlist")
         page.wait_for_selector("#scheduleModal", state="visible")
         page.fill("#scheduleModal #instance", "My Instance")
-        page.fill("#scheduleModal #interval", "15")
-        page.select_option("#scheduleModal #unit", "minute")
+        page.fill("#scheduleModal #scheduleInterval", "15")
+        page.select_option("#scheduleModal #scheduleUnit", "minute")
         # Save using the modal's Save button
         page.click("#scheduleModal button:has-text(\"Save\")")
 
+        # Small wait for async fetch stub to fire
+        page.wait_for_timeout(500)
+
         # Verify our stubbed fetch captured a request to add_plugin (Add to Playlist)
         posts = [r for r in page.evaluate("() => window.__requests__") if r and r.get('method','GET') == 'POST']
-        # Accept either /add_plugin (modal) or /save_plugin_settings if selector fell back; prefer /add_plugin
         assert any((isinstance(p.get('url'), str) and '/add_plugin' in p.get('url')) for p in posts)
 
         browser.close()
-
-

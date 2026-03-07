@@ -20,6 +20,7 @@ def test_generate_settings_template_contains_comics(plugin_config):
     t = p.generate_settings_template()
     assert "comics" in t
     assert set(COMICS).issubset(set(t["comics"]))
+    assert "settings_schema" in t
 
 def test_generate_image_valid_flow_horizontal(
     monkeypatch, plugin_config, device_config_dev
