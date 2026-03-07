@@ -1,17 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ plugin.display_name }} Settings</title>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+{% extends "base.html" %}
+{% block title %}{{ plugin.display_name }} Settings{% endblock %}
+{% block head %}
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}"></script>
-    
+
 
     <script>
         const pluginSettings = window.pluginSettings = {{ (plugin_settings | default({})) | tojson }};
@@ -34,44 +28,46 @@
         };
         const uploadedFiles = window.uploadedFiles = window.uploadedFiles || {};
     </script>
-</head>
-<body>
+{% endblock %}
+{% block body %}
     <main id="main-content" role="main" class="page-shell page-shell-workflow" data-page-shell="workflow">
     <div class="frame workflow-frame">
         {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP %}
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
-            <div class="app-identity">
-                <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                {{ theme_toggle() }}
-                {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
-                {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
-                <div class="title-stack">
-                    <h1 class="app-title">{{ plugin.display_name }}</h1>
-                    <span class="app-subtitle">{{ plugin.id }}</span>
-                </div>
-            </div>
-            <div class="header-controls">
-                <!-- API Key Status Indicator -->
-                {% if api_key and api_key.required %}
-                    {% if api_key.present %}
-                    <div class="api-key-indicator configured" id="apiKeyIndicator" title="{{ api_key.service }} API Key is configured">
-                        <span class="api-key-icon">✓</span>
-                        <span class="api-key-text">API</span>
+            <div class="header-content">
+                <div class="header-identity">
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    {{ theme_toggle() }}
+                    <div class="title-container">
+                        {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
+                        {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
+                        <div class="title-stack">
+                            <h1 class="app-title">{{ plugin.display_name }}</h1>
+                            <span class="app-subtitle">{{ plugin.id }}</span>
+                        </div>
                     </div>
-                    {% else %}
-                    <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" title="{{ api_key.service }} API Key required - Click to configure">
-                        <span class="api-key-icon">⚠</span>
-                        <span class="api-key-text">API Required</span>
-                    </a>
+                </div>
+                <div class="header-actions">
+                    <!-- API Key Status Indicator -->
+                    {% if api_key and api_key.required %}
+                        {% if api_key.present %}
+                        <div class="api-key-indicator configured" id="apiKeyIndicator" title="{{ api_key.service }} API Key is configured">
+                            <span class="api-key-icon">✓</span>
+                            <span class="api-key-text">API</span>
+                        </div>
+                        {% else %}
+                        <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" title="{{ api_key.service }} API Key required - Click to configure">
+                            <span class="api-key-icon">⚠</span>
+                            <span class="api-key-text">API Required</span>
+                        </a>
+                        {% endif %}
                     {% endif %}
-                {% endif %}
 
-                
-                {% from 'macros/icons.html' import icon %}
-                <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Show last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
-                <div id="loadingIndicator" class="loading-indicator"></div>
+                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Show last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                    <div id="loadingIndicator" class="loading-indicator"></div>
+                </div>
             </div>
         </div>
 
@@ -290,7 +286,7 @@
     {% include 'response_modal.html' %}
 
     <!-- Schedule Configuration Modal -->
-    <div id="scheduleModal" class="modal">
+    <div id="scheduleModal" class="modal" role="dialog" aria-modal="true">
         <div class="modal-content">
             <button class="close-button" type="button" data-close-modal="scheduleModal" aria-label="Close">×</button>
             <h2>Add to Playlist</h2>
@@ -311,7 +307,7 @@
                 </div>
                 <div class="form-group">
                     <label>Refresh</label>
-                    <span class="help-icon" title="Determines how often the data and image should be refreshed.">i</span>
+                    <span class="help-icon" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">i</span>
                 </div>
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
@@ -335,7 +331,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Image preview (lightbox) for plugin page -->
     <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" hidden>
         <div class="modal-content">
@@ -389,5 +385,4 @@
         });
     </script>
     </main>
-</body>
-</html>
+{% endblock %}

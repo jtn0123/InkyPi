@@ -1,22 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ config.name }}</title>
-</head>
-<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-<script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-<script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
-<script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
-<script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}"></script>
-<body>
+{% extends "base.html" %}
+{% block title %}{{ config.name }}{% endblock %}
+{% block head %}
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}"></script>
+{% endblock %}
+{% block body %}
     <!-- Subtle frame container -->
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP %}
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
+                    {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}
                         <h1 class="app-title">{{ config.name }}</h1>
@@ -26,7 +21,6 @@
                     <a href="{{ url_for('history.history_page') }}" class="header-button icon" title="History" aria-label="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
                     <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" title="Playlists" aria-label="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
                     <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" title="Settings" aria-label="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
                 </div>
             </div>
         </div>
@@ -55,7 +49,7 @@
                             <h2>Current Display</h2>
                             <p id="dashboardStageCopy" class="dashboard-stage-copy">Click the preview to inspect it in the lightbox. On desktop, double-click to toggle native pixels.</p>
                         </div>
-                        <span class="status-chip info">{{ config.resolution[0] }}×{{ config.resolution[1] }}</span>
+                        <span class="status-chip info">{{ config.resolution[0] }}&times;{{ config.resolution[1] }}</span>
                     </div>
                     <div class="image-container">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
@@ -154,5 +148,4 @@
         window.InkyPiDashboardPage.create(window.__INKYPI_DASHBOARD_BOOT__).init();
     });
 </script>
-</body>
-</html>
+{% endblock %}

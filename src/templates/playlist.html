@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playlists</title>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+{% extends "base.html" %}
+{% block title %}Playlists{% endblock %}
+{% block head %}
     <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
     <script>
         window.PLAYLIST_CTX = {
@@ -24,10 +18,10 @@
         };
     </script>
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
-</head>
-<body>
+{% endblock %}
+{% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle %}
-    <main class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+    <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
         <div class="app-header">
@@ -40,7 +34,9 @@
                         <h1 class="app-title">Playlists</h1>
                     </div>
                 </div>
-                <button id="newPlaylistBtn" class="header-button" type="button">New Playlist</button>
+                <div class="header-actions">
+                    <button id="newPlaylistBtn" class="header-button" type="button">New Playlist</button>
+                </div>
             </div>
         </div>
         <div class="separator"></div>
@@ -163,7 +159,7 @@
     </div>
 
     <!-- Schedule Configuration Modal -->
-    <div id="playlistModal" class="modal" hidden>
+    <div id="playlistModal" class="modal" role="dialog" aria-modal="true" hidden>
         <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">×</button>
             <h2 id="modalTitle">New Playlist</h2>
@@ -195,7 +191,7 @@
     </div>
 
     <!-- Refresh Settings Modal -->
-    <div id="refreshSettingsModal" class="modal" hidden>
+    <div id="refreshSettingsModal" class="modal" role="dialog" aria-modal="true" hidden>
         <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">×</button>
             <h2>Refresh Settings</h2>
@@ -222,5 +218,4 @@
         </div>
     </div>
     </main>
-</body>
-</html>
+{% endblock %}

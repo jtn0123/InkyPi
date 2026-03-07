@@ -2,14 +2,23 @@
 """Tests for UI enhancement CSS and styling."""
 
 import pytest
+from pathlib import Path
+
+# CSS is now split into @import partials; read all partials from disk
+_STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
+
+
+def _read_all_css() -> str:
+    """Concatenate all CSS partials referenced by main.css."""
+    parts = []
+    for p in sorted(_STYLES_DIR.glob("partials/_*.css")):
+        parts.append(p.read_text(encoding="utf-8"))
+    return "\n".join(parts)
 
 
 def test_main_css_contains_progressive_disclosure_styles(client):
     """Test that main.css contains progressive disclosure styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for progressive disclosure CSS classes
     assert ".settings-mode-selector" in css_content
@@ -21,10 +30,7 @@ def test_main_css_contains_progressive_disclosure_styles(client):
 
 def test_main_css_contains_form_enhancement_styles(client):
     """Test that main.css contains form enhancement styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for enhanced form styling
     assert ".form-section" in css_content
@@ -40,10 +46,7 @@ def test_main_css_contains_form_enhancement_styles(client):
 
 def test_main_css_contains_validation_styles(client):
     """Test that main.css contains validation styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for validation message styles
     assert ".validation-message" in css_content
@@ -58,10 +61,7 @@ def test_main_css_contains_validation_styles(client):
 
 def test_main_css_contains_tooltip_styles(client):
     """Test that main.css contains tooltip styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for tooltip system
     assert ".tooltip" in css_content
@@ -73,10 +73,7 @@ def test_main_css_contains_tooltip_styles(client):
 
 def test_main_css_contains_wizard_styles(client):
     """Test that main.css contains wizard styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for wizard styling
     assert ".setup-wizard" in css_content
@@ -89,10 +86,7 @@ def test_main_css_contains_wizard_styles(client):
 
 def test_main_css_contains_live_preview_styles(client):
     """Test that main.css contains live preview styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for live preview system
     assert ".live-preview-overlay" in css_content
@@ -104,10 +98,7 @@ def test_main_css_contains_live_preview_styles(client):
 
 
 def test_main_css_contains_workflow_and_management_shells(client):
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     assert ".workflow-layout" in css_content
     assert ".workflow-mode-bar" in css_content
@@ -140,10 +131,7 @@ def test_primary_templates_reduce_inline_handlers():
 
 def test_main_css_contains_enhanced_button_styles(client):
     """Test that main.css contains enhanced button styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for button enhancements
     assert ".action-button" in css_content
@@ -154,10 +142,7 @@ def test_main_css_contains_enhanced_button_styles(client):
 
 def test_main_css_contains_toggle_styles(client):
     """Test that main.css contains enhanced toggle styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for toggle switch styling
     assert ".toggle-container" in css_content
@@ -169,10 +154,7 @@ def test_main_css_contains_toggle_styles(client):
 
 def test_main_css_contains_responsive_design(client):
     """Test that main.css contains responsive design improvements."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for mobile responsive styles
     assert "@media (max-width: 768px)" in css_content
@@ -185,10 +167,7 @@ def test_main_css_contains_responsive_design(client):
 
 def test_main_css_contains_animation_styles(client):
     """Test that main.css contains animation and transition styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for animations
     assert "@keyframes slideInFromRight" in css_content
@@ -199,10 +178,7 @@ def test_main_css_contains_animation_styles(client):
 
 def test_main_css_contains_theme_variables(client):
     """Test that main.css properly uses theme variables."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for CSS custom properties usage
     assert "var(--text)" in css_content
@@ -227,10 +203,7 @@ def test_main_css_contains_theme_variables(client):
 
 def test_main_css_contains_spacing_improvements(client):
     """Test that main.css contains improved spacing system."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for spacing system
     assert ".form-field + .form-field" in css_content
@@ -245,10 +218,7 @@ def test_main_css_contains_spacing_improvements(client):
 
 def test_main_css_contains_accessibility_improvements(client):
     """Test that main.css contains accessibility improvements."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for focus styles
     assert ":focus" in css_content
@@ -262,10 +232,7 @@ def test_main_css_contains_accessibility_improvements(client):
 
 def test_main_css_contains_status_badges(client):
     """Test that main.css contains status badge styling."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for status badge system
     assert ".status-badge" in css_content
@@ -276,10 +243,7 @@ def test_main_css_contains_status_badges(client):
 
 def test_main_css_contains_color_picker_improvements(client):
     """Test that main.css contains color picker improvements."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for color picker styling
     assert ".color-picker" in css_content
@@ -289,10 +253,7 @@ def test_main_css_contains_color_picker_improvements(client):
 
 def test_main_css_contains_select_improvements(client):
     """Test that main.css contains select element improvements."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for select styling
     assert "select.form-input" in css_content
@@ -303,10 +264,7 @@ def test_main_css_contains_select_improvements(client):
 
 def test_main_css_contains_grid_improvements(client):
     """Test that main.css contains grid layout improvements."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for grid system
     assert ".sections-grid" in css_content
@@ -317,10 +275,7 @@ def test_main_css_contains_grid_improvements(client):
 
 def test_main_css_contains_preview_overlay_theming(client):
     """Test that main.css contains proper theming for preview overlay."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for dark theme preview overlay
     assert "[data-theme=\"dark\"] .live-preview-overlay" in css_content
@@ -334,10 +289,7 @@ def test_main_css_contains_preview_overlay_theming(client):
 
 def test_main_css_contains_mobile_preview_adjustments(client):
     """Test that main.css contains mobile adjustments for preview."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for mobile preview adjustments
     mobile_preview_section = css_content.find("/* Mobile adjustments for live preview */")
@@ -349,10 +301,7 @@ def test_main_css_contains_mobile_preview_adjustments(client):
 
 def test_main_css_typography_hierarchy(client):
     """Test that main.css contains proper typography hierarchy."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for typography improvements
     assert "/* Enhanced Typography Hierarchy */" in css_content
@@ -364,10 +313,7 @@ def test_main_css_typography_hierarchy(client):
 
 def test_main_css_contains_enhanced_skeleton_styles(client):
     """Test that main.css contains enhanced skeleton loading styles."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for plugin-specific skeleton patterns
     assert ".plugin-skeleton" in css_content
@@ -390,10 +336,7 @@ def test_main_css_contains_enhanced_skeleton_styles(client):
 
 def test_main_css_contains_enhanced_progress_styles(client):
     """Test that main.css contains enhanced progress display styles."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for enhanced progress display
     assert ".enhanced-progress-header" in css_content
@@ -419,10 +362,7 @@ def test_main_css_contains_enhanced_progress_styles(client):
 
 def test_main_css_contains_api_validation_styles(client):
     """Test that main.css contains API validation indicator styles."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for API validation indicators
     assert ".api-validation-indicator" in css_content
@@ -449,9 +389,7 @@ def test_main_css_contains_api_validation_styles(client):
 
 
 def test_main_css_contains_top_level_theme_normalization_helpers(client):
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     assert ".storage-meter" in css_content
     assert ".storage-meter-fill" in css_content
@@ -463,10 +401,7 @@ def test_main_css_contains_top_level_theme_normalization_helpers(client):
 
 def test_main_css_contains_operation_status_styles(client):
     """Test that main.css contains operation status indicator styles."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for operation status container
     assert ".operation-status-container" in css_content
@@ -499,10 +434,7 @@ def test_main_css_contains_operation_status_styles(client):
 
 def test_main_css_contains_status_color_variables(client):
     """Test that main.css contains status color variables."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for status color variables
     assert "--success-bg:" in css_content
@@ -517,10 +449,7 @@ def test_main_css_contains_status_color_variables(client):
 
 def test_main_css_contains_shimmer_animation(client):
     """Test that main.css contains shimmer animation for skeletons."""
-    resp = client.get("/static/styles/main.css")
-    assert resp.status_code == 200
-
-    css_content = resp.get_data(as_text=True)
+    css_content = _read_all_css()
 
     # Check for shimmer animation
     assert "@keyframes shimmer" in css_content

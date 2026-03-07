@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Keys</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+{% extends "base.html" %}
+{% block title %}API Keys{% endblock %}
+{% block head %}
     <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}"></script>
+{% endblock %}
+{% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle %}
-</head>
-<body>
     <main class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
@@ -156,5 +150,4 @@
             window.InkyPiApiKeysPage.create(window.__INKYPI_API_KEYS_BOOT__).init();
         });
     </script>
-</body>
-</html>
+{% endblock %}

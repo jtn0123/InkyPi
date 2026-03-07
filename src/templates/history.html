@@ -1,17 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>History</title>
-    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+{% block head %}
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/history_page.js') }}"></script>
-</head>
-<body>
-    <main class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+{% endblock %}
+{% block body %}
+    <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle %}
         <div class="app-header">
@@ -181,5 +175,4 @@
             window.InkyPiHistoryPage.create(window.__INKYPI_HISTORY_BOOT__).init();
         });
     </script>
-</body>
-</html>
+{% endblock %}

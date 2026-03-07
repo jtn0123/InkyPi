@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Settings</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='styles/main.css') }}">
-    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block head %}
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/settings_page.js') }}"></script>
-</head>
-<body>
+{% endblock %}
+{% block body %}
     <main id="settings-main" class="page-shell page-shell-management" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
@@ -26,7 +20,7 @@
                         <h1 class="app-title">Settings</h1>
                     </div>
                 </div>
-                <div class="header-actions header-actions-flex">
+                <div class="header-actions">
                     <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                 </div>
@@ -91,7 +85,7 @@
                 <!-- Time & Locale -->
                 <div class="collapsible" id="section-time-locale">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Time & Locale <span class="collapsible-icon" aria-hidden="true">▼</span>
+                        Time & Locale <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group nowrap">
@@ -125,12 +119,12 @@
                 <section class="settings-console-panel" data-settings-panel="scheduling">
                 <div class="collapsible" id="section-display-cycle">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Display Cycle & System <span class="collapsible-icon" aria-hidden="true">▼</span>
+                        Display Cycle & System <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <label for="interval" class="form-label">Plugin Cycle Interval</label>
-                            <span class="help-icon" title="Determines how often the display switches to a new plugin.">i</span>
+                            <span class="help-icon" title="Determines how often the display switches to a new plugin." aria-label="Determines how often the display switches to a new plugin.">i</span>
                             <span>Every</span>
                             <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
                             <span id="interval-settings-error" class="validation-message" role="alert"></span>
@@ -155,7 +149,7 @@
                 <section class="settings-console-panel" data-settings-panel="maintenance">
                 <div class="collapsible" id="section-backup-restore">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Backup & Restore <span class="collapsible-icon" aria-hidden="true">▼</span>
+                        Backup & Restore <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
@@ -178,7 +172,7 @@
                 <!-- Observability & Recovery -->
                 <div class="collapsible" id="section-observability">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Observability & Recovery <span class="collapsible-icon" aria-hidden="true">▼</span>
+                        Observability & Recovery <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="diagnostics-strip">
@@ -237,7 +231,7 @@
                 <section class="settings-console-panel" data-settings-panel="image">
                 <div class="collapsible" id="section-image-settings">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Image Settings <span class="collapsible-icon" aria-hidden="true">▼</span>
+                        Image Settings <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
@@ -279,7 +273,7 @@
                 </section>
             </div>
         </form>
- 
+
         <!-- Buttons -->
         <div class="buttons-container">
             <button type="button" id="saveSettingsBtn" class="action-button">Save</button>
@@ -354,5 +348,4 @@
             window.InkyPiSettingsPage.create(window.__INKYPI_SETTINGS_BOOT__).init();
         });
     </script>
-</body>
-</html>
+{% endblock %}
