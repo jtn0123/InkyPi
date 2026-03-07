@@ -220,6 +220,10 @@
     }
 
     function init() {
+      // Hide plugin icons that fail to load
+      document.querySelectorAll('.plugin-item img.icon-image[loading="lazy"]').forEach(function (img) {
+        img.addEventListener('error', function () { img.style.display = 'none'; });
+      });
       document.getElementById("displayNextBtn")?.addEventListener("click", displayNextNow);
       initPreviewInteractions();
       initRealtime();

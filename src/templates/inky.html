@@ -122,8 +122,7 @@
                         src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}"
                         alt=""
                         class="icon-image"
-                        loading="lazy"
-                        onerror="this.style.display='none'">
+                        loading="lazy">
                     {% endif %}
                     <span class="plugin-name">{{ plugin.display_name }}</span>
                 </a>

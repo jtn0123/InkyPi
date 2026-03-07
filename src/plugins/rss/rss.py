@@ -93,6 +93,8 @@ class Rss(BasePlugin):
         
         # Parse the feed content
         feed = feedparser.parse(resp.content)
+        if feed.bozo and not feed.entries:
+            raise RuntimeError(f"Failed to parse RSS feed: {feed.bozo_exception}")
         items = []
 
         for entry in feed.entries:

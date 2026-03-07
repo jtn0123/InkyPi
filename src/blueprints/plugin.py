@@ -103,7 +103,10 @@ def image(plugin_id: str, filename: str):
     # Serve static plugin asset files with traversal protection
     plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
     full_path = os.path.abspath(os.path.join(plugin_dir, filename))
-    if not full_path.startswith(plugin_dir + os.sep):
+    try:
+        if os.path.commonpath([plugin_dir, full_path]) != plugin_dir:
+            return abort(404)
+    except ValueError:
         return abort(404)
     if not os.path.exists(full_path):
         return abort(404)

@@ -4,6 +4,7 @@ import multiprocessing
 import os
 import queue
 import threading
+import traceback
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -101,6 +102,7 @@ def _execute_refresh_attempt_worker(
                 "ok": False,
                 "error_type": exc.__class__.__name__,
                 "error_message": str(exc),
+                "traceback": traceback.format_exc(),
             }
         )
 
