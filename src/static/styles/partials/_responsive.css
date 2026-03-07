@@ -1,0 +1,1008 @@
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .img-skeleton {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .loading-panel {
+        animation: none;
+        background: var(--skeleton-base, rgba(0,0,0,0.06));
+    }
+
+    .section-focus {
+        animation: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    :root {
+        --surface-border: #000;
+        --text: #000;
+        --accent: #0066cc;
+    }
+
+    [data-theme="dark"] {
+        --surface-border: #fff;
+        --text: #fff;
+        --accent: #4d9fff;
+    }
+
+    .icon-button,
+    .action-button,
+    .header-button {
+        border-width: 2px;
+    }
+}
+
+/* ── Progress steps mobile ── */
+@media (max-width: 640px) {
+    .enhanced-progress-steps {
+        gap: 6px;
+    }
+
+    .enhanced-step {
+        padding: 6px;
+    }
+
+    .enhanced-step.active,
+    .enhanced-step.failed {
+        padding-left: 7px;
+    }
+
+    .step-indicator {
+        width: 20px;
+        height: 20px;
+        font-size: 0.625rem;
+    }
+
+    .progress-controls {
+        gap: 8px;
+    }
+
+    .enhanced-progress-bar-section {
+        gap: 8px;
+    }
+
+    .operation-status-container {
+        position: fixed;
+        top: auto;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        width: auto;
+        max-height: 50vh;
+    }
+
+    .status-header {
+        padding: 10px 12px;
+    }
+
+    .status-summary {
+        gap: 8px;
+    }
+
+    .operation-item {
+        padding: 6px 8px;
+    }
+
+    .operation-header {
+        gap: 6px;
+    }
+
+    .image-container img {
+        max-height: 46vh;
+        object-fit: contain;
+    }
+
+    .dashboard-hero,
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-stage .image-container img {
+        max-height: none;
+    }
+
+    .dashboard-stage .image-container {
+        max-width: 100%;
+    }
+
+    .dashboard-stage .image-container.native {
+        max-height: min(48vh, 24rem);
+    }
+
+    .dashboard-stage .image-container.native,
+    .dashboard-stage .image-container.native-preview-enabled {
+        overflow: hidden;
+    }
+
+    .dashboard-stage .image-container.native img {
+        width: 100%;
+        max-width: min(100%, 28rem);
+    }
+
+    .status-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .status-divider {
+        display: none;
+    }
+
+    .plugins-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .plugins-container .plugin-item {
+        padding: 14px 12px;
+    }
+
+    .plugins-container .plugin-item .icon-image {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        min-height: 42px;
+    }
+
+    .plugin-name {
+        font-size: 0.8rem;
+        line-height: 1.35;
+    }
+
+    .logs-panel {
+        position: static;
+        max-height: none;
+    }
+
+    .logs-viewer {
+        min-height: 260px;
+        max-height: 50vh;
+    }
+
+    .logs-filters,
+    .logs-actions,
+    .history-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dashboard-status-card .action-button,
+    .dashboard-status-card .header-button {
+        justify-self: stretch;
+    }
+}
+
+/* ── Progress block small screens ── */
+@media (max-width: 520px) {
+    .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
+    .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
+
+    .buttons-container {
+        flex-direction: column;
+    }
+
+    .buttons-container .action-button,
+    .buttons-container .header-button {
+        width: 100%;
+    }
+
+    .playlist-toolbar {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+}
+
+/* ── API key row mobile ── */
+@media (max-width: 700px) {
+    .apikey-row {
+        grid-template-columns: 1fr;
+    }
+
+    .history-actions {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Improved mobile layout ── */
+@media (max-width: 768px) {
+    .frame {
+        width: 95%;
+        padding: 16px;
+        min-height: 95vh;
+    }
+
+    .app-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .api-key-indicator {
+        font-size: 0.75rem;
+        padding: 6px 10px;
+    }
+
+    .api-key-indicator.collapsed {
+        padding: 6px;
+    }
+
+    .api-key-icon {
+        width: var(--icon-sm);
+        height: var(--icon-sm);
+        font-size: 14px;
+    }
+
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .form-group {
+        gap: 8px 12px;
+    }
+
+    .workflow-layout,
+    .settings-console-layout,
+    .diagnostics-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-side-nav {
+        position: static;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .workflow-mode-bar {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .workflow-action-group,
+    .inline-action-row {
+        flex-direction: column;
+    }
+
+    /* Stack form elements on very small screens */
+    .form-group.nowrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* Better modal sizing on small screens */
+    .modal-content {
+        margin: 5% auto;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Improve form inputs on mobile */
+    .form-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        min-height: 44px;
+    }
+
+    /* Responsive icon sizing for mobile */
+    .app-header .app-icon {
+        width: var(--icon-md);
+        height: var(--icon-md);
+    }
+
+    .header-button.icon {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
+    }
+
+    .header-button.icon svg {
+        width: var(--icon-lg);
+        height: var(--icon-lg);
+    }
+
+    .section-nav {
+        gap: 6px;
+    }
+
+    .section-nav .status-chip {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .header-identity,
+    .header-actions,
+    .logs-actions,
+    .page-intro,
+    .page-summary {
+        width: 100%;
+    }
+
+    .header-identity {
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+
+    .header-actions,
+    .logs-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .page-intro {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .page-summary {
+        justify-content: flex-start;
+    }
+
+    .playlist-header {
+        padding: 16px 18px 10px;
+    }
+
+    .plugin-item {
+        padding: 12px 18px;
+    }
+
+    .api-key-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .metric-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .history-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Enhanced responsive design ── */
+@media (max-width: 900px) {
+    .status-bar {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .status-card.compact .image-container {
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    /* Improve button spacing on mobile */
+    .button-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        padding: 20px 12px;
+    }
+
+    /* Better modal sizing */
+    .modal-content {
+        margin: 10% auto;
+        width: 95%;
+        max-width: 500px;
+    }
+
+    /* Improved mobile form layouts */
+    .form-group.nowrap {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .form-group.nowrap > * {
+        width: 100%;
+        flex: none;
+    }
+
+    /* Stack form controls vertically on mobile */
+    .header-actions {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    /* Better spacing for form sections */
+    .form-section {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    /* Improved logs interface on mobile */
+    .logs-filters {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .logs-actions {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    /* Better title-row layout on mobile */
+    .title-row {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .custom-title-input {
+        order: 2;
+    }
+
+    .sections-grid.two-col{grid-template-columns:1fr;}
+}
+
+/* ── Touch device improvements ── */
+@media (hover: none) and (pointer: coarse) {
+    .icon-button,
+    .action-button,
+    .header-button {
+        min-height: 48px;
+        padding: 12px;
+    }
+
+    .icon-button:hover {
+        transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .action-button:hover {
+        transform: none;
+        background-color: var(--accent);
+    }
+
+    /* Better tap feedback */
+    .icon-button:active,
+    .action-button:active,
+    .header-button:active {
+        transform: scale(0.95);
+        transition-duration: 0.1s;
+    }
+
+    /* Improve touch targets for form elements */
+    .form-input,
+    .toggle-container,
+    .button-group button {
+        min-height: 48px;
+    }
+
+    /* Larger touch targets for small interactive elements */
+    .toggle-container {
+        min-width: 48px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Toast positioning for mobile */
+    .toast-container {
+        right: 12px;
+        left: 12px;
+        top: 16px;
+        max-width: none;
+    }
+
+    .toast {
+        font-size: 16px; /* Prevent zoom on input focus */
+    }
+}
+
+@media (max-aspect-ratio: 3/4) {
+    .frame {
+        width: 95%;
+    }
+}
+
+/* ── Phone-first mobile hardening ── */
+@media (max-width: 768px) {
+    .frame,
+    .playlist-frame,
+    .api-keys-frame {
+        width: min(100%, 100vw - 16px);
+        margin: 8px auto;
+        padding: 14px;
+        border-radius: 18px;
+    }
+
+    .app-header,
+    .header-content,
+    .header-identity,
+    .header-actions,
+    .page-intro,
+    .page-summary,
+    .history-toolbar,
+    .playlist-header,
+    .playlist-toolbar,
+    .workflow-action-group,
+    .buttons-container,
+    .inline-action-row,
+    .logs-actions,
+    .logs-filters {
+        width: 100%;
+    }
+
+    .header-content,
+    .app-header,
+    .playlist-header,
+    .dashboard-stage-header,
+    .storage-card-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .header-actions,
+    .playlist-toolbar,
+    .history-toolbar,
+    .logs-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .page-intro {
+        gap: 10px;
+    }
+
+    .page-summary {
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 2px;
+        flex-wrap: nowrap;
+    }
+
+    .page-summary .status-chip {
+        flex: 0 0 auto;
+    }
+
+    .dashboard-hero,
+    .workflow-layout,
+    .settings-grid,
+    .settings-console-layout,
+    .sections-grid.two-col,
+    .api-keys-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-stage,
+    .dashboard-status-card,
+    .storage-card,
+    .workflow-action-panel,
+    .api-key-card,
+    .playlist-item,
+    .history-card {
+        padding: 14px;
+    }
+
+    .dashboard-stage {
+        gap: 12px;
+    }
+
+    .dashboard-stage .image-container img {
+        max-height: min(42vh, 18rem);
+    }
+
+    .dashboard-overview {
+        gap: 10px;
+    }
+
+    .plugins-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .plugins-container .plugin-item {
+        padding: 16px 10px 14px;
+        min-height: 120px;
+    }
+
+    .plugin-name {
+        min-height: 2.7em;
+    }
+
+    .settings-grid {
+        gap: 14px;
+    }
+
+    .settings-console-layout {
+        gap: 12px;
+    }
+
+    .settings-side-nav {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 6px;
+        border: 1px solid var(--panel-border);
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
+        backdrop-filter: blur(16px);
+    }
+
+    .settings-side-link {
+        flex: 0 0 auto;
+        min-width: max-content;
+        border-radius: 999px;
+        padding: 10px 14px;
+        text-align: center;
+    }
+
+    .settings-console-main,
+    .settings-console-panel.active {
+        display: grid;
+        gap: 12px;
+    }
+
+    .logs-panel {
+        position: static;
+        max-height: none;
+    }
+
+    .logs-viewer,
+    .diagnostics-panel,
+    .diagnostics-panel-sm {
+        max-height: min(42vh, 22rem);
+        min-height: 180px;
+    }
+
+    .settings-panel > .buttons-container,
+    .api-keys-frame .buttons-container {
+        position: sticky;
+        bottom: 8px;
+        z-index: 6;
+        padding-top: 8px;
+        background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+    }
+
+    .workflow-mode-bar {
+        position: sticky;
+        top: 8px;
+        z-index: 6;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .workflow-mode-tab {
+        justify-content: center;
+    }
+
+    .title-stack {
+        gap: 0;
+    }
+
+    .app-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .plugin-mode-row {
+        margin: 0 0 8px;
+        gap: 6px;
+    }
+
+    .workflow-layout {
+        display: block;
+    }
+
+    .workflow-main-panel,
+    .workflow-side-panel {
+        display: none;
+    }
+
+    .workflow-main-panel.active,
+    .workflow-side-panel.active {
+        display: grid;
+        gap: 14px;
+    }
+
+    .workflow-side-panel {
+        margin-top: 14px;
+    }
+
+    .workflow-action-panel {
+        position: sticky;
+        bottom: 8px;
+        z-index: 7;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px color-mix(in srgb, var(--text) 12%, transparent);
+        background: color-mix(in srgb, var(--panel-bg) 94%, transparent);
+        backdrop-filter: blur(16px);
+    }
+
+    .workflow-device-toggle {
+        font-size: 0.92rem;
+    }
+
+    .workflow-action-group {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .workflow-help {
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    .workflow-section-header p {
+        font-size: 0.88rem;
+    }
+
+    .status-bar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .status-card.compact .image-container,
+    .status-card.instance .status-body img {
+        max-width: 100%;
+    }
+
+    .playlist-list {
+        gap: 12px;
+    }
+
+    .playlist-item {
+        padding: 0;
+        overflow: hidden;
+    }
+
+    .playlist-header {
+        padding: 14px;
+    }
+
+    .playlist-toolbar {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .playlist-toolbar .run-next-btn {
+        grid-column: 1 / -1;
+    }
+
+    .playlist-secondary-button,
+    .playlist-toggle-button {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 44px;
+    }
+
+    .playlist-secondary-button {
+        border-radius: 999px;
+        border: 1px solid var(--panel-border);
+        background: var(--surface);
+        color: var(--text);
+        padding: 9px 12px;
+    }
+
+    .playlist-secondary-button .action-button-label {
+        display: inline;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .playlist-card-body {
+        padding: 0 14px 14px;
+    }
+
+    .playlist-item.mobile-collapsed .playlist-card-body {
+        display: none;
+    }
+
+    .plugin-item {
+        padding: 12px 0;
+        border-top-width: 1px;
+    }
+
+    .plugin-info {
+        width: 100%;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .plugin-instance {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .plugin-thumbnail-container {
+        margin-left: 0;
+        width: 100%;
+        max-width: 180px;
+    }
+
+    .plugin-thumbnail-container .img-skeleton,
+    .plugin-thumbnail {
+        width: 100%;
+        height: auto;
+        min-height: 100px;
+    }
+
+    .plugin-actions {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .plugin-actions .latest-refresh {
+        width: 100%;
+    }
+
+    .edit-button,
+    .delete-button,
+    .plugin-actions .edit-button,
+    .plugin-actions .delete-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
+    .history-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .history-actions .btn:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .metric-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .history-card {
+        grid-template-columns: 104px minmax(0, 1fr);
+        align-items: start;
+        gap: 12px;
+    }
+
+    .history-thumb {
+        aspect-ratio: 1 / 1.2;
+    }
+
+    .history-name {
+        font-size: 0.94rem;
+    }
+
+    .history-sub {
+        font-size: 0.8rem;
+    }
+
+    .api-key-actions {
+        gap: 8px;
+    }
+
+    .api-key-card {
+        gap: 8px;
+    }
+
+    .api-key-status {
+        font-size: 0.8rem;
+    }
+
+    .api-key-actions .delete-button-danger {
+        align-self: flex-start;
+    }
+
+    .modal-content,
+    .thumbnail-preview-content {
+        width: min(100vw - 12px, 100%);
+        max-width: none;
+        margin: auto auto 0;
+        border-radius: 20px 20px 0 0;
+        max-height: min(88vh, 44rem);
+        overflow-y: auto;
+    }
+
+    .modal {
+        align-items: flex-end;
+    }
+}
+
+/* ── Narrowest screens ── */
+@media (max-width: 430px) {
+    .frame,
+    .playlist-frame,
+    .api-keys-frame {
+        width: min(100%, 100vw - 8px);
+        margin: 4px auto;
+        padding: 12px;
+    }
+
+    .header-actions,
+    .playlist-toolbar,
+    .history-toolbar,
+    .logs-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .metric-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .history-card {
+        grid-template-columns: 1fr;
+    }
+
+    .history-thumb {
+        aspect-ratio: 4 / 3;
+    }
+
+    .plugins-container {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .plugin-item,
+    .history-card,
+    .api-key-card {
+        border-radius: 14px;
+    }
+
+    .settings-side-nav {
+        top: 4px;
+    }
+
+    .workflow-action-panel {
+        bottom: 4px;
+        padding: 12px;
+    }
+
+    .page-summary {
+        margin-right: -2px;
+    }
+}
+
+/* ── Tablet landscape (iPad landscape, small laptops) ── */
+@media (min-width: 1024px) {
+    .frame {
+        max-width: 1200px;
+        margin-inline: auto;
+    }
+
+    .settings-grid {
+        max-width: 1400px;
+        margin-inline: auto;
+    }
+}
+
+/* ── Large screens (>1440px) ── */
+@media (min-width: 1440px) {
+    .page-shell {
+        max-width: 1600px;
+        margin-inline: auto;
+    }
+}
+
+/* ── Landscape mobile ── */
+@media (max-height: 500px) and (orientation: landscape) {
+    .modal-content,
+    .response-modal-content {
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+
+    .image-modal .modal-content {
+        max-height: 90vh;
+    }
+}

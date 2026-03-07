@@ -1,0 +1,159 @@
+.dashboard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.dashboard-stage,
+.dashboard-overview,
+.storage-card,
+.settings-panel,
+.logs-panel {
+  min-width: 0;
+}
+
+.dashboard-stage,
+.dashboard-status-card,
+.storage-card {
+  padding: 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--panel-bg);
+}
+
+.dashboard-stage {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-stage-header,
+.storage-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dashboard-stage-header h2,
+.storage-card-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dashboard-stage-copy,
+.storage-card-copy {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.dashboard-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-status-card {
+  display: grid;
+  gap: 10px;
+}
+
+.dashboard-status-card h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.dashboard-status-meta {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.dashboard-status-meta strong {
+  color: var(--text);
+}
+
+.dashboard-status-card .action-button,
+.dashboard-status-card .header-button {
+  justify-self: start;
+}
+
+.dashboard-stage .image-container {
+  width: 100%;
+  max-width: min(100%, 50rem);
+  margin: 0 auto;
+  padding: 0;
+  aspect-ratio: 5 / 3;
+  min-height: unset;
+  display: block;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+}
+
+.dashboard-stage .image-container img {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+  border-radius: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-stage .image-container .img-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: 10px;
+}
+
+.dashboard-stage .image-container.native {
+  width: auto;
+  max-width: 100%;
+  aspect-ratio: auto;
+  max-height: min(58vh, 32rem);
+  overflow: auto;
+  padding-bottom: 4px;
+}
+
+.dashboard-stage .image-container.native img {
+  width: auto;
+  height: auto;
+  width: auto;
+  max-width: none;
+}
+
+.dashboard-stage .image-container:not(.native-preview-enabled) {
+  overflow: hidden;
+}
+
+.dashboard-stage .image-container:not(.native-preview-enabled) img {
+  cursor: zoom-in;
+}
+
+.dashboard-meta {
+  margin-top: 8px;
+}
+
+.dashboard-status-row {
+  margin-top: 8px;
+}
+
+.storage-card {
+  display: grid;
+  gap: 12px;
+}
+
+.storage-meter {
+    background: var(--storage-track);
+    border-radius: 8px;
+    height: 14px;
+    overflow: hidden;
+}
+
+.storage-meter-fill {
+    background: linear-gradient(90deg, var(--storage-fill-start), var(--storage-fill-end));
+    height: 100%;
+}
