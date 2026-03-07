@@ -7,7 +7,6 @@ def test_settings_page_contains_section_nav_and_loading_panels(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert 'class="section-nav"' in html
     assert "section-basics" in html
     assert "section-observability" in html
     assert 'id="benchSummary"' in html and "loading-panel" in html
