@@ -9,7 +9,7 @@ def test_response_modal_script_exists(client):
     # Core functions
     for token in [
         "function ensureToastContainer()",
-        "function showToast(status, message, duration = 5000)",
+        "function showToast(status, message, duration = TOAST_DURATION_MS)",
         "function closeToast(toastId)",
         "function showResponseModal(status, message, useToast = true)",
         "function closeResponseModal()",

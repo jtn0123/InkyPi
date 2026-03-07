@@ -38,39 +38,14 @@
 <body>
     <main id="main-content" role="main" class="page-shell page-shell-workflow" data-page-shell="workflow">
     <div class="frame workflow-frame">
-        {% from 'macros/icons.html' import icon %}
+        {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP %}
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
             <div class="app-identity">
-                {% from 'macros/icons.html' import icon %}
                 <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                    <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                    </svg>
-                    <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                    </svg>
-                </button>
-                {% set plugin_icon_map = {
-                    'ai_image': 'magic-wand',
-                    'ai_text': 'text-t',
-                    'weather': 'cloud-sun',
-                    'calendar': 'calendar-blank',
-                    'clock': 'clock',
-                    'newspaper': 'newspaper-clipping',
-                    'apod': 'planet',
-                    'unsplash': 'images-square',
-                    'image_url': 'link-simple',
-                    'image_upload': 'upload-simple',
-                    'image_folder': 'folder-simple',
-                    'screenshot': 'monitor',
-                    'wpotd': 'book-open-text',
-                    'comic': 'mask-happy'
-                } %}
-                {% set ph_icon = plugin_icon_map.get(plugin.id, None) %}
+                {{ theme_toggle() }}
+                {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
                 {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
                 <div class="title-stack">
                     <h1 class="app-title">{{ plugin.display_name }}</h1>
@@ -157,7 +132,7 @@
                 {% if style_settings %}
                 <div class="collapsible">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Style <span class="collapsible-icon">▼</span>
+                        Style <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
@@ -215,7 +190,7 @@
                                 <input type="file" clear-on-submit id="imageUpload" name="backgroundImageFile" accept="image/*" class="file-upload-input" data-background-upload>
                                 <div id="fileName" class="file-name" hidden>
                                     <span id="fileNameText"></span>
-                                    <button type="button" id="removeFileButton" class="remove-btn">X</button>
+                                    <button type="button" id="removeFileButton" class="remove-btn" aria-label="Remove selected file">X</button>
                                 </div>
                             </div>
                         </div>

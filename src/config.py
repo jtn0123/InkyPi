@@ -72,8 +72,8 @@ class Config:
                 shutil.copyfile(default_img, self.processed_image_file)
             if not os.path.exists(self.current_image_file):
                 shutil.copyfile(self.processed_image_file, self.current_image_file)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.warning("Could not initialize preview images: %s", e)
 
         self.config = self.read_config()
         self.plugins_list = self.read_plugins_list()
@@ -390,8 +390,8 @@ class Config:
         data = self.get_config("refresh_info", {}) or {}
         try:
             return RefreshInfo.from_dict(data)
-        except Exception:
-            # If the config is missing required fields, fall back to empty defaults
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning("Invalid refresh_info in config, using defaults: %s", e)
             return RefreshInfo("Manual Update", "", None, None)
 
     def get_playlist_manager(self):

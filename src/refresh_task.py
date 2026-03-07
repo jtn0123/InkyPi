@@ -2,6 +2,7 @@ import io
 import logging
 import multiprocessing
 import os
+import queue
 import threading
 from collections import deque
 from dataclasses import dataclass, field
@@ -350,7 +351,7 @@ class RefreshTask:
                     int((perf_counter() - stage_t0) * 1000),
                 )
             except Exception:
-                pass
+                logger.debug("Failed to save generate_image benchmark event", exc_info=True)
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         # Plugin lifecycle: generate_complete
         logger.info(
@@ -454,7 +455,7 @@ class RefreshTask:
                         display_duration_ms,
                     )
                 except Exception:
-                    pass
+                    logger.debug("Failed to save display_pipeline benchmark event", exc_info=True)
         else:
             logger.info(
                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
@@ -478,7 +479,7 @@ class RefreshTask:
                 cpu_percent = psutil.cpu_percent(interval=None)
                 memory_percent = psutil.virtual_memory().percent
             except Exception:
-                pass
+                logger.debug("psutil metrics unavailable", exc_info=True)
             save_refresh_event(
                 self.device_config,
                 {
@@ -498,7 +499,7 @@ class RefreshTask:
                 },
             )
         except Exception:
-            pass
+            logger.debug("Failed to save refresh benchmark event", exc_info=True)
         self._update_plugin_health(
             plugin_id=plugin_id,
             instance=instance_name,
@@ -647,7 +648,7 @@ class RefreshTask:
                 else:
                     try:
                         payload = result_queue.get_nowait()
-                    except Exception:
+                    except queue.Empty:
                         payload = None
                     if not payload:
                         if proc.exitcode == 0:
@@ -680,11 +681,11 @@ class RefreshTask:
             finally:
                 try:
                     result_queue.close()
-                except Exception:
+                except OSError:
                     pass
                 try:
                     result_queue.join_thread()
-                except Exception:
+                except OSError:
                     pass
 
             if isinstance(last_exc, TimeoutError):
