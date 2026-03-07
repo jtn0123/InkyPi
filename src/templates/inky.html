@@ -127,7 +127,11 @@
                     <span class="plugin-name">{{ plugin.display_name }}</span>
                 </a>
                 {% else %}
-                <p class="empty-state-message">No plugins available. Check your installation.</p>
+                <div class="empty-state compact">
+                    <div class="empty-state-icon">{{ icon('squares-four', 'icon-image') | safe }}</div>
+                    <p class="empty-state-message">No plugins available.</p>
+                    <p class="empty-state-message">Check your installation.</p>
+                </div>
                 {% endfor %}
             </div>
         </section>

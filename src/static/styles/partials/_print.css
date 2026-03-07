@@ -1,0 +1,47 @@
+/* ── Print styles ── */
+@media print {
+  /* Hide non-essential chrome */
+  .header,
+  .back-button,
+  .buttons-container,
+  .action-button,
+  .header-button,
+  .response-modal,
+  .modal,
+  .toast-container,
+  #themeToggle,
+  .sort-toggle,
+  .footer {
+    display: none !important;
+  }
+
+  /* Reset colours for ink */
+  body {
+    background: var(--bg, #fff) !important;
+    color: var(--text, #000) !important;
+  }
+
+  .frame,
+  .page-shell,
+  .settings-section,
+  .plugin-item,
+  .collapsible-content {
+    background: var(--bg, #fff) !important;
+    border-color: var(--surface-border, #ccc) !important;
+    box-shadow: none !important;
+  }
+
+  /* Ensure all collapsible sections are expanded */
+  .collapsible-content {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Readable links */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: var(--muted, #555);
+  }
+}

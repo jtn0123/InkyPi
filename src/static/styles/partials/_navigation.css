@@ -1,0 +1,347 @@
+/* Enhanced app header layout */
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    min-height: 48px; /* Consistent header height */
+}
+
+.app-header .app-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text);
+}
+
+/* App icon standardization */
+.app-header .app-icon {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+    flex-shrink: 0;
+}
+
+/* Header actions container */
+.app-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto;
+}
+
+.app-header > .header-button.icon {
+    margin-left: 0;
+}
+
+/* Standardized icon styling with better centering */
+.icon-image {
+    width: var(--icon-xl);
+    height: var(--icon-xl);
+    flex-shrink: 0;
+    color: var(--text);
+}
+
+.icon-xs { width: var(--icon-xs); height: var(--icon-xs); }
+.icon-sm { width: var(--icon-sm); height: var(--icon-sm); }
+.icon-md { width: var(--icon-md); height: var(--icon-md); }
+.icon-lg { width: var(--icon-lg); height: var(--icon-lg); }
+.icon-xl { width: var(--icon-xl); height: var(--icon-xl); }
+.icon-xxl { width: var(--icon-xxl); height: var(--icon-xxl); }
+
+/* SVG icon standardization */
+svg.icon-image,
+svg.app-icon,
+svg.action-icon,
+svg.plugin-icon {
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    stroke: currentColor;
+}
+
+/* Thin stroke variant for delicate icons */
+.icon-thin,
+svg.icon-thin {
+    stroke-width: var(--icon-stroke-thin);
+}
+
+/* Consistent action icon sizing */
+.action-icon {
+    width: var(--icon-md);
+    height: var(--icon-md);
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+/* Back button with enhanced feedback */
+.back-button {
+    background-color: var(--button-bg);
+    color: var(--text);
+    border: 1px solid var(--surface-border);
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 20px;
+    text-align: left;
+    width: fit-content; /* Button takes up only the width of the text */
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    transition: transform 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
+                background-color 0.2s ease;
+}
+.back-button:hover {
+    background-color: rgba(255,255,255,0.08);
+    transform: translateX(-2px);
+}
+/* Enhanced focus management */
+.back-button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 6px;
+    box-shadow: 0 0 0 6px rgba(36, 221, 189, 0.15);
+}
+
+/* Enhanced global focus with better visibility */
+*:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+    /* Add subtle glow for better visibility */
+    box-shadow: 0 0 0 4px rgba(36, 221, 189, 0.15);
+}
+
+.icon-button:focus-visible,
+.action-button:focus-visible,
+.header-button:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    z-index: 1;
+    /* Enhanced glow effect for important interactive elements */
+    box-shadow: 0 0 0 6px rgba(36, 221, 189, 0.2),
+                0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Back button icon sizing */
+.back-button .icon-image {
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    margin: 0;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Settings button styling */
+.header-icons { display: flex; align-items: center; gap: 16px; }
+.nav-icons { display: inline-flex; align-items: center; gap: 8px; }
+
+.settings-button {
+    font-size: 1rem;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-button img {
+    margin-bottom: 0px;
+}
+
+/* Compact header and navigation icon sizing */
+.settings-button svg.icon-image,
+.settings-button .icon-image svg,
+.settings-button .app-icon svg,
+.settings-button svg.app-icon {
+    width: var(--icon-header);
+    height: var(--icon-header);
+    display: inline-block;
+    vertical-align: middle;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke-thin);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Compact navigation icons */
+.nav-icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-icons .settings-button {
+    padding: var(--container-padding);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--container-header);
+    height: var(--container-header);
+    border: 1px solid var(--surface-border);
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    background-color: transparent;
+    background-clip: padding-box; /* avoid inner square against the border */
+    transition: all 0.2s ease;
+}
+
+/* Subtle accent overlay to mirror plugin card hover */
+/* Create overlay only on hover to avoid any inner-edge artifacts */
+.nav-icons .settings-button::before { content: none; }
+.nav-icons .settings-button:hover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0.04;
+    transition: opacity 0.2s ease;
+    background-clip: padding-box;
+}
+
+.nav-icons .settings-button:hover {
+    background-color: var(--panel-bg);
+    border-color: var(--accent);
+    transform: none;
+}
+
+/* On dark themes, ensure hover overlay stays subtle and no edge shows */
+[data-theme="dark"] .nav-icons .settings-button:hover::before,
+[data-theme="dark"] .header-button.icon:hover::before {
+    opacity: 0.05;
+}
+
+/* no separate rule needed; overlay created with opacity already applied */
+.header-button.icon svg {
+    display: block;
+    shape-rendering: geometricPrecision;
+}
+
+.header-button.icon .icon-image {
+    width: var(--icon-header);
+    height: var(--icon-header);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.header-button.icon .icon-image svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.header-button.icon .theme-icon {
+    width: var(--icon-header);
+    height: var(--icon-header);
+}
+
+/* Ensure nav icons are perfectly centered and not pushed by defaults */
+.nav-icons .settings-button .icon-image {
+    width: var(--icon-header);
+    height: var(--icon-header);
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    background-color: transparent;
+    background-clip: padding-box;
+}
+
+/* Generic: inner SVGs fill their icon-image wrapper */
+.icon-image svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.app-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.nav-icons .settings-button .icon-image svg {
+    shape-rendering: geometricPrecision;
+    background: transparent;
+    pointer-events: none; /* avoid capturing hover inside */
+}
+
+.settings-button:hover {
+    background-color: var(--panel-bg);
+    color: var(--text);
+    transform: none; /* Remove excessive animations */
+}
+
+.header-button {
+    background-color: var(--accent);
+    color: var(--on-accent);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    line-height: 1;
+}
+
+.header-button:hover {
+    background-color: var(--primary-hover);
+}
+
+.header-button.is-secondary {
+    background-color: var(--bg-secondary);
+    color: var(--text);
+    border: 1px solid var(--border-color);
+}
+.header-button.is-secondary:hover {
+    background-color: var(--bg-tertiary);
+}
+.header-button.is-dark {
+    background-color: var(--text);
+    color: var(--bg);
+}
+.header-button.is-dark:hover {
+    opacity: 0.85;
+}
+
+.header-button.is-danger,
+.header-button.delete-button-danger {
+    background-color: var(--error);
+}
+
+.header-button.is-danger:hover,
+.header-button.delete-button-danger:hover {
+    background-color: var(--danger-hover);
+}
+
+.header-button.is-warning {
+    background-color: var(--warning);
+}

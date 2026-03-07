@@ -1,0 +1,326 @@
+/* Plugin List */
+.plugin-list {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Plugin Item */
+.plugin-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 10px 25px 10px 40px;
+    border-top: 2px solid var(--surface-border);
+    gap: 10px;
+}
+
+.plugin-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-grow: 1;
+}
+
+.plugin-actions { display:flex; justify-content:flex-end; gap:6px; align-items:center; }
+.plugin-actions .btn { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
+.plugin-actions .btn:hover { background: var(--hover-overlay, rgba(255,255,255,0.04)); }
+.plugin-actions .btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.plugin-actions .btn-primary:hover { background: var(--accent-hover); }
+.plugin-actions .btn-danger { background: var(--danger); color: var(--on-accent); border-color: var(--danger); }
+.plugin-actions .btn-danger:hover { background: var(--danger-hover); }
+.btn-label { font-size: 0.85em; }
+.btn-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.5); border-top-color: var(--on-accent); border-radius: 50%; display:none; animation: spin .9s linear infinite; }
+
+/* Enhanced plugin icon styling */
+.plugin-icon {
+    width: var(--icon-lg);
+    height: var(--icon-lg);
+    display: inline-block;
+    flex-shrink: 0;
+    color: var(--text);
+}
+
+/* Ensure inline SVG icons inside plugin icon container render uniformly */
+.plugin-info .plugin-icon {
+    flex: 0 0 var(--icon-lg);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plugin-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: var(--icon-stroke);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.plugin-instance {
+    color: var(--text);
+}
+
+/* Highlight the currently displayed instance */
+.plugin-item.is-current {
+  border-left: 4px solid var(--accent);
+}
+
+.timing-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.latest-refresh { background-color: var(--panel-bg); color: var(--text); padding: 2px 6px; border-radius: 4px; font-size: 0.78em; border:1px solid var(--panel-border); }
+.latest-refresh.nextin:empty { display:none; }
+
+/* Plugin Grid/List View Styles */
+.plugins-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.plugins-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.view-toggle,
+.sort-toggle {
+    background: var(--button-bg);
+    border: 1px solid var(--surface-border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text);
+    transition: all 0.2s;
+}
+
+.view-toggle:hover,
+.sort-toggle:hover {
+    background: var(--button-bg);
+}
+
+.sort-toggle.active {
+    background: var(--success);
+    color: var(--on-accent);
+    border-color: var(--success);
+}
+
+/* Grid View (default) */
+.plugins-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    justify-items: stretch;
+}
+
+.plugins-container .plugin-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    text-decoration: none;
+    color: var(--text);
+    padding: 12px 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--surface-border);
+    box-sizing: border-box;
+    width: 100%;
+    justify-self: stretch;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.plugins-container .plugin-item:hover {
+    background: var(--button-bg);
+    border-color: var(--muted);
+}
+
+.plugins-container .plugin-item .icon-image {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.plugin-name {
+    margin-top: 8px;
+    font-size: 0.78rem;
+    line-height: 1.3;
+    text-align: center;
+    color: var(--muted);
+    width: 100%;
+    padding: 0 2px;
+    box-sizing: border-box;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    min-height: 2.4em;
+}
+
+/* List View */
+.plugins-container.list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.plugins-container.list-view .plugin-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 12px;
+}
+
+.plugins-container.list-view .plugin-item .icon-image {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+.plugins-container.list-view .plugin-name {
+    margin-top: 0;
+    font-size: 14px;
+    text-align: left;
+    width: auto;
+    padding: 0;
+    white-space: nowrap;
+}
+
+/* Sorting Mode */
+.plugins-container.sorting .plugin-item {
+    cursor: grab;
+    border-style: dashed;
+}
+
+.plugins-container.sorting .plugin-item:hover {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+
+.plugins-container.sorting .plugin-item.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.plugins-container.sorting .plugin-item.drag-over {
+    border-color: var(--primary);
+    border-style: solid;
+    background: var(--primary-bg);
+}
+
+.sort-hint {
+    display: none;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+}
+
+.sort-hint.visible {
+    display: block;
+}
+
+/* Workflow layout for plugin page */
+.workflow-frame {
+  gap: var(--spacing-md);
+}
+
+.workflow-mode-bar {
+  display: inline-flex;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  align-self: flex-start;
+}
+
+.workflow-mode-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workflow-mode-tab.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.workflow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.workflow-main-panel,
+.workflow-side-panel,
+.settings-console-main {
+  min-width: 0;
+}
+
+.workflow-side-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.workflow-section-header {
+  display: grid;
+  gap: 4px;
+}
+
+.workflow-section-header h2 {
+  font-size: 1.05rem;
+}
+
+.workflow-section-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.workflow-meta {
+  margin-top: 8px;
+}
+
+.workflow-meta-row + .workflow-meta-row {
+  margin-top: 6px;
+}
+
+.workflow-action-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--border-radius-md);
+}
+
+.workflow-device-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.workflow-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workflow-help {
+  margin-top: 0;
+}
