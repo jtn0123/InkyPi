@@ -3415,6 +3415,11 @@ body.modal-open {
 .collapsible-icon {
     float: right;
     opacity: 50%;
+    transition: transform 0.2s ease;
+}
+
+.collapsible-header[aria-expanded="true"] .collapsible-icon {
+    transform: rotate(180deg);
 }
 
 .collapsible-content {
@@ -3776,6 +3781,13 @@ body.modal-open {
 
 .empty-state.compact .empty-state-icon {
   margin-bottom: 8px;
+}
+
+.empty-state-message {
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 24px 16px;
+  text-align: center;
 }
 
 .metric-strip {
@@ -4693,9 +4705,9 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .sort-toggle.active {
-    background: #4CAF50;
+    background: var(--success);
     color: #fff;
-    border-color: #4CAF50;
+    border-color: var(--success);
 }
 
 /* Grid View (default) */
@@ -4791,8 +4803,8 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .plugins-container.sorting .plugin-item:hover {
-    border-color: #4CAF50;
-    background: rgba(76, 175, 80, 0.05);
+    border-color: var(--success);
+    background: var(--success-bg);
 }
 
 .plugins-container.sorting .plugin-item.dragging {
@@ -4801,9 +4813,9 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .plugins-container.sorting .plugin-item.drag-over {
-    border-color: #2196F3;
+    border-color: var(--primary);
     border-style: solid;
-    background: rgba(33, 150, 243, 0.1);
+    background: var(--primary-bg);
 }
 
 .sort-hint {
@@ -5436,3 +5448,54 @@ main[data-page-shell="workflow"] .frame {
 .live-preview-overlay{bottom: 20px;}
 .live-preview-content{flex-direction: row;}
 .form-group:last-child{margin-bottom: 0;}
+
+/* ── Tablet landscape (iPad landscape, small laptops) ── */
+@media (min-width: 1024px) {
+  .frame {
+    max-width: 1200px;
+    margin-inline: auto;
+  }
+
+  .settings-grid {
+    max-width: 1400px;
+    margin-inline: auto;
+  }
+}
+
+/* ── Large screens (>1440px) ── */
+@media (min-width: 1440px) {
+  .page-shell {
+    max-width: 1600px;
+    margin-inline: auto;
+  }
+}
+
+/* ── Landscape mobile ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-content,
+  .response-modal-content {
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .image-modal .modal-content {
+    max-height: 90vh;
+  }
+}
+
+/* ── Button group stacking on small screens ── */
+@media (max-width: 520px) {
+  .buttons-container {
+    flex-direction: column;
+  }
+
+  .buttons-container .action-button,
+  .buttons-container .header-button {
+    width: 100%;
+  }
+
+  .playlist-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+}

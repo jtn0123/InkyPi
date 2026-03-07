@@ -1,4 +1,9 @@
 // Enhanced toast notification system
+// Configurable timing defaults (ms).
+const TOAST_DURATION_MS = 5000;
+const MODAL_AUTO_CLOSE_MS = 10000;
+const TOAST_FADE_MS = 300;
+
 let toastContainer = null;
 let toastCounter = 0;
 
@@ -13,7 +18,7 @@ function ensureToastContainer() {
     return toastContainer;
 }
 
-function showToast(status, message, duration = 5000) {
+function showToast(status, message, duration = TOAST_DURATION_MS) {
     const container = ensureToastContainer();
     const toastId = `toast-${++toastCounter}`;
 
@@ -30,11 +35,23 @@ function showToast(status, message, duration = 5000) {
         info: 'ⓘ'
     };
 
-    toast.innerHTML = `
-        <div class="toast-icon">${iconMap[status] || iconMap.info}</div>
-        <div class="toast-content">${message}</div>
-        <button class="toast-close" onclick="closeToast('${toastId}')" aria-label="Close notification">×</button>
-    `;
+    const iconEl = document.createElement('div');
+    iconEl.className = 'toast-icon';
+    iconEl.textContent = iconMap[status] || iconMap.info;
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'toast-content';
+    contentEl.textContent = message;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'toast-close';
+    closeBtn.setAttribute('aria-label', 'Close notification');
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => closeToast(toastId));
+
+    toast.appendChild(iconEl);
+    toast.appendChild(contentEl);
+    toast.appendChild(closeBtn);
 
     container.appendChild(toast);
 
@@ -59,7 +76,7 @@ function closeToast(toastId) {
             if (toast.parentNode) {
                 toast.parentNode.removeChild(toast);
             }
-        }, 300);
+        }, TOAST_FADE_MS);
     }
 }
 
@@ -95,8 +112,8 @@ function showResponseModal(status, message, useToast = true) {
     // Display Modal
     modal.style.display = 'block';
 
-    // Auto-Close Modal After 10 Seconds
-    setTimeout(() => closeResponseModal(), 10000);
+    // Auto-close modal
+    setTimeout(() => closeResponseModal(), MODAL_AUTO_CLOSE_MS);
 }
 
 // Function to Close the Modal
@@ -195,3 +212,17 @@ function getErrorMessage(status) {
 
     return errorMessages[status] || 'An unexpected error occurred. Please try again.';
 }
+
+// Wire up legacy modal close button (replaces inline onclick)
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('responseModalClose');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeResponseModal);
+        closeBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                closeResponseModal();
+            }
+        });
+    }
+});

@@ -8,7 +8,7 @@
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}"></script>
-    {% from 'macros/icons.html' import icon %}
+    {% from 'macros/icons.html' import icon, theme_toggle %}
 </head>
 <body>
     <main class="page-shell page-shell-management" data-page-shell="management">
@@ -27,15 +27,7 @@
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                        </svg>
-                        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                        </svg>
-                    </button>
+                    {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('gear-six', 'app-icon') | safe }}
                         <h1 class="app-title">API Keys</h1>
@@ -68,7 +60,7 @@
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input">×</button>{% endif %}
+                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input" aria-label="Clear OpenAI key">×</button>{% endif %}
                         {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_AI_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
@@ -79,7 +71,7 @@
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input">×</button>{% endif %}
+                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input" aria-label="Clear OpenWeatherMap key">×</button>{% endif %}
                         {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_WEATHER_MAP_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
@@ -90,7 +82,7 @@
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
-                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input">×</button>{% endif %}
+                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input" aria-label="Clear NASA key">×</button>{% endif %}
                         {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="NASA_SECRET">Delete</button>{% endif %}
                     </div>
                 </div>
@@ -101,7 +93,7 @@
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input">×</button>{% endif %}
+                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input" aria-label="Clear Unsplash key">×</button>{% endif %}
                         {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="UNSPLASH_ACCESS_KEY">Delete</button>{% endif %}
                     </div>
                 </div>

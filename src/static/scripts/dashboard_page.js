@@ -1,5 +1,13 @@
 (function () {
+  // Configurable timing defaults (ms). Override via config object.
+  const DEFAULTS = {
+    pollIntervalMs: 5000,
+    refreshDelayMs: 300,
+  };
+
   function createDashboardPage(config) {
+    const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
+    const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
     let lastImageHash = config.imageHash;
     const desktopPreviewQuery =
       window.matchMedia &&
@@ -105,10 +113,18 @@
       let up = null;
       try {
         [info, up] = await Promise.all([
-          fetch(config.refreshInfoUrl).then((response) => response.json()).catch(() => null),
-          fetch(config.nextUpUrl).then((response) => response.json()).catch(() => null),
+          fetch(config.refreshInfoUrl).then((response) => response.json()).catch((err) => {
+            console.warn("Failed to fetch refresh info:", err);
+            return null;
+          }),
+          fetch(config.nextUpUrl).then((response) => response.json()).catch((err) => {
+            console.warn("Failed to fetch next-up info:", err);
+            return null;
+          }),
         ]);
-      } catch (error) {}
+      } catch (error) {
+        console.warn("Dashboard preview refresh failed:", error);
+      }
 
       if (info && info.image_hash && info.image_hash !== lastImageHash && previewImg) {
         lastImageHash = info.image_hash;
@@ -132,7 +148,7 @@
         if (!response.ok || !result.success) {
           showResponseModal("failure", `Failed to display next: ${result.error || "Unknown error"}`);
         } else {
-          setTimeout(refreshPreview, 300);
+          setTimeout(refreshPreview, refreshDelayMs);
         }
       } catch (error) {
         showResponseModal("failure", "Failed to display next");
@@ -181,7 +197,7 @@
 
     function startPolling() {
       refreshPreview();
-      return setInterval(refreshPreview, 5000);
+      return setInterval(refreshPreview, pollIntervalMs);
     }
 
     function initRealtime() {
@@ -191,11 +207,14 @@
           const source = new EventSource(pushUrl);
           source.onmessage = () => refreshPreview();
           source.onerror = () => {
+            console.warn("SSE connection lost, falling back to polling");
             source.close();
             startPolling();
           };
           return;
-        } catch (error) {}
+        } catch (error) {
+          console.warn("SSE not available, using polling:", error);
+        }
       }
       startPolling();
     }

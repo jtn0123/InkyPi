@@ -66,6 +66,31 @@ class DisplayManager:
         else:
             raise ValueError(f"Unsupported display type: {display_type}")
 
+    # Maximum number of history snapshots to keep. Oldest entries beyond this
+    # limit are pruned after each new save. Override via INKYPI_HISTORY_MAX_ENTRIES.
+    HISTORY_MAX_ENTRIES = int(os.getenv("INKYPI_HISTORY_MAX_ENTRIES", "500") or "500")
+
+    def _prune_history(self, history_dir):
+        """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES."""
+        try:
+            png_files = sorted(
+                (f for f in os.listdir(history_dir) if f.endswith(".png")),
+            )
+            excess = len(png_files) - self.HISTORY_MAX_ENTRIES
+            if excess <= 0:
+                return
+            for name in png_files[:excess]:
+                base = name.rsplit(".", 1)[0]
+                for ext in (".png", ".json"):
+                    path = os.path.join(history_dir, base + ext)
+                    try:
+                        os.remove(path)
+                    except FileNotFoundError:
+                        pass
+            logger.info("Pruned %d old history entries (max %d)", excess, self.HISTORY_MAX_ENTRIES)
+        except OSError:
+            logger.debug("Could not prune history directory", exc_info=True)
+
     def _save_history_entry(self, processed_image, history_meta=None):
         """Persist a processed image snapshot and optional JSON sidecar metadata."""
         history_dir = getattr(self.device_config, "history_image_dir", None)
@@ -83,6 +108,10 @@ class DisplayManager:
                 png_path = os.path.join(history_dir, f"{base_name}.png")
 
             processed_image.save(png_path)
+        except (OSError, ValueError, RuntimeError):
+            logger.exception("Failed to save history snapshot image")
+            return
+        try:
             meta_payload = dict(history_meta or {})
             meta_payload.setdefault("refresh_time", datetime.now().isoformat())
             with open(
@@ -91,8 +120,9 @@ class DisplayManager:
                 encoding="utf-8",
             ) as fh:
                 json.dump(meta_payload, fh)
-        except Exception:
-            logger.exception("Failed to persist history snapshot")
+        except (OSError, TypeError, ValueError):
+            logger.exception("Failed to persist history metadata for %s", base_name)
+        self._prune_history(history_dir)
 
     def display_image(self, image, image_settings=None, history_meta=None):
 
@@ -116,7 +146,7 @@ class DisplayManager:
         logger.info(f"Saving image to {self.device_config.current_image_file}")
         try:
             image.save(self.device_config.current_image_file)
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save current image preview")
 
         # Resize and adjust orientation
@@ -133,7 +163,7 @@ class DisplayManager:
         )
         try:
             image.save(self.device_config.processed_image_file)
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save processed image preview")
         self._save_history_entry(image, history_meta=history_meta)
 

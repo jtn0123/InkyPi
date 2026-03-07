@@ -14,21 +14,13 @@
     <main id="settings-main" class="page-shell page-shell-management" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
-        {% from 'macros/icons.html' import icon %}
+        {% from 'macros/icons.html' import icon, theme_toggle %}
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    <button id="themeToggle" class="header-button icon" type="button" title="Toggle theme" aria-label="Toggle theme">
-                        <svg class="theme-icon sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <circle cx="12" cy="12" r="5" stroke="currentColor"></circle>
-                            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor"></path>
-                        </svg>
-                        <svg class="theme-icon moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor"></path>
-                        </svg>
-                    </button>
+                    {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('gear-six', 'app-icon') }}
                         <h1 class="app-title">Settings</h1>
@@ -99,7 +91,7 @@
                 <!-- Time & Locale -->
                 <div class="collapsible" id="section-time-locale">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Time & Locale <span class="collapsible-icon">▼</span>
+                        Time & Locale <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group nowrap">
@@ -133,7 +125,7 @@
                 <section class="settings-console-panel" data-settings-panel="scheduling">
                 <div class="collapsible" id="section-display-cycle">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Display Cycle & System <span class="collapsible-icon">▼</span>
+                        Display Cycle & System <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
@@ -163,7 +155,7 @@
                 <section class="settings-console-panel" data-settings-panel="maintenance">
                 <div class="collapsible" id="section-backup-restore">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Backup & Restore <span class="collapsible-icon">▼</span>
+                        Backup & Restore <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
@@ -186,7 +178,7 @@
                 <!-- Observability & Recovery -->
                 <div class="collapsible" id="section-observability">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Observability & Recovery <span class="collapsible-icon">▼</span>
+                        Observability & Recovery <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="diagnostics-strip">
@@ -245,7 +237,7 @@
                 <section class="settings-console-panel" data-settings-panel="image">
                 <div class="collapsible" id="section-image-settings">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Image Settings <span class="collapsible-icon">▼</span>
+                        Image Settings <span class="collapsible-icon" aria-hidden="true">▼</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">

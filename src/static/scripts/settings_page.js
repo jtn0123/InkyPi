@@ -29,6 +29,8 @@
 
     async function handleAction() {
       const form = document.querySelector(".settings-form");
+      const saveBtn = document.getElementById("saveSettingsBtn");
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       const formData = new FormData(form);
       try {
         if (state.attachGeo && navigator.geolocation) {
@@ -44,7 +46,9 @@
             formData.set("deviceLon", String(pos.coords.longitude));
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Geolocation unavailable:", e.message || e);
+      }
 
       try {
         const response = await fetch(config.saveSettingsUrl, {
@@ -63,6 +67,8 @@
           "failure",
           "An error occurred while processing your request. Please try again."
         );
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
       }
     }
 
@@ -462,7 +468,9 @@
         const refresh = () => refreshHealth();
         es.addEventListener("done", refresh);
         es.addEventListener("error", refresh);
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Progress SSE unavailable:", e);
+      }
     }
 
     function initializeLogsControls() {
