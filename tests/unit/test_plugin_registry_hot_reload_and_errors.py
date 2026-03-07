@@ -14,13 +14,14 @@ def test_plugin_registry_reports_missing_dir_and_module(monkeypatch, tmp_path):
     )
 
     pr.PLUGIN_CLASSES.clear()
+    pr._PLUGIN_CONFIGS.clear()
     # Two plugins that don't exist on disk
     pr.load_plugins([
         {"id": "fake_one", "class": "FakeOne"},
         {"id": "fake_two", "class": "FakeTwo"},
     ])
-    # Nothing loaded
-    assert not pr.PLUGIN_CLASSES
+    # Nothing registered (dirs don't exist)
+    assert not pr.get_registered_plugin_ids()
 
 
 def test_plugin_registry_hot_reload_flag(monkeypatch, tmp_path):

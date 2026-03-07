@@ -29,12 +29,12 @@ def test_config_write_failure_returns_error(client, monkeypatch):
 
 def test_plugin_generate_image_timeout(client, monkeypatch):
     """Plugin generate_image raising TimeoutError returns error response."""
-    from plugins.plugin_registry import PLUGIN_CLASSES
+    from plugins.plugin_registry import get_registered_plugin_ids, get_plugin_instance
 
-    if "clock" not in PLUGIN_CLASSES:
+    if "clock" not in get_registered_plugin_ids():
         pytest.skip("clock plugin not available")
 
-    plugin = PLUGIN_CLASSES["clock"]
+    plugin = get_plugin_instance({"id": "clock", "class": "Clock"})
 
     def slow_generate(*args, **kwargs):
         raise TimeoutError("Screenshot timed out")
