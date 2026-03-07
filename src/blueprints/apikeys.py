@@ -1,8 +1,11 @@
-from flask import Blueprint, request, jsonify, current_app, render_template
+from flask import Blueprint, request, current_app, render_template
 from dotenv import dotenv_values
 import os
 import re
 import logging
+import tempfile
+
+from utils.http_utils import json_error, json_success, json_internal_error
 
 logger = logging.getLogger(__name__)
 apikeys_bp = Blueprint("apikeys", __name__)
@@ -31,18 +34,31 @@ def parse_env_file(filepath):
 
 
 def write_env_file(filepath, entries):
-    """Write entries to .env file."""
+    """Write entries to .env file atomically via tempfile + os.replace."""
     try:
-        with open(filepath, 'w') as f:
-            f.write("# InkyPi API Keys and Secrets\n")
-            f.write("# Managed via web interface\n\n")
-            for key, value in entries:
-                if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
-                    raise ValueError(f"Invalid control character in value for key: {key}")
-                # Quote values with spaces or special characters
-                if ' ' in value or '"' in value or "'" in value:
-                    value = f'"{value}"'
-                f.write(f"{key}={value}\n")
+        env_dir = os.path.dirname(filepath) or "."
+        fd, tmp_path = tempfile.mkstemp(dir=env_dir, prefix=".env.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                f.write("# InkyPi API Keys and Secrets\n")
+                f.write("# Managed via web interface\n\n")
+                for key, value in entries:
+                    if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
+                        raise ValueError(f"Invalid control character in value for key: {key}")
+                    # Quote values with spaces or special characters
+                    if ' ' in value or '"' in value or "'" in value:
+                        value = f'"{value}"'
+                    f.write(f"{key}={value}\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, filepath)
+        finally:
+            # Clean up temp file if os.replace didn't run
+            try:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            except OSError:
+                pass
         return True
     except Exception as e:
         logger.error(f"Error writing .env file: {e}")
@@ -83,28 +99,28 @@ def save_apikeys():
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return jsonify({"error": "Invalid JSON payload"}), 400
+            return json_error("Invalid JSON payload", status=400)
         entries = data.get('entries', [])
         if not isinstance(entries, list):
-            return jsonify({"error": "Invalid entries format"}), 400
-        
+            return json_error("Invalid entries format", status=400)
+
         # Load existing values for keys marked as keepExisting
         env_path = get_env_path()
         existing_values = dict(parse_env_file(env_path))
-        
+
         # Validate and process entries
         valid_entries = []
         for entry in entries:
             key = entry.get('key', '').strip()
             keep_existing = entry.get('keepExisting', False)
-            
+
             if not key:
                 continue
-            
+
             # Validate key format
             if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', key):
-                return jsonify({"error": f"Invalid key format: {key}"}), 400
-            
+                return json_error(f"Invalid key format: {key}", status=400)
+
             if keep_existing:
                 # Use existing value from .env file
                 value = existing_values.get(key, '')
@@ -112,22 +128,21 @@ def save_apikeys():
                 # Use provided value
                 value = entry.get('value', '').strip()
             if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
-                return jsonify({"error": f"Invalid characters in value for key: {key}"}), 400
-            
+                return json_error(f"Invalid characters in value for key: {key}", status=400)
+
             valid_entries.append((key, value))
-        
+
         if write_env_file(env_path, valid_entries):
             # Reload environment variables
             for key, value in valid_entries:
                 os.environ[key] = value
-            
-            return jsonify({
-                "success": True,
-                "message": f"Saved {len(valid_entries)} API key(s). Some plugins may require restart to pick up changes."
-            })
+
+            return json_success(
+                f"Saved {len(valid_entries)} API key(s). Some plugins may require restart to pick up changes."
+            )
         else:
-            return jsonify({"error": "Failed to write .env file"}), 500
-            
+            return json_error("Failed to write .env file", status=500)
+
     except Exception as e:
         logger.error(f"Error saving API keys: {e}")
-        return jsonify({"error": str(e)}), 500
+        return json_internal_error("save API keys")

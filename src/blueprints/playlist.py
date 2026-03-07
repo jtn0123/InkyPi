@@ -68,9 +68,17 @@ def add_plugin():
                 code="validation_error",
                 details={"field": "playlist"},
             )
-        if not instance_name or not instance_name.strip():
+        instance_name = instance_name.strip() if instance_name else ""
+        if not instance_name:
             return json_error(
                 "Instance name is required",
+                status=422,
+                code="validation_error",
+                details={"field": "instance_name"},
+            )
+        if len(instance_name) > 64:
+            return json_error(
+                "Instance name must be 64 characters or fewer",
                 status=422,
                 code="validation_error",
                 details={"field": "instance_name"},
@@ -118,7 +126,23 @@ def add_plugin():
                     code="validation_error",
                     details={"field": "interval"},
                 )
-            refresh_interval_seconds = calculate_seconds(int(interval), unit)
+            try:
+                interval_int = int(interval)
+            except (ValueError, TypeError):
+                return json_error(
+                    "Refresh interval must be a number",
+                    status=422,
+                    code="validation_error",
+                    details={"field": "interval"},
+                )
+            if interval_int < 1 or interval_int > 999:
+                return json_error(
+                    "Refresh interval must be between 1 and 999",
+                    status=422,
+                    code="validation_error",
+                    details={"field": "interval"},
+                )
+            refresh_interval_seconds = calculate_seconds(interval_int, unit)
             refresh_config = {"interval": refresh_interval_seconds}
         else:
             refresh_time = refresh_settings.get("refreshTime")

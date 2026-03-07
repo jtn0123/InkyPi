@@ -18,14 +18,18 @@
       modal.className = 'modal image-modal';
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-label', 'Image preview');
       modal.style.display = 'none';
       const content = document.createElement('div');
       content.className = 'modal-content';
       const close = document.createElement('span');
       close.className = 'close-button';
+      close.setAttribute('role', 'button');
+      close.setAttribute('tabindex', '0');
       close.setAttribute('aria-label', 'Close');
       close.textContent = '×';
       close.addEventListener('click', closeLightbox);
+      close.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeLightbox(); } });
       const img = document.createElement('img');
       img.id = IMG_ID;
       img.alt = 'Large preview';
@@ -62,6 +66,9 @@
     img.style.width = '';
     img.style.height = '';
     modal.style.display = 'block';
+    // Focus the close button for keyboard users
+    const closeBtn = modal.querySelector('.close-button');
+    if (closeBtn) closeBtn.focus();
     trapEsc();
   }
 

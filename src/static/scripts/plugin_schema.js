@@ -67,7 +67,7 @@
 
   function replaceOptions(select, options, currentValue) {
     const previous = currentValue || select.dataset.currentValue || select.value;
-    select.innerHTML = "";
+    while (select.firstChild) select.removeChild(select.firstChild);
     options.forEach((opt) => {
       const option = document.createElement("option");
       option.value = opt.value;
@@ -164,7 +164,7 @@
     if (!newspaperInput || !locationInput || !slugInput || !newspaperList) return;
 
     const renderList = (items) => {
-      newspaperList.innerHTML = "";
+      while (newspaperList.firstChild) newspaperList.removeChild(newspaperList.firstChild);
       items.forEach((paper) => {
         const option = document.createElement("option");
         option.value = paper.name;
@@ -206,19 +206,42 @@
   function createCalendarEntry(url, color) {
     const entry = document.createElement("div");
     entry.className = "dynamic-list-item compact-repeater compact-repeater-calendar";
-    entry.innerHTML = `
-      <div class="dynamic-list-toolbar compact-repeater-toolbar">
-        <input type="text" name="calendarURLs[]" class="form-input" placeholder="Calendar URL" required>
-        <button type="button" class="remove-btn icon-button" aria-label="Remove calendar"><i class="ph ph-trash ph-thin action-icon" aria-hidden="true"></i></button>
-      </div>
-      <label class="dynamic-list-color-group">
-        <span>Color</span>
-        <input type="color" name="calendarColors[]" class="color-picker">
-      </label>
-    `;
-    entry.querySelector("input[name='calendarURLs[]']").value = url || "";
-    entry.querySelector("input[name='calendarColors[]']").value = color || "#007BFF";
-    entry.querySelector(".remove-btn").addEventListener("click", () => entry.remove());
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "dynamic-list-toolbar compact-repeater-toolbar";
+    const urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.name = "calendarURLs[]";
+    urlInput.className = "form-input";
+    urlInput.placeholder = "Calendar URL";
+    urlInput.required = true;
+    urlInput.value = url || "";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "remove-btn icon-button";
+    removeBtn.setAttribute("aria-label", "Remove calendar");
+    const icon = document.createElement("i");
+    icon.className = "ph ph-trash ph-thin action-icon";
+    icon.setAttribute("aria-hidden", "true");
+    removeBtn.appendChild(icon);
+    removeBtn.addEventListener("click", () => entry.remove());
+    toolbar.appendChild(urlInput);
+    toolbar.appendChild(removeBtn);
+
+    const colorLabel = document.createElement("label");
+    colorLabel.className = "dynamic-list-color-group";
+    const colorSpan = document.createElement("span");
+    colorSpan.textContent = "Color";
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.name = "calendarColors[]";
+    colorInput.className = "color-picker";
+    colorInput.value = color || "#007BFF";
+    colorLabel.appendChild(colorSpan);
+    colorLabel.appendChild(colorInput);
+
+    entry.appendChild(toolbar);
+    entry.appendChild(colorLabel);
     return entry;
   }
 
@@ -249,16 +272,36 @@
   function createTodoEntry(title, body) {
     const entry = document.createElement("div");
     entry.className = "dynamic-list-item compact-repeater compact-repeater-text";
-    entry.innerHTML = `
-      <div class="dynamic-list-toolbar compact-repeater-toolbar">
-        <input type="text" name="list-title[]" class="form-input" placeholder="List title">
-        <button type="button" class="remove-btn icon-button" aria-label="Remove list"><i class="ph ph-trash ph-thin action-icon" aria-hidden="true"></i></button>
-      </div>
-      <textarea name="list[]" class="form-input dynamic-list-textarea" rows="5" placeholder="Enter tasks, one per line"></textarea>
-    `;
-    entry.querySelector("input[name='list-title[]']").value = title || "";
-    entry.querySelector("textarea[name='list[]']").value = body || "";
-    entry.querySelector(".remove-btn").addEventListener("click", () => entry.remove());
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "dynamic-list-toolbar compact-repeater-toolbar";
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.name = "list-title[]";
+    titleInput.className = "form-input";
+    titleInput.placeholder = "List title";
+    titleInput.value = title || "";
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "remove-btn icon-button";
+    removeBtn.setAttribute("aria-label", "Remove list");
+    const icon = document.createElement("i");
+    icon.className = "ph ph-trash ph-thin action-icon";
+    icon.setAttribute("aria-hidden", "true");
+    removeBtn.appendChild(icon);
+    removeBtn.addEventListener("click", () => entry.remove());
+    toolbar.appendChild(titleInput);
+    toolbar.appendChild(removeBtn);
+
+    const textarea = document.createElement("textarea");
+    textarea.name = "list[]";
+    textarea.className = "form-input dynamic-list-textarea";
+    textarea.rows = 5;
+    textarea.placeholder = "Enter tasks, one per line";
+    textarea.value = body || "";
+
+    entry.appendChild(toolbar);
+    entry.appendChild(textarea);
     return entry;
   }
 
@@ -304,8 +347,16 @@
       const row = document.createElement("div");
       row.className = "file-name";
       row.id = id;
-      row.innerHTML = `<span>${fileName}</span><button type="button" class="remove-btn" aria-label="Remove file">X</button>`;
-      row.querySelector(".remove-btn").addEventListener("click", removeHandler);
+      const span = document.createElement("span");
+      span.textContent = fileName;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "remove-btn";
+      btn.setAttribute("aria-label", "Remove file");
+      btn.textContent = "X";
+      btn.addEventListener("click", removeHandler);
+      row.appendChild(span);
+      row.appendChild(btn);
       fileNames.appendChild(row);
     };
 

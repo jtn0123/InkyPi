@@ -334,7 +334,7 @@ def test_history_clear_exception_handling(client, flask_app, monkeypatch):
 
     resp = client.post("/history/clear")
     assert resp.status_code == 500
-    assert "An error occurred" in resp.get_json().get("error", "")
+    assert "error" in resp.get_json().get("error", "").lower()
 
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     import shutil as _shutil

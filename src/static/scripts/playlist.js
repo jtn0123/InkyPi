@@ -12,6 +12,11 @@
 // }
 
 (function(){
+    // Configurable timing defaults (ms / px).
+    const NEXT_IN_REFRESH_MS = 60000;      // 1 minute — countdown ticker interval
+    const THUMB_PREFETCH_MARGIN = '200px';  // IntersectionObserver pre-load margin
+    const PROGRESS_HIDE_DELAY_MS = 2000;    // delay before hiding progress panel
+
     const C = window.PLAYLIST_CTX || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
     const state = {
@@ -260,7 +265,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred while processing your request.');
+            showResponseModal('failure', 'An error occurred while processing your request.');
         }
     }
 
@@ -355,7 +360,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred while processing your request.');
+            showResponseModal('failure', 'An error occurred while processing your request.');
         } finally {
             if (loadingIndicator) loadingIndicator.style.display = 'none';
             if (btnEl) { btnEl.disabled = false; const sp = btnEl.querySelector('.btn-spinner'); if (sp) sp.style.display = 'none'; }
@@ -373,7 +378,7 @@
                 localStorage.setItem(key, JSON.stringify(data));
                 localStorage.setItem('INKYPI_LAST_PROGRESS', JSON.stringify(data));
             } catch(e){}
-            setTimeout(() => { if (progress) progress.style.display = 'none'; }, 2000);
+            setTimeout(() => { if (progress) progress.style.display = 'none'; }, PROGRESS_HIDE_DELAY_MS);
         }
     }
 
@@ -439,7 +444,7 @@
             const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){ closeModal(); location.reload(); }
-        } catch (error) { console.error("Error:", error); alert('An error occurred while processing your request.'); }
+        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 
     async function updatePlaylist() {
@@ -452,7 +457,7 @@
             const response = await fetch(C.update_playlist_base_url + oldName, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){ closeModal(); location.reload(); }
-        } catch (error) { console.error("Error:", error); alert('An error occurred while processing your request.'); }
+        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 
     async function deletePlaylist() {
@@ -461,7 +466,7 @@
             const response = await fetch(C.delete_playlist_base_url + name, { method: "DELETE" });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){ closeModal(); location.reload(); }
-        } catch (error) { console.error("Error:", error); alert('An error occurred while processing your request.'); }
+        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 
     async function deletePlaylistQuick(name){
@@ -470,7 +475,7 @@
             const response = await fetch(C.delete_playlist_base_url + name, { method: "DELETE" });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){ location.reload(); }
-        } catch (e){ alert('Failed to delete playlist'); }
+        } catch (e){ showResponseModal('failure', 'Failed to delete playlist'); }
     }
 
     async function displayNextInPlaylist(name){
@@ -678,7 +683,7 @@
                             loadThumb(img);
                         }
                     });
-                }, { rootMargin: '200px' });
+                }, { rootMargin: THUMB_PREFETCH_MARGIN });
                 thumbs.forEach(img => io.observe(img));
             } else {
                 thumbs.forEach(loadThumb);
@@ -686,7 +691,7 @@
         } catch(e){}
         try {
             initDeviceClock();
-            setInterval(renderNextIn, 60000);
+            setInterval(renderNextIn, NEXT_IN_REFRESH_MS);
             renderNextIn();
         } catch(e) { /* ignore */ }
         syncPlaylistCards();

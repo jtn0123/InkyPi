@@ -192,7 +192,10 @@ def handle_request_files(request_files, form_data=None):
 
         file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
         os.makedirs(file_save_dir, exist_ok=True)
-        file_path = os.path.join(file_save_dir, file_name)
+        # Prefix with timestamp to avoid silent overwrites from duplicate filenames
+        import time
+        unique_name = f"{int(time.time())}_{file_name}"
+        file_path = os.path.join(file_save_dir, unique_name)
 
         # Read raw bytes once so this works with both FileStorage and test fakes.
         content = file.read()

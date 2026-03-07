@@ -11,7 +11,7 @@ from flask import (
     send_from_directory,
 )
 
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import get_timezone, now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -184,7 +184,7 @@ def history_redisplay():
             return json_error("file not found", status=404)
 
         display_manager.display_preprocessed_image(safe_path)
-        return jsonify({"success": True, "message": "Display updated"}), 200
+        return json_success("Display updated")
     except Exception:
         logger.exception("Error redisplaying history image")
         return json_internal_error(
@@ -218,7 +218,7 @@ def history_delete():
                 sidecar = f"{base}.png"
                 if os.path.exists(sidecar):
                     os.remove(sidecar)
-        return jsonify({"success": True, "message": "Deleted"}), 200
+        return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")
         return json_internal_error(
@@ -240,10 +240,13 @@ def history_clear():
             if os.path.isfile(p) and f.lower().endswith((".png", ".json")):
                 os.remove(p)
                 count += 1
-        return jsonify({"success": True, "message": f"Cleared {count} images"}), 200
+        return json_success(f"Cleared {count} images")
     except Exception:
         logger.exception("Error clearing history images")
-        return json_error("An error occurred", status=500)
+        return json_internal_error(
+            "clear history",
+            details={"hint": "Check history directory permissions."},
+        )
 
 
 @history_bp.route("/history/storage")

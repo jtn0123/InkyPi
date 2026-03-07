@@ -6,7 +6,7 @@
 <div class="form-group nowrap" id="{{ prefix }}-group-interval">
   <input type="radio" name="refreshType" id="{{ prefix }}-refresh-interval" value="interval" checked>
   <label for="{{ prefix }}-refresh-interval">Every</label>
-  <input type="number" id="{{ prefix }}-interval" name="interval" class="form-input" required min="1" placeholder="Enter a number">
+  <input type="number" id="{{ prefix }}-interval" name="interval" class="form-input" required min="1" max="999" placeholder="Enter a number">
   <select id="{{ prefix }}-unit" name="unit" class="form-input" required>
     <option value="minute">Minute</option>
     <option value="hour">Hour</option>

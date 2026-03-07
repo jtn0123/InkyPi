@@ -116,7 +116,7 @@ class RefreshTask:
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
         self.running = False
-        self.manual_update_requests: deque[ManualUpdateRequest] = deque()
+        self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
         self.progress_bus = get_progress_bus()
         self.plugin_health: dict[str, dict] = {}
 
@@ -559,7 +559,7 @@ class RefreshTask:
                 self.manual_update_requests.append(request)
                 self.condition.notify_all()  # Wake the thread to process manual update
 
-            wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "300") or "300")
+            wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
             completed = request.done.wait(timeout=max(0.0, wait_s))
             if not completed:
                 with self.condition:
@@ -638,10 +638,17 @@ class RefreshTask:
                 proc.join(timeout=timeout_s)
                 if proc.is_alive():
                     proc.terminate()
-                    proc.join(timeout=1)
+                    proc.join(timeout=2)
                     if proc.is_alive():
                         proc.kill()
-                        proc.join(timeout=1)
+                        proc.join(timeout=2)
+                    if proc.is_alive():
+                        logger.warning(
+                            "plugin_lifecycle: zombie_process | plugin_id=%s pid=%s "
+                            "- process did not exit after kill",
+                            plugin_id,
+                            proc.pid,
+                        )
                     last_exc = TimeoutError(
                         f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
                     )

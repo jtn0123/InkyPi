@@ -36,11 +36,19 @@
         const inputElement = document.getElementById(inputId);
         const value = inputElement ? inputElement.value : "";
         if (statusElement && value && value !== config.maskPlaceholder) {
-          statusElement.innerHTML = `<strong>Status:</strong> Configured (${config.maskPlaceholder})`;
+          statusElement.textContent = "";
+          const strong1 = document.createElement("strong");
+          strong1.textContent = "Status:";
+          statusElement.appendChild(strong1);
+          statusElement.appendChild(document.createTextNode(` Configured (${config.maskPlaceholder})`));
           inputElement.value = config.maskPlaceholder;
           addDeleteAndClearButtons(sectionId, key);
         } else if (statusElement && value === "") {
-          statusElement.innerHTML = "<strong>Status:</strong> Not configured";
+          statusElement.textContent = "";
+          const strong2 = document.createElement("strong");
+          strong2.textContent = "Status:";
+          statusElement.appendChild(strong2);
+          statusElement.appendChild(document.createTextNode(" Not configured"));
           removeDeleteAndClearButtons(sectionId);
         }
       });
@@ -136,7 +144,13 @@
       const [statusId, inputId, sectionId] = entry;
       const statusElement = document.getElementById(statusId);
       const inputElement = document.getElementById(inputId);
-      if (statusElement) statusElement.innerHTML = "<strong>Status:</strong> Not configured";
+      if (statusElement) {
+        statusElement.textContent = "";
+        const strong3 = document.createElement("strong");
+        strong3.textContent = "Status:";
+        statusElement.appendChild(strong3);
+        statusElement.appendChild(document.createTextNode(" Not configured"));
+      }
       if (inputElement) inputElement.value = "";
       removeDeleteAndClearButtons(sectionId);
       updateManagedSummary();
@@ -149,11 +163,26 @@
       const row = document.createElement("div");
       row.className = "apikey-row";
       row.dataset.existing = "false";
-      row.innerHTML = `
-        <input type="text" class="apikey-key" value="${key}" placeholder="KEY_NAME">
-        <input type="text" class="apikey-value" value="${value}" placeholder="Enter value">
-        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete API key">×</button>
-      `;
+      const keyInput = document.createElement("input");
+      keyInput.type = "text";
+      keyInput.className = "apikey-key";
+      keyInput.value = key;
+      keyInput.placeholder = "KEY_NAME";
+      const valInput = document.createElement("input");
+      valInput.type = "text";
+      valInput.className = "apikey-value";
+      valInput.value = value;
+      valInput.placeholder = "Enter value";
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "btn-delete";
+      delBtn.dataset.apiAction = "delete-row";
+      delBtn.title = "Delete";
+      delBtn.setAttribute("aria-label", "Delete API key");
+      delBtn.textContent = "\u00d7";
+      row.appendChild(keyInput);
+      row.appendChild(valInput);
+      row.appendChild(delBtn);
       list.appendChild(row);
       (key ? row.querySelector(".apikey-value") : row.querySelector(".apikey-key")).focus();
     }
@@ -190,18 +219,36 @@
       }
       const list = document.getElementById("apikeys-list");
       if (list && list.children.length === 0) {
-        list.innerHTML = `
-          <div class="empty-state" id="empty-state">
-            <div class="empty-state-icon" aria-hidden="true">
-              <svg class="icon-image" viewBox="0 0 256 256" fill="none">
-                <rect x="52" y="112" width="152" height="108" rx="16" stroke="currentColor" stroke-width="16"></rect>
-                <path d="M84 112V76a44 44 0 0 1 88 0v36" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path>
-              </svg>
-            </div>
-            <p>No API keys configured yet.</p>
-            <p>Add keys below to enable plugin features.</p>
-          </div>
-        `;
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.id = "empty-state";
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "empty-state-icon";
+        iconWrap.setAttribute("aria-hidden", "true");
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("class", "icon-image");
+        svg.setAttribute("viewBox", "0 0 256 256");
+        svg.setAttribute("fill", "none");
+        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        rect.setAttribute("x", "52"); rect.setAttribute("y", "112");
+        rect.setAttribute("width", "152"); rect.setAttribute("height", "108");
+        rect.setAttribute("rx", "16"); rect.setAttribute("stroke", "currentColor");
+        rect.setAttribute("stroke-width", "16");
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M84 112V76a44 44 0 0 1 88 0v36");
+        path.setAttribute("stroke", "currentColor"); path.setAttribute("stroke-width", "16");
+        path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round");
+        svg.appendChild(rect);
+        svg.appendChild(path);
+        iconWrap.appendChild(svg);
+        empty.appendChild(iconWrap);
+        const p1 = document.createElement("p");
+        p1.textContent = "No API keys configured yet.";
+        const p2 = document.createElement("p");
+        p2.textContent = "Add keys below to enable plugin features.";
+        empty.appendChild(p1);
+        empty.appendChild(p2);
+        list.appendChild(empty);
       }
     }
 
