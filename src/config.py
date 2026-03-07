@@ -1,4 +1,5 @@
 import functools
+import hashlib
 import importlib
 import json
 import logging
@@ -55,6 +56,7 @@ class Config:
 
     def __init__(self):
         self._config_lock = threading.RLock()
+        self._last_written_hash = None
         self._resolve_runtime_paths()
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
@@ -223,11 +225,20 @@ class Config:
         return plugins_list
 
     def write_config(self):
-        """Updates the cached config from the model objects and writes to the config file."""
-        logger.debug(f"Writing device config to {self.config_file}")
+        """Updates the cached config from the model objects and writes to the config file.
+
+        Skips the disk write when the serialized content is identical to the
+        last write, reducing SD-card wear on low-power devices.
+        """
         with self._config_lock:
             self.config["playlist_config"] = self.playlist_manager.to_dict()
             self.config["refresh_info"] = self.refresh_info.to_dict()
+            serialized = json.dumps(self.config, indent=4)
+            content_hash = hashlib.md5(serialized.encode()).hexdigest()
+            if content_hash == self._last_written_hash:
+                logger.debug("Config unchanged, skipping write")
+                return
+            logger.debug(f"Writing device config to {self.config_file}")
             config_dir = os.path.dirname(self.config_file) or "."
             fd, tmp_path = tempfile.mkstemp(
                 dir=config_dir,
@@ -236,10 +247,11 @@ class Config:
             )
             try:
                 with os.fdopen(fd, "w") as outfile:
-                    json.dump(self.config, outfile, indent=4)
+                    outfile.write(serialized)
                     outfile.flush()
                     os.fsync(outfile.fileno())
                 os.replace(tmp_path, self.config_file)
+                self._last_written_hash = content_hash
             finally:
                 try:
                     if os.path.exists(tmp_path):
