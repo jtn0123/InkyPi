@@ -28,6 +28,11 @@ except Exception:  # pragma: no cover
     def save_stage_event(*args, **kwargs):  # type: ignore
         return None
 
+try:
+    from cysystemd.daemon import notify as _sd_notify
+except Exception:
+    _sd_notify = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,10 +46,17 @@ class ManualUpdateRequest:
 
 
 def _get_mp_context():
-    try:
-        return multiprocessing.get_context("fork")
-    except ValueError:
-        return multiprocessing.get_context()
+    import sys
+    # forkserver spawns children from a lean server process, reducing memory
+    # on constrained devices like Pi Zero 2W. It requires picklable arguments,
+    # so we only prefer it on Linux where the production target runs.
+    prefer = ("forkserver", "fork") if sys.platform == "linux" else ("fork",)
+    for method in prefer:
+        try:
+            return multiprocessing.get_context(method)
+        except ValueError:
+            continue
+    return multiprocessing.get_context()
 
 
 def _restore_child_config(device_config):
@@ -174,6 +186,11 @@ class RefreshTask:
         while True:
             result = None
             try:
+                if _sd_notify:
+                    try:
+                        _sd_notify("WATCHDOG=1")
+                    except Exception:
+                        pass
                 result = self._wait_for_trigger()
                 if result is None:
                     break

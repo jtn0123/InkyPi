@@ -21,7 +21,7 @@
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
     function tickClock(){ try { if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.elapsed) state.els.elapsed.textContent = fmtElapsed(Date.now() - state.t0); } catch(e){} }
-    function setStep(text, pct){ if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') state.els.bar.style.width = pct + '%';
+    function setStep(text, pct){ if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') { state.els.bar.style.width = pct + '%'; state.els.bar.setAttribute('aria-valuenow', pct); }
       if (state.els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); state.els.list.appendChild(li); try { state.els.list.scrollTop = state.els.list.scrollHeight; } catch(e){} }
     }
     function start(){ state.t0 = Date.now(); try { if (state.els.list) state.els.list.innerHTML = ''; if (state.els.elapsed) state.els.elapsed.textContent = '0s'; if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.bar) state.els.bar.style.width = '10%'; } catch(e){} tickClock(); state.clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
@@ -76,7 +76,14 @@
     } catch (e){
       console.error('Error in plugin form submission:', e);
       console.error('Error stack:', e.stack);
-      if (window.showResponseModal) window.showResponseModal('failure', 'An error occurred while processing your request. Please try again.');
+      if (e instanceof TypeError) {
+        const msg = navigator.onLine === false
+          ? 'You appear to be offline. Check your connection.'
+          : 'Unable to reach the device. Check that InkyPi is running.';
+        if (window.showResponseModal) window.showResponseModal('failure', msg);
+      } else {
+        if (window.showResponseModal) window.showResponseModal('failure', 'An error occurred. Please try again.');
+      }
     } finally {
       if (loadingIndicator) loadingIndicator.style.display = 'none';
       progress.setStep('Done', 100);

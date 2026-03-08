@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ plugin.display_name }} Settings{% endblock %}
 {% block head %}
-    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_form.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}" defer></script>
 
 
     <script>
@@ -348,7 +348,7 @@
             <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
             <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
         </div>
-        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill progress-fill-seeded"></div></div>
+        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill progress-fill-seeded" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"></div></div>
         <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
     </div>
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>

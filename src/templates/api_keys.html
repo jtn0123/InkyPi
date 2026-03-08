@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}API Keys{% endblock %}
 {% block head %}
-    <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}" defer></script>
 {% endblock %}
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle %}
@@ -51,6 +51,7 @@
                     <div class="api-key-card-head">
                         <label class="form-label">OpenAI</label>
                         <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
+                        {% if api_key_plugins and api_key_plugins.get('OPEN_AI_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['OPEN_AI_SECRET'] | join(', ') }}</div>{% endif %}
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
@@ -62,6 +63,7 @@
                     <div class="api-key-card-head">
                         <label class="form-label">OpenWeatherMap</label>
                         <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
+                        {% if api_key_plugins and api_key_plugins.get('OPEN_WEATHER_MAP_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['OPEN_WEATHER_MAP_SECRET'] | join(', ') }}</div>{% endif %}
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
@@ -73,6 +75,7 @@
                     <div class="api-key-card-head">
                         <label class="form-label">NASA APOD</label>
                         <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
+                        {% if api_key_plugins and api_key_plugins.get('NASA_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['NASA_SECRET'] | join(', ') }}</div>{% endif %}
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
@@ -84,6 +87,7 @@
                     <div class="api-key-card-head">
                         <label class="form-label">Unsplash</label>
                         <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
+                        {% if api_key_plugins and api_key_plugins.get('UNSPLASH_ACCESS_KEY') %}<div class="api-key-usage">Used by: {{ api_key_plugins['UNSPLASH_ACCESS_KEY'] | join(', ') }}</div>{% endif %}
                     </div>
                     <div class="input-container api-key-actions">
                         <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
@@ -114,11 +118,11 @@
             </div>
             <div class="add-buttons-grid">
                 <button type="button" id="addApiKeyBtn" class="btn-add"><span>+</span> Add API Key</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET">OPEN_WEATHER_MAP_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET">OPEN_AI_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET">NASA_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY">UNSPLASH_ACCESS_KEY</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET">GITHUB_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_WEATHER_MAP_SECRET', []) | join(', ') }}">OPEN_WEATHER_MAP_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_AI_SECRET', []) | join(', ') }}">OPEN_AI_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY" title="Used by: {{ api_key_plugins.get('UNSPLASH_ACCESS_KEY', []) | join(', ') }}">UNSPLASH_ACCESS_KEY</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET" title="Used by: {{ api_key_plugins.get('GITHUB_SECRET', []) | join(', ') }}">GITHUB_SECRET</button>
             </div>
         </div>
         {% endif %}

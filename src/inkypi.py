@@ -13,11 +13,6 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
 
-from blueprints.main import main_bp
-from blueprints.apikeys import apikeys_bp
-from blueprints.playlist import playlist_bp
-from blueprints.plugin import plugin_bp
-from blueprints.settings import settings_bp
 from config import Config
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
@@ -292,13 +287,18 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
     # Register Blueprints
+    from blueprints.main import main_bp
+    from blueprints.apikeys import apikeys_bp
+    from blueprints.settings import settings_bp
+    from blueprints.plugin import plugin_bp
+    from blueprints.playlist import playlist_bp
+    from blueprints.history import history_bp
+
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(playlist_bp)
-    from blueprints.history import history_bp
-
     app.register_blueprint(history_bp)
 
     # Lightweight health endpoints for probes/CI
@@ -483,12 +483,26 @@ if __name__ == "__main__":
     # display default inkypi image on startup (skip if web-only)
     device_cfg = created_app.config.get("DEVICE_CONFIG")
     if not WEB_ONLY and device_cfg is not None and device_cfg.get_config("startup") is True:
-        logger.info("Startup flag is set, displaying startup image")
-        display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
-        img = generate_startup_image(device_cfg.get_resolution())
-        if display_manager_obj is not None:
-            display_manager_obj.display_image(img)
-        device_cfg.update_value("startup", False, write=True)
+        import threading
+        def _show_startup():
+            try:
+                logger.info("Displaying startup image")
+                img = generate_startup_image(device_cfg.get_resolution())
+                display_manager_obj = created_app.config.get("DISPLAY_MANAGER")
+                if display_manager_obj is not None:
+                    display_manager_obj.display_image(img)
+                device_cfg.update_value("startup", False, write=True)
+            except Exception:
+                logger.exception("Startup image failed")
+        threading.Thread(target=_show_startup, daemon=True, name="StartupImage").start()
+
+    # Notify systemd that the service is ready
+    try:
+        from cysystemd.daemon import notify as sd_notify
+        sd_notify("READY=1")
+        logger.info("Notified systemd: READY=1")
+    except Exception:
+        pass  # Not running under systemd or cysystemd unavailable
 
     try:
         # Run the Flask app

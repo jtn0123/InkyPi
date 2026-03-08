@@ -84,12 +84,20 @@ def apikeys_page():
         for key, value in entries
     ]
     
+    api_key_plugins = {
+        "OPEN_AI_SECRET": ["AI Image", "AI Text"],
+        "OPEN_WEATHER_MAP_SECRET": ["Weather"],
+        "NASA_SECRET": ["NASA APOD"],
+        "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
+        "GITHUB_SECRET": ["GitHub"],
+    }
     return render_template(
         'api_keys.html',
         entries=template_entries,
         env_exists=os.path.exists(env_path),
         api_keys_mode="generic",
         masked={},
+        api_key_plugins=api_key_plugins,
     )
 
 

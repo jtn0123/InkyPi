@@ -857,11 +857,19 @@ def api_keys_page():
         "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
     }
     masked = {k: mask(v) for k, v in keys.items()}
+    api_key_plugins = {
+        "OPEN_AI_SECRET": ["AI Image", "AI Text"],
+        "OPEN_WEATHER_MAP_SECRET": ["Weather"],
+        "NASA_SECRET": ["NASA APOD"],
+        "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
+        "GITHUB_SECRET": ["GitHub"],
+    }
     return render_template(
         "api_keys.html",
         api_keys_mode="managed",
         entries=[],
         masked=masked,
+        api_key_plugins=api_key_plugins,
     )
 
 

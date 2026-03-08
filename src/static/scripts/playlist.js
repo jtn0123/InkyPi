@@ -683,7 +683,7 @@
                             loadThumb(img);
                         }
                     });
-                }, { rootMargin: THUMB_PREFETCH_MARGIN });
+                }, { rootMargin: mobileQuery.matches ? '50px' : THUMB_PREFETCH_MARGIN });
                 thumbs.forEach(img => io.observe(img));
             } else {
                 thumbs.forEach(loadThumb);

@@ -16,34 +16,44 @@ SRC_ABS = os.path.abspath(os.path.join(PROJECT_ROOT, "src"))
 if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
-# Auto-skip UI/a11y tests when Playwright browsers are unavailable
-_require_browser_smoke = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
-try:  # pragma: no cover - best effort detection
-    from playwright.sync_api import sync_playwright
+# Auto-skip UI/a11y tests when Playwright browsers are unavailable.
+# Short-circuit when SKIP flags are already set to avoid costly Playwright detection
+# (~13s per process), which is critical for fast pytest-xdist parallel startup.
+_skip_a11y = os.getenv("SKIP_A11Y", "").lower() in ("1", "true")
+_skip_ui = os.getenv("SKIP_UI", "").lower() in ("1", "true")
 
-    _has_browser = True
-    with sync_playwright() as _p:
-        try:
-            _b = _p.chromium.launch()
-            _b.close()
-        except Exception:
-            _has_browser = False
-    if not _has_browser:
+if _skip_a11y and _skip_ui:
+    pass  # Both flags set — skip Playwright detection entirely
+elif _skip_a11y:
+    os.environ.setdefault("SKIP_UI", "true")
+else:
+    _require_browser_smoke = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
+    try:  # pragma: no cover - best effort detection
+        from playwright.sync_api import sync_playwright
+
+        _has_browser = True
+        with sync_playwright() as _p:
+            try:
+                _b = _p.chromium.launch()
+                _b.close()
+            except Exception:
+                _has_browser = False
+        if not _has_browser:
+            if _require_browser_smoke:
+                raise RuntimeError(
+                    "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
+                    "Install browsers with `playwright install chromium`."
+                )
+            os.environ.setdefault("SKIP_A11Y", "true")
+            os.environ.setdefault("SKIP_UI", "true")
+    except Exception:
         if _require_browser_smoke:
             raise RuntimeError(
-                "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
-                "Install browsers with `playwright install chromium`."
+                "REQUIRE_BROWSER_SMOKE=1 but Playwright is unavailable. "
+                "Install dev dependencies and `playwright install chromium`."
             )
         os.environ.setdefault("SKIP_A11Y", "true")
         os.environ.setdefault("SKIP_UI", "true")
-except Exception:
-    if _require_browser_smoke:
-        raise RuntimeError(
-            "REQUIRE_BROWSER_SMOKE=1 but Playwright is unavailable. "
-            "Install dev dependencies and `playwright install chromium`."
-        )
-    os.environ.setdefault("SKIP_A11Y", "true")
-    os.environ.setdefault("SKIP_UI", "true")
 
 
 @pytest.fixture(autouse=True)

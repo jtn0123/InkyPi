@@ -213,6 +213,16 @@ setup_earlyoom_service() {
   sudo systemctl enable --now earlyoom
 }
 
+configure_journal_size() {
+  local conf="/etc/systemd/journald.conf"
+  if [ -f "$conf" ] && ! grep -q "^SystemMaxUse=" "$conf"; then
+    echo "Configuring journal size limit (50M)"
+    echo "SystemMaxUse=50M" | sudo tee -a "$conf" > /dev/null
+    sudo systemctl restart systemd-journald
+    echo_success "Journal size limit configured."
+  fi
+}
+
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
@@ -386,6 +396,7 @@ else
   echo "OS version is not Bookworm - skipping zramswap setup."
 fi
 setup_earlyoom_service
+configure_journal_size
 install_src
 install_cli
 create_venv
@@ -401,6 +412,15 @@ echo "Update JS and CSS files"
 bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
 
 echo "Building minified CSS bundle"
-"$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify > /dev/null && echo_success "CSS bundle built."
+if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
+  echo_error "ERROR: CSS build failed. The web UI will not render correctly."
+  exit 1
+fi
+CSS_OUTPUT="$SCRIPT_DIR/../src/static/styles/main.css"
+if [ ! -f "$CSS_OUTPUT" ]; then
+  echo_error "ERROR: CSS bundle was not generated at $CSS_OUTPUT."
+  exit 1
+fi
+echo_success "CSS bundle built."
 
 ask_for_reboot

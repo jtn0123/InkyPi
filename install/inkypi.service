@@ -4,17 +4,20 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
+Type=notify
 User=root
 RuntimeDirectory=inkypi
 WorkingDirectory=/run/inkypi
 ExecStart=/usr/local/bin/inkypi run
 Restart=on-failure
 RestartSec=60
+WatchdogSec=120
 KillSignal=SIGINT
 StandardOutput=journal
 StandardError=journal
 CPUQuota=40%
-MemoryMax=200M
+MemoryHigh=250M
+MemoryMax=350M
 
 [Install]
 WantedBy=multi-user.target

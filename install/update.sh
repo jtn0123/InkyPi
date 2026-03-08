@@ -122,7 +122,16 @@ echo "Update JS and CSS files"
 bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
 
 echo "Building minified CSS bundle"
-"$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify > /dev/null && echo_success "CSS bundle built."
+if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
+  echo_error "ERROR: CSS build failed. The web UI will not render correctly."
+  exit 1
+fi
+CSS_OUTPUT="$SCRIPT_DIR/../src/static/styles/main.css"
+if [ ! -f "$CSS_OUTPUT" ]; then
+  echo_error "ERROR: CSS bundle was not generated at $CSS_OUTPUT."
+  exit 1
+fi
+echo_success "CSS bundle built."
 
 update_app_service
 update_cli

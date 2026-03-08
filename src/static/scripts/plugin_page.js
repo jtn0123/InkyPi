@@ -157,7 +157,7 @@
       setHidden(metaDiv, metaContent.childNodes.length === 0);
     }
 
-    async function handleAction(action) {
+    async function handleAction(action, triggerButton) {
       try {
         if (typeof window.validatePluginSettings === "function") {
           const isValid = window.validatePluginSettings(action);
@@ -175,19 +175,24 @@
         return;
       }
 
-      await window.PluginForm.sendForm({
-        action,
-        urls: config.urls,
-        uploadedFiles,
-        onAfterSuccess: () => {
-          setTimeout(() => {
-            refreshPreviewImage();
-            refreshInstancePreview();
-          }, 250);
-          closeModal("scheduleModal");
-        },
-      });
-      saveLastProgressSnapshot(config.progressContext);
+      if (triggerButton) triggerButton.disabled = true;
+      try {
+        await window.PluginForm.sendForm({
+          action,
+          urls: config.urls,
+          uploadedFiles,
+          onAfterSuccess: () => {
+            setTimeout(() => {
+              refreshPreviewImage();
+              refreshInstancePreview();
+            }, 250);
+            closeModal("scheduleModal");
+          },
+        });
+        saveLastProgressSnapshot(config.progressContext);
+      } finally {
+        if (triggerButton) triggerButton.disabled = false;
+      }
     }
 
     async function refreshPreviewImage() {
@@ -494,7 +499,7 @@
         event.preventDefault();
       });
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
-        button.addEventListener("click", () => handleAction(button.dataset.pluginAction));
+        button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
       document.querySelectorAll("[data-open-modal]").forEach((button) => {
         button.addEventListener("click", () => openModal(button.dataset.openModal));

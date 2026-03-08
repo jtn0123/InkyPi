@@ -39,6 +39,7 @@ class DisplayManager:
             ValueError: If an unsupported display type is specified.
         """
         
+        self._last_image_hash = None
         self.device_config = device_config
      
         display_type = device_config.get_config("display_type", default="inky")
@@ -158,7 +159,14 @@ class DisplayManager:
 
         if not hasattr(self, "display"):
             raise ValueError("No valid display instance initialized.")
-        
+
+        from utils.image_utils import compute_image_hash
+        image_hash = compute_image_hash(image)
+        if image_hash == self._last_image_hash:
+            logger.info("Image unchanged, skipping display writes")
+            return
+        self._last_image_hash = image_hash
+
         # Save the raw image
         logger.info(f"Saving image to {self.device_config.current_image_file}")
         try:

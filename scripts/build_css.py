@@ -6,8 +6,9 @@ Usage:
     python scripts/build_css.py --minify        # concatenate + minify
     python scripts/build_css.py --check         # verify round-trip (no write)
 
-The script reads src/static/styles/main.css, resolves every @import in order,
-and writes the result back (or to --output if given).
+The script reads src/static/styles/_imports.css (the tracked manifest of @import
+directives), resolves every partial in order, and writes the bundled output to
+main.css (or to --output if given).
 """
 
 import argparse
@@ -16,6 +17,7 @@ import sys
 from pathlib import Path
 
 STYLES_DIR = Path(__file__).resolve().parent.parent / "src" / "static" / "styles"
+IMPORTS_CSS = STYLES_DIR / "_imports.css"
 MAIN_CSS = STYLES_DIR / "main.css"
 
 IMPORT_RE = re.compile(r'^@import\s+["\'](.+?)["\'];', re.MULTILINE)
@@ -62,10 +64,10 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="Dry-run: print stats without writing")
     args = parser.parse_args()
 
-    if not MAIN_CSS.is_file():
-        sys.exit(f"ERROR: {MAIN_CSS} not found")
+    if not IMPORTS_CSS.is_file():
+        sys.exit(f"ERROR: {IMPORTS_CSS} not found")
 
-    bundled = resolve_imports(MAIN_CSS)
+    bundled = resolve_imports(IMPORTS_CSS)
 
     if args.minify:
         bundled = minify_css(bundled)
@@ -73,7 +75,7 @@ def main() -> None:
     if args.check:
         print(f"Bundled size: {len(bundled):,} bytes")
         if args.minify:
-            raw = resolve_imports(MAIN_CSS)
+            raw = resolve_imports(IMPORTS_CSS)
             saved = len(raw) - len(bundled)
             print(f"Minified saving: {saved:,} bytes ({saved * 100 // len(raw)}%)")
         return

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ config.name }}{% endblock %}
 {% block head %}
-    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}" defer></script>
 {% endblock %}
 {% block body %}
     <!-- Subtle frame container -->
@@ -61,7 +61,7 @@
 
                 <aside class="dashboard-overview">
                     <div id="statusRow" class="dashboard-status-card" {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}hidden{% endif %}>
-                        <div id="nowShowingBlock" class="dashboard-status-meta" {% if not refresh_info.plugin_id %}hidden{% endif %}>
+                        <div id="nowShowingBlock" class="dashboard-status-meta" aria-live="polite" {% if not refresh_info.plugin_id %}hidden{% endif %}>
                             <h3>Now showing:</h3>
                             <div>
                                 <strong id="nsPlugin">{{ refresh_info.plugin_id or '' }}</strong>
@@ -77,7 +77,7 @@
                             <span id="nsPlaylist" hidden></span>
                             {% endif %}
                         </div>
-                        <div id="nextUpBlock" class="dashboard-status-meta" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
+                        <div id="nextUpBlock" class="dashboard-status-meta" aria-live="polite" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
                             <h3>Next up:</h3>
                             <div>
                                 <strong id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</strong>

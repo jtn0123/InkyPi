@@ -301,13 +301,14 @@ class SunriseX3:
         self.GPIO.cleanup([self.RST_PIN, self.DC_PIN, self.CS_PIN, self.BUSY_PIN], self.PWR_PIN)
 
 
-if sys.version_info[0] == 2:
-    process = subprocess.Popen("cat /proc/cpuinfo | grep Raspberry", shell=True, stdout=subprocess.PIPE)
-else:
-    process = subprocess.Popen("cat /proc/cpuinfo | grep Raspberry", shell=True, stdout=subprocess.PIPE, text=True)
-output, _ = process.communicate()
-if sys.version_info[0] == 2:
-    output = output.decode(sys.stdout.encoding)
+def _read_cpuinfo():
+    try:
+        with open("/proc/cpuinfo", "r") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+output = _read_cpuinfo()
 
 if "Raspberry" in output:
     implementation = RaspberryPi()

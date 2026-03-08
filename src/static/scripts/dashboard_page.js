@@ -222,7 +222,14 @@
     function init() {
       // Hide plugin icons that fail to load
       document.querySelectorAll('.plugin-item img.icon-image[loading="lazy"]').forEach(function (img) {
-        img.addEventListener('error', function () { img.style.display = 'none'; });
+        img.addEventListener('error', function () {
+          img.style.display = 'none';
+          const fallback = document.createElement('span');
+          fallback.className = 'icon-image icon-fallback';
+          fallback.setAttribute('aria-hidden', 'true');
+          fallback.textContent = '?';
+          img.parentNode.insertBefore(fallback, img.nextSibling);
+        });
       });
       document.getElementById("displayNextBtn")?.addEventListener("click", displayNextNow);
       initPreviewInteractions();

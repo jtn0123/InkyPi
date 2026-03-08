@@ -157,3 +157,16 @@
     background: linear-gradient(90deg, var(--storage-fill-start), var(--storage-fill-end));
     height: 100%;
 }
+
+.icon-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border-radius: var(--border-radius);
+}
