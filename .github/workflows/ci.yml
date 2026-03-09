@@ -260,8 +260,12 @@ jobs:
 
   preflash-validate:
     name: Pre-flash validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -272,6 +276,7 @@ jobs:
             install/requirements.txt
             install/requirements-dev.txt
       - name: Install OS dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \

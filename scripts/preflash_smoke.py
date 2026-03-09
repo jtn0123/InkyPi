@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import platform
 import sys
 import tempfile
 from pathlib import Path
@@ -82,8 +83,23 @@ def run_render_smoke() -> None:
 def run_import_smoke() -> None:
     import flask  # noqa: F401
     import PIL  # noqa: F401
+    import astral  # noqa: F401
+    import feedparser  # noqa: F401
+    import icalendar  # noqa: F401
+    import jsonschema  # noqa: F401
+    import numpy  # noqa: F401
+    import openai  # noqa: F401
+    import pi_heif  # noqa: F401
+    import psutil  # noqa: F401
+    import pytz  # noqa: F401
+    import recurring_ical_events  # noqa: F401
+    import requests  # noqa: F401
+    import urllib3  # noqa: F401
     import waitress  # noqa: F401
-    from inky.auto import auto  # noqa: F401
+
+    if platform.system() == "Linux":
+        from cysystemd.daemon import notify  # noqa: F401
+        from inky.auto import auto  # noqa: F401
 
 
 def main() -> int:

@@ -45,16 +45,16 @@ syntax_check() {
 
 import_smoke_check() {
     local temp_dir
+    local venv_python
     temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/inkypi-import-smoke.XXXXXX")"
-    trap 'rm -rf "${temp_dir}"' RETURN
+    trap 'rm -rf "${temp_dir:-}"' RETURN
 
     python3 -m venv "${temp_dir}/venv"
-    # shellcheck source=/dev/null
-    source "${temp_dir}/venv/bin/activate"
-    python -m pip install -U pip wheel >/dev/null
-    pip install -r install/requirements.txt >/dev/null
-    pip check >/dev/null
-    python scripts/preflash_smoke.py imports
+    venv_python="${temp_dir}/venv/bin/python"
+    "${venv_python}" -m pip install -U pip wheel >/dev/null
+    "${venv_python}" -m pip install -r install/requirements.txt >/dev/null
+    "${venv_python}" -m pip check >/dev/null
+    "${venv_python}" scripts/preflash_smoke.py imports
 }
 
 run_phase "syntax" syntax_check
@@ -71,11 +71,7 @@ run_phase "app-smoke" python scripts/preflash_smoke.py app
 run_phase "render-smoke" python scripts/preflash_smoke.py render
 
 if [[ "${INKYPI_VALIDATE_INSTALL:-0}" == "1" ]]; then
-    if [[ "$(uname -s)" != "Linux" ]]; then
-        status_skip "imports" "clean import smoke is Linux-only; CI runs it on Ubuntu"
-    else
-        run_phase "imports" import_smoke_check
-    fi
+    run_phase "imports" import_smoke_check
 else
     status_skip "imports" "set INKYPI_VALIDATE_INSTALL=1 to run import smoke"
 fi

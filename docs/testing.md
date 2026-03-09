@@ -38,7 +38,7 @@ Notes:
   - `playwright install chromium`
   - `PYTHONPATH=$(pwd)/src REQUIRE_BROWSER_SMOKE=1 pytest tests/integration/test_browser_smoke.py -q`
 - Pre-flash validation works without the device connected and checks app boot, config resolution, mock rendering, and targeted pytest coverage.
-- Set `INKYPI_VALIDATE_INSTALL=1` to include the import-only install smoke phase; it runs in a clean temporary environment on Linux and is skipped on non-Linux hosts.
+- Set `INKYPI_VALIDATE_INSTALL=1` to include the import-only install smoke phase; it runs in a clean temporary environment on both macOS and Linux, and Linux additionally validates the Inky/systemd-related imports.
 - Pre-flash validation does not prove EEPROM detection, SPI/GPIO access, or real panel refresh; those are post-flash hardware checks.
 - A11y/browser suites can still be run explicitly:
   - `PYTHONPATH=$(pwd)/src SKIP_A11Y=0 pytest tests/integration/test_more_a11y.py -q`

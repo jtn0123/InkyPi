@@ -139,7 +139,7 @@ To also run the import-only install smoke phase:
 INKYPI_VALIDATE_INSTALL=1 scripts/preflash_validate.sh
 ```
 
-The import-only smoke phase runs in a clean temporary environment on Linux and is skipped on non-Linux hosts. This still does not prove EEPROM detection, SPI/GPIO access, or actual panel refresh on the target hardware. Those remain post-flash checks.
+The import-only smoke phase runs in a clean temporary environment on both macOS and Linux. On Linux it also validates the Inky and systemd-related imports. This still does not prove EEPROM detection, SPI/GPIO access, or actual panel refresh on the target hardware. Those remain post-flash checks.
 
 ## Runtime Feature Flags
 
