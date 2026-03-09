@@ -18,12 +18,14 @@ python -m pip install -r install/requirements.txt -r install/requirements-dev.tx
 scripts/test.sh
 scripts/test.sh tests/unit/test_refresh_task_stress.py
 scripts/test_profile.sh
+scripts/preflash_validate.sh
 PYTHONPATH=$(pwd)/src pytest -q
 PYTHONPATH=$(pwd)/src pytest --cov=src --cov-report=term-missing
 ```
 
 Notes:
 - `scripts/test.sh` is the recommended fast local path.
+- `scripts/preflash_validate.sh` is the recommended hardware-free pre-flash gate.
 - With no args it shards the main local suite across 4 lanes (`core`, `plugins-a`, `plugins-b`, `plugins-c`) and uses `PYTEST_LANE_WORKERS=2` per lane by default.
 - It runs serial for a single explicit test file and uses `pytest -n 4 --dist=loadfile -q` for broader explicit targets.
 - The default fast path keeps Playwright-backed UI/a11y suites explicit so normal local runs avoid browser startup overhead.
@@ -35,6 +37,9 @@ Notes:
 - Browser smoke coverage is separate and requires Playwright Chromium:
   - `playwright install chromium`
   - `PYTHONPATH=$(pwd)/src REQUIRE_BROWSER_SMOKE=1 pytest tests/integration/test_browser_smoke.py -q`
+- Pre-flash validation works without the device connected and checks app boot, config resolution, mock rendering, and targeted pytest coverage.
+- Set `INKYPI_VALIDATE_INSTALL=1` to include the import-only install smoke phase; it runs in a clean temporary environment on Linux and is skipped on non-Linux hosts.
+- Pre-flash validation does not prove EEPROM detection, SPI/GPIO access, or real panel refresh; those are post-flash hardware checks.
 - A11y/browser suites can still be run explicitly:
   - `PYTHONPATH=$(pwd)/src SKIP_A11Y=0 pytest tests/integration/test_more_a11y.py -q`
   - `PYTHONPATH=$(pwd)/src SKIP_UI=0 pytest tests/integration/test_weather_autofill.py -q`

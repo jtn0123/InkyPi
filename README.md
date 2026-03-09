@@ -123,6 +123,24 @@ scripts/test_profile.sh
 - It runs single-file debug targets serially and shards the broader default suite for faster local feedback.
 - Browser and accessibility suites stay explicit; see [docs/testing.md](./docs/testing.md) for serial debug, coverage, and Playwright-backed commands.
 
+### Pre-Flash Validation
+
+Use the hardware-free validation gate before flashing a Raspberry Pi:
+
+```bash
+scripts/preflash_validate.sh
+```
+
+This validates app boot, config resolution, mock-display rendering, targeted tests, and install-script syntax without the device connected.
+
+To also run the import-only install smoke phase:
+
+```bash
+INKYPI_VALIDATE_INSTALL=1 scripts/preflash_validate.sh
+```
+
+The import-only smoke phase runs in a clean temporary environment on Linux and is skipped on non-Linux hosts. This still does not prove EEPROM detection, SPI/GPIO access, or actual panel refresh on the target hardware. Those remain post-flash checks.
+
 ## Runtime Feature Flags
 
 - `INKYPI_PLUGIN_RETRY_MAX` (default `1`)

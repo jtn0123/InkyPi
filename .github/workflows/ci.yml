@@ -55,6 +55,7 @@ jobs:
           bash -n scripts/dev_update.sh
           bash -n scripts/format.sh
           bash -n scripts/lint.sh
+          bash -n scripts/preflash_validate.sh
           bash -n scripts/test.sh
           bash -n scripts/test_profile.sh
           bash -n scripts/venv.sh
@@ -256,6 +257,40 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/benchmarks/summary >/dev/null
           curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
           kill $PID 2>/dev/null || true
+
+  preflash-validate:
+    name: Pre-flash validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Setup clean virtualenv
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install -U pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+          pip check
+      - name: Run pre-flash validation
+        env:
+          INKYPI_VALIDATE_INSTALL: '1'
+        run: |
+          scripts/preflash_validate.sh
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)
