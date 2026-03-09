@@ -4,15 +4,26 @@ These tests ensure the refresh task handles high-frequency updates, concurrent
 requests, and edge cases without deadlocks or race conditions.
 """
 
+import os
 import threading
 import time
-from unittest.mock import Mock, patch
 
+import psutil
 import pytest
 from PIL import Image
 
 from display.display_manager import DisplayManager
-from refresh_task import RefreshTask, ManualRefresh
+from refresh_task import ManualRefresh, RefreshTask
+
+
+def wait_until(predicate, timeout=1.0, interval=0.01):
+    """Poll until a condition becomes true."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return predicate()
 
 
 @pytest.fixture
@@ -62,11 +73,6 @@ def test_rapid_manual_updates(device_config_dev, mock_plugin, monkeypatch):
         for i in range(num_updates):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
-            # Small delay to allow processing but still stress the system
-            time.sleep(0.01)
-
-        # Wait for all refreshes to complete
-        time.sleep(0.5)
 
         # Verify the task is still running and responsive
         assert task.running
@@ -101,7 +107,6 @@ def test_concurrent_manual_updates_from_multiple_threads(
                 for i in range(5):
                     refresh = ManualRefresh("test", {})
                     task.manual_update(refresh)
-                    time.sleep(0.01)
                 completed.append(thread_id)
             except Exception as e:
                 errors.append((thread_id, e))
@@ -115,7 +120,7 @@ def test_concurrent_manual_updates_from_multiple_threads(
 
         # Wait for all threads
         for t in threads:
-            t.join(timeout=5)
+            t.join(timeout=2)
 
         # Verify no errors and all threads completed
         assert len(errors) == 0, f"Errors occurred: {errors}"
@@ -136,8 +141,6 @@ def test_start_stop_cycles(device_config_dev):
         assert task.thread.is_alive()
 
         task.stop()
-        # Give thread time to stop
-        time.sleep(0.05)
         assert not task.running
 
 
@@ -172,14 +175,19 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
         # Wait for the slow plugin to start
         assert slow_plugin_started.wait(timeout=1), "Plugin didn't start"
 
-        # Now try to stop while plugin is working
-        task.stop()
+        stop_thread = threading.Thread(target=task.stop)
+        stop_thread.start()
+        assert wait_until(stop_thread.is_alive, timeout=0.2), "Stop did not start"
 
         # Allow plugin to finish
         slow_plugin_can_finish.set()
-        refresh_thread.join(timeout=2)
+        assert wait_until(lambda: not stop_thread.is_alive(), timeout=2), (
+            "Stop should finish promptly once the refresh is released"
+        )
+        refresh_thread.join(timeout=1)
 
         # Verify task stopped
+        assert not stop_thread.is_alive()
         assert not task.running
 
     finally:
@@ -223,9 +231,6 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
             expected_order.append(plugin_id)
             refresh = ManualRefresh(plugin_id, {})
             task.manual_update(refresh)
-
-        # Wait for all to process
-        time.sleep(1)
 
         assert processed_order == expected_order
 
@@ -325,10 +330,6 @@ def test_high_frequency_updates_dont_deadlock(device_config_dev, mock_plugin, mo
         for i in range(100):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
-            # No delay - truly rapid
-
-        # Give it time to process
-        time.sleep(1)
 
         # Task should still be responsive
         assert task.running
@@ -345,9 +346,6 @@ def test_high_frequency_updates_dont_deadlock(device_config_dev, mock_plugin, mo
 
 def test_memory_not_growing_with_many_updates(device_config_dev, mock_plugin, monkeypatch):
     """Test that memory doesn't grow excessively with many updates."""
-    import psutil
-    import os
-
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -367,9 +365,6 @@ def test_memory_not_growing_with_many_updates(device_config_dev, mock_plugin, mo
         for i in range(50):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
-            time.sleep(0.01)
-
-        time.sleep(0.5)
 
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_growth = final_memory - initial_memory

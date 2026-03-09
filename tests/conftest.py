@@ -3,6 +3,8 @@ import json
 import os
 import sys
 import threading
+from functools import lru_cache
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -16,44 +18,96 @@ SRC_ABS = os.path.abspath(os.path.join(PROJECT_ROOT, "src"))
 if SRC_ABS not in sys.path:
     sys.path.insert(0, SRC_ABS)
 
-# Auto-skip UI/a11y tests when Playwright browsers are unavailable.
-# Short-circuit when SKIP flags are already set to avoid costly Playwright detection
-# (~13s per process), which is critical for fast pytest-xdist parallel startup.
-_skip_a11y = os.getenv("SKIP_A11Y", "").lower() in ("1", "true")
-_skip_ui = os.getenv("SKIP_UI", "").lower() in ("1", "true")
+UI_BROWSER_TESTS = {
+    "test_browser_smoke.py",
+    "test_e2e_form_workflows.py",
+    "test_playlist_interactions.py",
+    "test_plugin_add_to_playlist_ui.py",
+    "test_weather_autofill.py",
+    "test_weather_image_render.py",
+}
+A11Y_BROWSER_TESTS = {
+    "test_more_a11y.py",
+    "test_playlist_a11y.py",
+}
+MANAGED_API_KEY_ENV_VARS = (
+    "OPEN_AI_SECRET",
+    "OPEN_WEATHER_MAP_SECRET",
+    "NASA_SECRET",
+    "UNSPLASH_ACCESS_KEY",
+    "IMMICH_KEY",
+    "GITHUB_SECRET",
+)
 
-if _skip_a11y and _skip_ui:
-    pass  # Both flags set — skip Playwright detection entirely
-elif _skip_a11y:
-    os.environ.setdefault("SKIP_UI", "true")
-else:
-    _require_browser_smoke = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
+
+def _is_truthy(value: str) -> bool:
+    return value.strip().lower() in ("1", "true", "yes")
+
+
+def _browser_test_group(path: Path) -> str | None:
+    name = path.name
+    if name in A11Y_BROWSER_TESTS:
+        return "a11y"
+    if name in UI_BROWSER_TESTS:
+        return "ui"
+    return None
+
+
+@lru_cache(maxsize=1)
+def _playwright_browser_available() -> bool:
     try:  # pragma: no cover - best effort detection
         from playwright.sync_api import sync_playwright
 
-        _has_browser = True
-        with sync_playwright() as _p:
-            try:
-                _b = _p.chromium.launch()
-                _b.close()
-            except Exception:
-                _has_browser = False
-        if not _has_browser:
-            if _require_browser_smoke:
-                raise RuntimeError(
-                    "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
-                    "Install browsers with `playwright install chromium`."
-                )
-            os.environ.setdefault("SKIP_A11Y", "true")
-            os.environ.setdefault("SKIP_UI", "true")
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            browser.close()
+        return True
     except Exception:
-        if _require_browser_smoke:
-            raise RuntimeError(
-                "REQUIRE_BROWSER_SMOKE=1 but Playwright is unavailable. "
-                "Install dev dependencies and `playwright install chromium`."
-            )
-        os.environ.setdefault("SKIP_A11Y", "true")
+        return False
+
+
+def pytest_ignore_collect(collection_path, config):
+    path = Path(str(collection_path))
+    group = _browser_test_group(path)
+    if group is None:
+        return False
+
+    skip_a11y = _is_truthy(os.getenv("SKIP_A11Y", ""))
+    skip_ui = _is_truthy(os.getenv("SKIP_UI", ""))
+    require_browser_smoke = _is_truthy(os.getenv("REQUIRE_BROWSER_SMOKE", ""))
+
+    if skip_a11y and group == "a11y":
+        return True
+    if skip_ui and group == "ui" and not require_browser_smoke:
+        return True
+    if skip_a11y and group == "ui":
         os.environ.setdefault("SKIP_UI", "true")
+        return True
+    if _playwright_browser_available():
+        return False
+    if require_browser_smoke and path.name == "test_browser_smoke.py":
+        raise RuntimeError(
+            "REQUIRE_BROWSER_SMOKE=1 but Playwright Chromium is unavailable. "
+            "Install browsers with `playwright install chromium`."
+        )
+    return True
+
+
+@pytest.fixture(autouse=True)
+def clear_managed_api_key_env(monkeypatch):
+    # Keep tests hermetic even when earlier tests or the parent shell export real
+    # API credentials that would otherwise leak into "missing key" cases.
+    for env_var in MANAGED_API_KEY_ENV_VARS:
+        monkeypatch.delenv(env_var, raising=False)
+
+    try:
+        import blueprints.playlist as playlist_mod
+        import blueprints.settings as settings_mod
+
+        playlist_mod._eta_cache.clear()
+        settings_mod._REQUESTS.clear()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
@@ -65,8 +119,8 @@ def mock_screenshot(monkeypatch):
         img = Image.new("RGB", (width, height), "white")
         return img
 
-    import utils.image_utils as image_utils
     import plugins.base_plugin.base_plugin as base_plugin
+    import utils.image_utils as image_utils
 
     monkeypatch.setattr(image_utils, "take_screenshot", _fake_screenshot, raising=True)
     monkeypatch.setattr(
@@ -114,6 +168,7 @@ def device_config_dev(tmp_path, monkeypatch):
     }
     config_file = tmp_path / "device.json"
     config_file.write_text(json.dumps(cfg))
+    (tmp_path / ".env").write_text("", encoding="utf-8")
 
     # Ensure the app reads .env from the temp directory to avoid leaking real secrets
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
@@ -150,9 +205,9 @@ def flask_app(device_config_dev, monkeypatch):
     from flask import Flask
     from jinja2 import ChoiceLoader, FileSystemLoader
 
+    from blueprints.apikeys import apikeys_bp
     from blueprints.history import history_bp
     from blueprints.main import main_bp
-    from blueprints.apikeys import apikeys_bp
     from blueprints.playlist import playlist_bp
     from blueprints.plugin import plugin_bp
     from blueprints.settings import settings_bp

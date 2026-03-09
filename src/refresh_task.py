@@ -231,6 +231,8 @@ class RefreshTask:
             sleep_time = self.device_config.get_config(
                 "plugin_cycle_interval_seconds", default=60 * 60
             )
+            if not self.running:
+                return None
             if not self.manual_update_requests:
                 self.condition.wait(timeout=sleep_time)
             if not self.running:

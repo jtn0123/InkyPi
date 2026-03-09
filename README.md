@@ -109,6 +109,20 @@ This process ensures that any new updates, including code changes and additional
 - For parent-fork sync work (`fatihak/InkyPi`), prefer cherry-pick by feature area and run plugin flow smoke tests after each batch.
 - Use the PR template checklist for base-branch, sync, and compatibility verification before merging.
 
+## Testing
+
+For local development, use the fast test runner:
+
+```bash
+scripts/test.sh
+scripts/test.sh tests/unit/test_refresh_task_stress.py
+scripts/test_profile.sh
+```
+
+- `scripts/test.sh` is the recommended default local path.
+- It runs single-file debug targets serially and shards the broader default suite for faster local feedback.
+- Browser and accessibility suites stay explicit; see [docs/testing.md](./docs/testing.md) for serial debug, coverage, and Playwright-backed commands.
+
 ## Runtime Feature Flags
 
 - `INKYPI_PLUGIN_RETRY_MAX` (default `1`)

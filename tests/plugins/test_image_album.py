@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+from contextlib import ExitStack, contextmanager
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
@@ -20,6 +21,7 @@ def plugin_config():
 def _make_mock_session(albums, assets, image_bytes):
     """Build a mock session whose .get/.post return appropriate data."""
     session = MagicMock()
+    search_calls = {"count": 0}
 
     def fake_get(url, **kw):
         resp = MagicMock()
@@ -34,12 +36,29 @@ def _make_mock_session(albums, assets, image_bytes):
     def fake_post(url, **kw):
         resp = MagicMock()
         resp.raise_for_status = MagicMock()
-        resp.json.return_value = {"assets": {"items": assets}}
+        items = assets if search_calls["count"] == 0 else []
+        search_calls["count"] += 1
+        resp.json.return_value = {"assets": {"items": items}}
         return resp
 
     session.get = MagicMock(side_effect=fake_get)
     session.post = MagicMock(side_effect=fake_post)
     return session
+
+
+@contextmanager
+def _patched_album_sessions(session):
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch(
+                "plugins.image_album.image_album.get_http_session",
+                return_value=session,
+            )
+        )
+        stack.enter_context(
+            patch("utils.image_loader.get_http_session", return_value=session)
+        )
+        yield
 
 
 def test_image_album_generate_success(monkeypatch, plugin_config, device_config_dev):
@@ -53,7 +72,7 @@ def test_image_album_generate_success(monkeypatch, plugin_config, device_config_
     img_bytes = _png_bytes()
 
     session = _make_mock_session(albums, assets, img_bytes)
-    with patch("plugins.image_album.image_album.get_http_session", return_value=session):
+    with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
             {"albumProvider": "Immich", "url": "http://immich.local", "album": "Vacation"},
@@ -120,7 +139,7 @@ def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev)
 
     albums = [{"albumName": "Empty", "id": "album-2"}]
     session = _make_mock_session(albums, [], _png_bytes())
-    with patch("plugins.image_album.image_album.get_http_session", return_value=session):
+    with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         with pytest.raises(RuntimeError, match="Failed to load image"):
             p.generate_image(
@@ -139,7 +158,7 @@ def test_image_album_padding_blur(monkeypatch, plugin_config, device_config_dev)
     img_bytes = _png_bytes()
 
     session = _make_mock_session(albums, assets, img_bytes)
-    with patch("plugins.image_album.image_album.get_http_session", return_value=session):
+    with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
             {
@@ -164,7 +183,7 @@ def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev
     img_bytes = _png_bytes()
 
     session = _make_mock_session(albums, assets, img_bytes)
-    with patch("plugins.image_album.image_album.get_http_session", return_value=session):
+    with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
             {
@@ -191,7 +210,7 @@ def test_image_album_vertical(monkeypatch, plugin_config, device_config_dev):
     img_bytes = _png_bytes()
 
     session = _make_mock_session(albums, assets, img_bytes)
-    with patch("plugins.image_album.image_album.get_http_session", return_value=session):
+    with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
             {"albumProvider": "Immich", "url": "http://immich.local", "album": "Vacation"},

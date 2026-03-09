@@ -15,13 +15,19 @@ import pytest
 from PIL import Image
 
 from display.display_manager import DisplayManager
-from plugins.plugin_registry import get_plugin_instance
-from refresh_task import RefreshTask, ManualRefresh
+from refresh_task import ManualRefresh, RefreshTask
 from utils.image_utils import (
     apply_image_enhancement,
     load_image_from_bytes,
     resize_image,
 )
+
+
+def settle_memory(rounds=3, pause_s=0.01):
+    """Give GC and RSS accounting a short chance to settle."""
+    for _ in range(rounds):
+        gc.collect()
+        time.sleep(pause_s)
 
 
 @pytest.fixture
@@ -54,8 +60,7 @@ def test_image_resize_no_memory_leak(memory_baseline):
         del resized
 
     # Force garbage collection
-    gc.collect()
-    time.sleep(0.1)
+    settle_memory()
 
     process = psutil.Process(os.getpid())
     final_memory = process.memory_info().rss / 1024 / 1024
@@ -82,8 +87,7 @@ def test_image_enhancement_no_memory_leak(memory_baseline):
         enhanced = apply_image_enhancement(test_img, settings)
         del enhanced
 
-    gc.collect()
-    time.sleep(0.1)
+    settle_memory()
 
     process = psutil.Process(os.getpid())
     final_memory = process.memory_info().rss / 1024 / 1024
@@ -105,8 +109,7 @@ def test_image_load_from_bytes_no_memory_leak(memory_baseline):
         if loaded:
             del loaded
 
-    gc.collect()
-    time.sleep(0.1)
+    settle_memory()
 
     process = psutil.Process(os.getpid())
     final_memory = process.memory_info().rss / 1024 / 1024
@@ -147,15 +150,9 @@ def test_plugin_execution_no_memory_leak(device_config_dev, monkeypatch, memory_
         for i in range(num_iterations):
             refresh = ManualRefresh("simple", {})
             task.manual_update(refresh)
-            # Small delay to avoid overwhelming the system
-            time.sleep(0.01)
-
-        # Wait for all to complete
-        time.sleep(0.5)
 
         # Force garbage collection
-        gc.collect()
-        time.sleep(0.1)
+        settle_memory()
 
         process = psutil.Process(os.getpid())
         final_memory = process.memory_info().rss / 1024 / 1024
@@ -179,8 +176,7 @@ def test_display_manager_no_memory_leak(device_config_dev, memory_baseline):
         dm.display_image(img)
         del img
 
-    gc.collect()
-    time.sleep(0.1)
+    settle_memory()
 
     process = psutil.Process(os.getpid())
     final_memory = process.memory_info().rss / 1024 / 1024
@@ -237,9 +233,9 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
         def generate_image(self, settings, device_config):
             self.call_count += 1
             # Create temporary objects
-            temp_img = Image.new("RGB", (100, 100), color=(self.call_count % 256, 128, 200))
-            temp_list = list(range(1000))  # Some temp data
-            temp_dict = {f"key{i}": f"value{i}" for i in range(100)}
+            Image.new("RGB", (100, 100), color=(self.call_count % 256, 128, 200))
+            list(range(1000))  # Some temp data
+            {f"key{i}": f"value{i}" for i in range(100)}
 
             # Return final image
             return Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
@@ -265,10 +261,8 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
         for i in range(num_iterations):
             refresh = ManualRefresh("cycling", {})
             task.manual_update(refresh)
-            time.sleep(0.02)
 
-        time.sleep(0.5)
-        gc.collect()
+        settle_memory()
 
         final_memory = process.memory_info().rss / 1024 / 1024
         memory_growth = final_memory - initial_memory
@@ -332,8 +326,7 @@ def test_image_history_doesnt_accumulate_in_memory(device_config_dev):
         dm.display_image(img)
         del img
 
-    gc.collect()
-    time.sleep(0.1)
+    settle_memory()
 
     final_memory = process.memory_info().rss / 1024 / 1024
     memory_growth = final_memory - initial_memory

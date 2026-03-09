@@ -7,13 +7,22 @@ to other plugins or crash the system.
 import threading
 import time
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 from PIL import Image
 
 from display.display_manager import DisplayManager
-from refresh_task import RefreshTask, ManualRefresh
+from refresh_task import ManualRefresh, RefreshTask
+
+
+def wait_until(predicate, timeout=1.0, interval=0.01):
+    """Poll until a condition becomes true."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(interval)
+    return predicate()
 
 
 @pytest.fixture
@@ -26,7 +35,7 @@ def good_plugin():
 
         def generate_image(self, settings, device_config):
             self.call_count += 1
-            time.sleep(0.01)  # Simulate some work
+            time.sleep(0.001)
             return Image.new("RGB", device_config.get_resolution(), color=(0, 255, 0))
 
     return GoodPlugin()
@@ -57,7 +66,7 @@ def slow_plugin():
 
         def generate_image(self, settings, device_config):
             self.call_count += 1
-            time.sleep(0.5)  # Deliberately slow
+            time.sleep(0.1)
             return Image.new("RGB", device_config.get_resolution(), color=(0, 0, 255))
 
     return SlowPlugin()
@@ -67,6 +76,7 @@ def test_single_plugin_failure_doesnt_crash_task(
     device_config_dev, bad_plugin, good_plugin, monkeypatch
 ):
     """Test that a single plugin failure doesn't crash the refresh task."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -110,6 +120,7 @@ def test_multiple_plugins_concurrent_execution_with_failures(
     device_config_dev, bad_plugin, good_plugin, monkeypatch
 ):
     """Test that good plugins can execute while bad plugins are failing."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -146,7 +157,6 @@ def test_multiple_plugins_concurrent_execution_with_failures(
                     results.append(f"{plugin_id}_success_{i}")
                 except Exception:
                     errors.append(f"{plugin_id}_error_{i}")
-                time.sleep(0.02)
 
         # Run good and bad plugins concurrently
         good_thread = threading.Thread(target=run_plugin, args=("good", 5))
@@ -155,8 +165,8 @@ def test_multiple_plugins_concurrent_execution_with_failures(
         good_thread.start()
         bad_thread.start()
 
-        good_thread.join(timeout=10)
-        bad_thread.join(timeout=10)
+        good_thread.join(timeout=2)
+        bad_thread.join(timeout=2)
 
         # Good plugin should have succeeded at least some times
         # (exact count may vary due to threading/timing)
@@ -253,14 +263,14 @@ def test_plugin_timeout_isolation(device_config_dev, slow_plugin, good_plugin, m
 
         # While slow plugin is running, try to run good plugin
         # (This may queue up depending on refresh_task implementation)
-        time.sleep(0.1)  # Give slow plugin a head start
+        time.sleep(0.02)
 
         # Note: This behavior depends on whether refresh_task processes serially or in parallel
         # If serial, this will queue. If parallel, it runs concurrently.
         # For now, just verify the system doesn't deadlock
 
         # Wait for slow plugin to finish
-        slow_thread.join(timeout=2)
+        slow_thread.join(timeout=1)
 
         assert slow_result["done"], "Slow plugin should have completed"
 
@@ -275,6 +285,7 @@ def test_plugin_timeout_isolation(device_config_dev, slow_plugin, good_plugin, m
 
 def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
     """Test that plugin errors preserve their message across process boundaries."""
+    monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
@@ -428,11 +439,10 @@ def test_concurrent_plugin_calls_dont_interfere(
             for i in range(3):
                 try:
                     refresh = ManualRefresh("good", {})
-                    metrics = task.manual_update(refresh)
+                    task.manual_update(refresh)
                     results.append(f"thread{thread_id}_call{i}")
-                except Exception as e:
+                except Exception:
                     results.append(f"thread{thread_id}_error")
-                time.sleep(0.01)
 
         # Spawn multiple threads calling the same plugin
         threads = [threading.Thread(target=call_plugin, args=(i,)) for i in range(3)]
@@ -441,9 +451,10 @@ def test_concurrent_plugin_calls_dont_interfere(
             t.start()
 
         for t in threads:
-            t.join(timeout=5)
+            t.join(timeout=2)
 
         # All calls should have succeeded
+        assert wait_until(lambda: len(results) == 9, timeout=0.5)
         success_count = len([r for r in results if "error" not in r])
         assert success_count == 9  # 3 threads * 3 calls each
 

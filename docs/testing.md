@@ -10,22 +10,35 @@ This guide explains how to run, extend, and understand the test setup.
 ```bash
 bash scripts/venv.sh
 . .venv/bin/activate
-python -m pip install -r install/requirements.txt || true   # hardware/system deps may fail on non-Pi
-python -m pip install freezegun                           # required for time-freeze tests
+python -m pip install -r install/requirements.txt -r install/requirements-dev.txt || true
 ```
 
 2) Run tests
 ```bash
+scripts/test.sh
+scripts/test.sh tests/unit/test_refresh_task_stress.py
+scripts/test_profile.sh
 PYTHONPATH=$(pwd)/src pytest -q
 PYTHONPATH=$(pwd)/src pytest --cov=src --cov-report=term-missing
 ```
 
 Notes:
+- `scripts/test.sh` is the recommended fast local path.
+- With no args it shards the main local suite across 4 lanes (`core`, `plugins-a`, `plugins-b`, `plugins-c`) and uses `PYTEST_LANE_WORKERS=2` per lane by default.
+- It runs serial for a single explicit test file and uses `pytest -n 4 --dist=loadfile -q` for broader explicit targets.
+- The default fast path keeps Playwright-backed UI/a11y suites explicit so normal local runs avoid browser startup overhead.
+- Use `PYTHONPATH=$(pwd)/src pytest -q` for serial debugging or when investigating xdist-only issues.
+- Coverage runs remain serial for now while the parallel local path soaks.
+- `scripts/test_profile.sh` profiles the slowest tests with `--durations=25` and defaults to `tests/plugins`.
 - Tests auto-mock Chromium image capture with a fixture; no browser required.
-- Network calls to external APIs are mocked in plugin tests.
+- Managed API-key env vars are cleared per test and the temp test `PROJECT_DIR` gets an empty `.env`, which keeps missing-key flows local and deterministic.
 - Browser smoke coverage is separate and requires Playwright Chromium:
   - `playwright install chromium`
   - `PYTHONPATH=$(pwd)/src REQUIRE_BROWSER_SMOKE=1 pytest tests/integration/test_browser_smoke.py -q`
+- A11y/browser suites can still be run explicitly:
+  - `PYTHONPATH=$(pwd)/src SKIP_A11Y=0 pytest tests/integration/test_more_a11y.py -q`
+  - `PYTHONPATH=$(pwd)/src SKIP_UI=0 pytest tests/integration/test_weather_autofill.py -q`
+  - `PYTHONPATH=$(pwd)/src SKIP_UI=0 SKIP_A11Y=0 pytest tests/integration/test_browser_smoke.py tests/integration/test_more_a11y.py -q`
 - If a removed UI element such as the old skip link still appears in the browser after code changes, refresh the page or restart the app; stale server/browser state can mask template updates.
 
 ---
@@ -79,7 +92,7 @@ Server-side normalization:
 
 ### CI
 
-GitHub Actions runs the pytest matrix and a required browser-smoke job. Workflow file: `.github/workflows/ci.yml`.
+GitHub Actions runs the pytest matrix and a required browser-smoke job. The main pytest job remains serial for now while the local xdist path soaks. Workflow file: `.github/workflows/ci.yml`.
 
 ---
 
@@ -88,4 +101,3 @@ GitHub Actions runs the pytest matrix and a required browser-smoke job. Workflow
 1) Place tests under `tests/` (unit, integration, or plugin subfolders).
 2) Reuse fixtures from `conftest.py`.
 3) Mock external APIs and I/O. Keep tests deterministic and fast.
-

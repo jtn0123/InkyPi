@@ -55,6 +55,8 @@ jobs:
           bash -n scripts/dev_update.sh
           bash -n scripts/format.sh
           bash -n scripts/lint.sh
+          bash -n scripts/test.sh
+          bash -n scripts/test_profile.sh
           bash -n scripts/venv.sh
           bash -n scripts/web_only.sh
       - name: Run shellcheck
@@ -104,6 +106,7 @@ jobs:
           INKYPI_NO_REFRESH: '1'
           PYTHONPATH: src
         run: |
+          # Keep CI serial while the local pytest-xdist path soaks.
           pytest --cov=src --cov-report=xml -q
       - name: Upload coverage
         if: always()
