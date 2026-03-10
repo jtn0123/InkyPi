@@ -141,6 +141,32 @@ INKYPI_VALIDATE_INSTALL=1 scripts/preflash_validate.sh
 
 The import-only smoke phase runs in a clean temporary environment on both macOS and Linux. On Linux it also validates the Inky and systemd-related imports. This still does not prove EEPROM detection, SPI/GPIO access, or actual panel refresh on the target hardware. Those remain post-flash checks.
 
+Extended pre-install hardening lanes are available through env flags on `scripts/preflash_validate.sh`:
+
+```bash
+INKYPI_VALIDATE_PI_RUNTIME=1
+INKYPI_VALIDATE_STRESS=1
+INKYPI_VALIDATE_HEAVY_PLUGINS=1
+INKYPI_VALIDATE_BENCH_THRESHOLDS=1
+INKYPI_VALIDATE_COLD_BOOT=1
+INKYPI_VALIDATE_CACHE=1
+INKYPI_VALIDATE_ISOLATION=1
+INKYPI_VALIDATE_BROWSER_RENDER=1
+INKYPI_VALIDATE_INSTALL_IDEMPOTENCY=1
+INKYPI_VALIDATE_FAULTS=1
+INKYPI_VALIDATE_UPGRADE_COMPAT=1
+INKYPI_VALIDATE_COVERAGE=1
+INKYPI_VALIDATE_SECURITY=1
+INKYPI_VALIDATE_FLAKE=1
+INKYPI_VALIDATE_FS_PERMS=1
+INKYPI_VALIDATE_SOAK=1
+INKYPI_VALIDATE_RECOVERY=1
+INKYPI_VALIDATE_API_CONTRACT=1
+INKYPI_VALIDATE_MUTATION=1
+```
+
+Linux CI is the authoritative path for the Pi-like runtime, browser/render, install/update idempotency, security, flake-detection, soak, and mutation lanes. The new hardening lanes add fault injection, upgrade-compat checks, critical-file coverage thresholds, readonly filesystem checks, startup-recovery checks, API contract assertions, nightly soak, and a narrow mutation harness for refresh/cache/idempotency logic.
+
 ## Runtime Feature Flags
 
 - `INKYPI_PLUGIN_RETRY_MAX` (default `1`)

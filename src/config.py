@@ -401,6 +401,9 @@ class Config:
         """Loads the refresh information from the config."""
         data = self.get_config("refresh_info", {}) or {}
         try:
+            required = {"refresh_type", "plugin_id", "refresh_time", "image_hash"}
+            if not isinstance(data, dict) or not required.issubset(data.keys()):
+                raise ValueError("refresh_info missing required keys")
             return RefreshInfo.from_dict(data)
         except (KeyError, TypeError, ValueError) as e:
             logger.warning("Invalid refresh_info in config, using defaults: %s", e)

@@ -1,0 +1,18 @@
+{
+  "name": "InkyPi Legacy",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "UTC",
+  "time_format": "24h",
+  "playlist_config": {
+    "playlists": [],
+    "active_playlist": ""
+  },
+  "refresh_info": {
+    "refresh_time": null,
+    "image_hash": null,
+    "refresh_type": "Manual Update",
+    "plugin_id": ""
+  }
+}

@@ -3,7 +3,7 @@ import os
 import random
 import sqlite3
 import time
-from typing import Any, Optional
+from typing import Any
 
 
 def _get_db_path(device_config) -> str:
@@ -96,7 +96,48 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    _ensure_optional_columns(
+        conn,
+        "refresh_events",
+        {
+            "instance": "TEXT",
+            "playlist": "TEXT",
+            "used_cached": "INTEGER",
+            "request_ms": "INTEGER",
+            "generate_ms": "INTEGER",
+            "preprocess_ms": "INTEGER",
+            "display_ms": "INTEGER",
+            "cpu_percent": "REAL",
+            "memory_percent": "REAL",
+            "notes": "TEXT",
+        },
+    )
+    _ensure_optional_columns(
+        conn,
+        "stage_events",
+        {
+            "duration_ms": "INTEGER",
+            "extra_json": "TEXT",
+        },
+    )
     conn.commit()
+
+
+def _ensure_optional_columns(
+    conn: sqlite3.Connection,
+    table_name: str,
+    expected_columns: dict[str, str],
+) -> None:
+    existing = {
+        row[1]
+        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    }
+    for column_name, column_type in expected_columns.items():
+        if column_name in existing:
+            continue
+        conn.execute(
+            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+        )
 
 
 def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
@@ -158,8 +199,8 @@ def save_stage_event(
     device_config,
     refresh_id: str,
     stage: str,
-    duration_ms: Optional[int] = None,
-    extra: Optional[dict[str, Any]] = None,
+    duration_ms: int | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     """Persist a stage event tied to a refresh id. Best-effort; never raises upstream."""
     try:
@@ -189,5 +230,4 @@ def save_stage_event(
             conn.close()
     except Exception:
         pass
-
 

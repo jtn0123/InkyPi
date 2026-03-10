@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [ main ]
+  schedule:
+    - cron: '0 9 * * *'
 
 permissions:
   contents: read
@@ -261,7 +263,7 @@ jobs:
   preflash-validate:
     name: Pre-flash validate
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -291,9 +293,173 @@ jobs:
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
           pip check
+      - name: Install Playwright Chromium
+        if: runner.os == 'Linux'
+        run: |
+          . .venv/bin/activate
+          python -m playwright install --with-deps chromium
       - name: Run pre-flash validation
         env:
           INKYPI_VALIDATE_INSTALL: '1'
+          INKYPI_VALIDATE_PI_RUNTIME: '1'
+          INKYPI_VALIDATE_STRESS: '1'
+          INKYPI_VALIDATE_HEAVY_PLUGINS: '1'
+          INKYPI_VALIDATE_BENCH_THRESHOLDS: '1'
+          INKYPI_VALIDATE_COLD_BOOT: '1'
+          INKYPI_VALIDATE_CACHE: '1'
+          INKYPI_VALIDATE_ISOLATION: '1'
+          INKYPI_VALIDATE_BROWSER_RENDER: '1'
+          INKYPI_VALIDATE_INSTALL_IDEMPOTENCY: '1'
+          INKYPI_VALIDATE_FAULTS: '1'
+          INKYPI_VALIDATE_UPGRADE_COMPAT: '1'
+          INKYPI_VALIDATE_FS_PERMS: '1'
+          INKYPI_VALIDATE_RECOVERY: '1'
+          INKYPI_VALIDATE_API_CONTRACT: '1'
+        run: |
+          scripts/preflash_validate.sh
+
+  coverage-gate:
+    name: Coverage gate
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Run coverage validation
+        env:
+          INKYPI_VALIDATE_COVERAGE: '1'
+        run: |
+          scripts/preflash_validate.sh
+      - name: Upload coverage gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-gate
+          path: coverage.xml
+          if-no-files-found: error
+
+  security:
+    name: Security and SBOM
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Run security validation
+        env:
+          INKYPI_VALIDATE_SECURITY: '1'
+        run: |
+          scripts/preflash_validate.sh
+      - name: Upload security artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-artifacts
+          path: artifacts/security
+          if-no-files-found: error
+
+  flake-detection:
+    name: Flake detection
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install --with-deps chromium
+      - name: Run flake detection
+        env:
+          INKYPI_VALIDATE_FLAKE: '1'
+        run: |
+          scripts/preflash_validate.sh
+
+  soak-nightly:
+    name: Soak nightly
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Run soak validation
+        env:
+          INKYPI_VALIDATE_SOAK: '1'
+        run: |
+          scripts/preflash_validate.sh
+
+  mutation-nightly:
+    name: Mutation nightly
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: |
+            install/requirements.txt
+            install/requirements-dev.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip wheel
+          pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Run mutation validation
+        env:
+          INKYPI_VALIDATE_MUTATION: '1'
         run: |
           scripts/preflash_validate.sh
 

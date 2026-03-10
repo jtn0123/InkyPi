@@ -3,6 +3,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from time import perf_counter
 
 from display.mock_display import MockDisplay
 from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
@@ -164,9 +165,10 @@ class DisplayManager:
         image_hash = compute_image_hash(image)
         if image_hash == self._last_image_hash:
             logger.info("Image unchanged, skipping display writes")
-            return
+            return {"preprocess_ms": 0, "display_ms": 0, "display_driver": self.display.__class__.__name__}
         self._last_image_hash = image_hash
 
+        preprocess_t0 = perf_counter()
         # Save the raw image
         logger.info(f"Saving image to {self.device_config.current_image_file}")
         try:
@@ -191,9 +193,17 @@ class DisplayManager:
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save processed image preview")
         self._save_history_entry(image, history_meta=history_meta)
+        preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
 
         # Pass to the concrete instance to render to the device.
+        display_t0 = perf_counter()
         self.display.display_image(image, image_settings)
+        display_ms = int((perf_counter() - display_t0) * 1000)
+        return {
+            "preprocess_ms": preprocess_ms,
+            "display_ms": display_ms,
+            "display_driver": self.display.__class__.__name__,
+        }
 
     def display_preprocessed_image(self, image_path):
         """Display an already-processed image file without applying transforms again."""
@@ -201,6 +211,14 @@ class DisplayManager:
 
         with Image.open(image_path) as img:
             image = img.copy()
+        preprocess_t0 = perf_counter()
         image.save(self.device_config.current_image_file, optimize=True)
         image.save(self.device_config.processed_image_file, optimize=True)
+        preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
+        display_t0 = perf_counter()
         self.display.display_image(image, [])
+        return {
+            "preprocess_ms": preprocess_ms,
+            "display_ms": int((perf_counter() - display_t0) * 1000),
+            "display_driver": self.display.__class__.__name__,
+        }

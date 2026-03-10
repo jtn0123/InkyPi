@@ -39,6 +39,27 @@ Notes:
   - `PYTHONPATH=$(pwd)/src REQUIRE_BROWSER_SMOKE=1 pytest tests/integration/test_browser_smoke.py -q`
 - Pre-flash validation works without the device connected and checks app boot, config resolution, mock rendering, and targeted pytest coverage.
 - Set `INKYPI_VALIDATE_INSTALL=1` to include the import-only install smoke phase; it runs in a clean temporary environment on both macOS and Linux, and Linux additionally validates the Inky/systemd-related imports.
+- Additional opt-in lanes are available via env flags on `scripts/preflash_validate.sh`:
+  - `INKYPI_VALIDATE_PI_RUNTIME=1`
+  - `INKYPI_VALIDATE_STRESS=1`
+  - `INKYPI_VALIDATE_HEAVY_PLUGINS=1`
+  - `INKYPI_VALIDATE_BENCH_THRESHOLDS=1`
+  - `INKYPI_VALIDATE_COLD_BOOT=1`
+  - `INKYPI_VALIDATE_CACHE=1`
+  - `INKYPI_VALIDATE_ISOLATION=1`
+  - `INKYPI_VALIDATE_BROWSER_RENDER=1`
+  - `INKYPI_VALIDATE_INSTALL_IDEMPOTENCY=1`
+  - `INKYPI_VALIDATE_FAULTS=1`
+  - `INKYPI_VALIDATE_UPGRADE_COMPAT=1`
+  - `INKYPI_VALIDATE_COVERAGE=1`
+  - `INKYPI_VALIDATE_SECURITY=1`
+  - `INKYPI_VALIDATE_FLAKE=1`
+  - `INKYPI_VALIDATE_FS_PERMS=1`
+  - `INKYPI_VALIDATE_SOAK=1`
+  - `INKYPI_VALIDATE_RECOVERY=1`
+  - `INKYPI_VALIDATE_API_CONTRACT=1`
+  - `INKYPI_VALIDATE_MUTATION=1`
+- The new hardening lanes cover fault injection, property/invariant regression, upgrade compatibility for legacy config and benchmark DBs, per-file coverage thresholds, security audit plus SBOM output, flaky-test reruns, readonly filesystem handling, startup recovery, API contracts, nightly soak, and a narrow deterministic mutation harness.
 - Pre-flash validation does not prove EEPROM detection, SPI/GPIO access, or real panel refresh; those are post-flash hardware checks.
 - A11y/browser suites can still be run explicitly:
   - `PYTHONPATH=$(pwd)/src SKIP_A11Y=0 pytest tests/integration/test_more_a11y.py -q`
@@ -97,7 +118,7 @@ Server-side normalization:
 
 ### CI
 
-GitHub Actions runs the pytest matrix and a required browser-smoke job. The main pytest job remains serial for now while the local xdist path soaks. Workflow file: `.github/workflows/ci.yml`.
+GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gate, security/SBOM checks, flake detection, and the browser-smoke job. Nightly scheduled jobs run the soak and mutation lanes on Linux. The main pytest job remains serial for now while the local xdist path soaks. Workflow file: `.github/workflows/ci.yml`.
 
 ---
 

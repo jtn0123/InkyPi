@@ -423,11 +423,17 @@ class RefreshTask:
             )
             stage_t1 = perf_counter()
             try:
-                self.display_manager.display_image(
+                display_metrics = self.display_manager.display_image(
                     image,
                     image_settings=plugin_config.get("image_settings", []),
                     history_meta=history_meta,
                 )
+                if isinstance(display_metrics, dict):
+                    preprocess_ms = display_metrics.get("preprocess_ms")
+                    display_duration_ms = display_metrics.get("display_ms")
+                    display_driver = display_metrics.get("display_driver")
+                else:
+                    display_driver = None
             except Exception as exc:
                 logger.error(
                     "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
@@ -455,7 +461,8 @@ class RefreshTask:
                 )
                 raise
             finally:
-                display_duration_ms = int((perf_counter() - stage_t1) * 1000)
+                if display_duration_ms is None:
+                    display_duration_ms = int((perf_counter() - stage_t1) * 1000)
                 # Plugin lifecycle: display_complete
                 logger.info(
                     "plugin_lifecycle: display_complete",
@@ -475,6 +482,14 @@ class RefreshTask:
                         "display_pipeline",
                         display_duration_ms,
                     )
+                    if display_driver:
+                        save_stage_event(
+                            self.device_config,
+                            benchmark_id,
+                            "display_driver",
+                            display_duration_ms,
+                            extra={"driver": display_driver},
+                        )
                 except Exception:
                     logger.debug("Failed to save display_pipeline benchmark event", exc_info=True)
         else:
