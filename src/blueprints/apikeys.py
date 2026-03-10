@@ -87,6 +87,7 @@ def apikeys_page():
     
     api_key_plugins = {
         "OPEN_AI_SECRET": ["AI Image", "AI Text"],
+        "GOOGLE_AI_SECRET": ["AI Image", "AI Text"],
         "OPEN_WEATHER_MAP_SECRET": ["Weather"],
         "NASA_SECRET": ["NASA APOD"],
         "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],

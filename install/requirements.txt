@@ -8,6 +8,7 @@ pillow==12.1.1
 pi-heif==1.2.0
 pytz==2025.2
 openai==2.20.0
+google-genai>=1.14.0
 numpy==2.4.2
 icalendar==6.3.2
 recurring-ical-events==3.8.0
