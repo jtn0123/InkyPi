@@ -1,3 +1,5 @@
+[hidden] { display: none !important; }
+
 /* Subtle frame container */
 .frame {
     background-color: var(--surface);
@@ -153,6 +155,12 @@
 
 .page-shell {
   width: 100%;
+  animation: pageIn 0.25s ease-out;
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 main[data-page-shell="dashboard"] .frame,
@@ -426,6 +434,19 @@ main[data-page-shell="workflow"] .frame {
   text-align: center;
 }
 
+.empty-state-primary {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-state-secondary {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
 .info-banner {
   background: var(--info-bg);
   border: 1px solid var(--info-border);
@@ -499,4 +520,18 @@ main[data-page-shell="workflow"] .frame {
 .playlist-list, .button-grid, .history-grid {
   content-visibility: auto;
   contain-intrinsic-size: 1px 5000px; /* allow fast initial layout */
+}
+
+/* Dashboard header spacer - reserves space where home button would be on other pages */
+.header-nav-spacer {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .header-nav-spacer {
+    display: none;
+  }
 }

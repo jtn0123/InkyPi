@@ -1,14 +1,14 @@
-import os
-from utils.app_utils import resolve_path, get_font
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import field, row, schema, section, widget
-from PIL import Image, ImageColor, ImageDraw, ImageFont
-from io import BytesIO
 import logging
-import numpy as np
 import math
 from datetime import datetime
+
+import numpy as np
 import pytz
+from PIL import Image, ImageColor, ImageDraw
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, row, schema, section, widget
+from utils.app_utils import get_font
 
 logger = logging.getLogger(__name__)
 
@@ -215,9 +215,9 @@ class Clock(BasePlugin):
         ]
 
         canvas_size = min(w,h) - min(border)*2
-        for y, row in enumerate(letter_grid):
-            for x, letter in enumerate(row):
-                x_pos = x*(canvas_size/(len(row)-1)) + border[0] 
+        for y, grid_row in enumerate(letter_grid):
+            for x, letter in enumerate(grid_row):
+                x_pos = x*(canvas_size/(len(grid_row)-1)) + border[0]
                 y_pos = y*(canvas_size/(len(letter_grid)-1)) + border[1]
 
                 fill=secondary_color+(50,)

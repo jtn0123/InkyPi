@@ -220,8 +220,10 @@ class SkeletonLoader {
      * Show skeleton for image preview areas
      * @param {HTMLElement} imageContainer - Container with image preview
      * @param {string} pluginType - Type of plugin for specific skeleton pattern
+     * @param {Object} options - Optional configuration
+     * @param {number[]} options.resolution - [width, height] device resolution for aspect ratio
      */
-    static showImagePreviewSkeleton(imageContainer, pluginType = 'generic') {
+    static showImagePreviewSkeleton(imageContainer, pluginType = 'generic', options = {}) {
         if (!imageContainer) return;
 
         const img = imageContainer.querySelector('img');
@@ -229,9 +231,34 @@ class SkeletonLoader {
             img.style.display = 'none';
         }
 
+        // Apply device resolution aspect ratio
+        if (options.resolution && options.resolution.length === 2) {
+            const [w, h] = options.resolution;
+            imageContainer.style.aspectRatio = `${w} / ${h}`;
+        }
+
         const skeleton = this.createPluginSkeleton(pluginType, imageContainer);
         if (skeleton) {
             skeleton.classList.add('image-preview-skeleton');
+
+            // Add "Generating..." label with elapsed time
+            const label = document.createElement('div');
+            label.className = 'skeleton-generating-label';
+            label.innerHTML = '<span class="skeleton-generating-text">Generating\u2026</span> <span class="skeleton-elapsed">0s</span>';
+            skeleton.appendChild(label);
+
+            const startTime = Date.now();
+            const timer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const elapsedEl = label.querySelector('.skeleton-elapsed');
+                if (elapsedEl) {
+                    const m = Math.floor(elapsed / 60);
+                    const s = elapsed % 60;
+                    elapsedEl.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
+                }
+                if (!document.contains(skeleton)) clearInterval(timer);
+            }, 1000);
+            skeleton._elapsedTimer = timer;
         }
 
         return skeleton;
@@ -246,7 +273,12 @@ class SkeletonLoader {
 
         const skeleton = imageContainer.querySelector('.plugin-skeleton');
         if (skeleton) {
+            if (skeleton._elapsedTimer) clearInterval(skeleton._elapsedTimer);
             skeleton.remove();
+        }
+        // Reset aspect ratio
+        if (imageContainer.style.aspectRatio) {
+            imageContainer.style.aspectRatio = '';
         }
 
         const img = imageContainer.querySelector('img');

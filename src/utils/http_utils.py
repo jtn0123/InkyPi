@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import threading
-from typing import Any
 import os
+import threading
 from time import perf_counter
+from typing import Any
 
 import requests
-from flask import Request, jsonify, request, g
+from flask import Request, g, jsonify, request
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 

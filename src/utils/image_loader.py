@@ -6,15 +6,17 @@ Automatically uses memory-efficient strategies on low-RAM devices (Pi Zero)
 and high-performance strategies on capable devices (Pi 3/4).
 """
 
-from PIL import Image, ImageOps
-from io import BytesIO
-from utils.http_client import get_http_session
-import requests
-import logging
 import gc
-import psutil
-import tempfile
+import logging
 import os
+import tempfile
+from io import BytesIO
+
+import psutil
+import requests
+from PIL import Image, ImageOps
+
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +201,7 @@ class AdaptiveImageLoader:
             if resize:
                 # Apply draft mode for massive memory savings during decode
                 img.draft('RGB', (dimensions[0] * 2, dimensions[1] * 2))
-                logger.debug(f"Draft mode applied - PIL will decode at reduced resolution")
+                logger.debug("Draft mode applied - PIL will decode at reduced resolution")
 
                 # Force load with draft mode
                 img.load()

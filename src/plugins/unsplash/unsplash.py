@@ -1,11 +1,20 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import callout, field, option, row, schema, section
-from PIL import Image
-from io import BytesIO
-import requests
 import logging
-import random
 import os
+import random
+from io import BytesIO
+
+import requests
+from PIL import Image
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import (
+    callout,
+    field,
+    option,
+    row,
+    schema,
+    section,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,10 +129,10 @@ class Unsplash(BasePlugin):
         }
 
         if search_query:
-            url = f"https://api.unsplash.com/search/photos"
+            url = "https://api.unsplash.com/search/photos"
             params['query'] = search_query
         else:
-            url = f"https://api.unsplash.com/photos/random"
+            url = "https://api.unsplash.com/photos/random"
 
         if collections:
             params['collections'] = collections

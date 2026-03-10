@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ plugin.display_name }} Settings{% endblock %}
+{% block title %}{{ plugin.display_name }} - InkyPi{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/progressive_disclosure.js') }}" defer></script>
@@ -176,6 +176,7 @@
                                     Color
                                 </label>
                                 <input type="color" id="backgroundColor" name="backgroundColor" class="color-picker" value="#ffffff" aria-label="Background color">
+                                <span class="color-preview" style="background: #ffffff" data-color-preview="backgroundColor"></span>
                             </div>
                             <div class="form-group nowrap">
                                 <label>
@@ -196,6 +197,7 @@
                         <div class="form-group">
                             <label for="textColor" class="form-label">Text Color:</label>
                             <input type="color" id="textColor" name="textColor" class="color-picker" value="#000000">
+                            <span class="color-preview" style="background: #000000" data-color-preview="textColor"></span>
                         </div>
                     </div>
                 </div>
@@ -235,8 +237,8 @@
                 <div class="status-title">{% if plugin_instance %}This plugin instance{% else %}Latest from this plugin{% endif %}</div>
                 <div class="status-body">
                     <div class="img-skeleton instance-preview-skeleton" aria-hidden="true"></div>
-                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy">
-                    <div id="instancePreviewFallback" class="status-placeholder" hidden>
+                    <img id="instancePreviewImage" src="#" alt="{% if plugin_instance %}Latest for this instance{% else %}Latest from this plugin{% endif %}" loading="lazy" hidden>
+                    <div id="instancePreviewFallback" class="status-placeholder" aria-live="polite" hidden>
                         {% if plugin_instance %}
                         No saved image found for this instance yet.
                         {% if plugin_instance_playlist %}
@@ -288,7 +290,7 @@
     <!-- Schedule Configuration Modal -->
     <div id="scheduleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle">
         <div class="modal-content">
-            <button class="close-button" type="button" data-close-modal="scheduleModal" aria-label="Close">×</button>
+            <button class="close-button" type="button" data-close-modal="scheduleModal" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="scheduleModalTitle">Add to Playlist</h2>
             <div class="separator"></div>
             <form id="scheduleForm" class="settings-form">
@@ -307,7 +309,7 @@
                 </div>
                 <div class="form-group">
                     <label>Refresh</label>
-                    <span class="help-icon" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">i</span>
+                    <span class="help-icon" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
                 </div>
                 <div class="form-group nowrap">
                     <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
@@ -335,14 +337,14 @@
     <!-- Image preview (lightbox) for plugin page -->
     <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" hidden>
         <div class="modal-content">
-            <button class="close-button" type="button" data-lightbox-close aria-label="Close">×</button>
+            <button class="close-button" type="button" data-lightbox-close aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <img id="imagePreviewImg" alt="Large preview" class="lightbox-preview-image"/>
         </div>
     </div>
     <div id="requestProgress" class="progress-block" hidden>
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>
-            <button id="closeProgressBtn" type="button" class="progress-close" aria-label="Close progress">×</button>
+            <button id="closeProgressBtn" type="button" class="progress-close" aria-label="Close progress">{{ icon('x', 'close-icon') | safe }}</button>
         </div>
         <div class="progress-meta">
             <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>

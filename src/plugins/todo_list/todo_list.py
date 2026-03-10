@@ -1,9 +1,14 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
-from PIL import Image
-from io import BytesIO
-import requests
 import logging
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import (
+    field,
+    option,
+    row,
+    schema,
+    section,
+    widget,
+)
 
 logger = logging.getLogger(__name__)
 

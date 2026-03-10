@@ -42,6 +42,27 @@
     .header-button {
         border-width: 2px;
     }
+
+    /* Ensure skeletons remain visible in high contrast */
+    .img-skeleton,
+    .loading-panel {
+        border: 1px solid var(--surface-border);
+    }
+
+    /* Strengthen box shadows for visibility */
+    .frame,
+    .dashboard-stage,
+    .dashboard-status-card {
+        box-shadow: 0 0 0 1px var(--surface-border);
+    }
+
+    /* Disabled states need stronger contrast */
+    .action-button:disabled,
+    .header-button:disabled,
+    button:disabled {
+        opacity: 0.6;
+        border: 2px solid var(--surface-border);
+    }
 }
 
 /* ── Progress steps mobile ── */
@@ -485,6 +506,15 @@
     }
 
     /* Larger touch targets for small interactive elements */
+    .view-toggle,
+    .sort-toggle,
+    .btn-delete,
+    .clear-button,
+    .toggle-password-btn {
+        min-width: 44px;
+        min-height: 44px;
+    }
+
     .toggle-container {
         min-width: 48px;
         min-height: 48px;
@@ -626,26 +656,46 @@
         gap: 12px;
     }
 
+    .settings-mobile-toggle {
+        display: block;
+    }
+
     .settings-side-nav {
-        position: sticky;
-        top: 0;
+        position: static;
         z-index: 5;
-        display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        padding: 6px;
+        display: none;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
         border: 1px solid var(--panel-border);
-        border-radius: 999px;
+        border-radius: var(--border-radius-md);
         background: color-mix(in srgb, var(--panel-bg) 92%, transparent);
         backdrop-filter: blur(16px);
+    }
+
+    .settings-side-nav.is-open {
+        display: flex;
     }
 
     .settings-side-link {
         flex: 0 0 auto;
         min-width: max-content;
-        border-radius: 999px;
+        border-radius: var(--border-radius-md);
         padding: 10px 14px;
         text-align: center;
+    }
+
+    .logs-panel {
+        display: none;
+    }
+
+    .logs-panel.is-open {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .settings-logs-toggle {
+        display: block;
     }
 
     .settings-console-main,

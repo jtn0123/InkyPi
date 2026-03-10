@@ -535,8 +535,8 @@
     }
 
     function initializeCollapsibles() {
-      if (ui.setCollapsibles) {
-        ui.setCollapsibles(true, ".collapsible-header");
+      if (ui.restoreCollapsibles) {
+        ui.restoreCollapsibles(".collapsible-header");
       }
     }
 
@@ -565,14 +565,45 @@
     }
 
     function initializeMobilePanelState() {
-      if (!mobileQuery.matches) return;
       const panel = document.querySelector(`[data-settings-panel="${state.activeTab}"]`);
       if (!panel) return;
-      const openSection = panel.querySelector(".collapsible-content:not([hidden])");
+      const openSection = panel.querySelector(".collapsible-content.is-open");
       if (openSection) return;
       const firstToggle = panel.querySelector("[data-collapsible-toggle]");
       if (firstToggle && firstToggle.getAttribute("aria-expanded") !== "true" && ui.toggleCollapsible) {
         ui.toggleCollapsible(firstToggle);
+      }
+    }
+
+    function initMobileNav() {
+      const navToggle = document.getElementById("settingsMobileNavToggle");
+      const sideNav = document.getElementById("settingsSideNav");
+      if (navToggle && sideNav) {
+        navToggle.addEventListener("click", () => {
+          const isOpen = sideNav.classList.toggle("is-open");
+          navToggle.setAttribute("aria-expanded", String(isOpen));
+          navToggle.textContent = isOpen ? "Hide Sections" : "Sections";
+        });
+        // Auto-close nav on tab selection on mobile
+        sideNav.addEventListener("click", (e) => {
+          if (e.target.matches("[data-settings-tab]") && mobileQuery.matches) {
+            sideNav.classList.remove("is-open");
+            navToggle.setAttribute("aria-expanded", "false");
+            navToggle.textContent = "Sections";
+          }
+        });
+      }
+
+      const logsToggle = document.getElementById("settingsLogsToggle");
+      const logsPanel = document.querySelector(".logs-panel");
+      if (logsToggle && logsPanel) {
+        logsToggle.addEventListener("click", () => {
+          const isOpen = logsPanel.classList.toggle("is-open");
+          logsToggle.textContent = isOpen ? "Hide Logs" : "Show Logs";
+          if (isOpen) {
+            logsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
       }
     }
 
@@ -608,6 +639,7 @@
       initializeTabs();
       initializeLogsControls();
       initializeCollapsibles();
+      initMobileNav();
       refreshBenchmarks();
       refreshHealth();
       refreshIsolation();

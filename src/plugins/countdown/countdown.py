@@ -1,9 +1,10 @@
+import logging
+from datetime import datetime
+
+import pytz
+
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
-from PIL import Image
-from datetime import datetime
-import logging
-import pytz
 
 logger = logging.getLogger(__name__)
 class Countdown(BasePlugin):

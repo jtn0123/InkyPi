@@ -1,9 +1,11 @@
+import logging
+from io import BytesIO
+
+import requests
+from PIL import Image
+
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
-from PIL import Image
-from io import BytesIO
-import requests
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,10 @@
+import logging
+
 from ..base_plugin.base_plugin import BasePlugin
 from ..base_plugin.settings_schema import field, option, row, schema, section, widget
 from .github_contributions import contributions_generate_image
 from .github_sponsors import sponsors_generate_image
 from .github_stars import stars_generate_image
-import logging
 
 logger = logging.getLogger(__name__)
 

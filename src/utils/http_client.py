@@ -15,16 +15,16 @@ Usage:
     response = session.get(url)
 """
 
-import requests
 import logging
 import threading
-from typing import Optional
+
+import requests
 from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
 # Global session instance (singleton)
-_HTTP_SESSION: Optional[requests.Session] = None
+_HTTP_SESSION: requests.Session | None = None
 _HTTP_SESSION_LOCK = threading.Lock()
 
 

@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from typing import Optional
 from time import perf_counter
 
 from flask import (
@@ -19,7 +18,6 @@ from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.http_utils import APIError, json_error
 from utils.progress import track_progress
-
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -135,7 +133,7 @@ def latest_plugin_image(plugin_id: str):
                 continue
             json_path = os.path.join(history_dir, name)
             try:
-                with open(json_path, "r", encoding="utf-8") as fh:
+                with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
                 if meta.get("plugin_id") == plugin_id:
                     png_path = os.path.join(history_dir, name.replace(".json", ".png"))
@@ -413,7 +411,7 @@ def _save_plugin_settings_common(plugin_id, plugin_settings, device_config, play
     )
 
 
-def _find_history_image(device_config, plugin_id: str, instance_name: str) -> Optional[str]:
+def _find_history_image(device_config, plugin_id: str, instance_name: str) -> str | None:
     """Return path to a history PNG that matches plugin and instance, if any."""
     try:
         history_dir: str = str(device_config.history_image_dir)
@@ -424,7 +422,7 @@ def _find_history_image(device_config, plugin_id: str, instance_name: str) -> Op
                 continue
             json_path = os.path.join(history_dir, name)
             try:
-                with open(json_path, "r", encoding="utf-8") as fh:
+                with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
                 if (
                     meta.get("plugin_id") == plugin_id
@@ -440,7 +438,7 @@ def _find_history_image(device_config, plugin_id: str, instance_name: str) -> Op
     return None
 
 
-def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> Optional[str]:
+def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | None:
     """Return the most recent refresh time for any instance of this plugin."""
     try:
         history_dir = str(device_config.history_image_dir)
@@ -453,7 +451,7 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> Optional[
                 continue
             json_path = os.path.join(history_dir, name)
             try:
-                with open(json_path, "r", encoding="utf-8") as fh:
+                with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
                 if meta.get("plugin_id") == plugin_id:
                     refresh_time = meta.get("refresh_time")

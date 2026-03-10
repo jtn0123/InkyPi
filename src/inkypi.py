@@ -6,9 +6,9 @@ import logging.config
 import os
 import secrets
 import warnings
-
-from flask import Flask, request, g
 from time import perf_counter
+
+from flask import Flask, g, request
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -287,12 +287,12 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
     # Register Blueprints
-    from blueprints.main import main_bp
     from blueprints.apikeys import apikeys_bp
-    from blueprints.settings import settings_bp
-    from blueprints.plugin import plugin_bp
-    from blueprints.playlist import playlist_bp
     from blueprints.history import history_bp
+    from blueprints.main import main_bp
+    from blueprints.playlist import playlist_bp
+    from blueprints.plugin import plugin_bp
+    from blueprints.settings import settings_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)

@@ -144,13 +144,16 @@
         {% elif field.type == 'color' %}
         <div class="form-group">
             <label for="{{ field.id | default(field.name) }}" class="form-label">{{ field.label }}</label>
-            <input
-                type="color"
-                id="{{ field.id | default(field.name) }}"
-                name="{{ field.name }}"
-                class="color-picker"
-                value="{{ current_value or field.default | default('#ffffff') }}"
-            >
+            <div class="color-picker-group">
+                <input
+                    type="color"
+                    id="{{ field.id | default(field.name) }}"
+                    name="{{ field.name }}"
+                    class="color-picker"
+                    value="{{ current_value or field.default | default('#ffffff') }}"
+                >
+                <span class="color-preview" style="background: {{ current_value or field.default | default('#ffffff') }}" data-color-preview="{{ field.id | default(field.name) }}"></span>
+            </div>
             {% if field.hint %}<small class="field-note">{{ field.hint }}</small>{% endif %}
         </div>
         {% else %}

@@ -137,11 +137,18 @@
       setStatusBlock("nextUp", up);
       const row = document.getElementById("statusRow");
       setHidden(row, !(info && info.plugin_id) && !(up && up.plugin_id));
+      const overviewEmpty = document.getElementById("overviewEmpty");
+      const hasData = (info && info.plugin_id) || (up && up.plugin_id);
+      setHidden(overviewEmpty, hasData);
     }
 
     async function displayNextNow() {
       const button = document.getElementById("displayNextBtn");
-      if (button) button.disabled = true;
+      if (button) {
+          button.disabled = true;
+          button.textContent = "Displaying\u2026";
+          button.classList.add("loading");
+      }
       try {
         const response = await fetch(config.displayNextUrl, { method: "POST" });
         const result = await response.json();
@@ -153,7 +160,11 @@
       } catch (error) {
         showResponseModal("failure", "Failed to display next");
       } finally {
-        if (button) button.disabled = false;
+        if (button) {
+            button.disabled = false;
+            button.textContent = "Display Next";
+            button.classList.remove("loading");
+        }
       }
     }
 

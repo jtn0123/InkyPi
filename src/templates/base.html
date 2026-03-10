@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}InkyPi{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%2334c6a6'/><text x='50' y='72' font-size='60' font-family='system-ui' font-weight='700' text-anchor='middle' fill='white'>I</text></svg>">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles/main.css') }}">
     <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/form_validator.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     {% block head %}{% endblock %}
 </head>

@@ -88,6 +88,8 @@
 
     async function saveManagedKeys() {
       const form = document.getElementById("apiKeysForm");
+      const saveBtn = document.getElementById("saveApiKeysBtn");
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       const data = new FormData(form);
       try {
         const resp = await fetch(config.saveManagedUrl, {
@@ -105,10 +107,13 @@
         }
       } catch (e) {
         showResponseModal("failure", "Failed to save keys. Please try again.");
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
       }
     }
 
     async function deleteKey(keyName) {
+      if (!confirm(`Delete the ${keyName} API key? This cannot be undone.`)) return;
       const data = new FormData();
       data.append("key", keyName);
       try {
@@ -210,6 +215,9 @@
       const row = rowOrButton.closest ? rowOrButton.closest(".apikey-row") : rowOrButton;
       const keyInput = row?.querySelector(".apikey-key");
       const deletedKey = keyInput ? keyInput.value.trim() : "";
+      if (row?.dataset.existing === "true" && deletedKey) {
+        if (!confirm(`Remove ${deletedKey}? Save to apply.`)) return;
+      }
       row?.remove();
       if (deletedKey) {
         const presetBtn = document.querySelector(
@@ -273,6 +281,8 @@
         showResponseModal("failure", "Please enter a value for new API keys");
         return;
       }
+      const saveBtn = document.getElementById("saveApiKeysBtn");
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       try {
         const response = await fetch(config.saveGenericUrl, {
           method: "POST",
@@ -288,6 +298,8 @@
         }
       } catch (error) {
         showResponseModal("failure", "Failed to save API keys");
+      } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
       }
     }
 
@@ -298,12 +310,34 @@
       return saveGenericKeys();
     }
 
+    function togglePasswordVisibility(button) {
+      const inputId = button.dataset.toggleInput;
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const isPassword = input.type === "password";
+      input.type = isPassword ? "text" : "password";
+      button.textContent = isPassword ? "\u25CF" : "\u25CB";
+      button.setAttribute("aria-label", isPassword ? "Hide key" : "Show key");
+    }
+
     function init() {
       if (config.mode === "generic") {
         hideExistingPresets();
       } else {
         updateManagedSummary();
       }
+      // Add show/hide toggle buttons next to password inputs
+      document.querySelectorAll('input[type="password"].form-input').forEach((input) => {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "toggle-password-btn";
+        toggle.dataset.toggleInput = input.id;
+        toggle.dataset.apiAction = "toggle-password";
+        toggle.textContent = "\u25CB";
+        toggle.setAttribute("aria-label", "Show key");
+        toggle.title = "Toggle visibility";
+        input.parentElement.insertBefore(toggle, input.nextSibling);
+      });
       document.getElementById("addApiKeyBtn")?.addEventListener("click", () => addRow());
       document.getElementById("saveApiKeysBtn")?.addEventListener("click", saveKeys);
       document.addEventListener("click", (event) => {
@@ -318,6 +352,8 @@
           deleteRow(actionEl);
         } else if (action === "add-preset") {
           addPreset(actionEl);
+        } else if (action === "toggle-password") {
+          togglePasswordVisibility(actionEl);
         }
       });
     }

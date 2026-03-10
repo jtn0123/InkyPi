@@ -3,6 +3,7 @@ import io
 import logging
 import os
 import re
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -10,11 +11,18 @@ import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-import shlex
 from typing import Any
 
 import pytz
-from flask import Blueprint, Response, current_app, jsonify, render_template, request, stream_with_context
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+)
 
 from utils.http_utils import json_error, json_internal_error
 from utils.progress_events import get_progress_bus, to_sse
@@ -159,7 +167,7 @@ def _read_log_lines(hours: int) -> list[str]:
         # Development mode: return in-memory captured logs
         lines.append("=== Development Mode Logs (In-Memory Buffer) ===")
         lines.append(f"Showing logs from the last {hours} hours (max {DEV_LOG_BUFFER_SIZE} entries)")
-        lines.append(f"For complete logs, check your terminal output where Flask is running.")
+        lines.append("For complete logs, check your terminal output where Flask is running.")
         lines.append("")
 
         cutoff_timestamp = since.timestamp()
@@ -1001,7 +1009,7 @@ def save_settings():
             # wake the background thread up to signal interval config change
             refresh_task = current_app.config["REFRESH_TASK"]
             refresh_task.signal_config_change()
-    except RuntimeError as e:
+    except RuntimeError:
         return json_error("An internal error occurred", status=500, code="internal_error")
     except Exception:
         logger.exception("Error saving device settings")

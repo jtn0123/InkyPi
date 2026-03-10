@@ -1,10 +1,9 @@
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Set
+from datetime import UTC, datetime
+from typing import Any
 
-
-_DEFAULT_LOGRECORD_KEYS: Set[str] = {
+_DEFAULT_LOGRECORD_KEYS: set[str] = {
     "name",
     "msg",
     "args",
@@ -29,7 +28,7 @@ _DEFAULT_LOGRECORD_KEYS: Set[str] = {
 
 
 class JsonFormatter(logging.Formatter):
-    def __init__(self, *, default_fields: Dict[str, Any] | None = None, datefmt: str | None = None):
+    def __init__(self, *, default_fields: dict[str, Any] | None = None, datefmt: str | None = None):
         super().__init__(datefmt=datefmt)
         self.default_fields = default_fields or {}
 
@@ -41,9 +40,9 @@ class JsonFormatter(logging.Formatter):
             payload["stack_info"] = self.formatStack(record.stack_info)
         return json.dumps(payload, ensure_ascii=False, default=self._stringify)
 
-    def _record_to_dict(self, record: logging.LogRecord) -> Dict[str, Any]:
-        ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
-        data: Dict[str, Any] = {
+    def _record_to_dict(self, record: logging.LogRecord) -> dict[str, Any]:
+        ts = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
+        data: dict[str, Any] = {
             "timestamp": ts,
             "level": record.levelname,
             "logger": record.name,
@@ -56,7 +55,7 @@ class JsonFormatter(logging.Formatter):
         }
         data.update(self.default_fields)
 
-        extras: Dict[str, Any] = {}
+        extras: dict[str, Any] = {}
         for k, v in record.__dict__.items():
             if k not in _DEFAULT_LOGRECORD_KEYS and not k.startswith("_"):
                 extras[k] = v

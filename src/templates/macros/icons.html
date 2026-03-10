@@ -42,3 +42,12 @@
     'year_progress': 'chart-line-up'
 } %}
 
+{% macro empty_state(icon_name, primary_msg, secondary_msg='', compact=false) -%}
+<div class="empty-state{% if compact %} compact{% endif %}">
+    <div class="empty-state-icon">{{ icon(icon_name, 'icon-image') | safe }}</div>
+    <p class="empty-state-primary">{{ primary_msg }}</p>
+    {% if secondary_msg %}
+    <p class="empty-state-secondary">{{ secondary_msg }}</p>
+    {% endif %}
+</div>
+{%- endmacro %}

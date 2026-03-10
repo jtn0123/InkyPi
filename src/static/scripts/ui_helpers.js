@@ -3,11 +3,40 @@
     const content = button && button.nextElementSibling;
     const icon = button && button.querySelector(".collapsible-icon");
     if (!button || !content) return;
-    const isOpen = !content.hidden;
+    const isOpen = content.classList.contains("is-open");
     button.classList.toggle("active", !isOpen);
     button.setAttribute("aria-expanded", String(!isOpen));
-    content.hidden = isOpen;
-    if (icon) icon.textContent = isOpen ? "▼" : "▲";
+    content.classList.toggle("is-open", !isOpen);
+    content.removeAttribute("hidden");
+    if (icon) icon.textContent = isOpen ? "▲" : "▼";
+    const sectionId = button.closest('.collapsible')?.id;
+    if (sectionId) {
+      savePref('collapsible_', sectionId, !isOpen);
+    }
+  }
+
+  function restoreCollapsibles(selector) {
+    const buttons = document.querySelectorAll(selector || ".collapsible-header");
+    buttons.forEach((button) => {
+      const section = button.closest('.collapsible');
+      const sectionId = section?.id;
+      if (!sectionId) return;
+      const saved = loadPref('collapsible_', sectionId, null);
+      if (saved === null) return;
+      const shouldBeOpen = saved === 'true';
+      const content = button.nextElementSibling;
+      const icon = button.querySelector(".collapsible-icon");
+      const isOpen = content && content.classList.contains("is-open");
+      if (shouldBeOpen !== isOpen) {
+        button.classList.toggle("active", shouldBeOpen);
+        button.setAttribute("aria-expanded", String(shouldBeOpen));
+        if (content) {
+          content.classList.toggle("is-open", shouldBeOpen);
+          content.removeAttribute("hidden");
+        }
+        if (icon) icon.textContent = shouldBeOpen ? "▲" : "▼";
+      }
+    });
   }
 
   function setCollapsibles(open, selector) {
@@ -19,7 +48,10 @@
       const icon = button.querySelector(".collapsible-icon");
       button.classList.toggle("active", open);
       button.setAttribute("aria-expanded", String(open));
-      if (content) content.hidden = !open;
+      if (content) {
+        content.classList.toggle("is-open", open);
+        content.removeAttribute("hidden");
+      }
       if (icon) icon.textContent = open ? "▲" : "▼";
     });
   }
@@ -66,6 +98,7 @@
     debounce,
     jumpToSection,
     loadPref,
+    restoreCollapsibles,
     savePref,
     setCollapsibles,
     setPanelLoading,

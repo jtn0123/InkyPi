@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Playlists{% endblock %}
+{% block title %}InkyPi - Playlists{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
     <script>
@@ -20,7 +20,7 @@
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
 {% endblock %}
 {% block body %}
-    {% from 'macros/icons.html' import icon, theme_toggle %}
+    {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
     <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
@@ -56,9 +56,7 @@
         <!-- Playlists Container -->
         <div class="playlist-list">
             {% if not playlist_config.playlists %}
-            <div class="empty-state">
-                <p class="empty-state-message">No playlists yet. Click <strong>New Playlist</strong> to create one.</p>
-            </div>
+            {{ empty_state('squares-four', 'No playlists yet.', 'Click New Playlist to create one.') }}
             {% endif %}
             {% for playlist in playlist_config.playlists %}
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
@@ -86,6 +84,7 @@
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
                         <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}">
+                            <span class="drag-handle" aria-hidden="true">{{ icon('dots-six-vertical', 'drag-handle-icon') | safe }}</span>
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
                                 <span class="plugin-instance">{{ plugin_instance.name }}</span>
@@ -146,11 +145,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <div class="empty-state compact">
-                        <div class="empty-state-icon">{{ icon('squares-four', 'icon-image') | safe }}</div>
-                        <p>No plugin instances in this playlist yet.</p>
-                        <p>Add instances from a plugin page, then return here to schedule and reorder them.</p>
-                    </div>
+                    {{ empty_state('squares-four', 'No plugin instances in this playlist yet.', 'Add instances from a plugin page, then return here to schedule and reorder them.', compact=true) }}
                     {% endif %}
                     </div>
             </div>
@@ -161,7 +156,7 @@
     <!-- Schedule Configuration Modal -->
     <div id="playlistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
         <div class="modal-content modal-sheet">
-            <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">×</button>
+            <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="modalTitle">New Playlist</h2>
             <div class="separator"></div>
             <form id="scheduleForm" class="settings-form">
@@ -180,7 +175,8 @@
                 </div>
                 <div class="form-group">
                     <label for="cycle_minutes" class="form-label">Cycle override (minutes)</label>
-                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" placeholder="Use device default if blank" class="form-input" aria-label="Cycle override in minutes">
+                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" class="form-input" aria-label="Cycle override in minutes">
+                    <small class="form-help">Leave blank to use device default</small>
                 </div>
             </form>
             <div class="buttons-container">
@@ -193,7 +189,7 @@
     <!-- Refresh Settings Modal -->
     <div id="refreshSettingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="refreshSettingsTitle" hidden>
         <div class="modal-content modal-sheet">
-            <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">×</button>
+            <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="refreshSettingsTitle">Refresh Settings</h2>
             <div class="separator"></div>
             <form id="refreshSettingsForm" class="settings-form">
@@ -212,7 +208,7 @@
     <!-- Thumbnail Preview Modal -->
     <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" hidden>
         <div class="thumbnail-preview-content playlist-thumbnail-content">
-            <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">×</button>
+            <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">
             <div class="thumbnail-preview-info playlist-thumbnail-info" id="thumbnailPreviewInfo"></div>
         </div>

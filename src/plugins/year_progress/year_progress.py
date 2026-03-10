@@ -1,8 +1,9 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from PIL import Image
-from datetime import datetime
 import logging
+from datetime import datetime
+
 import pytz
+
+from plugins.base_plugin.base_plugin import BasePlugin
 
 logger = logging.getLogger(__name__)
 class YearProgress(BasePlugin):

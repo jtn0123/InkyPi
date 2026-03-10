@@ -24,6 +24,7 @@
 .plugin-actions { display:flex; justify-content:flex-end; gap:6px; align-items:center; }
 .plugin-actions .btn { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
 .plugin-actions .btn:hover { background: var(--hover-overlay, rgba(255,255,255,0.04)); }
+.plugin-actions .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .plugin-actions .btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .plugin-actions .btn-primary:hover { background: var(--accent-hover); }
 .plugin-actions .btn-danger { background: var(--danger); color: var(--on-accent); border-color: var(--danger); }
@@ -96,7 +97,7 @@
     cursor: pointer;
     font-size: 14px;
     color: var(--text);
-    transition: all 0.2s;
+    transition: all var(--transition-speed);
 }
 
 .view-toggle:hover,
@@ -131,12 +132,20 @@
     box-sizing: border-box;
     width: 100%;
     justify-self: stretch;
-    transition: background 0.2s, border-color 0.2s;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .plugins-container .plugin-item:hover {
     background: var(--button-bg);
     border-color: var(--muted);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.plugins-container .plugin-item:active {
+    transform: translateY(0);
+    box-shadow: none;
+    transition-duration: 0.05s;
 }
 
 .plugins-container .plugin-item .icon-image {
@@ -242,6 +251,8 @@
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   align-self: flex-start;
+  position: relative;
+  margin-bottom: 12px;
 }
 
 .workflow-mode-tab {
@@ -257,6 +268,16 @@
 .workflow-mode-tab.active {
   background: var(--accent);
   color: var(--on-accent);
+}
+
+.workflow-mode-bar::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--panel-border);
 }
 
 .workflow-layout {

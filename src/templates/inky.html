@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ config.name }}{% endblock %}
+{% block title %}{{ config.name }} - InkyPi{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}" defer></script>
@@ -7,10 +7,11 @@
 {% block body %}
     <!-- Subtle frame container -->
     <div class="frame">
-        {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP %}
+        {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP, empty_state %}
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
+                    <span class="header-nav-spacer" aria-hidden="true"></span>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}
@@ -100,6 +101,11 @@
                         <h3>Image details</h3>
                         <div id="imageMetaContent" class="dashboard-status-meta"></div>
                     </div>
+
+                    <div id="overviewEmpty" class="dashboard-overview-empty" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
+                        {{ icon('monitor', 'empty-state-icon') | safe }}
+                        <p>Display a plugin to see details here.</p>
+                    </div>
                 </aside>
             </div>
 
@@ -127,11 +133,7 @@
                     <span class="plugin-name">{{ plugin.display_name }}</span>
                 </a>
                 {% else %}
-                <div class="empty-state compact">
-                    <div class="empty-state-icon">{{ icon('squares-four', 'icon-image') | safe }}</div>
-                    <p class="empty-state-message">No plugins available.</p>
-                    <p class="empty-state-message">Check your installation.</p>
-                </div>
+                {{ empty_state('squares-four', 'No plugins available.', 'Check your installation.', compact=true) }}
                 {% endfor %}
             </div>
         </section>

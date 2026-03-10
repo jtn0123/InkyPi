@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Settings{% endblock %}
+{% block title %}InkyPi - Settings{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/settings_page.js') }}"></script>
@@ -38,7 +38,8 @@
             </div>
         </div>
         <div class="settings-console-layout">
-        <nav class="settings-side-nav" role="navigation" aria-label="Settings groups">
+        <button type="button" class="settings-mobile-toggle header-button" id="settingsMobileNavToggle" aria-expanded="false" aria-controls="settingsSideNav">Sections</button>
+        <nav class="settings-side-nav" id="settingsSideNav" role="navigation" aria-label="Settings groups">
             <button type="button" class="settings-side-link active" data-settings-tab="device">Device</button>
             <button type="button" class="settings-side-link" data-settings-tab="scheduling">Scheduling</button>
             <button type="button" class="settings-side-link" data-settings-tab="image">Image Processing</button>
@@ -124,7 +125,7 @@
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <label for="interval" class="form-label">Plugin Cycle Interval</label>
-                            <span class="help-icon" title="Determines how often the display switches to a new plugin." aria-label="Determines how often the display switches to a new plugin.">i</span>
+                            <span class="help-icon" title="Determines how often the display switches to a new plugin." aria-label="Determines how often the display switches to a new plugin.">{% include 'icons/ph/info.svg' ignore missing %}</span>
                             <span>Every</span>
                             <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
                             <span id="interval-settings-error" class="validation-message" role="alert"></span>
@@ -236,28 +237,28 @@
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <label for="saturation" class="form-label form-label-min-width">Saturation:</label>
-                            <span id="saturation-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
+                            <span id="saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
                             <input type="range" id="saturation" name="saturation" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
                         </div>
                         <div class="form-group">
                             <label for="contrast" class="form-label form-label-min-width">Contrast:</label>
-                            <span id="contrast-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
+                            <span id="contrast-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
                             <input type="range" id="contrast" name="contrast" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
                          </div>
                         <div class="form-group">
                             <label for="sharpness" class="form-label form-label-min-width">Sharpness:</label>
-                            <span id="sharpness-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
+                            <span id="sharpness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
                             <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
                         </div>
                         <div class="form-group">
                             <label for="brightness" class="form-label form-label-min-width">Brightness:</label>
-                            <span id="brightness-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
+                            <span id="brightness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
                             <input type="range" id="brightness" name="brightness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
                         </div>
                         {% if device_settings.get('display_type', 'inky') == 'inky' %}
                         <div class="form-group">
                             <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation:</label>
-                            <span id="inky_saturation-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
+                            <span id="inky_saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
                             <input
                                 type="range"
                                 id="inky_saturation"
@@ -329,6 +330,8 @@
         <pre id="logsViewer" class="logs-viewer"></pre>
     </div>
     </div>
+
+    <button type="button" class="action-button settings-logs-toggle" id="settingsLogsToggle">Show Logs</button>
 
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}

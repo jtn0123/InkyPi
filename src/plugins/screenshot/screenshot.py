@@ -1,8 +1,8 @@
+import logging
+
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
-from PIL import Image
 from utils.image_utils import take_screenshot
-import logging
 
 logger = logging.getLogger(__name__)
 

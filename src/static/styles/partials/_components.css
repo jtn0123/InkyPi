@@ -5,7 +5,7 @@
     color: var(--text-secondary);
     margin: 0;
     text-align: left;
-    transition: color 0.3s ease;
+    transition: color var(--transition-speed) ease;
 }
 
 /* Optimized button grid with better performance and consistency */
@@ -480,7 +480,7 @@ select.form-input option {
     padding: 5px;
     cursor: pointer;
     border-radius: 5px;
-    transition: border-color 0.3s ease;
+    transition: border-color var(--transition-speed) ease;
 }
 
 .image-option img {
@@ -497,8 +497,8 @@ select.form-input option {
     -webkit-appearance: none;
     -moz-appearance: none;
     appearance: none;
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
     border: 1px solid var(--divider);
     border-radius: 6px;
     background-color: var(--surface);
@@ -514,6 +514,36 @@ select.form-input option {
     border-radius: 6px;
 }
 
+.color-picker-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-preview {
+    display: inline-block;
+    width: 48px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--surface-border);
+    vertical-align: middle;
+    transition: background 0.15s ease;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.color-combined-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
 .remove-btn {
     background-color: transparent;
     border: none;
@@ -522,7 +552,7 @@ select.form-input option {
     cursor: pointer;
     margin-left: 10px;
     font-size: 1rem; /* Consistent font size */
-    transition: color 0.3s ease; /* Smooth transition on hover */
+    transition: color var(--transition-speed) ease;
 }
 
 .remove-btn:hover {
@@ -578,8 +608,16 @@ select.form-input option {
 }
 
 .collapsible-content {
-    display: none;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
     padding: 0px 0px;
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+
+.collapsible-content.is-open {
+    max-height: 2000px;
+    opacity: 1;
 }
 
 .button-group {
@@ -656,4 +694,36 @@ input:disabled, select:disabled, textarea:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     background-color: var(--bg-secondary, var(--surface));
+}
+
+/* Global focus-visible outline for interactive elements */
+button:focus-visible,
+a:focus-visible,
+.action-button:focus-visible,
+.header-button:focus-visible,
+.view-toggle:focus-visible,
+.sort-toggle:focus-visible,
+.icon-button:focus-visible,
+.toggle-container:focus-visible,
+.playlist-toggle-button:focus-visible,
+.workflow-mode-tab:focus-visible,
+.btn:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.slider-value {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text);
+    min-width: 2.5em;
+    text-align: center;
+    padding: 2px 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
 }

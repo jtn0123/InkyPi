@@ -1,5 +1,6 @@
 import os
 import re
+
 from markupsafe import Markup
 
 
@@ -14,7 +15,7 @@ def render_icon(name: str, class_name: str = "icon-image", title: str | None = N
         base_dir = os.path.dirname(os.path.dirname(__file__))  # src/
         svg_path = os.path.join(base_dir, "static", "icons", "ph", f"{name}.svg")
         if os.path.isfile(svg_path):
-            with open(svg_path, "r", encoding="utf-8") as f:
+            with open(svg_path, encoding="utf-8") as f:
                 svg = f.read()
             # inject class and title if missing
             # naive injection: add class attribute to first <svg ...>

@@ -21,16 +21,17 @@ Flow:
 6. Optionally resize the image to fit the device dimensions. (_shrink_to_fit))
 """
 
+import logging
+from datetime import date, datetime, timedelta
+from io import BytesIO
+from random import randint
+from typing import Any
+
+import requests
+from PIL import Image, UnidentifiedImageError
+
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
-from PIL import Image, UnidentifiedImageError
-from io import BytesIO
-import requests
-import logging
-from random import randint
-from datetime import datetime, timedelta, date
-from functools import lru_cache
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,12 @@ class Wpotd(BasePlugin):
             )
         )
 
-    def generate_settings_template(self) -> Dict[str, Any]:
+    def generate_settings_template(self) -> dict[str, Any]:
         template_params = super().generate_settings_template()
         template_params['style_settings'] = False
         return template_params
 
-    def generate_image(self, settings: Dict[str, Any], device_config: Dict[str, Any]) -> Image.Image:
+    def generate_image(self, settings: dict[str, Any], device_config: dict[str, Any]) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -100,7 +101,7 @@ class Wpotd(BasePlugin):
 
         return image
 
-    def _determine_date(self, settings: Dict[str, Any]) -> date:
+    def _determine_date(self, settings: dict[str, Any]) -> date:
         if settings.get("randomizeWpotd") == "true":
             start = datetime(2015, 1, 1)
             delta_days = (datetime.today() - start).days
@@ -126,7 +127,7 @@ class Wpotd(BasePlugin):
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
             raise RuntimeError("Failed to load WPOTD image.")
 
-    def _fetch_potd(self, cur_date: date) -> Dict[str, Any]:
+    def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
         title = f"Template:POTD/{cur_date.isoformat()}"
         params = {
             "action": "query",
@@ -168,7 +169,7 @@ class Wpotd(BasePlugin):
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
             raise RuntimeError("Failed to retrieve image URL.")
 
-    def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
         try:
             response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
             response.raise_for_status()

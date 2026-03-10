@@ -1,10 +1,12 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import field, option, row, schema, section
-from PIL import Image, ImageDraw, ImageFont
 import logging
 
-from .comic_parser import COMICS, get_panel
+from PIL import Image, ImageDraw
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.app_utils import get_font
+
+from .comic_parser import COMICS, get_panel
 
 logger = logging.getLogger(__name__)
 

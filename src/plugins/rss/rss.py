@@ -1,11 +1,18 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import callout, field, option, row, schema, section
-from PIL import Image
-from io import BytesIO
+import html
+import logging
+
 import feedparser
 import requests
-import logging
-import html
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import (
+    callout,
+    field,
+    option,
+    row,
+    schema,
+    section,
+)
 
 logger = logging.getLogger(__name__)
 

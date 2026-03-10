@@ -60,8 +60,8 @@ function showToast(status, message, duration = TOAST_DURATION_MS) {
         toast.classList.add('show');
     });
 
-    // Auto-close after duration
-    if (duration > 0) {
+    // Auto-close after duration (skip for errors so users can read details)
+    if (duration > 0 && status !== 'error') {
         setTimeout(() => closeToast(toastId), duration);
     }
 
@@ -112,8 +112,10 @@ function showResponseModal(status, message, useToast = true) {
     // Display Modal
     modal.style.display = 'block';
 
-    // Auto-close modal
-    setTimeout(() => closeResponseModal(), MODAL_AUTO_CLOSE_MS);
+    // Auto-close modal (skip for failure so users can read error details)
+    if (status === 'success') {
+        setTimeout(() => closeResponseModal(), MODAL_AUTO_CLOSE_MS);
+    }
 }
 
 // Function to Close the Modal

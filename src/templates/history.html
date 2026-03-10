@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}History{% endblock %}
+{% block title %}InkyPi - History{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/history_page.js') }}"></script>
@@ -7,7 +7,7 @@
 {% block body %}
     <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
-        {% from 'macros/icons.html' import icon, theme_toggle %}
+        {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
@@ -81,23 +81,10 @@
             {% endif %}
         </div>
         {% endif %}
-        {% if images|length > 0 %}
-        <div class="danger-zone history-danger-zone">
-            <div>
-                <h3>Reset cache</h3>
-                <p>Remove all saved history images from this device when you want to reclaim local storage quickly.</p>
-            </div>
-            <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
-        </div>
-        {% endif %}
         <div class="separator"></div>
 
         {% if images|length == 0 %}
-            <div class="empty-state compact">
-                <div class="empty-state-icon">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</div>
-                <p>No history yet.</p>
-                <p>Your generated images will appear here after the first successful render.</p>
-            </div>
+            {{ empty_state('clock-counter-clockwise', 'No history yet.', 'Your generated images will appear here after the first successful render.', compact=true) }}
         {% else %}
         <div class="history-grid">
             {% for img in images %}
@@ -131,13 +118,20 @@
             </div>
             {% endfor %}
         </div>
+        <div class="danger-zone history-danger-zone">
+            <div>
+                <h3>Reset cache</h3>
+                <p>Remove all saved history images from this device when you want to reclaim local storage quickly.</p>
+            </div>
+            <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
+        </div>
         {% endif %}
     </div>
 
     <!-- Delete image modal -->
     <div id="deleteHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteHistoryTitle" hidden>
         <div class="modal-content">
-            <button type="button" id="closeDeleteHistoryModalBtn" class="close-button" aria-label="Close">×</button>
+            <button type="button" id="closeDeleteHistoryModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="deleteHistoryTitle">Delete Image</h2>
             <div class="separator"></div>
             <p id="deleteHistoryText">Are you sure you want to delete?</p>
@@ -151,7 +145,7 @@
     <!-- Clear all history modal -->
     <div id="clearHistoryModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clearHistoryTitle" hidden>
         <div class="modal-content">
-            <button type="button" id="closeClearHistoryModalBtn" class="close-button" aria-label="Close">×</button>
+            <button type="button" id="closeClearHistoryModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="clearHistoryTitle">Clear All History</h2>
             <div class="separator"></div>
             <p>Are you sure you want to clear all history images?</p>

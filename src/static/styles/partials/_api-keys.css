@@ -318,3 +318,25 @@
   font-size: 1.2rem;
   padding: 4px 8px;
 }
+
+.toggle-password-btn {
+  background: transparent;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-sm);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 6px 10px;
+  min-height: var(--form-input-height);
+  transition: color var(--transition-speed) ease, border-color var(--transition-speed) ease;
+}
+
+.toggle-password-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.delete-button-danger {
+  color: var(--error);
+  border-color: var(--error);
+}

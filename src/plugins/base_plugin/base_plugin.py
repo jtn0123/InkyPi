@@ -1,16 +1,21 @@
+import base64
 import logging
 import os
 from pathlib import Path
+from time import perf_counter
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from PIL import Image
 
 from utils.app_utils import get_fonts, resolve_path
-from utils.image_utils import take_screenshot_html
 from utils.image_loader import AdaptiveImageLoader
-from time import perf_counter
-from utils.progress import record_step, start_step, update_step, complete_step, fail_step
-import base64
-from PIL import Image
+from utils.image_utils import take_screenshot_html
+from utils.progress import (
+    complete_step,
+    fail_step,
+    start_step,
+    update_step,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +180,7 @@ class BasePlugin:
         inline_css: list[str] = []
         for css_path in css_files:
             try:
-                with open(css_path, "r", encoding="utf-8") as f:
+                with open(css_path, encoding="utf-8") as f:
                     inline_css.append(f.read())
             except Exception as e:
                 logger.warning("Failed to read CSS file %s: %s", css_path, e)

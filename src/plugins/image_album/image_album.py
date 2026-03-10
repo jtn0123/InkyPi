@@ -2,9 +2,10 @@ import logging
 from random import choice
 
 from PIL import Image, ImageColor, ImageOps
-from utils.http_client import get_http_session
+
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
+from utils.http_client import get_http_session
 from utils.image_utils import pad_image_blur
 
 logger = logging.getLogger(__name__)

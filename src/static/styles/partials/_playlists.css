@@ -81,7 +81,7 @@
 .playlist-item {
     display: flex;
     padding: 0px 0px 5px 0px;
-    transition: all 0.3s ease;
+    transition: all var(--transition-speed) ease;
     border: 2px solid var(--surface-border);
     border-radius: 10px;
     flex-direction: column;
@@ -157,6 +157,18 @@
     border-color: var(--accent);
 }
 
+.playlist-toggle-button::after {
+    content: '\25BC';
+    font-size: 0.7em;
+    margin-left: 6px;
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+.playlist-toggle-button[aria-expanded="true"]::after {
+    transform: rotate(180deg);
+}
+
 .playlist-frame {
   max-width: 980px;
   margin: 0 auto;
@@ -174,4 +186,40 @@
 .playlist-thumbnail-info {
     background-color: var(--bg-primary);
     color: var(--text-secondary);
+}
+
+/* Drag handle */
+.drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    flex-shrink: 0;
+    padding: 8px 4px;
+    min-width: 32px;
+    min-height: 44px;
+    border-radius: 6px;
+}
+
+.drag-handle:hover {
+    opacity: 1;
+    background: var(--panel-bg);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.drag-handle-icon {
+    width: var(--icon-lg, 24px);
+    height: var(--icon-lg, 24px);
+}
+
+.plugin-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
 }

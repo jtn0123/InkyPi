@@ -531,6 +531,41 @@
       });
     }
 
+    function initColorPreviews() {
+      document.querySelectorAll(".color-picker").forEach((picker) => {
+        const preview = document.querySelector(
+          `[data-color-preview="${picker.id}"]`
+        );
+        if (!preview) return;
+        preview.style.background = picker.value;
+        picker.addEventListener("input", () => {
+          preview.style.background = picker.value;
+        });
+      });
+
+      // Combined bg+text preview for style section
+      const bgPicker = document.getElementById("backgroundColor");
+      const textPicker = document.getElementById("textColor");
+      if (bgPicker && textPicker) {
+        let combined = document.getElementById("colorCombinedPreview");
+        if (!combined) {
+          combined = document.createElement("span");
+          combined.id = "colorCombinedPreview";
+          combined.className = "color-combined-preview";
+          combined.textContent = "Aa";
+          const textGroup = textPicker.closest(".form-group");
+          if (textGroup) textGroup.appendChild(combined);
+        }
+        function updateCombined() {
+          combined.style.background = bgPicker.value;
+          combined.style.color = textPicker.value;
+        }
+        updateCombined();
+        bgPicker.addEventListener("input", updateCombined);
+        textPicker.addEventListener("input", updateCombined);
+      }
+    }
+
     function init() {
       populateStyleSettings();
       bindControls();
@@ -538,6 +573,7 @@
       initStatusBar();
       initPreviewInteractions();
       initApiIndicator();
+      initColorPreviews();
       bindModalClose();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setWorkflowMode(workflowMode));

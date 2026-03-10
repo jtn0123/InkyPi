@@ -1,7 +1,7 @@
-import feedparser
 import html
 import re
 
+import feedparser
 
 COMICS = {
     "XKCD": {

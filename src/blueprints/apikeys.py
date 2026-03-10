@@ -1,11 +1,12 @@
-from flask import Blueprint, request, current_app, render_template
-from dotenv import dotenv_values
+import logging
 import os
 import re
-import logging
 import tempfile
 
-from utils.http_utils import json_error, json_success, json_internal_error
+from dotenv import dotenv_values
+from flask import Blueprint, render_template, request
+
+from utils.http_utils import json_error, json_internal_error, json_success
 
 logger = logging.getLogger(__name__)
 apikeys_bp = Blueprint("apikeys", __name__)

@@ -1,14 +1,21 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
-from PIL import Image
-import os
-import requests
 import logging
-from datetime import datetime, timedelta, timezone, date
-from astral import moon
-import pytz
-from io import BytesIO
 import math
+import os
+from datetime import UTC, date, datetime, timedelta
+
+import pytz
+import requests
+from astral import moon
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import (
+    field,
+    option,
+    row,
+    schema,
+    section,
+    widget,
+)
 
 logger = logging.getLogger(__name__)
         
@@ -256,7 +263,7 @@ class Weather(BasePlugin):
         current = weather_data.get("current", {})
         if not current or current.get("dt") is None:
             raise AttributeError("Missing current weather data.")
-        dt = datetime.fromtimestamp(current.get('dt'), tz=timezone.utc).astimezone(tz)
+        dt = datetime.fromtimestamp(current.get('dt'), tz=UTC).astimezone(tz)
         weather_list = current.get("weather", [])
         if not weather_list:
             raise RuntimeError("Weather data missing 'weather' field")
@@ -423,7 +430,7 @@ class Weather(BasePlugin):
             moon_pct = f"{illum_fraction * 100:.0f}"
 
             # --- date & temps ---
-            dt = datetime.fromtimestamp(day["dt"], tz=timezone.utc).astimezone(tz)
+            dt = datetime.fromtimestamp(day["dt"], tz=UTC).astimezone(tz)
             day_label = dt.strftime("%a")
 
             forecast.append(
@@ -451,14 +458,13 @@ class Weather(BasePlugin):
         forecast = []
 
         for i in range(0, len(times)): 
-            dt = datetime.fromisoformat(times[i]).replace(tzinfo=timezone.utc).astimezone(tz)
+            dt = datetime.fromisoformat(times[i]).replace(tzinfo=UTC).astimezone(tz)
             day_label = dt.strftime("%a")
 
             code = weather_codes[i] if i < len(weather_codes) else 0
             weather_icon = self.map_weather_code_to_icon(code, is_day)
             weather_icon_path = self.get_plugin_dir(f"icons/{weather_icon}.png")
 
-            timestamp = int(dt.replace(hour=12, minute=0, second=0).timestamp())
             target_date: date = dt.date() + timedelta(days=1)
            
             try:
@@ -487,7 +493,7 @@ class Weather(BasePlugin):
     def parse_hourly(self, hourly_forecast, tz, time_format, units):
         hourly = []
         for hour in hourly_forecast[:24]:
-            dt = datetime.fromtimestamp(hour.get('dt'), tz=timezone.utc).astimezone(tz)
+            dt = datetime.fromtimestamp(hour.get('dt'), tz=UTC).astimezone(tz)
             rain_mm = hour.get("rain", {}).get("1h", 0.0)
             if units == "imperial":
                 rain = rain_mm / 25.4
@@ -543,7 +549,7 @@ class Weather(BasePlugin):
         sunrise_epoch = weather.get('current', {}).get("sunrise")
 
         if sunrise_epoch:
-            sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=timezone.utc).astimezone(tz)
+            sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=UTC).astimezone(tz)
             data_points.append({
                 "label": "Sunrise",
                 "measurement": self.format_time(sunrise_dt, time_format, include_am_pm=False),
@@ -555,7 +561,7 @@ class Weather(BasePlugin):
 
         sunset_epoch = weather.get('current', {}).get("sunset")
         if sunset_epoch:
-            sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=timezone.utc).astimezone(tz)
+            sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=UTC).astimezone(tz)
             data_points.append({
                 "label": "Sunset",
                 "measurement": self.format_time(sunset_dt, time_format, include_am_pm=False),
@@ -745,7 +751,7 @@ class Weather(BasePlugin):
                 logger.warning(f"Could not parse time string {time_str} for visibility.")
                 continue
 
-        visibility_str = f">{current_visibility}" if isinstance(current_visibility, (int, float)) and (
+        visibility_str = f">{current_visibility}" if isinstance(current_visibility, int | float) and (
             (units == "imperial" and current_visibility >= 6.2) or
             (units != "imperial" and current_visibility >= 10)
         ) else current_visibility
@@ -769,7 +775,7 @@ class Weather(BasePlugin):
                 logger.warning(f"Could not parse time string {time_str} for AQI.")
                 continue
         scale = ""
-        if isinstance(current_aqi, (int, float)):
+        if isinstance(current_aqi, int | float):
             scale = ["Good","Fair","Moderate","Poor","Very Poor","Ext Poor"][min(current_aqi//20,5)]
         data_points.append({
             "label": "Air Quality", "measurement": current_aqi,

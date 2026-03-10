@@ -1,10 +1,18 @@
-from plugins.base_plugin.base_plugin import BasePlugin
-from plugins.base_plugin.settings_schema import field, option, row, schema, section, widget
-from PIL import Image, ImageOps, ImageColor
 import logging
-import random
 import os
+import random
 
+from PIL import Image, ImageColor, ImageOps
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.settings_schema import (
+    field,
+    option,
+    row,
+    schema,
+    section,
+    widget,
+)
 from utils.image_utils import pad_image_blur
 
 logger = logging.getLogger(__name__)

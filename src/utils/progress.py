@@ -5,7 +5,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from threading import local
 from time import perf_counter
-from typing import Optional
 
 _thread_local = local()
 
@@ -18,7 +17,7 @@ class ProgressStep:
     description: str
     elapsed_ms: int
     status: str = "completed"  # completed, failed, in_progress
-    error_message: Optional[str] = None
+    error_message: str | None = None
     substeps: list[str] = field(default_factory=list)
 
 
@@ -29,7 +28,7 @@ class ProgressTracker:
     steps: list[ProgressStep] = field(default_factory=list)
     _start: float = field(default_factory=perf_counter)
     _last: float = field(init=False)
-    _current_step: Optional[str] = None
+    _current_step: str | None = None
     _current_step_start: float = field(init=False)
 
     def __post_init__(self) -> None:  # pragma: no cover - trivial
@@ -65,7 +64,7 @@ class ProgressTracker:
         )
         self.steps.append(step)
 
-    def update_current_step(self, description: str, substeps: Optional[list[str]] = None) -> None:
+    def update_current_step(self, description: str, substeps: list[str] | None = None) -> None:
         """Update the description or substeps of the current step."""
         if self.steps and self.steps[-1].status == "in_progress":
             self.steps[-1].description = description
@@ -109,7 +108,7 @@ class ProgressTracker:
         sum_steps_ms = sum(step.elapsed_ms for step in self.steps)
         return max(total_runtime_ms, sum_steps_ms)
 
-    def get_current_step_name(self) -> Optional[str]:
+    def get_current_step_name(self) -> str | None:
         """Get the name of the currently active step."""
         return self._current_step
 
@@ -148,7 +147,7 @@ def start_step(name: str, description: str = "") -> None:
         tracker.start_step(name, description)
 
 
-def update_step(description: str, substeps: Optional[list[str]] = None) -> None:
+def update_step(description: str, substeps: list[str] | None = None) -> None:
     """Update the current progress step with new information."""
     tracker: ProgressTracker | None = getattr(_thread_local, "tracker", None)
     if tracker:
@@ -169,6 +168,6 @@ def fail_step(error_message: str) -> None:
         tracker.fail_current_step(error_message)
 
 
-def get_current_tracker() -> Optional[ProgressTracker]:
+def get_current_tracker() -> ProgressTracker | None:
     """Get the current progress tracker if active."""
     return getattr(_thread_local, "tracker", None)
