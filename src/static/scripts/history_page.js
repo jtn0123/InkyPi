@@ -143,7 +143,9 @@
       document.querySelectorAll(".history-image").forEach((img) => {
         function hideSkeleton() {
           const skeleton = img.previousElementSibling;
-          if (skeleton) skeleton.style.display = "none";
+          if (!skeleton) return;
+          skeleton.classList.add('is-hidden');
+          skeleton.addEventListener('transitionend', () => { skeleton.style.display = 'none'; }, { once: true });
         }
         img.addEventListener("load", hideSkeleton);
         img.addEventListener("error", hideSkeleton);

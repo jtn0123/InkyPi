@@ -29,6 +29,14 @@
   background: var(--surface);
   border: 1px solid var(--surface-border);
   aspect-ratio: 4 / 3;
+  cursor: zoom-in;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.history-thumb:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .history-thumb img,

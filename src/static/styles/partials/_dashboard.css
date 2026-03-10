@@ -91,6 +91,15 @@
   border: 1px solid var(--surface-border);
 }
 
+.dashboard-stage .image-container {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dashboard-stage .image-container:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
 .dashboard-stage .image-container img {
   width: 100%;
   max-width: 100%;
@@ -121,7 +130,6 @@
 .dashboard-stage .image-container.native img {
   width: auto;
   height: auto;
-  width: auto;
   max-width: none;
 }
 

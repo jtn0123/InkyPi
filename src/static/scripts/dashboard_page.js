@@ -128,6 +128,7 @@
 
       if (info && info.image_hash && info.image_hash !== lastImageHash && previewImg) {
         lastImageHash = info.image_hash;
+        if (previewSkel) { previewSkel.style.display = ''; previewSkel.classList.remove('is-hidden'); }
         setHidden(previewSkel, false);
         previewImg.src = `${config.previewUrl}?t=${Date.now()}`;
       }
@@ -172,7 +173,11 @@
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
       const container = previewImg && previewImg.parentElement;
-      const hidePreviewSkeleton = () => setHidden(previewSkel, true);
+      const hidePreviewSkeleton = () => {
+        if (!previewSkel) return;
+        previewSkel.classList.add('is-hidden');
+        previewSkel.addEventListener('transitionend', () => { previewSkel.style.display = 'none'; }, { once: true });
+      };
       if (previewImg) {
         previewImg.addEventListener("load", hidePreviewSkeleton);
         previewImg.addEventListener("error", hidePreviewSkeleton);

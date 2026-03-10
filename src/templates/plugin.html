@@ -221,7 +221,7 @@
             <div class="status-card compact">
                 <div class="status-title">Current display</div>
                 <div class="status-body">
-                    <div class="image-container {% if not fit %}native{% endif %}" id="currentPreviewContainer">
+                    <div class="image-container" id="currentPreviewContainer">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
                         <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}" data-native-width="{{ resolution[0] }}" data-native-height="{{ resolution[1] }}">
                         <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>

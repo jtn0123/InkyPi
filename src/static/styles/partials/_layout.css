@@ -42,6 +42,11 @@
 /* Any image marked lightboxable gets the zoom-in cursor */
 .lightboxable { cursor: zoom-in; }
 
+/* Hover feedback on clickable image containers */
+.image-container {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
 /* Enhanced meta information hierarchy */
 .image-meta {
     background: var(--panel-bg);
@@ -248,6 +253,27 @@ main[data-page-shell="workflow"] .frame {
     max-width: 100%;
     max-height: 10rem;
     object-fit: contain;
+    cursor: zoom-in;
+}
+
+.status-card.compact .image-container.native {
+    width: 200px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+/* Status card image hover feedback */
+.status-card.instance .status-body {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-card.instance .status-body:hover {
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.status-card .status-body img:hover {
+    opacity: 0.92;
 }
 
 /* Full, non-cropped instance preview */
@@ -356,6 +382,7 @@ main[data-page-shell="workflow"] .frame {
   max-width: 92vw;
   max-height: 85vh;
   margin: 0 auto;
+  cursor: zoom-out;
 }
 
 .section-nav {

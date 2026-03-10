@@ -3,12 +3,14 @@
 // - Click to open
 // - Esc or outside click to close
 // - Double-click on the preview image to toggle native sizing
+// - Focus trap for accessibility
+// - Loading state with spinner
 (function(){
   'use strict';
 
   const MODAL_ID = 'imagePreviewModal';
   const IMG_ID = 'imagePreviewImg';
-  let escHandlerAttached = false;
+  let triggerElement = null;
 
   function ensureModal(){
     let modal = document.getElementById(MODAL_ID);
@@ -22,33 +24,138 @@
       modal.style.display = 'none';
       const content = document.createElement('div');
       content.className = 'modal-content';
-      const close = document.createElement('span');
+
+      const close = document.createElement('button');
       close.className = 'close-button';
-      close.setAttribute('role', 'button');
-      close.setAttribute('tabindex', '0');
+      close.type = 'button';
       close.setAttribute('aria-label', 'Close');
-      close.textContent = '×';
+      close.innerHTML = '<span class="close-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="currentColor"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></svg></span>';
       close.addEventListener('click', closeLightbox);
-      close.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeLightbox(); } });
+
+      const loader = document.createElement('div');
+      loader.className = 'lightbox-loading';
+      loader.innerHTML = '<div class="loading-indicator"></div>';
+
+      const errorEl = document.createElement('div');
+      errorEl.className = 'lightbox-error';
+      errorEl.style.display = 'none';
+      errorEl.textContent = 'Failed to load image';
+
       const img = document.createElement('img');
       img.id = IMG_ID;
+      img.className = 'lightbox-preview-image';
       img.alt = 'Large preview';
-      img.style.maxWidth = '92vw';
-      img.style.maxHeight = '85vh';
-      img.style.display = 'block';
-      img.style.margin = '0 auto';
-      // Double-click toggles native sizing
+      img.style.display = 'none';
+      img.style.cursor = 'zoom-out';
+      // Single click closes lightbox, double-click toggles native sizing
+      img.addEventListener('click', closeLightbox);
       img.addEventListener('dblclick', toggleNativeSizing);
+
+      img.addEventListener('load', function() {
+        loader.style.display = 'none';
+        errorEl.style.display = 'none';
+        img.style.display = 'block';
+      });
+
+      img.addEventListener('error', function() {
+        loader.style.display = 'none';
+        img.style.display = 'none';
+        errorEl.style.display = 'block';
+      });
+
       content.appendChild(close);
+      content.appendChild(loader);
+      content.appendChild(errorEl);
       content.appendChild(img);
       modal.appendChild(content);
       document.body.appendChild(modal);
+
+      // Focus trap
+      modal.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+          const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+          if (focusable.length === 0) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            }
+          } else {
+            if (document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
+          }
+        }
+      });
     } else {
-      // ensure dblclick handler present
+      const content = modal.querySelector('.modal-content');
       const img = document.getElementById(IMG_ID);
-      if (img && !img._dblInit){
+      if (img && !img._lbInit) {
+        img.style.cursor = 'zoom-out';
+        img.addEventListener('click', closeLightbox);
         img.addEventListener('dblclick', toggleNativeSizing);
-        img._dblInit = true;
+
+        // Inject loading/error elements if missing
+        if (!content.querySelector('.lightbox-loading')) {
+          const loader = document.createElement('div');
+          loader.className = 'lightbox-loading';
+          loader.innerHTML = '<div class="loading-indicator"></div>';
+          content.insertBefore(loader, img);
+        }
+        if (!content.querySelector('.lightbox-error')) {
+          const errorEl = document.createElement('div');
+          errorEl.className = 'lightbox-error';
+          errorEl.style.display = 'none';
+          errorEl.textContent = 'Failed to load image';
+          content.insertBefore(errorEl, img);
+        }
+
+        img.addEventListener('load', function() {
+          const l = content.querySelector('.lightbox-loading');
+          const e = content.querySelector('.lightbox-error');
+          if (l) l.style.display = 'none';
+          if (e) e.style.display = 'none';
+          img.style.display = 'block';
+        });
+        img.addEventListener('error', function() {
+          const l = content.querySelector('.lightbox-loading');
+          const e = content.querySelector('.lightbox-error');
+          if (l) l.style.display = 'none';
+          img.style.display = 'none';
+          if (e) e.style.display = 'block';
+        });
+
+        // Upgrade close <span> to <button> if needed
+        const closeSpan = content.querySelector('span.close-button');
+        if (closeSpan) {
+          const closeBtn = document.createElement('button');
+          closeBtn.className = closeSpan.className;
+          closeBtn.type = 'button';
+          closeBtn.setAttribute('aria-label', 'Close');
+          closeBtn.innerHTML = closeSpan.innerHTML;
+          closeBtn.addEventListener('click', closeLightbox);
+          closeSpan.replaceWith(closeBtn);
+        }
+
+        // Focus trap for pre-existing modal
+        modal.addEventListener('keydown', function(e) {
+          if (e.key === 'Tab') {
+            const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey) {
+              if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+            } else {
+              if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+          }
+        });
+
+        img._lbInit = true;
       }
     }
     return modal;
@@ -58,23 +165,48 @@
     const modal = ensureModal();
     const img = document.getElementById(IMG_ID);
     if (!modal || !img) return;
+
+    triggerElement = document.activeElement;
+
+    // Show loading state
+    const loader = modal.querySelector('.lightbox-loading');
+    const errorEl = modal.querySelector('.lightbox-error');
+    if (loader) loader.style.display = 'flex';
+    if (errorEl) errorEl.style.display = 'none';
+    img.style.display = 'none';
+
     img.src = url;
     img.alt = alt || 'Preview';
+    img.setAttribute('aria-label', alt || 'Preview');
     // Reset any native toggle state
-    img.style.maxWidth = '92vw';
-    img.style.maxHeight = '85vh';
+    img.style.maxWidth = '';
+    img.style.maxHeight = '';
     img.style.width = '';
     img.style.height = '';
+    img.removeAttribute('data-native');
+    img.style.cursor = '';
+    modal.removeAttribute('hidden');
     modal.style.display = 'block';
+
+    // If already cached, trigger load immediately
+    if (img.complete && img.naturalWidth > 0) {
+      if (loader) loader.style.display = 'none';
+      img.style.display = 'block';
+    }
+
     // Focus the close button for keyboard users
     const closeBtn = modal.querySelector('.close-button');
     if (closeBtn) closeBtn.focus();
-    trapEsc();
   }
 
   function closeLightbox(){
     const modal = document.getElementById(MODAL_ID);
-    if (modal) modal.style.display = 'none';
+    if (modal) { modal.style.display = 'none'; modal.setAttribute('hidden', ''); }
+    // Restore focus to the element that opened the lightbox
+    if (triggerElement && typeof triggerElement.focus === 'function') {
+      triggerElement.focus();
+      triggerElement = null;
+    }
   }
 
   function toggleNativeSizing(e){
@@ -83,8 +215,8 @@
     const isNative = img.getAttribute('data-native') === '1';
     if (isNative){
       img.removeAttribute('data-native');
-      img.style.maxWidth = '92vw';
-      img.style.maxHeight = '85vh';
+      img.style.maxWidth = '';
+      img.style.maxHeight = '';
       img.style.width = '';
       img.style.height = '';
       img.style.cursor = 'zoom-in';
@@ -98,13 +230,15 @@
     }
   }
 
-  function trapEsc(){
-    if (escHandlerAttached) return;
-    const esc = function(e){ if (e.key === 'Escape') { closeLightbox(); } };
-    document.addEventListener('keydown', esc, { once: true });
-    escHandlerAttached = true;
-    setTimeout(() => { escHandlerAttached = false; }, 1000);
-  }
+  // Persistent Esc handler — checks if modal is open
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById(MODAL_ID);
+      if (modal && modal.style.display !== 'none') {
+        closeLightbox();
+      }
+    }
+  });
 
   // Outside click closes the modal
   window.addEventListener('click', function(ev){
@@ -137,5 +271,3 @@
     bind
   };
 })();
-
-

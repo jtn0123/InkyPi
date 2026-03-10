@@ -199,7 +199,7 @@
       const img = document.getElementById("previewImage");
       const skel = document.getElementById("previewSkeleton");
       if (img) {
-        if (skel) skel.style.display = "";
+        if (skel) { skel.style.display = ""; skel.classList.remove("is-hidden"); }
         img.src = `${config.previewUrl}?t=${Date.now()}`;
       }
 
@@ -384,14 +384,20 @@
       refreshInstancePreview();
     }
 
+    function fadeSkeleton(skel) {
+      if (!skel) return;
+      skel.classList.add('is-hidden');
+      skel.addEventListener('transitionend', () => { skel.style.display = 'none'; }, { once: true });
+    }
+
     function initPreviewInteractions() {
       const previewImg = document.getElementById("previewImage");
       const instanceImg = document.getElementById("instancePreviewImage");
       const container = document.getElementById("currentPreviewContainer");
       if (previewImg && container) {
         const previewSkel = document.getElementById("previewSkeleton");
-        previewImg.addEventListener("load", () => setHidden(previewSkel, true));
-        previewImg.addEventListener("error", () => setHidden(previewSkel, true));
+        previewImg.addEventListener("load", () => fadeSkeleton(previewSkel));
+        previewImg.addEventListener("error", () => fadeSkeleton(previewSkel));
         const nativeWidth = previewImg.dataset.nativeWidth || config.resolution[0];
         const nativeHeight = previewImg.dataset.nativeHeight || config.resolution[1];
         previewImg.addEventListener("click", () => {
@@ -399,21 +405,23 @@
             window.Lightbox.open(previewImg.src, previewImg.alt);
           }
         });
-        previewImg.addEventListener("dblclick", (event) => {
-          event.preventDefault();
-          container.classList.toggle("native");
-          if (container.classList.contains("native")) {
-            previewImg.style.width = `${nativeWidth}px`;
-            previewImg.style.height = `${nativeHeight}px`;
-          } else {
-            previewImg.style.width = "";
-            previewImg.style.height = "";
-          }
-        });
+        if (!container.closest(".status-card.compact")) {
+          previewImg.addEventListener("dblclick", (event) => {
+            event.preventDefault();
+            container.classList.toggle("native");
+            if (container.classList.contains("native")) {
+              previewImg.style.width = `${nativeWidth}px`;
+              previewImg.style.height = `${nativeHeight}px`;
+            } else {
+              previewImg.style.width = "";
+              previewImg.style.height = "";
+            }
+          });
+        }
       }
       if (instanceImg) {
         const skeleton = instanceImg.previousElementSibling;
-        instanceImg.addEventListener("load", () => setHidden(skeleton, true));
+        instanceImg.addEventListener("load", () => fadeSkeleton(skeleton));
         instanceImg.addEventListener("click", () => {
           if (
             instanceImg.src &&
