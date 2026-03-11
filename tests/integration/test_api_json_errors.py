@@ -14,10 +14,10 @@ def test_update_now_surfaces_plugin_error_json(client, monkeypatch):
         "/update_now",
         data={"plugin_id": "ai_text", "title": "T", "textModel": "gpt-4o", "textPrompt": "hi"},
     )
-    assert resp.status_code == 500
+    assert resp.status_code == 400
     data = resp.get_json()
     assert isinstance(data, dict)
-    assert "error" in data
+    assert data["error"] == "boom"
 
 
 def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):

@@ -103,6 +103,7 @@ class AIText(BasePlugin):
             if provider == "google":
                 api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
                 if not api_key:
+                    logger.error("Google AI API Key not configured")
                     raise RuntimeError("Google AI API Key not configured.")
 
                 from google import genai
@@ -111,7 +112,8 @@ class AIText(BasePlugin):
             else:
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
                 if not api_key:
-                    raise RuntimeError("OPEN AI API Key not configured.")
+                    logger.error("OpenAI API Key not configured")
+                    raise RuntimeError("OpenAI API Key not configured.")
 
                 ai_client = OpenAI(api_key=api_key)
                 prompt_response = AIText.fetch_text_prompt(ai_client, text_model, text_prompt)

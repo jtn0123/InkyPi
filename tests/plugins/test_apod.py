@@ -54,7 +54,7 @@ def test_apod_missing_key(client):
         'plugin_id': 'apod',
     }
     resp = client.post('/update_now', data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
 
 @patch('requests.get')
 def test_apod_success_via_client(mock_http_get, client, monkeypatch):

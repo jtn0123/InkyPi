@@ -94,7 +94,7 @@ def test_image_upload_rejects_non_image(client, monkeypatch):
 
     resp = client.post("/update_now", data={"plugin_id": "image_upload"})
     # No files processed; plugin will error due to no images provided
-    assert resp.status_code == 500
+    assert resp.status_code == 400
 
 def test_image_upload_rejects_oversize(client, monkeypatch):
     # 11MB fake PNG-like bytes (not decodable)
@@ -261,6 +261,30 @@ def test_image_upload_generate_image_vertical_orientation(monkeypatch, device_co
             {"imageFiles[]": [tf.name], "padImage": "false"}, device_config_dev
         )
         assert result is not None
+
+def test_image_upload_missing_background_color(monkeypatch, device_config_dev):
+    """Bug 11: Missing backgroundColor should not crash ImageColor.getcolor."""
+    from plugins.image_upload.image_upload import ImageUpload
+    import tempfile
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+        tf.write(content)
+        tf.flush()
+
+        # padImage=true but no backgroundColor → should use white default
+        result = plugin.generate_image(
+            {"imageFiles[]": [tf.name], "padImage": "true"}, device_config_dev
+        )
+        assert result is not None
+        w, h = device_config_dev.get_resolution()
+        assert result.size == (w, h)
+
 
 def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev):
     from plugins.image_upload.image_upload import ImageUpload

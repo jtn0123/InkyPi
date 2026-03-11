@@ -376,7 +376,7 @@ def test_weather_provider_validation():
         weather.generate_image(settings, device_config)
         assert False, "Should have raised RuntimeError"
     except RuntimeError as e:
-        assert "request failure" in str(e)
+        assert "Unknown weather provider" in str(e)
 
 
 def test_weather_units_validation():
@@ -418,11 +418,8 @@ def test_weather_location_validation():
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
 
-    try:
+    with pytest.raises(RuntimeError, match="required"):
         weather.generate_image(settings, device_config)
-        assert False, "Should have raised TypeError"
-    except TypeError as e:
-        assert "float() argument must be a string or a real number" in str(e)
 
 
 def test_weather_api_key_validation():
@@ -446,7 +443,7 @@ def test_weather_api_key_validation():
         weather.generate_image(settings, device_config)
         assert False, "Should have raised RuntimeError"
     except RuntimeError as e:
-        assert "request failure" in str(e)
+        assert "OpenWeatherMap API Key not configured" in str(e)
 
 
 def test_weather_save_settings(client, monkeypatch):
@@ -597,18 +594,29 @@ def test_weather_missing_api_key(device_config_dev, monkeypatch):
         "weatherProvider": "OpenWeatherMap",
     }
 
-    with pytest.raises(RuntimeError, match="request failure"):
+    with pytest.raises(RuntimeError, match="OpenWeatherMap API Key not configured"):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_missing_coordinates(device_config_dev):
-    """Test weather plugin with missing coordinates."""
+def test_weather_missing_coordinates_raises(device_config_dev):
+    """Bug 9: Missing lat/long should raise RuntimeError, not TypeError from float(None)."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
     settings = {"units": "metric", "weatherProvider": "OpenWeatherMap"}
 
-    with pytest.raises(TypeError, match="float\\(\\) argument must be a string or a real number"):
+    with pytest.raises(RuntimeError, match="required"):
+        p.generate_image(settings, device_config_dev)
+
+
+def test_weather_invalid_coordinates_raises(device_config_dev):
+    """Bug 9: Non-numeric lat/long should raise RuntimeError."""
+    from plugins.weather.weather import Weather
+
+    p = Weather({"id": "weather"})
+    settings = {"latitude": "not_a_number", "longitude": "abc", "units": "metric", "weatherProvider": "OpenWeatherMap"}
+
+    with pytest.raises(RuntimeError, match="valid numbers"):
         p.generate_image(settings, device_config_dev)
 
 
@@ -644,7 +652,7 @@ def test_weather_unknown_provider(device_config_dev, monkeypatch):
         "weatherProvider": "UnknownProvider",
     }
 
-    with pytest.raises(RuntimeError, match="request failure"):
+    with pytest.raises(RuntimeError, match="Unknown weather provider"):
         p.generate_image(settings, device_config_dev)
 
 

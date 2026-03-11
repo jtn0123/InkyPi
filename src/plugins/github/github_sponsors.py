@@ -39,6 +39,7 @@ def sponsors_generate_image(plugin_instance, settings, device_config):
 
     api_key = device_config.load_env_key("GITHUB_SECRET")
     if not api_key:
+        logger.error("GitHub API Key not configured")
         raise RuntimeError("GitHub API Key not configured.")
 
     github_username = settings.get("githubUsername")

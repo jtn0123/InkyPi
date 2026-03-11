@@ -30,9 +30,10 @@ def contributions_generate_image(plugin_instance, settings, device_config):
 
     api_key = device_config.load_env_key("GITHUB_SECRET")
     if not api_key:
+        logger.error("GitHub API Key not configured")
         raise RuntimeError("GitHub API Key not configured.")
 
-    colors = settings.get("contributionColor[]")
+    colors = settings.get("contributionColor[]") or ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"]
     github_username = settings.get("githubUsername")
     if not github_username:
         raise RuntimeError("GitHub username is required.")

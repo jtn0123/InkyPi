@@ -149,7 +149,7 @@ class AIImage(BasePlugin):
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
                 if not api_key:
                     logger.error("OpenAI API Key not configured")
-                    raise RuntimeError("OPEN AI API Key not configured.")
+                    raise RuntimeError("OpenAI API Key not configured.")
 
                 ai_client = OpenAI(api_key=api_key)
 
@@ -232,7 +232,9 @@ class AIImage(BasePlugin):
         response = client.models.generate_images(
             model=model, prompt=prompt, config=config,
         )
-        return response.generated_images[0].image
+        if not response.generated_images:
+            raise RuntimeError("Google Imagen returned no images")
+        return Image.open(BytesIO(response.generated_images[0].image.image_bytes)).copy()
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):

@@ -166,10 +166,10 @@ def test_update_now_plugin_not_found(client):
 
 
 def test_update_now_exception_handling(client, flask_app, monkeypatch):
-    import plugins.plugin_registry as pr
+    import blueprints.plugin as plugin_mod
 
     monkeypatch.setattr(
-        pr, "get_plugin_instance", lambda x: (_ for _ in ()).throw(Exception("test"))
+        plugin_mod, "get_plugin_instance", lambda x: (_ for _ in ()).throw(Exception("test"))
     )
 
     resp = client.post("/update_now", data={"plugin_id": "ai_text"})

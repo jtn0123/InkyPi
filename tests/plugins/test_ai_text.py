@@ -30,11 +30,11 @@ def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatc
         # Missing textModel
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
     body = resp.get_json()
     assert body["success"] is False
-    assert body["code"] == "internal_error"
-    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "plugin_error"
+    assert "Text Model" in body["error"]
 
 
 def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypatch):
@@ -49,11 +49,11 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
         "textPrompt": "",
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
     body = resp.get_json()
     assert body["success"] is False
-    assert body["code"] == "internal_error"
-    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "plugin_error"
+    assert "Text Prompt" in body["error"]
 
 
 @patch('plugins.ai_text.ai_text.OpenAI')
@@ -71,11 +71,11 @@ def test_ai_text_generate_image_openai_error(mock_openai, client, flask_app, mon
         "textPrompt": "Hello",
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
     body = resp.get_json()
     assert body["success"] is False
-    assert body["code"] == "internal_error"
-    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "plugin_error"
+    assert "API request failure" in body["error"]
 
 
 @pytest.mark.parametrize("orientation,resolution", [("vertical", (400, 300)), ("horizontal", (800, 480))])
@@ -141,11 +141,11 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
         "textPrompt": "Hello",
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
     body = resp.get_json()
     assert body["success"] is False
-    assert body["code"] == "internal_error"
-    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "plugin_error"
+    assert body["error"] == "OpenAI API Key not configured."
 
 
 @patch('plugins.ai_text.ai_text.OpenAI')

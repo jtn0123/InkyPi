@@ -69,6 +69,7 @@ class Apod(BasePlugin):
 
         api_key = device_config.load_env_key("NASA_SECRET")
         if not api_key:
+            logger.error("NASA API Key not configured")
             raise RuntimeError("NASA API Key not configured.")
 
         params = {"api_key": api_key}

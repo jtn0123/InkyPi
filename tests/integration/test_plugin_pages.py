@@ -108,6 +108,33 @@ def test_url_based_plugins_use_warning_callouts(client):
         assert "settings-callout warning" in body
 
 
+def test_checkbox_false_value_not_checked(client, device_config_dev):
+    """Bug 2: Checkbox with 'false' value should not render as checked."""
+    # Set randomizePrompt to 'false' for ai_image plugin
+    device_config_dev.update_value("plugins", [
+        {
+            "plugin_id": "ai_image",
+            "name": "ai_image_saved_settings",
+            "plugin_settings": {"randomizePrompt": "false"},
+            "refresh": {"interval": 60},
+        }
+    ], write=True)
+
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    # Find the randomizePrompt checkbox input and check it doesn't have a standalone 'checked' attribute
+    import re
+    match = re.search(r'<input[^>]*name="randomizePrompt"[^>]*>', body, re.DOTALL)
+    assert match, "randomizePrompt checkbox not found"
+    checkbox_html = match.group(0)
+    # Strip data attributes that contain "checked" in their values to isolate the actual 'checked' attr
+    stripped = re.sub(r'data-\w+-\w+="[^"]*"', '', checkbox_html)
+    # The standalone 'checked' attribute (not inside another attribute value) should not be present
+    assert not re.search(r'\bchecked\b', stripped), f"Checkbox should not be checked when value is 'false': {checkbox_html}"
+
+
 def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
     resp = client.get("/plugin/github")
     assert resp.status_code == 200
@@ -177,7 +204,7 @@ def test_instance_image_history_fallback(client, device_config_dev):
         "instance_name": "ai_text_saved_settings",
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code in (200, 500)
+    assert resp.status_code in (200, 400, 500)
 
     # Now request the instance image (no plugin image file exists), should fallback to history
     resp2 = client.get("/instance_image/ai_text/ai_text_saved_settings")

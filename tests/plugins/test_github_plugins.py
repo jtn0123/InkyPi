@@ -104,6 +104,42 @@ def test_contributions_success(monkeypatch, plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
+def test_contributions_missing_colors_uses_defaults(monkeypatch, plugin_config, device_config_dev):
+    """Bug 8: Missing contributionColor[] should use default palette, not crash."""
+    from plugins.github.github import GitHub
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = _graphql_contributions_response()
+
+    with patch("plugins.github.github_contributions.requests.post", return_value=mock_resp):
+        p = GitHub(plugin_config)
+        result = p.generate_image(
+            {
+                "githubType": "contributions",
+                "githubUsername": "octocat",
+                # No contributionColor[] provided
+            },
+            device_config_dev,
+        )
+    assert isinstance(result, Image.Image)
+
+
+def test_contributions_missing_key(monkeypatch, plugin_config, device_config_dev):
+    from plugins.github.github import GitHub
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: None)
+
+    p = GitHub(plugin_config)
+    with pytest.raises(RuntimeError, match="GitHub API Key not configured"):
+        p.generate_image(
+            {"githubType": "contributions", "githubUsername": "octocat"},
+            device_config_dev,
+        )
+
+
 def test_contributions_missing_username(monkeypatch, plugin_config, device_config_dev):
     from plugins.github.github import GitHub
 
@@ -250,6 +286,19 @@ def test_sponsors_success(monkeypatch, plugin_config, device_config_dev):
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
+
+
+def test_sponsors_missing_key(monkeypatch, plugin_config, device_config_dev):
+    from plugins.github.github import GitHub
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: None)
+
+    p = GitHub(plugin_config)
+    with pytest.raises(RuntimeError, match="GitHub API Key not configured"):
+        p.generate_image(
+            {"githubType": "sponsors", "githubUsername": "octocat"},
+            device_config_dev,
+        )
 
 
 def test_sponsors_missing_username(monkeypatch, plugin_config, device_config_dev):

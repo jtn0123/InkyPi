@@ -23,14 +23,9 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
     try:
         response = requests.get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
-        img = Image.open(BytesIO(response.content))
-        try:
-            return img.resize(dimensions, Image.LANCZOS)
-        finally:
-            try:
-                img.close()
-            except Exception:
-                pass
+        with Image.open(BytesIO(response.content)) as img:
+            resized = img.resize(dimensions, Image.LANCZOS)
+            return resized.copy()
     except Exception as e:
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None
@@ -114,7 +109,8 @@ class Unsplash(BasePlugin):
     def generate_image(self, settings, device_config):
         access_key = device_config.load_env_key("UNSPLASH_ACCESS_KEY")
         if not access_key:
-            raise RuntimeError("'Unsplash Access Key' not found.")
+            logger.error("Unsplash API Key not configured")
+            raise RuntimeError("Unsplash API Key not configured.")
 
         search_query = settings.get('search_query')
         collections = settings.get('collections')

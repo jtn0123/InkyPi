@@ -196,8 +196,13 @@ class Weather(BasePlugin):
     def generate_image(self, settings, device_config):
         lat_str = settings.get('latitude')
         long_str = settings.get('longitude')
-        lat = float(lat_str)
-        long = float(long_str)
+        if not lat_str or not long_str:
+            raise RuntimeError("Latitude and longitude are required.")
+        try:
+            lat = float(lat_str)
+            long = float(long_str)
+        except (ValueError, TypeError):
+            raise RuntimeError("Latitude and longitude must be valid numbers.")
 
         units = settings.get('units')
         if not units or units not in ['metric', 'imperial', 'standard']:
@@ -214,7 +219,8 @@ class Weather(BasePlugin):
             if weather_provider == "OpenWeatherMap":
                 api_key = device_config.load_env_key("OPEN_WEATHER_MAP_SECRET")
                 if not api_key:
-                    raise RuntimeError("Open Weather Map API Key not configured.")
+                    logger.error("OpenWeatherMap API Key not configured")
+                    raise RuntimeError("OpenWeatherMap API Key not configured.")
                 weather_data = self.get_weather_data(api_key, units, lat, long)
                 aqi_data = self.get_air_quality(api_key, lat, long)
                 if settings.get('titleSelection', 'location') == 'location':
@@ -235,6 +241,8 @@ class Weather(BasePlugin):
                 raise RuntimeError(f"Unknown weather provider: {weather_provider}")
 
             template_params['title'] = title
+        except RuntimeError:
+            raise
         except Exception as e:
             logger.error(f"{weather_provider} request failed: {str(e)}")
             raise RuntimeError(f"{weather_provider} request failure, please check logs.")

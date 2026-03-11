@@ -301,7 +301,11 @@ def update_now():
             with track_progress() as tracker:
                 _t_req_start = perf_counter()
                 _t_gen_start = perf_counter()
-                image = plugin.generate_image(plugin_settings, device_config)
+                try:
+                    image = plugin.generate_image(plugin_settings, device_config)
+                except RuntimeError as e:
+                    logger.warning("Plugin error in update_now: %s", e)
+                    return json_error(str(e), status=400, code="plugin_error")
                 generate_ms = int((perf_counter() - _t_gen_start) * 1000)
                 display_manager.display_image(
                     image, image_settings=plugin_config.get("image_settings", [])

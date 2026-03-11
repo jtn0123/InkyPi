@@ -43,7 +43,7 @@ def test_ai_image_missing_api_key(device_config_dev):
     settings = {"textPrompt": "a cat", "imageModel": "gpt-image-1.5", "quality": "medium"}
 
     with patch.object(device_config_dev, "load_env_key", lambda key: None):
-        with pytest.raises(RuntimeError, match="OPEN AI API Key not configured"):
+        with pytest.raises(RuntimeError, match="OpenAI API Key not configured"):
             p.generate_image(settings, device_config_dev)
 
 
@@ -73,7 +73,7 @@ def test_ai_image_invalid_model(client, monkeypatch):
         "quality": "standard",
     }
     resp = client.post("/update_now", data=data)
-    assert resp.status_code == 500
+    assert resp.status_code == 400
 
 
 def test_ai_image_generate_image_success(client, monkeypatch, mock_openai):
@@ -115,9 +115,14 @@ def test_ai_image_google_generate_success(device_config_dev, monkeypatch):
     mock_client = MagicMock()
     mock_genai.Client.return_value = mock_client
 
+    # Build real PNG bytes for the mock
+    _buf = BytesIO()
+    PILImage.new("RGB", (64, 64), "red").save(_buf, format="PNG")
+    _png_bytes = _buf.getvalue()
+
     mock_response = MagicMock()
     mock_generated = MagicMock()
-    mock_generated.image = mock_pil_image
+    mock_generated.image.image_bytes = _png_bytes
     mock_response.generated_images = [mock_generated]
     mock_client.models.generate_images.return_value = mock_response
 
@@ -134,6 +139,42 @@ def test_ai_image_google_generate_success(device_config_dev, monkeypatch):
 
     result = p.generate_image(settings, device_config_dev)
     assert result is not None
+    assert isinstance(result, PILImage.Image)
+
+
+def test_ai_image_google_empty_results_raises(device_config_dev, monkeypatch):
+    """Bug 5: Empty generated_images should raise RuntimeError."""
+    import sys
+
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    mock_genai = MagicMock()
+    mock_google = MagicMock()
+    mock_google.genai = mock_genai
+
+    mock_client = MagicMock()
+    mock_genai.Client.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_response.generated_images = []
+    mock_client.models.generate_images.return_value = mock_response
+
+    monkeypatch.setitem(sys.modules, "google", mock_google)
+    monkeypatch.setitem(sys.modules, "google.genai", mock_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", mock_genai.types)
+
+    settings = {
+        "textPrompt": "a cat",
+        "provider": "google",
+        "imageModel": "imagen-4.0-generate-001",
+        "quality": "standard",
+    }
+
+    with pytest.raises(RuntimeError, match="no images"):
+        p.generate_image(settings, device_config_dev)
 
 
 def test_ai_image_openai_api_failure(device_config_dev, monkeypatch):

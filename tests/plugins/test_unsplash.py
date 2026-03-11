@@ -50,11 +50,8 @@ def test_unsplash_requires_key(monkeypatch, device_config_dev):
     from plugins.unsplash.unsplash import Unsplash
 
     monkeypatch.delenv("UNSPLASH_ACCESS_KEY", raising=False)
-    try:
+    with pytest.raises(RuntimeError, match="Unsplash API Key not configured"):
         Unsplash({"id": "unsplash"}).generate_image({}, device_config_dev)
-        assert False, "Expected error"
-    except RuntimeError:
-        pass
 
 
 def test_unsplash_random_photo_success(device_config_dev, monkeypatch):
@@ -365,11 +362,13 @@ def test_grab_image_success():
         mock_response.content = b"fake_image_data"
         mock_requests.return_value = mock_response
 
-        # Mock PIL Image (grab_image doesn't use context manager)
+        # Mock PIL Image (grab_image uses context manager)
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
             mock_img_instance = MagicMock()
-            mock_image.open.return_value = mock_img_instance
-            mock_img_instance.resize.return_value = MagicMock()
+            mock_resized = MagicMock()
+            mock_image.open.return_value.__enter__ = MagicMock(return_value=mock_img_instance)
+            mock_image.open.return_value.__exit__ = MagicMock(return_value=False)
+            mock_img_instance.resize.return_value = mock_resized
 
             result = grab_image("http://example.com/image.png", (800, 600))
 
@@ -377,8 +376,8 @@ def test_grab_image_success():
             mock_requests.assert_called_with(
                 "http://example.com/image.png", timeout=40.0
             )
-            # Upstream uses Image.LANCZOS constant directly
             mock_img_instance.resize.assert_called_with((800, 600), mock_image.LANCZOS)
+            mock_resized.copy.assert_called_once()
 
 
 def test_grab_image_download_failure():
