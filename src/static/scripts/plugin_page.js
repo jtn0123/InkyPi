@@ -48,7 +48,7 @@
         };
         localStorage.setItem(buildProgressKey(data.ctx), JSON.stringify(data));
         localStorage.setItem("INKYPI_LAST_PROGRESS", JSON.stringify(data));
-      } catch (e) {}
+      } catch (e) { console.warn("Failed to save progress snapshot:", e); }
     }
 
     function showLastProgress() {
@@ -98,7 +98,7 @@
         if (elapsedEl) elapsedEl.textContent = "—";
         if (bar) bar.style.width = "100%";
         if (progress) progress.style.display = "block";
-      } catch (e) {}
+      } catch (e) { console.warn("Failed to show last progress:", e); }
     }
 
     function renderMetaBlock(metaDiv, metaContent, info) {

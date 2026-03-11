@@ -585,6 +585,10 @@ class RefreshTask:
         if self.running:
             request = ManualUpdateRequest(str(uuid4()), refresh_action)
             with self.condition:
+                if len(self.manual_update_requests) >= self.manual_update_requests.maxlen:
+                    raise RuntimeError(
+                        "Manual update queue is full. Please wait for pending requests to complete."
+                    )
                 self.progress_bus.publish(
                     {
                         "state": "queued",
@@ -780,6 +784,7 @@ class RefreshTask:
             entry["last_success_at"] = now_iso
             entry["last_error"] = None
             entry["success_count"] = int(entry.get("success_count", 0)) + 1
+            entry["failure_count"] = 0
             entry["retained_display"] = False
             if metrics:
                 entry["last_metrics"] = metrics

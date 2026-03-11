@@ -139,6 +139,19 @@ def _rate_limit_ok(remote_addr: str | None) -> bool:
     except Exception:
         # On any failure, allow rather than block
         return True
+    finally:
+        # Prune empty deques to prevent unbounded memory growth from unique IPs
+        try:
+            _prune_empty_rate_limit_keys()
+        except Exception:
+            pass
+
+
+def _prune_empty_rate_limit_keys():
+    """Remove IP keys with empty deques from the rate limiter."""
+    empty_keys = [k for k, v in _REQUESTS.items() if not v]
+    for k in empty_keys:
+        del _REQUESTS[k]
 
 
 def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) -> int:
@@ -879,7 +892,9 @@ def api_keys_page():
         if not value:
             return None
         try:
-            return f"...{value[-4:]}" if len(value) >= 4 else "set"
+            if len(value) >= 4:
+                return f"...{value[-4:]} ({len(value)} chars)"
+            return f"set ({len(value)} chars)"
         except Exception:
             return "set"
 

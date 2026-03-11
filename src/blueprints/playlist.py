@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
 
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
+# Bounded to prevent unbounded growth; entries expire after 1 minute.
+_ETA_CACHE_MAX_SIZE = 64
 _eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
 
 
@@ -644,6 +646,16 @@ def playlist_eta(playlist_name: str):
                 except Exception:
                     continue
 
+        # Evict stale entries and cap cache size
+        if len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
+            stale_keys = [
+                k for k, (ts, _) in _eta_cache.items() if ts != floor_min
+            ]
+            for k in stale_keys:
+                _eta_cache.pop(k, None)
+            # If still over limit, drop oldest entries
+            while len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
+                _eta_cache.pop(next(iter(_eta_cache)), None)
         _eta_cache[playlist_name] = (floor_min, eta_map)
         return json_success("ok", eta=eta_map)
     except Exception:

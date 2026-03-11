@@ -524,7 +524,15 @@ class PluginInstance:
         # Check for scheduled refresh (HH:MM format)
         if "scheduled" in self.refresh:
             scheduled_time_str = self.refresh.get("scheduled")
-            scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M").time()
+            try:
+                scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M").time()
+            except (ValueError, TypeError):
+                logger.warning(
+                    "Malformed scheduled time '%s' for plugin '%s'; skipping scheduled check",
+                    scheduled_time_str,
+                    self.name,
+                )
+                return False
 
             scheduled_dt = current_time.replace(
                 hour=scheduled_time.hour,
@@ -562,14 +570,22 @@ class PluginInstance:
                     if current_time < snooze_dt:
                         return False
                 except Exception:
-                    # Ignore malformed snooze value
-                    pass
+                    logger.warning(
+                        "Malformed snooze_until value '%s' for plugin '%s'; treating as eligible",
+                        self.snooze_until,
+                        self.name,
+                    )
 
             if self.only_show_when_fresh and not self.should_refresh(current_time):
                 return False
 
             return True
         except Exception:
+            logger.warning(
+                "Unexpected error in is_show_eligible for plugin '%s'; treating as eligible",
+                self.name,
+                exc_info=True,
+            )
             return True
 
     def get_image_path(self):

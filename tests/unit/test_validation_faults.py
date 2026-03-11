@@ -83,12 +83,17 @@ def test_plugin_failure_remains_actionable_and_task_recovers(device_config_dev, 
         assert refresh_task.running is True
         assert refresh_task.thread.is_alive()
 
+        # Verify failure was recorded
+        health_after_fail = refresh_task.get_health_snapshot()
+        assert health_after_fail["faulty"]["failure_count"] >= 1
+
         current_plugin["instance"] = GoodPlugin()
         metrics = refresh_task.manual_update(ManualRefresh("faulty", {}))
         assert metrics is not None
 
         health = refresh_task.get_health_snapshot()
-        assert health["faulty"]["failure_count"] >= 1
+        # After successful recovery, failure_count is reset to 0
+        assert health["faulty"]["failure_count"] == 0
         assert health["faulty"]["success_count"] >= 1
         assert health["faulty"]["last_seen"]
     finally:

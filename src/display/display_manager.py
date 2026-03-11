@@ -2,6 +2,7 @@ import fnmatch
 import json
 import logging
 import os
+import threading
 from datetime import datetime
 from time import perf_counter
 
@@ -41,6 +42,7 @@ class DisplayManager:
         """
         
         self._last_image_hash = None
+        self._hash_lock = threading.Lock()
         self.device_config = device_config
      
         display_type = device_config.get_config("display_type", default="inky")
@@ -75,20 +77,27 @@ class DisplayManager:
     # Approximate count of history entries to avoid scanning the directory on
     # every save.  Reset to None to force a recount on the next prune cycle.
     _history_count_estimate = None
+    # Force a full recount every N increments to correct estimate drift
+    _RECOUNT_INTERVAL = 50
+    _history_increment_count = 0
 
     def _prune_history(self, history_dir):
         """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
 
         Uses an in-memory count estimate to skip the directory scan when the
         count is clearly below the limit.  The estimate is refreshed whenever
-        an actual scan is performed.
+        an actual scan is performed or every _RECOUNT_INTERVAL increments.
         """
         if (
             self._history_count_estimate is not None
             and self._history_count_estimate < self.HISTORY_MAX_ENTRIES
         ):
             self._history_count_estimate += 1
-            return
+            self._history_increment_count += 1
+            # Force periodic recount to correct drift from external deletions
+            if self._history_increment_count < self._RECOUNT_INTERVAL:
+                return
+            self._history_increment_count = 0
         try:
             png_files = sorted(
                 (f for f in os.listdir(history_dir) if f.endswith(".png")),
@@ -163,10 +172,11 @@ class DisplayManager:
 
         from utils.image_utils import compute_image_hash
         image_hash = compute_image_hash(image)
-        if image_hash == self._last_image_hash:
-            logger.info("Image unchanged, skipping display writes")
-            return {"preprocess_ms": 0, "display_ms": 0, "display_driver": self.display.__class__.__name__}
-        self._last_image_hash = image_hash
+        with self._hash_lock:
+            if image_hash == self._last_image_hash:
+                logger.info("Image unchanged, skipping display writes")
+                return {"preprocess_ms": 0, "display_ms": 0, "display_driver": self.display.__class__.__name__}
+            self._last_image_hash = image_hash
 
         preprocess_t0 = perf_counter()
         # Save the raw image

@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -11,6 +13,8 @@ from flask import (
     send_file,
     send_from_directory,
 )
+
+logger = logging.getLogger(__name__)
 
 try:
     from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
@@ -168,6 +172,11 @@ def save_plugin_order():
         return jsonify({"error": "Order must be a list"}), 400
     if any(not isinstance(item, str) for item in order):
         return jsonify({"error": "Order entries must be strings"}), 400
+    # Validate plugin IDs exist in the registry
+    registered_ids = {p["id"] for p in device_config.get_plugins()}
+    invalid_ids = [pid for pid in order if pid not in registered_ids]
+    if invalid_ids:
+        return jsonify({"error": f"Unknown plugin IDs: {', '.join(invalid_ids)}"}), 400
     device_config.set_plugin_order(order)
     return jsonify({"success": True})
 
@@ -201,8 +210,25 @@ def _configure_app_static(state):
         pass
 
 
+_DISPLAY_NEXT_COOLDOWN_SECONDS = 10
+_last_display_next_time: float = 0.0
+
+
+def _reset_display_next_cooldown():
+    """Reset the display-next rate limiter. Exposed for testing."""
+    global _last_display_next_time
+    _last_display_next_time = 0.0
+
+
 @main_bp.route("/display-next", methods=["POST"])
 def display_next():
+    global _last_display_next_time
+    now = time.monotonic()
+    if now - _last_display_next_time < _DISPLAY_NEXT_COOLDOWN_SECONDS:
+        remaining = int(_DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time))
+        return jsonify({"success": False, "error": f"Please wait {remaining}s before requesting another display update"}), 429
+    _last_display_next_time = now
+
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
@@ -271,6 +297,9 @@ def display_next():
                     image,
                     image_settings=plugin_config.get("image_settings", []),
                 )
+
+            # Persist playlist state so index is not lost on next refresh
+            device_config.write_config()
 
             # Update refresh_info
             try:

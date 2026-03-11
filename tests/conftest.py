@@ -140,6 +140,16 @@ def mock_screenshot(monkeypatch):
 # (Removed) Autouse requests.get stub to avoid interfering with tests that patch requests explicitly.
 
 
+@pytest.fixture(autouse=True)
+def reset_display_next_cooldown():
+    """Reset the /display-next rate limiter between tests."""
+    from blueprints.main import _reset_display_next_cooldown
+
+    _reset_display_next_cooldown()
+    yield
+    _reset_display_next_cooldown()
+
+
 @pytest.fixture()
 def device_config_dev(tmp_path, monkeypatch):
     # Create a temp device config mirroring device_dev.json
