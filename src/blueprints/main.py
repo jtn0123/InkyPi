@@ -30,7 +30,7 @@ def _current_dt(device_config):
 
         return time_utils.now_device_tz(device_config)
     except Exception:
-        return datetime.utcnow()
+        return datetime.now(UTC)
 
 
 @main_bp.route("/")

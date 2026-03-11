@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from blueprints.main import _current_dt
 
@@ -22,5 +22,5 @@ def test_current_dt_falls_back_to_utc(monkeypatch):
 
     result = _current_dt(object())
     assert isinstance(result, datetime)
-    assert result.tzinfo is None
-    assert abs((result - datetime.utcnow()).total_seconds()) < 5
+    assert result.tzinfo is UTC
+    assert abs((result - datetime.now(UTC)).total_seconds()) < 5

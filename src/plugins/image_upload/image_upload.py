@@ -113,7 +113,7 @@ class ImageUpload(BasePlugin):
             if settings.get('backgroundOption') == "blur":
                 return pad_image_blur(image, dimensions)
             else:
-                background_color = ImageColor.getcolor(settings.get('backgroundColor') or (255, 255, 255), "RGB")
+                background_color = ImageColor.getcolor(settings.get('backgroundColor') or "#ffffff", "RGB")
                 return ImageOps.pad(image, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
         return image
 

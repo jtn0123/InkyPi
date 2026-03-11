@@ -8,6 +8,7 @@ class ProgressiveDisclosure {
         this.currentMode = 'basic';
         this.validationRules = new Map();
         this.tooltips = new Map();
+        this._lastPreviewBlobUrl = null;
         this.init();
     }
 
@@ -613,7 +614,11 @@ class ProgressiveDisclosure {
 
             // The response is a PNG image blob
             const blob = await response.blob();
+            if (this._lastPreviewBlobUrl) {
+                URL.revokeObjectURL(this._lastPreviewBlobUrl);
+            }
             const imageUrl = URL.createObjectURL(blob);
+            this._lastPreviewBlobUrl = imageUrl;
 
             return imageUrl;
 

@@ -26,8 +26,9 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
         {"newspaperSlug": "NYT"}, device_config_dev
     )
     assert img is not None
-    # device_config_dev has horizontal orientation, so dimensions are swapped (480, 800)
-    # new_height = int((img_width * desired_width) / desired_height) = int((400 * 480) / 800) = 240
+    # device_config_dev has horizontal orientation, so dimensions stay (800, 480)
+    # img_ratio = 400/800 = 0.5 < desired_ratio = 800/480 = 1.667
+    # new_height = int(400 / (800/480)) = 240
     assert img.size == (400, 240)
 
 def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev):
@@ -84,13 +85,12 @@ def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     """Image wider than display ratio is returned without height expansion."""
     from plugins.newspaper.newspaper import Newspaper
 
-    # Create a very wide image (landscape)
-    # device_config_dev is horizontal, so desired dimensions are (480, 800)
-    # desired_ratio = 480/800 = 0.6
+    # device_config_dev is horizontal, so dimensions stay (800, 480)
+    # desired_ratio = 800/480 = 1.667
     # For no expansion, img_ratio must be >= desired_ratio
-    # Use 800x800 image: img_ratio = 1.0 > 0.6, so no expansion
+    # Use 1000x500 image: img_ratio = 2.0 > 1.667, so no expansion
     def fake_get_image(url):
-        return _png_image((800, 800))
+        return _png_image((1000, 500))
 
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
@@ -99,11 +99,11 @@ def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     )
     assert img is not None
     # Image should be unchanged since img_ratio >= desired_ratio
-    assert img.size == (800, 800)
+    assert img.size == (1000, 500)
 
 
 def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
-    """Vertical orientation uses dimensions as-is (not swapped)."""
+    """Vertical orientation swaps dimensions."""
     from plugins.newspaper.newspaper import Newspaper
 
     # Set orientation to vertical
@@ -118,10 +118,10 @@ def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
         {"newspaperSlug": "NYT"}, device_config_dev
     )
     assert img is not None
-    # In vertical mode, dimensions are (800, 480) - not swapped
-    # img_ratio = 400/800 = 0.5, desired_ratio = 800/480 = 1.67
+    # In vertical mode, dimensions are swapped to (480, 800)
+    # img_ratio = 400/800 = 0.5, desired_ratio = 480/800 = 0.6
     # Since img_ratio < desired_ratio, height is expanded
-    # new_height = int((400 * 800) / 480) = 666
+    # new_height = int(400 / 0.6) = 666
     assert img.size == (400, 666)
 
 

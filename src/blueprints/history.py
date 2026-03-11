@@ -160,6 +160,10 @@ def history_page():
 def history_image(filename: str):
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
+    try:
+        _resolve_history_path(history_dir, filename)
+    except ValueError:
+        return json_error("invalid filename", status=400)
     return send_from_directory(history_dir, filename)
 
 

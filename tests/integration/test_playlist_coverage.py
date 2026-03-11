@@ -360,16 +360,13 @@ def test_playlist_eta_caching(client, flask_app):
 # --- format_relative_time edge cases ---
 
 
-def test_format_relative_time_no_timezone_raises():
-    """Naive datetime without timezone raises ValueError."""
+def test_format_relative_time_no_timezone_assumes_utc():
+    """Bug 13: Naive datetime without timezone should assume UTC, not raise."""
     from blueprints.playlist import format_relative_time
 
-    # Explicitly pass a naive ISO string (no timezone suffix).
-    try:
-        format_relative_time("2024-01-15T10:00:00")  # naive - no TZ
-        assert False, "Expected ValueError"
-    except ValueError as e:
-        assert "timezone" in str(e).lower()
+    result = format_relative_time("2024-01-15T10:00:00")  # naive - no TZ
+    assert isinstance(result, str)
+    assert len(result) > 0
 
 
 def test_format_relative_time_edge_boundaries():

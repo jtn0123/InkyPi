@@ -221,6 +221,16 @@ def test_progressive_disclosure_contains_wizard_completion(client):
     assert "Setup wizard completed" in script_content
 
 
+def test_progressive_disclosure_revokes_blob_urls(client):
+    """Bug 14: Script should call revokeObjectURL to prevent memory leaks."""
+    resp = client.get("/static/scripts/progressive_disclosure.js")
+    assert resp.status_code == 200
+
+    script_content = resp.get_data(as_text=True)
+    assert "revokeObjectURL" in script_content
+    assert "_lastPreviewBlobUrl" in script_content
+
+
 def test_progressive_disclosure_module_export(client):
     """Test that progressive disclosure script can be used as a module."""
     resp = client.get("/static/scripts/progressive_disclosure.js")

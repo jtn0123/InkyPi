@@ -441,6 +441,7 @@ def update_status():
 def benchmarks_summary():
     if not _benchmarks_enabled():
         return json_error("Benchmarks API disabled", status=404)
+    conn = None
     try:
         since = _window_since_seconds(request.args.get("window", "24h"))
         conn = sqlite3.connect(_get_bench_db_path())
@@ -455,7 +456,6 @@ def benchmarks_summary():
             """,
             (since,),
         ).fetchall()
-        conn.close()
         req = [int(r["request_ms"]) for r in rows if r["request_ms"] is not None]
         gen = [int(r["generate_ms"]) for r in rows if r["generate_ms"] is not None]
         pre = [int(r["preprocess_ms"]) for r in rows if r["preprocess_ms"] is not None]
@@ -474,12 +474,16 @@ def benchmarks_summary():
         )
     except Exception as e:
         return json_internal_error("benchmarks summary", details={"error": str(e)})
+    finally:
+        if conn:
+            conn.close()
 
 
 @settings_bp.route("/api/benchmarks/refreshes")
 def benchmarks_refreshes():
     if not _benchmarks_enabled():
         return json_error("Benchmarks API disabled", status=404)
+    conn = None
     try:
         limit = max(1, min(200, int(request.args.get("limit", "50"))))
         cursor = request.args.get("cursor")
@@ -511,7 +515,6 @@ def benchmarks_refreshes():
                 """,
                 (since, limit),
             ).fetchall()
-        conn.close()
         next_cursor = str(rows[-1]["id"]) if rows else None
         return jsonify(
             {
@@ -522,12 +525,16 @@ def benchmarks_refreshes():
         )
     except Exception as e:
         return json_internal_error("benchmarks refreshes", details={"error": str(e)})
+    finally:
+        if conn:
+            conn.close()
 
 
 @settings_bp.route("/api/benchmarks/plugins")
 def benchmarks_plugins():
     if not _benchmarks_enabled():
         return json_error("Benchmarks API disabled", status=404)
+    conn = None
     try:
         since = _window_since_seconds(request.args.get("window", "24h"))
         conn = sqlite3.connect(_get_bench_db_path())
@@ -547,7 +554,6 @@ def benchmarks_plugins():
             """,
             (since,),
         ).fetchall()
-        conn.close()
         items = []
         for r in rows:
             items.append(
@@ -562,6 +568,9 @@ def benchmarks_plugins():
         return jsonify({"success": True, "items": items})
     except Exception as e:
         return json_internal_error("benchmarks plugins", details={"error": str(e)})
+    finally:
+        if conn:
+            conn.close()
 
 
 @settings_bp.route("/api/benchmarks/stages")
@@ -576,6 +585,7 @@ def benchmarks_stages():
             code="validation_error",
             details={"field": "refresh_id"},
         )
+    conn = None
     try:
         conn = sqlite3.connect(_get_bench_db_path())
         conn.row_factory = sqlite3.Row
@@ -589,10 +599,12 @@ def benchmarks_stages():
             """,
             (refresh_id,),
         ).fetchall()
-        conn.close()
         return jsonify({"success": True, "items": [dict(r) for r in rows]})
     except Exception as e:
         return json_internal_error("benchmarks stages", details={"error": str(e)})
+    finally:
+        if conn:
+            conn.close()
 
 
 @settings_bp.route("/api/progress/stream")
@@ -762,7 +774,7 @@ def backup_restore_page():
 @settings_bp.route("/settings/export", methods=["GET"])
 def export_settings():
     try:
-        include_keys = request.args.get("include_keys", "1").strip().lower() in (
+        include_keys = request.args.get("include_keys", "0").strip().lower() in (
             "1",
             "true",
             "yes",
@@ -800,6 +812,20 @@ def export_settings():
         )
 
 
+_ALLOWED_IMPORT_CONFIG_KEYS = frozenset({
+    "name", "resolution", "orientation", "timezone", "color_mode",
+    "playlist_config", "refresh_info", "plugins",
+    "plugin_cycle_interval_seconds", "time_format", "image_settings",
+    "display_type", "preview_size_mode", "saved_settings",
+    "inverted_image", "log_system_stats",
+})
+
+_ALLOWED_IMPORT_ENV_KEYS = frozenset({
+    "OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET",
+    "UNSPLASH_ACCESS_KEY", "GITHUB_SECRET", "GOOGLE_AI_SECRET",
+})
+
+
 @settings_bp.route("/settings/import", methods=["POST"])
 def import_settings():
     try:
@@ -819,13 +845,14 @@ def import_settings():
 
         cfg = payload.get("config")
         if isinstance(cfg, dict):
-            # Merge config and write
-            device_config.update_config(cfg)
+            # Filter to allowed keys only
+            filtered_cfg = {k: v for k, v in cfg.items() if k in _ALLOWED_IMPORT_CONFIG_KEYS}
+            device_config.update_config(filtered_cfg)
 
         env_keys = payload.get("env_keys") or {}
         if isinstance(env_keys, dict):
             for k, v in env_keys.items():
-                if v is None:
+                if k not in _ALLOWED_IMPORT_ENV_KEYS or v is None:
                     continue
                 try:
                     device_config.set_env_key(k, str(v))

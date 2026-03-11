@@ -102,6 +102,10 @@
                         <div id="imageMetaContent" class="dashboard-status-meta"></div>
                     </div>
 
+                    <div id="connectivityWarning" class="dashboard-connectivity-warning" hidden>
+                        <p>Unable to reach the server. Retrying&hellip;</p>
+                    </div>
+
                     <div id="overviewEmpty" class="dashboard-overview-empty" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
                         {{ icon('monitor', 'empty-state-icon') | safe }}
                         <p>Display a plugin to see details here.</p>

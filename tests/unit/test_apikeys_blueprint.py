@@ -54,6 +54,22 @@ def test_write_env_file_quoted_values(tmp_path):
     assert 'KEY="has spaces"' in content
 
 
+def test_write_env_file_value_with_double_quote(tmp_path):
+    """Bug 7: Values with double-quotes should be escaped, not corrupt the file."""
+    from blueprints.apikeys import write_env_file, parse_env_file
+
+    env_path = str(tmp_path / ".env")
+    result = write_env_file(env_path, [("KEY", 'value"with"quotes')])
+    assert result is True
+    content = open(env_path).read()
+    # The value should be quoted and internal quotes escaped
+    assert '\\"' in content
+    # Verify it round-trips correctly
+    entries = parse_env_file(env_path)
+    vals = dict(entries)
+    assert vals.get("KEY") == 'value"with"quotes'
+
+
 def test_write_env_file_control_chars(tmp_path):
     from blueprints.apikeys import write_env_file
 

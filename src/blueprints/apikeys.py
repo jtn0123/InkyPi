@@ -48,7 +48,7 @@ def write_env_file(filepath, entries):
                         raise ValueError(f"Invalid control character in value for key: {key}")
                     # Quote values with spaces or special characters
                     if ' ' in value or '"' in value or "'" in value:
-                        value = f'"{value}"'
+                        value = f'"{value.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))}"'
                     f.write(f"{key}={value}\n")
                 f.flush()
                 os.fsync(f.fileno())

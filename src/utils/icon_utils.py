@@ -1,7 +1,7 @@
 import os
 import re
 
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 
 def render_icon(name: str, class_name: str = "icon-image", title: str | None = None) -> Markup:
@@ -27,13 +27,13 @@ def render_icon(name: str, class_name: str = "icon-image", title: str | None = N
                 match = re.search(r"<svg\b[^>]*>", svg, flags=re.IGNORECASE)
                 if match:
                     pos = match.end()
-                    svg = svg[:pos] + f"<title>{title}</title>" + svg[pos:]
+                    svg = svg[:pos] + f"<title>{escape(title)}</title>" + svg[pos:]
             return Markup(svg)
     except Exception:
         # On any failure, fall through to class-based fallback
         pass
     # Fallback: Phosphor class (requires stylesheet)
-    title_attr = f' title="{title}"' if title else ""
+    title_attr = f' title="{escape(title)}"' if title else ""
     return Markup(f'<i class="ph ph-{name} ph-thin {class_name}" aria-hidden="true"{title_attr}></i>')
 
 

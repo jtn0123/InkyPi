@@ -33,7 +33,7 @@ class OperationStatusManager {
                 </div>
                 <div id="currentOperationsList" class="current-operations-list"></div>
                 <div id="recentOperationsList" class="recent-operations-list" style="display: none;"></div>
-                <button type="button" class="toggle-recent" onclick="operationStatus.toggleRecentOperations()">
+                <button type="button" class="toggle-recent" id="toggleRecentBtn">
                     <span class="toggle-text">Show Recent</span>
                     <span class="toggle-icon">▼</span>
                 </button>
@@ -46,6 +46,11 @@ class OperationStatusManager {
 
             if (targetContainer) {
                 targetContainer.appendChild(container);
+            }
+
+            const toggleBtn = container.querySelector('#toggleRecentBtn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => this.toggleRecentOperations());
             }
         }
 
@@ -264,11 +269,17 @@ class OperationStatusManager {
         const duration = operation.duration ? this.formatDuration(operation.duration) : '';
         const elapsed = isCurrent ? this.formatDuration(Date.now() - operation.startTime) : '';
 
+        const esc = (str) => {
+            const el = document.createElement('span');
+            el.textContent = str;
+            return el.innerHTML;
+        };
+
         return `
             <div class="operation-item ${statusClass}">
                 <div class="operation-header">
                     <span class="operation-icon">${statusIcon}</span>
-                    <span class="operation-description">${operation.description}</span>
+                    <span class="operation-description">${esc(operation.description)}</span>
                     <span class="operation-time">${duration || elapsed}</span>
                 </div>
                 ${isCurrent && operation.progress > 0 ? `
@@ -280,10 +291,10 @@ class OperationStatusManager {
                     </div>
                 ` : ''}
                 ${operation.currentStep ? `
-                    <div class="operation-step">${operation.currentStep}</div>
+                    <div class="operation-step">${esc(operation.currentStep)}</div>
                 ` : ''}
                 ${operation.error ? `
-                    <div class="operation-error">${operation.error}</div>
+                    <div class="operation-error">${esc(operation.error)}</div>
                 ` : ''}
             </div>
         `;
@@ -419,12 +430,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         operation.fail(`Request failed: ${response.status} ${response.statusText}`);
                     }
                     operationCompleted = true;
+                    window.fetch = originalFetch;
                 }
                 return response;
             }).catch(error => {
                 if (!operationCompleted) {
                     operation.fail(`Network error: ${error.message}`);
                     operationCompleted = true;
+                    window.fetch = originalFetch;
                 }
                 throw error;
             });
@@ -432,8 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Restore original fetch after a timeout
         setTimeout(() => {
-            window.fetch = originalFetch;
             if (!operationCompleted) {
+                window.fetch = originalFetch;
                 operation.fail('Request timeout');
             }
         }, 30000);

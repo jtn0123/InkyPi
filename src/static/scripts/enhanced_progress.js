@@ -68,7 +68,7 @@ class EnhancedProgressDisplay {
                 </div>
                 <div class="progress-controls">
                     <span id="enhancedProgressElapsed" class="progress-elapsed">0s</span>
-                    <button type="button" class="progress-close" aria-label="Close progress" onclick="this.closest('.progress-block').style.display='none'">×</button>
+                    <button type="button" class="progress-close" aria-label="Close progress">×</button>
                 </div>
             </div>
             <div class="enhanced-progress-bar-section">
@@ -85,11 +85,25 @@ class EnhancedProgressDisplay {
             <div class="enhanced-progress-details" id="enhancedProgressDetails" style="display: none;">
                 <div class="progress-details-header">
                     <span>Step Details</span>
-                    <button type="button" class="details-toggle" onclick="this.closest('.enhanced-progress-details').style.display='none'">Hide</button>
+                    <button type="button" class="details-toggle">Hide</button>
                 </div>
                 <ol id="enhancedProgressLog" class="enhanced-progress-log" aria-live="polite"></ol>
             </div>
         `;
+
+        // Bind close/hide buttons
+        const closeBtn = this.progressElement.querySelector('.progress-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.target.closest('.progress-block').style.display = 'none';
+            });
+        }
+        const hideBtn = this.progressElement.querySelector('.details-toggle');
+        if (hideBtn) {
+            hideBtn.addEventListener('click', (e) => {
+                e.target.closest('.enhanced-progress-details').style.display = 'none';
+            });
+        }
 
         // Get element references
         this.elements = {

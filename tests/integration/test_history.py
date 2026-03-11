@@ -91,6 +91,12 @@ def test_history_page_moves_clear_action_to_reset_cache(client, device_config_de
     assert "Reset cache" in body
     assert 'id="historyClearBtn"' in body
 
+def test_history_image_blocks_path_traversal(client):
+    """Bug 4: history_image should reject path traversal attempts."""
+    resp = client.get("/history/image/../../etc/passwd")
+    assert resp.status_code == 400
+
+
 def test_history_image_route_serves_png(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)

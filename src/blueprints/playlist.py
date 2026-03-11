@@ -208,7 +208,7 @@ def playlists():
         now_str = ""
         tz_off_min = 0
     try:
-        device_cycle_minutes = int(device_config.get_config("plugin_cycle_interval_seconds", default=3600) // 60)
+        device_cycle_minutes = int(int(device_config.get_config("plugin_cycle_interval_seconds", default=3600)) // 60)
     except Exception:
         device_cycle_minutes = 60
 
@@ -223,7 +223,7 @@ def playlists():
     try:
         for pl in playlist_manager.playlists:
             cycle_sec = getattr(pl, "cycle_interval_seconds", None)
-            cycle_min = int((cycle_sec or device_cycle_minutes * 60) // 60)
+            cycle_min = int((int(cycle_sec) if cycle_sec else device_cycle_minutes * 60) // 60)
             item: dict = {"cycle_minutes": cycle_min, "next_in_minutes": None, "next_at": None}
             try:
                 if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
@@ -657,7 +657,8 @@ def format_relative_time(iso_date_string):
 
     # Get the timezone from the parsed datetime
     if dt.tzinfo is None:
-        raise ValueError("Input datetime doesn't have a timezone.")
+        from datetime import timezone as _tz
+        dt = dt.replace(tzinfo=_tz.utc)
 
     # Get the current time using the device's configured timezone, if available
     if has_app_context():

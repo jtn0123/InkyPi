@@ -76,7 +76,7 @@
                     value="{{ field.checked_value | default('true') }}"
                     data-checked-value="{{ field.checked_value | default('true') }}"
                     data-unchecked-value="{{ field.unchecked_value | default('false') }}"
-                    {% if is_checked(field, plugin_settings) %}checked{% endif %}
+                    {% if is_checked(field, plugin_settings) == 'True' %}checked{% endif %}
                 >
                 <span class="toggle-label"></span>
             </label>

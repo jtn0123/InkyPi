@@ -3,6 +3,25 @@ import logging
 import os
 
 
+def test_update_config_writes_atomically(device_config_dev, tmp_path):
+    """Bug 10: update_config should write inside the lock to prevent races."""
+    device_config_dev.update_config({"name": "Atomic"})
+    assert device_config_dev.get_config("name") == "Atomic"
+    # Read back from disk to verify write happened
+    with open(device_config_dev.config_file) as f:
+        on_disk = json.load(f)
+    assert on_disk["name"] == "Atomic"
+
+
+def test_update_value_writes_atomically(device_config_dev, tmp_path):
+    """Bug 10: update_value with write=True should write inside the lock."""
+    device_config_dev.update_value("name", "AtomicVal", write=True)
+    assert device_config_dev.get_config("name") == "AtomicVal"
+    with open(device_config_dev.config_file) as f:
+        on_disk = json.load(f)
+    assert on_disk["name"] == "AtomicVal"
+
+
 def test_config_logging_is_sanitized(monkeypatch, tmp_path, caplog):
     import config as config_mod
 

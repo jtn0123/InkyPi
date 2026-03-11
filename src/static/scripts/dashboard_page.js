@@ -106,6 +106,8 @@
       setHidden(playlist, !data.playlist);
     }
 
+    let consecutiveFailures = 0;
+
     async function refreshPreview() {
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
@@ -124,6 +126,18 @@
         ]);
       } catch (error) {
         console.warn("Dashboard preview refresh failed:", error);
+      }
+
+      // Show connectivity warning after repeated failures
+      const connWarn = document.getElementById("connectivityWarning");
+      if (!info && !up) {
+        consecutiveFailures++;
+        if (consecutiveFailures >= 3 && connWarn) {
+          setHidden(connWarn, false);
+        }
+      } else {
+        consecutiveFailures = 0;
+        if (connWarn) setHidden(connWarn, true);
       }
 
       if (info && info.image_hash && info.image_hash !== lastImageHash && previewImg) {

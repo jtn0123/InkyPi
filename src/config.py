@@ -312,14 +312,14 @@ class Config:
         """Updates the config with the new values provided and writes to the config file."""
         with self._config_lock:
             self.config.update(config)
-        self.write_config()
+            self.write_config()
 
     def update_value(self, key, value, write=False):
         """Updates a specific key in the configuration with a new value and optionally writes it to the config file."""
         with self._config_lock:
             self.config[key] = value
-        if write:
-            self.write_config()
+            if write:
+                self.write_config()
 
     def get_env_file_path(self):
         """Return absolute path to the .env file used for secrets.
