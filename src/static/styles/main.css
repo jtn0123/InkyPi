@@ -580,6 +580,14 @@ main[data-page-shell="workflow"] .frame {
   max-height: 85vh;
   margin: 0 auto;
   cursor: zoom-out;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.lightbox-preview-image.lightbox-img-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .section-nav {
@@ -2449,6 +2457,14 @@ textarea:focus-visible {
 /* Plugin thumbnail containers */
 .plugin-thumbnail-container {
   position: relative;
+  border: 2px solid transparent;
+  border-radius: var(--border-radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plugin-thumbnail-container:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .plugin-thumbnail {

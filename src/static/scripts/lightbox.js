@@ -10,7 +10,49 @@
 
   const MODAL_ID = 'imagePreviewModal';
   const IMG_ID = 'imagePreviewImg';
+  const VISIBLE_CLASS = 'lightbox-img-visible';
   let triggerElement = null;
+
+  function showImage(img) {
+    img.classList.add(VISIBLE_CLASS);
+  }
+
+  function hideImage(img) {
+    img.classList.remove(VISIBLE_CLASS);
+  }
+
+  function bindImageLoadHandlers(img, content) {
+    img.addEventListener('load', function() {
+      const l = content.querySelector('.lightbox-loading');
+      const e = content.querySelector('.lightbox-error');
+      if (l) l.style.display = 'none';
+      if (e) e.style.display = 'none';
+      showImage(img);
+    });
+    img.addEventListener('error', function() {
+      const l = content.querySelector('.lightbox-loading');
+      const e = content.querySelector('.lightbox-error');
+      if (l) l.style.display = 'none';
+      hideImage(img);
+      if (e) e.style.display = 'block';
+    });
+  }
+
+  function addFocusTrap(modal) {
+    modal.addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    });
+  }
 
   function ensureModal(){
     let modal = document.getElementById(MODAL_ID);
@@ -45,23 +87,12 @@
       img.id = IMG_ID;
       img.className = 'lightbox-preview-image';
       img.alt = 'Large preview';
-      img.style.display = 'none';
       img.style.cursor = 'zoom-out';
       // Single click closes lightbox, double-click toggles native sizing
       img.addEventListener('click', closeLightbox);
       img.addEventListener('dblclick', toggleNativeSizing);
 
-      img.addEventListener('load', function() {
-        loader.style.display = 'none';
-        errorEl.style.display = 'none';
-        img.style.display = 'block';
-      });
-
-      img.addEventListener('error', function() {
-        loader.style.display = 'none';
-        img.style.display = 'none';
-        errorEl.style.display = 'block';
-      });
+      bindImageLoadHandlers(img, content);
 
       content.appendChild(close);
       content.appendChild(loader);
@@ -70,26 +101,7 @@
       modal.appendChild(content);
       document.body.appendChild(modal);
 
-      // Focus trap
-      modal.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-          const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
-          if (focusable.length === 0) return;
-          const first = focusable[0];
-          const last = focusable[focusable.length - 1];
-          if (e.shiftKey) {
-            if (document.activeElement === first) {
-              e.preventDefault();
-              last.focus();
-            }
-          } else {
-            if (document.activeElement === last) {
-              e.preventDefault();
-              first.focus();
-            }
-          }
-        }
-      });
+      addFocusTrap(modal);
     } else {
       const content = modal.querySelector('.modal-content');
       const img = document.getElementById(IMG_ID);
@@ -113,20 +125,7 @@
           content.insertBefore(errorEl, img);
         }
 
-        img.addEventListener('load', function() {
-          const l = content.querySelector('.lightbox-loading');
-          const e = content.querySelector('.lightbox-error');
-          if (l) l.style.display = 'none';
-          if (e) e.style.display = 'none';
-          img.style.display = 'block';
-        });
-        img.addEventListener('error', function() {
-          const l = content.querySelector('.lightbox-loading');
-          const e = content.querySelector('.lightbox-error');
-          if (l) l.style.display = 'none';
-          img.style.display = 'none';
-          if (e) e.style.display = 'block';
-        });
+        bindImageLoadHandlers(img, content);
 
         // Upgrade close <span> to <button> if needed
         const closeSpan = content.querySelector('span.close-button');
@@ -140,25 +139,17 @@
           closeSpan.replaceWith(closeBtn);
         }
 
-        // Focus trap for pre-existing modal
-        modal.addEventListener('keydown', function(e) {
-          if (e.key === 'Tab') {
-            const focusable = modal.querySelectorAll('button, [tabindex]:not([tabindex="-1"])');
-            if (focusable.length === 0) return;
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            if (e.shiftKey) {
-              if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-            } else {
-              if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-            }
-          }
-        });
+        addFocusTrap(modal);
 
         img._lbInit = true;
       }
     }
     return modal;
+  }
+
+  function syncModalOpen() {
+    var ui = window.InkyPiUI;
+    if (ui && ui.syncModalOpenState) ui.syncModalOpenState();
   }
 
   function openLightbox(url, alt){
@@ -173,11 +164,10 @@
     const errorEl = modal.querySelector('.lightbox-error');
     if (loader) loader.style.display = 'flex';
     if (errorEl) errorEl.style.display = 'none';
-    img.style.display = 'none';
+    hideImage(img);
 
     img.src = url;
     img.alt = alt || 'Preview';
-    img.setAttribute('aria-label', alt || 'Preview');
     // Reset any native toggle state
     img.style.maxWidth = '';
     img.style.maxHeight = '';
@@ -187,11 +177,13 @@
     img.style.cursor = '';
     modal.removeAttribute('hidden');
     modal.style.display = 'block';
+    modal.classList.add('is-open');
+    syncModalOpen();
 
     // If already cached, trigger load immediately
     if (img.complete && img.naturalWidth > 0) {
       if (loader) loader.style.display = 'none';
-      img.style.display = 'block';
+      showImage(img);
     }
 
     // Focus the close button for keyboard users
@@ -201,7 +193,12 @@
 
   function closeLightbox(){
     const modal = document.getElementById(MODAL_ID);
-    if (modal) { modal.style.display = 'none'; modal.setAttribute('hidden', ''); }
+    if (modal) {
+      modal.style.display = 'none';
+      modal.setAttribute('hidden', '');
+      modal.classList.remove('is-open');
+    }
+    syncModalOpen();
     // Restore focus to the element that opened the lightbox
     if (triggerElement && typeof triggerElement.focus === 'function') {
       triggerElement.focus();

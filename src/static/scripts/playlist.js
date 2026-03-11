@@ -28,8 +28,10 @@
     let playlistRefreshManager = null;
 
     function syncModalOpenState(){
-        const openModal = document.querySelector('.modal.is-open, .thumbnail-preview-modal.is-open');
-        document.body.classList.toggle('modal-open', !!openModal);
+        var ui = window.InkyPiUI;
+        if (ui && ui.syncModalOpenState) return ui.syncModalOpenState();
+        var open = document.querySelector('.modal.is-open, .thumbnail-preview-modal.is-open');
+        document.body.classList.toggle('modal-open', !!open);
     }
 
     function setModalOpen(modalId, open){

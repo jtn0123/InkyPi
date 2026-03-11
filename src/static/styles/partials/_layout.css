@@ -383,6 +383,14 @@ main[data-page-shell="workflow"] .frame {
   max-height: 85vh;
   margin: 0 auto;
   cursor: zoom-out;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.lightbox-preview-image.lightbox-img-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .section-nav {

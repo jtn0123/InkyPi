@@ -6,8 +6,9 @@
     let workflowMode = "configure";
 
     function syncModalOpenState() {
-      const openModal = document.querySelector(".modal.is-open");
-      document.body.classList.toggle("modal-open", !!openModal);
+      if (ui.syncModalOpenState) return ui.syncModalOpenState();
+      var open = document.querySelector(".modal.is-open");
+      document.body.classList.toggle("modal-open", !!open);
     }
 
     function setHidden(node, hidden) {

@@ -86,6 +86,11 @@
     el.setAttribute("aria-busy", loading ? "true" : "false");
   }
 
+  function syncModalOpenState() {
+    var open = document.querySelector('.modal.is-open, .thumbnail-preview-modal.is-open');
+    document.body.classList.toggle('modal-open', !!open);
+  }
+
   function debounce(fn, wait) {
     let timer = null;
     return (...args) => {
@@ -102,6 +107,7 @@
     savePref,
     setCollapsibles,
     setPanelLoading,
+    syncModalOpenState,
     toggleCollapsible,
   };
 })();
