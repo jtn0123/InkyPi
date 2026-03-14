@@ -708,13 +708,14 @@ class RefreshTask:
                     if payload.get("ok"):
                         from PIL import Image
 
-                        image = Image.open(io.BytesIO(payload["image_bytes"]))
+                        with Image.open(io.BytesIO(payload["image_bytes"])) as image:
+                            result_image = image.copy()
                         logger.info(
                             "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
                             plugin_id,
                             attempt,
                         )
-                        return image.copy(), payload.get("plugin_meta")
+                        return result_image, payload.get("plugin_meta")
                     last_exc = _remote_exception(
                         str(payload.get("error_type") or "RuntimeError"),
                         str(payload.get("error_message") or "unknown error"),

@@ -306,7 +306,7 @@ def create_playlist():
         if any(k in form_data for k in ("playlist_name", "start_time", "end_time")):
             data = form_data
         else:
-            return ("Unsupported media type", 415)
+            return json_error("Unsupported media type", status=415)
     if not isinstance(data, dict):
         return json_error("Invalid JSON data", status=400)
     playlist_name = data.get("playlist_name")

@@ -647,6 +647,12 @@
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setActiveTab(state.activeTab));
       }
+      window.addEventListener("beforeunload", () => {
+        if (state.updateTimer) {
+          clearInterval(state.updateTimer);
+          state.updateTimer = null;
+        }
+      });
     }
 
     Object.assign(window, {

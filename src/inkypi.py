@@ -8,7 +8,7 @@ import secrets
 import warnings
 from time import perf_counter
 
-from flask import Flask, g, request
+from flask import Flask, g, request, session
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -347,6 +347,43 @@ def create_app():
             _get_or_set_request_id()
         except Exception:
             pass
+
+    # --- CSRF protection ---
+    _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+    _CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
+
+    def _generate_csrf_token() -> str:
+        """Return the CSRF token for the current session, creating one if needed."""
+        if "_csrf_token" not in session:
+            session["_csrf_token"] = secrets.token_hex(32)
+        return session["_csrf_token"]
+
+    @app.context_processor
+    def _inject_csrf_token():
+        return {"csrf_token": _generate_csrf_token}
+
+    @app.before_request
+    def _check_csrf_token():
+        if request.method in _CSRF_SAFE_METHODS:
+            return
+        if request.path in _CSRF_EXEMPT_PATHS:
+            return
+        # Ensure a token exists in the session
+        token = session.get("_csrf_token")
+        if not token:
+            # First POST before any page load — skip enforcement so the
+            # initial session can be established.  The next request will
+            # have a token.
+            _generate_csrf_token()
+            return
+        # Accept the token from the X-CSRFToken header (preferred for fetch)
+        # or from a form field named csrf_token.
+        request_token = request.headers.get("X-CSRFToken") or (
+            request.form.get("csrf_token") if request.content_type
+            and "form" in request.content_type else None
+        )
+        if not request_token or not secrets.compare_digest(request_token, token):
+            return json_error("CSRF token missing or invalid", status=403)
 
     @app.errorhandler(APIError)
     def _handle_api_error(err: APIError):

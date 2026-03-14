@@ -349,9 +349,8 @@ class Config:
                 pass  # Create empty file
             try:
                 os.chmod(env_path, 0o600)
-            except Exception:
-                # best effort on non-POSIX systems
-                pass
+            except Exception as e:
+                logger.warning("Could not set .env file permissions to 0600: %s", e)
         # Write without quotes to satisfy tests and common .env style
         try:
             set_key(env_path, key, value, quote_mode="never")
@@ -382,9 +381,8 @@ class Config:
         if os.path.exists(env_path):
             try:
                 unset_key(env_path, key)
-            except Exception:
-                # ignore if key not present
-                pass
+            except Exception as e:
+                logger.warning("Failed to unset env key %s: %s", key, e)
         os.environ.pop(key, None)
         return True
 

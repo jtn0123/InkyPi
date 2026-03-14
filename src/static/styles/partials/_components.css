@@ -527,6 +527,7 @@ select.form-input option {
     border-radius: 6px;
     border: 1px solid var(--surface-border);
     vertical-align: middle;
+    background: var(--preview-color);
     transition: background 0.15s ease;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }

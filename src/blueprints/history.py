@@ -175,8 +175,10 @@ def history_redisplay():
 
     try:
         data = request.get_json(force=True)
-        filename = (data or {}).get("filename")
-        if not filename:
+        if not isinstance(data, dict):
+            return json_error("Request body must be a JSON object", status=400)
+        filename = data.get("filename")
+        if not isinstance(filename, str) or not filename.strip():
             return json_error("filename is required", status=400)
 
         # Prevent path traversal; only allow files within the history dir
@@ -202,9 +204,11 @@ def history_delete():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
-        data = request.get_json(force=True) or {}
+        data = request.get_json(force=True)
+        if not isinstance(data, dict):
+            return json_error("Request body must be a JSON object", status=400)
         filename = data.get("filename")
-        if not filename:
+        if not isinstance(filename, str) or not filename.strip():
             return json_error("filename is required", status=400)
         try:
             safe_path = _resolve_history_path(history_dir, filename)

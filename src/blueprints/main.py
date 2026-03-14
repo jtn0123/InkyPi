@@ -14,6 +14,8 @@ from flask import (
     send_from_directory,
 )
 
+from utils.http_utils import json_error
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -92,7 +94,7 @@ def get_current_image():
     image_path = device_config.current_image_file
 
     if not os.path.exists(image_path):
-        return jsonify({"error": "Image not found"}), 404
+        return json_error("Image not found", status=404)
 
     # Get the file's last modified time (UTC, truncated to seconds to match HTTP precision)
     file_mtime = int(os.path.getmtime(image_path))
@@ -166,17 +168,17 @@ def save_plugin_order():
     device_config = current_app.config["DEVICE_CONFIG"]
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
-        return jsonify({"error": "Invalid JSON payload"}), 400
+        return json_error("Invalid JSON payload", status=400)
     order = data.get("order", [])
     if not isinstance(order, list):
-        return jsonify({"error": "Order must be a list"}), 400
+        return json_error("Order must be a list", status=400)
     if any(not isinstance(item, str) for item in order):
-        return jsonify({"error": "Order entries must be strings"}), 400
+        return json_error("Order entries must be strings", status=400)
     # Validate plugin IDs exist in the registry
     registered_ids = {p["id"] for p in device_config.get_plugins()}
     invalid_ids = [pid for pid in order if pid not in registered_ids]
     if invalid_ids:
-        return jsonify({"error": f"Unknown plugin IDs: {', '.join(invalid_ids)}"}), 400
+        return json_error(f"Unknown plugin IDs: {', '.join(invalid_ids)}", status=400)
     device_config.set_plugin_order(order)
     return jsonify({"success": True})
 
@@ -226,7 +228,7 @@ def display_next():
     now = time.monotonic()
     if now - _last_display_next_time < _DISPLAY_NEXT_COOLDOWN_SECONDS:
         remaining = int(_DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time))
-        return jsonify({"success": False, "error": f"Please wait {remaining}s before requesting another display update"}), 429
+        return json_error(f"Please wait {remaining}s before requesting another display update", status=429)
     _last_display_next_time = now
 
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -240,14 +242,11 @@ def display_next():
     # Pick next eligible and commit index change
     playlist = playlist_manager.determine_active_playlist(current_dt)
     if not playlist:
-        return jsonify({"success": False, "error": "No active playlist"}), 400
+        return json_error("No active playlist", status=400)
 
     plugin_instance = playlist.get_next_eligible_plugin(current_dt)
     if not plugin_instance:
-        return (
-            jsonify({"success": False, "error": "No eligible plugin to display"}),
-            400,
-        )
+        return json_error("No eligible plugin to display", status=400)
 
     # Execute via background task if running; else do a direct update (dev path)
     request_ms = display_ms = generate_ms = preprocess_ms = None
@@ -268,10 +267,7 @@ def display_next():
 
             plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
             if not plugin_config:
-                return (
-                    jsonify({"success": False, "error": "Plugin config not found"}),
-                    404,
-                )
+                return json_error("Plugin config not found", status=404)
             plugin = get_plugin_instance(plugin_config)
             _t_gen_start = perf_counter()
             image = plugin.generate_image(plugin_instance.settings, device_config)
@@ -323,7 +319,7 @@ def display_next():
             except Exception:
                 pass
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return json_error(str(e), status=500)
 
     # Gather metrics from refresh_info if available
     try:

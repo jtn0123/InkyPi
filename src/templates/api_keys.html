@@ -5,6 +5,7 @@
 {% endblock %}
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
+    {% from 'macros/api_key_card.html' import api_key_card %}
     <main class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
@@ -47,54 +48,10 @@
         {% if api_keys_mode == 'managed' %}
         <form id="apiKeysForm" class="settings-form">
             <div class="settings-container api-keys-grid">
-                <div class="form-group api-key-card">
-                    <div class="api-key-card-head">
-                        <label class="form-label">OpenAI</label>
-                        <div id="openai-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_AI_SECRET ~ ')' if masked.OPEN_AI_SECRET else 'Not configured' }}</div>
-                        {% if api_key_plugins and api_key_plugins.get('OPEN_AI_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['OPEN_AI_SECRET'] | join(', ') }}</div>{% endif %}
-                    </div>
-                    <div class="input-container api-key-actions">
-                        <input type="password" id="openai-input" name="OPEN_AI_SECRET" placeholder="Enter OpenAI API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_AI_SECRET else '' }}">
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openai-input" aria-label="Clear OpenAI key">×</button>{% endif %}
-                        {% if masked.OPEN_AI_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_AI_SECRET">Delete</button>{% endif %}
-                    </div>
-                </div>
-                <div class="form-group api-key-card">
-                    <div class="api-key-card-head">
-                        <label class="form-label">OpenWeatherMap</label>
-                        <div id="openweather-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.OPEN_WEATHER_MAP_SECRET ~ ')' if masked.OPEN_WEATHER_MAP_SECRET else 'Not configured' }}</div>
-                        {% if api_key_plugins and api_key_plugins.get('OPEN_WEATHER_MAP_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['OPEN_WEATHER_MAP_SECRET'] | join(', ') }}</div>{% endif %}
-                    </div>
-                    <div class="input-container api-key-actions">
-                        <input type="password" id="openweather-input" name="OPEN_WEATHER_MAP_SECRET" placeholder="Enter OpenWeatherMap API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.OPEN_WEATHER_MAP_SECRET else '' }}">
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="openweather-input" aria-label="Clear OpenWeatherMap key">×</button>{% endif %}
-                        {% if masked.OPEN_WEATHER_MAP_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="OPEN_WEATHER_MAP_SECRET">Delete</button>{% endif %}
-                    </div>
-                </div>
-                <div class="form-group api-key-card">
-                    <div class="api-key-card-head">
-                        <label class="form-label">NASA APOD</label>
-                        <div id="nasa-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.NASA_SECRET ~ ')' if masked.NASA_SECRET else 'Not configured' }}</div>
-                        {% if api_key_plugins and api_key_plugins.get('NASA_SECRET') %}<div class="api-key-usage">Used by: {{ api_key_plugins['NASA_SECRET'] | join(', ') }}</div>{% endif %}
-                    </div>
-                    <div class="input-container api-key-actions">
-                        <input type="password" id="nasa-input" name="NASA_SECRET" placeholder="Enter NASA API key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.NASA_SECRET else '' }}">
-                        {% if masked.NASA_SECRET %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="nasa-input" aria-label="Clear NASA key">×</button>{% endif %}
-                        {% if masked.NASA_SECRET %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="NASA_SECRET">Delete</button>{% endif %}
-                    </div>
-                </div>
-                <div class="form-group api-key-card">
-                    <div class="api-key-card-head">
-                        <label class="form-label">Unsplash</label>
-                        <div id="unsplash-status" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked.UNSPLASH_ACCESS_KEY ~ ')' if masked.UNSPLASH_ACCESS_KEY else 'Not configured' }}</div>
-                        {% if api_key_plugins and api_key_plugins.get('UNSPLASH_ACCESS_KEY') %}<div class="api-key-usage">Used by: {{ api_key_plugins['UNSPLASH_ACCESS_KEY'] | join(', ') }}</div>{% endif %}
-                    </div>
-                    <div class="input-container api-key-actions">
-                        <input type="password" id="unsplash-input" name="UNSPLASH_ACCESS_KEY" placeholder="Enter Unsplash access key" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked.UNSPLASH_ACCESS_KEY else '' }}">
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="unsplash-input" aria-label="Clear Unsplash key">×</button>{% endif %}
-                        {% if masked.UNSPLASH_ACCESS_KEY %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="UNSPLASH_ACCESS_KEY">Delete</button>{% endif %}
-                    </div>
-                </div>
+                {{ api_key_card('OpenAI', 'OPEN_AI_SECRET', 'openai-input', 'openai-status', 'Enter OpenAI API key', masked, api_key_plugins) }}
+                {{ api_key_card('OpenWeatherMap', 'OPEN_WEATHER_MAP_SECRET', 'openweather-input', 'openweather-status', 'Enter OpenWeatherMap API key', masked, api_key_plugins) }}
+                {{ api_key_card('NASA APOD', 'NASA_SECRET', 'nasa-input', 'nasa-status', 'Enter NASA API key', masked, api_key_plugins) }}
+                {{ api_key_card('Unsplash', 'UNSPLASH_ACCESS_KEY', 'unsplash-input', 'unsplash-status', 'Enter Unsplash access key', masked, api_key_plugins) }}
             </div>
         </form>
         {% else %}

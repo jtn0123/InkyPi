@@ -178,6 +178,24 @@ main[data-page-shell="workflow"] .frame {
     display: none;
 }
 
+/* Skip-to-main-content link for keyboard navigation */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
 /* Visually hidden helper for accessibility */
 .sr-only {
   position: absolute;

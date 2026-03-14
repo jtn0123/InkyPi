@@ -1,4 +1,5 @@
 // Extracted playlist page logic from inline script in templates
+// Requires: showResponseModal, handleJsonResponse (from response_modal.js, loaded first)
 // Expect a global PLAYLIST_CTX providing URLs and constants
 // {
 //   reorder_url: str,
@@ -309,7 +310,7 @@
         function setStep(text, pct){
             if (progress) progress.style.display = 'block';
             if (progressText) progressText.textContent = text;
-            if (progressBar && typeof pct === 'number') progressBar.style.width = pct + '%';
+            if (progressBar && typeof pct === 'number') { progressBar.style.width = pct + '%'; progressBar.setAttribute('aria-valuenow', pct); }
             addLog(text);
         }
         if (loadingIndicator) loadingIndicator.style.display = 'block';
@@ -320,7 +321,7 @@
             if (progressList) progressList.innerHTML = '';
             if (progressElapsed) progressElapsed.textContent = '0s';
             if (progressClock) progressClock.textContent = new Date().toLocaleTimeString();
-            if (progressBar) progressBar.style.width = '10%';
+            if (progressBar) { progressBar.style.width = '10%'; progressBar.setAttribute('aria-valuenow', 10); }
         } catch(e){}
         tickClock();
         clockTimer = setInterval(tickClock, 1000);
@@ -471,15 +472,6 @@
         } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 
-    async function deletePlaylistQuick(name){
-        if (!confirm(`Delete playlist '${name}'?`)) return;
-        try {
-            const response = await fetch(C.delete_playlist_base_url + name, { method: "DELETE" });
-            const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){ location.reload(); }
-        } catch (e){ showResponseModal('failure', 'Failed to delete playlist'); }
-    }
-
     async function displayNextInPlaylist(name){
         try{
             const resp = await fetch(C.display_next_url, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
@@ -627,6 +619,10 @@
             });
         });
         
+        // Cancel buttons on delete confirm modals
+        document.getElementById('cancelDeletePlaylistBtn')?.addEventListener('click', closeDeletePlaylistModal);
+        document.getElementById('cancelDeleteInstanceBtn')?.addEventListener('click', closeDeleteInstanceModal);
+
         // Device cadence editor
         const editCadence = document.getElementById('editDeviceCycleBtn');
         if (editCadence){ editCadence.addEventListener('click', openDeviceCycleModal); }
@@ -775,7 +771,6 @@
     window.createPlaylist = createPlaylist;
     window.updatePlaylist = updatePlaylist;
     window.deletePlaylist = deletePlaylist;
-    window.deletePlaylistQuick = deletePlaylistQuick;
     window.displayNextInPlaylist = displayNextInPlaylist;
     window.deletePluginInstance = deletePluginInstance;
     window.displayPluginInstance = displayPluginInstance;
@@ -785,40 +780,24 @@
     
     // Use shared Lightbox API instead of local implementations
 
-    // --- Delete confirm flows (replace confirm()) ---
-    function showUndo(text){
-        const sb = document.getElementById('undoSnackbar');
-        const txt = document.getElementById('undoText');
-        if (!sb || !txt) return;
-        txt.textContent = text + ' Undo?';
-        sb.style.display = 'inline-flex';
-        const undo = document.getElementById('undoBtn');
-        if (undo){
-            undo.onclick = function(){ sb.style.display = 'none'; location.reload(); };
-        }
-        setTimeout(() => { sb.style.display = 'none'; }, 4000);
-    }
-
+    // --- Delete confirm flows ---
     function openDeletePlaylistModal(name){
         const el = document.getElementById('deletePlaylistModal');
         const txt = document.getElementById('deletePlaylistText');
         const btn = document.getElementById('confirmDeletePlaylistBtn');
         if (!el || !txt || !btn) return;
         txt.textContent = `Delete playlist '${name}'?`;
-        el.style.display = 'block';
+        setModalOpen('deletePlaylistModal', true);
         btn.onclick = async function(){
             try{
                 const resp = await fetch(C.delete_playlist_base_url + name, { method:'DELETE' });
                 const j = await handleJsonResponse(resp);
-                if (resp.ok && j && j.success){
-                    showUndo(`Playlist '${name}' deleted.`);
-                    setTimeout(() => location.reload(), 800);
-                }
+                if (resp.ok && j && j.success){ location.reload(); }
             } catch(e){ showResponseModal('failure', 'Failed to delete playlist'); }
             closeDeletePlaylistModal();
         };
     }
-    function closeDeletePlaylistModal(){ const el = document.getElementById('deletePlaylistModal'); if (el) el.style.display = 'none'; }
+    function closeDeletePlaylistModal(){ setModalOpen('deletePlaylistModal', false); }
 
     function openDeleteInstanceModal(playlistName, pluginId, instanceName){
         const el = document.getElementById('deleteInstanceModal');
@@ -826,20 +805,17 @@
         const btn = document.getElementById('confirmDeleteInstanceBtn');
         if (!el || !txt || !btn) return;
         txt.textContent = `Delete instance '${instanceName}'?`;
-        el.style.display = 'block';
+        setModalOpen('deleteInstanceModal', true);
         btn.onclick = async function(){
             try{
                 const resp = await fetch(C.delete_plugin_instance_url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName }) });
                 const j = await handleJsonResponse(resp);
-                if (resp.ok && j && j.success){
-                    showUndo(`Instance '${instanceName}' deleted.`);
-                    setTimeout(() => location.reload(), 800);
-                }
+                if (resp.ok && j && j.success){ location.reload(); }
             } catch(e){ showResponseModal('failure', 'Failed to delete instance'); }
             closeDeleteInstanceModal();
         };
     }
-    function closeDeleteInstanceModal(){ const el = document.getElementById('deleteInstanceModal'); if (el) el.style.display = 'none'; }
+    function closeDeleteInstanceModal(){ setModalOpen('deleteInstanceModal', false); }
 
     window.openDeletePlaylistModal = openDeletePlaylistModal;
     window.closeDeletePlaylistModal = closeDeletePlaylistModal;

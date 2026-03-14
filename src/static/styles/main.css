@@ -375,6 +375,24 @@ main[data-page-shell="workflow"] .frame {
     display: none;
 }
 
+/* Skip-to-main-content link for keyboard navigation */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 8px;
+}
+
 /* Visually hidden helper for accessibility */
 .sr-only {
   position: absolute;
@@ -1645,6 +1663,7 @@ select.form-input option {
     border-radius: 6px;
     border: 1px solid var(--surface-border);
     vertical-align: middle;
+    background: var(--preview-color);
     transition: background 0.15s ease;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
@@ -2012,6 +2031,7 @@ textarea:focus-visible {
 .storage-meter-fill {
     background: linear-gradient(90deg, var(--storage-fill-start), var(--storage-fill-end));
     height: 100%;
+    width: var(--meter-width, 0%);
 }
 
 .dashboard-overview-empty {

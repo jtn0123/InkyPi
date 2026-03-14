@@ -50,7 +50,7 @@
                 </div>
             </div>
             <div class="storage-meter">
-                <div id="storage-bar-inner" class="storage-meter-fill" style="width:{% if storage and storage.pct_free is not none %}{{ storage.pct_free }}%{% else %}0%{% endif %}"></div>
+                <div id="storage-bar-inner" class="storage-meter-fill" style="--meter-width: {% if storage and storage.pct_free is not none %}{{ storage.pct_free }}%{% else %}0%{% endif %}"></div>
             </div>
         </div>
         {% if metrics and (metrics.request_ms is not none or metrics.generate_ms is not none or metrics.preprocess_ms is not none or metrics.display_ms is not none) %}

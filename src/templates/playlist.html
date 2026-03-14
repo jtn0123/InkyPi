@@ -62,7 +62,7 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header">
                         <div class="playlist-heading">
-                        <span class="playlist-title">{{ playlist.name }}</span>
+                        <h3 class="playlist-title">{{ playlist.name }}</h3>
                         <div class="playlist-summary-row">
                             <span class="status-chip info">{{ playlist.plugins | length }} items</span>
                             {% if playlist.name == playlist_config.active_playlist %}
@@ -198,6 +198,28 @@
             </form>
             <div class="buttons-container">
                 <button type="button" class="action-button" id="saveRefreshSettingsBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Playlist Confirm Modal -->
+    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete playlist" hidden>
+        <div class="modal-content modal-sheet">
+            <p id="deletePlaylistText"></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
+                <button type="button" class="action-button is-secondary" id="cancelDeletePlaylistBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Instance Confirm Modal -->
+    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete instance" hidden>
+        <div class="modal-content modal-sheet">
+            <p id="deleteInstanceText"></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmDeleteInstanceBtn">Delete</button>
+                <button type="button" class="action-button is-secondary" id="cancelDeleteInstanceBtn">Cancel</button>
             </div>
         </div>
     </div>

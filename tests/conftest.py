@@ -25,6 +25,15 @@ UI_BROWSER_TESTS = {
     "test_plugin_add_to_playlist_ui.py",
     "test_weather_autofill.py",
     "test_weather_image_render.py",
+    "test_playlist_crud_e2e.py",
+    "test_settings_round_trip_e2e.py",
+    "test_plugin_workflow_e2e.py",
+    "test_dashboard_display_next_e2e.py",
+    "test_api_keys_e2e.py",
+    "test_modal_lifecycle_e2e.py",
+    "test_theme_toggle_e2e.py",
+    "test_collapsible_sections_e2e.py",
+    "test_cross_page_navigation_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_more_a11y.py",
@@ -72,16 +81,16 @@ def pytest_ignore_collect(collection_path, config):
     if group is None:
         return False
 
-    skip_a11y = _is_truthy(os.getenv("SKIP_A11Y", ""))
-    skip_ui = _is_truthy(os.getenv("SKIP_UI", ""))
+    # SKIP_BROWSER=1 skips all browser-dependent tests (a11y + UI).
+    # SKIP_A11Y=1 / SKIP_UI=1 skip their respective groups independently.
+    skip_browser = _is_truthy(os.getenv("SKIP_BROWSER", ""))
+    skip_a11y = skip_browser or _is_truthy(os.getenv("SKIP_A11Y", ""))
+    skip_ui = skip_browser or _is_truthy(os.getenv("SKIP_UI", ""))
     require_browser_smoke = _is_truthy(os.getenv("REQUIRE_BROWSER_SMOKE", ""))
 
     if skip_a11y and group == "a11y":
         return True
     if skip_ui and group == "ui" and not require_browser_smoke:
-        return True
-    if skip_a11y and group == "ui":
-        os.environ.setdefault("SKIP_UI", "true")
         return True
     if _playwright_browser_available():
         return False
@@ -106,6 +115,8 @@ def clear_managed_api_key_env(monkeypatch):
 
         playlist_mod._eta_cache.clear()
         settings_mod._REQUESTS.clear()
+        # Reset the shutdown rate limiter so tests are independent
+        settings_mod._last_shutdown_time = 0.0
     except Exception:
         pass
 
@@ -225,7 +236,12 @@ def flask_app(device_config_dev, monkeypatch):
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
 
+    import secrets as _secrets
+
+    from flask import session as _session
+
     app = Flask(__name__)
+    app.secret_key = "test-secret-key-for-csrf"
 
     # Template directories
     SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -257,6 +273,16 @@ def flask_app(device_config_dev, monkeypatch):
     except Exception:
         _max_len = 10 * 1024 * 1024
     app.config["MAX_CONTENT_LENGTH"] = _max_len
+
+    # CSRF token support (mirrors inkypi.py create_app)
+    def _generate_csrf_token() -> str:
+        if "_csrf_token" not in _session:
+            _session["_csrf_token"] = _secrets.token_hex(32)
+        return _session["_csrf_token"]
+
+    @app.context_processor
+    def _inject_csrf_token():
+        return {"csrf_token": _generate_csrf_token}
 
     # Register routes
     app.register_blueprint(main_bp)
@@ -325,7 +351,7 @@ def client(flask_app):
 
 
 @pytest.fixture()
-def live_server(flask_app, free_tcp_port_factory):
+def live_server(flask_app, free_tcp_port_factory):  # free_tcp_port_factory: from anyio pytest plugin
     host = "127.0.0.1"
     port = free_tcp_port_factory()
     server = make_server(host, port, flask_app, threaded=True)

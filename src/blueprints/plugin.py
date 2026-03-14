@@ -170,7 +170,7 @@ def delete_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return ("Unsupported media type", 415)
+        return json_error("Unsupported media type", status=415)
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
@@ -245,7 +245,7 @@ def display_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return ("Unsupported media type", 415)
+        return json_error("Unsupported media type", status=415)
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")

@@ -164,6 +164,7 @@
 .storage-meter-fill {
     background: linear-gradient(90deg, var(--storage-fill-start), var(--storage-fill-end));
     height: 100%;
+    width: var(--meter-width, 0%);
 }
 
 .dashboard-overview-empty {

@@ -716,11 +716,13 @@ def plugin_isolation():
     if request.method == "GET":
         return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
 
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return json_error("Request body must be a JSON object", status=400)
     plugin_id = body.get("plugin_id")
-    if not plugin_id:
+    if not isinstance(plugin_id, str) or not plugin_id.strip():
         return json_error(
-            "plugin_id is required",
+            "plugin_id is required and must be a non-empty string",
             status=422,
             code="validation_error",
             details={"field": "plugin_id"},
@@ -1092,7 +1094,9 @@ def client_log():
     visibility in terminal logs without failing the UX if logging fails.
     """
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return json_error("Request body must be a JSON object", status=400)
         level = str(data.get("level") or "info").lower()
         message = str(data.get("message") or "")
         extra = data.get("extra")
@@ -1123,13 +1127,29 @@ def client_log():
         )
 
 
+_last_shutdown_time: float = 0.0
+_SHUTDOWN_COOLDOWN_SECONDS: float = 30.0
+
+
 @settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
     """Reboot or shut down the device.
 
-    Consider adding authentication or CSRF protection if publicly exposed.
+    Rate-limited to one call per 30 seconds to prevent accidental repeats.
     """
-    data = request.get_json() or {}
+    global _last_shutdown_time
+    now = time.monotonic()
+    if now - _last_shutdown_time < _SHUTDOWN_COOLDOWN_SECONDS:
+        remaining = int(_SHUTDOWN_COOLDOWN_SECONDS - (now - _last_shutdown_time))
+        return json_error(
+            f"Please wait {remaining}s before requesting another reboot/shutdown",
+            status=429,
+        )
+    _last_shutdown_time = now
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
     try:
         if data.get("reboot"):
             logger.info("Reboot requested")

@@ -402,3 +402,74 @@ def test_handle_request_files_list_mode(monkeypatch, tmp_path):
     assert "files[]" in result
     assert isinstance(result["files[]"], list)
     assert len(result["files[]"]) == 1
+
+
+def test_handle_request_files_empty_filename_skipped(monkeypatch, tmp_path):
+    """Files with empty filenames should be silently skipped."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    f = FakeFile("", make_png_bytes())
+    files = FakeFiles([("file", f)])
+    result = app_utils.handle_request_files(files)
+    assert "file" not in result
+
+
+def test_handle_request_files_disallowed_extension_skipped(monkeypatch, tmp_path):
+    """Files with disallowed extensions (e.g. .exe) should be skipped."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    f = FakeFile("malware.exe", b"\x00" * 100)
+    files = FakeFiles([("file", f)])
+    result = app_utils.handle_request_files(files)
+    assert "file" not in result
+
+
+def test_handle_request_files_no_extension_skipped(monkeypatch, tmp_path):
+    """Files without an extension should be skipped."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    f = FakeFile("noextension", b"\x00" * 100)
+    files = FakeFiles([("file", f)])
+    result = app_utils.handle_request_files(files)
+    assert "file" not in result
+
+
+def test_handle_request_files_jpeg_exif_rotation(monkeypatch, tmp_path):
+    """JPEG uploads should have EXIF rotation applied via exif_transpose."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    # Create a valid JPEG image
+    bio = BytesIO()
+    Image.new("RGB", (20, 10), "blue").save(bio, format="JPEG")
+    content = bio.getvalue()
+
+    f = FakeFile("photo.jpg", content)
+    files = FakeFiles([("file", f)])
+
+    result = app_utils.handle_request_files(files)
+    assert "file" in result
+    saved_path = result["file"]
+    assert os.path.exists(saved_path)
+    # Verify it's a valid image
+    with Image.open(saved_path) as img:
+        assert img.size[0] > 0
+
+
+def test_handle_request_files_pdf_saved_as_is(monkeypatch, tmp_path):
+    """PDF uploads should be saved as raw bytes (no image processing)."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    pdf_bytes = b"%PDF-1.4 fake pdf content"
+    f = FakeFile("document.pdf", pdf_bytes)
+    files = FakeFiles([("file", f)])
+
+    result = app_utils.handle_request_files(files)
+    assert "file" in result
+    saved_path = result["file"]
+    with open(saved_path, "rb") as fh:
+        assert fh.read() == pdf_bytes
+
+
+def test_handle_request_files_invalid_jpeg_raises(monkeypatch, tmp_path):
+    """Invalid JPEG content should raise RuntimeError."""
+    monkeypatch.setenv("SRC_DIR", str(tmp_path))
+    f = FakeFile("bad.jpg", b"not a real jpeg")
+    files = FakeFiles([("file", f)])
+
+    with pytest.raises(RuntimeError, match="Invalid image upload"):
+        app_utils.handle_request_files(files)
