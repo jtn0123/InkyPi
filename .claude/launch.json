@@ -5,7 +5,8 @@
       "name": "inkypi-dev",
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["src/inkypi.py", "--dev", "--web-only"],
-      "port": 8080
+      "port": 8080,
+      "autoPort": true
     }
   ]
 }
