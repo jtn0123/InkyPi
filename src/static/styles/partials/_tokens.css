@@ -112,6 +112,9 @@
     --form-button-height: 48px;
     --form-slider-max-width: 400px;
     --form-label-min-width: 100px;
+
+    /* Animation */
+    --transition-speed: 0.2s;
 }
 [data-theme="dark"] {
     /* Enhanced dark theme with better accessibility */

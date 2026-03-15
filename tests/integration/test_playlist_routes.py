@@ -6,7 +6,7 @@ def test_playlist_page_renders(client):
     assert resp.status_code == 200
     assert b'data-page-shell="dashboard"' in resp.data
     assert b'id="newPlaylistBtn"' in resp.data
-    assert b'data-collapsed-label="Details"' in resp.data
+    assert b'data-collapsed-label="Open"' in resp.data
 
 
 def test_create_update_delete_playlist_flow(client):

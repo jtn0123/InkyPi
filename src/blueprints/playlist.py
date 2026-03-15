@@ -10,6 +10,7 @@ from flask import (
     request,
 )
 
+from model import Playlist
 from refresh_task import PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error, json_internal_error, json_success
@@ -25,12 +26,7 @@ _eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
 
 
 def _to_minutes(time_str: str) -> int:
-    if time_str == "24:00":
-        return 24 * 60
-    hour, minute = map(int, time_str.split(":"))
-    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
-        raise ValueError("Invalid time")
-    return hour * 60 + minute
+    return Playlist._to_minutes(time_str)
 
 
 def _segments(start_min: int, end_min: int) -> list[tuple[int, int]]:
@@ -500,8 +496,6 @@ def reorder_plugins():
         )
 
 
-## snooze endpoint removed
-
 
 # Trigger next eligible instance in a specific playlist immediately
 @playlist_bp.route("/display_next_in_playlist", methods=["POST"])
@@ -548,8 +542,6 @@ def display_next_in_playlist():
         return json_success("Displayed next instance", metrics=metrics)
     except Exception:
         return json_internal_error("display next in playlist")
-
-# removed toggle_only_fresh endpoint per product decision
 
 
 @playlist_bp.route("/playlist/eta/<string:playlist_name>")

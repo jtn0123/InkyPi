@@ -261,10 +261,13 @@ class Playlist:
         """Convert an ``HH:MM`` string to minutes since midnight.
 
         ``24:00`` is treated as midnight of the following day (1440 minutes).
+        Raises ``ValueError`` for out-of-range hours or minutes.
         """
         if time_str == "24:00":
             return 24 * 60
         hour, minute = map(int, time_str.split(":"))
+        if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+            raise ValueError("Invalid time")
         return hour * 60 + minute
 
     def is_active(self, current_time):

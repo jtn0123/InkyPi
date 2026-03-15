@@ -65,7 +65,7 @@
             body.hidden = false;
             item.classList.add('mobile-expanded');
             item.classList.remove('mobile-collapsed');
-            toggle.textContent = 'Open';
+            toggle.textContent = toggle.getAttribute('data-expanded-label') || 'Hide';
             toggle.setAttribute('aria-expanded', 'true');
             return;
         }
@@ -73,7 +73,7 @@
         body.hidden = !expanded;
         item.classList.toggle('mobile-expanded', expanded);
         item.classList.toggle('mobile-collapsed', !expanded);
-        toggle.textContent = expanded ? 'Hide' : 'Open';
+        toggle.textContent = expanded ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
         toggle.setAttribute('aria-expanded', String(expanded));
         if (expanded){
             state.expandedPlaylist = item.getAttribute('data-playlist-name');

@@ -88,8 +88,6 @@ def preview_image():
 @main_bp.route("/api/current_image")
 def get_current_image():
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
-    from flask import request
-
     device_config = current_app.config["DEVICE_CONFIG"]
     image_path = device_config.current_image_file
 

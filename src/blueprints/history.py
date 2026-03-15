@@ -1,5 +1,7 @@
+import json
 import logging
 import os
+import shutil
 from datetime import datetime
 
 from flask import (
@@ -69,7 +71,6 @@ def _list_history_images(history_dir: str) -> list[dict]:
             base, _ = os.path.splitext(f)
             sidecar_path = os.path.join(history_dir, f"{base}.json")
             if os.path.exists(sidecar_path):
-                import json
                 with open(sidecar_path, encoding="utf-8") as fh:
                     meta = json.load(fh) or {}
         except Exception:
@@ -128,8 +129,6 @@ def history_page():
     used_bytes = None
     pct_free = None
     try:
-        import shutil
-
         usage = shutil.disk_usage(history_dir)
         total_bytes = int(usage.total)
         free_bytes = int(usage.free)
@@ -266,8 +265,6 @@ def history_storage():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
-        import shutil
-
         usage = shutil.disk_usage(history_dir)
         total_bytes = int(usage.total)
         free_bytes = int(usage.free)

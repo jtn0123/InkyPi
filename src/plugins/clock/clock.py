@@ -140,7 +140,7 @@ class Clock(BasePlugin):
         Clock.draw_clock_hand(final_image, minute_length, minute_angle, primary_color, border_color=(255, 255, 255), border_width=border_width, hand_offset=hand_offset, offset_width=offset_width, hand_width=hand_width)
         Clock.draw_clock_hand(final_image, hour_length, hour_angle, primary_color, border_color=(255, 255, 255), border_width=border_width, hand_offset=hand_offset, offset_width=offset_width, hand_width=hand_width)
         
-        Clock.drew_clock_center(final_image, max(int(dim*0.01), 1), primary_color, outline_color=(255, 255, 255, 255), width=max(int(dim*0.004), 1))
+        Clock.draw_clock_center(final_image, max(int(dim*0.01), 1), primary_color, outline_color=(255, 255, 255, 255), width=max(int(dim*0.004), 1))
 
         return final_image
 
@@ -174,7 +174,7 @@ class Clock(BasePlugin):
         Clock.draw_clock_hand(image_draw._image, int(dim*0.3), minute_angle, secondary_color, hand_width=hand_width, border_color=secondary_color, round_corners=False)
         Clock.draw_clock_hand(image_draw._image, int(dim*0.2), hour_angle, secondary_color, hand_width=hand_width, border_color=secondary_color, round_corners=False)
 
-        Clock.drew_clock_center(image_draw._image, max(int(dim*0.014), 1), primary_color, secondary_color, width=max(int(dim* 0.007), 1))
+        Clock.draw_clock_center(image_draw._image, max(int(dim*0.014), 1), primary_color, secondary_color, width=max(int(dim* 0.007), 1))
 
         combined = Image.alpha_composite(bg, canvas)    
 
@@ -368,7 +368,7 @@ class Clock(BasePlugin):
         return hour_angle, minute_angle
 
     @staticmethod
-    def drew_clock_center(image, center_radius, fill_color, outline_color=None, width=None):
+    def draw_clock_center(image, center_radius, fill_color, outline_color=None, width=None):
         draw = ImageDraw.Draw(image)
         w, h = image.size
 
