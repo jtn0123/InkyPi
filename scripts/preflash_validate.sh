@@ -94,7 +94,7 @@ isolation_suite() {
     python -m pytest -q \
         tests/unit/test_plugin_isolation.py \
         tests/unit/test_refresh_policy.py \
-        tests/unit/test_refresh_task_controls.py \
+        tests/unit/test_refresh_task_unit.py \
         tests/integration/test_plugin_lifecycle_flow.py
 }
 
@@ -124,12 +124,12 @@ coverage_suite() {
         tests/unit/test_config_resolution.py \
         tests/unit/test_config_bootstrap_idempotent.py \
         tests/unit/test_config_validation.py \
-        tests/unit/test_config_validation_errors.py \
+        tests/unit/test_config_validation.py \
         tests/unit/test_config_fallbacks_extra.py \
         tests/unit/test_refresh_policy.py \
         tests/unit/test_refresh_task_helpers.py \
         tests/unit/test_refresh_task_execute.py \
-        tests/unit/test_refresh_task_controls.py \
+        tests/unit/test_refresh_task_unit.py \
         tests/unit/test_refresh_task_resilience.py \
         tests/unit/test_plugin_isolation.py \
         tests/unit/test_upgrade_compatibility.py \

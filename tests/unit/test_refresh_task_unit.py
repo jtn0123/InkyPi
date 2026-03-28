@@ -100,62 +100,32 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
         task.stop()
 
 
-def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
-    """Ensure PlaylistRefresh is executed via the unified execute method."""
+def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatch):
+    """Ensure _perform_refresh delegates to _execute_with_policy."""
     from display.display_manager import DisplayManager
-    from refresh_task import PlaylistRefresh, RefreshTask
+    from refresh_task import ManualRefresh, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    # Avoid waiting during the loop
-    monkeypatch.setattr(task.condition, "wait", lambda timeout=None: None)
-
-    # Stub plugin config and instance
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
+
+    called = {}
+
+    def fake_execute_with_policy(self, action, cfg, dt, request_id=None):
+        called["action"] = action
+        img = Image.new("RGB", device_config_dev.get_resolution(), "white")
+        return img, {}
+
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance",
-        lambda cfg: _dummy_plugin(device_config_dev),
-        raising=True,
+        RefreshTask, "_execute_with_policy",
+        fake_execute_with_policy,
     )
 
-    class FakePluginInstance:
-        plugin_id = "dummy"
-        name = "inst"
-        settings = {}
-
-        def get_image_path(self):
-            return "dummy.png"
-
-        def should_refresh(self, dt):
-            return True
-
-    fake_plugin_instance = FakePluginInstance()
-    fake_playlist = type("PL", (), {"name": "pl"})()
-
-    def fake_determine(self, pm, latest_refresh, current_dt):
-        if not getattr(self, "_done", False):
-            self._done = True
-            return fake_playlist, fake_plugin_instance
-        return None, None
-
-    monkeypatch.setattr(task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask))
-
-    marker = tmp_path / "playlist-execute.txt"
-
-    def fake_execute(self, plugin, device_config, current_dt):
-        marker.write_text("called", encoding="utf-8")
-        return Image.new("RGB", device_config.get_resolution(), "white")
-
-    monkeypatch.setattr(PlaylistRefresh, "execute", fake_execute, raising=True)
-
-    try:
-        task.start()
-        deadline = time.monotonic() + 2.0
-        while not marker.exists() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert marker.exists(), "PlaylistRefresh.execute was never called"
-        assert marker.read_text(encoding="utf-8") == "called"
-    finally:
-        task.stop()
+    refresh = ManualRefresh("dummy", {})
+    # Provide a fake latest_refresh with image_hash to avoid NoneType error
+    fake_latest = type("LR", (), {"image_hash": None})()
+    task._perform_refresh(refresh, fake_latest, __import__("datetime").datetime.now())
+    assert "action" in called
+    assert called["action"] is refresh

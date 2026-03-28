@@ -100,6 +100,8 @@ class TestUpdateStatus:
         import blueprints.settings as mod
 
         mod._set_update_state(True, "inkypi-update-123.service")
+        # Prevent auto-clear from systemctl checks in CI
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
         try:
             resp = client.get("/settings/update_status")
             assert resp.status_code == 200
