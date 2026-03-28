@@ -28,3 +28,5 @@ hypothesis==6.122.3
 astral==3.2
 pip-audit==2.9.0
 cyclonedx-bom==6.1.0
+pre-commit==4.2.0
+python-semantic-release==9.21.1

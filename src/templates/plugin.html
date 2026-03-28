@@ -32,7 +32,7 @@
 {% block body %}
     <main id="main-content" role="main" class="page-shell page-shell-workflow" data-page-shell="workflow">
     <div class="frame workflow-frame">
-        {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP %}
+        {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb, PLUGIN_ICON_MAP %}
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
@@ -72,6 +72,7 @@
         </div>
 
         <div class="separator"></div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': plugin.display_name}]) }}
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}

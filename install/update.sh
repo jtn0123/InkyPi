@@ -136,4 +136,5 @@ echo_success "CSS bundle built."
 update_app_service
 update_cli
 
+echo "Version: $(cat "$INSTALL_PATH/VERSION" 2>/dev/null || echo 'unknown')"
 echo_success "Update completed."

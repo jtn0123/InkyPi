@@ -24,6 +24,8 @@ from flask import (
     stream_with_context,
 )
 
+import requests as _requests
+
 from utils.http_utils import json_error, json_internal_error
 from utils.progress_events import get_progress_bus, to_sse
 from utils.time_utils import calculate_seconds, get_timezone, now_device_tz
@@ -290,28 +292,34 @@ _UPDATE_STATE: dict[str, object] = {
     "running": False,
     "unit": None,
     "started_at": None,  # epoch seconds
+    "last_unit": None,
 }
 
+_UPDATE_TIMEOUT_SECONDS = 1800  # 30 minutes
 
-def _get_install_update_script_path() -> str | None:
-    """Return absolute path to update.sh if available on this host.
+
+def _get_update_script_path() -> str | None:
+    """Return absolute path to the update script if available on this host.
 
     Priorities:
-    - $PROJECT_DIR/install/update.sh (production install path)
-    - repo-relative ../../install/update.sh (developer environment)
+    - $PROJECT_DIR/install/do_update.sh (git-aware updater)
+    - $PROJECT_DIR/install/update.sh (legacy)
+    - repo-relative paths for developer environments
     """
-    # 1) production install path
     project_dir = os.getenv("PROJECT_DIR")
-    if project_dir:
-        prod = os.path.join(project_dir, "install", "update.sh")
-        if os.path.isfile(prod):
-            return prod
-    # 2) repo path (this file: src/blueprints/settings.py → repo_root/install/update.sh)
     here = os.path.dirname(os.path.abspath(__file__))
-    repo_install = os.path.abspath(os.path.join(here, "..", "..", "install", "update.sh"))
-    if os.path.isfile(repo_install):
-        return repo_install
+    repo_root = os.path.abspath(os.path.join(here, "..", ".."))
+
+    for base in ([project_dir] if project_dir else []) + [repo_root]:
+        for name in ("do_update.sh", "update.sh"):
+            path = os.path.join(base, "install", name)
+            if os.path.isfile(path):
+                return path
     return None
+
+
+# Keep legacy alias
+_get_install_update_script_path = _get_update_script_path
 
 
 def _systemd_available() -> bool:
@@ -322,13 +330,20 @@ def _systemd_available() -> bool:
 
 
 def _set_update_state(running: bool, unit: str | None):
+    if not running and _UPDATE_STATE.get("unit"):
+        _UPDATE_STATE["last_unit"] = _UPDATE_STATE["unit"]
     _UPDATE_STATE["running"] = bool(running)
     _UPDATE_STATE["unit"] = unit
     _UPDATE_STATE["started_at"] = float(time.time()) if running else None
 
 
-def _start_update_via_systemd(unit_name: str, script_path: str) -> None:
+def _start_update_via_systemd(
+    unit_name: str, script_path: str, target_tag: str | None = None
+) -> None:
     # Run update script in a transient systemd unit so its logs are visible in journal
+    script_cmd = shlex.quote(script_path)
+    if target_tag:
+        script_cmd += " " + shlex.quote(target_tag)
     cmd = [
         "systemd-run",
         "--collect",
@@ -337,7 +352,7 @@ def _start_update_via_systemd(unit_name: str, script_path: str) -> None:
         "--property=StandardError=journal",
         "/bin/bash",
         "-lc",
-        shlex.quote(script_path),
+        script_cmd,
     ]
     subprocess.Popen(cmd)  # nosec: commands are fixed, script path quoted
 
@@ -409,13 +424,20 @@ def start_update():
                 "unit": _UPDATE_STATE.get("unit"),
             }), 409
 
-        script_path = _get_install_update_script_path()
+        data = request.get_json(silent=True) or {}
+        target_tag = data.get("target_version")
+
+        script_path = _get_update_script_path()
         unit = f"inkypi-update-{int(time.time())}"
 
         if _systemd_available():
             _set_update_state(True, f"{unit}.service")
             try:
-                _start_update_via_systemd(unit, script_path or "/usr/local/inkypi/install/update.sh")
+                _start_update_via_systemd(
+                    unit,
+                    script_path or "/usr/local/inkypi/install/update.sh",
+                    target_tag=target_tag,
+                )
             except Exception:
                 # If systemd-run fails unexpectedly, fall back to thread runner
                 logger.exception("systemd-run failed; falling back to thread runner")
@@ -441,6 +463,33 @@ def update_status():
         running = bool(_UPDATE_STATE.get("running"))
         unit = _UPDATE_STATE.get("unit")
         started_at = _UPDATE_STATE.get("started_at")
+
+        # Auto-clear: timeout after _UPDATE_TIMEOUT_SECONDS
+        if running and started_at:
+            if time.time() - float(started_at) > _UPDATE_TIMEOUT_SECONDS:
+                _set_update_state(False, None)
+                running = False
+                unit = None
+                started_at = None
+
+        # Auto-clear: systemd unit finished
+        if running and unit and _systemd_available():
+            try:
+                result = subprocess.run(
+                    ["systemctl", "is-active", unit],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                state = result.stdout.strip()
+                if state in ("inactive", "failed"):
+                    _set_update_state(False, None)
+                    running = False
+                    unit = None
+                    started_at = None
+            except Exception:
+                pass
+
         return jsonify({
             "running": running,
             "unit": unit,
@@ -448,6 +497,75 @@ def update_status():
         })
     except Exception as e:
         return json_internal_error("update status", details={"error": str(e)})
+
+
+# ---------------------------------------------------------------------------
+# Version API — checks GitHub for latest release
+# ---------------------------------------------------------------------------
+
+_GITHUB_REPO = os.getenv("INKYPI_GITHUB_REPO", "fatihak/InkyPi")
+
+_VERSION_CACHE: dict[str, object] = {
+    "latest": None,
+    "checked_at": 0.0,
+    "release_notes": None,
+}
+_VERSION_CACHE_TTL = 3600  # seconds
+
+
+def _semver_gt(a: str, b: str) -> bool:
+    """Return True if semver string *a* is strictly greater than *b*."""
+    def _parts(v: str) -> list[int]:
+        return [int(x) for x in v.split(".")]
+    try:
+        return _parts(a) > _parts(b)
+    except (ValueError, AttributeError):
+        return False
+
+
+@settings_bp.route("/api/version")
+def api_version():
+    """Return current version, latest release from GitHub, and update status."""
+    current = current_app.config.get("APP_VERSION", "unknown")
+
+    # Check cache
+    now = time.time()
+    if (
+        _VERSION_CACHE["latest"] is not None
+        and now - float(_VERSION_CACHE["checked_at"] or 0) < _VERSION_CACHE_TTL
+    ):
+        latest = _VERSION_CACHE["latest"]
+        release_notes = _VERSION_CACHE["release_notes"]
+    else:
+        latest = None
+        release_notes = None
+        try:
+            resp = _requests.get(
+                f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
+                timeout=5,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            tag = data.get("tag_name", "")
+            latest = tag.lstrip("v") if tag else None
+            release_notes = data.get("body")
+            _VERSION_CACHE["latest"] = latest
+            _VERSION_CACHE["checked_at"] = now
+            _VERSION_CACHE["release_notes"] = release_notes
+        except Exception:
+            logger.debug("Could not fetch latest release from GitHub")
+
+    update_available = False
+    if latest and current != "unknown":
+        update_available = _semver_gt(latest, current)
+
+    return jsonify({
+        "current": current,
+        "latest": latest,
+        "update_available": update_available,
+        "release_notes": release_notes,
+        "update_running": bool(_UPDATE_STATE.get("running")),
+    })
 
 
 @settings_bp.route("/api/benchmarks/summary")

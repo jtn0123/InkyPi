@@ -20,7 +20,7 @@
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
 {% endblock %}
 {% block body %}
-    {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
+    {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
@@ -40,6 +40,7 @@
             </div>
         </div>
         <div class="separator"></div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Playlists'}]) }}
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Organize plugin instances into time-based playlists so the display can rotate between curated sets instead of one flat queue.</p>

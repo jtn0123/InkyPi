@@ -1,7 +1,7 @@
 """Tests for HTTP response caching functionality."""
 
 import time
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
@@ -45,41 +45,42 @@ def test_cache_entry_expiration():
     """Test CacheEntry expiration logic."""
     resp = Mock(spec=requests.Response)
 
-    # Entry with 0.1 second TTL
-    entry = CacheEntry(
-        response=resp,
-        cached_at=time.time(),
-        ttl_seconds=0.1,
-        url="https://example.com",
-    )
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 1000.0
+        entry = CacheEntry(
+            response=resp,
+            cached_at=mock_time.time(),
+            ttl_seconds=0.1,
+            url="https://example.com",
+        )
 
-    # Should not be expired immediately
-    assert not entry.is_expired()
+        # Should not be expired immediately
+        assert not entry.is_expired()
 
-    # Wait for expiration
-    time.sleep(0.15)
-
-    # Should now be expired
-    assert entry.is_expired()
+        # Advance time past TTL
+        mock_time.time.return_value = 1000.2
+        assert entry.is_expired()
 
 
 def test_cache_entry_age():
     """Test CacheEntry age calculation."""
     resp = Mock(spec=requests.Response)
-    entry = CacheEntry(
-        response=resp,
-        cached_at=time.time(),
-        ttl_seconds=10.0,
-        url="https://example.com",
-    )
 
-    # Age should be near 0
-    assert entry.age_seconds() < 0.1
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 1000.0
+        entry = CacheEntry(
+            response=resp,
+            cached_at=mock_time.time(),
+            ttl_seconds=10.0,
+            url="https://example.com",
+        )
 
-    time.sleep(0.1)
+        # Age should be 0 at creation
+        assert entry.age_seconds() == 0.0
 
-    # Age should be around 0.1 seconds
-    assert 0.05 < entry.age_seconds() < 0.2
+        # Advance time by 0.1 seconds
+        mock_time.time.return_value = 1000.1
+        assert 0.05 < entry.age_seconds() < 0.2
 
 
 def test_cache_stats_hit_rate():
@@ -141,21 +142,24 @@ def test_cache_expiration(cache, mock_response):
     """Test that expired entries are not returned."""
     url = "https://api.example.com/data"
 
-    # Store with short TTL
-    cache.put(url, mock_response, ttl=0.1)
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 1000.0
 
-    # Should be available immediately
-    assert cache.get(url) is not None
+        # Store with short TTL
+        cache.put(url, mock_response, ttl=0.1)
 
-    # Wait for expiration
-    time.sleep(0.15)
+        # Should be available immediately
+        assert cache.get(url) is not None
 
-    # Should no longer be available
-    assert cache.get(url) is None
+        # Advance time past TTL
+        mock_time.time.return_value = 1000.2
 
-    # Stats should show an expiration
-    stats = cache.get_stats()
-    assert stats["expirations"] == 1
+        # Should no longer be available
+        assert cache.get(url) is None
+
+        # Stats should show an expiration
+        stats = cache.get_stats()
+        assert stats["expirations"] == 1
 
 
 def test_cache_control_headers(cache):
@@ -277,25 +281,28 @@ def test_cache_clear(cache, mock_response):
 
 def test_cache_remove_expired(cache, mock_response):
     """Test manual removal of expired entries."""
-    # Add entry with short TTL
-    cache.put("https://example.com/short", mock_response, ttl=0.1)
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 1000.0
 
-    # Add entry with long TTL
-    cache.put("https://example.com/long", mock_response, ttl=10.0)
+        # Add entry with short TTL
+        cache.put("https://example.com/short", mock_response, ttl=0.1)
 
-    assert len(cache._cache) == 2
+        # Add entry with long TTL
+        cache.put("https://example.com/long", mock_response, ttl=10.0)
 
-    # Wait for one to expire
-    time.sleep(0.15)
+        assert len(cache._cache) == 2
 
-    # Remove expired
-    removed = cache.remove_expired()
+        # Advance time past the short TTL
+        mock_time.time.return_value = 1000.2
 
-    assert removed == 1
-    assert len(cache._cache) == 1
+        # Remove expired
+        removed = cache.remove_expired()
 
-    # Long TTL entry should still be there
-    assert cache.get("https://example.com/long") is not None
+        assert removed == 1
+        assert len(cache._cache) == 1
+
+        # Long TTL entry should still be there
+        assert cache.get("https://example.com/long") is not None
 
 
 def test_global_cache_instance():

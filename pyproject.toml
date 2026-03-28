@@ -36,4 +36,10 @@ ignore = [
 combine-as-imports = true
 known-first-party = ["src"]
 
-
+[tool.semantic_release]
+version_toml = ["pyproject.toml:tool.semantic_release.version"]
+version = "0.1.0"
+branch = "main"
+tag_format = "v{version}"
+upload_to_pypi = false
+build_command = "echo '{version}' > VERSION"

@@ -115,7 +115,7 @@ def test_wait_for_blocks_then_returns_on_publish():
 
     t = threading.Thread(target=waiter)
     t.start()
-    time.sleep(0.05)
+    time.sleep(0.01)
     bus.publish({"msg": "wakeup"})
     t.join(timeout=2.0)
     assert len(results) == 1
@@ -207,7 +207,7 @@ def test_concurrent_publish_and_wait():
 
     t = threading.Thread(target=waiter)
     t.start()
-    time.sleep(0.05)
+    time.sleep(0.01)
     bus.publish({"concurrent": True})
     t.join(timeout=2.0)
     assert len(results) >= 1

@@ -1,6 +1,6 @@
 """Tests for HTTP cache integration with http_utils."""
 
-import time
+from unittest.mock import patch
 
 import pytest
 import requests_mock
@@ -87,24 +87,27 @@ def test_http_get_cache_bypass():
 
 def test_http_get_custom_cache_ttl():
     """Test that custom cache TTL is respected."""
-    with requests_mock.Mocker() as m:
-        url = "https://api.example.com/ttl"
-        m.get(url, text="data")
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 1000.0
 
-        # Request with short TTL
-        resp1 = http_get(url, cache_ttl=0.1)
-        assert m.call_count == 1
+        with requests_mock.Mocker() as m:
+            url = "https://api.example.com/ttl"
+            m.get(url, text="data")
 
-        # Immediate second request - should hit cache
-        resp2 = http_get(url)
-        assert m.call_count == 1
+            # Request with short TTL
+            resp1 = http_get(url, cache_ttl=0.1)
+            assert m.call_count == 1
 
-        # Wait for TTL expiration
-        time.sleep(0.15)
+            # Immediate second request - should hit cache
+            resp2 = http_get(url)
+            assert m.call_count == 1
 
-        # Third request - cache expired, should make new request
-        resp3 = http_get(url)
-        assert m.call_count == 2
+            # Advance time past TTL expiration
+            mock_time.time.return_value = 1000.2
+
+            # Third request - cache expired, should make new request
+            resp3 = http_get(url)
+            assert m.call_count == 2
 
 
 def test_http_get_streaming_bypasses_cache():

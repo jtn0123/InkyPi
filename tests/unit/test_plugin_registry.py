@@ -74,7 +74,8 @@ def test_venv_shell_sets_pythonpath():
 
     pythonpath = result.stdout.strip()
     expected_entries = [str(_repo_root()), str(_repo_root() / "src")]
-    assert pythonpath == os.pathsep.join(expected_entries)
+    # On case-insensitive filesystems (macOS), pwd may return different case
+    assert pythonpath.lower() == os.pathsep.join(expected_entries).lower()
 
 
 def test_plugin_import_with_pythonpath():

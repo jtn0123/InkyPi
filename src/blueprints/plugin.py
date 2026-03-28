@@ -59,10 +59,13 @@ def plugin_page(plugin_id: str):
         # If viewing an existing instance, pre-populate its settings
         plugin_instance_name = request.args.get("instance")
         if plugin_instance_name:
-            plugin_instance = playlist_manager.find_plugin(plugin_id, plugin_instance_name)
+            plugin_instance = playlist_manager.find_plugin(
+                plugin_id, plugin_instance_name
+            )
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {plugin_instance_name} does not exist", status=404
+                    f"Plugin instance: {plugin_instance_name} does not exist",
+                    status=404,
                 )
             template_params["plugin_settings"] = plugin_instance.settings
             template_params["plugin_instance"] = plugin_instance_name
@@ -71,7 +74,9 @@ def plugin_page(plugin_id: str):
             default_playlist = playlist_manager.get_playlist("Default")
             if default_playlist:
                 saved_instance_name = f"{plugin_id}_saved_settings"
-                saved_instance = default_playlist.find_plugin(plugin_id, saved_instance_name)
+                saved_instance = default_playlist.find_plugin(
+                    plugin_id, saved_instance_name
+                )
                 if saved_instance:
                     template_params["plugin_settings"] = saved_instance.settings
                     template_params["plugin_instance"] = saved_instance_name
@@ -79,7 +84,9 @@ def plugin_page(plugin_id: str):
         template_params["playlists"] = playlist_manager.get_playlist_names()
 
         # Find latest refresh time for this plugin (any instance)
-        plugin_latest_refresh = _find_latest_plugin_refresh_time(device_config, plugin_id)
+        plugin_latest_refresh = _find_latest_plugin_refresh_time(
+            device_config, plugin_id
+        )
         if plugin_latest_refresh:
             template_params["plugin_latest_refresh"] = plugin_latest_refresh
 
@@ -178,6 +185,26 @@ def delete_plugin_instance():
             return json_error("Plugin instance not found", status=400)
 
         device_config.write_config()
+
+        # Clean up cached plugin instance image
+        try:
+            image_path = device_config.get_plugin_image_path(plugin_id, plugin_instance)
+            if image_path and os.path.isfile(image_path):
+                os.remove(image_path)
+                logger.info("Removed cached image: %s", image_path)
+        except Exception:
+            logger.warning(
+                "Could not clean up image for %s/%s", plugin_id, plugin_instance,
+                exc_info=True,
+            )
+
+        # Run plugin-specific cleanup (e.g., image_upload deletes uploaded files)
+        try:
+            plugin_obj = get_plugin_instance(plugin_id)
+            if plugin_obj and hasattr(plugin_obj, "cleanup"):
+                plugin_obj.cleanup(data.get("settings", {}))
+        except Exception:
+            logger.warning("Plugin cleanup failed for %s", plugin_id, exc_info=True)
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error("An internal error occurred", status=500)
@@ -223,10 +250,12 @@ def update_plugin_instance(instance_name: str):
     except Exception:
         return json_error("An internal error occurred", status=500)
 
-    return jsonify({
-        "success": True,
-        "message": f"Updated plugin instance {instance_name}.",
-    })
+    return jsonify(
+        {
+            "success": True,
+            "message": f"Updated plugin instance {instance_name}.",
+        }
+    )
 
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
@@ -254,7 +283,9 @@ def display_plugin_instance():
                 f"Plugin instance '{plugin_instance_name}' not found", status=400
             )
 
-        refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
+        refresh_task.manual_update(
+            PlaylistRefresh(playlist, plugin_instance, force=True)
+        )
     except Exception:
         return json_error("An internal error occurred", status=500)
 
@@ -280,8 +311,15 @@ def update_now():
             )
 
         if refresh_task.running:
-            metrics = refresh_task.manual_update(ManualRefresh(plugin_id, plugin_settings))
-            return jsonify({"success": True, "message": "Display updated", "metrics": metrics}), 200
+            metrics = refresh_task.manual_update(
+                ManualRefresh(plugin_id, plugin_settings)
+            )
+            return (
+                jsonify(
+                    {"success": True, "message": "Display updated", "metrics": metrics}
+                ),
+                200,
+            )
         else:
             logger.info("Refresh task not running, updating display directly")
             plugin_config = device_config.get_plugin(plugin_id)
@@ -316,11 +354,17 @@ def update_now():
                     "preprocess_ms": preprocess_ms,
                     "steps": tracker.get_steps(),
                 }
-            return jsonify({"success": True, "message": "Display updated", "metrics": metrics}), 200
+            return (
+                jsonify(
+                    {"success": True, "message": "Display updated", "metrics": metrics}
+                ),
+                200,
+            )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
-        return json_error("An internal error occurred", status=500, code="internal_error")
-
+        return json_error(
+            "An internal error occurred", status=500, code="internal_error"
+        )
 
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
@@ -370,7 +414,9 @@ def save_plugin_settings_alias(plugin_id: str):
         return json_error("An internal error occurred", status=500)
 
 
-def _save_plugin_settings_common(plugin_id, plugin_settings, device_config, playlist_manager):
+def _save_plugin_settings_common(
+    plugin_id, plugin_settings, device_config, playlist_manager
+):
     default_playlist_name = "Default"
     playlist = playlist_manager.get_playlist(default_playlist_name)
     if not playlist:
@@ -406,7 +452,9 @@ def _save_plugin_settings_common(plugin_id, plugin_settings, device_config, play
     )
 
 
-def _find_history_image(device_config, plugin_id: str, instance_name: str) -> str | None:
+def _find_history_image(
+    device_config, plugin_id: str, instance_name: str
+) -> str | None:
     """Return path to a history PNG that matches plugin and instance, if any."""
     try:
         history_dir: str = str(device_config.history_image_dir)
@@ -423,7 +471,9 @@ def _find_history_image(device_config, plugin_id: str, instance_name: str) -> st
                     meta.get("plugin_id") == plugin_id
                     and meta.get("plugin_instance") == instance_name
                 ):
-                    png_path: str = os.path.join(history_dir, name.replace(".json", ".png"))
+                    png_path: str = os.path.join(
+                        history_dir, name.replace(".json", ".png")
+                    )
                     if os.path.exists(png_path):
                         return png_path
             except Exception:

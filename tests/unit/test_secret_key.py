@@ -66,7 +66,7 @@ def test_secret_key_dev_persisted(tmp_path, monkeypatch):
     assert env_text.strip().split("SECRET_KEY=")[-1].strip() != ""
 
 
-def test_secret_key_prod_ephemeral(tmp_path, monkeypatch):
+def test_secret_key_prod_persisted(tmp_path, monkeypatch):
     # Prepare minimal device config and environment
     cfg_path = tmp_path / "device.json"
     _write_min_device_config(cfg_path)
@@ -94,17 +94,14 @@ def test_secret_key_prod_ephemeral(tmp_path, monkeypatch):
     assert not inkypi.DEV_MODE, f"DEV_MODE should be False but is {inkypi.DEV_MODE}"
     assert not inkypi.args.dev, f"args.dev should be False but is {inkypi.args.dev}"
 
-    # SECRET_KEY should exist but not be persisted to .env in prod
+    # SECRET_KEY should exist AND be persisted to .env (even in prod now)
     secret = inkypi.app.secret_key
     assert isinstance(secret, str) and len(secret) >= 32
 
     env_file = tmp_path / ".env"
-    if env_file.exists():
-        env_text = env_file.read_text()
-        assert "SECRET_KEY=" not in env_text
-    else:
-        # .env may not be created at all
-        assert True
+    assert env_file.exists()
+    env_text = env_file.read_text()
+    assert "SECRET_KEY=" in env_text
 
 
 def _reload_inkypi(monkeypatch, argv=None, env=None):
@@ -170,22 +167,22 @@ def test_secret_key_persisted_in_dev_env_file(monkeypatch, tmp_path):
     assert app2.secret_key == generated
 
 
-def test_secret_key_ephemeral_in_prod_when_missing(monkeypatch, tmp_path):
-    # Production mode: if missing, it should generate but not necessarily persist
+def test_secret_key_stable_in_prod_after_persist(monkeypatch, tmp_path):
+    # Production mode: if missing, it should generate AND persist to .env
+    # so subsequent restarts reuse the same key
     env = {"INKYPI_ENV": "production", "PROJECT_DIR": str(tmp_path)}
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     app = getattr(mod, "app", None)
     assert app is not None
     first = app.secret_key
 
-    # Reload without setting SECRET_KEY; likely different each time
+    # Reload — should reuse same key from persisted .env
     mod2 = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env=env)
     app2 = getattr(mod2, "app", None)
     assert app2 is not None
     second = app2.secret_key
 
     assert isinstance(first, str) and isinstance(second, str)
-    # They may be equal by chance, but extremely unlikely; allow inequality check
-    assert first != second
+    assert first == second
 
 

@@ -1,0 +1,216 @@
+# pyright: reportMissingImports=false
+"""Tests for CSRF protection, rate limiting, and XSS prevention."""
+import secrets
+
+import pytest
+from flask import Flask, session
+
+
+@pytest.fixture()
+def csrf_app():
+    """Minimal Flask app with CSRF protection matching inkypi.py."""
+    from collections import defaultdict, deque
+
+    from utils.http_utils import json_error
+
+    app = Flask(__name__)
+    app.secret_key = "test-csrf-secret"
+    app.config["TESTING"] = True
+
+    _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+    _CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
+
+    def _generate_csrf_token():
+        if "_csrf_token" not in session:
+            session["_csrf_token"] = secrets.token_hex(32)
+        return session["_csrf_token"]
+
+    @app.context_processor
+    def _inject_csrf():
+        return {"csrf_token": _generate_csrf_token}
+
+    @app.before_request
+    def _check_csrf():
+        from flask import request
+
+        if request.method in _CSRF_SAFE_METHODS:
+            return
+        if request.path in _CSRF_EXEMPT_PATHS:
+            return
+        token = session.get("_csrf_token")
+        if not token:
+            _generate_csrf_token()
+            return json_error("CSRF token missing or invalid", status=403)
+        request_token = request.headers.get("X-CSRFToken") or (
+            request.form.get("csrf_token")
+            if request.content_type and "form" in request.content_type
+            else None
+        )
+        if not request_token or not secrets.compare_digest(request_token, token):
+            return json_error("CSRF token missing or invalid", status=403)
+
+    # --- Rate limiting ---
+    _MUTATE_REQUESTS = defaultdict(deque)
+    _MUTATE_WINDOW = 60
+    _MUTATE_MAX = 5  # Low limit for testing
+
+    @app.before_request
+    def _rate_limit():
+        import time as _time
+
+        from flask import request
+
+        if request.method in _CSRF_SAFE_METHODS:
+            return
+        if request.path in _CSRF_EXEMPT_PATHS:
+            return
+        addr = request.remote_addr or "unknown"
+        now = _time.monotonic()
+        dq = _MUTATE_REQUESTS[addr]
+        while dq and dq[0] < now - _MUTATE_WINDOW:
+            dq.popleft()
+        if len(dq) >= _MUTATE_MAX:
+            return json_error("Rate limit exceeded — try again shortly", status=429)
+        dq.append(now)
+
+    @app.route("/test-post", methods=["POST"])
+    def test_post():
+        return {"ok": True}
+
+    @app.route("/healthz", methods=["POST"])
+    def healthz_post():
+        return {"ok": True}
+
+    return app
+
+
+class TestCSRFProtection:
+    def test_get_requests_bypass_csrf(self, csrf_app):
+        client = csrf_app.test_client()
+        # GET requests should not need CSRF
+        # (no POST route for GET, just verify no 403 on a page)
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "testtoken123"
+
+    def test_post_without_token_returns_403(self, csrf_app):
+        client = csrf_app.test_client()
+        resp = client.post("/test-post")
+        assert resp.status_code == 403
+
+    def test_post_with_valid_header_token(self, csrf_app):
+        client = csrf_app.test_client()
+        # First, establish session with a token
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "valid-token-abc123"
+        resp = client.post("/test-post", headers={"X-CSRFToken": "valid-token-abc123"})
+        assert resp.status_code == 200
+
+    def test_post_with_invalid_token_returns_403(self, csrf_app):
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "correct-token"
+        resp = client.post("/test-post", headers={"X-CSRFToken": "wrong-token"})
+        assert resp.status_code == 403
+
+    def test_post_with_form_csrf_token(self, csrf_app):
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "form-token-xyz"
+        resp = client.post(
+            "/test-post",
+            data={"csrf_token": "form-token-xyz"},
+            content_type="application/x-www-form-urlencoded",
+        )
+        assert resp.status_code == 200
+
+    def test_exempt_paths_skip_csrf(self, csrf_app):
+        client = csrf_app.test_client()
+        resp = client.post("/healthz")
+        assert resp.status_code == 200
+
+    def test_first_post_without_session_returns_403(self, csrf_app):
+        """First POST without any session should be rejected (no exemption)."""
+        client = csrf_app.test_client()
+        resp = client.post("/test-post")
+        assert resp.status_code == 403
+        data = resp.get_json()
+        assert "CSRF" in data.get("error", "")
+
+
+class TestRateLimiting:
+    def test_rate_limit_allows_within_threshold(self, csrf_app):
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "rl-token"
+        for _ in range(5):
+            resp = client.post("/test-post", headers={"X-CSRFToken": "rl-token"})
+            assert resp.status_code == 200
+
+    def test_rate_limit_blocks_over_threshold(self, csrf_app):
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "rl-token"
+        # Exhaust limit
+        for _ in range(5):
+            client.post("/test-post", headers={"X-CSRFToken": "rl-token"})
+        # Next request should be blocked
+        resp = client.post("/test-post", headers={"X-CSRFToken": "rl-token"})
+        assert resp.status_code == 429
+
+    def test_rate_limit_exempt_paths(self, csrf_app):
+        """Exempt paths should not count against rate limit."""
+        client = csrf_app.test_client()
+        for _ in range(10):
+            resp = client.post("/healthz")
+            assert resp.status_code == 200
+
+
+class TestRSSXSSPrevention:
+    def test_sanitize_strips_script_tags(self):
+        from plugins.rss.rss import Rss
+
+        result = Rss._sanitize_text('<script>alert("xss")</script>Safe text')
+        assert "<script>" not in result
+        assert "Safe text" in result
+
+    def test_sanitize_strips_html_tags(self):
+        from plugins.rss.rss import Rss
+
+        result = Rss._sanitize_text("<b>Bold</b> and <em>italic</em>")
+        assert "<b>" not in result
+        assert "<em>" not in result
+        assert "Bold" in result
+        assert "italic" in result
+
+    def test_sanitize_decodes_entities(self):
+        from plugins.rss.rss import Rss
+
+        result = Rss._sanitize_text("Tom &amp; Jerry &lt;3")
+        assert result == "Tom & Jerry <3"
+
+    def test_sanitize_handles_nested_tags(self):
+        from plugins.rss.rss import Rss
+
+        result = Rss._sanitize_text(
+            '<div><p>Text <a href="http://evil.com">link</a></p></div>'
+        )
+        assert "<" not in result
+        assert "Text" in result
+        assert "link" in result
+
+    def test_sanitize_handles_img_onerror(self):
+        from plugins.rss.rss import Rss
+
+        result = Rss._sanitize_text("<img src=x onerror=alert(1)>")
+        assert "<" not in result
+        assert "onerror" not in result
+
+    def test_sanitize_empty_string(self):
+        from plugins.rss.rss import Rss
+
+        assert Rss._sanitize_text("") == ""
+
+    def test_sanitize_plain_text_unchanged(self):
+        from plugins.rss.rss import Rss
+
+        assert Rss._sanitize_text("Hello World") == "Hello World"

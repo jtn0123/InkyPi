@@ -5,31 +5,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-def test_apod_success(monkeypatch, device_config_dev):
+def test_apod_success(monkeypatch, device_config_dev, realistic_nasa_apod_response, fake_image_response):
     from plugins.apod.apod import Apod
 
     # Mock env key
     monkeypatch.setenv('NASA_SECRET', 'k')
 
-    class RespApi:
-        status_code = 200
-        def json(self):
-            return {"media_type": "image", "url": "http://img"}
-
-    class RespImg:
-        status_code = 200
-        def __init__(self):
-            buf = BytesIO()
-            Image.new('RGB', (5, 5), 'white').save(buf, format='PNG')
-            self.content = buf.getvalue()
-
-    calls = {"url": None}
+    api_resp = MagicMock()
+    api_resp.status_code = 200
+    api_resp.json.return_value = realistic_nasa_apod_response
 
     def fake_get(url, params=None, **kwargs):
-        calls["url"] = url
-        if 'apod' in url:
-            return RespApi()
-        return RespImg()
+        if 'api.nasa.gov' in url:
+            return api_resp
+        return fake_image_response
 
     monkeypatch.setattr('requests.get', fake_get)
 

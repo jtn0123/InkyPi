@@ -18,9 +18,17 @@ function ensureToastContainer() {
     return toastContainer;
 }
 
+const MAX_VISIBLE_TOASTS = 3;
+
 function showToast(status, message, duration = TOAST_DURATION_MS) {
     const container = ensureToastContainer();
     const toastId = `toast-${++toastCounter}`;
+
+    // Enforce stack limit — remove oldest toasts beyond MAX_VISIBLE_TOASTS
+    while (container.children.length >= MAX_VISIBLE_TOASTS) {
+        const oldest = container.firstElementChild;
+        if (oldest) oldest.remove();
+    }
 
     const toast = document.createElement('div');
     toast.className = `toast ${status}`;
@@ -52,6 +60,14 @@ function showToast(status, message, duration = TOAST_DURATION_MS) {
     toast.appendChild(iconEl);
     toast.appendChild(contentEl);
     toast.appendChild(closeBtn);
+
+    // Add countdown progress bar for auto-closing toasts
+    if (duration > 0 && status !== 'error') {
+        const progress = document.createElement('div');
+        progress.className = 'toast-progress';
+        progress.style.animationDuration = `${duration}ms`;
+        toast.appendChild(progress);
+    }
 
     container.appendChild(toast);
 
@@ -164,6 +180,7 @@ async function handleJsonResponse(response, options = {}) {
     } catch (e) {
         // Non-JSON responses
         if (!response.ok) {
+            console.warn('Non-JSON error response from', response.url, 'status:', response.status);
             const message = getErrorMessage(response.status);
             if (showToastNotification) {
                 showToast('error', message);
@@ -198,21 +215,22 @@ async function handleJsonResponse(response, options = {}) {
     return data;
 }
 
-function getErrorMessage(status) {
+function getErrorMessage(status, endpoint) {
+    const ctx = endpoint ? ` (${endpoint})` : '';
     const errorMessages = {
-        400: 'Invalid request. Please check your input.',
-        401: 'Authentication required. Please log in.',
-        403: 'Access denied. You don\'t have permission.',
-        404: 'Resource not found.',
-        408: 'Request timed out. Please try again.',
-        429: 'Too many requests. Please wait and try again.',
-        500: 'Server error. Please try again later.',
-        502: 'Service temporarily unavailable.',
-        503: 'Service unavailable. Please try again later.',
-        504: 'Request timed out. Please try again.'
+        400: `Invalid request${ctx}. Please check your input.`,
+        401: `Authentication required${ctx}. Please log in.`,
+        403: `Access denied${ctx}. You don\'t have permission.`,
+        404: `Resource not found${ctx}.`,
+        408: `Request timed out${ctx}. Please try again.`,
+        429: `Too many requests${ctx}. Please wait a moment and retry.`,
+        500: `Server error${ctx}. Please try again later.`,
+        502: `Service temporarily unavailable${ctx}. Retry in a few seconds.`,
+        503: `Service unavailable${ctx}. Retry in a few seconds.`,
+        504: `Gateway timeout${ctx}. Retry in a few seconds.`
     };
 
-    return errorMessages[status] || 'An unexpected error occurred. Please try again.';
+    return errorMessages[status] || `An unexpected error occurred${ctx}. Please try again.`;
 }
 
 // Wire up legacy modal close button (replaces inline onclick)

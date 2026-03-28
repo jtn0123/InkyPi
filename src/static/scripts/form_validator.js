@@ -147,6 +147,12 @@
         if (typeof showToast === "function") {
           showToast("error", errorCount + (errorCount === 1 ? " error needs" : " errors need") + " fixing before saving.");
         }
+        // Visual shake feedback on blocked submit
+        form.classList.add("form-shake");
+        form.addEventListener("animationend", function handler() {
+          form.classList.remove("form-shake");
+          form.removeEventListener("animationend", handler);
+        });
         // Focus first invalid input
         var firstInvalid = form.querySelector('[aria-invalid="true"]');
         if (firstInvalid) firstInvalid.focus();
@@ -154,9 +160,9 @@
     });
   }
 
-  // Auto-initialize on DOMContentLoaded for all forms with .settings-form
+  // Auto-initialize on DOMContentLoaded for forms with .settings-form or .validated-form
   document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".settings-form").forEach(function (form) {
+    document.querySelectorAll(".settings-form, .validated-form").forEach(function (form) {
       initFormValidation(form);
     });
   });

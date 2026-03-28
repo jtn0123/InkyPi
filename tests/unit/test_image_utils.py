@@ -189,3 +189,100 @@ def test_resize_image_zero_desired_height():
     img = Image.new("RGB", (10, 10), "white")
     with pytest.raises(ValueError):
         image_utils.resize_image(img, (5, 0))
+
+
+# ---------------------------------------------------------------------------
+# Section: get_image additional coverage (from test_image_utils_get_image.py)
+# ---------------------------------------------------------------------------
+
+
+def test_get_image_returns_correct_size(monkeypatch):
+    """get_image returns an image with the correct dimensions."""
+    buf = BytesIO()
+    Image.new("RGB", (5, 5), "white").save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+
+    class Resp:
+        status_code = 200
+        content = png_bytes
+
+    monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
+    img = image_utils.get_image("http://example/img.png")
+    assert img is not None
+    assert img.size == (5, 5)
+
+
+def test_get_image_error_500(monkeypatch):
+    """get_image returns None for a 500 response."""
+
+    class Resp:
+        status_code = 500
+        content = b""
+
+    monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
+    img = image_utils.get_image("http://example/img.png")
+    assert img is None
+
+
+def test_get_image_304_not_modified(monkeypatch):
+    """get_image handles a 304 response gracefully (returns None on decode failure)."""
+
+    class Resp:
+        status_code = 304
+        content = b"\x89PNG\r\n\x1a\n"  # minimal header; not a valid full image
+
+    monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
+    assert image_utils.get_image("http://example/img.png") is None
+
+
+# ---------------------------------------------------------------------------
+# Section: enhancement and orientation extras (from test_image_utils_more.py)
+# ---------------------------------------------------------------------------
+
+
+def test_apply_image_enhancement_noop_defaults():
+    """apply_image_enhancement with empty dict is a no-op on image size."""
+    img = Image.new("RGB", (10, 10), "gray")
+    out = image_utils.apply_image_enhancement(img, {})
+    assert out.size == img.size
+
+
+def test_change_orientation_inverted_flag():
+    """change_orientation with inverted=True keeps size for horizontal."""
+    img = Image.new("RGB", (20, 10), "white")
+    out = image_utils.change_orientation(img, "horizontal", inverted=True)
+    assert out.size == (20, 10)
+
+
+def test_change_orientation_unknown_orientation():
+    """change_orientation raises ValueError for unknown orientation string."""
+    img = Image.new("RGB", (10, 10), "white")
+    with pytest.raises(ValueError):
+        image_utils.change_orientation(img, "diagonal")
+
+
+# ---------------------------------------------------------------------------
+# Section: hash and pad coverage (from test_image_utils_remaining.py)
+# ---------------------------------------------------------------------------
+
+
+def test_compute_image_hash_consistency():
+    """compute_image_hash returns the same hash for the same image object."""
+    img = Image.new("RGB", (100, 100), "red")
+    h1 = image_utils.compute_image_hash(img)
+    h2 = image_utils.compute_image_hash(img)
+    assert h1 == h2
+
+
+def test_compute_image_hash_different():
+    """compute_image_hash produces different hashes for different image content."""
+    img1 = Image.new("RGB", (100, 100), "red")
+    img2 = Image.new("RGB", (100, 100), "blue")
+    assert image_utils.compute_image_hash(img1) != image_utils.compute_image_hash(img2)
+
+
+def test_pad_image_blur():
+    """pad_image_blur produces an image of the requested dimensions."""
+    img = Image.new("RGB", (100, 200), "green")
+    result = image_utils.pad_image_blur(img, (400, 300))
+    assert result.size == (400, 300)
