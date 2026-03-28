@@ -1,6 +1,6 @@
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px;
 }
 
@@ -8,11 +8,11 @@
   display: grid;
   gap: 12px;
   padding: 14px;
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
+  border: var(--card-border);
+  border-radius: var(--card-radius);
   background: var(--panel-bg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--transition-speed) ease, border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
 }
 
 .history-card-body {
@@ -36,7 +36,7 @@
 .history-thumb:hover {
   border-color: var(--accent);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .history-thumb img,
