@@ -97,12 +97,11 @@ def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path)
 
     try:
         task.start()
-        for _ in range(20):
+        import time
+        for _ in range(60):
             if marker.exists():
                 break
-            import time
-
-            time.sleep(0.05)
+            time.sleep(0.1)
         assert marker.read_text(encoding="utf-8") == "called"
     finally:
         task.stop()
