@@ -62,8 +62,13 @@
         for (const key of keys) {
           const raw = localStorage.getItem(key);
           if (raw) {
-            data = JSON.parse(raw);
-            break;
+            try {
+              data = JSON.parse(raw);
+              break;
+            } catch (e) {
+              console.warn("Corrupt progress data, removing key:", key, e);
+              localStorage.removeItem(key);
+            }
           }
         }
         if (!data) {

@@ -45,6 +45,32 @@ def test_abstract_display_initialization_sets_device_config(device_config_dev):
     assert display.device_config == device_config_dev
 
 
+def test_mutable_default_not_shared(device_config_dev, tmp_path):
+    """Verify display_image default image_settings is not shared across calls."""
+    from display.mock_display import MockDisplay
+
+    display = MockDisplay.__new__(MockDisplay)
+    display.device_config = device_config_dev
+    display.width = 100
+    display.height = 100
+    display.output_dir = str(tmp_path)
+
+    img = Image.new("RGB", (100, 100), "white")
+
+    # First call with default — should get a fresh empty list
+    display.display_image(img)
+
+    # Second call with default — should also get a fresh empty list, not a
+    # reference to the same object from the first call
+    display.display_image(img)
+
+    # If the default were mutable, passing a list and mutating it would leak
+    settings = ["test_setting"]
+    display.display_image(img, image_settings=settings)
+    # A fresh call should still get an independent default
+    display.display_image(img)
+
+
 # --- Inky Display ---
 
 

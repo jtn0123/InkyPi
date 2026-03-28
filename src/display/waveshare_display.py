@@ -106,7 +106,9 @@ class WaveshareDisplay(AbstractDisplay):
                 write=True)
 
 
-    def display_image(self, image, image_settings=[]):
+    def display_image(self, image, image_settings=None):
+        if image_settings is None:
+            image_settings = []
         
         """
         Displays an image on the Waveshare display.

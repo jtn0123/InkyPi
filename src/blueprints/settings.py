@@ -53,7 +53,10 @@ MAX_LOG_HOURS = 24
 MIN_LOG_HOURS = 1
 MAX_LOG_LINES = 2000
 MIN_LOG_LINES = 50
-MAX_RESPONSE_BYTES = 512 * 1024  # 512 KB safety cap
+MAX_RESPONSE_BYTES = 512 * 1024
+
+# Strict semver pattern for update target tags (e.g. "v1.2.3", "1.0.0-rc1")
+_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[\w.]+)?$")  # 512 KB safety cap
 
 # Simple in-process rate limiter (per remote addr)
 _REQUESTS: dict[str, deque] = defaultdict(deque)
@@ -460,6 +463,9 @@ def start_update():
                 target_tag = raw.strip()
         except Exception:
             pass
+
+        if target_tag and not _TAG_RE.fullmatch(target_tag):
+            return jsonify({"success": False, "error": "Invalid target version format"}), 400
 
         script_path = _get_update_script_path()
         unit = f"inkypi-update-{int(time.time())}"
