@@ -10,7 +10,7 @@
     flex-wrap: wrap;
     align-items: center;
     padding: 10px 25px 10px 40px;
-    border-top: 2px solid var(--surface-border);
+    border-top: 1px solid var(--surface-border);
     gap: 10px;
 }
 
@@ -25,8 +25,8 @@
 .plugin-actions .btn { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
 .plugin-actions .btn:hover { background: var(--hover-overlay, rgba(255,255,255,0.04)); }
 .plugin-actions .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.plugin-actions .btn-primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-.plugin-actions .btn-primary:hover { background: var(--accent-hover); }
+.plugin-actions .btn-primary { background: var(--primary); color: var(--on-accent); border-color: var(--primary); }
+.plugin-actions .btn-primary:hover { background: var(--primary-hover); }
 .plugin-actions .btn-danger { background: var(--danger); color: var(--on-accent); border-color: var(--danger); }
 .plugin-actions .btn-danger:hover { background: var(--danger-hover); }
 .btn-label { font-size: 0.85em; }

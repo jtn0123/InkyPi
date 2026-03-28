@@ -1056,11 +1056,11 @@ body.modal-open {
 .toast {
     background: var(--surface);
     border: 1px solid var(--surface-border);
-    border-radius: 12px;
+    border-radius: var(--border-radius-lg);
     padding: 16px 20px;
     color: var(--text);
     font-size: 14px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-lg);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -1079,17 +1079,17 @@ body.modal-open {
 
 .toast.success {
     border-left: 4px solid var(--success);
-    background: linear-gradient(90deg, rgba(56, 161, 105, 0.1) 0%, var(--surface) 20%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--success) 10%, var(--surface)) 0%, var(--surface) 20%);
 }
 
 .toast.error {
     border-left: 4px solid var(--error);
-    background: linear-gradient(90deg, rgba(229, 62, 62, 0.1) 0%, var(--surface) 20%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--error) 10%, var(--surface)) 0%, var(--surface) 20%);
 }
 
 .toast.warning {
     border-left: 4px solid var(--warning);
-    background: linear-gradient(90deg, rgba(214, 158, 46, 0.1) 0%, var(--surface) 20%);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 10%, var(--surface)) 0%, var(--surface) 20%);
 }
 
 .toast-icon {
@@ -1119,6 +1119,151 @@ body.modal-open {
 .toast-close:hover {
     background: var(--hover-overlay, rgba(0, 0, 0, 0.1));
     color: var(--text);
+}
+
+/* Toast countdown progress bar */
+.toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    width: 100%;
+    background: currentcolor;
+    opacity: 0.3;
+    transform-origin: left;
+    animation: toast-countdown linear forwards;
+}
+
+@keyframes toast-countdown {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+}
+
+/* Software Update Panel */
+.update-panel {
+    padding: var(--spacing-lg);
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-md);
+    margin-bottom: var(--spacing-lg);
+    background: var(--panel-bg);
+}
+
+.update-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
+}
+
+.update-header h3 {
+    margin: 0;
+    font-size: var(--text-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text);
+}
+
+.update-version-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-md);
+}
+
+.update-version-card {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 20px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-md);
+    background: var(--surface);
+    min-width: 100px;
+    flex: 1;
+}
+
+.update-version-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.update-version-number {
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+.update-arrow {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.update-release-notes {
+    margin-bottom: var(--spacing-md);
+}
+
+.update-release-notes-toggle {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px 0;
+}
+
+.update-release-notes-body {
+    margin-top: var(--spacing-sm);
+    padding: 12px;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--surface);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+.update-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+/* Legacy compatibility */
+.update-version-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.update-label {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+}
+
+.update-value {
+    font-weight: var(--font-semibold);
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+
+/* Form shake animation on blocked submit */
+@keyframes form-shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+}
+
+.form-shake {
+    animation: form-shake 0.4s ease-in-out;
 }
 
 /* Legacy modal styles for backward compatibility */
@@ -1364,7 +1509,7 @@ body.modal-open {
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: currentColor;
+    background: currentcolor;
     animation: loading-dots 1.4s ease-in-out infinite both;
     animation-delay: 0.16s;
 }
@@ -1374,7 +1519,7 @@ body.modal-open {
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: currentColor;
+    background: currentcolor;
     animation: loading-dots 1.4s ease-in-out infinite both;
 }
 

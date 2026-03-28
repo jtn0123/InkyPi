@@ -1,7 +1,7 @@
 {% macro icon(name, class_name='icon-image', title=None) -%}
     {# Prefer local inline SVG if available; embed a hidden <i> fallback for tests and legacy. #}
     {% set tpl = 'icons/ph/' ~ name ~ '.svg' %}
-    <span class="{{ class_name }}"{% if title %} title="{{ title }}"{% endif %} role="img"{% if title %} aria-label="{{ title }}"{% else %} aria-hidden="true"{% endif %}>{% include tpl ignore missing %}</span>
+    <span class="{{ class_name }}"{% if title %} title="{{ title }}" role="img" aria-label="{{ title }}"{% else %} aria-hidden="true"{% endif %}>{% include tpl ignore missing %}</span>
     <i class="ph ph-{{ name }} ph-thin {{ class_name }}" aria-hidden="true" style="display:none;"></i>
 {%- endmacro %}
 
@@ -45,15 +45,15 @@
 {% macro breadcrumb(items) -%}
 <nav aria-label="Breadcrumb" class="breadcrumb">
     <ol>
-    {% for item in items %}
+        {% for item in items %}
         <li{% if loop.last %} aria-current="page"{% endif %}>
-            {% if item.url and not loop.last -%}
-                <a href="{{ item.url }}">{{ item.label }}</a>
-            {%- else -%}
-                <span>{{ item.label }}</span>
-            {%- endif %}
+            {% if item.url and not loop.last %}
+            <a href="{{ item.url }}">{{ item.label }}</a>
+            {% else %}
+            <span>{{ item.label }}</span>
+            {% endif %}
         </li>
-    {% endfor %}
+        {% endfor %}
     </ol>
 </nav>
 {%- endmacro %}

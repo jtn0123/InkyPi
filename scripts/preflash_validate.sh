@@ -67,15 +67,13 @@ import_smoke_check() {
 }
 
 stress_suite() {
-    (
-        export INKYPI_PLUGIN_TIMEOUT_S="${INKYPI_PLUGIN_TIMEOUT_S:-10}"
-        export INKYPI_PLUGIN_RETRY_MAX="${INKYPI_PLUGIN_RETRY_MAX:-0}"
-        export INKYPI_HISTORY_MAX_ENTRIES="${INKYPI_HISTORY_MAX_ENTRIES:-20}"
-        export PYTEST_ADDOPTS="${PYTEST_ADDOPTS:-}"
-        python -m pytest -q \
-            tests/unit/test_refresh_task_stress.py \
-            tests/unit/test_memory_leaks.py
-    )
+    export INKYPI_PLUGIN_TIMEOUT_S="${INKYPI_PLUGIN_TIMEOUT_S:-10}"
+    export INKYPI_PLUGIN_RETRY_MAX="${INKYPI_PLUGIN_RETRY_MAX:-0}"
+    export INKYPI_HISTORY_MAX_ENTRIES="${INKYPI_HISTORY_MAX_ENTRIES:-20}"
+    export PYTEST_ADDOPTS="${PYTEST_ADDOPTS:-}"
+    python -m pytest -q \
+        tests/unit/test_refresh_task_stress.py \
+        tests/unit/test_memory_leaks.py
 }
 
 heavy_plugin_suite() {
@@ -91,15 +89,13 @@ heavy_plugin_suite() {
 }
 
 isolation_suite() {
-    (
-        export INKYPI_PLUGIN_TIMEOUT_S="${INKYPI_PLUGIN_TIMEOUT_S:-5}"
-        export INKYPI_PLUGIN_RETRY_MAX="${INKYPI_PLUGIN_RETRY_MAX:-0}"
-        python -m pytest -q \
-            tests/unit/test_plugin_isolation.py \
-            tests/unit/test_refresh_policy.py \
-            tests/unit/test_refresh_task_controls.py \
-            tests/integration/test_plugin_lifecycle_flow.py
-    )
+    export INKYPI_PLUGIN_TIMEOUT_S="${INKYPI_PLUGIN_TIMEOUT_S:-5}"
+    export INKYPI_PLUGIN_RETRY_MAX="${INKYPI_PLUGIN_RETRY_MAX:-0}"
+    python -m pytest -q \
+        tests/unit/test_plugin_isolation.py \
+        tests/unit/test_refresh_policy.py \
+        tests/unit/test_refresh_task_controls.py \
+        tests/integration/test_plugin_lifecycle_flow.py
 }
 
 fault_suite() {
@@ -116,6 +112,8 @@ upgrade_compat_suite() {
 
 coverage_suite() {
     rm -f coverage.xml
+    export INKYPI_PLUGIN_ISOLATION=none
+    export INKYPI_NO_HOT_RELOAD=1
     python -m pytest \
         -q \
         --cov=src \
@@ -150,8 +148,8 @@ security_suite() {
 }
 
 flake_suite() {
-    local run_index
-    for run_index in 1 2 3; do
+    local _run_index
+    for _run_index in 1 2 3; do
         python -m pytest -q \
             tests/unit/test_refresh_task_stress.py \
             tests/unit/test_memory_leaks.py \

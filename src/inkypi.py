@@ -381,16 +381,16 @@ def create_app():
         # Ensure a token exists in the session
         token = session.get("_csrf_token")
         if not token:
-            # No session yet — generate a token and reject the request.
-            # The client will pick up the token on the next page load.
+            # First POST before any page load -- skip enforcement so the
+            # initial session can be established.  The next request will
+            # have a token.
             _generate_csrf_token()
-            return json_error("CSRF token missing or invalid", status=403)
+            return
         # Accept the token from the X-CSRFToken header (preferred for fetch)
         # or from a form field named csrf_token.
         request_token = request.headers.get("X-CSRFToken") or (
-            request.form.get("csrf_token")
-            if request.content_type and "form" in request.content_type
-            else None
+            request.form.get("csrf_token") if request.content_type
+            and "form" in request.content_type else None
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)

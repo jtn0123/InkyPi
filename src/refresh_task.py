@@ -651,6 +651,14 @@ class RefreshTask:
         timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
         attempts = max(1, retries + 1)
 
+        # When isolation is disabled (e.g. in tests or on constrained devices),
+        # run the plugin directly in the current process instead of spawning a
+        # subprocess.  This avoids pickling issues that arise with the ``spawn``
+        # and ``forkserver`` multiprocessing start methods on Linux.
+        isolation = (os.getenv("INKYPI_PLUGIN_ISOLATION") or "process").strip().lower()
+        if isolation == "none":
+            return self._execute_inprocess(refresh_action, plugin_config, current_dt)
+
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
             logger.info(
@@ -759,6 +767,57 @@ class RefreshTask:
                         "step": f"retry {attempt}/{attempts - 1}",
                     }
                 )
+
+        if last_exc is not None:
+            raise last_exc
+        raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
+
+    def _execute_inprocess(self, refresh_action, plugin_config, current_dt: datetime):
+        """Run a plugin directly in the current process (no subprocess isolation).
+
+        Used when ``INKYPI_PLUGIN_ISOLATION=none`` to avoid pickling constraints
+        imposed by the ``spawn``/``forkserver`` multiprocessing start methods.
+
+        Supports retries and timeouts via a worker thread so the behaviour
+        mirrors the subprocess path as closely as possible.
+        """
+        plugin_id = refresh_action.get_plugin_id()
+        retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
+        backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
+        timeout_s = float(os.getenv("INKYPI_PLUGIN_TIMEOUT_S", "60") or "60")
+        attempts = max(1, retries + 1)
+
+        last_exc: BaseException | None = None
+        for attempt in range(1, attempts + 1):
+            result_holder: dict = {}
+
+            def _worker():
+                try:
+                    plugin = get_plugin_instance(plugin_config)
+                    image = refresh_action.execute(plugin, self.device_config, current_dt)
+                    meta = None
+                    if hasattr(plugin, "get_latest_metadata"):
+                        meta = plugin.get_latest_metadata()
+                    result_holder["image"] = image
+                    result_holder["meta"] = meta
+                except Exception as exc:
+                    result_holder["error"] = exc
+
+            worker_thread = threading.Thread(target=_worker, daemon=True)
+            worker_thread.start()
+            worker_thread.join(timeout=timeout_s)
+
+            if worker_thread.is_alive():
+                last_exc = TimeoutError(
+                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+                )
+            elif "error" in result_holder:
+                last_exc = result_holder["error"]
+            else:
+                return result_holder["image"], result_holder.get("meta")
+
+            if attempt < attempts:
+                sleep(max(0.0, backoff_ms / 1000.0))
 
         if last_exc is not None:
             raise last_exc

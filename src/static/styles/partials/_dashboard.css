@@ -38,7 +38,11 @@
 .dashboard-stage-header h2,
 .storage-card-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--muted);
 }
 
 .dashboard-stage-copy,
@@ -60,7 +64,11 @@
 
 .dashboard-status-card h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--muted);
 }
 
 .dashboard-status-meta {
@@ -81,23 +89,24 @@
   width: 100%;
   max-width: min(100%, 50rem);
   margin: 0 auto;
-  padding: 0;
+  padding: 4px;
   aspect-ratio: 5 / 3;
   min-height: unset;
   display: block;
   overflow: hidden;
-  border-radius: 10px;
+  border-radius: var(--border-radius-lg);
   background: var(--surface);
   border: 1px solid var(--surface-border);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-sm);
 }
 
 .dashboard-stage .image-container {
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
 }
 
 .dashboard-stage .image-container:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-md);
 }
 
 .dashboard-stage .image-container img {
@@ -203,5 +212,5 @@
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--surface);
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-md);
 }

@@ -267,6 +267,38 @@
       ui.savePref && ui.savePref("", prefKey("wrap"), state.logsWrap);
     }
 
+    async function checkForUpdates() {
+      const badge = document.getElementById("updateBadge");
+      const latestEl = document.getElementById("latestVersion");
+      const updateBtn = document.getElementById("startUpdateBtn");
+      const notesContainer = document.getElementById("releaseNotesContainer");
+      const notesBody = document.getElementById("releaseNotesBody");
+      if (badge) { badge.textContent = "Checking..."; badge.className = "status-chip"; }
+      try {
+        const resp = await fetch(config.versionUrl, { cache: "no-store" });
+        const data = await resp.json();
+        if (latestEl) latestEl.textContent = data.latest || "—";
+        if (data.update_available) {
+          if (badge) { badge.textContent = "Update available"; badge.className = "status-chip warning"; }
+          if (updateBtn) updateBtn.disabled = false;
+        } else if (data.latest) {
+          if (badge) { badge.textContent = "Up to date"; badge.className = "status-chip success"; }
+          if (updateBtn) updateBtn.disabled = true;
+        } else {
+          if (badge) { badge.textContent = "Unable to check"; badge.className = "status-chip"; }
+        }
+        // Populate release notes if available
+        if (data.release_notes && notesContainer && notesBody) {
+          notesBody.textContent = data.release_notes;
+          notesContainer.hidden = false;
+        } else if (notesContainer) {
+          notesContainer.hidden = true;
+        }
+      } catch (e) {
+        if (badge) { badge.textContent = "Check failed"; badge.className = "status-chip"; }
+      }
+    }
+
     async function startUpdate() {
       const btns = document.querySelectorAll(".header-actions .header-button");
       try {
@@ -290,6 +322,7 @@
               clearInterval(state.updateTimer);
               state.updateTimer = null;
               setTimeout(fetchAndRenderLogs, 500);
+              checkForUpdates();
             }
           } catch (e) {
             clearInterval(state.updateTimer);
@@ -461,13 +494,15 @@
       }
     }
 
+    let _progressES = null;
+
     function initProgressSSE() {
       try {
         if (!window.EventSource) return;
-        const es = new EventSource("/api/progress/stream");
+        _progressES = new EventSource("/api/progress/stream");
         const refresh = () => refreshHealth();
-        es.addEventListener("done", refresh);
-        es.addEventListener("error", refresh);
+        _progressES.addEventListener("done", refresh);
+        _progressES.addEventListener("error", refresh);
       } catch (e) {
         console.warn("Progress SSE unavailable:", e);
       }
@@ -619,6 +654,7 @@
       document.getElementById("isolatePluginBtn")?.addEventListener("click", isolatePlugin);
       document.getElementById("unIsolatePluginBtn")?.addEventListener("click", unIsolatePlugin);
       document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
+      document.getElementById("checkUpdatesBtn")?.addEventListener("click", checkForUpdates);
       document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
       document.getElementById("rebootBtn")?.addEventListener("click", () => handleShutdown(true));
       document.getElementById("shutdownBtn")?.addEventListener("click", () => handleShutdown(false));
@@ -644,6 +680,7 @@
       refreshHealth();
       refreshIsolation();
       initProgressSSE();
+      setTimeout(checkForUpdates, 5000);
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setActiveTab(state.activeTab));
       }
@@ -652,10 +689,15 @@
           clearInterval(state.updateTimer);
           state.updateTimer = null;
         }
+        if (_progressES) {
+          _progressES.close();
+          _progressES = null;
+        }
       });
     }
 
     Object.assign(window, {
+      checkForUpdates,
       exportConfig,
       handleAction,
       handleShutdown,

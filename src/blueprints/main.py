@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import time
 from datetime import UTC, datetime
@@ -225,7 +226,7 @@ def display_next():
     global _last_display_next_time
     now = time.monotonic()
     if now - _last_display_next_time < _DISPLAY_NEXT_COOLDOWN_SECONDS:
-        remaining = int(_DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time))
+        remaining = math.ceil(_DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time))
         return json_error(f"Please wait {remaining}s before requesting another display update", status=429)
     _last_display_next_time = now
 
@@ -316,8 +317,9 @@ def display_next():
                 device_config.write_config()
             except Exception:
                 pass
-    except Exception as e:
-        return json_error(str(e), status=500)
+    except Exception:
+        logger.exception("display_next failed")
+        return json_error("An internal error occurred", status=500)
 
     # Gather metrics from refresh_info if available
     try:

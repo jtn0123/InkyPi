@@ -64,8 +64,7 @@ def plugin_page(plugin_id: str):
             )
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {plugin_instance_name} does not exist",
-                    status=404,
+                    f"Plugin instance: {plugin_instance_name} does not exist", status=404
                 )
             template_params["plugin_settings"] = plugin_instance.settings
             template_params["plugin_instance"] = plugin_instance_name
