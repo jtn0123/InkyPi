@@ -112,6 +112,8 @@ upgrade_compat_suite() {
 
 coverage_suite() {
     rm -f coverage.xml
+    export INKYPI_PLUGIN_ISOLATION=none
+    export INKYPI_NO_HOT_RELOAD=1
     python -m pytest \
         -q \
         --cov=src \
