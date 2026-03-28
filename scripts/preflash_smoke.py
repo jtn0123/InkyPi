@@ -270,6 +270,9 @@ def run_cache_smoke() -> None:
         _prepare_env(tmpdir, config_path=config_path, web_only=True)
         _ensure_src_on_path()
 
+        from PIL import Image
+
+        import plugins.ai_text.ai_text as ai_text_mod
         from config import Config
         from display.display_manager import DisplayManager
         from refresh_task import ManualRefresh, RefreshTask
@@ -286,6 +289,15 @@ def run_cache_smoke() -> None:
 
         display_manager.display.display_image = fake_display
 
+        calls = {"count": 0}
+
+        def fake_generate(self, settings, cfg):
+            calls["count"] += 1
+            return Image.new("RGB", cfg.get_resolution(), (200, 200, 200))
+
+        original_generate = ai_text_mod.AIText.generate_image
+        ai_text_mod.AIText.generate_image = fake_generate
+
         refresh_task.start()
         try:
             settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
@@ -293,6 +305,7 @@ def run_cache_smoke() -> None:
             metrics2 = refresh_task.manual_update(ManualRefresh("ai_text", settings))
         finally:
             refresh_task.stop()
+            ai_text_mod.AIText.generate_image = original_generate
 
         if writes["count"] != 1:
             raise RuntimeError(f"Expected 1 display write, saw {writes['count']}")
