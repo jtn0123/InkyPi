@@ -48,7 +48,9 @@ echo "Repository root: $REPO_DIR"
 # Save current version for rollback breadcrumb
 # ---------------------------------------------------------------------------
 CURRENT_VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "unknown")
-echo "$CURRENT_VERSION" > /tmp/inkypi_prev_version
+STATE_DIR="/var/lib/inkypi"
+mkdir -p "$STATE_DIR"
+echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version"
 echo "Current version: $CURRENT_VERSION"
 
 # ---------------------------------------------------------------------------
@@ -85,11 +87,11 @@ fi
 # ---------------------------------------------------------------------------
 # Delegate to update.sh for deps, CSS build, and service restart
 # ---------------------------------------------------------------------------
-UPDATE_SCRIPT="$SCRIPT_DIR/update.sh"
+UPDATE_SCRIPT="$REPO_DIR/install/update.sh"
 if [ ! -f "$UPDATE_SCRIPT" ]; then
   echo "ERROR: update.sh not found at $UPDATE_SCRIPT" >&2
   exit 1
 fi
 
-echo "Running update.sh..."
+echo "Running update.sh from checked-out code..."
 exec bash "$UPDATE_SCRIPT"

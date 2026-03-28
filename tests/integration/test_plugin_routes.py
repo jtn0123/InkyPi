@@ -375,4 +375,4 @@ def test_delete_plugin_instance_calls_plugin_cleanup(client, device_config_dev, 
     )
     assert resp.status_code == 200
     assert "settings" in cleanup_called
-    assert cleanup_called["settings"] == {"key": "val"}
+    assert cleanup_called["settings"] == {}

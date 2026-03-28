@@ -201,7 +201,7 @@ def delete_plugin_instance():
         try:
             plugin_obj = get_plugin_instance(plugin_id)
             if plugin_obj and hasattr(plugin_obj, "cleanup"):
-                plugin_obj.cleanup(data.get("settings", {}))
+                plugin_obj.cleanup({})
         except Exception:
             logger.warning("Plugin cleanup failed for %s", plugin_id, exc_info=True)
     except Exception as e:

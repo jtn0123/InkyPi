@@ -294,6 +294,7 @@ _UPDATE_STATE: dict[str, object] = {
 }
 
 _UPDATE_TIMEOUT_SECONDS = 1800  # 30 minutes
+_update_lock = threading.Lock()
 
 
 def _get_update_script_path() -> str | None:
@@ -345,11 +346,12 @@ def _systemd_available() -> bool:
 
 
 def _set_update_state(running: bool, unit: str | None):
-    if not running and _UPDATE_STATE.get("unit"):
-        _UPDATE_STATE["last_unit"] = _UPDATE_STATE["unit"]
-    _UPDATE_STATE["running"] = bool(running)
-    _UPDATE_STATE["unit"] = unit
-    _UPDATE_STATE["started_at"] = float(time.time()) if running else None
+    with _update_lock:
+        if not running and _UPDATE_STATE.get("unit"):
+            _UPDATE_STATE["last_unit"] = _UPDATE_STATE["unit"]
+        _UPDATE_STATE["running"] = bool(running)
+        _UPDATE_STATE["unit"] = unit
+        _UPDATE_STATE["started_at"] = float(time.time()) if running else None
 
 
 def _start_update_via_systemd(unit_name: str, script_path: str, target_tag: str | None = None) -> None:
@@ -440,13 +442,14 @@ def start_update():
     panel via /api/logs.
     """
     try:
-        if _UPDATE_STATE.get("running"):
-            return jsonify({
-                "success": False,
-                "error": "Update already in progress.",
-                "running": True,
-                "unit": _UPDATE_STATE.get("unit"),
-            }), 409
+        with _update_lock:
+            if _UPDATE_STATE.get("running"):
+                return jsonify({
+                    "success": False,
+                    "error": "Update already in progress.",
+                    "running": True,
+                    "unit": _UPDATE_STATE.get("unit"),
+                }), 409
 
         # Accept optional target tag from JSON body
         target_tag: str | None = None
