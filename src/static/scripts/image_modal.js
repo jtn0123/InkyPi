@@ -35,18 +35,26 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(img, { attributes: true, attributeFilter: ['src'] });
     });
 
+    function closeModal() {
+        if (observer) {
+            observer.disconnect();
+            observer = null;
+        }
+        if (modalOverlay) {
+            modalOverlay.remove();
+            modalOverlay = null;
+        }
+        modalImg = null;
+        imageContainer.classList.remove('maximized');
+        document.body.style.overflow = '';
+    }
+
     // Handle click on overlay to close modal
     document.addEventListener('click', function(e) {
         if (imageContainer.classList.contains('maximized') && modalOverlay && !img.contains(e.target)) {
-            if (observer) {
-                observer.disconnect();
-                observer = null;
-            }
-            modalOverlay.remove();
-            modalOverlay = null;
-            modalImg = null;
-            imageContainer.classList.remove('maximized');
-            document.body.style.overflow = '';
+            closeModal();
         }
     });
+
+    window.addEventListener('beforeunload', closeModal);
 });

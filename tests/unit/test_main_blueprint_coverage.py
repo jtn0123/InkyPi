@@ -84,6 +84,52 @@ def test_display_next_no_playlist(client, device_config_dev):
     assert resp.status_code == 400
 
 
+def test_display_next_first_request_not_rate_limited(client, device_config_dev):
+    """First POST to /display-next should not be rate-limited (returns 400 for no playlist, not 429)."""
+    from blueprints.main import _reset_display_next_cooldown
+
+    _reset_display_next_cooldown()
+    resp = client.post("/display-next")
+    assert resp.status_code == 400  # no active playlist, but NOT 429
+
+
+def test_display_next_second_request_within_cooldown_returns_429(client, device_config_dev):
+    """Second immediate POST within cooldown returns 429."""
+    from blueprints.main import _reset_display_next_cooldown
+
+    _reset_display_next_cooldown()
+    client.post("/display-next")
+    resp = client.post("/display-next")
+    assert resp.status_code == 429
+    body = resp.get_json()
+    assert body["success"] is False
+    assert "wait" in body["error"].lower()
+
+
+def test_display_next_after_cooldown_expires_succeeds(client, device_config_dev, monkeypatch):
+    """After the cooldown period elapses, the endpoint should accept requests again."""
+    import blueprints.main as main_mod
+    from blueprints.main import _reset_display_next_cooldown
+
+    _reset_display_next_cooldown()
+
+    # First request at t=1000
+    fake_time = [1000.0]
+    monkeypatch.setattr(time, "monotonic", lambda: fake_time[0])
+    resp1 = client.post("/display-next")
+    assert resp1.status_code == 400  # no playlist, but not 429
+
+    # Second request still within cooldown (t=1005, cooldown=10s)
+    fake_time[0] = 1005.0
+    resp2 = client.post("/display-next")
+    assert resp2.status_code == 429
+
+    # Third request after cooldown expires (t=1011)
+    fake_time[0] = 1011.0
+    resp3 = client.post("/display-next")
+    assert resp3.status_code == 400  # no playlist, but not 429
+
+
 def test_display_next_exception(client, flask_app, device_config_dev):
     """Plugin generation error returns 500."""
     mock_playlist = MagicMock()

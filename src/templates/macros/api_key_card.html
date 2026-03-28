@@ -1,0 +1,25 @@
+{#- Reusable API-key card for the managed-keys form.
+
+    Parameters:
+        label         – Human-readable provider name (e.g. "OpenAI")
+        key_name      – Env-var / secret key name  (e.g. "OPEN_AI_SECRET")
+        input_id      – HTML id for the <input>     (e.g. "openai-input")
+        status_id     – HTML id for the status div   (e.g. "openai-status")
+        placeholder   – Input placeholder text
+        masked        – The full `masked` dict from the template context
+        api_key_plugins – The plugin-usage dict (may be None)
+-#}
+{% macro api_key_card(label, key_name, input_id, status_id, placeholder, masked, api_key_plugins) %}
+<div class="form-group api-key-card">
+    <div class="api-key-card-head">
+        <label class="form-label" for="{{ input_id }}">{{ label }}</label>
+        <div id="{{ status_id }}" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked[key_name] ~ ')' if masked[key_name] else 'Not configured' }}</div>
+        {% if api_key_plugins and api_key_plugins.get(key_name) %}<div class="api-key-usage">Used by: {{ api_key_plugins[key_name] | join(', ') }}</div>{% endif %}
+    </div>
+    <div class="input-container api-key-actions">
+        <input type="password" id="{{ input_id }}" name="{{ key_name }}" placeholder="{{ placeholder }}" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked[key_name] else '' }}">
+        {% if masked[key_name] %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="{{ input_id }}" aria-label="Clear {{ label }} key">×</button>{% endif %}
+        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}">Delete</button>{% endif %}
+    </div>
+</div>
+{% endmacro %}

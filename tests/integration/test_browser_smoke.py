@@ -168,11 +168,10 @@ def _assert_clean_runtime(page, runtime: dict, screenshot_dir: Path, name: str):
         pytest.fail("\n".join(failures + [f"screenshot: {screenshot_path}"]))
 
 
-def _assert_skip_link_removed(page):
+def _assert_skip_link_present(page):
+    """Skip links are an accessibility requirement — verify they exist."""
     html = page.content()
-    assert "skip-nav" not in html
-    assert "Skip to main content" not in html
-    assert "Skip to settings content" not in html
+    assert "skip-link" in html or "Skip to main content" in html
 
 
 def _assert_plugin_page_ready(page, plugin_id: str):
@@ -247,7 +246,7 @@ def _open_and_check(page, base_url: str, route_name: str, route_path: str, scree
     page.goto(f"{base_url}{route_path}", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector("[data-page-shell]", timeout=10000)
     page.wait_for_timeout(500)
-    _assert_skip_link_removed(page)
+    _assert_skip_link_present(page)
     return runtime
 
 

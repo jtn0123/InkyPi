@@ -221,15 +221,18 @@ class OperationStatusManager {
         if (!listEl) return;
 
         if (this.currentOperations.size === 0) {
-            listEl.innerHTML = '<div class="no-operations">No active operations</div>';
+            listEl.textContent = '';
+            const noOps = document.createElement('div');
+            noOps.className = 'no-operations';
+            noOps.textContent = 'No active operations';
+            listEl.appendChild(noOps);
             return;
         }
 
-        const operationsHtml = Array.from(this.currentOperations.values())
-            .map(op => this.renderOperationItem(op, true))
-            .join('');
-
-        listEl.innerHTML = operationsHtml;
+        listEl.textContent = '';
+        Array.from(this.currentOperations.values()).forEach(op => {
+            listEl.appendChild(this.renderOperationItem(op, true));
+        });
     }
 
     /**
@@ -240,22 +243,25 @@ class OperationStatusManager {
         if (!listEl) return;
 
         if (this.recentOperations.length === 0) {
-            listEl.innerHTML = '<div class="no-operations">No recent operations</div>';
+            listEl.textContent = '';
+            const noOps = document.createElement('div');
+            noOps.className = 'no-operations';
+            noOps.textContent = 'No recent operations';
+            listEl.appendChild(noOps);
             return;
         }
 
-        const operationsHtml = this.recentOperations
-            .map(op => this.renderOperationItem(op, false))
-            .join('');
-
-        listEl.innerHTML = operationsHtml;
+        listEl.textContent = '';
+        this.recentOperations.forEach(op => {
+            listEl.appendChild(this.renderOperationItem(op, false));
+        });
     }
 
     /**
      * Render an operation item
      * @param {Object} operation - Operation data
      * @param {boolean} isCurrent - Whether this is a current operation
-     * @returns {string} HTML string
+     * @returns {HTMLElement} DOM element for the operation
      */
     renderOperationItem(operation, isCurrent) {
         const statusIcon = {
@@ -269,35 +275,57 @@ class OperationStatusManager {
         const duration = operation.duration ? this.formatDuration(operation.duration) : '';
         const elapsed = isCurrent ? this.formatDuration(Date.now() - operation.startTime) : '';
 
-        const esc = (str) => {
-            const el = document.createElement('span');
-            el.textContent = str;
-            return el.innerHTML;
-        };
+        const item = document.createElement('div');
+        item.className = `operation-item ${statusClass}`;
 
-        return `
-            <div class="operation-item ${statusClass}">
-                <div class="operation-header">
-                    <span class="operation-icon">${statusIcon}</span>
-                    <span class="operation-description">${esc(operation.description)}</span>
-                    <span class="operation-time">${duration || elapsed}</span>
-                </div>
-                ${isCurrent && operation.progress > 0 ? `
-                    <div class="operation-progress">
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${operation.progress}%"></div>
-                        </div>
-                        <span class="progress-text">${operation.progress}%</span>
-                    </div>
-                ` : ''}
-                ${operation.currentStep ? `
-                    <div class="operation-step">${esc(operation.currentStep)}</div>
-                ` : ''}
-                ${operation.error ? `
-                    <div class="operation-error">${esc(operation.error)}</div>
-                ` : ''}
-            </div>
-        `;
+        const header = document.createElement('div');
+        header.className = 'operation-header';
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'operation-icon';
+        iconSpan.textContent = statusIcon;
+        const descSpan = document.createElement('span');
+        descSpan.className = 'operation-description';
+        descSpan.textContent = operation.description;
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'operation-time';
+        timeSpan.textContent = duration || elapsed;
+        header.appendChild(iconSpan);
+        header.appendChild(descSpan);
+        header.appendChild(timeSpan);
+        item.appendChild(header);
+
+        if (isCurrent && operation.progress > 0) {
+            const progressDiv = document.createElement('div');
+            progressDiv.className = 'operation-progress';
+            const bar = document.createElement('div');
+            bar.className = 'progress-bar';
+            const fill = document.createElement('div');
+            fill.className = 'progress-fill';
+            fill.style.width = `${operation.progress}%`;
+            bar.appendChild(fill);
+            const pctSpan = document.createElement('span');
+            pctSpan.className = 'progress-text';
+            pctSpan.textContent = `${operation.progress}%`;
+            progressDiv.appendChild(bar);
+            progressDiv.appendChild(pctSpan);
+            item.appendChild(progressDiv);
+        }
+
+        if (operation.currentStep) {
+            const stepDiv = document.createElement('div');
+            stepDiv.className = 'operation-step';
+            stepDiv.textContent = operation.currentStep;
+            item.appendChild(stepDiv);
+        }
+
+        if (operation.error) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'operation-error';
+            errorDiv.textContent = operation.error;
+            item.appendChild(errorDiv);
+        }
+
+        return item;
     }
 
     /**
@@ -408,6 +436,10 @@ window.startOperation = function(id, description, options = {}) {
 // Integration with existing progress systems
 document.addEventListener('DOMContentLoaded', () => {
     // Auto-detect when form submissions start
+    const nativeFetch = window.fetch.bind(window);
+    let fetchWrapped = false;
+    let fetchTimeoutId = null;
+
     document.addEventListener('submit', (e) => {
         const form = e.target;
         const formId = form.id || 'form-' + Date.now();
@@ -416,37 +448,51 @@ document.addEventListener('DOMContentLoaded', () => {
         // Start operation tracking
         const operation = window.operationStatus.startOperation(formId, description);
 
-        // Try to detect when the form submission completes
-        const originalFetch = window.fetch;
         let operationCompleted = false;
 
-        // Wrap fetch to detect completion
-        window.fetch = function(...args) {
-            return originalFetch.apply(this, args).then(response => {
-                if (!operationCompleted) {
-                    if (response.ok) {
-                        operation.complete('Form submitted successfully');
-                    } else {
-                        operation.fail(`Request failed: ${response.status} ${response.statusText}`);
+        function restoreFetch() {
+            if (fetchWrapped) {
+                window.fetch = nativeFetch;
+                fetchWrapped = false;
+            }
+            if (fetchTimeoutId) {
+                clearTimeout(fetchTimeoutId);
+                fetchTimeoutId = null;
+            }
+        }
+
+        // Only wrap fetch if not already wrapped
+        if (!fetchWrapped) {
+            fetchWrapped = true;
+            window.fetch = function(...args) {
+                return nativeFetch(...args).then(response => {
+                    if (!operationCompleted) {
+                        operationCompleted = true;
+                        restoreFetch();
+                        if (response.ok) {
+                            operation.complete('Form submitted successfully');
+                        } else {
+                            operation.fail(`Request failed: ${response.status} ${response.statusText}`);
+                        }
                     }
-                    operationCompleted = true;
-                    window.fetch = originalFetch;
-                }
-                return response;
-            }).catch(error => {
-                if (!operationCompleted) {
-                    operation.fail(`Network error: ${error.message}`);
-                    operationCompleted = true;
-                    window.fetch = originalFetch;
-                }
-                throw error;
-            });
-        };
+                    return response;
+                }).catch(error => {
+                    if (!operationCompleted) {
+                        operationCompleted = true;
+                        restoreFetch();
+                        operation.fail(`Network error: ${error.message}`);
+                    }
+                    throw error;
+                });
+            };
+        }
 
         // Restore original fetch after a timeout
-        setTimeout(() => {
+        if (fetchTimeoutId) clearTimeout(fetchTimeoutId);
+        fetchTimeoutId = setTimeout(() => {
+            restoreFetch();
             if (!operationCompleted) {
-                window.fetch = originalFetch;
+                operationCompleted = true;
                 operation.fail('Request timeout');
             }
         }, 30000);

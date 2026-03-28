@@ -231,22 +231,35 @@
     }
 
     function initRealtime() {
+      let pollTimerId = null;
+      let sseSource = null;
+
+      function cleanup() {
+        if (sseSource) { sseSource.close(); sseSource = null; }
+        if (pollTimerId) { clearInterval(pollTimerId); pollTimerId = null; }
+      }
+
+      window.addEventListener("beforeunload", cleanup);
+      window.addEventListener("pagehide", cleanup);
+
       const pushUrl = config.pushUrl;
       if (pushUrl && window.EventSource) {
         try {
-          const source = new EventSource(pushUrl);
-          source.onmessage = () => refreshPreview();
-          source.onerror = () => {
+          sseSource = new EventSource(pushUrl);
+          sseSource.onmessage = () => refreshPreview();
+          sseSource.onerror = () => {
             console.warn("SSE connection lost, falling back to polling");
-            source.close();
-            startPolling();
+            if (sseSource) { sseSource.close(); sseSource = null; }
+            refreshPreview();
+            pollTimerId = setInterval(refreshPreview, pollIntervalMs);
           };
           return;
         } catch (error) {
           console.warn("SSE not available, using polling:", error);
         }
       }
-      startPolling();
+      refreshPreview();
+      pollTimerId = setInterval(refreshPreview, pollIntervalMs);
     }
 
     function init() {

@@ -277,8 +277,9 @@
   background: var(--bg-secondary);
   padding: 14px;
   color: var(--text);
-  font-size: 0.8rem;
-  line-height: 1.45;
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.78rem;
+  line-height: 1.5;
   white-space: pre-wrap;
 }
 
@@ -303,26 +304,40 @@
 
 .settings-side-nav {
   display: grid;
-  gap: 8px;
+  gap: 2px;
   align-self: start;
   position: sticky;
   top: 16px;
+  border-right: 1px solid var(--divider);
+  padding-right: var(--spacing-lg);
 }
 
 .settings-side-link {
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
-  color: var(--text);
-  border-radius: var(--border-radius-md);
-  padding: 12px 14px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 0;
+  padding: 10px 14px;
   text-align: left;
+  font-size: var(--text-sm);
   font-weight: 600;
+  letter-spacing: var(--tracking-wide);
   cursor: pointer;
+  transition: color var(--transition-speed) ease,
+              background-color var(--transition-speed) ease,
+              border-color var(--transition-speed) ease;
+}
+
+.settings-side-link:hover {
+  color: var(--text);
+  background: var(--panel-bg);
 }
 
 .settings-side-link.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--panel-bg));
+  border-left-color: var(--accent);
+  color: var(--text);
+  background: var(--panel-bg);
 }
 
 .settings-console-panel {

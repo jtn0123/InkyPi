@@ -248,7 +248,13 @@ class SkeletonLoader {
             skeleton.appendChild(label);
 
             const startTime = Date.now();
+            if (skeleton._elapsedTimer) clearInterval(skeleton._elapsedTimer);
             const timer = setInterval(() => {
+                if (!document.contains(skeleton)) {
+                    clearInterval(timer);
+                    skeleton._elapsedTimer = null;
+                    return;
+                }
                 const elapsed = Math.floor((Date.now() - startTime) / 1000);
                 const elapsedEl = label.querySelector('.skeleton-elapsed');
                 if (elapsedEl) {
@@ -256,7 +262,6 @@ class SkeletonLoader {
                     const s = elapsed % 60;
                     elapsedEl.textContent = m > 0 ? `${m}m ${s}s` : `${s}s`;
                 }
-                if (!document.contains(skeleton)) clearInterval(timer);
             }, 1000);
             skeleton._elapsedTimer = timer;
         }

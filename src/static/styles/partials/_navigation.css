@@ -3,15 +3,18 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 0;
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--divider);
     min-height: 48px; /* Consistent header height */
 }
 
 .app-header .app-title {
     margin: 0;
     font-size: 1.5rem;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.2;
+    letter-spacing: var(--tracking-tight);
     color: var(--text);
 }
 
@@ -28,6 +31,26 @@
     align-items: center;
     gap: 12px;
     margin-left: auto;
+}
+
+/* Ghost-style icon buttons for navigation (no fill, border on hover) */
+.header-button.icon {
+    background-color: transparent;
+    color: var(--muted);
+    border: 1px solid transparent;
+    padding: var(--container-padding);
+    width: var(--container-header);
+    height: var(--container-header);
+    border-radius: var(--border-radius-md);
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.header-button.icon:hover {
+    background-color: var(--panel-bg);
+    border-color: var(--surface-border);
+    color: var(--text);
 }
 
 .app-header > .header-button.icon {
@@ -108,16 +131,15 @@ svg.icon-thin {
     outline: 3px solid var(--accent);
     outline-offset: 3px;
     border-radius: 6px;
-    box-shadow: 0 0 0 6px rgba(36, 221, 189, 0.15);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 /* Enhanced global focus with better visibility */
 *:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 3px;
-    border-radius: 4px;
-    /* Add subtle glow for better visibility */
-    box-shadow: 0 0 0 4px rgba(36, 221, 189, 0.15);
+    border-radius: var(--border-radius-sm);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
 .icon-button:focus-visible,
@@ -126,9 +148,8 @@ svg.icon-thin {
     outline: 3px solid var(--accent);
     outline-offset: 3px;
     z-index: 1;
-    /* Enhanced glow effect for important interactive elements */
-    box-shadow: 0 0 0 6px rgba(36, 221, 189, 0.2),
-                0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent),
+                0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 /* Back button icon sizing */
@@ -189,19 +210,21 @@ svg.icon-thin {
 
 .nav-icons .settings-button {
     padding: var(--container-padding);
-    border-radius: 6px;
+    border-radius: var(--border-radius-md);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: var(--container-header);
     height: var(--container-header);
-    border: 1px solid var(--surface-border);
+    border: 1px solid transparent;
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
     background-color: transparent;
-    background-clip: padding-box; /* avoid inner square against the border */
-    transition: all 0.2s ease;
+    background-clip: padding-box;
+    transition: background-color var(--transition-speed) ease,
+                border-color var(--transition-speed) ease,
+                color var(--transition-speed) ease;
 }
 
 /* Subtle accent overlay to mirror plugin card hover */
@@ -220,7 +243,7 @@ svg.icon-thin {
 
 .nav-icons .settings-button:hover {
     background-color: var(--panel-bg);
-    border-color: var(--accent);
+    border-color: var(--surface-border);
     transform: none;
 }
 
@@ -230,7 +253,6 @@ svg.icon-thin {
     opacity: 0.05;
 }
 
-/* no separate rule needed; overlay created with opacity already applied */
 .header-button.icon svg {
     display: block;
     shape-rendering: geometricPrecision;
@@ -295,15 +317,16 @@ svg.icon-thin {
 }
 
 .header-button {
-    background-color: var(--accent);
+    background-color: var(--primary);
     color: var(--on-accent);
     border: none;
     padding: 10px 16px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-md);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide);
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.2, 0, 0.38, 0.9);
+    transition: all var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
@@ -322,7 +345,7 @@ svg.icon-thin {
     border: 1px solid var(--border-color);
 }
 .header-button.is-secondary:hover {
-    background-color: var(--bg-tertiary);
+    background-color: var(--panel-bg);
 }
 .header-button.is-dark {
     background-color: var(--text);
@@ -344,4 +367,51 @@ svg.icon-thin {
 
 .header-button.is-warning {
     background-color: var(--warning);
+}
+
+/* Breadcrumb navigation */
+.breadcrumb {
+    margin-bottom: var(--spacing-md);
+}
+
+.breadcrumb ol {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.breadcrumb li {
+    display: inline-flex;
+    align-items: center;
+}
+
+.breadcrumb li + li::before {
+    content: "\203A";
+    margin: 0 var(--spacing-sm);
+    color: var(--muted);
+    font-weight: var(--font-normal);
+    font-size: var(--text-sm);
+}
+
+.breadcrumb a {
+    color: var(--primary);
+    text-decoration: none;
+    transition: color var(--transition-speed) ease;
+}
+
+.breadcrumb a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
+.breadcrumb [aria-current="page"] span {
+    color: var(--text);
+    font-weight: var(--font-medium);
 }

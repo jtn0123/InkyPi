@@ -80,7 +80,7 @@ def test_update_plugin_instance_missing_instance_name(client):
 
 def test_update_plugin_instance_plugin_not_found(client):
     resp = client.put("/update_plugin_instance/test", data={"plugin_id": "nonexistent"})
-    assert resp.status_code == 500
+    assert resp.status_code == 404
     assert "Plugin instance: test does not exist" in resp.get_json().get("error", "")
 
 
@@ -201,7 +201,7 @@ def test_update_plugin_instance_missing(client):
     resp = client.put(
         "/update_plugin_instance/does-not-exist", data={"plugin_id": "ai_text"}
     )
-    assert resp.status_code in (200, 500)
+    assert resp.status_code in (200, 404, 500)
 
 
 def test_save_plugin_settings_persist_and_load_on_plugin_page(client, monkeypatch):

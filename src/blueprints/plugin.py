@@ -62,7 +62,7 @@ def plugin_page(plugin_id: str):
             plugin_instance = playlist_manager.find_plugin(plugin_id, plugin_instance_name)
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {plugin_instance_name} does not exist", status=500
+                    f"Plugin instance: {plugin_instance_name} does not exist", status=404
                 )
             template_params["plugin_settings"] = plugin_instance.settings
             template_params["plugin_instance"] = plugin_instance_name
@@ -155,22 +155,13 @@ def latest_plugin_image(plugin_id: str):
         return ("Not Found", 404)
 
 
-@plugin_bp.route("/weather_icon_preview", methods=["POST"], endpoint="weather_icon_preview")
-def weather_icon_preview():
-    """Stub endpoint used by weather plugin settings to preview icons.
-
-    For tests, returning 404 is acceptable; the UI handles preview errors gracefully.
-    """
-    return ("Not Found", 404)
-
-
 @plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])
 def delete_plugin_instance():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return ("Unsupported media type", 415)
+        return json_error("Unsupported media type", status=415)
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
@@ -222,7 +213,7 @@ def update_plugin_instance(instance_name: str):
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             return json_error(
-                f"Plugin instance: {instance_name} does not exist", status=500
+                f"Plugin instance: {instance_name} does not exist", status=404
             )
 
         plugin_instance.settings = plugin_settings
@@ -245,7 +236,7 @@ def display_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return ("Unsupported media type", 415)
+        return json_error("Unsupported media type", status=415)
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")

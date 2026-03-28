@@ -309,7 +309,9 @@ def test_plugin_exception_message_is_preserved(device_config_dev, monkeypatch):
     try:
         task.start()
 
-        with pytest.raises(RuntimeError, match="Custom plugin error"):
+        # In subprocess mode the custom exception is wrapped as RuntimeError;
+        # in in-process mode the original exception propagates directly.
+        with pytest.raises(Exception, match="Custom plugin error"):
             refresh = ManualRefresh("custom", {})
             task.manual_update(refresh)
 

@@ -1,10 +1,12 @@
 /* Enhanced plugins section hierarchy */
 .plugins-title {
-    font-size: 1.25rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--muted);
     margin: 0;
     text-align: left;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
     transition: color var(--transition-speed) ease;
 }
 
@@ -24,21 +26,20 @@
 
 /* Improved button styling with better touch targets and consistent sizing */
 .icon-button {
-    border: 1px solid var(--surface-border);
-    border-radius: 12px;
+    border: var(--card-border);
+    border-radius: var(--card-radius);
     display: flex;
     align-items: center;
     justify-content: center;
-    /* Enforce consistent sizing */
     min-height: 90px;
     height: 90px;
     aspect-ratio: 1;
     padding: 12px;
     cursor: pointer;
-    transition: transform 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
-                box-shadow 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
-                border-color 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    transition: transform var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                border-color var(--transition-speed) ease;
+    box-shadow: var(--shadow-xs);
     background-color: var(--surface);
     position: relative;
     overflow: hidden;
@@ -46,15 +47,15 @@
 }
 
 .icon-button:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
     border-color: var(--accent);
 }
 
 .icon-button:active {
-    transform: translateY(0) scale(0.98);
+    transform: translateY(0);
     transition-duration: 0.1s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-xs);
 }
 
 .icon-button::before {
@@ -64,7 +65,7 @@
     border-radius: inherit;
     background: var(--accent);
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-speed) ease;
 }
 
 .icon-button:hover::before {
@@ -118,15 +119,16 @@
 }
 
 .form-group input[type="text"] {
-    flex-grow: 1; /* Expand the input field to fill the available space */
+    flex-grow: 1;
     padding: 0.5rem;
     font-size: 1rem;
     border: 1px solid var(--surface-border);
-    border-radius: 6px;
+    border-radius: var(--border-radius-sm);
     box-sizing: border-box;
     min-width: 50px;
     background-color: var(--input-bg);
     color: var(--text);
+    box-shadow: var(--input-shadow);
 }
 
 /* Standardize form input heights for accessibility */
@@ -148,7 +150,7 @@
 .form-group input[type="text"]:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Buttons container */
@@ -161,23 +163,24 @@
 /* Enhanced action buttons */
 .action-button {
     flex: 1;
-    background-color: var(--accent);
+    background-color: var(--primary);
     color: var(--on-accent);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--border-radius-md);
     padding: 16px;
     font-size: 1rem;
     font-weight: 600;
+    letter-spacing: var(--tracking-wide);
     cursor: pointer;
     text-align: center;
     width: 100%;
-    min-height: 48px; /* Better touch target */
+    min-height: 48px;
     position: relative;
     overflow: hidden;
-    transition: transform 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
-                box-shadow 0.2s cubic-bezier(0.2, 0, 0.38, 0.9),
-                background-color 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                background-color var(--transition-speed) ease;
+    box-shadow: var(--shadow-sm);
 }
 
 .action-button.warn {
@@ -190,29 +193,14 @@
 
 .action-button:hover {
     background-color: var(--primary-hover);
-    transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .action-button:active {
-    transform: translateY(0) scale(0.98);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: translateY(0);
+    box-shadow: var(--shadow-xs);
     transition-duration: 0.1s;
-}
-
-.action-button::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-}
-
-.action-button:active::after {
-    opacity: 1;
-    transition-duration: 0s;
 }
 
 .action-button.compact {
@@ -293,13 +281,14 @@
     padding: 0.4rem;
     font-size: 1rem;
     border: 1px solid var(--surface-border);
-    border-radius: 5px;
+    border-radius: var(--border-radius-sm);
     box-sizing: border-box;
     background-color: var(--input-bg);
     color: var(--text);
     min-height: var(--form-input-height);
     display: flex;
     align-items: center;
+    box-shadow: var(--input-shadow);
 }
 
 /* Unified styling for dropdowns to match the rest of the UI */
@@ -336,7 +325,7 @@ select.form-input option {
 .form-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 0 2px rgba(52, 198, 166, 0.28);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Enhanced form validation states */
@@ -416,18 +405,19 @@ select.form-input option {
 .toggle-label::before {
     position: absolute;
     content: "";
-    height: 18px;
-    width: 18px;
+    height: 20px;
+    width: 20px;
     background-color: var(--surface);
     border-radius: 50%;
-    top: 3px;
-    left: 3px;
-    transition: 0.3s;
+    top: 2px;
+    left: 2px;
+    transition: 0.25s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 /* When Checked */
 .toggle-checkbox:checked + .toggle-label {
-    background-color: var(--accent);
+    background-color: var(--primary);
 }
 
 .toggle-checkbox:checked + .toggle-label::before {
@@ -527,6 +517,7 @@ select.form-input option {
     border-radius: 6px;
     border: 1px solid var(--surface-border);
     vertical-align: middle;
+    background: var(--preview-color);
     transition: background 0.15s ease;
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }

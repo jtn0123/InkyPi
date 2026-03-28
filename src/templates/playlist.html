@@ -62,7 +62,7 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header">
                         <div class="playlist-heading">
-                        <span class="playlist-title">{{ playlist.name }}</span>
+                        <h3 class="playlist-title">{{ playlist.name }}</h3>
                         <div class="playlist-summary-row">
                             <span class="status-chip info">{{ playlist.plugins | length }} items</span>
                             {% if playlist.name == playlist_config.active_playlist %}
@@ -75,7 +75,7 @@
                             <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
                             <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
                             <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
-                            <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Details" data-expanded-label="Collapse" aria-expanded="false">Details</button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
                         </div>
                     </div>
                     <div class="playlist-card-body" data-playlist-body>
@@ -111,7 +111,7 @@
                                 {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
                                 <span class="displayed-now">Displayed Now</span>
                                 {% endif %}
-                                <div id="loadingIndicator" class="loading-indicator small left-align"></div>
+                                <div class="loading-indicator small left-align"></div>
 
                             </div>
                             <div class="plugin-actions">
@@ -198,6 +198,28 @@
             </form>
             <div class="buttons-container">
                 <button type="button" class="action-button" id="saveRefreshSettingsBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Playlist Confirm Modal -->
+    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete playlist" hidden>
+        <div class="modal-content modal-sheet">
+            <p id="deletePlaylistText"></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
+                <button type="button" class="action-button is-secondary" id="cancelDeletePlaylistBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Instance Confirm Modal -->
+    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete instance" hidden>
+        <div class="modal-content modal-sheet">
+            <p id="deleteInstanceText"></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmDeleteInstanceBtn">Delete</button>
+                <button type="button" class="action-button is-secondary" id="cancelDeleteInstanceBtn">Cancel</button>
             </div>
         </div>
     </div>

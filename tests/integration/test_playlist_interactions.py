@@ -1,55 +1,18 @@
+# pyright: reportMissingImports=false
 """
-UI Interaction Tests
+UI Interaction Tests for playlist page.
 
-WHY THESE TESTS REQUIRE BROWSER AUTOMATION:
-================================================================================
-These tests verify dynamic JavaScript behavior in the web interface that cannot
-be tested via static HTML requests. They require Playwright/Selenium because:
-
-1. **JavaScript Execution**:
-   - Tests verify client-side form validation
-   - Dynamic DOM updates (add/remove playlist items)
-   - AJAX requests and response handling
-   - Event listeners and user interactions
-   Cannot be tested with Flask test client (no JavaScript engine)
-
-2. **User Interactions**:
-   - Button clicks (add plugin, delete instance, etc.)
-   - Form submissions with validation
-   - Drag-and-drop reordering
-   - Modal dialogs (open/close/submit)
-   - Real browser events (mousedown, keypress, etc.)
-
-3. **Asynchronous Behavior**:
-   - Fetch API calls to backend
-   - Promise resolution and error handling
-   - Loading states and spinners
-   - Success/error message display
-   - Real network timing
-
-4. **Environment Requirements**:
-   - Browser automation framework (Playwright/Selenium)
-   - Browser binaries (Chromium ~200MB)
-   - JavaScript runtime
-   - Headless mode or display server
-
-WHAT THESE TESTS VERIFY:
-- Playlist UI allows adding/removing plugins via JavaScript
-- Form validation prevents invalid configurations
-- Dynamic updates work without page reload
-- Error messages display correctly
-- Modals and dialogs function properly
-
-TO RUN THESE TESTS:
-1. Install Playwright: pip install playwright
-2. Install browsers: playwright install chromium
-3. Unset SKIP_UI: unset SKIP_UI or SKIP_UI=0 pytest tests/integration/test_playlist_interactions.py
+Tests verify dynamic JavaScript behavior: keyboard reordering,
+delete modals, and drag-and-drop in the playlist interface.
 """
+from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
 
 import pytest
+
+from tests.integration.browser_helpers import navigate_and_wait, stub_leaflet
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -95,99 +58,155 @@ def _prepare_playlist(device_config_dev):
     device_config_dev.write_config()
 
 
-@pytest.mark.skip(reason="Keyboard reordering broken by upstream merge - needs JS investigation")
-def test_playlist_keyboard_reorder_and_delete_modal(client, device_config_dev, monkeypatch):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+def test_playlist_keyboard_reorder(live_server, device_config_dev, monkeypatch):
+    """Keyboard ArrowDown reorders plugin items and fires a reorder request."""
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     _prepare_playlist(device_config_dev)
-
-    resp = client.get("/playlist")
-    assert resp.status_code == 200
-    html = resp.get_data(as_text=True)
 
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            stub_leaflet(page)
 
-        # Load HTML and front-end scripts
-        page.set_content(html)
-        # Make response_modal helpers available
-        with open("src/static/scripts/response_modal.js", "r", encoding="utf-8") as f:
-            js_modal = f.read()
-        page.add_script_tag(content=js_modal)
+            # Intercept reorder requests instead of letting them hit the server
+            reorder_requests = []
+            page.route(
+                "**/reorder_plugins",
+                lambda route: (
+                    reorder_requests.append(route.request.url),
+                    route.fulfill(
+                        status=200,
+                        content_type="application/json",
+                        body='{"success": true, "message": "Reordered"}',
+                    ),
+                ),
+            )
+            # Prevent location.reload from navigating away
+            page.add_init_script("window.location.reload = () => {};")
 
-        # Set up mocks and context
-        page.evaluate("""
-            window.PLAYLIST_CTX = {
-                reorder_url: "/reorder_plugins",
-                delete_plugin_instance_url: "/delete_plugin_instance",
-                display_plugin_instance_url: "/display_plugin_instance",
-                create_playlist_url: "/create_playlist",
-                update_playlist_base_url: "/update_playlist/",
-                delete_playlist_base_url: "/delete_playlist/",
-                display_next_url: "/display_next_in_playlist",
-                device_tz_offset_min: 0
-            };
+            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
 
-            window.__requests__ = [];
-            const ok = (body) => new Response(JSON.stringify(Object.assign({success:true,message:"ok"}, body||{})), {status:200, headers:{'Content-Type':'application/json'}});
+            # Verify plugin items exist
+            items = page.locator(".plugin-item")
+            assert items.count() >= 2, "Need at least 2 plugin items for reorder test"
 
-            const origFetch = window.fetch;
-            window.fetch = (url, opts) => {
-                opts = opts || {};
-                console.log('Mock fetch called with URL:', url);
-                try { window.__requests__.push({url: (url && url.toString ? url.toString() : String(url)), body: opts.body, method: (opts && opts.method) || 'GET'}); } catch(e){ console.error('Error pushing request:', e); };
-                return Promise.resolve(ok());
-            };
-        """)
+            # Get initial order
+            first_name = items.nth(0).get_attribute("data-instance-name")
+            assert first_name == "Clock A"
 
-        # Attach playlist behavior script
-        with open("src/static/scripts/playlist.js", "r", encoding="utf-8") as f:
-            js_playlist = f.read()
-        page.add_script_tag(content=js_playlist)
+            # Focus first item and press ArrowDown to reorder
+            items.nth(0).focus()
+            items.nth(0).press("ArrowDown")
+            page.wait_for_timeout(500)
 
-        # Wait for script to load
-        page.wait_for_timeout(100)
-
-        # Check if playlist functions are loaded (check for a function that actually exists)
-        loaded = page.evaluate("() => typeof window.deletePluginInstance !== 'undefined'")
-        print(f"DEBUG: Playlist functions loaded: {loaded}")
-
-        # Check if plugin items exist
-        plugin_items = page.query_selector_all(".plugin-item")
-        print(f"DEBUG: Found {len(plugin_items)} plugin items")
-        if plugin_items:
-            print(f"DEBUG: First plugin item HTML: {plugin_items[0].inner_html()[:200]}")
-
-        # Focus first plugin item and move it down with ArrowDown to trigger reorder
-        page.focus(".plugin-item")
-        page.evaluate("""
-            const el = document.querySelector('.plugin-item');
-            if (el){
-                const evt = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
-                el.dispatchEvent(evt);
-            }
-        """)
-
-        # Wait a bit for any async operations
-        page.wait_for_timeout(100)
-
-        # Ensure reordering via ArrowDown triggers our mock fetch to reorder endpoint
-        reqs = page.evaluate("() => window.__requests__")
-        assert any((r and r.get('url') and isinstance(r.get('url'), str) and r.get('url').endswith('/reorder_plugins')) for r in reqs)
-
-        # Open and confirm Delete Playlist modal; ensure DELETE request fires
-        page.click(".delete-playlist-btn")
-        page.click("#confirmDeletePlaylistBtn")
-        reqs2 = page.evaluate("() => window.__requests__")
-        assert any((r and isinstance(r.get('url'), str) and '/delete_playlist/' in r.get('url') and r.get('method') == 'DELETE') for r in reqs2)
-
-        # Trigger delete playlist modal and confirm
-        # Click the first playlist's delete button
-        # (Assertions moved above after modal interaction)
-
-        browser.close()
+            # Verify reorder request was fired
+            assert len(reorder_requests) > 0, "Reorder request should have been sent"
+        finally:
+            browser.close()
 
 
+def test_playlist_delete_modal(live_server, device_config_dev, monkeypatch):
+    """Delete playlist button opens confirmation modal and fires DELETE request."""
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+    _prepare_playlist(device_config_dev)
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            stub_leaflet(page)
+
+            # Intercept delete requests
+            delete_requests = []
+            page.route(
+                "**/delete_playlist/**",
+                lambda route: (
+                    delete_requests.append(route.request.method),
+                    route.fulfill(
+                        status=200,
+                        content_type="application/json",
+                        body='{"success": true, "message": "Deleted"}',
+                    ),
+                ),
+            )
+            page.add_init_script("window.location.reload = () => {};")
+
+            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+
+            # Click delete playlist button
+            delete_btn = page.locator(".delete-playlist-btn").first
+            delete_btn.click()
+
+            # Verify delete modal appeared
+            modal = page.locator("#deletePlaylistModal")
+            page.wait_for_timeout(300)
+            assert modal.is_visible(), "Delete playlist modal should be visible"
+
+            # Confirm delete
+            page.locator("#confirmDeletePlaylistBtn").click()
+            page.wait_for_timeout(500)
+
+            # Verify DELETE request was sent
+            assert any(m == "DELETE" for m in delete_requests), "DELETE request should have been sent"
+        finally:
+            browser.close()
+
+
+def test_playlist_delete_instance_modal(live_server, device_config_dev, monkeypatch):
+    """Delete instance button opens confirmation modal and fires POST request."""
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
+    _prepare_playlist(device_config_dev)
+
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1280, "height": 900})
+            stub_leaflet(page)
+
+            # Intercept delete instance requests
+            delete_requests = []
+            page.route(
+                "**/delete_plugin_instance",
+                lambda route: (
+                    delete_requests.append(route.request.method),
+                    route.fulfill(
+                        status=200,
+                        content_type="application/json",
+                        body='{"success": true, "message": "Deleted"}',
+                    ),
+                ),
+            )
+            page.add_init_script("window.location.reload = () => {};")
+
+            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+
+            # Click delete instance button on first plugin
+            delete_btn = page.locator(".delete-instance-btn").first
+            delete_btn.click()
+
+            # Verify delete instance modal appeared
+            modal = page.locator("#deleteInstanceModal")
+            page.wait_for_timeout(300)
+            assert modal.is_visible(), "Delete instance modal should be visible"
+
+            # Confirm delete
+            page.locator("#confirmDeleteInstanceBtn").click()
+            page.wait_for_timeout(500)
+
+            # Verify POST request was sent
+            assert any(m == "POST" for m in delete_requests), "POST delete request should have been sent"
+        finally:
+            browser.close()

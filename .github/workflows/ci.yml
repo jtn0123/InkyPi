@@ -336,6 +336,10 @@ jobs:
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Create venv for preflash script
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r install/requirements.txt -r install/requirements-dev.txt
       - name: Run coverage validation
         env:
           INKYPI_VALIDATE_COVERAGE: '1'
@@ -367,6 +371,10 @@ jobs:
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Create venv symlink for preflash script
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r install/requirements.txt -r install/requirements-dev.txt
       - name: Run security validation
         env:
           INKYPI_VALIDATE_SECURITY: '1'
@@ -406,9 +414,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
+      - name: Create venv for preflash script
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r install/requirements.txt -r install/requirements-dev.txt
       - name: Install Playwright Chromium
         run: |
-          python -m playwright install --with-deps chromium
+          .venv/bin/python -m playwright install --with-deps chromium
       - name: Run flake detection
         env:
           INKYPI_VALIDATE_FLAKE: '1'

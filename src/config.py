@@ -54,6 +54,22 @@ class Config:
     # Directory path for storing historical processed images
     history_image_dir = os.path.join(BASE_DIR, "static", "images", "history")
 
+    def __getstate__(self):
+        """Support pickling by excluding the unpicklable RLock.
+
+        This is required on Linux where multiprocessing uses the 'spawn' or
+        'forkserver' start method, which pickles objects passed to child
+        processes.
+        """
+        state = self.__dict__.copy()
+        state.pop("_config_lock", None)
+        return state
+
+    def __setstate__(self, state):
+        """Restore the RLock when unpickling."""
+        self.__dict__.update(state)
+        self._config_lock = threading.RLock()
+
     def __init__(self):
         self._config_lock = threading.RLock()
         self._last_written_hash = None
@@ -349,9 +365,8 @@ class Config:
                 pass  # Create empty file
             try:
                 os.chmod(env_path, 0o600)
-            except Exception:
-                # best effort on non-POSIX systems
-                pass
+            except Exception as e:
+                logger.warning("Could not set .env file permissions to 0600: %s", e)
         # Write without quotes to satisfy tests and common .env style
         try:
             set_key(env_path, key, value, quote_mode="never")
@@ -382,9 +397,8 @@ class Config:
         if os.path.exists(env_path):
             try:
                 unset_key(env_path, key)
-            except Exception:
-                # ignore if key not present
-                pass
+            except Exception as e:
+                logger.warning("Failed to unset env key %s: %s", key, e)
         os.environ.pop(key, None)
         return True
 

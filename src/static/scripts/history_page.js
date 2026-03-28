@@ -43,7 +43,7 @@
         if (text) {
           text.textContent = `${pct}% free • ${data.free_gb} GB remaining of ${data.total_gb} GB total`;
         }
-        if (inner) inner.style.width = `${pct}%`;
+        if (inner) inner.style.setProperty("--meter-width", `${pct}%`);
       } catch (e) {
         console.error("Failed to update storage", e);
       }

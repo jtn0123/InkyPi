@@ -116,18 +116,16 @@ def _probe_routes(client, routes: list[str]) -> None:
             raise RuntimeError(f"{route} returned {response.status_code}")
 
 
-def _force_inprocess_execution(refresh_task) -> None:
-    def _execute_inprocess(refresh_action, plugin_config, current_dt, request_id=None):
-        import refresh_task as refresh_task_mod
+def _force_inprocess_execution(refresh_task=None) -> None:
+    """Disable subprocess isolation so plugins run in the current process.
 
-        plugin = refresh_task_mod.get_plugin_instance(plugin_config)
-        image = refresh_action.execute(plugin, refresh_task.device_config, current_dt)
-        plugin_meta = None
-        if hasattr(plugin, "get_latest_metadata"):
-            plugin_meta = plugin.get_latest_metadata()
-        return image, plugin_meta
-
-    refresh_task._execute_with_policy = _execute_inprocess
+    This avoids pickling issues with the ``spawn``/``forkserver``
+    multiprocessing start methods on Linux CI and keeps monkey-patches
+    visible to the plugin code.
+    """
+    os.environ["INKYPI_PLUGIN_ISOLATION"] = "none"
+    # Prevent dev-mode hot-reload from wiping monkey-patches on plugin modules.
+    os.environ["INKYPI_NO_HOT_RELOAD"] = "1"
 
 
 def run_app_smoke() -> None:
@@ -270,6 +268,9 @@ def run_cache_smoke() -> None:
         _prepare_env(tmpdir, config_path=config_path, web_only=True)
         _ensure_src_on_path()
 
+        from PIL import Image
+
+        import plugins.ai_text.ai_text as ai_text_mod
         from config import Config
         from display.display_manager import DisplayManager
         from refresh_task import ManualRefresh, RefreshTask
@@ -286,6 +287,15 @@ def run_cache_smoke() -> None:
 
         display_manager.display.display_image = fake_display
 
+        calls = {"count": 0}
+
+        def fake_generate(self, settings, cfg):
+            calls["count"] += 1
+            return Image.new("RGB", cfg.get_resolution(), (200, 200, 200))
+
+        original_generate = ai_text_mod.AIText.generate_image
+        ai_text_mod.AIText.generate_image = fake_generate
+
         refresh_task.start()
         try:
             settings = {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
@@ -293,6 +303,7 @@ def run_cache_smoke() -> None:
             metrics2 = refresh_task.manual_update(ManualRefresh("ai_text", settings))
         finally:
             refresh_task.stop()
+            ai_text_mod.AIText.generate_image = original_generate
 
         if writes["count"] != 1:
             raise RuntimeError(f"Expected 1 display write, saw {writes['count']}")

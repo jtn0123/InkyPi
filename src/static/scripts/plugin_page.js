@@ -96,7 +96,7 @@
           clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
         }
         if (elapsedEl) elapsedEl.textContent = "—";
-        if (bar) bar.style.width = "100%";
+        if (bar) { bar.style.width = "100%"; bar.setAttribute("aria-valuenow", 100); }
         if (progress) progress.style.display = "block";
       } catch (e) { console.warn("Failed to show last progress:", e); }
     }
@@ -546,9 +546,9 @@
           `[data-color-preview="${picker.id}"]`
         );
         if (!preview) return;
-        preview.style.background = picker.value;
+        preview.style.setProperty("--preview-color", picker.value);
         picker.addEventListener("input", () => {
-          preview.style.background = picker.value;
+          preview.style.setProperty("--preview-color", picker.value);
         });
       });
 

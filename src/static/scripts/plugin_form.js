@@ -39,7 +39,7 @@
     let result = null;
 
     // append uploaded files
-    try { Object.keys(uploadedFiles || {}).forEach(key => { (uploadedFiles[key] || []).forEach(f => formData.append(key, f)); }); } catch(e){ console.warn('Failed to append uploaded files:', e); }
+    try { Object.keys(uploadedFiles || {}).forEach(key => { (uploadedFiles[key] || []).forEach(f => formData.append(key, f)); }); } catch(e){ console.warn('Failed to append uploaded files:', e); if (window.showResponseModal) window.showResponseModal('failure', 'Failed to attach uploaded files: ' + (e.message || e)); return { success: false, result: null }; }
 
     let url = urls.update_now; let method = 'POST'; let clearFormOnSubmit = true;
     if (action === 'add_to_playlist'){

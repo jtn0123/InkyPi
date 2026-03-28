@@ -15,6 +15,7 @@ Usage:
     response = session.get(url)
 """
 
+import atexit
 import logging
 import threading
 
@@ -64,6 +65,7 @@ def get_http_session() -> requests.Session:
             _HTTP_SESSION.mount('http://', adapter)
             _HTTP_SESSION.mount('https://', adapter)
 
+            atexit.register(close_http_session)
             logger.debug("HTTP session initialized successfully")
 
     return _HTTP_SESSION

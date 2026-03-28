@@ -166,6 +166,7 @@ def _env_float(name: str, default: float) -> float:
             return default
         return float(raw)
     except Exception:
+        logger.warning("Failed to parse env var %s as float, using default %s", name, default)
         return default
 
 def _env_int(name: str, default: int) -> int:
@@ -175,6 +176,7 @@ def _env_int(name: str, default: int) -> int:
             return default
         return int(raw)
     except Exception:
+        logger.warning("Failed to parse env var %s as int, using default %s", name, default)
         return default
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -182,6 +184,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
         raw = os.getenv(name, "")
         return raw.strip().lower() in ("1", "true", "yes", "on")
     except Exception:
+        logger.warning("Failed to parse env var %s as bool, using default %s", name, default)
         return default
 
 DEFAULT_TIMEOUT_SECONDS: float = _env_float("INKYPI_HTTP_TIMEOUT_DEFAULT_S", 20.0)
@@ -194,6 +197,7 @@ try:
     CONNECT_TIMEOUT_SECONDS = float(_c) if _c and _c.strip() != "" else None
     READ_TIMEOUT_SECONDS = float(_r) if _r and _r.strip() != "" else None
 except Exception:
+    logger.warning("Failed to parse HTTP split timeout env vars, using defaults")
     CONNECT_TIMEOUT_SECONDS = None
     READ_TIMEOUT_SECONDS = None
 DEFAULT_HEADERS: dict[str, str] = {

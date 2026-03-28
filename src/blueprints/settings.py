@@ -3,7 +3,6 @@ import io
 import logging
 import os
 import re
-import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -14,6 +13,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytz
+import requests as _requests
 from flask import (
     Blueprint,
     Response,
@@ -290,27 +290,44 @@ _UPDATE_STATE: dict[str, object] = {
     "running": False,
     "unit": None,
     "started_at": None,  # epoch seconds
+    "last_unit": None,  # preserved after update completes for log retrieval
 }
 
 
-def _get_install_update_script_path() -> str | None:
-    """Return absolute path to update.sh if available on this host.
+def _get_update_script_path() -> str | None:
+    """Return absolute path to the best update script available on this host.
+
+    Looks for ``do_update.sh`` first (git pull + deps), then ``update.sh`` (deps only).
 
     Priorities:
-    - $PROJECT_DIR/install/update.sh (production install path)
-    - repo-relative ../../install/update.sh (developer environment)
+    1. Follow the ``$PROJECT_DIR/src`` symlink back to the repo for ``install/do_update.sh``
+    2. ``$PROJECT_DIR/install/do_update.sh``
+    3. Repo-relative ``../../install/do_update.sh`` (developer environment)
+    4. Same cascade for ``update.sh`` as fallback
     """
-    # 1) production install path
+    candidates: list[str] = []
     project_dir = os.getenv("PROJECT_DIR")
+
+    # Resolve the real repo root by following the src symlink (production layout)
     if project_dir:
-        prod = os.path.join(project_dir, "install", "update.sh")
-        if os.path.isfile(prod):
-            return prod
-    # 2) repo path (this file: src/blueprints/settings.py → repo_root/install/update.sh)
+        src_link = os.path.join(project_dir, "src")
+        if os.path.islink(src_link):
+            repo_root = os.path.dirname(os.path.realpath(src_link))
+            candidates.append(os.path.join(repo_root, "install", "do_update.sh"))
+            candidates.append(os.path.join(repo_root, "install", "update.sh"))
+        # Direct PROJECT_DIR/install paths
+        candidates.append(os.path.join(project_dir, "install", "do_update.sh"))
+        candidates.append(os.path.join(project_dir, "install", "update.sh"))
+
+    # Repo-relative path (this file: src/blueprints/settings.py → repo_root/install/)
     here = os.path.dirname(os.path.abspath(__file__))
-    repo_install = os.path.abspath(os.path.join(here, "..", "..", "install", "update.sh"))
-    if os.path.isfile(repo_install):
-        return repo_install
+    repo_install = os.path.abspath(os.path.join(here, "..", "..", "install"))
+    candidates.append(os.path.join(repo_install, "do_update.sh"))
+    candidates.append(os.path.join(repo_install, "update.sh"))
+
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
     return None
 
 
@@ -327,33 +344,45 @@ def _set_update_state(running: bool, unit: str | None):
     _UPDATE_STATE["started_at"] = float(time.time()) if running else None
 
 
-def _start_update_via_systemd(unit_name: str, script_path: str) -> None:
+def _start_update_via_systemd(unit_name: str, script_path: str, target_tag: str | None = None) -> None:
     # Run update script in a transient systemd unit so its logs are visible in journal
+    project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     cmd = [
         "systemd-run",
         "--collect",
         f"--unit={unit_name}",
         "--property=StandardOutput=journal",
         "--property=StandardError=journal",
+        f"--setenv=PROJECT_DIR={project_dir}",
         "/bin/bash",
-        "-lc",
-        shlex.quote(script_path),
+        script_path,
     ]
-    subprocess.Popen(cmd)  # nosec: commands are fixed, script path quoted
+    if target_tag:
+        cmd.append(target_tag)
+    subprocess.Popen(cmd)  # nosec: commands are fixed, script path validated
 
 
 def _start_update_fallback_thread(script_path: str | None) -> None:
     # Development/macOS path: run a simulated update and pipe output into our logger
     # to make it visible in inkypi.service logs and the UI viewer.
+    def _log_and_publish(msg: str, level: str = "info"):
+        """Log and publish update progress to the SSE bus."""
+        getattr(logger, level)("update | %s", msg)
+        try:
+            bus = get_progress_bus()
+            bus.publish({"type": "update_log", "line": msg})
+        except Exception:
+            pass
+
     def _runner():
         try:
-            logger.info("web_update: starting")
+            _log_and_publish("web_update: starting")
             if script_path and os.path.isfile(script_path) and os.access(script_path, os.X_OK):
                 # Do not run the real script unless explicitly enabled
                 allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in ("1", "true", "yes")
                 if allow_real:
                     proc = subprocess.Popen(
-                        ["/bin/bash", "-lc", shlex.quote(script_path)],
+                        ["/bin/bash", script_path],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.STDOUT,
                         text=True,
@@ -361,13 +390,13 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
                         universal_newlines=True,
                     )
                     for line in proc.stdout or []:
-                        logger.info("update | %s", line.rstrip())
+                        _log_and_publish(line.rstrip())
                     proc.wait()
                     rc = proc.returncode if proc.returncode is not None else 0
                     if rc == 0:
-                        logger.info("web_update: completed successfully")
+                        _log_and_publish("web_update: completed successfully")
                     else:
-                        logger.error("web_update: failed with return code %s", rc)
+                        _log_and_publish(f"web_update: failed with return code {rc}", "error")
                 else:
                     # Simulated update to avoid privileged operations in development and tests
                     for msg in [
@@ -378,13 +407,13 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
                         "Restarting service...",
                         "Update completed.",
                     ]:
-                        logger.info("update | %s", msg)
+                        _log_and_publish(msg)
                         time.sleep(0.5)
             else:
                 for i in range(6):
-                    logger.info("update | step %d/6", i + 1)
+                    _log_and_publish(f"step {i + 1}/6")
                     time.sleep(0.5)
-                logger.info("update | done (simulated)")
+                _log_and_publish("done (simulated)")
         except Exception:
             logger.exception("web_update: exception while running update")
         finally:
@@ -398,7 +427,9 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
 def start_update():
     """Trigger InkyPi update via systemd-run when available, with dev fallback.
 
-    Returns JSON immediately; progress is visible in the Logs panel via /api/logs.
+    Accepts optional JSON body ``{"target_version": "v1.2.0"}`` to update to a
+    specific tag.  Returns JSON immediately; progress is visible in the Logs
+    panel via /api/logs.
     """
     try:
         if _UPDATE_STATE.get("running"):
@@ -409,13 +440,27 @@ def start_update():
                 "unit": _UPDATE_STATE.get("unit"),
             }), 409
 
-        script_path = _get_install_update_script_path()
+        # Accept optional target tag from JSON body
+        target_tag: str | None = None
+        try:
+            body = request.get_json(silent=True) or {}
+            raw = body.get("target_version")
+            if raw and isinstance(raw, str):
+                target_tag = raw.strip()
+        except Exception:
+            pass
+
+        script_path = _get_update_script_path()
         unit = f"inkypi-update-{int(time.time())}"
 
         if _systemd_available():
             _set_update_state(True, f"{unit}.service")
             try:
-                _start_update_via_systemd(unit, script_path or "/usr/local/inkypi/install/update.sh")
+                _start_update_via_systemd(
+                    unit,
+                    script_path or "/usr/local/inkypi/install/do_update.sh",
+                    target_tag=target_tag,
+                )
             except Exception:
                 # If systemd-run fails unexpectedly, fall back to thread runner
                 logger.exception("systemd-run failed; falling back to thread runner")
@@ -435,12 +480,43 @@ def start_update():
         return json_internal_error("start update", details={"error": str(e)})
 
 
+_UPDATE_TIMEOUT_SECONDS = 30 * 60  # 30 minutes
+
+
 @settings_bp.route("/settings/update_status")
 def update_status():
     try:
         running = bool(_UPDATE_STATE.get("running"))
         unit = _UPDATE_STATE.get("unit")
         started_at = _UPDATE_STATE.get("started_at")
+
+        # Auto-clear stale update state
+        if running:
+            cleared = False
+            # Check if the systemd transient unit has finished
+            if unit and _systemd_available():
+                try:
+                    result = subprocess.run(
+                        ["systemctl", "is-active", unit],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    status = result.stdout.strip()
+                    if status not in ("active", "activating"):
+                        _UPDATE_STATE["last_unit"] = unit
+                        _set_update_state(False, None)
+                        cleared = True
+                except Exception:
+                    pass
+            # Timeout fallback: force-clear if started >30 min ago
+            if not cleared and started_at and (time.time() - float(started_at)) > _UPDATE_TIMEOUT_SECONDS:
+                _UPDATE_STATE["last_unit"] = unit
+                _set_update_state(False, None)
+
+            # Re-read after potential clear
+            running = bool(_UPDATE_STATE.get("running"))
+            unit = _UPDATE_STATE.get("unit")
+            started_at = _UPDATE_STATE.get("started_at")
+
         return jsonify({
             "running": running,
             "unit": unit,
@@ -448,6 +524,65 @@ def update_status():
         })
     except Exception as e:
         return json_internal_error("update status", details={"error": str(e)})
+
+
+# --- Version check via GitHub Releases API ---
+_GITHUB_REPO = os.getenv("INKYPI_GITHUB_REPO", "jtn0123/InkyPi")
+_VERSION_CACHE: dict[str, object] = {"latest": None, "checked_at": 0.0, "release_notes": None}
+_VERSION_CACHE_TTL = 3600  # 1 hour
+
+
+def _semver_gt(a: str, b: str) -> bool:
+    """Return True if semver string *a* is strictly greater than *b*."""
+    try:
+        return tuple(int(x) for x in a.split(".")) > tuple(int(x) for x in b.split("."))
+    except (ValueError, AttributeError):
+        return False
+
+
+def _check_latest_version() -> str | None:
+    """Fetch the latest release tag from the GitHub Releases API. Returns None on failure."""
+    now = time.time()
+    if _VERSION_CACHE["latest"] and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL:
+        return _VERSION_CACHE["latest"]  # type: ignore[return-value]
+    try:
+        resp = _requests.get(
+            f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
+            timeout=10,
+            headers={"Accept": "application/vnd.github.v3+json"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        tag = data.get("tag_name", "")
+        if re.match(r"^v?\d+\.\d+\.\d+$", tag):
+            latest = tag.lstrip("v")
+            _VERSION_CACHE["latest"] = latest
+            _VERSION_CACHE["checked_at"] = now
+            _VERSION_CACHE["release_notes"] = data.get("body")
+            return latest
+    except Exception:
+        logger.debug("Failed to check latest version via GitHub API", exc_info=True)
+    return None
+
+
+@settings_bp.route("/api/version")
+def api_version():
+    """Return current and latest version info."""
+    try:
+        current = current_app.config.get("APP_VERSION", "unknown")
+        latest = _check_latest_version()
+        update_available = False
+        if latest and current != "unknown":
+            update_available = _semver_gt(latest, current)
+        return jsonify({
+            "current": current,
+            "latest": latest,
+            "update_available": update_available,
+            "update_running": bool(_UPDATE_STATE.get("running")),
+            "release_notes": _VERSION_CACHE.get("release_notes"),
+        })
+    except Exception as e:
+        return json_internal_error("version check", details={"error": str(e)})
 
 
 @settings_bp.route("/api/benchmarks/summary")
@@ -716,11 +851,13 @@ def plugin_isolation():
     if request.method == "GET":
         return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
 
-    body = request.get_json(silent=True) or {}
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return json_error("Request body must be a JSON object", status=400)
     plugin_id = body.get("plugin_id")
-    if not plugin_id:
+    if not isinstance(plugin_id, str) or not plugin_id.strip():
         return json_error(
-            "plugin_id is required",
+            "plugin_id is required and must be a non-empty string",
             status=422,
             code="validation_error",
             details={"field": "plugin_id"},
@@ -1092,7 +1229,9 @@ def client_log():
     visibility in terminal logs without failing the UX if logging fails.
     """
     try:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return json_error("Request body must be a JSON object", status=400)
         level = str(data.get("level") or "info").lower()
         message = str(data.get("message") or "")
         extra = data.get("extra")
@@ -1123,13 +1262,33 @@ def client_log():
         )
 
 
+_last_shutdown_time: float = 0.0
+_SHUTDOWN_COOLDOWN_SECONDS: float = 30.0
+_shutdown_lock = threading.Lock()
+
+
 @settings_bp.route("/shutdown", methods=["POST"])
 def shutdown():
     """Reboot or shut down the device.
 
-    Consider adding authentication or CSRF protection if publicly exposed.
+    Rate-limited to one call per 30 seconds to prevent accidental repeats.
     """
-    data = request.get_json() or {}
+    global _last_shutdown_time
+    now = time.monotonic()
+    with _shutdown_lock:
+        if now - _last_shutdown_time < _SHUTDOWN_COOLDOWN_SECONDS:
+            remaining = int(_SHUTDOWN_COOLDOWN_SECONDS - (now - _last_shutdown_time))
+            return json_error(
+                f"Please wait {remaining}s before requesting another reboot/shutdown",
+                status=429,
+            )
+        _last_shutdown_time = now
+
+    data = request.get_json(silent=True)
+    if data is None and request.content_type and "application/json" in request.content_type:
+        return json_error("Invalid JSON payload", status=400)
+    if not isinstance(data, dict):
+        data = {}
     try:
         if data.get("reboot"):
             logger.info("Reboot requested")
