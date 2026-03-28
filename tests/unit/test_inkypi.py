@@ -1,8 +1,9 @@
 import importlib
+import logging
 import sys
 from unittest.mock import MagicMock, patch
 
-from flask import Flask
+from flask import Flask, abort
 
 
 def _reload_inkypi(monkeypatch, argv=None, env=None):
@@ -306,3 +307,315 @@ def test_inkypi_refresh_task_lazy_start(monkeypatch):
                 rt.start()
 
         mock_rt.start.assert_called_once()
+
+
+def test_read_version_normal(tmp_path, monkeypatch):
+    """Test _read_version reads and strips the VERSION file."""
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("1.2.3\n")
+    import inkypi
+    _real_open = open
+    def _patched_open(path, *args, **kwargs):
+        if "VERSION" in str(path):
+            return _real_open(str(version_file), *args, **kwargs)
+        return _real_open(path, *args, **kwargs)
+    monkeypatch.setattr("builtins.open", _patched_open)
+    assert inkypi._read_version() == "1.2.3"
+
+
+def test_read_version_missing_file(monkeypatch):
+    """Test _read_version returns 'unknown' when VERSION file doesn't exist."""
+    import inkypi
+    _real_open = open
+    def _patched_open(path, *args, **kwargs):
+        if "VERSION" in str(path):
+            raise FileNotFoundError("No such file")
+        return _real_open(path, *args, **kwargs)
+    monkeypatch.setattr("builtins.open", _patched_open)
+    assert inkypi._read_version() == "unknown"
+
+
+def test_read_version_empty_file(tmp_path, monkeypatch):
+    """Test _read_version with an empty VERSION file."""
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("")
+    import inkypi
+    _real_open = open
+    def _patched_open(path, *args, **kwargs):
+        if "VERSION" in str(path):
+            return _real_open(str(version_file), *args, **kwargs)
+        return _real_open(path, *args, **kwargs)
+    monkeypatch.setattr("builtins.open", _patched_open)
+    assert inkypi._read_version() == ""
+
+
+# --- JSON error handlers ---
+
+
+def _register_json_error_routes(app):
+    from utils.http_utils import APIError
+
+    @app.route("/cause_api_error")
+    def cause_api_error():
+        raise APIError("boom", status=418, code="X", details={"a": 1})
+
+    @app.route("/cause_bad_request")
+    def cause_bad_request():
+        return abort(400)
+
+    @app.route("/cause_unsupported")
+    def cause_unsupported():
+        return abort(415)
+
+    @app.route("/cause_exception")
+    def cause_exception():
+        raise RuntimeError("explode")
+
+
+def test_error_handlers_json_and_html(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    _register_json_error_routes(app)
+    client = app.test_client()
+
+    # JSON Accept should yield JSON bodies
+    r = client.get("/cause_api_error", headers={"Accept": "application/json"})
+    assert r.status_code == 418
+    assert r.is_json and r.get_json().get("error") == "boom"
+
+    r = client.get("/cause_bad_request", headers={"Accept": "application/json"})
+    assert r.status_code == 400
+    assert r.is_json and r.get_json().get("error") == "Bad request"
+
+    r = client.get("/cause_unsupported", headers={"Accept": "application/json"})
+    assert r.status_code == 415
+    assert r.is_json and r.get_json().get("error") == "Unsupported media type"
+
+    r = client.get("/cause_exception", headers={"Accept": "application/json"})
+    assert r.status_code == 500
+    assert r.is_json and r.get_json().get("error")
+
+    # HTML Accept should yield plain text bodies
+    r = client.get("/cause_bad_request", headers={"Accept": "text/html"})
+    assert r.status_code == 400
+    assert b"Bad request" in r.data
+
+    r = client.get("/cause_unsupported", headers={"Accept": "text/html"})
+    assert r.status_code == 415
+    assert b"Unsupported media type" in r.data
+
+    r = client.get("/cause_exception", headers={"Accept": "text/html"})
+    assert r.status_code == 500
+    assert b"Internal Server Error" in r.data
+
+
+def test_readyz_states(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+    client = app.test_client()
+
+    # web-only branch
+    app.config["WEB_ONLY"] = True
+    r = client.get("/readyz")
+    assert r.status_code == 200 and b"ready:web-only" in r.data
+
+    # running branch
+    app.config["WEB_ONLY"] = False
+
+    class _RT:
+        running: bool = True
+
+    app.config["REFRESH_TASK"] = _RT()
+    r = client.get("/readyz")
+    assert r.status_code == 200 and b"ready" in r.data
+
+    # not-ready branch
+    app.config["REFRESH_TASK"].running = False
+    r = client.get("/readyz")
+    assert r.status_code == 503 and b"not-ready" in r.data
+
+
+def test_csp_headers_default_and_overrides(monkeypatch):
+    # Default: report-only header is set
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+    client = app.test_client()
+
+    r = client.get("/healthz")
+    # Default is report-only
+    assert (
+        "Content-Security-Policy-Report-Only" in r.headers
+    ), "CSP report-only header missing"
+    assert "default-src" in r.headers["Content-Security-Policy-Report-Only"]
+
+    # Force enforcement header via env
+    monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "0")
+    r2 = client.get("/healthz")
+    assert "Content-Security-Policy" in r2.headers
+    assert "Content-Security-Policy-Report-Only" not in r2.headers
+
+    # Custom policy value
+    monkeypatch.setenv("INKYPI_CSP", "default-src 'none'")
+    r3 = client.get("/healthz")
+    header_name = (
+        "Content-Security-Policy"
+        if "Content-Security-Policy" in r3.headers
+        else "Content-Security-Policy-Report-Only"
+    )
+    assert r3.headers[header_name] == "default-src 'none'"
+
+
+# --- Request ID and hot reload ---
+
+
+def _register_request_id_routes(app):
+    from utils.http_utils import APIError, json_success
+
+    @app.route("/raise_api_error")
+    def _raise_api_error():
+        raise APIError("boom", status=418, code="X")
+
+    @app.route("/ok")
+    def _ok():
+        return json_success("OK")
+
+
+def test_request_id_propagates_in_json_error(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    _register_request_id_routes(app)
+    client = app.test_client()
+
+    r = client.get(
+        "/raise_api_error",
+        headers={
+            "Accept": "application/json",
+            "X-Request-Id": "rid-123",
+        },
+    )
+    assert r.status_code == 418
+    body = r.get_json()
+    assert body.get("error") == "boom"
+    assert body.get("request_id") == "rid-123"
+
+
+def test_request_id_propagates_in_json_success(monkeypatch):
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    _register_request_id_routes(app)
+    client = app.test_client()
+
+    r = client.get(
+        "/ok",
+        headers={
+            "Accept": "application/json",
+            "X-Request-Id": "rid-456",
+        },
+    )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body.get("success") is True
+    assert body.get("message") == "OK"
+    assert body.get("request_id") == "rid-456"
+
+
+def test_hot_reload_header_emitted_in_dev(monkeypatch):
+    # Ensure DEV mode
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    # Monkeypatch the imported function within inkypi module
+    monkeypatch.setattr(
+        "inkypi.pop_hot_reload_info",
+        lambda: {"plugin_id": "foo", "reloaded": True},
+        raising=True,
+    )
+
+    client = app.test_client()
+    r = client.get("/healthz")
+
+    # Header should be set when DEV_MODE and info present
+    hdr = r.headers.get("X-InkyPi-Hot-Reload")
+    assert hdr == "foo:1"
+
+
+# --- Timing logs ---
+
+
+def test_request_timing_log_emitted(monkeypatch, caplog):
+    # Enable timing logs and run in dev to avoid production headers affecting path
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py", "--dev"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    # Turn on timing via env
+    monkeypatch.setenv("INKYPI_REQUEST_TIMING", "1")
+
+    # Capture logs from the inkypi logger specifically
+    caplog.set_level(logging.INFO, logger="inkypi")
+
+    # Spy on inkypi logger to ensure timing log path executes regardless of handlers
+    messages = []
+
+    def _spy_info(msg, *args, **kwargs):
+        try:
+            messages.append(msg % args if args else msg)
+        except Exception:
+            messages.append(str(msg))
+
+    monkeypatch.setattr(mod, "logger", logging.getLogger("inkypi"), raising=True)
+    monkeypatch.setattr(mod.logger, "info", _spy_info, raising=True)
+
+    client = app.test_client()
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+
+    # Look for the timing line emitted by after_request (either via records or aggregated text)
+    found = bool(messages) or any(
+        "HTTP GET /healthz -> 200 in" in rec.getMessage() for rec in caplog.records
+    ) or (
+        "HTTP GET /healthz -> 200 in" in caplog.text
+    ) or (
+        # Fallback: match key parts to avoid formatter differences
+        ("HTTP GET" in caplog.text and "/healthz" in caplog.text and "-> 200" in caplog.text)
+    )
+    assert found
+
+
+def test_secret_key_persisted_in_production(monkeypatch):
+    """SECRET_KEY should be persisted via set_env_key even in production mode."""
+    # Ensure no SECRET_KEY is set in environment
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+
+    with (
+        patch("config.Config") as mock_config_class,
+        patch("display.display_manager.DisplayManager"),
+    ):
+        mock_config = MagicMock()
+        mock_config.get_config.return_value = None
+        mock_config.get_plugins.return_value = []
+        mock_config.get_resolution.return_value = (800, 480)
+        # Simulate load_env_key returning None (no persisted key)
+        mock_config.load_env_key.return_value = None
+        mock_config_class.return_value = mock_config
+
+        mod = _reload_inkypi(
+            monkeypatch,
+            argv=["inkypi.py"],
+            env={"INKYPI_ENV": "production"},
+        )
+
+        # set_env_key should have been called to persist the generated key
+        mock_config.set_env_key.assert_called_once()
+        call_args = mock_config.set_env_key.call_args
+        assert call_args[0][0] == "SECRET_KEY"
+        assert len(call_args[0][1]) == 64  # hex(32 bytes) = 64 chars

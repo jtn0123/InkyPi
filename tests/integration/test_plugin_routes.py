@@ -320,3 +320,59 @@ def test_instance_image_served_from_history_on_generation_failure(
     assert resp.status_code == 200
     img = Image.open(io.BytesIO(resp.data))
     assert img.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_delete_plugin_instance_cleans_up_cache(client, device_config_dev):
+    """Deleting a plugin instance removes its cached image file."""
+    import os
+
+    from PIL import Image
+
+    _setup_playlist_for_instance(device_config_dev)
+
+    # Create a cached image file
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    Image.new("RGB", (10, 10), "white").save(path)
+    assert os.path.isfile(path)
+
+    resp = client.post(
+        "/delete_plugin_instance",
+        json={
+            "playlist_name": "Default",
+            "plugin_id": "ai_text",
+            "plugin_instance": "Inst One",
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["success"] is True
+    # Cached image should be removed
+    assert not os.path.isfile(path)
+
+
+def test_delete_plugin_instance_calls_plugin_cleanup(client, device_config_dev, monkeypatch):
+    """Deleting a plugin instance calls plugin.cleanup() if available."""
+    _setup_playlist_for_instance(device_config_dev)
+
+    cleanup_called = {}
+
+    class _StubPlugin:
+        def cleanup(self, settings):
+            cleanup_called["settings"] = settings
+
+    monkeypatch.setattr(
+        "blueprints.plugin.get_plugin_instance", lambda pid: _StubPlugin(), raising=True
+    )
+
+    resp = client.post(
+        "/delete_plugin_instance",
+        json={
+            "playlist_name": "Default",
+            "plugin_id": "ai_text",
+            "plugin_instance": "Inst One",
+            "settings": {"key": "val"},
+        },
+    )
+    assert resp.status_code == 200
+    assert "settings" in cleanup_called
+    assert cleanup_called["settings"] == {}

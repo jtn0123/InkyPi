@@ -6,9 +6,10 @@ import logging.config
 import os
 import secrets
 import warnings
+from collections import defaultdict, deque
 from time import perf_counter
 
-from flask import Flask, g, request, session
+from flask import Flask, g, request, session, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -26,6 +27,7 @@ warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 # Register HEIF/HEIC image support (for iPhone photos)
 try:
     from pi_heif import register_heif_opener
+
     register_heif_opener()
 except ImportError:
     pass  # pi-heif not installed, skip HEIF support
@@ -81,8 +83,7 @@ When imported, values are derived from environment variables only. The
 
 def _env_dev_mode() -> bool:
     env_mode = (
-        os.getenv("INKYPI_ENV", "").strip()
-        or os.getenv("FLASK_ENV", "").strip()
+        os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
     ).lower()
     return env_mode in ("dev", "development")
 
@@ -144,18 +145,14 @@ def main(argv: list[str] | None = None):
 
     # Infer DEV_MODE from CLI or environment
     env_mode = (
-        os.getenv("INKYPI_ENV", "").strip()
-        or os.getenv("FLASK_ENV", "").strip()
+        os.getenv("INKYPI_ENV", "").strip() or os.getenv("FLASK_ENV", "").strip()
     ).lower()
     DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
 
     # Toggle for disabling background refresh thread
     WEB_ONLY = bool(
         args.web_only
-        or (
-            os.getenv("INKYPI_NO_REFRESH", "").strip().lower()
-            in ("1", "true", "yes")
-        )
+        or (os.getenv("INKYPI_NO_REFRESH", "").strip().lower() in ("1", "true", "yes"))
     )
 
     # If --dev explicitly passed, set env var for downstream logic and logs
@@ -190,9 +187,7 @@ def main(argv: list[str] | None = None):
     logging.getLogger("waitress.queue").setLevel(logging.ERROR)
     FAST_DEV = bool(
         args.fast_dev
-        or (
-            os.getenv("INKYPI_FAST_DEV", "").strip().lower() in ("1", "true", "yes")
-        )
+        or (os.getenv("INKYPI_FAST_DEV", "").strip().lower() in ("1", "true", "yes"))
     )
 
     app = create_app()
@@ -201,6 +196,7 @@ def main(argv: list[str] | None = None):
     if DEV_MODE:
         try:
             from blueprints.settings import DevModeLogHandler
+
             dev_handler = DevModeLogHandler()
             dev_handler.setLevel(logging.DEBUG)
             logging.getLogger().addHandler(dev_handler)
@@ -209,6 +205,16 @@ def main(argv: list[str] | None = None):
             logger.warning(f"Could not enable dev mode log handler: {e}")
 
     return app
+
+
+def _read_version() -> str:
+    """Read the application version from the VERSION file at the repo root."""
+    try:
+        version_path = os.path.join(os.path.dirname(__file__), "..", "VERSION")
+        with open(version_path) as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
 
 
 def create_app():
@@ -221,6 +227,19 @@ def create_app():
         [FileSystemLoader(directory) for directory in template_dirs]
     )
     # No server-side helper required; icons via CDN classes
+
+    app.config["APP_VERSION"] = _read_version()
+
+    @app.context_processor
+    def _inject_app_version():
+        version = app.config["APP_VERSION"]
+
+        def versioned_url_for(endpoint, **values):
+            if endpoint == "static":
+                values.setdefault("v", version)
+            return flask_url_for(endpoint, **values)
+
+        return {"app_version": version, "url_for": versioned_url_for}
 
     device_config = Config()
     display_manager = DisplayManager(device_config)
@@ -255,24 +274,14 @@ def create_app():
             secret = None
     if not secret:
         generated = secrets.token_hex(32)
-        if DEV_MODE:
-            try:
-                device_config.set_env_key("SECRET_KEY", generated)
-                secret = generated
-                logger.info(
-                    "SECRET_KEY not found; generated and persisted a dev fallback in .env"
-                )
-            except Exception:
-                secret = generated
-                logger.warning(
-                    "SECRET_KEY not found; generated a non-persistent dev fallback"
-                )
-        else:
-            # In production, do not persist automatically; warn for operator action
+        try:
+            device_config.set_env_key("SECRET_KEY", generated)
+            secret = generated
+            logger.info("SECRET_KEY not set; generated and persisted to .env")
+        except Exception as e:
             secret = generated
             logger.warning(
-                "SECRET_KEY not set; generated an ephemeral secret. "
-                "Configure SECRET_KEY in environment or .env for stable sessions."
+                "SECRET_KEY could not persist: %s — sessions won't survive restarts", e
             )
     app.secret_key = secret
 
@@ -338,6 +347,7 @@ def create_app():
             g._t0 = perf_counter()
         except Exception:
             pass
+
     @app.before_request
     def _attach_request_id():
         # Ensure each request has a request_id stored in g and echoed in responses
@@ -371,7 +381,7 @@ def create_app():
         # Ensure a token exists in the session
         token = session.get("_csrf_token")
         if not token:
-            # First POST before any page load — skip enforcement so the
+            # First POST before any page load -- skip enforcement so the
             # initial session can be established.  The next request will
             # have a token.
             _generate_csrf_token()
@@ -384,6 +394,32 @@ def create_app():
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
+
+    # --- Global rate limiting for mutating requests ---
+    _MUTATE_REQUESTS: dict[str, deque] = defaultdict(deque)
+    _MUTATE_WINDOW = 60  # seconds
+    _MUTATE_MAX = 60  # requests per IP per window
+    _RATE_EXEMPT = frozenset({"/healthz", "/readyz"})
+
+    @app.before_request
+    def _rate_limit_mutations():
+        if request.method in _CSRF_SAFE_METHODS:
+            return
+        if request.path in _RATE_EXEMPT:
+            return
+        import time as _time
+
+        addr = request.remote_addr or "unknown"
+        now = _time.monotonic()
+        dq = _MUTATE_REQUESTS[addr]
+        while dq and dq[0] < now - _MUTATE_WINDOW:
+            dq.popleft()
+        # Prune empty entries to prevent memory leak from inactive IPs
+        if not dq:
+            _MUTATE_REQUESTS.pop(addr, None)
+        if len(dq) >= _MUTATE_MAX:
+            return json_error("Rate limit exceeded — try again shortly", status=429)
+        _MUTATE_REQUESTS[addr].append(now)
 
     @app.errorhandler(APIError)
     def _handle_api_error(err: APIError):
@@ -428,7 +464,11 @@ def create_app():
     def _set_security_headers(response):
         # Request timing log (env-gated)
         try:
-            if os.getenv("INKYPI_REQUEST_TIMING", "").strip().lower() in ("1", "true", "yes"):
+            if os.getenv("INKYPI_REQUEST_TIMING", "").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            ):
                 t0 = getattr(g, "_t0", None)
                 if t0 is not None:
                     elapsed_ms = int((perf_counter() - t0) * 1000)
@@ -443,13 +483,29 @@ def create_app():
             pass
 
         # Static asset caching for better performance
-        if request.path.startswith('/static/'):
-            # Cache CSS, JS, and images for 1 year (they have versioned URLs when changed)
-            if any(request.path.endswith(ext) for ext in ['.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2', '.ttf']):
-                response.headers.setdefault('Cache-Control', 'public, max-age=31536000, immutable')
+        if request.path.startswith("/static/"):
+            # Cache CSS, JS, and images for 1 year (versioned via ?v= query param)
+            if any(
+                request.path.endswith(ext)
+                for ext in [
+                    ".css",
+                    ".js",
+                    ".png",
+                    ".jpg",
+                    ".jpeg",
+                    ".gif",
+                    ".svg",
+                    ".woff",
+                    ".woff2",
+                    ".ttf",
+                ]
+            ):
+                response.headers.setdefault(
+                    "Cache-Control", "public, max-age=31536000, immutable"
+                )
             else:
                 # Other static files: 1 day cache
-                response.headers.setdefault('Cache-Control', 'public, max-age=86400')
+                response.headers.setdefault("Cache-Control", "public, max-age=86400")
 
         # Basic hardening headers
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -519,8 +575,13 @@ if __name__ == "__main__":
 
     # display default inkypi image on startup (skip if web-only)
     device_cfg = created_app.config.get("DEVICE_CONFIG")
-    if not WEB_ONLY and device_cfg is not None and device_cfg.get_config("startup") is True:
+    if (
+        not WEB_ONLY
+        and device_cfg is not None
+        and device_cfg.get_config("startup") is True
+    ):
         import threading
+
         def _show_startup():
             try:
                 logger.info("Displaying startup image")
@@ -531,11 +592,13 @@ if __name__ == "__main__":
                 device_cfg.update_value("startup", False, write=True)
             except Exception:
                 logger.exception("Startup image failed")
+
         threading.Thread(target=_show_startup, daemon=True, name="StartupImage").start()
 
     # Notify systemd that the service is ready
     try:
         from cysystemd.daemon import notify as sd_notify
+
         sd_notify("READY=1")
         logger.info("Notified systemd: READY=1")
     except Exception:

@@ -80,6 +80,17 @@ def test_weather_malformed_response(monkeypatch):
         p.generate_image(_base_settings(), cfg)
 
 
+def test_weather_realistic_response_shape(monkeypatch, realistic_weather_response):
+    """Verify the realistic weather fixture has the expected structure."""
+    resp = realistic_weather_response
+    assert "current" in resp
+    assert "daily" in resp
+    assert "hourly" in resp
+    assert resp["current"]["weather"][0]["main"] == "Clouds"
+    assert len(resp["daily"]) == 7
+    assert len(resp["hourly"]) == 24
+
+
 def test_weather_openmeteo_timeout(monkeypatch):
     """OpenMeteo provider timeout."""
     p = _make_weather_plugin()

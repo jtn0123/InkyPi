@@ -8,7 +8,7 @@
     <main id="settings-main" class="page-shell page-shell-management" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
-        {% from 'macros/icons.html' import icon, theme_toggle %}
+        {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
         <!-- Settings Header -->
         <div class="app-header">
             <div class="header-content">
@@ -27,6 +27,7 @@
             </div>
         </div>
         <div class="separator"></div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings'}]) }}
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Manage device behavior, scheduling, recovery tools, and image processing from one control surface.</p>
@@ -43,7 +44,7 @@
             <button type="button" class="settings-side-link active" data-settings-tab="device">Device</button>
             <button type="button" class="settings-side-link" data-settings-tab="scheduling">Scheduling</button>
             <button type="button" class="settings-side-link" data-settings-tab="image">Image Processing</button>
-            <button type="button" class="settings-side-link" data-settings-tab="maintenance">Maintenance</button>
+            <button type="button" class="settings-side-link" data-settings-tab="maintenance">Updates</button>
         </nav>
         <div class="settings-console-main">
         <!-- Settings Content -->
@@ -146,8 +147,38 @@
                 </div>
                 </section>
 
-                <!-- Backup & Restore -->
                 <section class="settings-console-panel" data-settings-panel="maintenance">
+
+                <!-- Software Update — always visible, top of Updates tab -->
+                <div class="update-panel" id="updatePanel">
+                    <div class="update-header">
+                        <h3>Software Update</h3>
+                        <span class="status-chip" id="updateBadge">Checking...</span>
+                    </div>
+                    <div class="update-version-row">
+                        <div class="update-version-card">
+                            <span class="update-version-label">Installed</span>
+                            <span class="update-version-number" id="currentVersion">{{ app_version }}</span>
+                        </div>
+                        <span class="update-arrow" aria-hidden="true">→</span>
+                        <div class="update-version-card">
+                            <span class="update-version-label">Latest</span>
+                            <span class="update-version-number" id="latestVersion">—</span>
+                        </div>
+                    </div>
+                    <div id="releaseNotesContainer" class="update-release-notes" hidden>
+                        <details>
+                            <summary class="update-release-notes-toggle">Release Notes</summary>
+                            <div id="releaseNotesBody" class="update-release-notes-body"></div>
+                        </details>
+                    </div>
+                    <div class="update-actions">
+                        <button type="button" id="checkUpdatesBtn" class="action-button compact">Check for Updates</button>
+                        <button type="button" id="startUpdateBtn" class="action-button compact" disabled>Update Now</button>
+                    </div>
+                </div>
+
+                <!-- Backup & Restore -->
                 <div class="collapsible" id="section-backup-restore">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Backup & Restore <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
@@ -170,25 +201,15 @@
                     </div>
                 </div>
 
-                <!-- Observability & Recovery -->
+                <!-- Diagnostics -->
                 <div class="collapsible" id="section-observability">
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Observability & Recovery <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
+                        Diagnostics <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
-                        <div class="diagnostics-strip">
-                            <div class="metric-pill"><span class="metric-pill-label">Logs</span><span class="metric-pill-value">Live</span></div>
-                            <div class="metric-pill"><span class="metric-pill-label">Health</span><span class="metric-pill-value">System + plugins</span></div>
-                            <div class="metric-pill"><span class="metric-pill-label">Recovery</span><span class="metric-pill-value">Scoped actions</span></div>
-                        </div>
                         <div class="form-group nowrap">
-                            <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh Benchmark Summary</button>
+                            <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh Benchmarks</button>
                             <button type="button" id="safeResetBtn" class="action-button compact warn">Safe Reset</button>
-                        </div>
-                        <div class="status-row">
-                            <span class="status-chip success">Health API</span>
-                            <span class="status-chip info">Benchmarks API</span>
-                            <span class="status-chip warning">Recovery Tools</span>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
@@ -213,17 +234,18 @@
                             <label class="form-label">Isolation Summary</label>
                             <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-busy="true">Isolation list loading...</div>
                         </div>
-                        <div class="danger-zone">
-                            <div>
-                                <h3>Maintenance Actions</h3>
-                                <p>Use these only for lifecycle operations on the device itself.</p>
-                            </div>
-                            <div class="inline-action-row">
-                                <button type="button" id="startUpdateBtn" class="action-button">Update InkyPi</button>
-                                <button type="button" id="rebootBtn" class="action-button is-warning">Reboot</button>
-                                <button type="button" id="shutdownBtn" class="action-button is-danger">Shutdown</button>
-                            </div>
-                        </div>
+                    </div>
+                </div>
+
+                <!-- Device Actions -->
+                <div class="danger-zone">
+                    <div>
+                        <h3>Device Actions</h3>
+                        <p>Lifecycle operations on the device itself.</p>
+                    </div>
+                    <div class="inline-action-row">
+                        <button type="button" id="rebootBtn" class="action-button is-warning">Reboot</button>
+                        <button type="button" id="shutdownBtn" class="action-button is-danger">Shutdown</button>
                     </div>
                 </div>
                 </section>
@@ -346,6 +368,7 @@
             shutdownUrl: {{ url_for('settings.shutdown') | tojson }},
             startUpdateUrl: {{ url_for('settings.start_update') | tojson }},
             updateStatusUrl: {{ url_for('settings.update_status') | tojson }},
+            versionUrl: {{ url_for('settings.api_version') | tojson }},
         };
         document.addEventListener('DOMContentLoaded', () => {
             window.InkyPiSettingsPage.create(window.__INKYPI_SETTINGS_BOOT__).init();

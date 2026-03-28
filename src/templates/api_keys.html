@@ -4,7 +4,7 @@
     <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}" defer></script>
 {% endblock %}
 {% block body %}
-    {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
+    {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     {% from 'macros/api_key_card.html' import api_key_card %}
     <main class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
@@ -34,6 +34,7 @@
             </div>
         </div>
         <div class="separator"></div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Store service credentials in one place. Existing values stay masked so you can update only the keys that changed.</p>
