@@ -212,5 +212,5 @@
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--surface);
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-md);
 }

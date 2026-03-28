@@ -2,14 +2,14 @@
 
 /* Jost — geometric sans-serif for the industrial aesthetic */
 @font-face {
-    font-family: 'Jost';
+    font-family: Jost;
     src: url('../fonts/Jost.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
-    font-family: 'Jost';
+    font-family: Jost;
     src: url('../fonts/Jost-SemiBold.ttf') format('truetype');
     font-weight: 600;
     font-style: normal;
@@ -29,7 +29,7 @@
 
 /* Base body styling */
 body {
-    font-family: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     font-display: swap;
     background-color: var(--bg);
     color: var(--text);
@@ -51,7 +51,7 @@ body {
     --divider: var(--surface-border);
     --button-bg: #f0ede8;
     --input-bg: #ffffff;
-    --accent: #c45d3e;
+    --accent: #b5522f;
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
     --subtext: #6b6560;
@@ -88,7 +88,7 @@ body {
     --warning-contrast: #8a6500;
     --danger: #c4453a;
     --danger-hover: #a93530;
-    --accent-hover: #a94d32;
+    --accent-hover: #984428;
     --on-accent: #ffffff;
     --storage-track: #d8d4cd;
     --storage-fill-start: #5aab7a;
@@ -828,13 +828,13 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Staggered card reveal animation */
-@keyframes fadeInUp {
+@keyframes fade-in-up {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .plugins-container .icon-button {
-  animation: fadeInUp 0.3s ease-out both;
+  animation: fade-in-up 0.3s ease-out both;
 }
 
 .plugins-container .icon-button:nth-child(1) { animation-delay: 0ms; }
@@ -2209,7 +2209,7 @@ textarea:focus-visible {
   font-weight: 600;
   color: var(--text-secondary);
   background: var(--surface);
-  border-radius: var(--border-radius);
+  border-radius: var(--border-radius-md);
 }
 
 /* Plugin List */
@@ -4811,7 +4811,7 @@ body.modal-open {
     left: 0;
     height: 3px;
     width: 100%;
-    background: currentColor;
+    background: currentcolor;
     opacity: 0.3;
     transform-origin: left;
     animation: toast-countdown linear forwards;
@@ -5192,7 +5192,7 @@ body.modal-open {
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: currentColor;
+    background: currentcolor;
     animation: loading-dots 1.4s ease-in-out infinite both;
     animation-delay: 0.16s;
 }
@@ -5202,7 +5202,7 @@ body.modal-open {
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: currentColor;
+    background: currentcolor;
     animation: loading-dots 1.4s ease-in-out infinite both;
 }
 

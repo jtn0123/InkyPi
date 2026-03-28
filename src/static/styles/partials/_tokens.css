@@ -9,7 +9,7 @@
     --divider: var(--surface-border);
     --button-bg: #f0ede8;
     --input-bg: #ffffff;
-    --accent: #c45d3e;
+    --accent: #b5522f;
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
     --subtext: #6b6560;
@@ -46,7 +46,7 @@
     --warning-contrast: #8a6500;
     --danger: #c4453a;
     --danger-hover: #a93530;
-    --accent-hover: #a94d32;
+    --accent-hover: #984428;
     --on-accent: #ffffff;
     --storage-track: #d8d4cd;
     --storage-fill-start: #5aab7a;

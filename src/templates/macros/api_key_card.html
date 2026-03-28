@@ -12,7 +12,7 @@
 {% macro api_key_card(label, key_name, input_id, status_id, placeholder, masked, api_key_plugins) %}
 <div class="form-group api-key-card">
     <div class="api-key-card-head">
-        <label class="form-label">{{ label }}</label>
+        <label class="form-label" for="{{ input_id }}">{{ label }}</label>
         <div id="{{ status_id }}" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked[key_name] ~ ')' if masked[key_name] else 'Not configured' }}</div>
         {% if api_key_plugins and api_key_plugins.get(key_name) %}<div class="api-key-usage">Used by: {{ api_key_plugins[key_name] | join(', ') }}</div>{% endif %}
     </div>
