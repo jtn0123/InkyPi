@@ -116,18 +116,14 @@ def _probe_routes(client, routes: list[str]) -> None:
             raise RuntimeError(f"{route} returned {response.status_code}")
 
 
-def _force_inprocess_execution(refresh_task) -> None:
-    def _execute_inprocess(refresh_action, plugin_config, current_dt, request_id=None):
-        import refresh_task as refresh_task_mod
+def _force_inprocess_execution(refresh_task=None) -> None:
+    """Disable subprocess isolation so plugins run in the current process.
 
-        plugin = refresh_task_mod.get_plugin_instance(plugin_config)
-        image = refresh_action.execute(plugin, refresh_task.device_config, current_dt)
-        plugin_meta = None
-        if hasattr(plugin, "get_latest_metadata"):
-            plugin_meta = plugin.get_latest_metadata()
-        return image, plugin_meta
-
-    refresh_task._execute_with_policy = _execute_inprocess
+    This avoids pickling issues with the ``spawn``/``forkserver``
+    multiprocessing start methods on Linux CI and keeps monkey-patches
+    visible to the plugin code.
+    """
+    os.environ["INKYPI_PLUGIN_ISOLATION"] = "none"
 
 
 def run_app_smoke() -> None:

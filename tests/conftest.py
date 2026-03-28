@@ -103,6 +103,20 @@ def pytest_ignore_collect(collection_path, config):
 
 
 @pytest.fixture(autouse=True)
+def disable_plugin_process_isolation(monkeypatch):
+    """Run plugins in-process during tests.
+
+    The production code spawns a subprocess per plugin execution to isolate
+    failures.  On Linux the ``spawn``/``forkserver`` multiprocessing start
+    methods require all arguments to be picklable and do **not** inherit
+    monkey-patches from the test process.  Setting this env var tells
+    ``RefreshTask._execute_with_policy`` to skip the subprocess and call the
+    plugin directly, which is both faster and compatible with monkeypatch.
+    """
+    monkeypatch.setenv("INKYPI_PLUGIN_ISOLATION", "none")
+
+
+@pytest.fixture(autouse=True)
 def clear_managed_api_key_env(monkeypatch):
     # Keep tests hermetic even when earlier tests or the parent shell export real
     # API credentials that would otherwise leak into "missing key" cases.

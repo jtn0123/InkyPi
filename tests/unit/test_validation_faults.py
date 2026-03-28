@@ -77,7 +77,9 @@ def test_plugin_failure_remains_actionable_and_task_recovers(device_config_dev, 
 
     refresh_task.start()
     try:
-        with pytest.raises(RuntimeError, match="broken PNG stream"):
+        # In subprocess mode OSError is wrapped as RuntimeError; in
+        # in-process mode the original OSError propagates directly.
+        with pytest.raises(Exception, match="broken PNG stream"):
             refresh_task.manual_update(ManualRefresh("faulty", {}))
 
         assert refresh_task.running is True

@@ -54,6 +54,22 @@ class Config:
     # Directory path for storing historical processed images
     history_image_dir = os.path.join(BASE_DIR, "static", "images", "history")
 
+    def __getstate__(self):
+        """Support pickling by excluding the unpicklable RLock.
+
+        This is required on Linux where multiprocessing uses the 'spawn' or
+        'forkserver' start method, which pickles objects passed to child
+        processes.
+        """
+        state = self.__dict__.copy()
+        state.pop("_config_lock", None)
+        return state
+
+    def __setstate__(self, state):
+        """Restore the RLock when unpickling."""
+        self.__dict__.update(state)
+        self._config_lock = threading.RLock()
+
     def __init__(self):
         self._config_lock = threading.RLock()
         self._last_written_hash = None
