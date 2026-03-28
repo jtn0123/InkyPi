@@ -122,8 +122,6 @@ coverage_suite() {
         tests/unit/test_display_manager.py \
         tests/unit/test_display_manager_coverage.py \
         tests/unit/test_config_resolution.py \
-        tests/unit/test_config_bootstrap_idempotent.py \
-        tests/unit/test_config_validation.py \
         tests/unit/test_config_validation.py \
         tests/unit/test_config_fallbacks_extra.py \
         tests/unit/test_refresh_policy.py \
