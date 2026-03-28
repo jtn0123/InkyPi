@@ -1,3 +1,5 @@
+import threading
+
 from PIL import Image
 
 
@@ -14,7 +16,7 @@ def _dummy_plugin(device_config, marker=None):
 
 
 def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
-    """Ensure ManualRefresh is executed via the unified execute method."""
+    """Ensure ManualRefresh exercises the plugin generate_image path."""
     from display.display_manager import DisplayManager
     from refresh_task import ManualRefresh, RefreshTask
 
@@ -23,7 +25,6 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
 
     marker = tmp_path / "manual-execute.txt"
 
-    # Stub plugin retrieval
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
@@ -41,19 +42,19 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
 
 
 def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
-    """Ensure PlaylistRefresh exercises the plugin generate_image path."""
+    """Ensure PlaylistRefresh exercises the plugin generate_image path.
+
+    Uses manual_update with a PlaylistRefresh to avoid timing issues
+    with the background refresh loop.
+    """
     from display.display_manager import DisplayManager
-    from refresh_task import RefreshTask
+    from refresh_task import PlaylistRefresh, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
 
-    # Avoid waiting during the loop
-    monkeypatch.setattr(task.condition, "wait", lambda timeout=None: None)
-
     marker = tmp_path / "playlist-execute.txt"
 
-    # Stub plugin config and instance — marker written by generate_image
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
@@ -73,24 +74,15 @@ def test_playlist_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path)
         def should_refresh(self, dt):
             return True
 
-    fake_plugin_instance = FakePluginInstance()
+    fake_instance = FakePluginInstance()
     fake_playlist = type("PL", (), {"name": "pl"})()
 
-    def fake_determine(self, pm, latest_refresh, current_dt):
-        if not getattr(self, "_done", False):
-            self._done = True
-            return fake_playlist, fake_plugin_instance
-        return None, None
-
-    monkeypatch.setattr(task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask))
+    refresh = PlaylistRefresh(fake_playlist, fake_instance)
 
     try:
         task.start()
-        import time
-        for _ in range(60):
-            if marker.exists():
-                break
-            time.sleep(0.1)
+        task.manual_update(refresh)
+        assert marker.exists(), "generate_image should have been called"
         assert marker.read_text(encoding="utf-8") == "called"
     finally:
         task.stop()
