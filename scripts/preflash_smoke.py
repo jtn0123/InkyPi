@@ -32,7 +32,7 @@ def _truthy(value: str | None) -> bool:
 
 
 def _prepare_env(runtime_dir: str, config_path: str | None = None, web_only: bool = True) -> None:
-    os.environ["INKYPI_ENV"] = "dev"
+    os.environ["INKYPI_ENV"] = "test"
     os.environ["INKYPI_RUNTIME_DIR"] = runtime_dir
     if web_only:
         os.environ["INKYPI_NO_REFRESH"] = "1"
