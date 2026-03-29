@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.1.2 (2026-03-29)
+
+### Bug Fixes
+
+- Add styled 404 page and stop leaking UUIDs in error toasts
+  ([`f84c93a`](https://github.com/jtn0123/InkyPi/commit/f84c93aa51782977754f5abf228f00d7ae8f6680))
+
+- Create 404.html template with app layout, nav, and "Back to Home" link instead of plain "Not
+  found" text (JTN-43) - Change includeRequestId default to false in handleJsonResponse() so
+  internal request UUIDs are no longer shown in user-facing error toasts (JTN-44) - Add 404 error
+  handler to test fixture and integration tests - JTN-45 (toast z-index) canceled as false positive
+  — toast z-index (10000) already higher than modal (1000)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.1 (2026-03-29)
 
 ### Bug Fixes
