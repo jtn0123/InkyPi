@@ -173,6 +173,54 @@ class TestUpdateStatus:
         assert captured_args["script"] == "/fake/do_update.sh"
         mod._set_update_state(False, None)
 
+    def test_start_update_rejects_invalid_target_tag(self, client, monkeypatch):
+        """POST /settings/update rejects shell injection in target_version."""
+        import blueprints.settings as mod
+
+        mod._set_update_state(False, None)
+        resp = client.post(
+            "/settings/update",
+            json={"target_version": "; rm -rf /"},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["success"] is False
+        assert "Invalid target version" in data["error"]
+
+    def test_start_update_rejects_flag_injection(self, client, monkeypatch):
+        """POST /settings/update rejects flag-style injection."""
+        import blueprints.settings as mod
+
+        mod._set_update_state(False, None)
+        resp = client.post(
+            "/settings/update",
+            json={"target_version": "--malicious"},
+        )
+        assert resp.status_code == 400
+
+    def test_start_update_accepts_semver_with_prerelease(self, client, monkeypatch):
+        """POST /settings/update accepts valid semver with pre-release suffix."""
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake/do_update.sh")
+
+        captured_args = {}
+
+        def mock_systemd(unit, script, target_tag=None):
+            captured_args["target_tag"] = target_tag
+
+        monkeypatch.setattr(mod, "_start_update_via_systemd", mock_systemd)
+        mod._set_update_state(False, None)
+
+        resp = client.post(
+            "/settings/update",
+            json={"target_version": "1.0.0-rc1"},
+        )
+        assert resp.status_code == 200
+        assert captured_args["target_tag"] == "1.0.0-rc1"
+        mod._set_update_state(False, None)
+
 
 # ---------------------------------------------------------------------------
 # /settings/isolation (GET, POST, DELETE) - plugin isolation
