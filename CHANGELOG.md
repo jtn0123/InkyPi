@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.1.3 (2026-03-29)
+
+### Bug Fixes
+
+- Security hardening and thread safety improvements
+  ([`030d750`](https://github.com/jtn0123/InkyPi/commit/030d7508140290e932c38a523b9a2db0bbf8be53))
+
+- Remove os.environ writes after API key save; plugins already reload via load_dotenv() so keys no
+  longer leak in process memory (JTN-27) - Add threading.Lock around DisplayManager
+  _history_count_estimate and _history_increment_count to prevent data races (JTN-29) - Set
+  SESSION_COOKIE_HTTPONLY and SESSION_COOKIE_SAMESITE=Lax; change CSP default from report-only to
+  enforcing in production (JTN-31) - Add threading.Lock around _LAST_HOT_RELOAD in plugin registry
+  to prevent race between concurrent plugin loads and pop (JTN-33)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.2 (2026-03-29)
 
 ### Bug Fixes
