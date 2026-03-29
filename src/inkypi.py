@@ -9,7 +9,7 @@ import warnings
 from collections import defaultdict, deque
 from time import perf_counter
 
-from flask import Flask, g, render_template, request, session, url_for as flask_url_for
+from flask import Flask, g, redirect, render_template, request, session, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -349,6 +349,21 @@ def create_app():
             g._t0 = perf_counter()
         except Exception:
             pass
+
+    # --- HTTPS redirect (opt-in via INKYPI_FORCE_HTTPS=1) ---
+    _force_https = (
+        not DEV_MODE
+        and os.getenv("INKYPI_FORCE_HTTPS", "0").strip().lower() in ("1", "true", "yes")
+    )
+
+    @app.before_request
+    def _redirect_to_https():
+        if not _force_https:
+            return
+        if request.is_secure or request.headers.get("X-Forwarded-Proto", "").lower() == "https":
+            return
+        url = request.url.replace("http://", "https://", 1)
+        return redirect(url, code=301)
 
     @app.before_request
     def _attach_request_id():
