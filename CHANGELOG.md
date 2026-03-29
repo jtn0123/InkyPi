@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.1.1 (2026-03-29)
+
+### Bug Fixes
+
+- Sanitize target_version, fix mutable defaults, guard JSON.parse
+  ([`c47b91c`](https://github.com/jtn0123/InkyPi/commit/c47b91c9e7e1ba812d420896fd346a4010c81a2c))
+
+- Validate target_version against semver regex before passing to subprocess in update route (JTN-26)
+  - Fix mutable default argument image_settings=[] in 4 display classes by using None with runtime
+  guard (JTN-28) - Wrap localStorage JSON.parse in try-catch to prevent page crash on corrupted data
+  (JTN-32) - Add tests for injection rejection, valid semver acceptance, and mutable default
+  isolation
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.0 (2026-03-28)
 
 ### Bug Fixes
