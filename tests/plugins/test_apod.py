@@ -47,7 +47,7 @@ def test_apod_missing_key(client):
     assert resp.status_code == 400
 
 @patch('plugins.apod.apod.get_http_session')
-def test_apod_success_via_client(mock_get_session, client, monkeypatch):
+def test_apod_success_via_client(mock_get_session, client):
     import os
     os.environ['NASA_SECRET'] = 'test'
 

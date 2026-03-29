@@ -151,10 +151,10 @@ class Unsplash(BasePlugin):
                 image_url = data["urls"]["full"]
         except RequestException as e:
             logger.error(f"Error fetching image from Unsplash API: {e}")
-            raise RuntimeError("Failed to fetch image from Unsplash API, please check logs.")
+            raise RuntimeError("Failed to fetch image from Unsplash API, please check logs.") from e
         except (KeyError, IndexError) as e:
             logger.error(f"Error parsing Unsplash API response: {e}")
-            raise RuntimeError("Failed to parse Unsplash API response, please check logs.")
+            raise RuntimeError("Failed to parse Unsplash API response, please check logs.") from e
 
 
         dimensions = self.get_oriented_dimensions(device_config)

@@ -54,7 +54,9 @@ def test_weather_api_timeout(monkeypatch):
     p = _make_weather_plugin()
     cfg = _make_device_config()
 
-    timeout_fn = lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.Timeout("timed out"))
+    def timeout_fn(*a, **kw):
+        raise requests.exceptions.Timeout("timed out")
+
     mock_session = type("S", (), {"get": staticmethod(timeout_fn)})()
     monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
@@ -97,7 +99,9 @@ def test_weather_openmeteo_timeout(monkeypatch):
     p = _make_weather_plugin()
     cfg = _make_device_config()
 
-    timeout_fn = lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.Timeout("timed out"))
+    def timeout_fn(*a, **kw):
+        raise requests.exceptions.Timeout("timed out")
+
     mock_session = type("S", (), {"get": staticmethod(timeout_fn)})()
     monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 

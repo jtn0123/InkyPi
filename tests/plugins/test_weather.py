@@ -7,7 +7,7 @@ import requests
 
 
 @patch('plugins.weather.weather.get_http_session')
-def test_weather_openweathermap_success(mock_get_session, client, monkeypatch):
+def test_weather_openweathermap_success(mock_get_session, client):
     import os
 
     os.environ["OPEN_WEATHER_MAP_SECRET"] = "key"
