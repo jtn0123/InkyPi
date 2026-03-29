@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.1.9 (2026-03-29)
+
+### Bug Fixes
+
+- Dashboard Home icon and client-side form validation (JTN-46, JTN-47)
+  ([`b5f5dbc`](https://github.com/jtn0123/InkyPi/commit/b5f5dbced9dc84faa46b76f73c37d99bfb33f80b))
+
+JTN-46: Replace header-nav-spacer on dashboard with a Home icon link
+
+matching other pages. Styled with muted opacity + pointer-events:none to indicate current page.
+
+JTN-47: Add client-side validation to playlist and plugin modals: - Validate playlist name
+  (required, max 64 chars) before fetch - Validate instance name (required) in Add to Playlist modal
+  - Show inline error messages with aria-invalid + validation-message - Server-side validation
+  remains as safety net
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.8 (2026-03-29)
 
 ### Bug Fixes
