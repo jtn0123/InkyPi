@@ -239,3 +239,20 @@ def test_backup_restore_route(client, device_config_dev):
     """Test restoring backup returns 404 (route does not exist)."""
     resp = client.post("/backup/restore", data={})
     assert resp.status_code == 404
+
+
+def test_404_page_renders_styled_html(client):
+    """HTML 404 requests should return a styled page with navigation."""
+    resp = client.get("/nonexistent-page", headers={"Accept": "text/html"})
+    assert resp.status_code == 404
+    assert b"Page Not Found" in resp.data
+    assert b'href="/"' in resp.data
+
+
+def test_404_json_still_returns_json(client):
+    """JSON 404 requests should still return a JSON error."""
+    resp = client.get("/nonexistent-page", headers={"Accept": "application/json"})
+    assert resp.status_code == 404
+    data = resp.get_json()
+    assert data["success"] is False
+    assert "Not found" in data["error"]

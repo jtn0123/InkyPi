@@ -9,7 +9,7 @@ import warnings
 from collections import defaultdict, deque
 from time import perf_counter
 
-from flask import Flask, g, request, session, url_for as flask_url_for
+from flask import Flask, g, render_template, request, session, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -437,7 +437,7 @@ def create_app():
     def _handle_not_found(err):
         if wants_json():
             return json_error("Not found", status=404)
-        return ("Not found", 404)
+        return render_template("404.html"), 404
 
     @app.errorhandler(415)
     def _handle_unsupported_media_type(err):

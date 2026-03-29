@@ -324,6 +324,14 @@ def flask_app(device_config_dev, monkeypatch):
         except Exception:
             return ("not-ready", 503)
 
+    @app.errorhandler(404)
+    def _handle_not_found(err):
+        from utils.http_utils import wants_json, json_error
+        if wants_json():
+            return json_error("Not found", status=404)
+        from flask import render_template as _rt
+        return _rt("404.html"), 404
+
     @app.after_request
     def _set_security_headers(response):
         # Basic hardening headers

@@ -172,7 +172,7 @@ function clearAllToasts() {
  */
 // Enhanced error handling with better user feedback
 async function handleJsonResponse(response, options = {}) {
-    const { showToastNotification = true, includeRequestId = true } = options;
+    const { showToastNotification = true, includeRequestId = false } = options;
 
     let data = null;
     try {
