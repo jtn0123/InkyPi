@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.1.6 (2026-03-29)
+
+### Bug Fixes
+
+- Address SonarCloud high-value findings
+  ([`e699aea`](https://github.com/jtn0123/InkyPi/commit/e699aeaddc462e796b338442aa63287043821f54))
+
+- BLOCKER vuln: resolve path with realpath before send_file (plugin.py) - MAJOR vuln: use
+  send_from_directory for plugin assets (path traversal) - MINOR vuln: sanitize user input before
+  logging to prevent log injection - CRITICAL bug: fix duplicate HTML ids on radio buttons
+  (image_album, image_folder) - MAJOR bug: remove redundant always-true condition
+  (settings/__init__.py) - CRITICAL smell: use tz.localize() instead of tzinfo= for pytz
+  (year_progress) - MINOR vuln: use %r formatting for user data in model.py logs
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.5 (2026-03-29)
 
 ### Bug Fixes
