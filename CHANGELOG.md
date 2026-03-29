@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.1.7 (2026-03-29)
+
+### Bug Fixes
+
+- Add HTTPS redirect and playlist name validation (JTN-30, JTN-38)
+  ([`41cd75c`](https://github.com/jtn0123/InkyPi/commit/41cd75c8873135c2f562efb3d4864ee25eeb1ee3))
+
+JTN-30: Add opt-in HTTPS redirect via INKYPI_FORCE_HTTPS=1 env var. Redirects HTTP→HTTPS in
+  production mode via before_request hook. Skipped in dev mode and when already behind HTTPS proxy.
+
+JTN-38: Add format, length, and character constraints to playlist names. Max 64 chars, alphanumeric
+  + spaces/hyphens/underscores only. Applied in create_playlist and delete_plugin_instance routes.
+
+Adds 8 new tests (4 HTTPS redirect, 4 playlist validation).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Split weather plugin into API client and data modules (JTN-36)
+  ([`cb58fb1`](https://github.com/jtn0123/InkyPi/commit/cb58fb1f9f67b3a2414d5de05e4ef1eeb8d3bba8))
+
+Extract weather.py (887 lines) into 3 focused modules: - weather.py (277 lines): Weather class,
+  settings schema, orchestration - weather_api.py (78 lines): HTTP client functions (5 API
+  endpoints) - weather_data.py (622 lines): parsing, transformation, utility functions
+
+Delegate methods on Weather class preserve backward compatibility for tests and external callers.
+  Test mock paths updated for new API module.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.6 (2026-03-29)
 
 ### Bug Fixes
