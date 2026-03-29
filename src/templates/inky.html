@@ -11,7 +11,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
-                    <span class="header-nav-spacer" aria-hidden="true"></span>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon current-page" title="Home" aria-label="Home" aria-current="page">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}

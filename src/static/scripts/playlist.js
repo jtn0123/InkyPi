@@ -439,8 +439,30 @@
         } catch(e){ showResponseModal('failure', 'Failed saving cadence'); }
     }
 
+    function _validatePlaylistName() {
+        const input = document.getElementById("playlist_name");
+        const error = document.getElementById("playlist-name-error");
+        const name = (input.value || "").trim();
+        if (!name) {
+            input.setAttribute("aria-invalid", "true");
+            if (error) error.textContent = "Playlist name is required";
+            input.focus();
+            return null;
+        }
+        if (name.length > 64) {
+            input.setAttribute("aria-invalid", "true");
+            if (error) error.textContent = "Name must be 64 characters or fewer";
+            input.focus();
+            return null;
+        }
+        input.setAttribute("aria-invalid", "false");
+        if (error) error.textContent = "";
+        return name;
+    }
+
     async function createPlaylist() {
-        let playlistName = document.getElementById("playlist_name").value.trim();
+        let playlistName = _validatePlaylistName();
+        if (!playlistName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         try {
@@ -452,7 +474,8 @@
 
     async function updatePlaylist() {
         let oldName = document.getElementById("editingPlaylistName").value;
-        let newName = document.getElementById("playlist_name").value;
+        let newName = _validatePlaylistName();
+        if (!newName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         let cycleMinutes = document.getElementById('cycle_minutes').value;
