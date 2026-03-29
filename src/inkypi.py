@@ -284,6 +284,8 @@ def create_app():
                 "SECRET_KEY could not persist: %s — sessions won't survive restarts", e
             )
     app.secret_key = secret
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
     # Set additional parameters
     app.config["MAX_FORM_PARTS"] = 10_000
@@ -531,7 +533,7 @@ def create_app():
                 os.getenv("INKYPI_CSP")
                 or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
             )
-            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in (
+            report_only = DEV_MODE or os.getenv("INKYPI_CSP_REPORT_ONLY", "0").strip().lower() in (
                 "1",
                 "true",
                 "yes",

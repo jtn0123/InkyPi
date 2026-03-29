@@ -143,10 +143,10 @@ def save_apikeys():
             valid_entries.append((key, value))
 
         if write_env_file(env_path, valid_entries):
-            # Reload environment variables
-            for key, value in valid_entries:
-                os.environ[key] = value
-
+            # Keys are persisted in .env; plugins reload via
+            # device_config.load_env_key() which calls load_dotenv().
+            # Do NOT inject into os.environ to avoid leaking secrets
+            # in process memory (/proc/<pid>/environ).
             return json_success(
                 f"Saved {len(valid_entries)} API key(s). Some plugins may require restart to pick up changes."
             )
