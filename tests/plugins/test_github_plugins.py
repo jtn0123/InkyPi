@@ -91,7 +91,8 @@ def test_contributions_success(monkeypatch, plugin_config, device_config_dev):
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response()
 
-    with patch("plugins.github.github_contributions.requests.post", return_value=mock_resp):
+    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {
@@ -114,7 +115,8 @@ def test_contributions_missing_colors_uses_defaults(monkeypatch, plugin_config, 
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response()
 
-    with patch("plugins.github.github_contributions.requests.post", return_value=mock_resp):
+    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {
@@ -159,10 +161,8 @@ def test_contributions_api_error(monkeypatch, plugin_config, device_config_dev):
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
 
-    with patch(
-        "plugins.github.github_contributions.requests.post",
-        side_effect=req_mod.exceptions.HTTPError("Server error"),
-    ):
+    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.side_effect = req_mod.exceptions.HTTPError("Server error")
         p = GitHub(plugin_config)
         with pytest.raises(Exception):
             p.generate_image(
@@ -184,7 +184,8 @@ def test_contributions_empty_data(monkeypatch, plugin_config, device_config_dev)
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response(count=0)
 
-    with patch("plugins.github.github_contributions.requests.post", return_value=mock_resp):
+    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {
@@ -206,7 +207,8 @@ def test_stars_success(monkeypatch, plugin_config, device_config_dev):
     mock_resp.status_code = 200
     mock_resp.json.return_value = {"stargazers_count": 1234}
 
-    with patch("plugins.github.github_stars.requests.get", return_value=mock_resp):
+    with patch("plugins.github.github_stars.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.get.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {"githubType": "stars", "githubUsername": "octocat", "githubRepository": "Hello-World"},
@@ -233,7 +235,8 @@ def test_stars_http_error(monkeypatch, plugin_config, device_config_dev):
     mock_resp.status_code = 404
     mock_resp.text = "Not Found"
 
-    with patch("plugins.github.github_stars.requests.get", return_value=mock_resp):
+    with patch("plugins.github.github_stars.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.get.return_value = mock_resp
         p = GitHub(plugin_config)
         # fetch_stars returns 0 on error; stars_generate_image still renders
         result = p.generate_image(
@@ -279,7 +282,8 @@ def test_sponsors_success(monkeypatch, plugin_config, device_config_dev):
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_sponsors_response()
 
-    with patch("plugins.github.github_sponsors.requests.post", return_value=mock_resp):
+    with patch("plugins.github.github_sponsors.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {"githubType": "sponsors", "githubUsername": "octocat"},
@@ -323,7 +327,8 @@ def test_sponsors_api_error(monkeypatch, plugin_config, device_config_dev):
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = {"errors": [{"message": "Bad credentials"}]}
 
-    with patch("plugins.github.github_sponsors.requests.post", return_value=mock_resp):
+    with patch("plugins.github.github_sponsors.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         with pytest.raises(RuntimeError, match="errors"):
             p.generate_image(

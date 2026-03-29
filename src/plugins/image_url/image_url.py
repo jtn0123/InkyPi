@@ -1,10 +1,10 @@
 import logging
 from io import BytesIO
 
-import requests
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_client import get_http_session
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def grab_image(image_url, dimensions, timeout_ms=40000):
     """Grab an image from a URL and resize it to the specified dimensions."""
     try:
-        response = requests.get(image_url, timeout=timeout_ms / 1000)
+        response = get_http_session().get(image_url, timeout=timeout_ms / 1000)
         response.raise_for_status()
         with Image.open(BytesIO(response.content)) as img:
             resized = img.resize(dimensions, Image.LANCZOS)
@@ -45,9 +45,7 @@ class ImageURL(BasePlugin):
         if not url:
             raise RuntimeError("URL is required.")
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
 
         logger.info(f"Grabbing image from: {url}")
 

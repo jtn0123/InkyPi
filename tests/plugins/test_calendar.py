@@ -168,8 +168,9 @@ def test_fetch_calendar_timeout_raises(monkeypatch):
     def raise_timeout(url, **kwargs):
         raise requests.exceptions.Timeout("timeout")
 
+    mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get", raise_timeout, raising=True
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     p = Calendar({"id": "calendar"})
@@ -186,10 +187,9 @@ def test_fetch_calendar_http_error_raises(monkeypatch):
         def raise_for_status(self):
             raise requests.HTTPError("bad status")
 
+    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: Resp())})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: Resp(),
-        raising=True,
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     p = Calendar({"id": "calendar"})
@@ -207,10 +207,9 @@ def test_fetch_calendar_bad_ical_raises(monkeypatch):
             return None
 
     # Return a 200 OK but break ical parsing
+    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: Resp())})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: Resp(),
-        raising=True,
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     class FakeCal:
@@ -429,8 +428,9 @@ def test_fetch_calendar_connection_error(monkeypatch):
     def raise_connection_error(url, **kwargs):
         raise requests.exceptions.ConnectionError("connection failed")
 
+    mock_session = type("S", (), {"get": staticmethod(raise_connection_error)})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get", raise_connection_error
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     p = Calendar({"id": "calendar"})
@@ -448,8 +448,9 @@ def test_fetch_calendar_decode_error(monkeypatch):
         def raise_for_status(self):
             return None
 
+    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: BadResponse())})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get", lambda url, **kwargs: BadResponse()
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     p = Calendar({"id": "calendar"})

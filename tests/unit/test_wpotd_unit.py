@@ -44,9 +44,9 @@ def test_download_image_unidentified(monkeypatch):
             return None
 
     monkeypatch.setattr(
-        wpotd_mod.Wpotd,
-        "SESSION",
-        type("S", (), {"get": staticmethod(lambda *a, **k: Resp())}),
+        wpotd_mod,
+        "get_http_session",
+        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp())})(),
     )
 
     with pytest.raises(RuntimeError):
@@ -65,9 +65,9 @@ def test_download_image_success(monkeypatch):
             return None
 
     monkeypatch.setattr(
-        wpotd_mod.Wpotd,
-        "SESSION",
-        type("S", (), {"get": staticmethod(lambda *a, **k: Resp(content))}),
+        wpotd_mod,
+        "get_http_session",
+        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp(content))})(),
     )
     img = p._download_image("http://example.com/image.png")
     assert isinstance(img, Image.Image)

@@ -103,12 +103,8 @@ class ImageUpload(BasePlugin):
 
         # Write the new index back ot the device json
         settings['image_index'] = img_index
-        orientation = device_config.get_config("orientation")
-
         if settings.get('padImage') == "true":
-            dimensions = device_config.get_resolution()
-            if orientation == "vertical":
-                dimensions = dimensions[::-1]
+            dimensions = self.get_oriented_dimensions(device_config)
 
             if settings.get('backgroundOption') == "blur":
                 return pad_image_blur(image, dimensions)

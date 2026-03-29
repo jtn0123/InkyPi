@@ -57,6 +57,14 @@ class BasePlugin:
         except Exception:
             pass
 
+    @staticmethod
+    def get_oriented_dimensions(device_config):
+        """Return display (width, height) adjusted for the current orientation."""
+        dimensions = device_config.get_resolution()
+        if device_config.get_config("orientation") == "vertical":
+            dimensions = dimensions[::-1]
+        return dimensions
+
     def generate_image(self, settings, device_config):
         raise NotImplementedError("generate_image must be implemented by subclasses")
 

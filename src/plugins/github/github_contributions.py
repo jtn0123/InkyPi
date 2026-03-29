@@ -1,7 +1,7 @@
 import logging
 from datetime import date, datetime, timedelta
 
-import requests
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +24,7 @@ query($username: String!) {
 """
 
 def contributions_generate_image(plugin_instance, settings, device_config):
-    dimensions = device_config.get_resolution()
-    if device_config.get_config("orientation") == "vertical":
-        dimensions = dimensions[::-1]
+    dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
     api_key = device_config.load_env_key("GITHUB_SECRET")
     if not api_key:
@@ -65,7 +63,7 @@ def fetch_contributions(username, api_key):
     url = "https://api.github.com/graphql"
     headers = {"Authorization": f"Bearer {api_key}"}
     variables = {"username": username}
-    resp = requests.post(url, json={"query": GRAPHQL_QUERY, "variables": variables}, headers=headers, timeout=30)
+    resp = get_http_session().post(url, json={"query": GRAPHQL_QUERY, "variables": variables}, headers=headers, timeout=30)
     resp.raise_for_status()
     return resp.json()
 

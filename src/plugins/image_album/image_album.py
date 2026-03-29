@@ -195,12 +195,7 @@ class ImageAlbum(BasePlugin):
     def generate_image(self, settings, device_config):
         logger.info("=== Image Album Plugin: Starting image generation ===")
 
-        orientation = device_config.get_config("orientation")
-        dimensions = device_config.get_resolution()
-
-        if orientation == "vertical":
-            dimensions = dimensions[::-1]
-            logger.debug(f"Vertical orientation detected, dimensions: {dimensions[0]}x{dimensions[1]}")
+        dimensions = self.get_oriented_dimensions(device_config)
 
         img = None
         album_provider = settings.get("albumProvider")

@@ -6,8 +6,8 @@ import pytest
 import requests
 
 
-@patch('requests.get')
-def test_weather_openweathermap_success(mock_http_get, client, monkeypatch):
+@patch('plugins.weather.weather.get_http_session')
+def test_weather_openweathermap_success(mock_get_session, client):
     import os
 
     os.environ["OPEN_WEATHER_MAP_SECRET"] = "key"
@@ -51,7 +51,9 @@ def test_weather_openweathermap_success(mock_http_get, client, monkeypatch):
 
         return R()
 
-    mock_http_get.side_effect = fake_get
+    mock_session = MagicMock()
+    mock_session.get.side_effect = fake_get
+    mock_get_session.return_value = mock_session
 
     data = {
         "plugin_id": "weather",
@@ -102,7 +104,8 @@ def test_weather_openmeteo_success(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr("requests.get", fake_get, raising=True)
+    mock_session = type("S", (), {"get": staticmethod(fake_get)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     data = {
         "plugin_id": "weather",
@@ -449,8 +452,6 @@ def test_weather_api_key_validation():
 def test_weather_save_settings(client, monkeypatch):
     """Test saving weather settings to default playlist from main plugin page."""
     # Mock the weather API calls
-    import requests
-
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
@@ -489,7 +490,8 @@ def test_weather_save_settings(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr(requests, "get", fake_get, raising=True)
+    mock_session = type("S", (), {"get": staticmethod(fake_get)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     data = {
         "plugin_id": "weather",
@@ -512,8 +514,6 @@ def test_weather_save_settings(client, monkeypatch):
 def test_weather_settings_persistence(client, monkeypatch):
     """Test that saved weather settings persist when navigating back to plugin page."""
     # Mock the weather API calls
-    import requests
-
     def fake_get(url, *args, **kwargs):
         class R:
             status_code = 200
@@ -552,7 +552,8 @@ def test_weather_settings_persistence(client, monkeypatch):
 
         return R()
 
-    monkeypatch.setattr(requests, "get", fake_get, raising=True)
+    mock_session = type("S", (), {"get": staticmethod(fake_get)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     data = {
         "plugin_id": "weather",
@@ -668,7 +669,8 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
     def raise_timeout(*args, **kwargs):
         raise requests.exceptions.Timeout("Connection timeout")
 
-    monkeypatch.setattr("requests.get", raise_timeout)
+    mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     settings = {
         "latitude": "40.7128",
@@ -690,7 +692,8 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
     def raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("Connection failed")
 
-    monkeypatch.setattr("requests.get", raise_connection_error)
+    mock_session = type("S", (), {"get": staticmethod(raise_connection_error)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     settings = {
         "latitude": "40.7128",

@@ -78,10 +78,7 @@ class Comic(BasePlugin):
         if comic_panel.get("caption"):
             logger.debug(f"Comic caption: {comic_panel['caption']}")
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
-            logger.debug(f"Vertical orientation detected, dimensions: {dimensions[0]}x{dimensions[1]}")
+        dimensions = self.get_oriented_dimensions(device_config)
 
         width, height = dimensions
 

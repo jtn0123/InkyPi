@@ -19,7 +19,8 @@ def test_image_url_happy(monkeypatch, device_config_dev):
         Image.new("RGB", (10, 10), "white").save(buf, format="PNG")
         return Resp(buf.getvalue())
 
-    monkeypatch.setattr("requests.get", fake_get)
+    mock_session = type("S", (), {"get": staticmethod(fake_get)})()
+    monkeypatch.setattr("plugins.image_url.image_url.get_http_session", lambda: mock_session)
 
     img = ImageURL({"id": "image_url"}).generate_image(
         {"url": "http://img"}, device_config_dev

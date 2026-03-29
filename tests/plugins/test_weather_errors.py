@@ -42,7 +42,8 @@ def test_weather_invalid_coordinates(monkeypatch):
     def raise_error(*args, **kwargs):
         raise requests.exceptions.HTTPError("400 Bad Request")
 
-    monkeypatch.setattr("requests.get", raise_error)
+    mock_session = type("S", (), {"get": staticmethod(raise_error)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     with pytest.raises(RuntimeError, match="request failure"):
         p.generate_image(_base_settings(latitude="999", longitude="999"), cfg)
@@ -53,10 +54,11 @@ def test_weather_api_timeout(monkeypatch):
     p = _make_weather_plugin()
     cfg = _make_device_config()
 
-    monkeypatch.setattr(
-        "requests.get",
-        lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.Timeout("timed out")),
-    )
+    def timeout_fn(*a, **kw):
+        raise requests.exceptions.Timeout("timed out")
+
+    mock_session = type("S", (), {"get": staticmethod(timeout_fn)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     with pytest.raises(RuntimeError, match="request failure"):
         p.generate_image(_base_settings(), cfg)
@@ -74,7 +76,8 @@ def test_weather_malformed_response(monkeypatch):
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr("requests.get", lambda *a, **kw: EmptyResp())
+    mock_session = type("S", (), {"get": staticmethod(lambda *a, **kw: EmptyResp())})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     with pytest.raises((RuntimeError, KeyError, AttributeError, TypeError)):
         p.generate_image(_base_settings(), cfg)
@@ -96,10 +99,11 @@ def test_weather_openmeteo_timeout(monkeypatch):
     p = _make_weather_plugin()
     cfg = _make_device_config()
 
-    monkeypatch.setattr(
-        "requests.get",
-        lambda *a, **kw: (_ for _ in ()).throw(requests.exceptions.Timeout("timed out")),
-    )
+    def timeout_fn(*a, **kw):
+        raise requests.exceptions.Timeout("timed out")
+
+    mock_session = type("S", (), {"get": staticmethod(timeout_fn)})()
+    monkeypatch.setattr("plugins.weather.weather.get_http_session", lambda: mock_session)
 
     with pytest.raises(RuntimeError, match="request failure"):
         p.generate_image(_base_settings(weatherProvider="OpenMeteo"), cfg)
