@@ -1,0 +1,374 @@
+"""Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
+
+import blueprints.settings as _mod
+
+import pytz
+from flask import current_app, jsonify, render_template, request
+from utils.http_utils import json_error, json_internal_error
+from utils.time_utils import calculate_seconds
+
+
+@_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
+def plugin_isolation():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    isolated = device_config.get_config("isolated_plugins", default=[])
+    if not isinstance(isolated, list):
+        isolated = []
+
+    if request.method == "GET":
+        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return json_error("Request body must be a JSON object", status=400)
+    plugin_id = body.get("plugin_id")
+    if not isinstance(plugin_id, str) or not plugin_id.strip():
+        return json_error(
+            "plugin_id is required and must be a non-empty string",
+            status=422,
+            code="validation_error",
+            details={"field": "plugin_id"},
+        )
+
+    if request.method == "POST":
+        if plugin_id not in isolated:
+            isolated.append(plugin_id)
+            device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
+        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+    # DELETE
+    isolated = [p for p in isolated if p != plugin_id]
+    device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
+    return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+
+
+@_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
+def safe_reset():
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        config = device_config.get_config().copy()
+        keep = {
+            "playlist_config": config.get("playlist_config"),
+            "plugins_enabled": config.get("plugins_enabled"),
+            "name": config.get("name"),
+            "timezone": config.get("timezone"),
+            "time_format": config.get("time_format"),
+            "display_type": config.get("display_type"),
+            "resolution": config.get("resolution"),
+            "orientation": config.get("orientation"),
+            "preview_size_mode": config.get("preview_size_mode"),
+        }
+        # Reset selected runtime controls to safe defaults while preserving plugins/playlists.
+        keep["plugin_cycle_interval_seconds"] = 3600
+        keep["log_system_stats"] = False
+        keep["isolated_plugins"] = []
+        device_config.update_config(keep)
+        return jsonify({"success": True, "message": "Safe reset applied."})
+    except Exception as e:
+        return json_internal_error("safe reset", details={"error": str(e)})
+
+
+@_mod.settings_bp.route("/settings")
+def settings_page():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    timezones = sorted(pytz.all_timezones_set)
+    return render_template(
+        "settings.html", device_settings=device_config.get_config(), timezones=timezones
+    )
+
+
+@_mod.settings_bp.route("/settings/backup")
+def backup_restore_page():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    # For now, reuse the main settings page and anchor to a section; separate template can be added later
+    return render_template(
+        "settings.html",
+        device_settings=device_config.get_config(),
+        timezones=sorted(pytz.all_timezones_set),
+    )
+
+
+@_mod.settings_bp.route("/settings/export", methods=["GET"])
+def export_settings():
+    try:
+        include_keys = request.args.get("include_keys", "0").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        device_config = current_app.config["DEVICE_CONFIG"]
+
+        # Build export object with config plus env keys when requested
+        data = {
+            "config": device_config.get_config(),
+        }
+        if include_keys:
+            # Include known API keys and possibly other keys
+            keys = {}
+            for k in (
+                "OPEN_AI_SECRET",
+                "OPEN_WEATHER_MAP_SECRET",
+                "NASA_SECRET",
+                "UNSPLASH_ACCESS_KEY",
+            ):
+                try:
+                    v = device_config.load_env_key(k)
+                except Exception:
+                    v = None
+                if v:
+                    keys[k] = v
+            data["env_keys"] = keys
+
+        # JSON response for now; a file download route can be added if needed
+        return jsonify({"success": True, "data": data})
+    except Exception as e:
+        _mod.logger.exception("Error exporting settings")
+        return json_internal_error(
+            "export settings",
+            details={"hint": "Check config readability.", "error": str(e)},
+        )
+
+
+@_mod.settings_bp.route("/settings/import", methods=["POST"])
+def import_settings():
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        # Accept JSON body or form upload with a JSON file
+        payload = None
+        if request.is_json:
+            payload = request.get_json(silent=True)
+        if payload is None:
+            file = request.files.get("file")
+            if file:
+                import json as _json
+
+                payload = _json.loads(file.stream.read().decode("utf-8"))
+        if not payload or not isinstance(payload, dict):
+            return json_error("Invalid import payload", status=400)
+
+        cfg = payload.get("config")
+        if isinstance(cfg, dict):
+            # Filter to allowed keys only
+            filtered_cfg = {k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS}
+            device_config.update_config(filtered_cfg)
+
+        env_keys = payload.get("env_keys") or {}
+        if isinstance(env_keys, dict):
+            for k, v in env_keys.items():
+                if k not in _mod._ALLOWED_IMPORT_ENV_KEYS or v is None:
+                    continue
+                try:
+                    device_config.set_env_key(k, str(v))
+                except Exception:
+                    _mod.logger.exception("Failed setting env key during import: %s", k)
+
+        return jsonify({"success": True, "message": "Import completed"})
+    except Exception as e:
+        _mod.logger.exception("Error importing settings")
+        return json_internal_error(
+            "import settings",
+            details={
+                "hint": "Verify JSON structure and file permissions.",
+                "error": str(e),
+            },
+        )
+
+
+@_mod.settings_bp.route("/settings/api-keys")
+def api_keys_page():
+    device_config = current_app.config["DEVICE_CONFIG"]
+
+    def mask(value):
+        if not value:
+            return None
+        try:
+            if len(value) >= 4:
+                return f"...{value[-4:]} ({len(value)} chars)"
+            return f"set ({len(value)} chars)"
+        except Exception:
+            return "set"
+
+    keys = {
+        "OPEN_AI_SECRET": device_config.load_env_key("OPEN_AI_SECRET"),
+        "OPEN_WEATHER_MAP_SECRET": device_config.load_env_key(
+            "OPEN_WEATHER_MAP_SECRET"
+        ),
+        "NASA_SECRET": device_config.load_env_key("NASA_SECRET"),
+        "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
+    }
+    masked = {k: mask(v) for k, v in keys.items()}
+    api_key_plugins = {
+        "OPEN_AI_SECRET": ["AI Image", "AI Text"],
+        "OPEN_WEATHER_MAP_SECRET": ["Weather"],
+        "NASA_SECRET": ["NASA APOD"],
+        "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
+        "GITHUB_SECRET": ["GitHub"],
+    }
+    return render_template(
+        "api_keys.html",
+        api_keys_mode="managed",
+        entries=[],
+        masked=masked,
+        api_key_plugins=api_key_plugins,
+    )
+
+
+@_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])
+def save_api_keys():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    try:
+        form_data = request.form.to_dict()
+        updated = []
+        for key in (
+            "OPEN_AI_SECRET",
+            "OPEN_WEATHER_MAP_SECRET",
+            "NASA_SECRET",
+            "UNSPLASH_ACCESS_KEY",
+        ):
+            value = form_data.get(key)
+            if value:
+                device_config.set_env_key(key, value)
+                updated.append(key)
+        return jsonify(
+            {"success": True, "message": "API keys saved.", "updated": updated}
+        )
+    except Exception:
+        _mod.logger.exception("Error saving API keys")
+        return json_internal_error(
+            "saving API keys",
+            details={
+                "hint": "Ensure .env is writable and values are valid; check disk space/permissions.",
+            },
+        )
+
+
+@_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])
+def delete_api_key():
+    device_config = current_app.config["DEVICE_CONFIG"]
+    key = request.form.get("key")
+    valid_keys = {
+        "OPEN_AI_SECRET",
+        "OPEN_WEATHER_MAP_SECRET",
+        "NASA_SECRET",
+        "UNSPLASH_ACCESS_KEY",
+    }
+    if key not in valid_keys:
+        return json_error("Invalid key name", status=400)
+    try:
+        device_config.unset_env_key(key)
+        return jsonify({"success": True, "message": f"Deleted {key}."})
+    except Exception:
+        _mod.logger.exception("Error deleting API key")
+        return json_internal_error(
+            "deleting API key",
+            details={"hint": "Verify .env file permissions and key exists."},
+        )
+
+
+@_mod.settings_bp.route("/save_settings", methods=["POST"])
+def save_settings():
+    device_config = current_app.config["DEVICE_CONFIG"]
+
+    try:
+        form_data = request.form.to_dict()
+
+        unit, interval, time_format = (
+            form_data.get("unit"),
+            form_data.get("interval"),
+            form_data.get("timeFormat"),
+        )
+        if not unit or unit not in ["minute", "hour"]:
+            return json_error(
+                "Plugin cycle interval unit is required",
+                status=422,
+                code="validation_error",
+                details={"field": "unit"},
+            )
+        if not interval or not interval.isnumeric():
+            return json_error(
+                "Refresh interval is required",
+                status=422,
+                code="validation_error",
+                details={"field": "interval"},
+            )
+        if not form_data.get("timezoneName"):
+            return json_error(
+                "Time Zone is required",
+                status=422,
+                code="validation_error",
+                details={"field": "timezoneName"},
+            )
+        if not time_format or time_format not in ["12h", "24h"]:
+            return json_error(
+                "Time format is required",
+                status=422,
+                code="validation_error",
+                details={"field": "timeFormat"},
+            )
+        previous_interval_seconds = device_config.get_config(
+            "plugin_cycle_interval_seconds"
+        )
+        plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
+        if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
+            return json_error(
+                "Plugin cycle interval must be less than 24 hours",
+                status=422,
+                code="validation_error",
+                details={"field": "interval"},
+            )
+
+        settings = {
+            "name": form_data.get("deviceName"),
+            "orientation": form_data.get("orientation"),
+            "inverted_image": form_data.get("invertImage"),
+            "log_system_stats": form_data.get("logSystemStats"),
+            "timezone": form_data.get("timezoneName"),
+            "time_format": form_data.get("timeFormat"),
+            "plugin_cycle_interval_seconds": plugin_cycle_interval_seconds,
+            "image_settings": {
+                "saturation": float(form_data.get("saturation", "1.0")),
+                "brightness": float(form_data.get("brightness", "1.0")),
+                "sharpness": float(form_data.get("sharpness", "1.0")),
+                "contrast": float(form_data.get("contrast", "1.0")),
+            },
+            "preview_size_mode": form_data.get("previewSizeMode", "native"),
+        }
+        if "inky_saturation" in form_data:
+            settings["image_settings"]["inky_saturation"] = float(form_data.get("inky_saturation", "0.5"))
+        device_config.update_config(settings)
+
+        if plugin_cycle_interval_seconds != previous_interval_seconds:
+            # wake the background thread up to signal interval config change
+            refresh_task = current_app.config["REFRESH_TASK"]
+            refresh_task.signal_config_change()
+    except RuntimeError:
+        return json_error("An internal error occurred", status=500, code="internal_error")
+    except Exception:
+        _mod.logger.exception("Error saving device settings")
+        return json_internal_error(
+            "saving device settings",
+            details={"hint": "Check numeric values and config file permissions."},
+        )
+    return jsonify({"success": True, "message": "Saved settings."})
+
+
+# Legacy route aliases used by older UI/tests.
+@_mod.settings_bp.route("/settings/device", methods=["GET", "POST"])
+def save_device_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
+
+
+@_mod.settings_bp.route("/settings/display", methods=["GET", "POST"])
+def save_display_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
+
+
+@_mod.settings_bp.route("/settings/network", methods=["GET", "POST"])
+def save_network_settings():
+    if request.method == "GET":
+        return settings_page()
+    return save_settings()
