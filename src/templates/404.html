@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}InkyPi - Page Not Found{% endblock %}
+{% block body %}
+    <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+    <div class="frame">
+        {% from 'macros/icons.html' import icon, theme_toggle %}
+        <div class="app-header">
+            <div class="header-content">
+                <div class="header-identity">
+                    <a href="/" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    {{ theme_toggle() }}
+                    <div class="title-container">
+                        <h1 class="app-title">Page Not Found</h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="separator"></div>
+        <div class="page-intro" style="text-align: center; padding: 4rem 1rem;">
+            <h2 style="font-size: 4rem; margin-bottom: 0.5rem; opacity: 0.3;">404</h2>
+            <p class="page-subtitle">The page you're looking for doesn't exist or has been moved.</p>
+            <a href="/" class="btn btn-primary" style="margin-top: 1.5rem; display: inline-block;">Back to Home</a>
+        </div>
+    </div>
+    </main>
+{% endblock %}
