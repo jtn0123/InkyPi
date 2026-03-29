@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.1.8 (2026-03-29)
+
+### Bug Fixes
+
+- Add graceful shutdown handler and fix Image.open file handle leaks (JTN-42)
+  ([`57a0dce`](https://github.com/jtn0123/InkyPi/commit/57a0dce9a5500c027392f0afa2c418f064a0cc05))
+
+- Register SIGTERM/SIGINT handler in create_app() for clean shutdown (stops refresh task, closes
+  HTTP session, main process only) - Add explicit img.load() calls in image_loader file-based opens
+  to release file handles immediately instead of relying on GC - Prevents file descriptor exhaustion
+  on Pi Zero under memory pressure
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.7 (2026-03-29)
 
 ### Bug Fixes
