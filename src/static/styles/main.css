@@ -911,6 +911,12 @@ main[data-page-shell="workflow"] .frame {
     color: var(--text);
 }
 
+.header-button.icon.current-page {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+}
+
 .app-header > .header-button.icon {
     margin-left: 0;
 }
@@ -5322,6 +5328,17 @@ body.modal-open {
 .help-icon svg {
     width: 100%;
     height: 100%;
+}
+
+/* Client-side form validation */
+.form-input[aria-invalid="true"] {
+    border-color: var(--red, #e53e3e);
+}
+
+.validation-message:not(:empty) {
+    color: var(--red, #e53e3e);
+    font-size: 0.85em;
+    margin-top: 0.25rem;
 }
 
 /* Reduced motion support */

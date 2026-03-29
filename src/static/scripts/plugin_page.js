@@ -164,6 +164,20 @@
     }
 
     async function handleAction(action, triggerButton) {
+      // Client-side validation for Add to Playlist
+      if (action === "add_to_playlist") {
+        const instanceInput = document.getElementById("instance");
+        const instanceError = document.getElementById("instance-error");
+        const name = (instanceInput?.value || "").trim();
+        if (!name) {
+          if (instanceInput) { instanceInput.setAttribute("aria-invalid", "true"); instanceInput.focus(); }
+          if (instanceError) instanceError.textContent = "Instance name is required";
+          return;
+        }
+        if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
+        if (instanceError) instanceError.textContent = "";
+      }
+
       try {
         if (typeof window.validatePluginSettings === "function") {
           const isValid = window.validatePluginSettings(action);
