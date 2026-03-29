@@ -5,6 +5,7 @@ import logging
 import logging.config
 import os
 import secrets
+import signal
 import warnings
 from collections import defaultdict, deque
 from time import perf_counter
@@ -573,6 +574,26 @@ def create_app():
         except Exception:
             pass
         return response
+
+    # Register signal handlers for graceful shutdown (main process only)
+    if not is_running_from_reloader():
+
+        def _shutdown_handler(signum, frame):
+            sig_name = signal.Signals(signum).name
+            logger.info("Received %s — shutting down gracefully", sig_name)
+            rt = app.config.get("REFRESH_TASK")
+            if rt is not None:
+                rt.stop()
+            try:
+                from utils.http_client import close_http_session
+
+                close_http_session()
+            except Exception:
+                pass
+            raise SystemExit(0)
+
+        signal.signal(signal.SIGTERM, _shutdown_handler)
+        signal.signal(signal.SIGINT, _shutdown_handler)
 
     return app
 
