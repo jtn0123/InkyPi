@@ -209,6 +209,7 @@ class AdaptiveImageLoader:
 
                 img = self._process_and_resize(img, dimensions, original_size)
             else:
+                img.load()  # Force decode to release file handle
                 # Even without resizing, apply EXIF orientation correction
                 img = ImageOps.exif_transpose(img)
                 if img.size != original_size:
@@ -265,6 +266,7 @@ class AdaptiveImageLoader:
         """High-performance file loading using in-memory processing."""
         try:
             img = Image.open(path)
+            img.load()  # Force decode to release file handle
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
             logger.info(f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)")
