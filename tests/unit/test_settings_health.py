@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 class TestHealthPlugins:
     def test_filters_stale_entries(self, client, monkeypatch):
         """Entries with last_seen older than the window are filtered out."""
-        import blueprints.settings as mod
+        monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
 
         stale_time = (datetime.now() - timedelta(days=2)).isoformat()
         snapshot = {"old_plugin": {"last_seen": stale_time, "status": "ok"}}
@@ -28,6 +28,7 @@ class TestHealthPlugins:
 
     def test_keeps_recent_entries(self, client, monkeypatch):
         """Entries with recent last_seen are preserved."""
+        monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
         recent_time = datetime.now().isoformat()
         snapshot = {"fresh_plugin": {"last_seen": recent_time, "status": "ok"}}
 

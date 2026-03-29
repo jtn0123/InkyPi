@@ -66,7 +66,7 @@ def test_download_logs_exception_500(client, monkeypatch):
 
 
 def test_api_logs_level_warn_errors(client):
-    """level=warn_errors matches both WARNING and ERROR lines."""
+    """level=warn_errors is accepted and echoed back in meta."""
     resp = client.get("/api/logs?level=warn_errors")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -74,7 +74,7 @@ def test_api_logs_level_warn_errors(client):
 
 
 def test_api_logs_level_all(client):
-    """level=all returns all lines without filtering."""
+    """level=all is accepted and echoed back in meta."""
     resp = client.get("/api/logs?level=all")
     assert resp.status_code == 200
     data = resp.get_json()
@@ -82,7 +82,7 @@ def test_api_logs_level_all(client):
 
 
 def test_api_logs_contains_case_insensitive(client):
-    """contains filter is case-insensitive."""
+    """contains parameter is accepted and echoed back in meta."""
     resp = client.get("/api/logs?contains=ERROR")
     assert resp.status_code == 200
     data = resp.get_json()

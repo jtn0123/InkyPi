@@ -54,6 +54,17 @@ class TestDisplayManagerInit:
 
 
 class TestPruneHistory:
+    @pytest.fixture(autouse=True)
+    def reset_class_state(self):
+        """Reset class-level state to avoid leaks between tests."""
+        from display.display_manager import DisplayManager
+
+        DisplayManager._history_count_estimate = None
+        DisplayManager._history_increment_count = 0
+        yield
+        DisplayManager._history_count_estimate = None
+        DisplayManager._history_increment_count = 0
+
     def test_skips_when_estimate_under_limit(self, device_config_dev, tmp_path):
         """Estimate below max → no directory scan."""
         from display.display_manager import DisplayManager

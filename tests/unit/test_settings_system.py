@@ -60,10 +60,8 @@ class TestClientLog:
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
 
-    def test_outer_exception(self, client, monkeypatch):
-        """Exception in request parsing returns 500."""
-        from flask import Flask
-
+    def test_invalid_json_returns_400(self, client):
+        """Invalid JSON body returns 400 (not a dict)."""
         resp = client.post(
             "/settings/client_log",
             data=b"\xff\xfe",

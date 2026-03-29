@@ -90,6 +90,7 @@ class TestApiVersion:
 
         mod._VERSION_CACHE["latest"] = "1.0.0"
         mod._VERSION_CACHE["checked_at"] = time.time()
+        original_version = client.application.config.get("APP_VERSION")
         try:
             with client.application.app_context():
                 client.application.config["APP_VERSION"] = "2.0.0"
@@ -100,6 +101,10 @@ class TestApiVersion:
         finally:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0
+            if original_version is not None:
+                client.application.config["APP_VERSION"] = original_version
+            else:
+                client.application.config.pop("APP_VERSION", None)
 
     def test_unknown_current(self, client, monkeypatch):
         """current='unknown' → update_available is False."""
@@ -107,6 +112,7 @@ class TestApiVersion:
 
         mod._VERSION_CACHE["latest"] = "2.0.0"
         mod._VERSION_CACHE["checked_at"] = time.time()
+        original_version = client.application.config.get("APP_VERSION")
         try:
             with client.application.app_context():
                 client.application.config["APP_VERSION"] = "unknown"
@@ -117,6 +123,10 @@ class TestApiVersion:
         finally:
             mod._VERSION_CACHE["latest"] = None
             mod._VERSION_CACHE["checked_at"] = 0.0
+            if original_version is not None:
+                client.application.config["APP_VERSION"] = original_version
+            else:
+                client.application.config.pop("APP_VERSION", None)
 
 
 class TestSemverGt:

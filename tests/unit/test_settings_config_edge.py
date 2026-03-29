@@ -239,12 +239,13 @@ class TestApiKeysMask:
         assert b"set (3 chars)" in resp.data
 
     def test_mask_empty_string(self, client, device_config_dev, monkeypatch):
-        """Empty string key returns None mask (not displayed)."""
+        """Empty string key returns None mask (not displayed as 'set')."""
         monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "")
 
         resp = client.get("/settings/api-keys")
         assert resp.status_code == 200
-        # Empty string → mask returns None → not shown as "set"
+        # Empty string → mask returns None → should not display "set" or "chars"
+        assert b"set (" not in resp.data
 
 
 class TestDeleteApiKeyEdge:

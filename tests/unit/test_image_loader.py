@@ -318,9 +318,8 @@ def test_resize_high_performance():
 # ---- Additional edge-case tests ----
 
 
-def test_from_url_lowmem_temp_cleanup_on_error(tmp_path):
-    """Download error cleans up temp file."""
-    import os
+def test_from_url_lowmem_temp_cleanup_on_error():
+    """Download error returns None without leaving temp files."""
     import requests
     from utils.image_loader import AdaptiveImageLoader
 
