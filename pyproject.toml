@@ -38,7 +38,7 @@ known-first-party = ["src"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:tool.semantic_release.version"]
-version = "0.1.4"
+version = "0.1.5"
 branch = "main"
 tag_format = "v{version}"
 upload_to_pypi = false

@@ -1,6 +1,43 @@
 # CHANGELOG
 
 
+## v0.1.5 (2026-03-29)
+
+### Bug Fixes
+
+- Correct SonarCloud project key
+  ([`f32258d`](https://github.com/jtn0123/InkyPi/commit/f32258d069c0a3057019ee29d61f82da73306d31))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- Add SonarCloud integration for code quality analysis
+  ([`9654195`](https://github.com/jtn0123/InkyPi/commit/9654195f79e7137a50f18e80a293f1c45c55b42d))
+
+Add sonar-project.properties and GitHub Actions workflow for SonarCloud. Runs on PRs and pushes to
+  main, generates coverage report, and feeds it to SonarCloud for code smell, bug, and vulnerability
+  analysis.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Split settings.py (1,434 lines) into focused sub-modules
+  ([`2e2c121`](https://github.com/jtn0123/InkyPi/commit/2e2c12174b48186138b0b5c4f5449820d8864b36))
+
+Convert blueprints/settings.py into a package with 7 files: - __init__.py (507 lines): state,
+  constants, helpers - _updates.py (134 lines): update, status, version routes - _benchmarks.py (178
+  lines): benchmark API routes - _health.py (98 lines): health + SSE streaming routes - _logs.py
+  (126 lines): log download + API routes - _system.py (86 lines): shutdown + client logging routes -
+  _config.py (374 lines): settings pages, save, import/export, API keys, isolation, safe reset,
+  legacy aliases
+
+All 27 route paths unchanged. All 1699 tests pass without modification.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.4 (2026-03-29)
 
 ### Bug Fixes
