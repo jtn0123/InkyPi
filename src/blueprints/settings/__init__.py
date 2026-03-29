@@ -94,7 +94,7 @@ def _window_since_seconds(window: str | None) -> float:
     now = time.time()
     if not window:
         return now - 24 * 3600
-    val = (window or "").strip().lower()
+    val = window.strip().lower()
     if val.endswith("h"):
         return now - (int(val[:-1]) * 3600)
     if val.endswith("m"):
