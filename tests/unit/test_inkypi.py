@@ -439,24 +439,22 @@ def test_readyz_states(monkeypatch):
 
 
 def test_csp_headers_default_and_overrides(monkeypatch):
-    # Default: report-only header is set
+    # Default in production: CSP is enforced (not report-only)
     mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
     app = getattr(mod, "app", None)
     assert app is not None
     client = app.test_client()
 
     r = client.get("/healthz")
-    # Default is report-only
     assert (
-        "Content-Security-Policy-Report-Only" in r.headers
-    ), "CSP report-only header missing"
-    assert "default-src" in r.headers["Content-Security-Policy-Report-Only"]
+        "Content-Security-Policy" in r.headers
+    ), "CSP enforcement header missing in production mode"
+    assert "default-src" in r.headers["Content-Security-Policy"]
 
-    # Force enforcement header via env
-    monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "0")
+    # Explicit report-only override via env
+    monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "1")
     r2 = client.get("/healthz")
-    assert "Content-Security-Policy" in r2.headers
-    assert "Content-Security-Policy-Report-Only" not in r2.headers
+    assert "Content-Security-Policy-Report-Only" in r2.headers
 
     # Custom policy value
     monkeypatch.setenv("INKYPI_CSP", "default-src 'none'")

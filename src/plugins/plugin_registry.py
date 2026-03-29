@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 
 from utils.app_utils import resolve_path
@@ -13,6 +14,7 @@ PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
 _PLUGIN_CONFIGS = {}
 _LAST_HOT_RELOAD: dict | None = None
+_hot_reload_lock = threading.Lock()
 
 
 def _is_dev_mode() -> bool:
@@ -45,7 +47,8 @@ def _load_single_plugin_instance(plugin_config):
         instance = plugin_cls(plugin_config)
         # record hot reload info for request/response hooks to surface
         global _LAST_HOT_RELOAD
-        _LAST_HOT_RELOAD = {"plugin_id": plugin_id, "reloaded": reloaded}
+        with _hot_reload_lock:
+            _LAST_HOT_RELOAD = {"plugin_id": plugin_id, "reloaded": reloaded}
         return instance
     except ImportError as e:
         logger.error(f"Failed to import plugin module {module_name}: {e}")
@@ -121,6 +124,7 @@ def pop_hot_reload_info():
     Returns a dict like {"plugin_id": str, "reloaded": bool} or None.
     """
     global _LAST_HOT_RELOAD
-    info = _LAST_HOT_RELOAD
-    _LAST_HOT_RELOAD = None
+    with _hot_reload_lock:
+        info = _LAST_HOT_RELOAD
+        _LAST_HOT_RELOAD = None
     return info

@@ -80,6 +80,7 @@ class DisplayManager:
     # Force a full recount every N increments to correct estimate drift
     _RECOUNT_INTERVAL = 50
     _history_increment_count = 0
+    _history_lock = threading.Lock()
 
     def _prune_history(self, history_dir):
         """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
@@ -88,36 +89,37 @@ class DisplayManager:
         count is clearly below the limit.  The estimate is refreshed whenever
         an actual scan is performed or every _RECOUNT_INTERVAL increments.
         """
-        if (
-            self._history_count_estimate is not None
-            and self._history_count_estimate < self.HISTORY_MAX_ENTRIES
-        ):
-            self._history_count_estimate += 1
-            self._history_increment_count += 1
-            # Force periodic recount to correct drift from external deletions
-            if self._history_increment_count < self._RECOUNT_INTERVAL:
-                return
-            self._history_increment_count = 0
-        try:
-            png_files = sorted(
-                (f for f in os.listdir(history_dir) if f.endswith(".png")),
-            )
-            self._history_count_estimate = len(png_files)
-            excess = len(png_files) - self.HISTORY_MAX_ENTRIES
-            if excess <= 0:
-                return
-            for name in png_files[:excess]:
-                base = name.rsplit(".", 1)[0]
-                for ext in (".png", ".json"):
-                    path = os.path.join(history_dir, base + ext)
-                    try:
-                        os.remove(path)
-                    except FileNotFoundError:
-                        pass
-            self._history_count_estimate = len(png_files) - excess
-            logger.info("Pruned %d old history entries (max %d)", excess, self.HISTORY_MAX_ENTRIES)
-        except OSError:
-            logger.debug("Could not prune history directory", exc_info=True)
+        with self._history_lock:
+            if (
+                self._history_count_estimate is not None
+                and self._history_count_estimate < self.HISTORY_MAX_ENTRIES
+            ):
+                self._history_count_estimate += 1
+                self._history_increment_count += 1
+                # Force periodic recount to correct drift from external deletions
+                if self._history_increment_count < self._RECOUNT_INTERVAL:
+                    return
+                self._history_increment_count = 0
+            try:
+                png_files = sorted(
+                    (f for f in os.listdir(history_dir) if f.endswith(".png")),
+                )
+                self._history_count_estimate = len(png_files)
+                excess = len(png_files) - self.HISTORY_MAX_ENTRIES
+                if excess <= 0:
+                    return
+                for name in png_files[:excess]:
+                    base = name.rsplit(".", 1)[0]
+                    for ext in (".png", ".json"):
+                        path = os.path.join(history_dir, base + ext)
+                        try:
+                            os.remove(path)
+                        except FileNotFoundError:
+                            pass
+                self._history_count_estimate = len(png_files) - excess
+                logger.info("Pruned %d old history entries (max %d)", excess, self.HISTORY_MAX_ENTRIES)
+            except OSError:
+                logger.debug("Could not prune history directory", exc_info=True)
 
     def _save_history_entry(self, processed_image, history_meta=None):
         """Persist a processed image snapshot and optional JSON sidecar metadata."""
