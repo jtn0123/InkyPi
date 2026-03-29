@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.1.4 (2026-03-29)
+
+### Bug Fixes
+
+- Address CodeRabbit review findings
+  ([`7dae7e6`](https://github.com/jtn0123/InkyPi/commit/7dae7e6ce429189b53adbca71838b753af7140ae))
+
+- Replace lambda assignments with def (Ruff E731) in test_weather_errors - Add exception chaining
+  (from e) in unsplash error handlers - Remove unused monkeypatch params in test_apod and
+  test_weather
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract shared dimension helper and migrate plugins to HTTP session
+  ([`be45a6b`](https://github.com/jtn0123/InkyPi/commit/be45a6b2d0f972fb4a1b1b27f35ce8699c3dd5e7))
+
+Add BasePlugin.get_oriented_dimensions() to replace the 3-line get_resolution + orientation check
+  pattern duplicated across 20 plugins. Migrate 10 plugins from raw requests.get/post to the shared
+  HTTP session (get_http_session) for connection pooling, retries, and consistent headers.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.3 (2026-03-29)
 
 ### Bug Fixes
