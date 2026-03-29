@@ -181,6 +181,10 @@ def delete_plugin_instance():
     plugin_id = data.get("plugin_id")
     plugin_instance = data.get("plugin_instance")
 
+    if not playlist_name or not isinstance(playlist_name, str) or not playlist_name.strip():
+        return json_error("Playlist name is required", status=400)
+    playlist_name = playlist_name.strip()
+
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:

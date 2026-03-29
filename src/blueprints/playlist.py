@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from datetime import datetime, timedelta
 
 from flask import (
@@ -18,6 +19,27 @@ from utils.time_utils import calculate_seconds, now_device_tz
 
 logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
+
+_PLAYLIST_NAME_MAX_LEN = 64
+_PLAYLIST_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
+
+
+def _validate_playlist_name(name):
+    """Validate playlist name format. Returns (cleaned_name, error_response) tuple."""
+    if not name or not name.strip():
+        return None, json_error("Playlist name is required", status=400)
+    name = name.strip()
+    if len(name) > _PLAYLIST_NAME_MAX_LEN:
+        return None, json_error(
+            f"Playlist name must be {_PLAYLIST_NAME_MAX_LEN} characters or fewer",
+            status=400,
+        )
+    if not _PLAYLIST_NAME_RE.match(name):
+        return None, json_error(
+            "Playlist name may only contain letters, numbers, spaces, hyphens, and underscores",
+            status=400,
+        )
+    return name, None
 
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
 # Bounded to prevent unbounded growth; entries expire after 1 minute.
@@ -305,12 +327,13 @@ def create_playlist():
             return json_error("Unsupported media type", status=415)
     if not isinstance(data, dict):
         return json_error("Invalid JSON data", status=400)
-    playlist_name = data.get("playlist_name")
+    raw_name = data.get("playlist_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
 
-    if not playlist_name or not playlist_name.strip():
-        return json_error("Playlist name is required", status=400)
+    playlist_name, name_err = _validate_playlist_name(raw_name)
+    if name_err:
+        return name_err
     if not start_time or not end_time:
         return json_error("Start time and End time are required", status=400)
     try:

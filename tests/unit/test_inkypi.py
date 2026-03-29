@@ -617,3 +617,67 @@ def test_secret_key_persisted_in_production(monkeypatch):
         call_args = mock_config.set_env_key.call_args
         assert call_args[0][0] == "SECRET_KEY"
         assert len(call_args[0][1]) == 64  # hex(32 bytes) = 64 chars
+
+
+# --- HTTPS redirect ---
+
+
+def test_https_redirect_when_enabled(monkeypatch):
+    """INKYPI_FORCE_HTTPS=1 in production mode should 301-redirect HTTP to HTTPS."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        argv=["inkypi.py"],
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    client = app.test_client()
+    resp = client.get("/settings")
+    assert resp.status_code == 301
+    assert resp.location.startswith("https://")
+
+
+def test_no_redirect_when_disabled(monkeypatch):
+    """Without INKYPI_FORCE_HTTPS, HTTP requests should not be redirected."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        argv=["inkypi.py"],
+        env={"INKYPI_ENV": "production"},
+    )
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    client = app.test_client()
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+
+
+def test_no_redirect_in_dev_mode(monkeypatch):
+    """Even with INKYPI_FORCE_HTTPS=1, dev mode should skip the redirect."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        argv=["inkypi.py"],
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "dev"},
+    )
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    client = app.test_client()
+    resp = client.get("/healthz")
+    assert resp.status_code == 200
+
+
+def test_no_redirect_when_already_https(monkeypatch):
+    """Requests with X-Forwarded-Proto: https should not be redirected."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        argv=["inkypi.py"],
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = getattr(mod, "app", None)
+    assert app is not None
+
+    client = app.test_client()
+    resp = client.get("/healthz", headers={"X-Forwarded-Proto": "https"})
+    assert resp.status_code == 200
