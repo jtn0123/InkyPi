@@ -11,6 +11,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    send_from_directory,
 )
 
 from plugins.plugin_registry import get_plugin_instance
@@ -25,8 +26,16 @@ plugin_bp = Blueprint("plugin", __name__)
 PLUGINS_DIR = resolve_path("plugins")
 
 
+def _sanitize_log(value: str) -> str:
+    """Strip control characters from user input before logging to prevent log injection."""
+    return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:200]
+
+
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
-    resp = send_file(path)
+    safe_path = os.path.realpath(path)
+    if not os.path.isfile(safe_path):
+        abort(404)
+    resp = send_file(safe_path)
     try:
         ttl = int(os.getenv(ttl_env, "300") or "300")
     except Exception:
@@ -104,17 +113,15 @@ def plugin_page(plugin_id: str):
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>")
 def image(plugin_id: str, filename: str):
-    # Serve static plugin asset files with traversal protection
+    # send_from_directory handles path traversal protection internally
     plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
-    full_path = os.path.abspath(os.path.join(plugin_dir, filename))
+    resp = send_from_directory(plugin_dir, filename)
     try:
-        if os.path.commonpath([plugin_dir, full_path]) != plugin_dir:
-            return abort(404)
-    except ValueError:
-        return abort(404)
-    if not os.path.exists(full_path):
-        return abort(404)
-    return _cacheable_send_file(full_path, ttl_env="INKYPI_STATIC_PLUGIN_ASSET_TTL_S")
+        ttl = int(os.getenv("INKYPI_STATIC_PLUGIN_ASSET_TTL_S", "300") or "300")
+    except Exception:
+        ttl = 300
+    resp.headers["Cache-Control"] = f"public, max-age={max(0, ttl)}"
+    return resp
 
 
 @plugin_bp.route(
@@ -193,7 +200,8 @@ def delete_plugin_instance():
                 logger.info("Removed cached image: %s", image_path)
         except Exception:
             logger.warning(
-                "Could not clean up image for %s/%s", plugin_id, plugin_instance,
+                "Could not clean up image for %s/%s",
+                _sanitize_log(plugin_id), _sanitize_log(str(plugin_instance)),
                 exc_info=True,
             )
 
@@ -203,7 +211,7 @@ def delete_plugin_instance():
             if plugin_obj and hasattr(plugin_obj, "cleanup"):
                 plugin_obj.cleanup({})
         except Exception:
-            logger.warning("Plugin cleanup failed for %s", plugin_id, exc_info=True)
+            logger.warning("Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True)
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error("An internal error occurred", status=500)
