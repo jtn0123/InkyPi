@@ -27,16 +27,15 @@ from io import BytesIO
 from random import randint
 from typing import Any
 
-import requests
 from PIL import Image, UnidentifiedImageError
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
 class Wpotd(BasePlugin):
-    SESSION = requests.Session()
     HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
     API_URL = "https://en.wikipedia.org/w/api.php"
 
@@ -92,9 +91,7 @@ class Wpotd(BasePlugin):
             logger.error("Failed to download WPOTD image.")
             raise RuntimeError("Failed to download WPOTD image.")
         if settings.get("shrinkToFitWpotd") == "true":
-            dimensions = device_config.get_resolution()
-            if device_config.get_config("orientation") == "vertical":
-                dimensions = dimensions[::-1]
+            dimensions = self.get_oriented_dimensions(device_config)
             max_width, max_height = dimensions
             image = self._shrink_to_fit(image, max_width, max_height)
             logger.info(f"Image resized to fit device dimensions: {max_width},{max_height}")
@@ -116,7 +113,7 @@ class Wpotd(BasePlugin):
             logger.warning("SVG format is not supported by Pillow. Skipping image download.")
             raise RuntimeError("Failed to load WPOTD image.")
         try:
-            response = self.SESSION.get(url, headers=self.HEADERS, timeout=10)
+            response = get_http_session().get(url, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
             with Image.open(BytesIO(response.content)) as img:
                 return img.copy()
@@ -171,7 +168,7 @@ class Wpotd(BasePlugin):
 
     def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = self.SESSION.get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
+            response = get_http_session().get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
             response.raise_for_status()
             return response.json()
         except Exception as e:

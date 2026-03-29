@@ -14,7 +14,7 @@ def _png_bytes(size=(10, 6), color="white"):
 def test_wpotd_happy_path(monkeypatch, device_config_dev):
     from plugins.wpotd.wpotd import Wpotd
 
-    def fake_session_get(self, url, params=None, headers=None, timeout=None):
+    def fake_session_get(url, params=None, headers=None, timeout=None):
         class R:
             status_code = 200
 
@@ -42,10 +42,9 @@ def test_wpotd_happy_path(monkeypatch, device_config_dev):
 
         return R()
 
-    # Patch requests.Session.get so Wpotd.SESSION.get uses our fake
-    import requests
-
-    monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
+    # Patch get_http_session so wpotd uses our fake session
+    mock_session = type("S", (), {"get": staticmethod(fake_session_get)})()
+    monkeypatch.setattr("plugins.wpotd.wpotd.get_http_session", lambda: mock_session)
 
     # Patch download step to avoid PIL open complexities
     import plugins.wpotd.wpotd as wpotd_mod
@@ -75,12 +74,11 @@ def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
         def json(self):
             return {}
 
-    def fake_session_get(self, url, params=None, headers=None, timeout=None):
+    def fake_session_get(url, params=None, headers=None, timeout=None):
         return BadResp()
 
-    import requests
-
-    monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
+    mock_session = type("S", (), {"get": staticmethod(fake_session_get)})()
+    monkeypatch.setattr("plugins.wpotd.wpotd.get_http_session", lambda: mock_session)
 
     try:
         Wpotd({"id": "wpotd"}).generate_image({}, device_config_dev)
@@ -92,7 +90,7 @@ def test_wpotd_bad_status_raises(monkeypatch, device_config_dev):
 def test_wpotd_missing_fields_raises(monkeypatch, device_config_dev):
     from plugins.wpotd.wpotd import Wpotd
 
-    def fake_session_get(self, url, params=None, headers=None, timeout=None):
+    def fake_session_get(url, params=None, headers=None, timeout=None):
         class R:
             status_code = 200
 
@@ -105,9 +103,8 @@ def test_wpotd_missing_fields_raises(monkeypatch, device_config_dev):
 
         return R()
 
-    import requests
-
-    monkeypatch.setattr(requests.Session, "get", fake_session_get, raising=True)
+    mock_session = type("S", (), {"get": staticmethod(fake_session_get)})()
+    monkeypatch.setattr("plugins.wpotd.wpotd.get_http_session", lambda: mock_session)
 
     try:
         Wpotd({"id": "wpotd"}).generate_image({}, device_config_dev)
@@ -285,13 +282,16 @@ def test_download_image_success():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock the session get
-    with patch.object(p.SESSION, "get") as mock_get:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = _png_bytes()
-        mock_get.return_value = mock_response
+    # Mock get_http_session to return a session with a mock get
+    mock_get = MagicMock()
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = _png_bytes()
+    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get = mock_get
 
+    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
         # Mock PIL Image
         with patch("plugins.wpotd.wpotd.Image") as mock_image:
             mock_image.open.return_value.__enter__.return_value.copy.return_value = (
@@ -310,10 +310,11 @@ def test_download_image_network_error():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock the session get to raise exception
-    with patch.object(p.SESSION, "get") as mock_get:
-        mock_get.side_effect = Exception("Network error")
+    # Mock get_http_session to return a session whose get raises
+    mock_session = MagicMock()
+    mock_session.get.side_effect = Exception("Network error")
 
+    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
         with pytest.raises(RuntimeError, match="Failed to load WPOTD image"):
             p._download_image("http://example.com/image.png")
 
@@ -326,13 +327,14 @@ def test_download_image_invalid_format():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock the session get
-    with patch.object(p.SESSION, "get") as mock_get:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"invalid_image_data"
-        mock_get.return_value = mock_response
+    # Mock get_http_session to return a session with mock get
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.content = b"invalid_image_data"
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
 
+    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
         # Mock PIL Image to raise UnidentifiedImageError
         with patch("plugins.wpotd.wpotd.Image") as mock_image:
             mock_image.open.side_effect = UnidentifiedImageError(
@@ -460,13 +462,16 @@ def test_make_request_success():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock session get
-    with patch.object(p.SESSION, "get") as mock_get:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"query": {"pages": []}}
-        mock_get.return_value = mock_response
+    # Mock get_http_session to return a session with mock get
+    mock_get = MagicMock()
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"query": {"pages": []}}
+    mock_get.return_value = mock_response
+    mock_session = MagicMock()
+    mock_session.get = mock_get
 
+    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
         result = p._make_request({"action": "query"})
 
         assert result == {"query": {"pages": []}}
@@ -479,10 +484,11 @@ def test_make_request_api_error():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock session get to raise exception
-    with patch.object(p.SESSION, "get") as mock_get:
-        mock_get.side_effect = Exception("API Error")
+    # Mock get_http_session to return a session whose get raises
+    mock_session = MagicMock()
+    mock_session.get.side_effect = Exception("API Error")
 
+    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
         with pytest.raises(RuntimeError, match="Wikipedia API request failed"):
             p._make_request({"action": "query"})
 

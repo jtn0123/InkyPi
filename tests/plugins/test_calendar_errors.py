@@ -15,11 +15,12 @@ def test_calendar_network_error(monkeypatch):
     """ICS URL unreachable raises RuntimeError."""
     p = _make_calendar_plugin()
 
+    def raise_conn_error(url, **kwargs):
+        raise requests.exceptions.ConnectionError("Network unreachable")
+
+    mock_session = type("S", (), {"get": staticmethod(raise_conn_error)})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: (_ for _ in ()).throw(
-            requests.exceptions.ConnectionError("Network unreachable")
-        ),
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     with pytest.raises(RuntimeError, match="Failed to fetch iCalendar url"):
@@ -36,9 +37,9 @@ def test_calendar_malformed_ics(monkeypatch):
         def raise_for_status(self):
             pass
 
+    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: FakeResp())})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: FakeResp(),
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     import plugins.calendar.calendar as cal_mod
@@ -61,11 +62,12 @@ def test_calendar_timeout(monkeypatch):
     """ICS URL request times out."""
     p = _make_calendar_plugin()
 
+    def raise_timeout(url, **kwargs):
+        raise requests.exceptions.Timeout("timed out")
+
+    mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: (_ for _ in ()).throw(
-            requests.exceptions.Timeout("timed out")
-        ),
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     with pytest.raises(RuntimeError, match="Failed to fetch iCalendar url"):
@@ -81,9 +83,9 @@ def test_calendar_http_403(monkeypatch):
         def raise_for_status(self):
             raise requests.exceptions.HTTPError("403 Forbidden")
 
+    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: ForbiddenResp())})()
     monkeypatch.setattr(
-        "plugins.calendar.calendar.requests.get",
-        lambda url, **kwargs: ForbiddenResp(),
+        "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
 
     with pytest.raises(RuntimeError, match="Failed to fetch iCalendar url"):

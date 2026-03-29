@@ -70,9 +70,7 @@ class Clock(BasePlugin):
         if not clock_face or clock_face not in [face['name'] for face in CLOCK_FACES]:
             clock_face = DEFAULT_CLOCK_FACE
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
 
         timezone_name = device_config.get_config("timezone") or DEFAULT_TIMEZONE
         tz = pytz.timezone(timezone_name)

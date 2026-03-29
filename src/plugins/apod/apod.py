@@ -11,11 +11,11 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from random import randint
 
-import requests
 from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,7 @@ class Apod(BasePlugin):
         elif settings.get("customDate"):
             params["date"] = settings["customDate"]
 
-        response = requests.get(
+        response = get_http_session().get(
             "https://api.nasa.gov/planetary/apod",
             params=params,
             timeout=self._request_timeout(),
@@ -101,7 +101,7 @@ class Apod(BasePlugin):
         image_url = data.get("hdurl") or data.get("url")
 
         try:
-            img_data = requests.get(image_url, timeout=self._request_timeout())
+            img_data = get_http_session().get(image_url, timeout=self._request_timeout())
             if not 200 <= img_data.status_code < 300:
                 logger.error(f"Failed to fetch APOD image: status {img_data.status_code}")
                 raise RuntimeError("Failed to fetch APOD image.")

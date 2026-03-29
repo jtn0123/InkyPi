@@ -30,9 +30,7 @@ class Screenshot(BasePlugin):
         if not url:
             raise RuntimeError("URL is required.")
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
 
         logger.info(f"Taking screenshot of url: {url}")
 

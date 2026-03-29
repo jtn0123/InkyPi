@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 import icalendar
 import pytz
 import recurring_ical_events
-import requests
 from PIL import ImageColor
+
+from utils.http_client import get_http_session
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
@@ -161,9 +162,7 @@ class Calendar(BasePlugin):
             if not url.strip():
                 raise RuntimeError("Invalid calendar URL")
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
         
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
@@ -267,7 +266,7 @@ class Calendar(BasePlugin):
         if calendar_url.startswith("webcal://"):
             calendar_url = calendar_url.replace("webcal://", "https://")
         try:
-            response = requests.get(calendar_url, timeout=30)
+            response = get_http_session().get(calendar_url, timeout=30)
             response.raise_for_status()
             return icalendar.Calendar.from_ical(response.text)
         except Exception as e:

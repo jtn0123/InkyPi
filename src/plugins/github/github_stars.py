@@ -1,6 +1,6 @@
 import logging
 
-import requests
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
@@ -11,9 +11,7 @@ def stars_generate_image(plugin_instance, settings, device_config):
     if not username or not repository:
         raise RuntimeError("GitHub username and repository are required.")
 
-    dimensions = device_config.get_resolution()
-    if device_config.get_config("orientation") == "vertical":
-        dimensions = dimensions[::-1]
+    dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
     github_repository = username + "/" + repository
 
@@ -40,7 +38,7 @@ def fetch_stars(github_repository):
     url = f"https://api.github.com/repos/{github_repository}"
     headers = {"Accept": "application/json"}
 
-    response = requests.get(url, headers=headers, timeout=30)
+    response = get_http_session().get(url, headers=headers, timeout=30)
     if response.status_code != 200:
         logger.error(
             "GitHub Stars Plugin: Error: %s - %s",

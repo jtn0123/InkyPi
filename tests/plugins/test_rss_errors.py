@@ -34,12 +34,12 @@ def test_rss_malformed_xml():
     """feedparser gets garbage XML -> RuntimeError."""
     p = _make_rss_plugin()
 
-    with patch("plugins.rss.rss.requests.get") as mock_get:
+    with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
         resp = MagicMock()
         resp.status_code = 200
         resp.content = b"<not valid xml at all><><><"
         resp.raise_for_status = MagicMock()
-        mock_get.return_value = resp
+        mock_session_fn.return_value.get.return_value = resp
 
         # feedparser with bozo and no entries should raise
         import feedparser
@@ -58,12 +58,12 @@ def test_rss_empty_feed():
     """Valid XML with zero entries returns empty list gracefully."""
     p = _make_rss_plugin()
 
-    with patch("plugins.rss.rss.requests.get") as mock_get:
+    with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
         resp = MagicMock()
         resp.status_code = 200
         resp.content = b"<rss><channel></channel></rss>"
         resp.raise_for_status = MagicMock()
-        mock_get.return_value = resp
+        mock_session_fn.return_value.get.return_value = resp
 
         with patch("plugins.rss.rss.feedparser.parse") as mock_parse:
             mock_result = MagicMock()
@@ -79,7 +79,8 @@ def test_rss_network_timeout():
     """requests.get raises Timeout."""
     p = _make_rss_plugin()
 
-    with patch("plugins.rss.rss.requests.get", side_effect=requests.exceptions.Timeout("timed out")):
+    with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.get.side_effect = requests.exceptions.Timeout("timed out")
         with pytest.raises(requests.exceptions.Timeout):
             p.parse_rss_feed("http://example.com/feed.xml")
 
@@ -88,11 +89,11 @@ def test_rss_http_500():
     """Server returns 500 -> raise_for_status raises."""
     p = _make_rss_plugin()
 
-    with patch("plugins.rss.rss.requests.get") as mock_get:
+    with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
         resp = MagicMock()
         resp.status_code = 500
         resp.raise_for_status.side_effect = requests.exceptions.HTTPError("500 Server Error")
-        mock_get.return_value = resp
+        mock_session_fn.return_value.get.return_value = resp
 
         with pytest.raises(requests.exceptions.HTTPError):
             p.parse_rss_feed("http://example.com/feed.xml")
@@ -111,6 +112,7 @@ def test_rss_connection_error():
     """requests.get raises ConnectionError."""
     p = _make_rss_plugin()
 
-    with patch("plugins.rss.rss.requests.get", side_effect=requests.exceptions.ConnectionError("refused")):
+    with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.get.side_effect = requests.exceptions.ConnectionError("refused")
         with pytest.raises(requests.exceptions.ConnectionError):
             p.parse_rss_feed("http://example.com/feed.xml")

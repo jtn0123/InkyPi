@@ -83,10 +83,7 @@ class ImageFolder(BasePlugin):
             logger.error(f"Path is not a directory: {folder_path}")
             raise RuntimeError(f"Path is not a directory: {folder_path}")
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
-            logger.debug(f"Vertical orientation detected, dimensions: {dimensions[0]}x{dimensions[1]}")
+        dimensions = self.get_oriented_dimensions(device_config)
 
         logger.info(f"Scanning folder: {folder_path}")
         image_files = list_files_in_folder(folder_path)

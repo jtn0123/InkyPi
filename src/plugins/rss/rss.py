@@ -3,9 +3,9 @@ import logging
 import re
 
 import feedparser
-import requests
 
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.http_client import get_http_session
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -77,9 +77,7 @@ class Rss(BasePlugin):
 
         items = self.parse_rss_feed(feed_url)
 
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
 
         template_params = {
             "title": title,
@@ -103,7 +101,7 @@ class Rss(BasePlugin):
         return html.unescape(text).strip()
 
     def parse_rss_feed(self, url, timeout=10):
-        resp = requests.get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
+        resp = get_http_session().get(url, timeout=timeout, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
 
         # Parse the feed content

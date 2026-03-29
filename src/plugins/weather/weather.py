@@ -4,7 +4,6 @@ import os
 from datetime import UTC, date, datetime, timedelta
 
 import pytz
-import requests
 from astral import moon
 
 from plugins.base_plugin.base_plugin import BasePlugin
@@ -16,6 +15,7 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
         
@@ -247,9 +247,7 @@ class Weather(BasePlugin):
             logger.error(f"{weather_provider} request failed: {str(e)}")
             raise RuntimeError(f"{weather_provider} request failure, please check logs.")
        
-        dimensions = device_config.get_resolution()
-        if device_config.get_config("orientation") == "vertical":
-            dimensions = dimensions[::-1]
+        dimensions = self.get_oriented_dimensions(device_config)
 
         template_params["plugin_settings"] = settings
 
@@ -813,7 +811,7 @@ class Weather(BasePlugin):
 
     def get_weather_data(self, api_key, units, lat, long):
         url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
-        response = requests.get(url, timeout=self._request_timeout())
+        response = get_http_session().get(url, timeout=self._request_timeout())
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve weather data: %s", response.content)
             raise RuntimeError("Failed to retrieve weather data.")
@@ -822,7 +820,7 @@ class Weather(BasePlugin):
 
     def get_air_quality(self, api_key, lat, long):
         url = AIR_QUALITY_URL.format(lat=lat, long=long, api_key=api_key)
-        response = requests.get(url, timeout=self._request_timeout())
+        response = get_http_session().get(url, timeout=self._request_timeout())
 
         if not 200 <= response.status_code < 300:
             logger.error("Failed to get air quality data: %s", response.content)
@@ -832,7 +830,7 @@ class Weather(BasePlugin):
 
     def get_location(self, api_key, lat, long):
         url = GEOCODING_URL.format(lat=lat, long=long, api_key=api_key)
-        response = requests.get(url, timeout=self._request_timeout())
+        response = get_http_session().get(url, timeout=self._request_timeout())
 
         if not 200 <= response.status_code < 300:
             logger.error(f"Failed to get location: {response.content}")
@@ -850,7 +848,7 @@ class Weather(BasePlugin):
     def get_open_meteo_data(self, lat, long, units, forecast_days):
         unit_params = OPEN_METEO_UNIT_PARAMS[units]
         url = OPEN_METEO_FORECAST_URL.format(lat=lat, long=long, forecast_days=forecast_days) + f"&{unit_params}"
-        response = requests.get(url, timeout=self._request_timeout())
+        response = get_http_session().get(url, timeout=self._request_timeout())
         
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve Open-Meteo weather data: %s", response.content)
@@ -860,7 +858,7 @@ class Weather(BasePlugin):
 
     def get_open_meteo_air_quality(self, lat, long):
         url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
-        response = requests.get(url, timeout=self._request_timeout())
+        response = get_http_session().get(url, timeout=self._request_timeout())
         if not 200 <= response.status_code < 300:
             logger.error("Failed to retrieve Open-Meteo air quality data: %s", response.content)
             raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")

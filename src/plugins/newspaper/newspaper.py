@@ -48,9 +48,7 @@ class Newspaper(BasePlugin):
             # expand height if newspaper is wider than resolution
             img_width, img_height = image.size
 
-            dimensions = device_config.get_resolution()
-            if device_config.get_config("orientation") == "vertical":
-                dimensions = dimensions[::-1]
+            dimensions = self.get_oriented_dimensions(device_config)
 
             desired_width, desired_height = dimensions
 
