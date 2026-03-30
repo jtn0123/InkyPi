@@ -73,3 +73,71 @@ def test_thread_safety():
 
     assert len(results) == 2
     assert results[0] is results[1]
+
+
+# ---- Additional edge-case tests ----
+
+
+def test_close_when_none():
+    """Close with no session initialized → no crash."""
+    assert http_client_mod._HTTP_SESSION is None
+    close_http_session()  # should not raise
+    assert http_client_mod._HTTP_SESSION is None
+
+
+def test_close_idempotent():
+    """Close twice → second is no-op, no crash."""
+    get_http_session()
+    close_http_session()
+    assert http_client_mod._HTTP_SESSION is None
+    close_http_session()  # second close
+    assert http_client_mod._HTTP_SESSION is None
+
+
+def test_concurrent_init_same_instance():
+    """10 threads calling get_http_session all get the same object."""
+    results = []
+
+    def fetch():
+        results.append(get_http_session())
+
+    threads = [threading.Thread(target=fetch) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(results) == 10
+    assert all(r is results[0] for r in results)
+
+
+def test_retry_adapter_pool_config():
+    """Adapter has pool_connections=10 and pool_maxsize=10."""
+    session = get_http_session()
+    adapter = session.get_adapter("https://example.com")
+    assert adapter._pool_connections == 10
+    assert adapter._pool_maxsize == 10
+
+
+def test_retry_allowed_methods():
+    """Only GET, HEAD, OPTIONS are retried (not POST)."""
+    session = get_http_session()
+    adapter = session.get_adapter("https://example.com")
+    allowed = adapter.max_retries.allowed_methods
+    assert "GET" in allowed
+    assert "HEAD" in allowed
+    assert "OPTIONS" in allowed
+    assert "POST" not in allowed
+
+
+def test_atexit_registered():
+    """atexit.register is called with close_http_session during init."""
+    import atexit
+    from unittest.mock import patch as _patch
+
+    with _patch.object(atexit, "register") as mock_register:
+        # Force re-initialization
+        http_client_mod._HTTP_SESSION = None
+        get_http_session()
+        # atexit.register should have been called with close_http_session
+        mock_register.assert_called_with(close_http_session)

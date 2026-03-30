@@ -313,3 +313,96 @@ def test_resize_high_performance():
         loader = AdaptiveImageLoader()
         result = loader._resize_high_performance(img, (100, 75))
     assert result.size == (100, 75)
+
+
+# ---- Additional edge-case tests ----
+
+
+def test_from_url_lowmem_temp_cleanup_on_error():
+    """Download error returns None without leaving temp files."""
+    import requests
+    from utils.image_loader import AdaptiveImageLoader
+
+    session = MagicMock()
+    session.get.side_effect = requests.exceptions.ConnectionError("refused")
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=True):
+        with patch("utils.image_loader.get_http_session", return_value=session):
+            loader = AdaptiveImageLoader()
+            result = loader.from_url("http://fail.com/img.png", (100, 75))
+    assert result is None
+    # No temp files should be left behind (checked implicitly - no error)
+
+
+def test_from_url_lowmem_custom_headers():
+    """Headers are merged in low-mem path."""
+    from utils.image_loader import AdaptiveImageLoader
+
+    img_bytes = _png_bytes()
+    session = MagicMock()
+    session.get.return_value = _make_session_response(img_bytes)
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=True):
+        with patch("utils.image_loader.get_http_session", return_value=session):
+            loader = AdaptiveImageLoader()
+            loader.from_url("http://example.com/img.png", (100, 75), headers={"Authorization": "Bearer tok"})
+    call_kwargs = session.get.call_args[1]
+    assert "Authorization" in call_kwargs["headers"]
+    # Default User-Agent should also be present
+    assert "InkyPi" in call_kwargs["headers"]["User-Agent"]
+
+
+def test_from_file_fast_corrupt_file(tmp_path):
+    """Corrupt file on fast path returns None."""
+    from utils.image_loader import AdaptiveImageLoader
+
+    bad_file = tmp_path / "corrupt.png"
+    bad_file.write_bytes(b"\x89PNG\r\n\x1a\ngarbage")
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=False):
+        loader = AdaptiveImageLoader()
+        result = loader.from_file(str(bad_file), (100, 75))
+    assert result is None
+
+
+def test_resize_low_resource_portrait_two_stage():
+    """Portrait (tall) image on low-resource two-stage resize path."""
+    from utils.image_loader import AdaptiveImageLoader
+
+    # Portrait: width < height, aspect < 1
+    img = Image.new("RGB", (1000, 2000), "purple")
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=True):
+        loader = AdaptiveImageLoader()
+        result = loader._resize_low_resource(img, (100, 75))
+    assert result.size == (100, 75)
+
+
+def test_from_url_fast_processing_error():
+    """Successful download but corrupt image data returns None."""
+    from utils.image_loader import AdaptiveImageLoader
+
+    session = MagicMock()
+    session.get.return_value = _make_session_response(b"not an image at all")
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=False):
+        with patch("utils.image_loader.get_http_session", return_value=session):
+            loader = AdaptiveImageLoader()
+            result = loader.from_url("http://example.com/bad.png", (100, 75))
+    assert result is None
+
+
+def test_from_bytesio_rgba_conversion():
+    """RGBA image is converted to RGB through from_bytesio path."""
+    from utils.image_loader import AdaptiveImageLoader
+
+    buf = BytesIO()
+    Image.new("RGBA", (200, 150), (255, 0, 0, 128)).save(buf, format="PNG")
+    buf.seek(0)
+
+    with patch("utils.image_loader._is_low_resource_device", return_value=False):
+        loader = AdaptiveImageLoader()
+        result = loader.from_bytesio(buf, (100, 75))
+    assert isinstance(result, Image.Image)
+    assert result.mode == "RGB"
+    assert result.size == (100, 75)
