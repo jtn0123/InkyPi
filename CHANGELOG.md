@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.1.10 (2026-03-30)
+
+### Bug Fixes
+
+- Address CodeRabbit review findings
+  ([`f86acd2`](https://github.com/jtn0123/InkyPi/commit/f86acd2cfc612503d91c1f8db9fcf8e3fc840082))
+
+- Reset class-level DisplayManager state between prune tests - Remove unused tmp_path parameter from
+  lowmem test - Add assertion for empty mask behavior in API keys test - Set explicit
+  INKYPI_HEALTH_WINDOW_MIN in health tests - Fix docstrings to match actual test behavior (logs
+  level tests) - Remove unused monkeypatch arg, fix test name (system tests) - Restore APP_VERSION
+  in try/finally to prevent cross-test contamination
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Expand unit test coverage for untested core modules (JTN-39)
+  ([`2c89a8c`](https://github.com/jtn0123/InkyPi/commit/2c89a8cd5d654f334a74f8a49d72a488d5fd4395))
+
+Add 87 new tests targeting error paths and edge cases in settings sub-modules, display manager, HTTP
+  client, and image loader. Brings total test count from 1,707 to 1,794.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.9 (2026-03-29)
 
 ### Bug Fixes
