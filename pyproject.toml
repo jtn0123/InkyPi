@@ -23,13 +23,21 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-  "E",   # pycodestyle
-  "F",   # pyflakes
-  "I",   # isort (imports)
-  "UP"   # pyupgrade
+  "E",      # pycodestyle
+  "F",      # pyflakes
+  "I",      # isort (imports)
+  "UP",     # pyupgrade
+  "B",      # flake8-bugbear
+  "SIM",    # flake8-simplify
+  "C4",     # flake8-comprehensions
+  "PERF",   # perflint
 ]
 ignore = [
-  "E501" # line length handled by Black
+  "E501",   # line length handled by Black
+  "B011",   # assert False (used as sentinel in tests)
+  "B017",   # pytest.raises(Exception) is acceptable
+  "SIM105", # contextlib.suppress — noisy, debatable
+  "SIM117", # multiple with statements — stylistic
 ]
 
 [tool.ruff.lint.isort]
