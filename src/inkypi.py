@@ -10,7 +10,7 @@ import warnings
 from collections import defaultdict, deque
 from time import perf_counter
 
-from flask import Flask, g, redirect, render_template, request, session, url_for as flask_url_for
+from flask import Flask, g, make_response, redirect, render_template, request, session, url_for as flask_url_for
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -449,7 +449,7 @@ def create_app():
     def _handle_bad_request(err):
         if wants_json():
             return json_error("Bad request", status=400)
-        return ("Bad request", 400)
+        return make_response("Bad request", 400)
 
     @app.errorhandler(404)
     def _handle_not_found(err):
@@ -461,7 +461,7 @@ def create_app():
     def _handle_unsupported_media_type(err):
         if wants_json():
             return json_error("Unsupported media type", status=415)
-        return ("Unsupported media type", 415)
+        return make_response("Unsupported media type", 415)
 
     @app.errorhandler(Exception)
     def _handle_unexpected_error(err: Exception):
@@ -476,7 +476,7 @@ def create_app():
                     "hint": "Check server logs for stack trace; enable DEV mode for more diagnostics.",
                 },
             )
-        return ("Internal Server Error", 500)
+        return make_response("Internal Server Error", 500)
 
     @app.after_request
     def _set_security_headers(response):

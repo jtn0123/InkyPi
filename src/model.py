@@ -297,7 +297,7 @@ class Playlist:
         if plugin:
             plugin.update(updated_data)
             return True
-        logger.warning(f"Plugin '{plugin_id}' with name '{instance_name}' not found.")
+        logger.warning("Plugin %r with name %r not found.", plugin_id, instance_name)
         return False
 
     def delete_plugin(self, plugin_id, name):
@@ -308,7 +308,7 @@ class Playlist:
         ]
 
         if len(self.plugins) == initial_count:
-            logger.warning(f"Plugin '{plugin_id}' with instance '{name}' not found.")
+            logger.warning("Plugin %r with instance %r not found.", plugin_id, name)
             return False
         return True
 

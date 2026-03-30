@@ -8,13 +8,12 @@
   height: 100%;
   width: 100%;
   gap: 1dvh;
-  font-family: "Jost";
+  font-family: "Jost", sans-serif;
   container-type: size;
 }
 
 .title {
   font-weight: bold;
-  font-size: 4rem;
   max-width: 100%;
   font-size: min(10cqh, 8cqi);
 }

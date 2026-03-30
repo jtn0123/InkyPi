@@ -2,7 +2,7 @@
 .rss-container {
     align-items: center; 
     justify-content: center;
-    font-family: "Jost";
+    font-family: "Jost", sans-serif;
     height: 100%;
     width: 100%;
     overflow: hidden;
