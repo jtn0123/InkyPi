@@ -900,11 +900,9 @@ class RefreshTask:
         )
 
         if not should_refresh:
-            latest_refresh_str = (
-                latest_refresh_dt.strftime("%Y-%m-%d %H:%M:%S")
-                if latest_refresh_dt
-                else "None"
-            )
+            # latest_refresh_dt is guaranteed non-None here because
+            # PlaylistManager.should_refresh() returns True when input is None.
+            latest_refresh_str = latest_refresh_dt.strftime("%Y-%m-%d %H:%M:%S")
             logger.info(
                 f"Not time to update display. | latest_update: {latest_refresh_str} | plugin_cycle_interval: {plugin_cycle_interval}"
             )

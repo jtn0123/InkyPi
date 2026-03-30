@@ -13,7 +13,7 @@
   gap: 1dvh;
   width: 100%;
   height: 100%;
-  font-family: "Jost"
+  font-family: "Jost", sans-serif;
 }
 
 .header {
@@ -204,7 +204,6 @@
 }
 
 .forecast-icon {
-  max-width: 100%;
   width: 100%;
   height: 100%;
   flex: 1;
@@ -253,7 +252,6 @@
 }
 
 .moon-phase-icon {
-  max-width: 100%;
   width: 100%;
   height: 100%;
   flex: 1;
@@ -327,6 +325,6 @@
 
 @media (max-width: 250px) {
   .weather-dashboard {
-    font-family: "Dogica";
+    font-family: "Dogica", sans-serif;
   }
 }
