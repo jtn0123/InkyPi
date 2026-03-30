@@ -1,7 +1,5 @@
 import os
 
-import pytest
-
 
 def test_generate_settings_template_defaults(monkeypatch):
     # Import within test to pick up runtime code changes
@@ -11,9 +9,10 @@ def test_generate_settings_template_defaults(monkeypatch):
     p = BasePlugin({"id": "ai_text"})
     template = p.generate_settings_template()
 
-    assert template["settings_template"] == "ai_text/settings.html" or template[
-        "settings_template"
-    ] == "base_plugin/settings.html"
+    assert (
+        template["settings_template"] == "ai_text/settings.html"
+        or template["settings_template"] == "base_plugin/settings.html"
+    )
     # Always include frame styles
     assert "frame_styles" in template
     assert isinstance(template["frame_styles"], list)
@@ -49,7 +48,9 @@ def test_render_image_with_base_template(monkeypatch, tmp_path):
     p = BasePlugin({"id": fake_plugin_id})
 
     # Use the base plugin template to render
-    out = p.render_image((100, 50), "plugin.html", template_params={"plugin_settings": {}})
+    out = p.render_image(
+        (100, 50), "plugin.html", template_params={"plugin_settings": {}}
+    )
     assert out is not None
     assert out.size == (100, 50)
 
@@ -243,9 +244,7 @@ def test_render_image_with_extra_css_string(tmp_path):
     out = p.render_image(
         (100, 50),
         "plugin.html",
-        template_params={
-            "plugin_settings": {"extra_css": "body { background: red; }"}
-        },
+        template_params={"plugin_settings": {"extra_css": "body { background: red; }"}},
     )
     assert out is not None
     assert out.size == (100, 50)
@@ -265,14 +264,17 @@ def test_render_image_screenshot_returns_none(monkeypatch):
     p = BasePlugin({"id": "clock"})
 
     # Should create fallback white image
-    out = p.render_image((100, 50), "plugin.html", template_params={"plugin_settings": {}})
+    out = p.render_image(
+        (100, 50), "plugin.html", template_params={"plugin_settings": {}}
+    )
     assert out is not None
     assert out.size == (100, 50)
 
 
 def test_render_image_with_screenshot_timeout(monkeypatch):
-    from plugins.base_plugin.base_plugin import BasePlugin
     from PIL import Image
+
+    from plugins.base_plugin.base_plugin import BasePlugin
 
     # Set environment variable for screenshot timeout
     monkeypatch.setenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "5000")
@@ -289,8 +291,9 @@ def test_render_image_with_screenshot_timeout(monkeypatch):
     )
 
     p = BasePlugin({"id": "clock"})
-    out = p.render_image((100, 50), "plugin.html", template_params={"plugin_settings": {}})
+    out = p.render_image(
+        (100, 50), "plugin.html", template_params={"plugin_settings": {}}
+    )
 
     assert out is not None
     assert captured_timeout[0] == 5000
-

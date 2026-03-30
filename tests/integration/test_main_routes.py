@@ -1,6 +1,8 @@
 # pyright: reportMissingImports=false
 import os
+
 from model import RefreshInfo
+
 
 def test_main_page(client):
     resp = client.get("/")

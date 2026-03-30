@@ -130,7 +130,9 @@ def _run_commands(repo_root: Path, mutant: Mutant) -> bool:
 def main() -> int:
     survivors: list[str] = []
     for mutant in MUTANTS:
-        with tempfile.TemporaryDirectory(prefix=f"inkypi-mutant-{mutant.name}-") as tmpdir:
+        with tempfile.TemporaryDirectory(
+            prefix=f"inkypi-mutant-{mutant.name}-"
+        ) as tmpdir:
             repo_copy = Path(tmpdir) / "repo"
             _copy_repo(repo_copy)
             _apply_mutation(repo_copy, mutant)

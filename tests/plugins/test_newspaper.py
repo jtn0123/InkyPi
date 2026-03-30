@@ -1,9 +1,12 @@
 import pytest
 from PIL import Image
+
 from plugins.newspaper.constants import NEWSPAPERS
+
 
 def _png_image(size=(600, 800), color="white"):
     return Image.new("RGB", size, color)
+
 
 def test_newspaper_initialization():
     from plugins.newspaper.newspaper import Newspaper
@@ -12,6 +15,7 @@ def test_newspaper_initialization():
     template = plugin.generate_settings_template()
 
     assert template["newspapers"] == sorted(NEWSPAPERS, key=lambda n: n["name"])
+
 
 def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
     from plugins.newspaper.newspaper import Newspaper
@@ -31,6 +35,7 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
     # new_height = int(400 / (800/480)) = 240
     assert img.size == (400, 240)
 
+
 def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev):
     from plugins.newspaper.newspaper import Newspaper
 
@@ -44,6 +49,7 @@ def test_newspaper_tries_multiple_days_then_fails(monkeypatch, device_config_dev
         assert False, "Expected failure when no front cover found"
     except RuntimeError:
         pass
+
 
 def test_newspaper_slug_case_variants(monkeypatch, device_config_dev):
     from plugins.newspaper.newspaper import Newspaper
@@ -127,8 +133,8 @@ def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
 
 def test_newspaper_finds_on_second_day(monkeypatch, device_config_dev):
     """Newspaper found on second day in retry sequence."""
+
     from plugins.newspaper.newspaper import Newspaper
-    from datetime import datetime
 
     call_count = [0]
 

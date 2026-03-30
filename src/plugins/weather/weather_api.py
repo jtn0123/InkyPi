@@ -12,8 +12,8 @@ OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast?latitude={lat}
 OPEN_METEO_AIR_QUALITY_URL = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={long}&hourly=european_aqi,uv_index,uv_index_clear_sky&timezone=auto"
 OPEN_METEO_UNIT_PARAMS = {
     "standard": "temperature_unit=kelvin&wind_speed_unit=ms&precipitation_unit=mm",
-    "metric":   "temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm",
-    "imperial": "temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"
+    "metric": "temperature_unit=celsius&wind_speed_unit=ms&precipitation_unit=mm",
+    "imperial": "temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch",
 }
 
 
@@ -58,7 +58,10 @@ def get_location(api_key, lat, long, timeout=20):
 
 def get_open_meteo_data(lat, long, units, forecast_days, timeout=20):
     unit_params = OPEN_METEO_UNIT_PARAMS[units]
-    url = OPEN_METEO_FORECAST_URL.format(lat=lat, long=long, forecast_days=forecast_days) + f"&{unit_params}"
+    url = (
+        OPEN_METEO_FORECAST_URL.format(lat=lat, long=long, forecast_days=forecast_days)
+        + f"&{unit_params}"
+    )
     response = get_http_session().get(url, timeout=timeout)
 
     if not 200 <= response.status_code < 300:
@@ -72,7 +75,9 @@ def get_open_meteo_air_quality(lat, long, timeout=20):
     url = OPEN_METEO_AIR_QUALITY_URL.format(lat=lat, long=long)
     response = get_http_session().get(url, timeout=timeout)
     if not 200 <= response.status_code < 300:
-        logger.error("Failed to retrieve Open-Meteo air quality data: %s", response.content)
+        logger.error(
+            "Failed to retrieve Open-Meteo air quality data: %s", response.content
+        )
         raise RuntimeError("Failed to retrieve Open-Meteo air quality data.")
 
     return response.json()

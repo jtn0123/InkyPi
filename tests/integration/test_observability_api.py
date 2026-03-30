@@ -1,6 +1,3 @@
-import time
-
-
 def test_benchmarks_summary_refreshes_and_plugins(client, device_config_dev, tmp_path):
     db_path = tmp_path / "benchmarks.db"
     device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)

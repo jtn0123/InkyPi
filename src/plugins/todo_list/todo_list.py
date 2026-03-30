@@ -12,13 +12,8 @@ from plugins.base_plugin.settings_schema import (
 
 logger = logging.getLogger(__name__)
 
-FONT_SIZES = {
-    "x-small": 0.7,
-    "small": 0.9,
-    "normal": 1,
-    "large": 1.1,
-    "x-large": 1.3
-}
+FONT_SIZES = {"x-small": 0.7, "small": 0.9, "normal": 1, "large": 1.1, "x-large": 1.3}
+
 
 class TodoList(BasePlugin):
     def build_settings_schema(self):
@@ -64,29 +59,28 @@ class TodoList(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['style_settings'] = True
+        template_params["style_settings"] = True
         return template_params
 
     def generate_image(self, settings, device_config):
         dimensions = self.get_oriented_dimensions(device_config)
 
         lists = []
-        titles = settings.get('list-title[]', [])
-        raw_lists = settings.get('list[]', [])
-        for title, raw_list in zip(titles, raw_lists):
-            elements = [line for line in raw_list.split('\n') if line.strip()]
-            lists.append({
-                'title': title,
-                'elements': elements
-            })
+        titles = settings.get("list-title[]", [])
+        raw_lists = settings.get("list[]", [])
+        for title, raw_list in zip(titles, raw_lists, strict=False):
+            elements = [line for line in raw_list.split("\n") if line.strip()]
+            lists.append({"title": title, "elements": elements})
 
         template_params = {
-            "title": settings.get('title'),
-            "list_style": settings.get('listStyle', 'disc'),
-            "font_scale": FONT_SIZES.get(settings.get('fontSize', 'normal'), 1),
+            "title": settings.get("title"),
+            "list_style": settings.get("listStyle", "disc"),
+            "font_scale": FONT_SIZES.get(settings.get("fontSize", "normal"), 1),
             "lists": lists,
-            "plugin_settings": settings
+            "plugin_settings": settings,
         }
-        
-        image = self.render_image(dimensions, "todo_list.html", "todo_list.css", template_params)
+
+        image = self.render_image(
+            dimensions, "todo_list.html", "todo_list.css", template_params
+        )
         return image

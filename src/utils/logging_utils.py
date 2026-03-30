@@ -28,7 +28,12 @@ _DEFAULT_LOGRECORD_KEYS: set[str] = {
 
 
 class JsonFormatter(logging.Formatter):
-    def __init__(self, *, default_fields: dict[str, Any] | None = None, datefmt: str | None = None):
+    def __init__(
+        self,
+        *,
+        default_fields: dict[str, Any] | None = None,
+        datefmt: str | None = None,
+    ):
         super().__init__(datefmt=datefmt)
         self.default_fields = default_fields or {}
 
@@ -55,10 +60,11 @@ class JsonFormatter(logging.Formatter):
         }
         data.update(self.default_fields)
 
-        extras: dict[str, Any] = {}
-        for k, v in record.__dict__.items():
-            if k not in _DEFAULT_LOGRECORD_KEYS and not k.startswith("_"):
-                extras[k] = v
+        extras = {
+            k: v
+            for k, v in record.__dict__.items()
+            if k not in _DEFAULT_LOGRECORD_KEYS and not k.startswith("_")
+        }
         if extras:
             data["extra"] = extras
         return data
@@ -69,5 +75,3 @@ class JsonFormatter(logging.Formatter):
             return str(obj)
         except Exception:
             return "<unserializable>"
-
-

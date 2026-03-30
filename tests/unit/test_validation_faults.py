@@ -49,7 +49,9 @@ def test_benchmark_lock_does_not_wedge_manual_update(device_config_dev, monkeypa
         refresh_task.stop()
 
 
-def test_plugin_failure_remains_actionable_and_task_recovers(device_config_dev, monkeypatch):
+def test_plugin_failure_remains_actionable_and_task_recovers(
+    device_config_dev, monkeypatch
+):
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
     display_manager = DisplayManager(device_config_dev)

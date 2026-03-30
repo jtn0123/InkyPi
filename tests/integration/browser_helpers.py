@@ -85,33 +85,39 @@ class RuntimeCollector:
         page.on("console", handle_console)
         page.on(
             "requestfailed",
-            lambda request: self.request_failures.append(
-                {
-                    "url": request.url,
-                    "resource_type": request.resource_type,
-                    "failure": request.failure or "",
-                }
-            )
-            if (not base_url or request.url.startswith(base_url))
-            and request.resource_type in CRITICAL_RESPONSE_TYPES
-            else None,
+            lambda request: (
+                self.request_failures.append(
+                    {
+                        "url": request.url,
+                        "resource_type": request.resource_type,
+                        "failure": request.failure or "",
+                    }
+                )
+                if (not base_url or request.url.startswith(base_url))
+                and request.resource_type in CRITICAL_RESPONSE_TYPES
+                else None
+            ),
         )
         page.on(
             "response",
-            lambda response: self.response_failures.append(
-                {
-                    "url": response.url,
-                    "status": response.status,
-                    "resource_type": response.request.resource_type,
-                }
-            )
-            if (not base_url or response.url.startswith(base_url))
-            and response.status >= 400
-            and response.request.resource_type in CRITICAL_RESPONSE_TYPES
-            else None,
+            lambda response: (
+                self.response_failures.append(
+                    {
+                        "url": response.url,
+                        "status": response.status,
+                        "resource_type": response.request.resource_type,
+                    }
+                )
+                if (not base_url or response.url.startswith(base_url))
+                and response.status >= 400
+                and response.request.resource_type in CRITICAL_RESPONSE_TYPES
+                else None
+            ),
         )
 
-    def assert_no_errors(self, screenshot_dir: Path | str | None = None, name: str = "page"):
+    def assert_no_errors(
+        self, screenshot_dir: Path | str | None = None, name: str = "page"
+    ):
         failures = []
         if self.page_errors:
             failures.append(f"pageerror: {self.page_errors[:5]}")
@@ -124,7 +130,11 @@ class RuntimeCollector:
 
         if failures:
             if screenshot_dir:
-                screenshot_dir = Path(screenshot_dir) if not isinstance(screenshot_dir, Path) else screenshot_dir
+                screenshot_dir = (
+                    Path(screenshot_dir)
+                    if not isinstance(screenshot_dir, Path)
+                    else screenshot_dir
+                )
                 screenshot_dir.mkdir(parents=True, exist_ok=True)
                 slug = name.replace("/", "_").replace("?", "_").replace("&", "_")
                 path = screenshot_dir / f"{slug}.png"
@@ -139,7 +149,9 @@ def wait_for_app_ready(page, timeout: int = 10000):
     page.wait_for_timeout(300)
 
 
-def navigate_and_wait(page, base_url: str, path: str, timeout: int = 30000) -> RuntimeCollector:
+def navigate_and_wait(
+    page, base_url: str, path: str, timeout: int = 30000
+) -> RuntimeCollector:
     """Navigate to a page with leaflet stub, attach collectors, and wait for ready."""
     stub_leaflet(page)
     collector = RuntimeCollector(page, base_url)

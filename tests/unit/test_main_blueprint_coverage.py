@@ -1,11 +1,9 @@
 # pyright: reportMissingImports=false
 """Tests for blueprints/main.py — additional coverage."""
-import json
 import os
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
 from PIL import Image
 
 
@@ -14,6 +12,7 @@ def _save_png(path, size=(800, 480), color="white"):
 
 
 # ---- /preview ----
+
 
 def test_preview_image_processed_exists(client, device_config_dev):
     _save_png(device_config_dev.processed_image_file)
@@ -30,7 +29,10 @@ def test_preview_image_fallback_current(client, device_config_dev):
 
 def test_preview_image_404(client, device_config_dev):
     # Ensure neither image exists
-    for p in (device_config_dev.processed_image_file, device_config_dev.current_image_file):
+    for p in (
+        device_config_dev.processed_image_file,
+        device_config_dev.current_image_file,
+    ):
         if os.path.exists(p):
             os.remove(p)
     resp = client.get("/preview")
@@ -38,6 +40,7 @@ def test_preview_image_404(client, device_config_dev):
 
 
 # ---- /api/current_image ----
+
 
 def test_current_image_not_found(client, device_config_dev):
     # Ensure image file doesn't exist
@@ -79,6 +82,7 @@ def test_current_image_if_modified_since_malformed(client, device_config_dev):
 
 # ---- /display-next ----
 
+
 def test_display_next_no_playlist(client, device_config_dev):
     resp = client.post("/display-next")
     assert resp.status_code == 400
@@ -93,7 +97,9 @@ def test_display_next_first_request_not_rate_limited(client, device_config_dev):
     assert resp.status_code == 400  # no active playlist, but NOT 429
 
 
-def test_display_next_second_request_within_cooldown_returns_429(client, device_config_dev):
+def test_display_next_second_request_within_cooldown_returns_429(
+    client, device_config_dev
+):
     """Second immediate POST within cooldown returns 429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -106,9 +112,10 @@ def test_display_next_second_request_within_cooldown_returns_429(client, device_
     assert "wait" in body["error"].lower()
 
 
-def test_display_next_after_cooldown_expires_succeeds(client, device_config_dev, monkeypatch):
+def test_display_next_after_cooldown_expires_succeeds(
+    client, device_config_dev, monkeypatch
+):
     """After the cooldown period elapses, the endpoint should accept requests again."""
-    import blueprints.main as main_mod
     from blueprints.main import _reset_display_next_cooldown
 
     _reset_display_next_cooldown()
@@ -146,13 +153,16 @@ def test_display_next_exception(client, flask_app, device_config_dev):
     with patch.object(device_config_dev, "get_playlist_manager", return_value=mock_pm):
         refresh_task = flask_app.config["REFRESH_TASK"]
         refresh_task.running = True
-        refresh_task.manual_update = MagicMock(side_effect=RuntimeError("generation failed"))
+        refresh_task.manual_update = MagicMock(
+            side_effect=RuntimeError("generation failed")
+        )
 
         resp = client.post("/display-next")
     assert resp.status_code == 500
 
 
 # ---- /api/plugin_order ----
+
 
 def test_plugin_order_invalid_json(client):
     resp = client.post(

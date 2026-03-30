@@ -25,6 +25,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
+
     mod = importlib.reload(sys.modules["inkypi"])
     mod.main(argv[1:])
     return mod
@@ -314,11 +315,14 @@ def test_read_version_normal(tmp_path, monkeypatch):
     version_file = tmp_path / "VERSION"
     version_file.write_text("1.2.3\n")
     import inkypi
+
     _real_open = open
+
     def _patched_open(path, *args, **kwargs):
         if "VERSION" in str(path):
             return _real_open(str(version_file), *args, **kwargs)
         return _real_open(path, *args, **kwargs)
+
     monkeypatch.setattr("builtins.open", _patched_open)
     assert inkypi._read_version() == "1.2.3"
 
@@ -326,11 +330,14 @@ def test_read_version_normal(tmp_path, monkeypatch):
 def test_read_version_missing_file(monkeypatch):
     """Test _read_version returns 'unknown' when VERSION file doesn't exist."""
     import inkypi
+
     _real_open = open
+
     def _patched_open(path, *args, **kwargs):
         if "VERSION" in str(path):
             raise FileNotFoundError("No such file")
         return _real_open(path, *args, **kwargs)
+
     monkeypatch.setattr("builtins.open", _patched_open)
     assert inkypi._read_version() == "unknown"
 
@@ -340,11 +347,14 @@ def test_read_version_empty_file(tmp_path, monkeypatch):
     version_file = tmp_path / "VERSION"
     version_file.write_text("")
     import inkypi
+
     _real_open = open
+
     def _patched_open(path, *args, **kwargs):
         if "VERSION" in str(path):
             return _real_open(str(version_file), *args, **kwargs)
         return _real_open(path, *args, **kwargs)
+
     monkeypatch.setattr("builtins.open", _patched_open)
     assert inkypi._read_version() == ""
 
@@ -578,13 +588,18 @@ def test_request_timing_log_emitted(monkeypatch, caplog):
     assert resp.status_code == 200
 
     # Look for the timing line emitted by after_request (either via records or aggregated text)
-    found = bool(messages) or any(
-        "HTTP GET /healthz -> 200 in" in rec.getMessage() for rec in caplog.records
-    ) or (
-        "HTTP GET /healthz -> 200 in" in caplog.text
-    ) or (
-        # Fallback: match key parts to avoid formatter differences
-        ("HTTP GET" in caplog.text and "/healthz" in caplog.text and "-> 200" in caplog.text)
+    found = (
+        bool(messages)
+        or any(
+            "HTTP GET /healthz -> 200 in" in rec.getMessage() for rec in caplog.records
+        )
+        or ("HTTP GET /healthz -> 200 in" in caplog.text)
+        or (
+            # Fallback: match key parts to avoid formatter differences
+            "HTTP GET" in caplog.text
+            and "/healthz" in caplog.text
+            and "-> 200" in caplog.text
+        )
     )
     assert found
 
@@ -606,7 +621,7 @@ def test_secret_key_persisted_in_production(monkeypatch):
         mock_config.load_env_key.return_value = None
         mock_config_class.return_value = mock_config
 
-        mod = _reload_inkypi(
+        _reload_inkypi(
             monkeypatch,
             argv=["inkypi.py"],
             env={"INKYPI_ENV": "production"},

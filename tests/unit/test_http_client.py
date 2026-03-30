@@ -1,6 +1,5 @@
 # pyright: reportMissingImports=false
 import threading
-from unittest.mock import patch
 
 import pytest
 import requests

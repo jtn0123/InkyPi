@@ -11,6 +11,7 @@ from utils.http_utils import json_error, json_internal_error, json_success
 logger = logging.getLogger(__name__)
 apikeys_bp = Blueprint("apikeys", __name__)
 
+
 # Path to .env file
 def get_env_path():
     """Get path to .env file in the project root."""
@@ -18,14 +19,14 @@ def get_env_path():
     if project_dir:
         return os.path.join(project_dir, ".env")
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    return os.path.join(base_dir, '.env')
+    return os.path.join(base_dir, ".env")
 
 
 def parse_env_file(filepath):
     """Parse .env file and return list of (key, value) tuples."""
     if not os.path.exists(filepath):
         return []
-    
+
     try:
         env_dict = dotenv_values(filepath)
         return list(env_dict.items())
@@ -44,10 +45,15 @@ def write_env_file(filepath, entries):
                 f.write("# InkyPi API Keys and Secrets\n")
                 f.write("# Managed via web interface\n\n")
                 for key, value in entries:
-                    if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
-                        raise ValueError(f"Invalid control character in value for key: {key}")
+                    if any(
+                        (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r")
+                        for ch in value
+                    ):
+                        raise ValueError(
+                            f"Invalid control character in value for key: {key}"
+                        )
                     # Quote values with spaces or special characters
-                    if ' ' in value or '"' in value or "'" in value:
+                    if " " in value or '"' in value or "'" in value:
                         value = f'"{value.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))}"'
                     f.write(f"{key}={value}\n")
                 f.flush()
@@ -73,18 +79,17 @@ def mask_value(value):
     return "●" * min(len(value), 20)
 
 
-@apikeys_bp.route('/api-keys')
+@apikeys_bp.route("/api-keys")
 def apikeys_page():
     """Render API keys management page."""
     env_path = get_env_path()
     entries = parse_env_file(env_path)
-    
+
     # Prepare entries for template: only key and masked value (no real values for security)
     template_entries = [
-        {"key": key, "masked": mask_value(value)}
-        for key, value in entries
+        {"key": key, "masked": mask_value(value)} for key, value in entries
     ]
-    
+
     api_key_plugins = {
         "OPEN_AI_SECRET": ["AI Image", "AI Text"],
         "GOOGLE_AI_SECRET": ["AI Image", "AI Text"],
@@ -94,7 +99,7 @@ def apikeys_page():
         "GITHUB_SECRET": ["GitHub"],
     }
     return render_template(
-        'api_keys.html',
+        "api_keys.html",
         entries=template_entries,
         env_exists=os.path.exists(env_path),
         api_keys_mode="generic",
@@ -103,14 +108,14 @@ def apikeys_page():
     )
 
 
-@apikeys_bp.route('/api-keys/save', methods=['POST'])
+@apikeys_bp.route("/api-keys/save", methods=["POST"])
 def save_apikeys():
     """Save API keys to .env file."""
     try:
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return json_error("Invalid JSON payload", status=400)
-        entries = data.get('entries', [])
+        entries = data.get("entries", [])
         if not isinstance(entries, list):
             return json_error("Invalid entries format", status=400)
 
@@ -121,24 +126,29 @@ def save_apikeys():
         # Validate and process entries
         valid_entries = []
         for entry in entries:
-            key = entry.get('key', '').strip()
-            keep_existing = entry.get('keepExisting', False)
+            key = entry.get("key", "").strip()
+            keep_existing = entry.get("keepExisting", False)
 
             if not key:
                 continue
 
             # Validate key format
-            if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', key):
+            if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
                 return json_error(f"Invalid key format: {key}", status=400)
 
             if keep_existing:
                 # Use existing value from .env file
-                value = existing_values.get(key, '')
+                value = existing_values.get(key, "")
             else:
                 # Use provided value
-                value = entry.get('value', '').strip()
-            if any((ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value):
-                return json_error(f"Invalid characters in value for key: {key}", status=400)
+                value = entry.get("value", "").strip()
+            if any(
+                (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r")
+                for ch in value
+            ):
+                return json_error(
+                    f"Invalid characters in value for key: {key}", status=400
+                )
 
             valid_entries.append((key, value))
 

@@ -17,6 +17,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
     if "inkypi" in sys.modules:
         del sys.modules["inkypi"]
     import inkypi  # noqa: F401
+
     mod = importlib.reload(sys.modules["inkypi"])
     mod.main(argv[1:])
     return mod
@@ -29,7 +30,9 @@ def test_csp_enforcement_and_report_only(monkeypatch):
 
     # Default report-only in env
     r = client.get("/healthz")
-    assert ("Content-Security-Policy-Report-Only" in r.headers) or ("Content-Security-Policy" in r.headers)
+    assert ("Content-Security-Policy-Report-Only" in r.headers) or (
+        "Content-Security-Policy" in r.headers
+    )
 
     # Force enforcement header via env
     monkeypatch.setenv("INKYPI_CSP_REPORT_ONLY", "0")
@@ -60,4 +63,3 @@ def test_hsts_only_under_https_or_forward_proto(monkeypatch):
     # HSTS when forwarded proto HTTPS
     r3 = client.get("/healthz", headers={"X-Forwarded-Proto": "https"})
     assert "Strict-Transport-Security" in r3.headers
-

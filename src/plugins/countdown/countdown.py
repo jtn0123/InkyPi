@@ -7,6 +7,8 @@ from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
 
 logger = logging.getLogger(__name__)
+
+
 class Countdown(BasePlugin):
     def build_settings_schema(self):
         return schema(
@@ -26,12 +28,12 @@ class Countdown(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['style_settings'] = True
+        template_params["style_settings"] = True
         return template_params
 
     def generate_image(self, settings, device_config):
-        title = settings.get('title')
-        countdown_date_str = settings.get('date')
+        title = settings.get("title")
+        countdown_date_str = settings.get("date")
 
         if not countdown_date_str:
             raise RuntimeError("Date is required.")
@@ -53,8 +55,10 @@ class Countdown(BasePlugin):
             "date": countdown_date.strftime("%B %d, %Y"),
             "day_count": abs(day_count),
             "label": label,
-            "plugin_settings": settings
+            "plugin_settings": settings,
         }
 
-        image = self.render_image(dimensions, "countdown.html", "countdown.css", template_params)
+        image = self.render_image(
+            dimensions, "countdown.html", "countdown.css", template_params
+        )
         return image

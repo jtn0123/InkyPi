@@ -38,7 +38,7 @@ def test_schema_backed_plugin_pages_use_shared_renderer(client):
         resp = client.get(f"/plugin/{plugin_id}")
         assert resp.status_code == 200
         body = resp.data.decode("utf-8")
-        assert 'data-settings-schema' in body
+        assert "data-settings-schema" in body
 
 
 def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
@@ -58,7 +58,7 @@ def test_remaining_plugin_pages_use_shared_or_hybrid_renderer(client):
         resp = client.get(f"/plugin/{plugin_id}")
         assert resp.status_code == 200
         body = resp.data.decode("utf-8")
-        assert 'data-settings-schema' in body
+        assert "data-settings-schema" in body
 
 
 def test_ai_image_page_uses_shared_select_dependency_renderer(client):
@@ -82,8 +82,8 @@ def test_weather_plugin_second_pass_polish(client):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
 
-    assert "settings-card-title\">Location" in body
-    assert "settings-card-title\">Display" in body
+    assert 'settings-card-title">Location' in body
+    assert 'settings-card-title">Display' in body
     assert "toggle-item" in body
     assert "radio-segment" in body
     assert "settings-map" in body
@@ -111,14 +111,18 @@ def test_url_based_plugins_use_warning_callouts(client):
 def test_checkbox_false_value_not_checked(client, device_config_dev):
     """Bug 2: Checkbox with 'false' value should not render as checked."""
     # Set randomizePrompt to 'false' for ai_image plugin
-    device_config_dev.update_value("plugins", [
-        {
-            "plugin_id": "ai_image",
-            "name": "ai_image_saved_settings",
-            "plugin_settings": {"randomizePrompt": "false"},
-            "refresh": {"interval": 60},
-        }
-    ], write=True)
+    device_config_dev.update_value(
+        "plugins",
+        [
+            {
+                "plugin_id": "ai_image",
+                "name": "ai_image_saved_settings",
+                "plugin_settings": {"randomizePrompt": "false"},
+                "refresh": {"interval": 60},
+            }
+        ],
+        write=True,
+    )
 
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
@@ -126,13 +130,16 @@ def test_checkbox_false_value_not_checked(client, device_config_dev):
 
     # Find the randomizePrompt checkbox input and check it doesn't have a standalone 'checked' attribute
     import re
+
     match = re.search(r'<input[^>]*name="randomizePrompt"[^>]*>', body, re.DOTALL)
     assert match, "randomizePrompt checkbox not found"
     checkbox_html = match.group(0)
     # Strip data attributes that contain "checked" in their values to isolate the actual 'checked' attr
-    stripped = re.sub(r'data-\w+-\w+="[^"]*"', '', checkbox_html)
+    stripped = re.sub(r'data-\w+-\w+="[^"]*"', "", checkbox_html)
     # The standalone 'checked' attribute (not inside another attribute value) should not be present
-    assert not re.search(r'\bchecked\b', stripped), f"Checkbox should not be checked when value is 'false': {checkbox_html}"
+    assert not re.search(
+        r"\bchecked\b", stripped
+    ), f"Checkbox should not be checked when value is 'false': {checkbox_html}"
 
 
 def test_github_plugin_uses_hidden_state_instead_of_inline_display(client):
@@ -172,7 +179,6 @@ def test_plugin_page_status_bar_present(client):
 
 def test_plugin_page_instance_preview_shown_when_instance(client):
     # Create a playlist instance explicitly
-    from utils.time_utils import calculate_seconds
     # Add to Default playlist
     resp = client.post(
         "/add_plugin",
@@ -222,11 +228,11 @@ def test_api_key_indicator_shows_missing_when_no_key(client, device_config_dev):
 
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
-    body = resp.data.decode('utf-8')
+    body = resp.data.decode("utf-8")
 
     # Should show the missing indicator
     assert 'class="api-key-indicator missing"' in body
-    assert 'API Required' in body or 'API Key required' in body
+    assert "API Required" in body or "API Key required" in body
 
 
 def test_api_key_indicator_shows_configured_when_key_present(client, device_config_dev):
@@ -239,11 +245,11 @@ def test_api_key_indicator_shows_configured_when_key_present(client, device_conf
 
     resp = client.get("/plugin/ai_image")
     assert resp.status_code == 200
-    body = resp.data.decode('utf-8')
+    body = resp.data.decode("utf-8")
 
     # Should show the configured indicator
     assert 'class="api-key-indicator configured"' in body
-    assert 'API Key is configured' in body or '✓' in body
+    assert "API Key is configured" in body or "✓" in body
 
 
 def test_plugin_latest_image_endpoint(client, device_config_dev):
@@ -251,8 +257,9 @@ def test_plugin_latest_image_endpoint(client, device_config_dev):
 
     Regression test for: "Latest from this plugin" section not showing historical images.
     """
-    import os
     import json
+    import os
+
     from PIL import Image
 
     # Create a fake history image and metadata
@@ -260,27 +267,27 @@ def test_plugin_latest_image_endpoint(client, device_config_dev):
     os.makedirs(history_dir, exist_ok=True)
 
     # Create test image
-    img = Image.new('RGB', (100, 100), color='red')
-    img_path = os.path.join(history_dir, 'display_20250115_120000.png')
+    img = Image.new("RGB", (100, 100), color="red")
+    img_path = os.path.join(history_dir, "display_20250115_120000.png")
     img.save(img_path)
 
     # Create metadata
     metadata = {
-        'plugin_id': 'clock',
-        'plugin_instance': 'test_instance',
-        'refresh_time': '2025-01-15T12:00:00'
+        "plugin_id": "clock",
+        "plugin_instance": "test_instance",
+        "refresh_time": "2025-01-15T12:00:00",
     }
-    json_path = os.path.join(history_dir, 'display_20250115_120000.json')
-    with open(json_path, 'w') as f:
+    json_path = os.path.join(history_dir, "display_20250115_120000.json")
+    with open(json_path, "w") as f:
         json.dump(metadata, f)
 
     # Request latest image for this plugin
-    resp = client.get('/plugin_latest_image/clock')
+    resp = client.get("/plugin_latest_image/clock")
     assert resp.status_code == 200
-    assert resp.content_type.startswith('image/')
+    assert resp.content_type.startswith("image/")
 
     # Test with non-existent plugin
-    resp2 = client.get('/plugin_latest_image/nonexistent_plugin')
+    resp2 = client.get("/plugin_latest_image/nonexistent_plugin")
     assert resp2.status_code == 404
 
 
@@ -289,27 +296,27 @@ def test_plugin_latest_refresh_time_populated(client, device_config_dev):
 
     Regression test for: "Last generated" timestamp not showing for "Latest from this plugin".
     """
-    import os
     import json
+    import os
 
     # Create a fake history metadata
     history_dir = device_config_dev.history_image_dir
     os.makedirs(history_dir, exist_ok=True)
 
     metadata = {
-        'plugin_id': 'clock',
-        'plugin_instance': 'test_instance',
-        'refresh_time': '2025-01-15T12:00:00'
+        "plugin_id": "clock",
+        "plugin_instance": "test_instance",
+        "refresh_time": "2025-01-15T12:00:00",
     }
-    json_path = os.path.join(history_dir, 'display_20250115_120000.json')
-    with open(json_path, 'w') as f:
+    json_path = os.path.join(history_dir, "display_20250115_120000.json")
+    with open(json_path, "w") as f:
         json.dump(metadata, f)
 
     # Visit plugin page
-    resp = client.get('/plugin/clock')
+    resp = client.get("/plugin/clock")
     assert resp.status_code == 200
-    body = resp.data.decode('utf-8')
+    body = resp.data.decode("utf-8")
 
     # The template should render the refresh time
     # It's rendered via JavaScript, so we check that the variable is set
-    assert 'plugin_latest_refresh' in body or '2025-01-15' in body
+    assert "plugin_latest_refresh" in body or "2025-01-15" in body

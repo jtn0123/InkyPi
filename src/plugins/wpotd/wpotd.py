@@ -35,8 +35,9 @@ from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
+
 class Wpotd(BasePlugin):
-    HEADERS = {'User-Agent': 'InkyPi/0.0 (https://github.com/fatihak/InkyPi/)'}
+    HEADERS = {"User-Agent": "InkyPi/0.0 (https://github.com/fatihak/InkyPi/)"}
     API_URL = "https://en.wikipedia.org/w/api.php"
 
     def build_settings_schema(self):
@@ -74,10 +75,12 @@ class Wpotd(BasePlugin):
 
     def generate_settings_template(self) -> dict[str, Any]:
         template_params = super().generate_settings_template()
-        template_params['style_settings'] = False
+        template_params["style_settings"] = False
         return template_params
 
-    def generate_image(self, settings: dict[str, Any], device_config: dict[str, Any]) -> Image.Image:
+    def generate_image(
+        self, settings: dict[str, Any], device_config: dict[str, Any]
+    ) -> Image.Image:
         logger.info(f"WPOTD plugin settings: {settings}")
         datetofetch = self._determine_date(settings)
         logger.info(f"WPOTD plugin datetofetch: {datetofetch}")
@@ -94,7 +97,9 @@ class Wpotd(BasePlugin):
             dimensions = self.get_oriented_dimensions(device_config)
             max_width, max_height = dimensions
             image = self._shrink_to_fit(image, max_width, max_height)
-            logger.info(f"Image resized to fit device dimensions: {max_width},{max_height}")
+            logger.info(
+                f"Image resized to fit device dimensions: {max_width},{max_height}"
+            )
 
         return image
 
@@ -110,7 +115,9 @@ class Wpotd(BasePlugin):
 
     def _download_image(self, url: str) -> Image.Image:
         if url.lower().endswith(".svg"):
-            logger.warning("SVG format is not supported by Pillow. Skipping image download.")
+            logger.warning(
+                "SVG format is not supported by Pillow. Skipping image download."
+            )
             raise RuntimeError("Failed to load WPOTD image.")
         try:
             response = get_http_session().get(url, headers=self.HEADERS, timeout=10)
@@ -119,10 +126,10 @@ class Wpotd(BasePlugin):
                 return img.copy()
         except UnidentifiedImageError as e:
             logger.error(f"Unsupported image format at {url}: {str(e)}")
-            raise RuntimeError("Unsupported image format.")
+            raise RuntimeError("Unsupported image format.") from e
         except Exception as e:
             logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
-            raise RuntimeError("Failed to load WPOTD image.")
+            raise RuntimeError("Failed to load WPOTD image.") from e
 
     def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
         title = f"Template:POTD/{cur_date.isoformat()}"
@@ -131,7 +138,7 @@ class Wpotd(BasePlugin):
             "format": "json",
             "formatversion": "2",
             "prop": "images",
-            "titles": title
+            "titles": title,
         }
 
         data = self._make_request(params)
@@ -139,7 +146,7 @@ class Wpotd(BasePlugin):
             filename = data["query"]["pages"][0]["images"][0]["title"]
         except (KeyError, IndexError) as e:
             logger.error(f"Failed to retrieve POTD filename for {cur_date}: {e}")
-            raise RuntimeError("Failed to retrieve POTD filename.")
+            raise RuntimeError("Failed to retrieve POTD filename.") from e
 
         image_src = self._fetch_image_src(filename)
 
@@ -147,7 +154,7 @@ class Wpotd(BasePlugin):
             "filename": filename,
             "image_src": image_src,
             "image_page_url": f"https://en.wikipedia.org/wiki/{title}",
-            "date": cur_date
+            "date": cur_date,
         }
 
     def _fetch_image_src(self, filename: str) -> str:
@@ -156,7 +163,7 @@ class Wpotd(BasePlugin):
             "format": "json",
             "prop": "imageinfo",
             "iiprop": "url",
-            "titles": filename
+            "titles": filename,
         }
         data = self._make_request(params)
         try:
@@ -164,18 +171,22 @@ class Wpotd(BasePlugin):
             return page["imageinfo"][0]["url"]
         except (KeyError, IndexError, StopIteration) as e:
             logger.error(f"Failed to retrieve image URL for {filename}: {e}")
-            raise RuntimeError("Failed to retrieve image URL.")
+            raise RuntimeError("Failed to retrieve image URL.") from e
 
     def _make_request(self, params: dict[str, Any]) -> dict[str, Any]:
         try:
-            response = get_http_session().get(self.API_URL, params=params, headers=self.HEADERS, timeout=10)
+            response = get_http_session().get(
+                self.API_URL, params=params, headers=self.HEADERS, timeout=10
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
             logger.error(f"Wikipedia API request failed with params {params}: {str(e)}")
-            raise RuntimeError("Wikipedia API request failed.")
-        
-    def _shrink_to_fit(self, image: Image.Image, max_width: int, max_height: int) -> Image.Image:
+            raise RuntimeError("Wikipedia API request failed.") from e
+
+    def _shrink_to_fit(
+        self, image: Image.Image, max_width: int, max_height: int
+    ) -> Image.Image:
         """
         Resize the image to fit within max_width and max_height while maintaining aspect ratio.
         Uses high-quality resampling.
@@ -202,7 +213,9 @@ class Wpotd(BasePlugin):
             image = image.resize((new_width, new_height), Image.LANCZOS)
             # Create a new image with white background and paste the resized image in the center
             new_image = Image.new("RGB", (max_width, max_height), (255, 255, 255))
-            new_image.paste(image, ((max_width - new_width) // 2, (max_height - new_height) // 2))
+            new_image.paste(
+                image, ((max_width - new_width) // 2, (max_height - new_height) // 2)
+            )
             return new_image
         else:
             # If the image is already within bounds, return it as is

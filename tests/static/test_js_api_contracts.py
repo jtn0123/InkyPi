@@ -5,7 +5,6 @@ test_icons_loader_js.py, test_lightbox_js.py, test_response_modal_js.py,
 test_response_modal_more.py, test_theme_js.py
 """
 
-
 # --- API Validator ---
 
 

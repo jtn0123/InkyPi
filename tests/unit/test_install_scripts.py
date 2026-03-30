@@ -1,7 +1,5 @@
 # pyright: reportMissingImports=false
 """Structural validation of install/setup scripts — no shell execution."""
-import os
-import re
 from pathlib import Path
 
 import pytest
@@ -12,11 +10,13 @@ INSTALL_DIR = REPO_ROOT / "install"
 
 # ---- Helpers ----
 
+
 def _read(name):
     return (INSTALL_DIR / name).read_text()
 
 
 # ---- Systemd service ----
+
 
 class TestSystemdService:
     @pytest.fixture(autouse=True)
@@ -52,6 +52,7 @@ class TestSystemdService:
 
 # ---- CLI wrapper ----
 
+
 class TestCLIWrapper:
     @pytest.fixture(autouse=True)
     def _load(self):
@@ -79,6 +80,7 @@ class TestCLIWrapper:
 
 
 # ---- install.sh ----
+
 
 class TestInstallScript:
     @pytest.fixture(autouse=True)
@@ -108,6 +110,7 @@ class TestInstallScript:
 
 # ---- update.sh ----
 
+
 class TestUpdateScript:
     @pytest.fixture(autouse=True)
     def _load(self):
@@ -126,6 +129,7 @@ class TestUpdateScript:
 
 # ---- uninstall.sh ----
 
+
 class TestUninstallScript:
     @pytest.fixture(autouse=True)
     def _load(self):
@@ -142,6 +146,7 @@ class TestUninstallScript:
 
 
 # ---- Cross-file consistency ----
+
 
 def test_requirements_files_exist():
     assert (INSTALL_DIR / "requirements.txt").exists()

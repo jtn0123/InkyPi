@@ -20,8 +20,6 @@ This script does not modify the app; it produces a static HTML report.
 import argparse
 import base64
 import os
-from typing import Dict, Optional
-
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CURRENT_DIR = os.path.join(REPO_ROOT, "src", "plugins", "weather", "icons")
@@ -29,9 +27,24 @@ CURRENT_DIR = os.path.join(REPO_ROOT, "src", "plugins", "weather", "icons")
 
 OWM_CODES = [
     # Clear/Clouds/Rain/Thunder/Snow/Mist (day/night)
-    "01d", "01n", "02d", "02n", "03d", "03n", "04d", "04n",
-    "09d", "09n", "10d", "10n", "11d", "11n", "13d", "13n",
-    "50d", "50n",
+    "01d",
+    "01n",
+    "02d",
+    "02n",
+    "03d",
+    "03n",
+    "04d",
+    "04n",
+    "09d",
+    "09n",
+    "10d",
+    "10n",
+    "11d",
+    "11n",
+    "13d",
+    "13n",
+    "50d",
+    "50n",
 ]
 
 # Short descriptions for OWM icon families (see OWM docs)
@@ -124,7 +137,7 @@ def to_data_uri(path: str) -> str:
         return ""
 
 
-def find_in_dir(root: str, filename: str) -> Optional[str]:
+def find_in_dir(root: str, filename: str) -> str | None:
     candidate = os.path.join(root, filename)
     if os.path.exists(candidate):
         return candidate
@@ -137,32 +150,50 @@ def find_in_dir(root: str, filename: str) -> Optional[str]:
 def main():
     ap = argparse.ArgumentParser(description="Compare weather icons (OWM codes)")
     ap.add_argument("--new-dir", required=True, help="Path to candidate icon pack root")
-    ap.add_argument("--out", default=os.path.join(REPO_ROOT, "mock_display_output", "icon_compare.html"))
-    ap.add_argument("--map", help="Optional JSON mapping file: { '10n': 'path/in/new/dir.png', ... }")
-    ap.add_argument("--new-dir2", help="Second candidate pack root to compare (optional)")
+    ap.add_argument(
+        "--out",
+        default=os.path.join(REPO_ROOT, "mock_display_output", "icon_compare.html"),
+    )
+    ap.add_argument(
+        "--map",
+        help="Optional JSON mapping file: { '10n': 'path/in/new/dir.png', ... }",
+    )
+    ap.add_argument(
+        "--new-dir2", help="Second candidate pack root to compare (optional)"
+    )
     ap.add_argument("--map2", help="Optional JSON mapping file for second pack")
-    ap.add_argument("--new-dir3", help="Third candidate pack root to compare (optional)")
+    ap.add_argument(
+        "--new-dir3", help="Third candidate pack root to compare (optional)"
+    )
     ap.add_argument("--map3", help="Optional JSON mapping file for third pack")
-    ap.add_argument("--repo-url", help="Public base URL for pack A (e.g., https://github.com/Makin-Things/weather-icons/blob/main/)")
+    ap.add_argument(
+        "--repo-url",
+        help="Public base URL for pack A (e.g., https://github.com/Makin-Things/weather-icons/blob/main/)",
+    )
     ap.add_argument("--repo-url2", help="Public base URL for pack B")
     ap.add_argument("--repo-url3", help="Public base URL for pack C")
-    ap.add_argument("--citations-out", help="Optional JSON file to write per-icon citations")
+    ap.add_argument(
+        "--citations-out", help="Optional JSON file to write per-icon citations"
+    )
     args = ap.parse_args()
 
-    mapping: Dict[str, str] = {}
+    mapping: dict[str, str] = {}
     if args.map and os.path.exists(args.map):
         import json
-        with open(args.map, "r", encoding="utf-8") as f:
+
+        with open(args.map, encoding="utf-8") as f:
             mapping = json.load(f)
-    mapping2: Dict[str, str] = {}
+    mapping2: dict[str, str] = {}
     if args.map2 and os.path.exists(args.map2):
         import json
-        with open(args.map2, "r", encoding="utf-8") as f:
+
+        with open(args.map2, encoding="utf-8") as f:
             mapping2 = json.load(f)
-    mapping3: Dict[str, str] = {}
+    mapping3: dict[str, str] = {}
     if args.map3 and os.path.exists(args.map3):
         import json
-        with open(args.map3, "r", encoding="utf-8") as f:
+
+        with open(args.map3, encoding="utf-8") as f:
             mapping3 = json.load(f)
 
     rows = []
@@ -171,7 +202,7 @@ def main():
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
-    def resolve_new(pack_root: str, mapping_dict: Dict[str, str], code: str) -> str:
+    def resolve_new(pack_root: str, mapping_dict: dict[str, str], code: str) -> str:
         if not pack_root:
             return ""
         mapped = mapping_dict.get(code)
@@ -179,12 +210,16 @@ def main():
             candidate = os.path.join(pack_root, mapped)
             if not os.path.exists(candidate) and "/original/" in candidate:
                 candidate_alt = candidate.replace("/original/", "/", 1)
-                candidate = candidate_alt if os.path.exists(candidate_alt) else candidate
+                candidate = (
+                    candidate_alt if os.path.exists(candidate_alt) else candidate
+                )
             return candidate if os.path.exists(candidate) else ""
         np = find_in_dir(pack_root, f"{code}.png")
         return np or ""
 
-    def relative_in_pack(pack_root: str, mapping_dict: Dict[str, str], code: str, resolved_path: str) -> str:
+    def relative_in_pack(
+        pack_root: str, mapping_dict: dict[str, str], code: str, resolved_path: str
+    ) -> str:
         mapped = mapping_dict.get(code)
         if mapped:
             return mapped
@@ -206,9 +241,19 @@ def main():
         relA = relative_in_pack(args.new_dir, mapping, code, new_path)
         relB = relative_in_pack(args.new_dir2, mapping2, code, new_path2)
         relC = relative_in_pack(args.new_dir3, mapping3, code, new_path3)
-        ghA = (args.repo_url.rstrip("/") + "/" + relA) if (args.repo_url and relA) else ""
-        ghB = (args.repo_url2.rstrip("/") + "/" + relB) if (args.repo_url2 and relB) else ""
-        ghC = (args.repo_url3.rstrip("/") + "/" + relC) if (args.repo_url3 and relC) else ""
+        ghA = (
+            (args.repo_url.rstrip("/") + "/" + relA) if (args.repo_url and relA) else ""
+        )
+        ghB = (
+            (args.repo_url2.rstrip("/") + "/" + relB)
+            if (args.repo_url2 and relB)
+            else ""
+        )
+        ghC = (
+            (args.repo_url3.rstrip("/") + "/" + relC)
+            if (args.repo_url3 and relC)
+            else ""
+        )
 
         status = "OK" if new_uri else "MISSING"
         if status == "OK":
@@ -216,7 +261,23 @@ def main():
         else:
             missing.append(code)
 
-        rows.append((code, current_uri, new_uri, new_uri2, new_uri3, status, current_path, new_path or "", new_path2 or "", new_path3 or "", ghA, ghB, ghC))
+        rows.append(
+            (
+                code,
+                current_uri,
+                new_uri,
+                new_uri2,
+                new_uri3,
+                status,
+                current_path,
+                new_path or "",
+                new_path2 or "",
+                new_path3 or "",
+                ghA,
+                ghB,
+                ghC,
+            )
+        )
 
     # Build HTML
     html = [
@@ -225,33 +286,57 @@ def main():
         "<title>Icon Compare</title>",
         "<style>body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Arial,sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left;vertical-align:top}th{background:#f6f6f6}img.thumb-sm{width:48px;height:48px}img.thumb-lg{width:128px;height:128px}code{background:#f2f2f2;padding:2px 4px;border-radius:3px}</style>",
         "</head><body>",
-        f"<h2>Weather Icon Comparison</h2>",
+        "<h2>Weather Icon Comparison</h2>",
         f"<p>Current set: {CURRENT_DIR}</p>",
         f"<p>New set: {args.new_dir}</p>",
         f"<p>Found {found}/{len(OWM_CODES)} icons. Missing: {', '.join(missing) if missing else 'None'}</p>",
-        "<p><strong>OpenWeather icon families</strong> (per their docs: <a href=\"https://openweathermap.org/weather-conditions\">openweathermap.org/weather-conditions</a>): 01x—Clear; 02x—Few clouds; 03x—Scattered clouds; 04x—Broken/overcast; 09x—Shower rain/drizzle; 10x—Rain; 11x—Thunderstorm; 13x—Snow; 50x—Mist/Haze/Fog. Day vs night variants use the trailing letter <code>d</code> or <code>n</code> respectively.</p>",
+        '<p><strong>OpenWeather icon families</strong> (per their docs: <a href="https://openweathermap.org/weather-conditions">openweathermap.org/weather-conditions</a>): 01x—Clear; 02x—Few clouds; 03x—Scattered clouds; 04x—Broken/overcast; 09x—Shower rain/drizzle; 10x—Rain; 11x—Thunderstorm; 13x—Snow; 50x—Mist/Haze/Fog. Day vs night variants use the trailing letter <code>d</code> or <code>n</code> respectively.</p>',
         "<table><thead><tr><th>Code</th><th>Current (48/128)</th><th>Pack A (48/128)</th><th>Pack B (48/128)</th><th>Pack C (48/128)</th><th>Status(A)</th><th>Current Path</th><th>Pack A Path</th><th>Pack B Path</th><th>Pack C Path</th><th>Pack A Link</th><th>Pack B Link</th><th>Pack C Link</th></tr></thead><tbody>",
     ]
 
     citations = []
-    for code, cur, new, new2, new3, status, curp, newp, newp2, newp3, ghA, ghB, ghC in rows:
+    for (
+        code,
+        cur,
+        new,
+        new2,
+        new3,
+        status,
+        curp,
+        newp,
+        newp2,
+        newp3,
+        ghA,
+        ghB,
+        ghC,
+    ) in rows:
         html.append("<tr>")
         desc = OWM_DESCRIPTIONS.get(code[:2], "")
-        html.append(f"<td>{code}<div style='color:#555;font-size:12px'>{desc}</div></td>")
+        html.append(
+            f"<td>{code}<div style='color:#555;font-size:12px'>{desc}</div></td>"
+        )
         if cur:
-            html.append(f"<td><a href='file://{curp}'><img class='thumb-sm' src='{cur}'></a><br><a href='file://{curp}'><img class='thumb-lg' src='{cur}'></a></td>")
+            html.append(
+                f"<td><a href='file://{curp}'><img class='thumb-sm' src='{cur}'></a><br><a href='file://{curp}'><img class='thumb-lg' src='{cur}'></a></td>"
+            )
         else:
             html.append("<td>—</td>")
         if new:
-            html.append(f"<td><a href='file://{newp}'><img class='thumb-sm' src='{new}'></a><br><a href='file://{newp}'><img class='thumb-lg' src='{new}'></a></td>")
+            html.append(
+                f"<td><a href='file://{newp}'><img class='thumb-sm' src='{new}'></a><br><a href='file://{newp}'><img class='thumb-lg' src='{new}'></a></td>"
+            )
         else:
             html.append("<td>—</td>")
         if new2:
-            html.append(f"<td><a href='file://{newp2}'><img class='thumb-sm' src='{new2}'></a><br><a href='file://{newp2}'><img class='thumb-lg' src='{new2}'></a></td>")
+            html.append(
+                f"<td><a href='file://{newp2}'><img class='thumb-sm' src='{new2}'></a><br><a href='file://{newp2}'><img class='thumb-lg' src='{new2}'></a></td>"
+            )
         else:
             html.append("<td>—</td>")
         if new3:
-            html.append(f"<td><a href='file://{newp3}'><img class='thumb-sm' src='{new3}'></a><br><a href='file://{newp3}'><img class='thumb-lg' src='{new3}'></a></td>")
+            html.append(
+                f"<td><a href='file://{newp3}'><img class='thumb-sm' src='{new3}'></a><br><a href='file://{newp3}'><img class='thumb-lg' src='{new3}'></a></td>"
+            )
         else:
             html.append("<td>—</td>")
         html.append(f"<td>{status}</td>")
@@ -259,24 +344,41 @@ def main():
         html.append(f"<td style='font-size:12px;color:#555'>{newp}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{newp2}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{newp3}</td>")
-        html.append(f"<td>{('<a href=\'%s\' target=\'_blank\'>GitHub</a>' % ghA) if ghA else '—'}</td>")
-        html.append(f"<td>{('<a href=\'%s\' target=\'_blank\'>GitHub</a>' % ghB) if ghB else '—'}</td>")
-        html.append(f"<td>{('<a href=\'%s\' target=\'_blank\'>GitHub</a>' % ghC) if ghC else '—'}</td>")
+        html.append(
+            f"<td>{(f'<a href=\'{ghA}\' target=\'_blank\'>GitHub</a>') if ghA else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<a href=\'{ghB}\' target=\'_blank\'>GitHub</a>') if ghB else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<a href=\'{ghC}\' target=\'_blank\'>GitHub</a>') if ghC else '—'}</td>"
+        )
         html.append("</tr>")
 
-        citations.append({
-            "code": code,
-            "current_path": curp,
-            "pack_a": {"path": newp, "repo_url": ghA},
-            "pack_b": {"path": newp2, "repo_url": ghB},
-            "pack_c": {"path": newp3, "repo_url": ghC}
-        })
+        citations.append(
+            {
+                "code": code,
+                "current_path": curp,
+                "pack_a": {"path": newp, "repo_url": ghA},
+                "pack_b": {"path": newp2, "repo_url": ghB},
+                "pack_c": {"path": newp3, "repo_url": ghC},
+            }
+        )
 
     # Extras and Moon sections
     html.append("</tbody></table>")
     html.append("<h3>Extra Phenomena</h3>")
-    html.append("<table><thead><tr><th>Name</th><th>Pack A</th><th>Pack B</th><th>Pack C</th><th>Path A</th><th>Path B</th><th>Path C</th></tr></thead><tbody>")
-    for key, label in [("tornado","Tornado"),("hurricane","Hurricane"),("tropical-storm","Tropical Storm"),("rain-and-snow-mix","Rain & Snow Mix"),("rain-and-sleet-mix","Rain & Sleet Mix"),("fog","Fog (generic)")]:
+    html.append(
+        "<table><thead><tr><th>Name</th><th>Pack A</th><th>Pack B</th><th>Pack C</th><th>Path A</th><th>Path B</th><th>Path C</th></tr></thead><tbody>"
+    )
+    for key, label in [
+        ("tornado", "Tornado"),
+        ("hurricane", "Hurricane"),
+        ("tropical-storm", "Tropical Storm"),
+        ("rain-and-snow-mix", "Rain & Snow Mix"),
+        ("rain-and-sleet-mix", "Rain & Sleet Mix"),
+        ("fog", "Fog (generic)"),
+    ]:
         p1 = resolve_new(args.new_dir, mapping, key)
         p2 = resolve_new(args.new_dir2, mapping2, key)
         p3 = resolve_new(args.new_dir3, mapping3, key)
@@ -284,10 +386,18 @@ def main():
         u2 = to_data_uri(p2) if p2 else ""
         u3 = to_data_uri(p3) if p3 else ""
         html.append("<tr>")
-        html.append(f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u1,u1)) if u1 else '—'}</td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u2,u2)) if u2 else '—'}</td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u3,u3)) if u3 else '—'}</td>")
+        html.append(
+            f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u1}\'><br><img class=\'thumb-lg\' src=\'{u1}\'>') if u1 else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u2}\'><br><img class=\'thumb-lg\' src=\'{u2}\'>') if u2 else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u3}\'><br><img class=\'thumb-lg\' src=\'{u3}\'>') if u3 else '—'}</td>"
+        )
         html.append(f"<td style='font-size:12px;color:#555'>{p1}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p2}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p3}</td>")
@@ -295,7 +405,9 @@ def main():
     html.append("</tbody></table>")
 
     html.append("<h3>Moon Phases</h3>")
-    html.append("<table><thead><tr><th>Phase</th><th>Current (PNG)</th><th>Pack A</th><th>Pack B</th><th>Pack C</th><th>Path A</th><th>Path B</th><th>Path C</th></tr></thead><tbody>")
+    html.append(
+        "<table><thead><tr><th>Phase</th><th>Current (PNG)</th><th>Pack A</th><th>Pack B</th><th>Pack C</th><th>Path A</th><th>Path B</th><th>Path C</th></tr></thead><tbody>"
+    )
     for key, label in MOON_PHASES:
         curp2 = os.path.join(CURRENT_DIR, f"{key}.png")
         curu2 = to_data_uri(curp2) if os.path.exists(curp2) else ""
@@ -306,11 +418,21 @@ def main():
         u2m = to_data_uri(p2m) if p2m else ""
         u3m = to_data_uri(p3m) if p3m else ""
         html.append("<tr>")
-        html.append(f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (curu2,curu2)) if curu2 else '—'}</td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u1m,u1m)) if u1m else '—'}</td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u2m,u2m)) if u2m else '—'}</td>")
-        html.append(f"<td>{('<img class=\'thumb-sm\' src=\'%s\'><br><img class=\'thumb-lg\' src=\'%s\'>' % (u3m,u3m)) if u3m else '—'}</td>")
+        html.append(
+            f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{curu2}\'><br><img class=\'thumb-lg\' src=\'{curu2}\'>') if curu2 else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u1m}\'><br><img class=\'thumb-lg\' src=\'{u1m}\'>') if u1m else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u2m}\'><br><img class=\'thumb-lg\' src=\'{u2m}\'>') if u2m else '—'}</td>"
+        )
+        html.append(
+            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u3m}\'><br><img class=\'thumb-lg\' src=\'{u3m}\'>') if u3m else '—'}</td>"
+        )
         html.append(f"<td style='font-size:12px;color:#555'>{p1m}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p2m}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p3m}</td>")
@@ -319,6 +441,7 @@ def main():
 
     if args.citations_out:
         import json
+
         with open(args.citations_out, "w", encoding="utf-8") as cf:
             json.dump(citations, cf, indent=2)
 
@@ -330,5 +453,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

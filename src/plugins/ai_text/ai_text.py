@@ -54,9 +54,18 @@ class AIText(BasePlugin):
                                 option("gpt-5-nano", "GPT-5 nano \u00b7 $0.05/1M in"),
                             ],
                             "google": [
-                                option("gemini-3.1-pro-preview", "Gemini 3.1 Pro \u00b7 ~$2.00/1M in"),
-                                option("gemini-3-flash-preview", "Gemini 3 Flash \u00b7 $0.50/1M in"),
-                                option("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash-Lite \u00b7 $0.25/1M in"),
+                                option(
+                                    "gemini-3.1-pro-preview",
+                                    "Gemini 3.1 Pro \u00b7 ~$2.00/1M in",
+                                ),
+                                option(
+                                    "gemini-3-flash-preview",
+                                    "Gemini 3 Flash \u00b7 $0.50/1M in",
+                                ),
+                                option(
+                                    "gemini-3.1-flash-lite-preview",
+                                    "Gemini 3.1 Flash-Lite \u00b7 $0.25/1M in",
+                                ),
                             ],
                         },
                     ),
@@ -78,24 +87,24 @@ class AIText(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "OpenAI / Google",
             "expected_key": "OPEN_AI_SECRET",
             "alt_key": "GOOGLE_AI_SECRET",
         }
-        template_params['style_settings'] = True
+        template_params["style_settings"] = True
         return template_params
 
     def generate_image(self, settings, device_config):
         provider = settings.get("provider", "openai")
         title = settings.get("title")
 
-        text_model = settings.get('textModel')
+        text_model = settings.get("textModel")
         if not text_model:
             raise RuntimeError("Text Model is required.")
 
-        text_prompt = settings.get('textPrompt', '')
+        text_prompt = settings.get("textPrompt", "")
         if not text_prompt.strip():
             raise RuntimeError("Text Prompt is required.")
 
@@ -107,8 +116,11 @@ class AIText(BasePlugin):
                     raise RuntimeError("Google AI API Key not configured.")
 
                 from google import genai
+
                 google_client = genai.Client(api_key=api_key)
-                prompt_response = AIText.fetch_text_prompt_google(google_client, text_model, text_prompt)
+                prompt_response = AIText.fetch_text_prompt_google(
+                    google_client, text_model, text_prompt
+                )
             else:
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
                 if not api_key:
@@ -116,12 +128,14 @@ class AIText(BasePlugin):
                     raise RuntimeError("OpenAI API Key not configured.")
 
                 ai_client = OpenAI(api_key=api_key)
-                prompt_response = AIText.fetch_text_prompt(ai_client, text_model, text_prompt)
+                prompt_response = AIText.fetch_text_prompt(
+                    ai_client, text_model, text_prompt
+                )
         except RuntimeError:
             raise
         except Exception as e:
             logger.error(f"Failed to make API request: {str(e)}")
-            raise RuntimeError("API request failure, please check logs.")
+            raise RuntimeError("API request failure, please check logs.") from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 
@@ -131,13 +145,17 @@ class AIText(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(dimensions, "ai_text.html", "ai_text.css", image_template_params)
+        image = self.render_image(
+            dimensions, "ai_text.html", "ai_text.css", image_template_params
+        )
 
         return image
 
     @staticmethod
     def fetch_text_prompt(ai_client, model, text_prompt):
-        logger.info(f"Getting random text prompt from input {text_prompt}, model: {model}")
+        logger.info(
+            f"Getting random text prompt from input {text_prompt}, model: {model}"
+        )
 
         system_content = (
             "You are a highly intelligent text generation assistant. Generate concise, "
@@ -170,7 +188,9 @@ class AIText(BasePlugin):
         """Fetch text response from Google Gemini API."""
         from google.genai import types
 
-        logger.info(f"Getting text prompt from Google, input: {text_prompt}, model: {model}")
+        logger.info(
+            f"Getting text prompt from Google, input: {text_prompt}, model: {model}"
+        )
 
         system_content = (
             "You are a highly intelligent text generation assistant. Generate concise, "

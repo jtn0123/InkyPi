@@ -128,7 +128,9 @@ def json_internal_error(
             ctx.update(details)
         except Exception:
             pass
-    return json_error("An internal error occurred", status=status, code=code, details=ctx)
+    return json_error(
+        "An internal error occurred", status=status, code=code, details=ctx
+    )
 
 
 def wants_json(req: Request | None = None) -> bool:
@@ -159,6 +161,7 @@ _thread_local = threading.local()
 
 # Conservative defaults that keep tests fast (no backoff sleeps) while providing resiliency
 
+
 def _env_float(name: str, default: float) -> float:
     try:
         raw = os.getenv(name)
@@ -166,8 +169,11 @@ def _env_float(name: str, default: float) -> float:
             return default
         return float(raw)
     except Exception:
-        logger.warning("Failed to parse env var %s as float, using default %s", name, default)
+        logger.warning(
+            "Failed to parse env var %s as float, using default %s", name, default
+        )
         return default
+
 
 def _env_int(name: str, default: int) -> int:
     try:
@@ -176,16 +182,22 @@ def _env_int(name: str, default: int) -> int:
             return default
         return int(raw)
     except Exception:
-        logger.warning("Failed to parse env var %s as int, using default %s", name, default)
+        logger.warning(
+            "Failed to parse env var %s as int, using default %s", name, default
+        )
         return default
+
 
 def _env_bool(name: str, default: bool = False) -> bool:
     try:
         raw = os.getenv(name, "")
         return raw.strip().lower() in ("1", "true", "yes", "on")
     except Exception:
-        logger.warning("Failed to parse env var %s as bool, using default %s", name, default)
+        logger.warning(
+            "Failed to parse env var %s as bool, using default %s", name, default
+        )
         return default
+
 
 DEFAULT_TIMEOUT_SECONDS: float = _env_float("INKYPI_HTTP_TIMEOUT_DEFAULT_S", 20.0)
 CONNECT_TIMEOUT_SECONDS: float | None = None
@@ -305,8 +317,16 @@ def http_get(
         effective_timeout = timeout
     else:
         if CONNECT_TIMEOUT_SECONDS is not None or READ_TIMEOUT_SECONDS is not None:
-            ct = CONNECT_TIMEOUT_SECONDS if CONNECT_TIMEOUT_SECONDS is not None else DEFAULT_TIMEOUT_SECONDS
-            rt = READ_TIMEOUT_SECONDS if READ_TIMEOUT_SECONDS is not None else DEFAULT_TIMEOUT_SECONDS
+            ct = (
+                CONNECT_TIMEOUT_SECONDS
+                if CONNECT_TIMEOUT_SECONDS is not None
+                else DEFAULT_TIMEOUT_SECONDS
+            )
+            rt = (
+                READ_TIMEOUT_SECONDS
+                if READ_TIMEOUT_SECONDS is not None
+                else DEFAULT_TIMEOUT_SECONDS
+            )
             effective_timeout = (float(ct), float(rt))
         else:
             effective_timeout = DEFAULT_TIMEOUT_SECONDS

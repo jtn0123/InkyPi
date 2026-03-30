@@ -6,7 +6,9 @@ from pathlib import Path
 def test_config_loads_legacy_fixture(monkeypatch, tmp_path):
     import config as config_mod
 
-    fixture = Path(__file__).resolve().parents[1] / "fixtures" / "upgrade" / "device_v1.json"
+    fixture = (
+        Path(__file__).resolve().parents[1] / "fixtures" / "upgrade" / "device_v1.json"
+    )
     config_path = tmp_path / "device.json"
     shutil.copyfile(fixture, config_path)
 

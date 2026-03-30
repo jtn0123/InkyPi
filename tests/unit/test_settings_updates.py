@@ -31,7 +31,9 @@ class TestUpdateStatus:
 
         mod._set_update_state(True, None)
         # Backdate started_at beyond the timeout
-        mod._UPDATE_STATE["started_at"] = time.time() - (mod._UPDATE_TIMEOUT_SECONDS + 60)
+        mod._UPDATE_STATE["started_at"] = time.time() - (
+            mod._UPDATE_TIMEOUT_SECONDS + 60
+        )
         try:
             resp = client.get("/settings/update_status")
             data = resp.get_json()

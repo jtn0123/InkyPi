@@ -10,7 +10,7 @@ from PIL import Image as PILImage
 @pytest.fixture(autouse=True)
 def mock_openai():
     """Mock OpenAI for all ai_image tests."""
-    with patch('plugins.ai_image.ai_image.OpenAI') as mock:
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock:
         mock_client = MagicMock()
         mock.return_value = mock_client
 
@@ -40,7 +40,11 @@ def test_ai_image_missing_api_key(device_config_dev):
     from plugins.ai_image.ai_image import AIImage
 
     p = AIImage({"id": "ai_image"})
-    settings = {"textPrompt": "a cat", "imageModel": "gpt-image-1.5", "quality": "medium"}
+    settings = {
+        "textPrompt": "a cat",
+        "imageModel": "gpt-image-1.5",
+        "quality": "medium",
+    }
 
     with patch.object(device_config_dev, "load_env_key", lambda key: None):
         with pytest.raises(RuntimeError, match="OpenAI API Key not configured"):

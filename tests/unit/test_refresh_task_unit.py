@@ -1,10 +1,7 @@
 # pyright: reportMissingImports=false
 
-import threading
-import time
 
 from PIL import Image
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -89,7 +86,9 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
         marker.write_text("called", encoding="utf-8")
         return Image.new("RGB", device_config.get_resolution(), "white")
 
-    monkeypatch.setattr(refresh, "execute", fake_execute.__get__(refresh, ManualRefresh))
+    monkeypatch.setattr(
+        refresh, "execute", fake_execute.__get__(refresh, ManualRefresh)
+    )
 
     try:
         task.start()
@@ -119,7 +118,8 @@ def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatc
         return img, {}
 
     monkeypatch.setattr(
-        RefreshTask, "_execute_with_policy",
+        RefreshTask,
+        "_execute_with_policy",
         fake_execute_with_policy,
     )
 

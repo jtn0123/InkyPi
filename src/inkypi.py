@@ -10,7 +10,16 @@ import warnings
 from collections import defaultdict, deque
 from time import perf_counter
 
-from flask import Flask, g, make_response, redirect, render_template, request, session, url_for as flask_url_for
+from flask import (
+    Flask,
+    g,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for as flask_url_for,
+)
 from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
@@ -352,16 +361,18 @@ def create_app():
             pass
 
     # --- HTTPS redirect (opt-in via INKYPI_FORCE_HTTPS=1) ---
-    _force_https = (
-        not DEV_MODE
-        and os.getenv("INKYPI_FORCE_HTTPS", "0").strip().lower() in ("1", "true", "yes")
-    )
+    _force_https = not DEV_MODE and os.getenv(
+        "INKYPI_FORCE_HTTPS", "0"
+    ).strip().lower() in ("1", "true", "yes")
 
     @app.before_request
     def _redirect_to_https():
         if not _force_https:
             return
-        if request.is_secure or request.headers.get("X-Forwarded-Proto", "").lower() == "https":
+        if (
+            request.is_secure
+            or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+        ):
             return
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
@@ -407,8 +418,9 @@ def create_app():
         # Accept the token from the X-CSRFToken header (preferred for fetch)
         # or from a form field named csrf_token.
         request_token = request.headers.get("X-CSRFToken") or (
-            request.form.get("csrf_token") if request.content_type
-            and "form" in request.content_type else None
+            request.form.get("csrf_token")
+            if request.content_type and "form" in request.content_type
+            else None
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
@@ -549,7 +561,9 @@ def create_app():
                 os.getenv("INKYPI_CSP")
                 or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
             )
-            report_only = DEV_MODE or os.getenv("INKYPI_CSP_REPORT_ONLY", "0").strip().lower() in (
+            report_only = DEV_MODE or os.getenv(
+                "INKYPI_CSP_REPORT_ONLY", "0"
+            ).strip().lower() in (
                 "1",
                 "true",
                 "yes",

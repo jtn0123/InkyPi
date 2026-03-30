@@ -1,6 +1,5 @@
 # pyright: reportMissingImports=false
 """Error scenario tests for the Calendar plugin."""
-from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -8,6 +7,7 @@ import requests
 
 def _make_calendar_plugin():
     from plugins.calendar.calendar import Calendar
+
     return Calendar({"id": "calendar"})
 
 
@@ -34,10 +34,13 @@ def test_calendar_malformed_ics(monkeypatch):
     class FakeResp:
         text = "THIS IS NOT ICS CONTENT AT ALL"
         status_code = 200
+
         def raise_for_status(self):
             pass
 
-    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: FakeResp())})()
+    mock_session = type(
+        "S", (), {"get": staticmethod(lambda url, **kwargs: FakeResp())}
+    )()
     monkeypatch.setattr(
         "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )
@@ -80,10 +83,13 @@ def test_calendar_http_403(monkeypatch):
 
     class ForbiddenResp:
         status_code = 403
+
         def raise_for_status(self):
             raise requests.exceptions.HTTPError("403 Forbidden")
 
-    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: ForbiddenResp())})()
+    mock_session = type(
+        "S", (), {"get": staticmethod(lambda url, **kwargs: ForbiddenResp())}
+    )()
     monkeypatch.setattr(
         "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )

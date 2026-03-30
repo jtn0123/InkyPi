@@ -6,7 +6,7 @@ import pytest
 import requests
 
 
-@patch('plugins.weather.weather_api.get_http_session')
+@patch("plugins.weather.weather_api.get_http_session")
 def test_weather_openweathermap_success(mock_get_session, client):
     import os
 
@@ -105,7 +105,9 @@ def test_weather_openmeteo_success(client, monkeypatch):
         return R()
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
-    monkeypatch.setattr("plugins.weather.weather_api.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.weather.weather_api.get_http_session", lambda: mock_session
+    )
 
     data = {
         "plugin_id": "weather",
@@ -339,7 +341,7 @@ def test_openmeteo_hourly_parsing():
     humidity_hourly_times = cast(list[str], hourly_data.get("time", []))
     humidity_values = cast(list[int], hourly_data.get("relative_humidity_2m", []))
 
-    for i, time_str in enumerate(humidity_hourly_times):
+    for i, _time_str in enumerate(humidity_hourly_times):
         try:
             # This covers the humidity parsing logic
             current_humidity = str(int(humidity_values[i]))
@@ -349,7 +351,7 @@ def test_openmeteo_hourly_parsing():
 
     # Test pressure parsing
     pressure_values = cast(list[int], hourly_data.get("surface_pressure", []))
-    for i, time_str in enumerate(humidity_hourly_times):
+    for i, _time_str in enumerate(humidity_hourly_times):
         try:
             # This covers the pressure parsing logic
             current_pressure = str(int(pressure_values[i]))
@@ -451,6 +453,7 @@ def test_weather_api_key_validation():
 
 def test_weather_save_settings(client, monkeypatch):
     """Test saving weather settings to default playlist from main plugin page."""
+
     # Mock the weather API calls
     def fake_get(url, *args, **kwargs):
         class R:
@@ -491,7 +494,9 @@ def test_weather_save_settings(client, monkeypatch):
         return R()
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
-    monkeypatch.setattr("plugins.weather.weather_api.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.weather.weather_api.get_http_session", lambda: mock_session
+    )
 
     data = {
         "plugin_id": "weather",
@@ -513,6 +518,7 @@ def test_weather_save_settings(client, monkeypatch):
 
 def test_weather_settings_persistence(client, monkeypatch):
     """Test that saved weather settings persist when navigating back to plugin page."""
+
     # Mock the weather API calls
     def fake_get(url, *args, **kwargs):
         class R:
@@ -553,7 +559,9 @@ def test_weather_settings_persistence(client, monkeypatch):
         return R()
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
-    monkeypatch.setattr("plugins.weather.weather_api.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.weather.weather_api.get_http_session", lambda: mock_session
+    )
 
     data = {
         "plugin_id": "weather",
@@ -615,7 +623,12 @@ def test_weather_invalid_coordinates_raises(device_config_dev):
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    settings = {"latitude": "not_a_number", "longitude": "abc", "units": "metric", "weatherProvider": "OpenWeatherMap"}
+    settings = {
+        "latitude": "not_a_number",
+        "longitude": "abc",
+        "units": "metric",
+        "weatherProvider": "OpenWeatherMap",
+    }
 
     with pytest.raises(RuntimeError, match="valid numbers"):
         p.generate_image(settings, device_config_dev)
@@ -670,7 +683,9 @@ def test_weather_openweathermap_api_failure(device_config_dev, monkeypatch):
         raise requests.exceptions.Timeout("Connection timeout")
 
     mock_session = type("S", (), {"get": staticmethod(raise_timeout)})()
-    monkeypatch.setattr("plugins.weather.weather_api.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.weather.weather_api.get_http_session", lambda: mock_session
+    )
 
     settings = {
         "latitude": "40.7128",
@@ -693,7 +708,9 @@ def test_weather_openmeteo_api_failure(device_config_dev, monkeypatch):
         raise requests.exceptions.ConnectionError("Connection failed")
 
     mock_session = type("S", (), {"get": staticmethod(raise_connection_error)})()
-    monkeypatch.setattr("plugins.weather.weather_api.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.weather.weather_api.get_http_session", lambda: mock_session
+    )
 
     settings = {
         "latitude": "40.7128",

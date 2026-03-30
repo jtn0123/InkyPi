@@ -54,7 +54,7 @@ def test_image_resize_no_memory_leak(memory_baseline):
 
     # Perform many resize operations
     num_iterations = 100
-    for i in range(num_iterations):
+    for _i in range(num_iterations):
         resized = resize_image(test_img, (400, 300))
         # Explicitly delete to help GC
         del resized
@@ -83,7 +83,7 @@ def test_image_enhancement_no_memory_leak(memory_baseline):
     }
 
     num_iterations = 100
-    for i in range(num_iterations):
+    for _i in range(num_iterations):
         enhanced = apply_image_enhancement(test_img, settings)
         del enhanced
 
@@ -104,7 +104,7 @@ def test_image_load_from_bytes_no_memory_leak(memory_baseline):
     img_bytes = bio.getvalue()
 
     num_iterations = 100
-    for i in range(num_iterations):
+    for _i in range(num_iterations):
         loaded = load_image_from_bytes(img_bytes)
         if loaded:
             del loaded
@@ -118,7 +118,9 @@ def test_image_load_from_bytes_no_memory_leak(memory_baseline):
     assert memory_growth < 10, f"Memory grew by {memory_growth:.2f}MB (potential leak)"
 
 
-def test_plugin_execution_no_memory_leak(device_config_dev, monkeypatch, memory_baseline):
+def test_plugin_execution_no_memory_leak(
+    device_config_dev, monkeypatch, memory_baseline
+):
     """Test that repeated plugin execution doesn't leak memory."""
 
     class SimplePlugin:
@@ -126,7 +128,9 @@ def test_plugin_execution_no_memory_leak(device_config_dev, monkeypatch, memory_
 
         def generate_image(self, settings, device_config):
             # Simulate typical plugin work: create an image, do some processing
-            img = Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
+            img = Image.new(
+                "RGB", device_config.get_resolution(), color=(255, 255, 255)
+            )
             # Simulate some processing
             img = img.rotate(45)
             img = img.crop((0, 0, 100, 100))
@@ -147,7 +151,7 @@ def test_plugin_execution_no_memory_leak(device_config_dev, monkeypatch, memory_
 
         # Execute many plugin updates
         num_iterations = 50
-        for i in range(num_iterations):
+        for _i in range(num_iterations):
             refresh = ManualRefresh("simple", {})
             task.manual_update(refresh)
 
@@ -160,7 +164,9 @@ def test_plugin_execution_no_memory_leak(device_config_dev, monkeypatch, memory_
 
         # Be generous here as plugin execution involves display manager,
         # file I/O, and other components
-        assert memory_growth < 30, f"Memory grew by {memory_growth:.2f}MB (potential leak)"
+        assert (
+            memory_growth < 30
+        ), f"Memory grew by {memory_growth:.2f}MB (potential leak)"
 
     finally:
         task.stop()
@@ -194,18 +200,19 @@ def test_tracemalloc_image_processing():
     snapshot1 = tracemalloc.take_snapshot()
 
     # Perform image operations
-    for i in range(50):
+    for _i in range(50):
         img = Image.new("RGB", (400, 300), color=(128, 128, 128))
         resized = resize_image(img, (200, 150))
         enhanced = apply_image_enhancement(
-            resized, {"brightness": 1.1, "contrast": 1.0, "saturation": 1.0, "sharpness": 1.0}
+            resized,
+            {"brightness": 1.1, "contrast": 1.0, "saturation": 1.0, "sharpness": 1.0},
         )
         del img, resized, enhanced
 
     gc.collect()
 
     snapshot2 = tracemalloc.take_snapshot()
-    top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+    top_stats = snapshot2.compare_to(snapshot1, "lineno")
 
     # Find the largest memory allocations
     largest_growth = 0
@@ -217,9 +224,9 @@ def test_tracemalloc_image_processing():
 
     # Largest allocation shouldn't be more than 5MB
     largest_growth_mb = largest_growth / 1024 / 1024
-    assert largest_growth_mb < 5, (
-        f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
-    )
+    assert (
+        largest_growth_mb < 5
+    ), f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
 
 
 def test_long_running_refresh_task(device_config_dev, monkeypatch):
@@ -227,6 +234,7 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
 
     class CyclingPlugin:
         """Plugin that creates and discards various objects."""
+
         config = {"image_settings": []}
         call_count = 0
 
@@ -238,7 +246,9 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
             {f"key{i}": f"value{i}" for i in range(100)}
 
             # Return final image
-            return Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
+            return Image.new(
+                "RGB", device_config.get_resolution(), color=(255, 255, 255)
+            )
 
     cycling_plugin = CyclingPlugin()
     dummy_cfg = {"id": "cycling", "class": "Cycling"}
@@ -258,7 +268,7 @@ def test_long_running_refresh_task(device_config_dev, monkeypatch):
 
         # Run for a bit longer to detect slow leaks
         num_iterations = 30
-        for i in range(num_iterations):
+        for _i in range(num_iterations):
             refresh = ManualRefresh("cycling", {})
             task.manual_update(refresh)
 
@@ -288,6 +298,7 @@ def test_repeated_plugin_instantiation_no_leak(device_config_dev):
     # Create and destroy plugin instances (if we had a real plugin)
     # For now, test the pattern with mock objects
     for i in range(100):
+
         class TempPlugin:
             config = {"id": f"temp_{i}", "image_settings": []}
 
@@ -301,15 +312,15 @@ def test_repeated_plugin_instantiation_no_leak(device_config_dev):
     gc.collect()
     snapshot2 = tracemalloc.take_snapshot()
 
-    top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+    top_stats = snapshot2.compare_to(snapshot1, "lineno")
     largest_growth = max((stat.size_diff for stat in top_stats[:10]), default=0)
     largest_growth_mb = largest_growth / 1024 / 1024
 
     tracemalloc.stop()
 
-    assert largest_growth_mb < 3, (
-        f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
-    )
+    assert (
+        largest_growth_mb < 3
+    ), f"Largest memory allocation was {largest_growth_mb:.2f}MB (potential leak)"
 
 
 def test_image_history_doesnt_accumulate_in_memory(device_config_dev):

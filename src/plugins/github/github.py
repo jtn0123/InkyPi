@@ -53,23 +53,23 @@ class GitHub(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "GitHub",
-            "expected_key": "GITHUB_SECRET"
+            "expected_key": "GITHUB_SECRET",
         }
-        template_params['style_settings'] = True
+        template_params["style_settings"] = True
         return template_params
 
     def generate_image(self, settings, device_config):
         try:
-            github_type = settings.get('githubType', 'contributions')
+            github_type = settings.get("githubType", "contributions")
 
-            if github_type == 'contributions':
+            if github_type == "contributions":
                 return contributions_generate_image(self, settings, device_config)
-            elif github_type == 'sponsors':
+            elif github_type == "sponsors":
                 return sponsors_generate_image(self, settings, device_config)
-            elif github_type == 'stars':
+            elif github_type == "stars":
                 return stars_generate_image(self, settings, device_config)
             else:
                 logger.error(f"Unknown GitHub type: {github_type}")

@@ -1,5 +1,4 @@
 # pyright: reportMissingImports=false, reportMissingTypeStubs=false, reportMissingModuleSource=false, reportRedeclaration=false
-import io
 import logging
 import os
 import re
@@ -10,23 +9,15 @@ import threading
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from typing import Any
 
-import pytz
 import requests as _requests
 from flask import (
     Blueprint,
-    Response,
     current_app,
-    jsonify,
-    render_template,
-    request,
-    stream_with_context,
 )
 
-from utils.http_utils import json_error, json_internal_error
-from utils.progress_events import get_progress_bus, to_sse
-from utils.time_utils import calculate_seconds, get_timezone, now_device_tz
+from utils.progress_events import get_progress_bus
+from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
 try:
@@ -118,7 +109,9 @@ class DevModeLogHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            timestamp = datetime.fromtimestamp(record.created).strftime("%b %d %H:%M:%S")
+            timestamp = datetime.fromtimestamp(record.created).strftime(
+                "%b %d %H:%M:%S"
+            )
             log_line = f"{timestamp} [{record.levelname}] {record.name}: {msg}"
             with _dev_log_lock:
                 _dev_log_buffer.append((record.created, log_line))
@@ -182,8 +175,12 @@ def _read_log_lines(hours: int) -> list[str]:
     if not JOURNAL_AVAILABLE:
         # Development mode: return in-memory captured logs
         lines.append("=== Development Mode Logs (In-Memory Buffer) ===")
-        lines.append(f"Showing logs from the last {hours} hours (max {DEV_LOG_BUFFER_SIZE} entries)")
-        lines.append("For complete logs, check your terminal output where Flask is running.")
+        lines.append(
+            f"Showing logs from the last {hours} hours (max {DEV_LOG_BUFFER_SIZE} entries)"
+        )
+        lines.append(
+            "For complete logs, check your terminal output where Flask is running."
+        )
         lines.append("")
 
         cutoff_timestamp = since.timestamp()
@@ -357,7 +354,9 @@ def _set_update_state(running: bool, unit: str | None):
         _UPDATE_STATE["started_at"] = float(time.time()) if running else None
 
 
-def _start_update_via_systemd(unit_name: str, script_path: str, target_tag: str | None = None) -> None:
+def _start_update_via_systemd(
+    unit_name: str, script_path: str, target_tag: str | None = None
+) -> None:
     # Run update script in a transient systemd unit so its logs are visible in journal
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     cmd = [
@@ -390,9 +389,17 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
     def _runner():
         try:
             _log_and_publish("web_update: starting")
-            if script_path and os.path.isfile(script_path) and os.access(script_path, os.X_OK):
+            if (
+                script_path
+                and os.path.isfile(script_path)
+                and os.access(script_path, os.X_OK)
+            ):
                 # Do not run the real script unless explicitly enabled
-                allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in ("1", "true", "yes")
+                allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in (
+                    "1",
+                    "true",
+                    "yes",
+                )
                 if allow_real:
                     proc = subprocess.Popen(
                         ["/bin/bash", script_path],
@@ -409,7 +416,9 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
                     if rc == 0:
                         _log_and_publish("web_update: completed successfully")
                     else:
-                        _log_and_publish(f"web_update: failed with return code {rc}", "error")
+                        _log_and_publish(
+                            f"web_update: failed with return code {rc}", "error"
+                        )
                 else:
                     # Simulated update to avoid privileged operations in development and tests
                     for msg in [
@@ -438,7 +447,11 @@ def _start_update_fallback_thread(script_path: str | None) -> None:
 
 # --- Version check via GitHub Releases API ---
 _GITHUB_REPO = os.getenv("INKYPI_GITHUB_REPO", "jtn0123/InkyPi")
-_VERSION_CACHE: dict[str, object] = {"latest": None, "checked_at": 0.0, "release_notes": None}
+_VERSION_CACHE: dict[str, object] = {
+    "latest": None,
+    "checked_at": 0.0,
+    "release_notes": None,
+}
 _VERSION_CACHE_TTL = 3600  # 1 hour
 
 
@@ -453,7 +466,10 @@ def _semver_gt(a: str, b: str) -> bool:
 def _check_latest_version() -> str | None:
     """Fetch the latest release tag from the GitHub Releases API. Returns None on failure."""
     now = time.time()
-    if _VERSION_CACHE["latest"] and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL:
+    if (
+        _VERSION_CACHE["latest"]
+        and (now - float(_VERSION_CACHE["checked_at"] or 0)) < _VERSION_CACHE_TTL
+    ):
         return _VERSION_CACHE["latest"]  # type: ignore[return-value]
     try:
         resp = _requests.get(
@@ -476,18 +492,37 @@ def _check_latest_version() -> str | None:
 
 
 # Import allowlists for settings import
-_ALLOWED_IMPORT_CONFIG_KEYS = frozenset({
-    "name", "resolution", "orientation", "timezone", "color_mode",
-    "playlist_config", "refresh_info", "plugins",
-    "plugin_cycle_interval_seconds", "time_format", "image_settings",
-    "display_type", "preview_size_mode", "saved_settings",
-    "inverted_image", "log_system_stats",
-})
+_ALLOWED_IMPORT_CONFIG_KEYS = frozenset(
+    {
+        "name",
+        "resolution",
+        "orientation",
+        "timezone",
+        "color_mode",
+        "playlist_config",
+        "refresh_info",
+        "plugins",
+        "plugin_cycle_interval_seconds",
+        "time_format",
+        "image_settings",
+        "display_type",
+        "preview_size_mode",
+        "saved_settings",
+        "inverted_image",
+        "log_system_stats",
+    }
+)
 
-_ALLOWED_IMPORT_ENV_KEYS = frozenset({
-    "OPEN_AI_SECRET", "OPEN_WEATHER_MAP_SECRET", "NASA_SECRET",
-    "UNSPLASH_ACCESS_KEY", "GITHUB_SECRET", "GOOGLE_AI_SECRET",
-})
+_ALLOWED_IMPORT_ENV_KEYS = frozenset(
+    {
+        "OPEN_AI_SECRET",
+        "OPEN_WEATHER_MAP_SECRET",
+        "NASA_SECRET",
+        "UNSPLASH_ACCESS_KEY",
+        "GITHUB_SECRET",
+        "GOOGLE_AI_SECRET",
+    }
+)
 
 # Shutdown rate limiting
 _last_shutdown_time: float = 0.0
@@ -499,7 +534,7 @@ _shutdown_lock = threading.Lock()
 # Route handlers are split into sub-modules for maintainability.
 # Import them here so they register their routes on settings_bp.
 # ---------------------------------------------------------------------------
-from . import _updates, _benchmarks, _health, _logs, _system, _config  # noqa: E402,F401
+from . import _benchmarks, _config, _health, _logs, _system, _updates  # noqa: E402,F401
 
 __all__ = ["settings_bp"]
 

@@ -34,7 +34,6 @@ def test_display_continue_on_save_failures(monkeypatch, device_config_dev):
         dm.display_image(img, image_settings=[])
     except Exception as e:
         # Should not raise due to save failures
-        raise AssertionError(f"display_image should tolerate save failures: {e}")
+        raise AssertionError(f"display_image should tolerate save failures: {e}") from e
 
     assert called["render"] == 1
-

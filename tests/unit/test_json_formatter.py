@@ -26,7 +26,13 @@ def test_json_formatter_basic():
 
 def test_json_formatter_includes_extras():
     record = logging.LogRecord(
-        name="t", level=logging.WARNING, pathname=__file__, lineno=1, msg="X", args=(), exc_info=None
+        name="t",
+        level=logging.WARNING,
+        pathname=__file__,
+        lineno=1,
+        msg="X",
+        args=(),
+        exc_info=None,
     )
     record.request_id = "abc123"
     out = JsonFormatter().format(record)
@@ -45,7 +51,15 @@ def test_json_format_basic_fields():
         exc_info=None,
     )
     data = json.loads(JsonFormatter().format(record))
-    for key in ("timestamp", "level", "logger", "message", "module", "function", "line"):
+    for key in (
+        "timestamp",
+        "level",
+        "logger",
+        "message",
+        "module",
+        "function",
+        "line",
+    ):
         assert key in data, f"Expected key '{key}' missing from output"
     assert data["level"] == "DEBUG"
     assert data["logger"] == "myapp.module"
@@ -58,10 +72,17 @@ def test_json_format_exception_info():
         raise ValueError("boom")
     except ValueError:
         import sys
+
         exc = sys.exc_info()
 
     record = logging.LogRecord(
-        name="t", level=logging.ERROR, pathname=__file__, lineno=1, msg="error", args=(), exc_info=exc
+        name="t",
+        level=logging.ERROR,
+        pathname=__file__,
+        lineno=1,
+        msg="error",
+        args=(),
+        exc_info=exc,
     )
     data = json.loads(JsonFormatter().format(record))
     assert "exc_info" in data
@@ -70,7 +91,13 @@ def test_json_format_exception_info():
 
 def test_json_format_extra_fields():
     record = logging.LogRecord(
-        name="t", level=logging.INFO, pathname=__file__, lineno=1, msg="msg", args=(), exc_info=None
+        name="t",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="msg",
+        args=(),
+        exc_info=None,
     )
     record.trace_id = "xyz-789"
     record.user_id = 42
@@ -82,7 +109,13 @@ def test_json_format_extra_fields():
 def test_json_format_default_fields():
     formatter = JsonFormatter(default_fields={"app": "inkypi", "env": "test"})
     record = logging.LogRecord(
-        name="t", level=logging.INFO, pathname=__file__, lineno=1, msg="hi", args=(), exc_info=None
+        name="t",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hi",
+        args=(),
+        exc_info=None,
     )
     data = json.loads(formatter.format(record))
     assert data["app"] == "inkypi"
@@ -95,11 +128,16 @@ def test_stringify_fallback():
             return "<Unserializable>"
 
     record = logging.LogRecord(
-        name="t", level=logging.INFO, pathname=__file__, lineno=1, msg="msg", args=(), exc_info=None
+        name="t",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="msg",
+        args=(),
+        exc_info=None,
     )
     record.bad_field = Unserializable()
     # Should not raise; the non-serializable object is coerced via _stringify
     out = JsonFormatter().format(record)
     data = json.loads(out)
     assert "bad_field" in data["extra"]
-

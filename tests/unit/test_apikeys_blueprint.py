@@ -1,12 +1,11 @@
 # pyright: reportMissingImports=false
 """Tests for blueprints/apikeys.py."""
 import os
+from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-
 # ---- Helper functions ----
+
 
 def test_parse_env_file_nonexistent(tmp_path):
     from blueprints.apikeys import parse_env_file
@@ -28,7 +27,9 @@ def test_parse_env_file_valid(tmp_path):
 def test_parse_env_file_error(tmp_path):
     from blueprints.apikeys import parse_env_file
 
-    with patch("blueprints.apikeys.dotenv_values", side_effect=Exception("parse error")):
+    with patch(
+        "blueprints.apikeys.dotenv_values", side_effect=Exception("parse error")
+    ):
         result = parse_env_file(str(tmp_path / ".env"))
     assert result == []
 
@@ -39,7 +40,7 @@ def test_write_env_file_basic(tmp_path):
     env_path = str(tmp_path / ".env")
     result = write_env_file(env_path, [("API_KEY", "abc123"), ("SECRET", "xyz")])
     assert result is True
-    content = open(env_path).read()
+    content = Path(env_path).read_text()
     assert "API_KEY=abc123" in content
     assert "SECRET=xyz" in content
 
@@ -50,18 +51,18 @@ def test_write_env_file_quoted_values(tmp_path):
     env_path = str(tmp_path / ".env")
     result = write_env_file(env_path, [("KEY", "has spaces")])
     assert result is True
-    content = open(env_path).read()
+    content = Path(env_path).read_text()
     assert 'KEY="has spaces"' in content
 
 
 def test_write_env_file_value_with_double_quote(tmp_path):
     """Bug 7: Values with double-quotes should be escaped, not corrupt the file."""
-    from blueprints.apikeys import write_env_file, parse_env_file
+    from blueprints.apikeys import parse_env_file, write_env_file
 
     env_path = str(tmp_path / ".env")
     result = write_env_file(env_path, [("KEY", 'value"with"quotes')])
     assert result is True
-    content = open(env_path).read()
+    content = Path(env_path).read_text()
     # The value should be quoted and internal quotes escaped
     assert '\\"' in content
     # Verify it round-trips correctly
@@ -117,9 +118,10 @@ def test_get_env_path_default(monkeypatch):
 
 # ---- Route tests ----
 
+
 def test_apikeys_page_renders(client, tmp_path, monkeypatch):
     env_path = str(tmp_path / ".env")
-    open(env_path, "w").write("TEST_KEY=hidden\n")
+    Path(env_path).write_text("TEST_KEY=hidden\n")
     monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: env_path)
 
     resp = client.get("/api-keys")
@@ -139,7 +141,9 @@ def test_save_apikeys_success(client, tmp_path, monkeypatch):
 
 
 def test_save_apikeys_invalid_json(client):
-    resp = client.post("/api-keys/save", data="not json", content_type="application/json")
+    resp = client.post(
+        "/api-keys/save", data="not json", content_type="application/json"
+    )
     assert resp.status_code == 400
 
 
@@ -161,7 +165,7 @@ def test_save_apikeys_invalid_key_format(client, tmp_path, monkeypatch):
 
 def test_save_apikeys_keep_existing(client, tmp_path, monkeypatch):
     env_path = str(tmp_path / ".env")
-    open(env_path, "w").write("EXISTING=secret_val\n")
+    Path(env_path).write_text("EXISTING=secret_val\n")
     monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: env_path)
 
     resp = client.post(
@@ -169,7 +173,7 @@ def test_save_apikeys_keep_existing(client, tmp_path, monkeypatch):
         json={"entries": [{"key": "EXISTING", "keepExisting": True}]},
     )
     assert resp.status_code == 200
-    content = open(env_path).read()
+    content = Path(env_path).read_text()
     assert "secret_val" in content
 
 

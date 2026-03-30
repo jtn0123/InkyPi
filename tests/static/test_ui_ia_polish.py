@@ -8,9 +8,10 @@ _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 
 def _read_all_css() -> str:
     """Concatenate all CSS partials referenced by main.css."""
-    parts = []
-    for p in sorted(_STYLES_DIR.glob("partials/_*.css")):
-        parts.append(p.read_text(encoding="utf-8"))
+    parts = [
+        p.read_text(encoding="utf-8")
+        for p in sorted(_STYLES_DIR.glob("partials/_*.css"))
+    ]
     return "\n".join(parts)
 
 

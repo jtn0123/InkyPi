@@ -2,7 +2,6 @@
 
 import pytest
 from PIL import Image
-from io import BytesIO
 
 
 def test_resize_image_with_extreme_aspect_ratio(device_config_dev):
@@ -44,11 +43,7 @@ def test_apply_image_enhancement_with_extreme_values():
     img = Image.new("RGB", (100, 100), color="gray")
 
     # Test with very high values (should be clamped or handled)
-    settings = {
-        "brightness": 100,
-        "contrast": 100,
-        "sharpness": 100
-    }
+    settings = {"brightness": 100, "contrast": 100, "sharpness": 100}
 
     result = apply_image_enhancement(img, settings)
 
@@ -63,11 +58,7 @@ def test_apply_image_enhancement_with_zero_values():
 
     img = Image.new("RGB", (100, 100), color="gray")
 
-    settings = {
-        "brightness": 0,
-        "contrast": 0,
-        "sharpness": 0
-    }
+    settings = {"brightness": 0, "contrast": 0, "sharpness": 0}
 
     result = apply_image_enhancement(img, settings)
 

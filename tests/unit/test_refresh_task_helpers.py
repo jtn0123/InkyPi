@@ -58,7 +58,9 @@ def test_select_refresh_action_playlist(device_config_dev, monkeypatch):
     def fake_determine(self, pm, latest, current_dt):
         return fake_playlist, fake_plugin
 
-    monkeypatch.setattr(task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask))
+    monkeypatch.setattr(
+        task, "_determine_next_plugin", fake_determine.__get__(task, RefreshTask)
+    )
     action, request_id = task._select_refresh_action(
         None, None, task._get_current_datetime(), None
     )
@@ -87,8 +89,8 @@ def test_select_refresh_action_manual(device_config_dev):
 
 def test_perform_refresh_skips_when_cached(device_config_dev, monkeypatch):
     from display.display_manager import DisplayManager
-    from refresh_task import ManualRefresh, RefreshTask
     from model import RefreshInfo
+    from refresh_task import ManualRefresh, RefreshTask
 
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)

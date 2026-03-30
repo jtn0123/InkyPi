@@ -197,7 +197,7 @@ class Config:
                 f"Unable to locate or create a device configuration file. Checked: "
                 f"env INKYPI_CONFIG_FILE, class override, {prod_path}, {dev_path}. "
                 f"Also attempted bootstrap from {template_path} and failed: {ex}"
-            )
+            ) from ex
 
     def read_config(self):
         """Reads the device config JSON file and returns it as a dictionary."""
@@ -286,19 +286,21 @@ class Config:
 
     def get_plugins(self):
         """Returns the list of plugin configurations, sorted by custom order if set."""
-        plugin_order = self.config.get('plugin_order', [])
+        plugin_order = self.config.get("plugin_order", [])
 
         if not plugin_order:
             return self.plugins_list
 
         # Create a dict for quick lookup
-        plugins_dict = {p['id']: p for p in self.plugins_list}
+        plugins_dict = {p["id"]: p for p in self.plugins_list}
 
         # Build ordered list
         ordered = []
         for plugin_id in plugin_order:
             if not isinstance(plugin_id, str):
-                logger.warning("Skipping invalid plugin_order entry (non-string): %r", plugin_id)
+                logger.warning(
+                    "Skipping invalid plugin_order entry (non-string): %r", plugin_id
+                )
                 continue
             if plugin_id in plugins_dict:
                 ordered.append(plugins_dict.pop(plugin_id))
@@ -310,7 +312,7 @@ class Config:
 
     def set_plugin_order(self, order):
         """Sets the custom plugin display order."""
-        self.update_value('plugin_order', order, write=True)
+        self.update_value("plugin_order", order, write=True)
 
     def get_plugin(self, plugin_id):
         """Finds and returns a plugin config by its ID."""

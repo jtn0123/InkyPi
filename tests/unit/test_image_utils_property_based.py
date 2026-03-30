@@ -7,8 +7,7 @@ a wide range of inputs, catching edge cases that unit tests might miss.
 from io import BytesIO
 
 import pytest
-from hypothesis import assume, given, settings
-from hypothesis import strategies as st
+from hypothesis import assume, given, settings, strategies as st
 from PIL import Image
 
 from utils.image_utils import (
@@ -16,7 +15,6 @@ from utils.image_utils import (
     change_orientation,
     compute_image_hash,
     load_image_from_bytes,
-    load_image_from_path,
     resize_image,
 )
 
@@ -85,9 +83,7 @@ def test_resize_preserves_aspect_ratio_with_crop(img):
     resized = resize_image(img, target_size)
 
     # Result should exactly match target dimensions
-    assert resized.size == target_size, (
-        f"Expected {target_size}, got {resized.size}"
-    )
+    assert resized.size == target_size, f"Expected {target_size}, got {resized.size}"
 
 
 @given(pil_image(), image_dimensions(min_size=10, max_size=800))

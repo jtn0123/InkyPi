@@ -1,9 +1,9 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
-import blueprints.settings as _mod
-
 import pytz
 from flask import current_app, jsonify, render_template, request
+
+import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
 from utils.time_utils import calculate_seconds
 
@@ -33,7 +33,9 @@ def plugin_isolation():
     if request.method == "POST":
         if plugin_id not in isolated:
             isolated.append(plugin_id)
-            device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
+            device_config.update_value(
+                "isolated_plugins", sorted(set(isolated)), write=True
+            )
         return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
 
     # DELETE
@@ -149,7 +151,9 @@ def import_settings():
         cfg = payload.get("config")
         if isinstance(cfg, dict):
             # Filter to allowed keys only
-            filtered_cfg = {k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS}
+            filtered_cfg = {
+                k: v for k, v in cfg.items() if k in _mod._ALLOWED_IMPORT_CONFIG_KEYS
+            }
             device_config.update_config(filtered_cfg)
 
         env_keys = payload.get("env_keys") or {}
@@ -334,7 +338,9 @@ def save_settings():
             "preview_size_mode": form_data.get("previewSizeMode", "native"),
         }
         if "inky_saturation" in form_data:
-            settings["image_settings"]["inky_saturation"] = float(form_data.get("inky_saturation", "0.5"))
+            settings["image_settings"]["inky_saturation"] = float(
+                form_data.get("inky_saturation", "0.5")
+            )
         device_config.update_config(settings)
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:
@@ -342,7 +348,9 @@ def save_settings():
             refresh_task = current_app.config["REFRESH_TASK"]
             refresh_task.signal_config_change()
     except RuntimeError:
-        return json_error("An internal error occurred", status=500, code="internal_error")
+        return json_error(
+            "An internal error occurred", status=500, code="internal_error"
+        )
     except Exception:
         _mod.logger.exception("Error saving device settings")
         return json_internal_error(

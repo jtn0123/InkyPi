@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 import requests_mock
 
-from utils.http_utils import http_get, _reset_shared_session_for_tests
-from utils.http_cache import get_cache, _reset_cache_for_tests
+from utils.http_cache import _reset_cache_for_tests, get_cache
+from utils.http_utils import _reset_shared_session_for_tests, http_get
 
 
 @pytest.fixture(autouse=True)
@@ -54,15 +54,15 @@ def test_http_get_cache_respects_params():
         m.get(url, text="result1")
 
         # Request with params1
-        resp1 = http_get(url, params={"q": "python"})
+        http_get(url, params={"q": "python"})
         assert m.call_count == 1
 
         # Request with same params - should hit cache
-        resp2 = http_get(url, params={"q": "python"})
+        http_get(url, params={"q": "python"})
         assert m.call_count == 1
 
         # Request with different params - should miss cache
-        resp3 = http_get(url, params={"q": "rust"})
+        http_get(url, params={"q": "rust"})
         assert m.call_count == 2
 
 
@@ -73,15 +73,15 @@ def test_http_get_cache_bypass():
         m.get(url, text="data")
 
         # First request with cache
-        resp1 = http_get(url, use_cache=True)
+        http_get(url, use_cache=True)
         assert m.call_count == 1
 
         # Second request bypassing cache
-        resp2 = http_get(url, use_cache=False)
+        http_get(url, use_cache=False)
         assert m.call_count == 2  # Should make a new request
 
         # Third request with cache - should still hit cache from first request
-        resp3 = http_get(url, use_cache=True)
+        http_get(url, use_cache=True)
         assert m.call_count == 2  # No new request
 
 
@@ -95,18 +95,18 @@ def test_http_get_custom_cache_ttl():
             m.get(url, text="data")
 
             # Request with short TTL
-            resp1 = http_get(url, cache_ttl=0.1)
+            http_get(url, cache_ttl=0.1)
             assert m.call_count == 1
 
             # Immediate second request - should hit cache
-            resp2 = http_get(url)
+            http_get(url)
             assert m.call_count == 1
 
             # Advance time past TTL expiration
             mock_time.time.return_value = 1000.2
 
             # Third request - cache expired, should make new request
-            resp3 = http_get(url)
+            http_get(url)
             assert m.call_count == 2
 
 
@@ -117,11 +117,11 @@ def test_http_get_streaming_bypasses_cache():
         m.get(url, text="streaming data")
 
         # Streaming request
-        resp1 = http_get(url, stream=True)
+        http_get(url, stream=True)
         assert m.call_count == 1
 
         # Second streaming request - should not use cache
-        resp2 = http_get(url, stream=True)
+        http_get(url, stream=True)
         assert m.call_count == 2
 
         # Verify cache is empty
@@ -160,7 +160,7 @@ def test_http_get_cache_control_headers():
             headers={"Cache-Control": "max-age=3600"},
         )
 
-        resp1 = http_get(url1)
+        http_get(url1)
         cache = get_cache()
         cache_key = cache._make_cache_key(url1)
         entry = cache._cache[cache_key]
@@ -174,7 +174,7 @@ def test_http_get_cache_control_headers():
             headers={"Cache-Control": "no-cache"},
         )
 
-        resp2 = http_get(url2)
+        http_get(url2)
         cache_key2 = cache._make_cache_key(url2)
         assert cache_key2 not in cache._cache  # Should not be cached
 
@@ -308,5 +308,5 @@ def test_http_get_real_world_weather_api_pattern():
 
         # Request with different location - should miss cache
         params2 = {"lat": "34.0", "lon": "-118.2", "appid": "test"}
-        resp3 = http_get(weather_url, params=params2)
+        http_get(weather_url, params=params2)
         assert m.call_count == 2  # New request for different location

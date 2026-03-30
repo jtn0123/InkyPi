@@ -5,9 +5,9 @@ import time
 from datetime import datetime, timedelta
 from typing import Any
 
-import blueprints.settings as _mod
-
 from flask import Response, current_app, jsonify, request, stream_with_context
+
+import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
 from utils.progress_events import get_progress_bus, to_sse
 

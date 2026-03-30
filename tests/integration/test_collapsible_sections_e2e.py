@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
 
 pytestmark = pytest.mark.skipif(

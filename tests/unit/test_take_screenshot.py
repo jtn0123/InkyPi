@@ -122,9 +122,7 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
         if p == "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome":
             return True
         # Also return True for the temporary screenshot file
-        if p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p):
-            return True
-        return False
+        return bool(p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p))
 
     monkeypatch.setattr("utils.image_utils.os.path.exists", mock_exists)
     monkeypatch.setattr("utils.image_utils.os.remove", lambda p: None)
@@ -166,16 +164,16 @@ def test_take_screenshot_browser_fallback_to_chromium(monkeypatch):
 
     def mock_exists(p):
         # Return True for temporary screenshot files
-        if p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p):
-            return True
-        return False
+        return bool(p and p.endswith(".png") and ("/tmp/" in p or "/T/" in p))
 
     monkeypatch.setattr("utils.image_utils.subprocess.run", fake_run)
     monkeypatch.setattr("utils.image_utils.os.path.exists", mock_exists)
     monkeypatch.setattr("utils.image_utils.os.remove", lambda p: None)
     monkeypatch.setattr(
         "utils.image_utils.shutil.which",
-        lambda b: b if b in ["chromium", "chromium-headless-shell", "google-chrome"] else None,
+        lambda b: (
+            b if b in ["chromium", "chromium-headless-shell", "google-chrome"] else None
+        ),
     )
 
     class _Ctx:

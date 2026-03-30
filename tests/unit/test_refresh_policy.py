@@ -1,4 +1,3 @@
-import os
 import time
 from pathlib import Path
 
@@ -6,7 +5,7 @@ import pytest
 from PIL import Image
 
 from display.display_manager import DisplayManager
-from refresh_task import RefreshTask, ManualRefresh
+from refresh_task import ManualRefresh, RefreshTask
 
 
 class SlowPlugin:
@@ -38,7 +37,11 @@ class FileBackedFlakyPlugin:
 
     def generate_image(self, settings, device_config):
         counter_path = Path(self.cfg["counter_path"])
-        calls = int(counter_path.read_text(encoding="utf-8")) if counter_path.exists() else 0
+        calls = (
+            int(counter_path.read_text(encoding="utf-8"))
+            if counter_path.exists()
+            else 0
+        )
         calls += 1
         counter_path.write_text(str(calls), encoding="utf-8")
         if calls == 1:
@@ -53,8 +56,12 @@ def test_plugin_timeout_policy(device_config_dev, monkeypatch):
     monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S", "0.05")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
-    monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: {"id": "slow", "class": "Slow"})
-    monkeypatch.setattr("refresh_task.get_plugin_instance", lambda cfg: SlowPlugin(), raising=True)
+    monkeypatch.setattr(
+        device_config_dev, "get_plugin", lambda pid: {"id": "slow", "class": "Slow"}
+    )
+    monkeypatch.setattr(
+        "refresh_task.get_plugin_instance", lambda cfg: SlowPlugin(), raising=True
+    )
 
     task.start()
     try:
@@ -76,7 +83,11 @@ def test_plugin_retry_policy(device_config_dev, monkeypatch, tmp_path):
     monkeypatch.setattr(
         device_config_dev,
         "get_plugin",
-        lambda pid: {"id": "flaky", "class": "Flaky", "counter_path": str(counter_path)},
+        lambda pid: {
+            "id": "flaky",
+            "class": "Flaky",
+            "counter_path": str(counter_path),
+        },
     )
     monkeypatch.setattr(
         "refresh_task.get_plugin_instance",

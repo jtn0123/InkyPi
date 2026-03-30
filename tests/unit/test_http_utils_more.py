@@ -30,4 +30,3 @@ def test_http_client_headers_and_ssl_verify(monkeypatch):
     assert hdrs.get("X-Test") == "1"
     # By default requests uses verify=True; our wrapper should not disable it
     assert captured["verify"] is None
-

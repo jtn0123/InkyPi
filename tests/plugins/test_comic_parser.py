@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from plugins.comic.comic_parser import (
     COMICS,
@@ -46,7 +47,9 @@ def _make_mock_feed(description, title):
 
 
 def test_get_panel_xkcd():
-    description = '<img src="https://imgs.xkcd.com/comics/test.png" alt="Alt text here" />'
+    description = (
+        '<img src="https://imgs.xkcd.com/comics/test.png" alt="Alt text here" />'
+    )
     mock_feed = _make_mock_feed(description, "XKCD Title")
 
     with patch("plugins.comic.comic_parser.feedparser") as mock_feedparser:

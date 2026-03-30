@@ -16,7 +16,9 @@ def test_history_page_ignores_truncated_sidecar_json(client, device_config_dev):
     assert response.status_code == 200
 
 
-def test_preview_falls_back_to_current_image_when_processed_missing(client, device_config_dev):
+def test_preview_falls_back_to_current_image_when_processed_missing(
+    client, device_config_dev
+):
     current_path = device_config_dev.current_image_file
     processed_path = device_config_dev.processed_image_file
 

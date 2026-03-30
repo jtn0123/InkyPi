@@ -14,7 +14,9 @@ def main():
     from config import Config
 
     cfg = Config()
-    db_path = cfg.get_config("benchmarks_db_path", default=os.path.join(cfg.BASE_DIR, "benchmarks.db"))
+    db_path = cfg.get_config(
+        "benchmarks_db_path", default=os.path.join(cfg.BASE_DIR, "benchmarks.db")
+    )
     if not os.path.exists(db_path):
         print("No benchmarks database found at:", db_path)
         return 0
@@ -40,7 +42,9 @@ def main():
         fh.write("## InkyPi Benchmarks Report\n\n")
         fh.write(f"Generated: {datetime.utcnow().isoformat()}Z\n\n")
         fh.write("### Recent refreshes (latest 50)\n\n")
-        fh.write("| ts | plugin | instance | playlist | cached | req(ms) | gen(ms) | pre(ms) | disp(ms) | cpu% | mem% |\n")
+        fh.write(
+            "| ts | plugin | instance | playlist | cached | req(ms) | gen(ms) | pre(ms) | disp(ms) | cpu% | mem% |\n"
+        )
         fh.write("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|\n")
         for r in rows:
             (_rid, ts, plugin, inst, pl, cached, req, gen, pre, disp, cpu, mem) = r
@@ -71,5 +75,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

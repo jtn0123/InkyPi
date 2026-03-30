@@ -1,8 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for progressive disclosure JavaScript functionality."""
 
-import pytest
-
 
 def test_progressive_disclosure_script_exists(client):
     """Test that progressive disclosure script is accessible."""

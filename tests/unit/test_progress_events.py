@@ -7,7 +7,6 @@ import time
 
 from utils.progress_events import ProgressEventBus, get_progress_bus, to_sse
 
-
 # ---- publish() ----
 
 
@@ -141,15 +140,15 @@ def test_to_sse_formats_event_type_and_data():
     assert "data: " in output
     assert output.endswith("\n\n")
     # Parse the data line
-    data_line = [l for l in output.split("\n") if l.startswith("data:")][0]
-    data_json = json.loads(data_line[len("data: "):])
+    data_line = [line for line in output.split("\n") if line.startswith("data:")][0]
+    data_json = json.loads(data_line[len("data: ") :])
     assert data_json["seq"] == 1
     assert data_json["msg"] == "hi"
 
 
 def test_to_sse_uses_compact_json():
     output = to_sse("test", {"a": 1, "b": 2})
-    data_line = [l for l in output.split("\n") if l.startswith("data:")][0]
+    data_line = [line for line in output.split("\n") if line.startswith("data:")][0]
     # Compact separators: no spaces after , or :
     assert '" :' not in data_line
     assert '", ' not in data_line

@@ -13,8 +13,7 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
-from plugins.weather import weather_api
-from plugins.weather import weather_data as _wd
+from plugins.weather import weather_api, weather_data as _wd
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +58,10 @@ class Weather(BasePlugin):
                             option("locationTimeZone", "Use Location Time Zone"),
                             option("localTimeZone", "Use Local Time Zone"),
                         ],
-                        visible_if={"field": "weatherProvider", "equals": "OpenWeatherMap"},
+                        visible_if={
+                            "field": "weatherProvider",
+                            "equals": "OpenWeatherMap",
+                        },
                     ),
                 ),
             ),
@@ -75,7 +77,10 @@ class Weather(BasePlugin):
                             option("location", "Location"),
                             option("custom", "Custom"),
                         ],
-                        visible_if={"field": "weatherProvider", "equals": "OpenWeatherMap"},
+                        visible_if={
+                            "field": "weatherProvider",
+                            "equals": "OpenWeatherMap",
+                        },
                     ),
                     field(
                         "customTitle",
@@ -88,16 +93,58 @@ class Weather(BasePlugin):
             section(
                 "Display",
                 row(
-                    field("displayRefreshTime", "checkbox", label="Refresh Time", submit_unchecked=True, checked_value="true", unchecked_value="false"),
-                    field("displayMetrics", "checkbox", label="Metrics", submit_unchecked=True, checked_value="true", unchecked_value="false"),
-                    field("displayGraph", "checkbox", label="Weather Graph", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "displayRefreshTime",
+                        "checkbox",
+                        label="Refresh Time",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
+                    field(
+                        "displayMetrics",
+                        "checkbox",
+                        label="Metrics",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
+                    field(
+                        "displayGraph",
+                        "checkbox",
+                        label="Weather Graph",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
                 ),
                 row(
-                    field("displayRain", "checkbox", label="Rain Amount", submit_unchecked=True, checked_value="true", unchecked_value="false"),
-                    field("moonPhase", "checkbox", label="Moon Phase", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "displayRain",
+                        "checkbox",
+                        label="Rain Amount",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
+                    field(
+                        "moonPhase",
+                        "checkbox",
+                        label="Moon Phase",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
                 ),
                 row(
-                    field("displayGraphIcons", "checkbox", label="Graph Icons", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "displayGraphIcons",
+                        "checkbox",
+                        label="Graph Icons",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
                     field(
                         "graphIconStep",
                         "select",
@@ -114,7 +161,14 @@ class Weather(BasePlugin):
                     ),
                 ),
                 row(
-                    field("displayForecast", "checkbox", label="Forecast", submit_unchecked=True, checked_value="true", unchecked_value="false"),
+                    field(
+                        "displayForecast",
+                        "checkbox",
+                        label="Forecast",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                    ),
                     field(
                         "forecastDays",
                         "select",
@@ -139,37 +193,39 @@ class Weather(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "OpenWeatherMap",
-            "expected_key": "OPEN_WEATHER_MAP_SECRET"
+            "expected_key": "OPEN_WEATHER_MAP_SECRET",
         }
-        template_params['style_settings'] = True
+        template_params["style_settings"] = True
         return template_params
 
     def generate_image(self, settings, device_config):
-        lat_str = settings.get('latitude')
-        long_str = settings.get('longitude')
+        lat_str = settings.get("latitude")
+        long_str = settings.get("longitude")
         if not lat_str or not long_str:
             raise RuntimeError("Latitude and longitude are required.")
         try:
             lat = float(lat_str)
             long = float(long_str)
         except (ValueError, TypeError):
-            raise RuntimeError("Latitude and longitude must be valid numbers.")
+            raise RuntimeError(
+                "Latitude and longitude must be valid numbers."
+            ) from None
 
-        units = settings.get('units')
-        if not units or units not in ['metric', 'imperial', 'standard']:
+        units = settings.get("units")
+        if not units or units not in ["metric", "imperial", "standard"]:
             raise RuntimeError("Units are required.")
 
-        weather_provider = settings.get('weatherProvider', 'OpenWeatherMap')
-        title = settings.get('customTitle', '')
+        weather_provider = settings.get("weatherProvider", "OpenWeatherMap")
+        title = settings.get("customTitle", "")
 
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
         tz = pytz.timezone(timezone)
-        timeout = self._request_timeout()
-        plugin_dir = self.get_plugin_dir()
+        self._request_timeout()
+        self.get_plugin_dir()
 
         try:
             if weather_provider == "OpenWeatherMap":
@@ -179,29 +235,42 @@ class Weather(BasePlugin):
                     raise RuntimeError("OpenWeatherMap API Key not configured.")
                 weather_data = self.get_weather_data(api_key, units, lat, long)
                 aqi_data = self.get_air_quality(api_key, lat, long)
-                if settings.get('titleSelection', 'location') == 'location':
+                if settings.get("titleSelection", "location") == "location":
                     title = self.get_location(api_key, lat, long)
-                if settings.get('weatherTimeZone', 'locationTimeZone') == 'locationTimeZone':
+                if (
+                    settings.get("weatherTimeZone", "locationTimeZone")
+                    == "locationTimeZone"
+                ):
                     logger.info("Using location timezone for OpenWeatherMap data.")
                     wtz = self.parse_timezone(weather_data)
-                    template_params = self.parse_weather_data(weather_data, aqi_data, wtz, units, time_format, lat)
+                    template_params = self.parse_weather_data(
+                        weather_data, aqi_data, wtz, units, time_format, lat
+                    )
                 else:
                     logger.info("Using configured timezone for OpenWeatherMap data.")
-                    template_params = self.parse_weather_data(weather_data, aqi_data, tz, units, time_format, lat)
+                    template_params = self.parse_weather_data(
+                        weather_data, aqi_data, tz, units, time_format, lat
+                    )
             elif weather_provider == "OpenMeteo":
                 forecast_days = 7
-                weather_data = self.get_open_meteo_data(lat, long, units, forecast_days + 1)
+                weather_data = self.get_open_meteo_data(
+                    lat, long, units, forecast_days + 1
+                )
                 aqi_data = self.get_open_meteo_air_quality(lat, long)
-                template_params = self.parse_open_meteo_data(weather_data, aqi_data, tz, units, time_format, lat)
+                template_params = self.parse_open_meteo_data(
+                    weather_data, aqi_data, tz, units, time_format, lat
+                )
             else:
                 raise RuntimeError(f"Unknown weather provider: {weather_provider}")
 
-            template_params['title'] = title
+            template_params["title"] = title
         except RuntimeError:
             raise
         except Exception as e:
             logger.error(f"{weather_provider} request failed: {str(e)}")
-            raise RuntimeError(f"{weather_provider} request failure, please check logs.")
+            raise RuntimeError(
+                f"{weather_provider} request failure, please check logs."
+            ) from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 
@@ -215,7 +284,9 @@ class Weather(BasePlugin):
             last_refresh_time = now.strftime("%Y-%m-%d %I:%M %p")
         template_params["last_refresh_time"] = last_refresh_time
 
-        image = self.render_image(dimensions, "weather.html", "weather.css", template_params)
+        image = self.render_image(
+            dimensions, "weather.html", "weather.css", template_params
+        )
 
         if not image:
             raise RuntimeError("Failed to take screenshot, please check logs.")
@@ -223,7 +294,9 @@ class Weather(BasePlugin):
 
     # Delegate methods — keep backward compatibility for tests and external callers
     def get_weather_data(self, api_key, units, lat, long):
-        return weather_api.get_weather_data(api_key, units, lat, long, self._request_timeout())
+        return weather_api.get_weather_data(
+            api_key, units, lat, long, self._request_timeout()
+        )
 
     def get_air_quality(self, api_key, lat, long):
         return weather_api.get_air_quality(api_key, lat, long, self._request_timeout())
@@ -232,10 +305,14 @@ class Weather(BasePlugin):
         return weather_api.get_location(api_key, lat, long, self._request_timeout())
 
     def get_open_meteo_data(self, lat, long, units, forecast_days):
-        return weather_api.get_open_meteo_data(lat, long, units, forecast_days, self._request_timeout())
+        return weather_api.get_open_meteo_data(
+            lat, long, units, forecast_days, self._request_timeout()
+        )
 
     def get_open_meteo_air_quality(self, lat, long):
-        return weather_api.get_open_meteo_air_quality(lat, long, self._request_timeout())
+        return weather_api.get_open_meteo_air_quality(
+            lat, long, self._request_timeout()
+        )
 
     def format_time(self, dt, time_format, hour_only=False, include_am_pm=True):
         return _wd.format_time(dt, time_format, hour_only, include_am_pm)
@@ -253,10 +330,14 @@ class Weather(BasePlugin):
         return _wd.get_moon_phase_icon_path(phase_name, lat, self.get_plugin_dir())
 
     def parse_forecast(self, daily_forecast, tz, current_suffix, lat):
-        return _wd.parse_forecast(daily_forecast, tz, current_suffix, lat, self.get_plugin_dir())
+        return _wd.parse_forecast(
+            daily_forecast, tz, current_suffix, lat, self.get_plugin_dir()
+        )
 
     def parse_open_meteo_forecast(self, daily_data, tz, is_day, lat):
-        return _wd.parse_open_meteo_forecast(daily_data, tz, is_day, lat, self.get_plugin_dir())
+        return _wd.parse_open_meteo_forecast(
+            daily_data, tz, is_day, lat, self.get_plugin_dir()
+        )
 
     def parse_hourly(self, hourly_forecast, tz, time_format, units):
         return _wd.parse_hourly(hourly_forecast, tz, time_format, units)
@@ -265,13 +346,25 @@ class Weather(BasePlugin):
         return _wd.parse_open_meteo_hourly(hourly_data, tz, time_format)
 
     def parse_data_points(self, weather, air_quality, tz, units, time_format):
-        return _wd.parse_data_points(weather, air_quality, tz, units, time_format, self.get_plugin_dir())
+        return _wd.parse_data_points(
+            weather, air_quality, tz, units, time_format, self.get_plugin_dir()
+        )
 
-    def parse_open_meteo_data_points(self, weather_data, aqi_data, tz, units, time_format):
-        return _wd.parse_open_meteo_data_points(weather_data, aqi_data, tz, units, time_format, self.get_plugin_dir())
+    def parse_open_meteo_data_points(
+        self, weather_data, aqi_data, tz, units, time_format
+    ):
+        return _wd.parse_open_meteo_data_points(
+            weather_data, aqi_data, tz, units, time_format, self.get_plugin_dir()
+        )
 
     def parse_weather_data(self, weather_data, aqi_data, tz, units, time_format, lat):
-        return _wd.parse_weather_data(weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir())
+        return _wd.parse_weather_data(
+            weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir()
+        )
 
-    def parse_open_meteo_data(self, weather_data, aqi_data, tz, units, time_format, lat):
-        return _wd.parse_open_meteo_data(weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir())
+    def parse_open_meteo_data(
+        self, weather_data, aqi_data, tz, units, time_format, lat
+    ):
+        return _wd.parse_open_meteo_data(
+            weather_data, aqi_data, tz, units, time_format, lat, self.get_plugin_dir()
+        )

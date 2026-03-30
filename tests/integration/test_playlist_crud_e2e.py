@@ -10,16 +10,22 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
+from tests.integration.browser_helpers import (  # noqa: E402
+    navigate_and_wait,
+    prepare_playlist,
+)
 
 
-def test_create_playlist_via_form(live_server, device_config_dev, browser_page, tmp_path):
+def test_create_playlist_via_form(
+    live_server, device_config_dev, browser_page, tmp_path
+):
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")
 
     # Stub reload so the page stays testable after form submit
-    page.evaluate("""() => {
+    page.evaluate(
+        """() => {
         const origFetch = window.fetch;
         window.__fetchCalls = [];
         window.fetch = function(...args) {
@@ -27,7 +33,8 @@ def test_create_playlist_via_form(live_server, device_config_dev, browser_page, 
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }""")
+    }"""
+    )
 
     # Click New Playlist button
     new_btn = page.locator("#newPlaylistBtn")
@@ -48,7 +55,9 @@ def test_create_playlist_via_form(live_server, device_config_dev, browser_page, 
     rc.assert_no_errors(str(tmp_path), "create_playlist")
 
 
-def test_edit_playlist_opens_modal(live_server, device_config_dev, browser_page, tmp_path):
+def test_edit_playlist_opens_modal(
+    live_server, device_config_dev, browser_page, tmp_path
+):
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")
@@ -73,7 +82,8 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
     rc = navigate_and_wait(page, live_server, "/playlist")
 
     # Stub fetch and reload AFTER navigation so JS context is live
-    page.evaluate("""() => {
+    page.evaluate(
+        """() => {
         const origFetch = window.fetch;
         window.__deleteCalls = [];
         window.fetch = function(...args) {
@@ -84,7 +94,8 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }""")
+    }"""
+    )
 
     # Click delete button on a playlist
     delete_btn = page.locator(".delete-playlist-btn").first

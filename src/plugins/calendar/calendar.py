@@ -6,8 +6,6 @@ import pytz
 import recurring_ical_events
 from PIL import ImageColor
 
-from utils.http_client import get_http_session
-
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
     field,
@@ -18,8 +16,10 @@ from plugins.base_plugin.settings_schema import (
     widget,
 )
 from plugins.calendar.constants import FONT_SIZES, LOCALE_MAP
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
+
 
 class Calendar(BasePlugin):
     def build_settings_schema(self):
@@ -49,23 +49,52 @@ class Calendar(BasePlugin):
                         "select",
                         label="Language",
                         default="en",
-                        options=[option(code, name) for code, name in LOCALE_MAP.items()],
+                        options=[
+                            option(code, name) for code, name in LOCALE_MAP.items()
+                        ],
                     ),
                     field(
                         "fontSize",
                         "select",
                         label="Font Size",
                         default="normal",
-                        options=[option(key, key.replace("-", " ").title()) for key in FONT_SIZES.keys()],
+                        options=[
+                            option(key, key.replace("-", " ").title())
+                            for key in FONT_SIZES
+                        ],
                     ),
                 ),
             ),
             section(
                 "Display",
                 row(
-                    field("displayTitle", "checkbox", label="Title", submit_unchecked=True, checked_value="true", unchecked_value="false", default="true"),
-                    field("displayWeekends", "checkbox", label="Weekends", submit_unchecked=True, checked_value="true", unchecked_value="false", default="true"),
-                    field("displayEventTime", "checkbox", label="Event Time", submit_unchecked=True, checked_value="true", unchecked_value="false", default="true"),
+                    field(
+                        "displayTitle",
+                        "checkbox",
+                        label="Title",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                        default="true",
+                    ),
+                    field(
+                        "displayWeekends",
+                        "checkbox",
+                        label="Weekends",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                        default="true",
+                    ),
+                    field(
+                        "displayEventTime",
+                        "checkbox",
+                        label="Event Time",
+                        submit_unchecked=True,
+                        checked_value="true",
+                        unchecked_value="false",
+                        default="true",
+                    ),
                 ),
                 row(
                     field(
@@ -76,14 +105,22 @@ class Calendar(BasePlugin):
                         checked_value="true",
                         unchecked_value="false",
                         default="true",
-                        visible_if={"field": "viewMode", "operator": "in", "values": ["timeGridDay", "timeGridWeek"]},
+                        visible_if={
+                            "field": "viewMode",
+                            "operator": "in",
+                            "values": ["timeGridDay", "timeGridWeek"],
+                        },
                     ),
                     field(
                         "nowIndicatorColor",
                         "color",
                         label="Now Indicator Color",
                         default="#007BFF",
-                        visible_if={"field": "viewMode", "operator": "in", "values": ["timeGridDay", "timeGridWeek"]},
+                        visible_if={
+                            "field": "viewMode",
+                            "operator": "in",
+                            "values": ["timeGridDay", "timeGridWeek"],
+                        },
                     ),
                     field(
                         "displayPreviousDays",
@@ -111,19 +148,31 @@ class Calendar(BasePlugin):
                             option("5", "Friday"),
                             option("6", "Saturday"),
                         ],
-                        visible_if={"field": "viewMode", "operator": "in", "values": ["timeGridWeek", "dayGrid", "dayGridMonth"]},
+                        visible_if={
+                            "field": "viewMode",
+                            "operator": "in",
+                            "values": ["timeGridWeek", "dayGrid", "dayGridMonth"],
+                        },
                     ),
                     field(
                         "startTimeInterval",
                         "time",
                         label="Start Time",
-                        visible_if={"field": "viewMode", "operator": "in", "values": ["timeGridDay", "timeGridWeek"]},
+                        visible_if={
+                            "field": "viewMode",
+                            "operator": "in",
+                            "values": ["timeGridDay", "timeGridWeek"],
+                        },
                     ),
                     field(
                         "endTimeInterval",
                         "time",
                         label="End Time",
-                        visible_if={"field": "viewMode", "operator": "in", "values": ["timeGridDay", "timeGridWeek"]},
+                        visible_if={
+                            "field": "viewMode",
+                            "operator": "in",
+                            "values": ["timeGridDay", "timeGridWeek"],
+                        },
                     ),
                 ),
                 row(
@@ -142,18 +191,24 @@ class Calendar(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['style_settings'] = True
-        template_params['locale_map'] = LOCALE_MAP
+        template_params["style_settings"] = True
+        template_params["locale_map"] = LOCALE_MAP
         return template_params
 
     def generate_image(self, settings, device_config):
-        calendar_urls = settings.get('calendarURLs[]')
-        calendar_colors = settings.get('calendarColors[]')
+        calendar_urls = settings.get("calendarURLs[]")
+        calendar_colors = settings.get("calendarColors[]")
         view = settings.get("viewMode")
 
         if not view:
             raise RuntimeError("View is required")
-        elif view not in ["timeGridDay", "timeGridWeek", "dayGrid", "dayGridMonth", "listMonth"]:
+        elif view not in [
+            "timeGridDay",
+            "timeGridWeek",
+            "dayGrid",
+            "dayGridMonth",
+            "listMonth",
+        ]:
             raise RuntimeError("Invalid view")
 
         if not calendar_urls:
@@ -163,7 +218,7 @@ class Calendar(BasePlugin):
                 raise RuntimeError("Invalid calendar URL")
 
         dimensions = self.get_oriented_dimensions(device_config)
-        
+
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
         tz = pytz.timezone(timezone)
@@ -175,29 +230,33 @@ class Calendar(BasePlugin):
         if not events:
             logger.warning("No events found for ics url")
 
-        if view == 'timeGridWeek' and settings.get("displayPreviousDays") != "true":
-            view = 'timeGrid'
+        if view == "timeGridWeek" and settings.get("displayPreviousDays") != "true":
+            view = "timeGrid"
 
         template_params = {
             "view": view,
             "events": events,
-            "current_dt": current_dt.replace(minute=0, second=0, microsecond=0).isoformat(),
+            "current_dt": current_dt.replace(
+                minute=0, second=0, microsecond=0
+            ).isoformat(),
             "timezone": timezone,
             "plugin_settings": settings,
             "time_format": time_format,
-            "font_scale": FONT_SIZES.get(settings.get("fontSize", "normal"))
+            "font_scale": FONT_SIZES.get(settings.get("fontSize", "normal")),
         }
 
-        image = self.render_image(dimensions, "calendar.html", "calendar.css", template_params)
+        image = self.render_image(
+            dimensions, "calendar.html", "calendar.css", template_params
+        )
 
         if not image:
             raise RuntimeError("Failed to take screenshot, please check logs.")
         return image
-    
+
     def fetch_ics_events(self, calendar_urls, colors, tz, start_range, end_range):
         parsed_events = []
 
-        for calendar_url, color in zip(calendar_urls, colors):
+        for calendar_url, color in zip(calendar_urls, colors, strict=False):
             cal = self.fetch_calendar(calendar_url)
             events = recurring_ical_events.of(cal).between(start_range, end_range)
             contrast_color = self.get_contrast_color(color)
@@ -209,15 +268,15 @@ class Calendar(BasePlugin):
                     "start": start,
                     "backgroundColor": color,
                     "textColor": contrast_color,
-                    "allDay": all_day
+                    "allDay": all_day,
                 }
                 if end:
-                    parsed_event['end'] = end
+                    parsed_event["end"] = end
 
                 parsed_events.append(parsed_event)
 
         return parsed_events
-    
+
     def get_view_range(self, view, current_dt, settings):
         start = datetime(current_dt.year, current_dt.month, current_dt.day)
         if view == "timeGridDay":
@@ -239,7 +298,7 @@ class Calendar(BasePlugin):
         elif view == "listMonth":
             end = start + timedelta(weeks=5)
         return start, end
-        
+
     def parse_data_points(self, event, tz):
         all_day = False
         dtstart = event.decoded("dtstart")
@@ -270,7 +329,7 @@ class Calendar(BasePlugin):
             response.raise_for_status()
             return icalendar.Calendar.from_ical(response.text)
         except Exception as e:
-            raise RuntimeError(f"Failed to fetch iCalendar url: {str(e)}")
+            raise RuntimeError(f"Failed to fetch iCalendar url: {str(e)}") from e
 
     def get_contrast_color(self, color):
         """
@@ -281,4 +340,4 @@ class Calendar(BasePlugin):
         # YIQ formula to estimate brightness
         yiq = (r * 299 + g * 587 + b * 114) / 1000
 
-        return '#000000' if yiq >= 150 else '#ffffff'
+        return "#000000" if yiq >= 150 else "#ffffff"

@@ -2,8 +2,6 @@
 """Concurrent request tests to verify thread safety."""
 import threading
 
-import pytest
-
 
 def test_concurrent_settings_saves(client):
     """5 simultaneous settings POSTs should not corrupt state."""
@@ -43,6 +41,7 @@ def test_concurrent_playlist_creates(client):
     def create_playlist(idx):
         try:
             import json
+
             data = {
                 "playlist_name": f"concurrent_test_{idx}",
                 "start_time": f"{8 + idx}:00",

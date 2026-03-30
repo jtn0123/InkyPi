@@ -64,6 +64,7 @@ def test_update_device_cycle_signals_refresh_task(client, flask_app, monkeypatch
 
 def test_update_device_cycle_handles_signal_exception(client, flask_app, monkeypatch):
     """Handles exception from signal_config_change gracefully."""
+
     def raise_error():
         raise RuntimeError("signal failed")
 
@@ -173,7 +174,9 @@ def test_update_playlist_overlapping_with_other(client):
 
 
 def test_update_playlist_invalid_json_payload(client):
-    resp = client.put("/update_playlist/Any", data="not-json", content_type="text/plain")
+    resp = client.put(
+        "/update_playlist/Any", data="not-json", content_type="text/plain"
+    )
     assert resp.status_code == 400
 
 
@@ -236,12 +239,14 @@ def test_display_next_in_playlist_success(client, flask_app, monkeypatch):
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Test", "00:00", "24:00")
     pl = pm.get_playlist("Test")
-    pl.add_plugin({
-        "plugin_id": "clock",
-        "name": "TestClock",
-        "plugin_settings": {},
-        "refresh": {"interval": 60},
-    })
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "TestClock",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     flask_app.config["DEVICE_CONFIG"].write_config()
 
     # Mock manual_update to verify it's called
@@ -265,12 +270,14 @@ def test_add_plugin_scheduled_type_success(client, device_config_dev):
 
     payload = {
         "plugin_id": "clock",
-        "refresh_settings": json.dumps({
-            "playlist": "Default",
-            "instance_name": "ScheduledClock",
-            "refreshType": "scheduled",
-            "refreshTime": "08:00",
-        }),
+        "refresh_settings": json.dumps(
+            {
+                "playlist": "Default",
+                "instance_name": "ScheduledClock",
+                "refreshType": "scheduled",
+                "refreshTime": "08:00",
+            }
+        ),
     }
     resp = client.post("/add_plugin", data=payload)
     assert resp.status_code == 200
@@ -296,12 +303,14 @@ def test_reorder_plugins_invalid_order(client, flask_app):
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Test", "00:00", "24:00")
     pl = pm.get_playlist("Test")
-    pl.add_plugin({
-        "plugin_id": "clock",
-        "name": "A",
-        "plugin_settings": {},
-        "refresh": {"interval": 60},
-    })
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     flask_app.config["DEVICE_CONFIG"].write_config()
 
     # Wrong plugin in order
@@ -339,12 +348,14 @@ def test_playlist_eta_caching(client, flask_app):
     pm = flask_app.config["DEVICE_CONFIG"].get_playlist_manager()
     pm.add_playlist("Cached", "00:00", "24:00")
     pl = pm.get_playlist("Cached")
-    pl.add_plugin({
-        "plugin_id": "clock",
-        "name": "A",
-        "plugin_settings": {},
-        "refresh": {"interval": 60},
-    })
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     flask_app.config["DEVICE_CONFIG"].write_config()
 
     # First call

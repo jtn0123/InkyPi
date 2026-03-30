@@ -27,13 +27,17 @@ def _is_low_resource_device():
     Returns True if device has less than 1GB RAM, False otherwise.
     """
     try:
-        total_memory_gb = psutil.virtual_memory().total / (1024 ** 3)
+        total_memory_gb = psutil.virtual_memory().total / (1024**3)
         is_low_resource = total_memory_gb < 1.0
-        logger.debug(f"Device RAM: {total_memory_gb:.2f}GB - Low resource mode: {is_low_resource}")
+        logger.debug(
+            f"Device RAM: {total_memory_gb:.2f}GB - Low resource mode: {is_low_resource}"
+        )
         return is_low_resource
     except Exception as e:
         # If we can't detect, assume low resource to be safe
-        logger.warning(f"Could not detect device memory: {e}. Defaulting to low-resource mode.")
+        logger.warning(
+            f"Could not detect device memory: {e}. Defaulting to low-resource mode."
+        )
         return True
 
 
@@ -57,7 +61,7 @@ class AdaptiveImageLoader:
 
     # Default headers to avoid 403 errors from sites that block requests without User-Agent
     DEFAULT_HEADERS = {
-        'User-Agent': 'InkyPi/1.0 (https://github.com/fatihak/InkyPi/) Python-requests'
+        "User-Agent": "InkyPi/1.0 (https://github.com/fatihak/InkyPi/) Python-requests"
     }
 
     def __init__(self):
@@ -80,9 +84,13 @@ class AdaptiveImageLoader:
         logger.debug(f"Loading image from URL: {url}")
 
         if self.is_low_resource:
-            return self._load_from_url_lowmem(url, dimensions, timeout_ms, resize, headers)
+            return self._load_from_url_lowmem(
+                url, dimensions, timeout_ms, resize, headers
+            )
         else:
-            return self._load_from_url_fast(url, dimensions, timeout_ms, resize, headers)
+            return self._load_from_url_fast(
+                url, dimensions, timeout_ms, resize, headers
+            )
 
     def from_file(self, path, dimensions, resize=True):
         """
@@ -129,7 +137,9 @@ class AdaptiveImageLoader:
             img = Image.open(data)
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
-            logger.info(f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)")
+            logger.info(
+                f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)"
+            )
 
             if resize:
                 img = self._process_and_resize(img, dimensions, original_size)
@@ -137,7 +147,9 @@ class AdaptiveImageLoader:
                 # Even without resizing, apply EXIF orientation correction
                 img = ImageOps.exif_transpose(img)
                 if img.size != original_size:
-                    logger.debug(f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}")
+                    logger.debug(
+                        f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}"
+                    )
 
             return img
         except Exception as e:
@@ -157,11 +169,13 @@ class AdaptiveImageLoader:
             request_headers = {**self.DEFAULT_HEADERS, **(headers or {})}
 
             # Create temp file and stream download
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tmp:
                 tmp_path = tmp.name
 
                 session = get_http_session()
-                response = session.get(url, timeout=timeout_ms / 1000, stream=True, headers=request_headers)
+                response = session.get(
+                    url, timeout=timeout_ms / 1000, stream=True, headers=request_headers
+                )
                 response.raise_for_status()
 
                 downloaded_bytes = 0
@@ -196,16 +210,22 @@ class AdaptiveImageLoader:
             img = Image.open(path)
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
-            logger.info(f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)")
+            logger.info(
+                f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)"
+            )
 
             if resize:
                 # Apply draft mode for massive memory savings during decode
-                img.draft('RGB', (dimensions[0] * 2, dimensions[1] * 2))
-                logger.debug("Draft mode applied - PIL will decode at reduced resolution")
+                img.draft("RGB", (dimensions[0] * 2, dimensions[1] * 2))
+                logger.debug(
+                    "Draft mode applied - PIL will decode at reduced resolution"
+                )
 
                 # Force load with draft mode
                 img.load()
-                logger.debug(f"Image decoded: {img.size[0]}x{img.size[1]} (draft mode reduced from {original_size[0]}x{original_size[1]})")
+                logger.debug(
+                    f"Image decoded: {img.size[0]}x{img.size[1]} (draft mode reduced from {original_size[0]}x{original_size[1]})"
+                )
 
                 img = self._process_and_resize(img, dimensions, original_size)
             else:
@@ -213,7 +233,9 @@ class AdaptiveImageLoader:
                 # Even without resizing, apply EXIF orientation correction
                 img = ImageOps.exif_transpose(img)
                 if img.size != original_size:
-                    logger.debug(f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}")
+                    logger.debug(
+                        f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}"
+                    )
 
             return img
 
@@ -237,13 +259,17 @@ class AdaptiveImageLoader:
             request_headers = {**self.DEFAULT_HEADERS, **(headers or {})}
 
             session = get_http_session()
-            response = session.get(url, timeout=timeout_ms / 1000, stream=True, headers=request_headers)
+            response = session.get(
+                url, timeout=timeout_ms / 1000, stream=True, headers=request_headers
+            )
             response.raise_for_status()
 
             img = Image.open(BytesIO(response.content))
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
-            logger.info(f"Downloaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)")
+            logger.info(
+                f"Downloaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)"
+            )
 
             if resize:
                 img = self._process_and_resize(img, dimensions, original_size)
@@ -251,7 +277,9 @@ class AdaptiveImageLoader:
                 # Even without resizing, apply EXIF orientation correction
                 img = ImageOps.exif_transpose(img)
                 if img.size != original_size:
-                    logger.debug(f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}")
+                    logger.debug(
+                        f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}"
+                    )
 
             return img
 
@@ -269,7 +297,9 @@ class AdaptiveImageLoader:
             img.load()  # Force decode to release file handle
             original_size = img.size
             original_pixels = original_size[0] * original_size[1]
-            logger.info(f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)")
+            logger.info(
+                f"Loaded image: {original_size[0]}x{original_size[1]} ({img.mode} mode, {original_pixels/1_000_000:.1f}MP)"
+            )
 
             if resize:
                 img = self._process_and_resize(img, dimensions, original_size)
@@ -277,7 +307,9 @@ class AdaptiveImageLoader:
                 # Even without resizing, apply EXIF orientation correction
                 img = ImageOps.exif_transpose(img)
                 if img.size != original_size:
-                    logger.debug(f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}")
+                    logger.debug(
+                        f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}"
+                    )
 
             return img
 
@@ -304,13 +336,15 @@ class AdaptiveImageLoader:
         # Safe to call on any image - returns unchanged if no EXIF data present
         img = ImageOps.exif_transpose(img)
         if img.size != original_size:
-            logger.debug(f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}")
-        
+            logger.debug(
+                f"EXIF orientation applied: {original_size[0]}x{original_size[1]} -> {img.size[0]}x{img.size[1]}"
+            )
+
         # Convert to RGB if necessary (removes alpha channel, saves memory)
         # E-ink displays don't need alpha channel anyway
-        if img.mode in ('RGBA', 'LA', 'P'):
+        if img.mode in ("RGBA", "LA", "P"):
             logger.debug(f"Converting image from {img.mode} to RGB")
-            img = img.convert('RGB')
+            img = img.convert("RGB")
 
         # Choose processing strategy based on device capabilities
         if self.is_low_resource:
@@ -327,7 +361,9 @@ class AdaptiveImageLoader:
 
         # For very large images, use two-stage resize
         if img.size[0] > dimensions[0] * 2 or img.size[1] > dimensions[1] * 2:
-            logger.debug(f"Image is {img.size[0]}x{img.size[1]}, using two-stage resize")
+            logger.debug(
+                f"Image is {img.size[0]}x{img.size[1]}, using two-stage resize"
+            )
 
             # Stage 1: Aggressive downsample using thumbnail (in-place, very memory efficient)
             aspect = img.size[0] / img.size[1]
@@ -336,18 +372,24 @@ class AdaptiveImageLoader:
             else:  # Portrait
                 intermediate_size = (int(dimensions[1] * 2 * aspect), dimensions[1] * 2)
 
-            logger.debug(f"Stage 1: Downsampling to ~{intermediate_size[0]}x{intermediate_size[1]} using NEAREST")
+            logger.debug(
+                f"Stage 1: Downsampling to ~{intermediate_size[0]}x{intermediate_size[1]} using NEAREST"
+            )
             img.thumbnail(intermediate_size, Image.NEAREST)
             logger.debug(f"Stage 1 complete: {img.size[0]}x{img.size[1]}")
             gc.collect()
 
             # Stage 2: High-quality resize to exact dimensions
-            logger.debug(f"Stage 2: Final resize to {dimensions[0]}x{dimensions[1]} using LANCZOS")
+            logger.debug(
+                f"Stage 2: Final resize to {dimensions[0]}x{dimensions[1]} using LANCZOS"
+            )
             img = ImageOps.fit(img, dimensions, method=Image.LANCZOS)
             logger.debug(f"Stage 2 complete: {dimensions[0]}x{dimensions[1]}")
         else:
             # Direct resize with BICUBIC (fast, sufficient quality for e-ink)
-            logger.debug(f"Resizing directly from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}")
+            logger.debug(
+                f"Resizing directly from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}"
+            )
             img = ImageOps.fit(img, dimensions, method=Image.BICUBIC)
 
         # Explicit garbage collection
@@ -359,6 +401,8 @@ class AdaptiveImageLoader:
     def _resize_high_performance(self, img, dimensions):
         """High-quality resize for powerful devices."""
         logger.debug("Using high-quality processing (LANCZOS filter)")
-        logger.debug(f"Resizing from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}")
+        logger.debug(
+            f"Resizing from {img.size[0]}x{img.size[1]} to {dimensions[0]}x{dimensions[1]}"
+        )
 
         return ImageOps.fit(img, dimensions, method=Image.LANCZOS)

@@ -2,8 +2,8 @@
 from datetime import datetime
 from unittest.mock import patch
 
-import pytz
 import pytest
+import pytz
 from PIL import Image
 
 

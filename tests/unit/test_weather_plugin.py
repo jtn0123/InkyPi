@@ -1,4 +1,3 @@
-import os
 from datetime import UTC, datetime
 
 import pytest
@@ -40,11 +39,17 @@ def weather_plugin(tmp_path, monkeypatch):
 def test_map_weather_code_to_icon_various_codes(weather_plugin):
     w = weather_plugin
     assert w.map_weather_code_to_icon(0, 12) == "01d"
-    assert w.map_weather_code_to_icon(1, 12) == "022d"  # Mainly clear (upstream changed)
-    assert w.map_weather_code_to_icon(2, 12) == "02d"   # Partly cloudy (upstream changed)
+    assert (
+        w.map_weather_code_to_icon(1, 12) == "022d"
+    )  # Mainly clear (upstream changed)
+    assert (
+        w.map_weather_code_to_icon(2, 12) == "02d"
+    )  # Partly cloudy (upstream changed)
     assert w.map_weather_code_to_icon(3, 12) == "04d"
     assert w.map_weather_code_to_icon(45, 12) == "50d"
-    assert w.map_weather_code_to_icon(51, 12) == "51d"  # Light drizzle (upstream changed)
+    assert (
+        w.map_weather_code_to_icon(51, 12) == "51d"
+    )  # Light drizzle (upstream changed)
     assert w.map_weather_code_to_icon(61, 12) == "51d"  # Light rain (upstream changed)
     assert w.map_weather_code_to_icon(71, 12) == "71d"  # Light snow (upstream changed)
     assert w.map_weather_code_to_icon(95, 12) == "11d"
@@ -96,6 +101,7 @@ def test_parse_open_meteo_forecast_uses_local_phase(monkeypatch, weather_plugin)
 
     # Mock the astral moon.phase function used by upstream
     from astral import moon
+
     monkeypatch.setattr(moon, "phase", lambda dt: 14.75)  # Full moon phase age
     res = w.parse_open_meteo_forecast(daily, tz, 1, 40.7)  # is_day=1, lat=40.7
     assert isinstance(res, list)
@@ -198,6 +204,7 @@ def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
 
     # Mock moon.phase to raise error (upstream uses astral library)
     from astral import moon
+
     monkeypatch.setattr(moon, "phase", boom)
     res = w.parse_open_meteo_forecast(daily, tz, 1, 40.7)
     assert res and res[0]["moon_phase_pct"] == "0"
@@ -222,7 +229,9 @@ def test_generate_settings_template(weather_plugin):
 def test_get_weather_data_error_handling(weather_plugin, requests_mock):
     w = weather_plugin
     # Mock API to return error
-    requests_mock.get("https://api.openweathermap.org/data/3.0/onecall", status_code=401)
+    requests_mock.get(
+        "https://api.openweathermap.org/data/3.0/onecall", status_code=401
+    )
 
     with pytest.raises(RuntimeError):
         w.get_weather_data("bad_key", "metric", 40.7, -74.0)

@@ -21,7 +21,9 @@ class ImmichProvider:
 
     def get_album_id(self, album: str) -> str:
         logger.debug(f"Fetching albums from {self.base_url}")
-        r = self.session.get(f"{self.base_url}/api/albums", headers=self.headers, timeout=10)
+        r = self.session.get(
+            f"{self.base_url}/api/albums", headers=self.headers, timeout=10
+        )
         r.raise_for_status()
         albums = r.json()
 
@@ -39,11 +41,7 @@ class ImmichProvider:
 
         logger.debug(f"Fetching assets from album {album_id}")
         while page_items:
-            body = {
-                "albumIds": [album_id],
-                "size": 1000,
-                "page": page
-            }
+            body = {"albumIds": [album_id], "size": 1000, "page": page}
             r2 = self.session.post(
                 f"{self.base_url}/api/search/metadata",
                 json=body,
@@ -60,7 +58,9 @@ class ImmichProvider:
         logger.debug(f"Found {len(all_items)} total assets in album")
         return all_items
 
-    def get_image(self, album: str, dimensions: tuple[int, int], resize: bool = True) -> Image.Image | None:
+    def get_image(
+        self, album: str, dimensions: tuple[int, int], resize: bool = True
+    ) -> Image.Image | None:
         """
         Get a random image from the album.
 
@@ -97,11 +97,7 @@ class ImmichProvider:
         # Use adaptive image loader for memory-efficient processing
         # Let loader resize when requested (when no padding will be applied)
         img = self.image_loader.from_url(
-            asset_url,
-            dimensions,
-            timeout_ms=40000,
-            resize=resize,
-            headers=self.headers
+            asset_url, dimensions, timeout_ms=40000, resize=resize, headers=self.headers
         )
 
         if not img:
@@ -185,10 +181,10 @@ class ImageAlbum(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "Immich",
-            "expected_key": "IMMICH_KEY"
+            "expected_key": "IMMICH_KEY",
         }
         return template_params
 
@@ -202,9 +198,11 @@ class ImageAlbum(BasePlugin):
         logger.info(f"Album provider: {album_provider}")
 
         # Check padding options to determine resize strategy
-        use_padding = settings.get('padImage') == "true"
-        background_option = settings.get('backgroundOption', 'blur')
-        logger.debug(f"Settings: pad_image={use_padding}, background_option={background_option}")
+        use_padding = settings.get("padImage") == "true"
+        background_option = settings.get("backgroundOption", "blur")
+        logger.debug(
+            f"Settings: pad_image={use_padding}, background_option={background_option}"
+        )
 
         match album_provider:
             case "Immich":
@@ -213,12 +211,12 @@ class ImageAlbum(BasePlugin):
                     logger.error("Immich API Key not configured")
                     raise RuntimeError("Immich API Key not configured.")
 
-                url = settings.get('url')
+                url = settings.get("url")
                 if not url:
                     logger.error("Immich URL not provided")
                     raise RuntimeError("Immich URL is required.")
 
-                album = settings.get('album')
+                album = settings.get("album")
                 if not album:
                     logger.error("Album name not provided")
                     raise RuntimeError("Album name is required.")
@@ -248,10 +246,14 @@ class ImageAlbum(BasePlugin):
                 img = pad_image_blur(img, dimensions)
             else:
                 background_color = ImageColor.getcolor(
-                    settings.get('backgroundColor') or "white",
-                    img.mode
+                    settings.get("backgroundColor") or "white", img.mode
                 )
-                img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
+                img = ImageOps.pad(
+                    img,
+                    dimensions,
+                    color=background_color,
+                    method=Image.Resampling.LANCZOS,
+                )
         # else: loader already resized to fit with proper aspect ratio
 
         logger.info("=== Image Album Plugin: Image generation complete ===")

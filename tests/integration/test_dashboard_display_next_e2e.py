@@ -10,10 +10,15 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait, prepare_playlist
+from tests.integration.browser_helpers import (  # noqa: E402
+    navigate_and_wait,
+    prepare_playlist,
+)
 
 
-def test_display_next_button_exists(live_server, device_config_dev, browser_page, tmp_path):
+def test_display_next_button_exists(
+    live_server, device_config_dev, browser_page, tmp_path
+):
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
@@ -25,13 +30,16 @@ def test_display_next_button_exists(live_server, device_config_dev, browser_page
     rc.assert_no_errors(str(tmp_path), "display_next_exists")
 
 
-def test_display_next_sends_request(live_server, device_config_dev, browser_page, tmp_path):
+def test_display_next_sends_request(
+    live_server, device_config_dev, browser_page, tmp_path
+):
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
 
     # Mock fetch AFTER navigation so JS context is live
-    page.evaluate("""() => {
+    page.evaluate(
+        """() => {
         const origFetch = window.fetch;
         window.__fetchCalls = [];
         window.fetch = function(...args) {
@@ -47,7 +55,8 @@ def test_display_next_sends_request(live_server, device_config_dev, browser_page
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }""")
+    }"""
+    )
 
     display_next = page.locator("#displayNextBtn, button:has-text('Display Next')")
     display_next.first.wait_for(state="visible", timeout=5000)
@@ -56,22 +65,26 @@ def test_display_next_sends_request(live_server, device_config_dev, browser_page
 
     calls = page.evaluate("() => window.__fetchCalls || []")
     display_next_calls = [
-        c for c in calls
+        c
+        for c in calls
         if "display-next" in c.get("url", "") or "display_next" in c.get("url", "")
     ]
-    assert len(display_next_calls) > 0, (
-        f"Display Next should fire a fetch request, got calls: {calls}"
-    )
+    assert (
+        len(display_next_calls) > 0
+    ), f"Display Next should fire a fetch request, got calls: {calls}"
 
     rc.assert_no_errors(str(tmp_path), "display_next_request")
 
 
-def test_display_next_no_js_errors(live_server, device_config_dev, browser_page, tmp_path):
+def test_display_next_no_js_errors(
+    live_server, device_config_dev, browser_page, tmp_path
+):
     prepare_playlist(device_config_dev)
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
 
-    page.evaluate("""() => {
+    page.evaluate(
+        """() => {
         const origFetch = window.fetch;
         window.fetch = function(...args) {
             const url = typeof args[0] === 'string' ? args[0] : args[0].url;
@@ -84,7 +97,8 @@ def test_display_next_no_js_errors(live_server, device_config_dev, browser_page,
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }""")
+    }"""
+    )
 
     display_next = page.locator("#displayNextBtn, button:has-text('Display Next')")
     display_next.first.wait_for(state="visible", timeout=5000)

@@ -10,7 +10,9 @@ def test_logs_api_truncation_and_level_filter(client, monkeypatch):
             "ERROR failed to do thing",
         ] * 1000  # many lines to trigger truncation/byte cap
 
-    monkeypatch.setattr(settings_mod, "_read_log_lines", fake_read_log_lines, raising=True)
+    monkeypatch.setattr(
+        settings_mod, "_read_log_lines", fake_read_log_lines, raising=True
+    )
 
     # errors level should only return error lines and be truncated
     r = client.get("/api/logs?hours=2&limit=100&level=errors")
@@ -22,5 +24,6 @@ def test_logs_api_truncation_and_level_filter(client, monkeypatch):
     # warnings+errors
     r2 = client.get("/api/logs?hours=2&limit=100&level=warn")
     data2 = r2.get_json()
-    assert any("WARNING" in ln for ln in data2["lines"]) and any("ERROR" in ln for ln in data2["lines"])  # mixed
-
+    assert any("WARNING" in ln for ln in data2["lines"]) and any(
+        "ERROR" in ln for ln in data2["lines"]
+    )  # mixed

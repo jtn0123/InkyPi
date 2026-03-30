@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sqlite3
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 
 def main(limit: int = 20) -> int:
@@ -15,7 +15,9 @@ def main(limit: int = 20) -> int:
     from config import Config
 
     cfg = Config()
-    db_path = cfg.get_config("benchmarks_db_path", default=os.path.join(cfg.BASE_DIR, "benchmarks.db"))
+    db_path = cfg.get_config(
+        "benchmarks_db_path", default=os.path.join(cfg.BASE_DIR, "benchmarks.db")
+    )
     if not os.path.exists(db_path):
         print("No benchmarks database found at:", db_path)
         return 0
@@ -51,7 +53,22 @@ def main(limit: int = 20) -> int:
         disp_s = "" if disp is None else str(int(disp))
         cpu_s = "" if cpu is None else f"{float(cpu):.1f}"
         mem_s = "" if mem is None else f"{float(mem):.1f}"
-        formatted.append([ts_s, rid_s, plugin_s, inst_s, pl_s, cached_s, req_s, gen_s, pre_s, disp_s, cpu_s, mem_s])
+        formatted.append(
+            [
+                ts_s,
+                rid_s,
+                plugin_s,
+                inst_s,
+                pl_s,
+                cached_s,
+                req_s,
+                gen_s,
+                pre_s,
+                disp_s,
+                cpu_s,
+                mem_s,
+            ]
+        )
 
     # Column definitions: (header, max_width, align)
     cols = [
@@ -90,7 +107,7 @@ def main(limit: int = 20) -> int:
 
     # Render header
     header_cells = []
-    for (hdr, _m, align), w in zip(cols, widths):
+    for (hdr, _m, align), w in zip(cols, widths, strict=False):
         header_cells.append(f"{hdr:<{w}}" if align == "left" else f"{hdr:>{w}}")
     print(" | ".join(header_cells))
     print("-+-".join("-" * w for w in widths))
@@ -98,13 +115,10 @@ def main(limit: int = 20) -> int:
     # Render rows
     for row in formatted:
         cells = []
-        for idx, ((_, _m, align), w) in enumerate(zip(cols, widths)):
+        for idx, ((_, _m, align), w) in enumerate(zip(cols, widths, strict=False)):
             val = row[idx] or ""
             # Use truncated refresh_id
-            if idx == 1 and len(val) > w:
-                val = trunc(val, w)
-            else:
-                val = trunc(val, w)
+            val = trunc(val, w) if idx == 1 and len(val) > w else trunc(val, w)
             cells.append(f"{val:<{w}}" if align == "left" else f"{val:>{w}}")
         print(" | ".join(cells))
 
@@ -119,5 +133,3 @@ if __name__ == "__main__":
     p.add_argument("--limit", type=int, default=20, help="number of rows to display")
     args = p.parse_args()
     raise SystemExit(main(args.limit))
-
-

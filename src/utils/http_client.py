@@ -45,9 +45,9 @@ def get_http_session() -> requests.Session:
             _HTTP_SESSION = requests.Session()
 
             # Set common headers for all InkyPi requests
-            _HTTP_SESSION.headers.update({
-                'User-Agent': 'InkyPi/1.0 (https://github.com/fatihak/InkyPi/)'
-            })
+            _HTTP_SESSION.headers.update(
+                {"User-Agent": "InkyPi/1.0 (https://github.com/fatihak/InkyPi/)"}
+            )
 
             # Configure connection pool with retries for transient network and 5xx/429 responses.
             retry_strategy = Retry(
@@ -60,10 +60,10 @@ def get_http_session() -> requests.Session:
                 pool_connections=10,
                 pool_maxsize=10,
                 max_retries=retry_strategy,
-                pool_block=False
+                pool_block=False,
             )
-            _HTTP_SESSION.mount('http://', adapter)
-            _HTTP_SESSION.mount('https://', adapter)
+            _HTTP_SESSION.mount("http://", adapter)
+            _HTTP_SESSION.mount("https://", adapter)
 
             atexit.register(close_http_session)
             logger.debug("HTTP session initialized successfully")

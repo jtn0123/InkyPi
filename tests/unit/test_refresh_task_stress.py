@@ -70,7 +70,7 @@ def test_rapid_manual_updates(device_config_dev, mock_plugin, monkeypatch):
 
         # Send 20 rapid manual updates
         num_updates = 20
-        for i in range(num_updates):
+        for _i in range(num_updates):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
 
@@ -104,7 +104,7 @@ def test_concurrent_manual_updates_from_multiple_threads(
 
         def send_update(thread_id):
             try:
-                for i in range(5):
+                for _i in range(5):
                     refresh = ManualRefresh("test", {})
                     task.manual_update(refresh)
                 completed.append(thread_id)
@@ -134,7 +134,7 @@ def test_start_stop_cycles(device_config_dev):
     """Test rapid start/stop cycles don't cause issues."""
     dm = DisplayManager(device_config_dev)
 
-    for i in range(10):
+    for _i in range(10):
         task = RefreshTask(device_config_dev, dm)
         task.start()
         assert task.running
@@ -156,7 +156,12 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
         slow_plugin_started.set()
         slow_plugin_can_finish.wait(timeout=2)
         return (
-            {"refresh_type": "Manual Update", "plugin_id": "slow", "refresh_time": current_dt.isoformat(), "image_hash": "hash"},
+            {
+                "refresh_type": "Manual Update",
+                "plugin_id": "slow",
+                "refresh_time": current_dt.isoformat(),
+                "image_hash": "hash",
+            },
             False,
             {"request_ms": 1},
         )
@@ -181,9 +186,9 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
 
         # Allow plugin to finish
         slow_plugin_can_finish.set()
-        assert wait_until(lambda: not stop_thread.is_alive(), timeout=2), (
-            "Stop should finish promptly once the refresh is released"
-        )
+        assert wait_until(
+            lambda: not stop_thread.is_alive(), timeout=2
+        ), "Stop should finish promptly once the refresh is released"
         refresh_thread.join(timeout=1)
 
         # Verify task stopped
@@ -238,9 +243,7 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
         task.stop()
 
 
-def test_exception_during_refresh_does_not_crash_task(
-    device_config_dev, monkeypatch
-):
+def test_exception_during_refresh_does_not_crash_task(device_config_dev, monkeypatch):
     """Test that exceptions during refresh are captured and re-raised but don't crash the background thread."""
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
     dm = DisplayManager(device_config_dev)
@@ -289,7 +292,9 @@ def test_exception_during_refresh_does_not_crash_task(
         task.stop()
 
 
-def test_manual_update_returns_metrics_after_update(device_config_dev, mock_plugin, monkeypatch):
+def test_manual_update_returns_metrics_after_update(
+    device_config_dev, mock_plugin, monkeypatch
+):
     """Test that manual updates return per-request metrics."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -312,7 +317,9 @@ def test_manual_update_returns_metrics_after_update(device_config_dev, mock_plug
         task.stop()
 
 
-def test_high_frequency_updates_dont_deadlock(device_config_dev, mock_plugin, monkeypatch):
+def test_high_frequency_updates_dont_deadlock(
+    device_config_dev, mock_plugin, monkeypatch
+):
     """Test that very high frequency updates don't cause deadlocks."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -327,7 +334,7 @@ def test_high_frequency_updates_dont_deadlock(device_config_dev, mock_plugin, mo
         task.start()
 
         # Hammer the task with updates as fast as possible
-        for i in range(100):
+        for _i in range(100):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
 
@@ -344,7 +351,9 @@ def test_high_frequency_updates_dont_deadlock(device_config_dev, mock_plugin, mo
             task.stop()
 
 
-def test_memory_not_growing_with_many_updates(device_config_dev, mock_plugin, monkeypatch):
+def test_memory_not_growing_with_many_updates(
+    device_config_dev, mock_plugin, monkeypatch
+):
     """Test that memory doesn't grow excessively with many updates."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -362,7 +371,7 @@ def test_memory_not_growing_with_many_updates(device_config_dev, mock_plugin, mo
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
 
         # Send many updates
-        for i in range(50):
+        for _i in range(50):
             refresh = ManualRefresh("test", {})
             task.manual_update(refresh)
 
@@ -370,9 +379,9 @@ def test_memory_not_growing_with_many_updates(device_config_dev, mock_plugin, mo
         memory_growth = final_memory - initial_memory
 
         # Memory shouldn't grow by more than 50MB (generous threshold)
-        assert memory_growth < 50, (
-            f"Memory grew by {memory_growth:.2f}MB, which may indicate a leak"
-        )
+        assert (
+            memory_growth < 50
+        ), f"Memory grew by {memory_growth:.2f}MB, which may indicate a leak"
 
     finally:
         task.stop()

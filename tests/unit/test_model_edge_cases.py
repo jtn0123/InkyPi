@@ -1,13 +1,13 @@
 """Edge case tests for model.py — Playlist, PluginInstance, PlaylistManager."""
 
-import pytest
-from datetime import datetime, UTC, timedelta
-from model import Playlist, PluginInstance
+from datetime import UTC, datetime, timedelta
 
+from model import Playlist, PluginInstance
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _plugin_dict(pid="test", name="Test", refresh=None, **kwargs):
     return {
@@ -40,6 +40,7 @@ def _past_snooze():
 # ---------------------------------------------------------------------------
 # Playlist.is_active() — overnight wrap
 # ---------------------------------------------------------------------------
+
 
 class TestIsActiveOvernight:
     def setup_method(self):
@@ -81,6 +82,7 @@ class TestIsActiveBoundary:
 # Playlist.get_time_range_minutes()
 # ---------------------------------------------------------------------------
 
+
 class TestGetTimeRangeMinutes:
     def test_overnight_range(self):
         pl = _make_playlist("22:00", "06:00")
@@ -98,6 +100,7 @@ class TestGetTimeRangeMinutes:
 # ---------------------------------------------------------------------------
 # Playlist.get_next_plugin()
 # ---------------------------------------------------------------------------
+
 
 class TestGetNextPlugin:
     def test_corrupted_index_resets_to_zero(self):
@@ -123,6 +126,7 @@ class TestGetNextPlugin:
 # ---------------------------------------------------------------------------
 # Playlist.get_next_eligible_plugin()
 # ---------------------------------------------------------------------------
+
 
 class TestGetNextEligiblePlugin:
     def test_all_snoozed_returns_none(self):
@@ -163,6 +167,7 @@ class TestGetNextEligiblePlugin:
 # Playlist.peek_next_eligible_plugin()
 # ---------------------------------------------------------------------------
 
+
 class TestPeekNextEligiblePlugin:
     def test_does_not_mutate_index(self):
         plugins = [_plugin_dict("a"), _plugin_dict("b"), _plugin_dict("c")]
@@ -193,18 +198,25 @@ class TestPeekNextEligiblePlugin:
 # Playlist.reorder_plugins()
 # ---------------------------------------------------------------------------
 
+
 class TestReorderPlugins:
     def _pl_with_abc(self):
-        plugins = [_plugin_dict("a", "Alpha"), _plugin_dict("b", "Beta"), _plugin_dict("c", "Gamma")]
+        plugins = [
+            _plugin_dict("a", "Alpha"),
+            _plugin_dict("b", "Beta"),
+            _plugin_dict("c", "Gamma"),
+        ]
         return _make_playlist("00:00", "24:00", plugins=plugins)
 
     def test_reorder_with_dicts(self):
         pl = self._pl_with_abc()
-        result = pl.reorder_plugins([
-            {"plugin_id": "c", "name": "Gamma"},
-            {"plugin_id": "a", "name": "Alpha"},
-            {"plugin_id": "b", "name": "Beta"},
-        ])
+        result = pl.reorder_plugins(
+            [
+                {"plugin_id": "c", "name": "Gamma"},
+                {"plugin_id": "a", "name": "Alpha"},
+                {"plugin_id": "b", "name": "Beta"},
+            ]
+        )
         assert result is not False
         ids = [p.plugin_id for p in pl.plugins]
         assert ids == ["c", "a", "b"]
@@ -223,27 +235,32 @@ class TestReorderPlugins:
 
     def test_too_many_items_returns_false(self):
         pl = self._pl_with_abc()
-        result = pl.reorder_plugins([
-            {"plugin_id": "a", "name": "Alpha"},
-            {"plugin_id": "b", "name": "Beta"},
-            {"plugin_id": "c", "name": "Gamma"},
-            {"plugin_id": "d", "name": "Delta"},
-        ])
+        result = pl.reorder_plugins(
+            [
+                {"plugin_id": "a", "name": "Alpha"},
+                {"plugin_id": "b", "name": "Beta"},
+                {"plugin_id": "c", "name": "Gamma"},
+                {"plugin_id": "d", "name": "Delta"},
+            ]
+        )
         assert result is False
 
     def test_unknown_plugin_id_returns_false(self):
         pl = self._pl_with_abc()
-        result = pl.reorder_plugins([
-            {"plugin_id": "x", "name": "X"},
-            {"plugin_id": "a", "name": "Alpha"},
-            {"plugin_id": "b", "name": "Beta"},
-        ])
+        result = pl.reorder_plugins(
+            [
+                {"plugin_id": "x", "name": "X"},
+                {"plugin_id": "a", "name": "Alpha"},
+                {"plugin_id": "b", "name": "Beta"},
+            ]
+        )
         assert result is False
 
 
 # ---------------------------------------------------------------------------
 # PluginInstance.should_refresh()
 # ---------------------------------------------------------------------------
+
 
 class TestShouldRefreshInterval:
     def test_refreshed_two_hours_ago_interval_one_hour(self):
@@ -266,24 +283,37 @@ class TestShouldRefreshInterval:
 
 class TestShouldRefreshScheduled:
     def test_scheduled_time_passed_last_refresh_yesterday(self):
-        yesterday_early = (datetime.now(UTC).replace(hour=6, minute=0, second=0, microsecond=0)
-                           - timedelta(days=1)).isoformat()
-        d = _plugin_dict(refresh={"scheduled": "08:00"}, latest_refresh_time=yesterday_early)
+        yesterday_early = (
+            datetime.now(UTC).replace(hour=6, minute=0, second=0, microsecond=0)
+            - timedelta(days=1)
+        ).isoformat()
+        d = _plugin_dict(
+            refresh={"scheduled": "08:00"}, latest_refresh_time=yesterday_early
+        )
         plugin = PluginInstance.from_dict(d)
-        current_time = datetime.now(UTC).replace(hour=9, minute=0, second=0, microsecond=0)
+        current_time = datetime.now(UTC).replace(
+            hour=9, minute=0, second=0, microsecond=0
+        )
         assert plugin.should_refresh(current_time) is True
 
     def test_scheduled_already_refreshed_today(self):
-        today_8_30 = datetime.now(UTC).replace(hour=8, minute=30, second=0, microsecond=0).isoformat()
+        today_8_30 = (
+            datetime.now(UTC)
+            .replace(hour=8, minute=30, second=0, microsecond=0)
+            .isoformat()
+        )
         d = _plugin_dict(refresh={"scheduled": "08:00"}, latest_refresh_time=today_8_30)
         plugin = PluginInstance.from_dict(d)
-        current_time = datetime.now(UTC).replace(hour=9, minute=0, second=0, microsecond=0)
+        current_time = datetime.now(UTC).replace(
+            hour=9, minute=0, second=0, microsecond=0
+        )
         assert plugin.should_refresh(current_time) is False
 
 
 # ---------------------------------------------------------------------------
 # PluginInstance.is_show_eligible()
 # ---------------------------------------------------------------------------
+
 
 class TestIsShowEligible:
     def test_active_snooze_returns_false(self):
@@ -327,6 +357,7 @@ class TestIsShowEligible:
 # ---------------------------------------------------------------------------
 # PluginInstance.from_dict() round-trip
 # ---------------------------------------------------------------------------
+
 
 class TestFromDictRoundTrip:
     def test_round_trip_preserves_fields(self):

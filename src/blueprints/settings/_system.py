@@ -3,9 +3,9 @@
 import subprocess
 import time
 
-import blueprints.settings as _mod
-
 from flask import jsonify, request
+
+import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
 
 
@@ -59,7 +59,9 @@ def shutdown():
     now = time.monotonic()
     with _mod._shutdown_lock:
         if now - _mod._last_shutdown_time < _mod._SHUTDOWN_COOLDOWN_SECONDS:
-            remaining = int(_mod._SHUTDOWN_COOLDOWN_SECONDS - (now - _mod._last_shutdown_time))
+            remaining = int(
+                _mod._SHUTDOWN_COOLDOWN_SECONDS - (now - _mod._last_shutdown_time)
+            )
             return json_error(
                 f"Please wait {remaining}s before requesting another reboot/shutdown",
                 status=429,
@@ -67,7 +69,11 @@ def shutdown():
         _mod._last_shutdown_time = now
 
     data = request.get_json(silent=True)
-    if data is None and request.content_type and "application/json" in request.content_type:
+    if (
+        data is None
+        and request.content_type
+        and "application/json" in request.content_type
+    ):
         return json_error("Invalid JSON payload", status=400)
     if not isinstance(data, dict):
         data = {}
@@ -81,6 +87,4 @@ def shutdown():
         return jsonify({"success": True})
     except subprocess.CalledProcessError as e:
         _mod.logger.exception("Failed to execute shutdown command")
-        return json_internal_error(
-            "shutdown", details={"error": str(e)}
-        )
+        return json_internal_error("shutdown", details={"error": str(e)})

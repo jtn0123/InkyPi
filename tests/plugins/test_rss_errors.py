@@ -8,6 +8,7 @@ import requests
 
 def _make_rss_plugin():
     from plugins.rss.rss import Rss
+
     return Rss({"id": "rss"})
 
 
@@ -42,7 +43,6 @@ def test_rss_malformed_xml():
         mock_session_fn.return_value.get.return_value = resp
 
         # feedparser with bozo and no entries should raise
-        import feedparser
         with patch("plugins.rss.rss.feedparser.parse") as mock_parse:
             mock_result = MagicMock()
             mock_result.bozo = True
@@ -80,7 +80,9 @@ def test_rss_network_timeout():
     p = _make_rss_plugin()
 
     with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
-        mock_session_fn.return_value.get.side_effect = requests.exceptions.Timeout("timed out")
+        mock_session_fn.return_value.get.side_effect = requests.exceptions.Timeout(
+            "timed out"
+        )
         with pytest.raises(requests.exceptions.Timeout):
             p.parse_rss_feed("http://example.com/feed.xml")
 
@@ -92,7 +94,9 @@ def test_rss_http_500():
     with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
         resp = MagicMock()
         resp.status_code = 500
-        resp.raise_for_status.side_effect = requests.exceptions.HTTPError("500 Server Error")
+        resp.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "500 Server Error"
+        )
         mock_session_fn.return_value.get.return_value = resp
 
         with pytest.raises(requests.exceptions.HTTPError):
@@ -113,6 +117,8 @@ def test_rss_connection_error():
     p = _make_rss_plugin()
 
     with patch("plugins.rss.rss.get_http_session") as mock_session_fn:
-        mock_session_fn.return_value.get.side_effect = requests.exceptions.ConnectionError("refused")
+        mock_session_fn.return_value.get.side_effect = (
+            requests.exceptions.ConnectionError("refused")
+        )
         with pytest.raises(requests.exceptions.ConnectionError):
             p.parse_rss_feed("http://example.com/feed.xml")

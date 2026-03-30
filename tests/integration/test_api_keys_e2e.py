@@ -10,7 +10,7 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait
+from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
 def test_api_keys_page_loads(live_server, browser_page):
@@ -26,7 +26,7 @@ def test_api_keys_page_loads(live_server, browser_page):
 
 def test_api_key_input_and_save(live_server, browser_page):
     page = browser_page
-    rc = navigate_and_wait(page, live_server, "/api-keys")
+    navigate_and_wait(page, live_server, "/api-keys")
 
     # Prevent page reload after save
     page.evaluate("window.location.reload = () => {};")
@@ -40,9 +40,11 @@ def test_api_key_input_and_save(live_server, browser_page):
     save_responses = []
     page.on(
         "response",
-        lambda resp: save_responses.append(resp.status)
-        if "/save_api_keys" in resp.url or "/api-keys" in resp.url
-        else None,
+        lambda resp: (
+            save_responses.append(resp.status)
+            if "/save_api_keys" in resp.url or "/api-keys" in resp.url
+            else None
+        ),
     )
 
     save_btn = page.locator("#saveApiKeysBtn")
@@ -60,9 +62,9 @@ def test_api_key_close_buttons_are_buttons(live_server, browser_page):
     count = close_btns.count()
     for i in range(count):
         tag = close_btns.nth(i).evaluate("el => el.tagName.toLowerCase()")
-        assert tag == "button", (
-            f"Close button at index {i} should be a <button>, got <{tag}>"
-        )
+        assert (
+            tag == "button"
+        ), f"Close button at index {i} should be a <button>, got <{tag}>"
 
     rc.assert_no_errors(name="api_key_close_buttons")
 
@@ -75,8 +77,8 @@ def test_api_key_managed_fields_exist(live_server, browser_page):
     managed_inputs = page.locator(
         "#openai-input, #openweather-input, #nasa-input, #unsplash-input"
     )
-    assert managed_inputs.count() >= 1, (
-        "Managed API keys page should have provider input fields"
-    )
+    assert (
+        managed_inputs.count() >= 1
+    ), "Managed API keys page should have provider input fields"
 
     rc.assert_no_errors(name="api_key_managed_fields")

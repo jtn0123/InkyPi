@@ -16,16 +16,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 _real_open = builtins.open
 
 
 def mock_cpuinfo(content):
     """Return a context manager that patches builtins.open to fake /proc/cpuinfo."""
+
     def _patched_open(path, *args, **kwargs):
         if path == "/proc/cpuinfo":
             return io.StringIO(content)
         return _real_open(path, *args, **kwargs)
+
     return patch("builtins.open", side_effect=_patched_open)
 
 
@@ -289,7 +290,7 @@ def test_pin_mapping_comprehensive(monkeypatch):
     # All pins should return correct values via digital_read
     for pin in [17, 25, 18, 24]:  # RST, DC, PWR, BUSY
         value = epdconfig.digital_read(pin)
-        assert isinstance(value, (int, bool))
+        assert isinstance(value, int | bool)
 
 
 def test_raspberry_pi_cleanup_mode_with_dev_config(monkeypatch):
@@ -318,7 +319,7 @@ def test_digital_read_all_pins(monkeypatch):
     # All pins should return a value without error
     for pin in [17, 25, 18, 24]:  # RST, DC, PWR, BUSY
         value = epdconfig.digital_read(pin)
-        assert isinstance(value, (int, bool))
+        assert isinstance(value, int | bool)
 
 
 def test_spi_configuration(monkeypatch):

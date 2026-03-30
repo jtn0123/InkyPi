@@ -98,9 +98,7 @@ class HTTPCache:
             max_size,
         )
 
-    def _make_cache_key(
-        self, url: str, params: dict[str, Any] | None = None
-    ) -> str:
+    def _make_cache_key(self, url: str, params: dict[str, Any] | None = None) -> str:
         """Generate a cache key from URL and parameters."""
         # Include params in the key for uniqueness
         key_parts = [url]
@@ -150,9 +148,7 @@ class HTTPCache:
         # Higher hit_count adds to the score, making it less likely to be evicted
         lru_key = min(
             self._cache.keys(),
-            key=lambda k: (
-                self._cache[k].cached_at + (self._cache[k].hit_count * 100)
-            ),
+            key=lambda k: (self._cache[k].cached_at + (self._cache[k].hit_count * 100)),
         )
         del self._cache[lru_key]
         self._stats.evictions += 1
@@ -252,10 +248,7 @@ class HTTPCache:
         if effective_ttl is None:
             # Try to get TTL from Cache-Control header
             header_ttl = self._parse_cache_control(response)
-            if header_ttl is not None:
-                effective_ttl = header_ttl
-            else:
-                effective_ttl = self.default_ttl
+            effective_ttl = header_ttl if header_ttl is not None else self.default_ttl
 
         # Don't cache if TTL is 0
         if effective_ttl <= 0:
@@ -358,9 +351,7 @@ def get_cache() -> HTTPCache:
         except ValueError:
             max_size = 100
 
-        _global_cache = HTTPCache(
-            default_ttl=ttl, max_size=max_size, enabled=enabled
-        )
+        _global_cache = HTTPCache(default_ttl=ttl, max_size=max_size, enabled=enabled)
         return _global_cache
 
 

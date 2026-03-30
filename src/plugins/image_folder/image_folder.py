@@ -10,16 +10,30 @@ from utils.image_utils import pad_image_blur
 
 logger = logging.getLogger(__name__)
 
+
 def list_files_in_folder(folder_path):
     """Return a list of image file paths in the given folder, excluding hidden files."""
-    image_extensions = ('.avif', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heif', '.heic')
-    image_files = []
-    for root, dirs, files in os.walk(folder_path, followlinks=False):
-        for f in files:
-            if f.lower().endswith(image_extensions) and not f.startswith('.'):
-                image_files.append(os.path.join(root, f))
+    image_extensions = (
+        ".avif",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".webp",
+        ".heif",
+        ".heic",
+    )
+    image_files = [
+        os.path.join(root, f)
+        for root, _dirs, files in os.walk(folder_path, followlinks=False)
+        for f in files
+        if f.lower().endswith(image_extensions) and not f.startswith(".")
+    ]
 
     return image_files
+
 
 class ImageFolder(BasePlugin):
     def build_settings_schema(self):
@@ -70,7 +84,7 @@ class ImageFolder(BasePlugin):
     def generate_image(self, settings, device_config):
         logger.info("=== Image Folder Plugin: Starting image generation ===")
 
-        folder_path = settings.get('folder_path')
+        folder_path = settings.get("folder_path")
         if not folder_path:
             logger.error("No folder path provided in settings")
             raise RuntimeError("Folder path is required.")
@@ -98,9 +112,11 @@ class ImageFolder(BasePlugin):
         logger.debug(f"Full path: {image_url}")
 
         # Check padding options
-        use_padding = settings.get('padImage') == "true"
-        background_option = settings.get('backgroundOption', 'blur')
-        logger.debug(f"Settings: pad_image={use_padding}, background_option={background_option}")
+        use_padding = settings.get("padImage") == "true"
+        background_option = settings.get("backgroundOption", "blur")
+        logger.debug(
+            f"Settings: pad_image={use_padding}, background_option={background_option}"
+        )
 
         try:
             # Use adaptive loader for memory-efficient processing
@@ -116,11 +132,20 @@ class ImageFolder(BasePlugin):
                 if background_option == "blur":
                     img = pad_image_blur(img, dimensions)
                 else:
-                    background_color = ImageColor.getcolor(settings.get('backgroundColor') or "white", img.mode)
-                    img = ImageOps.pad(img, dimensions, color=background_color, method=Image.Resampling.LANCZOS)
+                    background_color = ImageColor.getcolor(
+                        settings.get("backgroundColor") or "white", img.mode
+                    )
+                    img = ImageOps.pad(
+                        img,
+                        dimensions,
+                        color=background_color,
+                        method=Image.Resampling.LANCZOS,
+                    )
             else:
                 # No padding requested, scale to fit dimensions (crop to preserve aspect ratio)
-                logger.debug(f"Scaling to fit dimensions: {dimensions[0]}x{dimensions[1]}")
+                logger.debug(
+                    f"Scaling to fit dimensions: {dimensions[0]}x{dimensions[1]}"
+                )
                 img = ImageOps.fit(img, dimensions, method=Image.LANCZOS)
 
             logger.info("=== Image Folder Plugin: Image generation complete ===")

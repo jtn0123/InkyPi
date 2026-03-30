@@ -12,6 +12,7 @@ def plugin_config():
 
 # ---- Router (github.py) ----
 
+
 def test_github_routes_to_contributions(monkeypatch, plugin_config, device_config_dev):
     from plugins.github.github import GitHub
 
@@ -35,7 +36,11 @@ def test_github_routes_to_stars(monkeypatch, plugin_config, device_config_dev):
         mock_fn.return_value = Image.new("RGB", (800, 480))
         p = GitHub(plugin_config)
         result = p.generate_image(
-            {"githubType": "stars", "githubUsername": "octocat", "githubRepository": "Hello-World"},
+            {
+                "githubType": "stars",
+                "githubUsername": "octocat",
+                "githubRepository": "Hello-World",
+            },
             device_config_dev,
         )
     mock_fn.assert_called_once()
@@ -66,8 +71,11 @@ def test_github_unknown_type(plugin_config, device_config_dev):
 
 # ---- Contributions (github_contributions.py) ----
 
+
 def _graphql_contributions_response(count=5):
-    days = [{"contributionCount": count, "date": f"2025-01-{d:02d}"} for d in range(1, 8)]
+    days = [
+        {"contributionCount": count, "date": f"2025-01-{d:02d}"} for d in range(1, 8)
+    ]
     return {
         "data": {
             "user": {
@@ -91,21 +99,31 @@ def test_contributions_success(monkeypatch, plugin_config, device_config_dev):
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response()
 
-    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+    with patch(
+        "plugins.github.github_contributions.get_http_session"
+    ) as mock_session_fn:
         mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {
                 "githubType": "contributions",
                 "githubUsername": "octocat",
-                "contributionColor[]": ["#eee", "#9be9a8", "#40c463", "#30a14e", "#216e39"],
+                "contributionColor[]": [
+                    "#eee",
+                    "#9be9a8",
+                    "#40c463",
+                    "#30a14e",
+                    "#216e39",
+                ],
             },
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
 
 
-def test_contributions_missing_colors_uses_defaults(monkeypatch, plugin_config, device_config_dev):
+def test_contributions_missing_colors_uses_defaults(
+    monkeypatch, plugin_config, device_config_dev
+):
     """Bug 8: Missing contributionColor[] should use default palette, not crash."""
     from plugins.github.github import GitHub
 
@@ -115,7 +133,9 @@ def test_contributions_missing_colors_uses_defaults(monkeypatch, plugin_config, 
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response()
 
-    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+    with patch(
+        "plugins.github.github_contributions.get_http_session"
+    ) as mock_session_fn:
         mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
@@ -156,13 +176,18 @@ def test_contributions_missing_username(monkeypatch, plugin_config, device_confi
 
 
 def test_contributions_api_error(monkeypatch, plugin_config, device_config_dev):
-    from plugins.github.github import GitHub
     import requests as req_mod
+
+    from plugins.github.github import GitHub
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
 
-    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
-        mock_session_fn.return_value.post.side_effect = req_mod.exceptions.HTTPError("Server error")
+    with patch(
+        "plugins.github.github_contributions.get_http_session"
+    ) as mock_session_fn:
+        mock_session_fn.return_value.post.side_effect = req_mod.exceptions.HTTPError(
+            "Server error"
+        )
         p = GitHub(plugin_config)
         with pytest.raises(Exception):
             p.generate_image(
@@ -184,14 +209,22 @@ def test_contributions_empty_data(monkeypatch, plugin_config, device_config_dev)
     mock_resp.raise_for_status = MagicMock()
     mock_resp.json.return_value = _graphql_contributions_response(count=0)
 
-    with patch("plugins.github.github_contributions.get_http_session") as mock_session_fn:
+    with patch(
+        "plugins.github.github_contributions.get_http_session"
+    ) as mock_session_fn:
         mock_session_fn.return_value.post.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
             {
                 "githubType": "contributions",
                 "githubUsername": "octocat",
-                "contributionColor[]": ["#eee", "#9be9a8", "#40c463", "#30a14e", "#216e39"],
+                "contributionColor[]": [
+                    "#eee",
+                    "#9be9a8",
+                    "#40c463",
+                    "#30a14e",
+                    "#216e39",
+                ],
             },
             device_config_dev,
         )
@@ -199,6 +232,7 @@ def test_contributions_empty_data(monkeypatch, plugin_config, device_config_dev)
 
 
 # ---- Stars (github_stars.py) ----
+
 
 def test_stars_success(monkeypatch, plugin_config, device_config_dev):
     from plugins.github.github import GitHub
@@ -211,7 +245,11 @@ def test_stars_success(monkeypatch, plugin_config, device_config_dev):
         mock_session_fn.return_value.get.return_value = mock_resp
         p = GitHub(plugin_config)
         result = p.generate_image(
-            {"githubType": "stars", "githubUsername": "octocat", "githubRepository": "Hello-World"},
+            {
+                "githubType": "stars",
+                "githubUsername": "octocat",
+                "githubRepository": "Hello-World",
+            },
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
@@ -240,13 +278,18 @@ def test_stars_http_error(monkeypatch, plugin_config, device_config_dev):
         p = GitHub(plugin_config)
         # fetch_stars returns 0 on error; stars_generate_image still renders
         result = p.generate_image(
-            {"githubType": "stars", "githubUsername": "octocat", "githubRepository": "nonexistent"},
+            {
+                "githubType": "stars",
+                "githubUsername": "octocat",
+                "githubRepository": "nonexistent",
+            },
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
 
 
 # ---- Sponsors (github_sponsors.py) ----
+
 
 def _graphql_sponsors_response():
     return {

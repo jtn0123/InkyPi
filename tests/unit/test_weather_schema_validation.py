@@ -42,11 +42,17 @@ def test_openweather_schema_loose_example():
 
 def test_openmeteo_schema_loose_example():
     payload = {
-        "current_weather": {"time": "2025-01-01T12:00", "temperature": 21, "weathercode": 1},
-        "daily": {"time": ["2025-01-01"], "temperature_2m_max": [25], "temperature_2m_min": [10], "weathercode": [1]},
+        "current_weather": {
+            "time": "2025-01-01T12:00",
+            "temperature": 21,
+            "weathercode": 1,
+        },
+        "daily": {
+            "time": ["2025-01-01"],
+            "temperature_2m_max": [25],
+            "temperature_2m_min": [10],
+            "weathercode": [1],
+        },
         "hourly": {"time": ["2025-01-01T12:00"], "temperature_2m": [21]},
     }
     _validate_openmeteo_schema(payload)
-
-
-

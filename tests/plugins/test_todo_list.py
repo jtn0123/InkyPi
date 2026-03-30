@@ -62,7 +62,7 @@ def test_todo_list_empty_items_filtered(plugin_config, device_config_dev):
 def test_todo_list_font_sizes(plugin_config, device_config_dev):
     from plugins.todo_list.todo_list import FONT_SIZES, TodoList
 
-    for size_name, expected_scale in FONT_SIZES.items():
+    for size_name in FONT_SIZES:
         p = TodoList(plugin_config)
         result = p.generate_image(
             {

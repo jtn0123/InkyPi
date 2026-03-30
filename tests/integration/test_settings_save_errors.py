@@ -78,7 +78,6 @@ def test_save_settings_missing_timezone_and_bad_time_format(client):
 
 def test_save_settings_success_triggers_config_change_signal(client, monkeypatch):
     # Spy refresh_task.signal_config_change
-    from blueprints import settings as settings_mod
 
     called = {"signal": 0}
 

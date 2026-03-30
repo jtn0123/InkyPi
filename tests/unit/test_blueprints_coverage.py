@@ -1,8 +1,6 @@
 """Tests for blueprint routes to improve code coverage."""
 
-import pytest
-from datetime import datetime
-from unittest.mock import patch, Mock, MagicMock
+from unittest.mock import patch
 
 
 def test_get_current_image_conditional_request(client, device_config_dev):
@@ -23,7 +21,7 @@ def test_refresh_info_with_exception(client, device_config_dev):
     with patch.object(
         device_config_dev,
         "get_refresh_info",
-        side_effect=Exception("Refresh info error")
+        side_effect=Exception("Refresh info error"),
     ):
         resp = client.get("/refresh-info")
         assert resp.status_code == 200
@@ -53,7 +51,6 @@ def test_next_up_no_playlist(client, device_config_dev):
 
 def test_next_up_no_next_plugin(client, device_config_dev, monkeypatch):
     """Test next_up when playlist has no next plugin."""
-    from datetime import datetime, timezone
 
     pm = device_config_dev.get_playlist_manager()
 
@@ -62,13 +59,14 @@ def test_next_up_no_next_plugin(client, device_config_dev, monkeypatch):
         pm.add_playlist("Default", "00:00", "24:00")
 
     playlist = pm.get_playlist("Default")
-    original_peek = playlist.peek_next_plugin
 
     def mock_peek_next(*args, **kwargs):
         return None
 
     with patch.object(playlist, "peek_next_plugin", side_effect=mock_peek_next):
-        with patch.object(playlist, "peek_next_eligible_plugin", side_effect=mock_peek_next):
+        with patch.object(
+            playlist, "peek_next_eligible_plugin", side_effect=mock_peek_next
+        ):
             resp = client.get("/next-up")
             assert resp.status_code == 200
             data = resp.get_json()
@@ -80,7 +78,9 @@ def test_next_up_with_exception(client, device_config_dev):
     pm = device_config_dev.get_playlist_manager()
 
     # Mock determine_active_playlist to raise an exception
-    with patch.object(pm, "determine_active_playlist", side_effect=Exception("Playlist error")):
+    with patch.object(
+        pm, "determine_active_playlist", side_effect=Exception("Playlist error")
+    ):
         resp = client.get("/next-up")
         assert resp.status_code == 200
         data = resp.get_json()
@@ -96,7 +96,9 @@ def test_static_files_route(client):
 
 def test_current_image_with_invalid_if_modified_since(client, device_config_dev):
     """Test get_current_image with invalid If-Modified-Since header — 404 when no image."""
-    resp = client.get("/current-image", headers={"If-Modified-Since": "invalid-date-format"})
+    resp = client.get(
+        "/current-image", headers={"If-Modified-Since": "invalid-date-format"}
+    )
     assert resp.status_code == 404
 
 

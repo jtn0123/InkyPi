@@ -2,7 +2,6 @@
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -57,7 +56,9 @@ def validate_plugin_folder(plugin_dir: Path) -> list[str]:
     render_dir = plugin_dir / "render"
     if not settings_html.is_file():
         # Not strictly required but warn
-        errors.append("Warning: settings.html not found (plugin may not be configurable)")
+        errors.append(
+            "Warning: settings.html not found (plugin may not be configurable)"
+        )
     if not render_dir.is_dir():
         errors.append(
             "Warning: render/ directory not found (plugin may not use HTML renderer)"
@@ -79,7 +80,9 @@ def main() -> int:
     if args.plugin:
         targets = [PLUGINS_DIR / args.plugin]
     else:
-        targets = [p for p in PLUGINS_DIR.iterdir() if p.is_dir() and p.name != "__pycache__"]
+        targets = [
+            p for p in PLUGINS_DIR.iterdir() if p.is_dir() and p.name != "__pycache__"
+        ]
 
     overall_errors = 0
     for plugin_dir in sorted(targets):
@@ -98,5 +101,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

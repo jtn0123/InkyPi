@@ -5,9 +5,7 @@ import os
 from pathlib import Path
 
 import pytest
-
 from scripts.ui_audit import TOP_LEVEL_ROUTES, discover_plugin_ids
-
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
 pytestmark = pytest.mark.skipif(
@@ -121,30 +119,34 @@ def _attach_runtime_collectors(page, base_url: str):
     page.on("console", handle_console)
     page.on(
         "requestfailed",
-        lambda request: runtime["request_failures"].append(
-            {
-                "url": request.url,
-                "resource_type": request.resource_type,
-                "failure": request.failure or "",
-            }
-        )
-        if request.url.startswith(base_url)
-        and request.resource_type in CRITICAL_RESPONSE_TYPES
-        else None,
+        lambda request: (
+            runtime["request_failures"].append(
+                {
+                    "url": request.url,
+                    "resource_type": request.resource_type,
+                    "failure": request.failure or "",
+                }
+            )
+            if request.url.startswith(base_url)
+            and request.resource_type in CRITICAL_RESPONSE_TYPES
+            else None
+        ),
     )
     page.on(
         "response",
-        lambda response: runtime["response_failures"].append(
-            {
-                "url": response.url,
-                "status": response.status,
-                "resource_type": response.request.resource_type,
-            }
-        )
-        if response.url.startswith(base_url)
-        and response.status >= 400
-        and response.request.resource_type in CRITICAL_RESPONSE_TYPES
-        else None,
+        lambda response: (
+            runtime["response_failures"].append(
+                {
+                    "url": response.url,
+                    "status": response.status,
+                    "resource_type": response.request.resource_type,
+                }
+            )
+            if response.url.startswith(base_url)
+            and response.status >= 400
+            and response.request.resource_type in CRITICAL_RESPONSE_TYPES
+            else None
+        ),
     )
     return runtime
 
@@ -176,7 +178,9 @@ def _assert_skip_link_present(page):
 
 def _assert_plugin_page_ready(page, plugin_id: str):
     page.wait_for_selector("#settingsForm", state="attached")
-    interactive_fields = page.locator("#settingsForm input, #settingsForm select, #settingsForm textarea")
+    interactive_fields = page.locator(
+        "#settingsForm input, #settingsForm select, #settingsForm textarea"
+    )
     assert interactive_fields.count() > 0
 
     if plugin_id == "calendar":
@@ -196,7 +200,9 @@ def _assert_plugin_page_ready(page, plugin_id: str):
 
 
 def _new_page(browser, viewport: dict, theme: str):
-    page = browser.new_page(viewport={"width": viewport["width"], "height": viewport["height"]})
+    page = browser.new_page(
+        viewport={"width": viewport["width"], "height": viewport["height"]}
+    )
     page.add_init_script(
         script=f"""
         (() => {{
@@ -241,7 +247,9 @@ def _maybe_capture_baseline(page, screenshot_dir: Path, name: str):
     page.screenshot(path=str(screenshot_dir / f"{_slug(name)}.png"), full_page=True)
 
 
-def _open_and_check(page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path):
+def _open_and_check(
+    page, base_url: str, route_name: str, route_path: str, screenshot_dir: Path
+):
     runtime = _attach_runtime_collectors(page, base_url)
     page.goto(f"{base_url}{route_path}", wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector("[data-page-shell]", timeout=10000)
@@ -267,7 +275,9 @@ def test_top_level_tabs_boot_cleanly(live_server, tmp_path):
         try:
             for route_name, route_path in TOP_LEVEL_ROUTES:
                 page = browser.new_page(viewport={"width": 1440, "height": 1100})
-                runtime = _open_and_check(page, live_server, route_name, route_path, screenshot_dir)
+                runtime = _open_and_check(
+                    page, live_server, route_name, route_path, screenshot_dir
+                )
                 marker = TOP_LEVEL_MARKERS[route_name]
                 page.wait_for_selector(marker, timeout=10000)
                 if route_name == "settings":
@@ -315,7 +325,9 @@ def test_top_level_tabs_phone_layout(live_server, tmp_path, viewport, theme):
         try:
             for route_name, route_path in TOP_LEVEL_ROUTES:
                 page = _new_page(browser, viewport, theme)
-                runtime = _open_and_check(page, live_server, route_name, route_path, screenshot_dir)
+                runtime = _open_and_check(
+                    page, live_server, route_name, route_path, screenshot_dir
+                )
                 page.wait_for_selector(TOP_LEVEL_MARKERS[route_name], timeout=10000)
                 _assert_no_horizontal_overflow(page)
                 _assert_action_visible(page, TOP_LEVEL_PRIMARY_ACTIONS[route_name])
@@ -324,7 +336,12 @@ def test_top_level_tabs_phone_layout(live_server, tmp_path, viewport, theme):
                     screenshot_dir,
                     f"mobile_{route_name}_{theme}_{viewport['label']}",
                 )
-                _assert_clean_runtime(page, runtime, screenshot_dir, f"mobile_{route_name}_{theme}_{viewport['label']}")
+                _assert_clean_runtime(
+                    page,
+                    runtime,
+                    screenshot_dir,
+                    f"mobile_{route_name}_{theme}_{viewport['label']}",
+                )
                 page.close()
         finally:
             browser.close()

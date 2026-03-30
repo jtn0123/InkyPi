@@ -44,7 +44,7 @@ class ProgressTracker:
             name=name,
             description=description or name,
             elapsed_ms=elapsed_ms,
-            status="completed"
+            status="completed",
         )
         self.steps.append(step)
         self._last = now
@@ -60,11 +60,13 @@ class ProgressTracker:
             name=name,
             description=description or name,
             elapsed_ms=0,
-            status="in_progress"
+            status="in_progress",
         )
         self.steps.append(step)
 
-    def update_current_step(self, description: str, substeps: list[str] | None = None) -> None:
+    def update_current_step(
+        self, description: str, substeps: list[str] | None = None
+    ) -> None:
         """Update the description or substeps of the current step."""
         if self.steps and self.steps[-1].status == "in_progress":
             self.steps[-1].description = description
@@ -75,7 +77,9 @@ class ProgressTracker:
         """Complete the current step with final timing."""
         if self.steps and self.steps[-1].status == "in_progress":
             now = perf_counter()
-            elapsed_ms = max(1, int((now - self._current_step_start) * 1000))  # Ensure at least 1ms
+            elapsed_ms = max(
+                1, int((now - self._current_step_start) * 1000)
+            )  # Ensure at least 1ms
             self.steps[-1].elapsed_ms = elapsed_ms
             self.steps[-1].status = "completed"
             if description:
@@ -87,7 +91,9 @@ class ProgressTracker:
         """Mark the current step as failed with an error message."""
         if self.steps and self.steps[-1].status == "in_progress":
             now = perf_counter()
-            elapsed_ms = max(1, int((now - self._current_step_start) * 1000))  # Ensure at least 1ms
+            elapsed_ms = max(
+                1, int((now - self._current_step_start) * 1000)
+            )  # Ensure at least 1ms
             self.steps[-1].elapsed_ms = elapsed_ms
             self.steps[-1].status = "failed"
             self.steps[-1].error_message = error_message

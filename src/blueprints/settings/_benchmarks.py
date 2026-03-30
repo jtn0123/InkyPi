@@ -2,9 +2,9 @@
 
 import sqlite3
 
-import blueprints.settings as _mod
-
 from flask import jsonify, request
+
+import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
 
 
@@ -36,10 +36,22 @@ def benchmarks_summary():
                 "success": True,
                 "count": len(rows),
                 "summary": {
-                    "request_ms": {"p50": _mod._pct(req, 0.5), "p95": _mod._pct(req, 0.95)},
-                    "generate_ms": {"p50": _mod._pct(gen, 0.5), "p95": _mod._pct(gen, 0.95)},
-                    "preprocess_ms": {"p50": _mod._pct(pre, 0.5), "p95": _mod._pct(pre, 0.95)},
-                    "display_ms": {"p50": _mod._pct(dsp, 0.5), "p95": _mod._pct(dsp, 0.95)},
+                    "request_ms": {
+                        "p50": _mod._pct(req, 0.5),
+                        "p95": _mod._pct(req, 0.95),
+                    },
+                    "generate_ms": {
+                        "p50": _mod._pct(gen, 0.5),
+                        "p95": _mod._pct(gen, 0.95),
+                    },
+                    "preprocess_ms": {
+                        "p50": _mod._pct(pre, 0.5),
+                        "p95": _mod._pct(pre, 0.95),
+                    },
+                    "display_ms": {
+                        "p50": _mod._pct(dsp, 0.5),
+                        "p95": _mod._pct(dsp, 0.95),
+                    },
                 },
             }
         )
@@ -125,17 +137,28 @@ def benchmarks_plugins():
             """,
             (since,),
         ).fetchall()
-        items = []
-        for r in rows:
-            items.append(
-                {
-                    "plugin_id": r["plugin_id"],
-                    "runs": int(r["runs"] or 0),
-                    "request_avg": int(round(r["request_avg"])) if r["request_avg"] is not None else None,
-                    "generate_avg": int(round(r["generate_avg"])) if r["generate_avg"] is not None else None,
-                    "display_avg": int(round(r["display_avg"])) if r["display_avg"] is not None else None,
-                }
-            )
+        items = [
+            {
+                "plugin_id": r["plugin_id"],
+                "runs": int(r["runs"] or 0),
+                "request_avg": (
+                    int(round(r["request_avg"]))
+                    if r["request_avg"] is not None
+                    else None
+                ),
+                "generate_avg": (
+                    int(round(r["generate_avg"]))
+                    if r["generate_avg"] is not None
+                    else None
+                ),
+                "display_avg": (
+                    int(round(r["display_avg"]))
+                    if r["display_avg"] is not None
+                    else None
+                ),
+            }
+            for r in rows
+        ]
         return jsonify({"success": True, "items": items})
     except Exception as e:
         return json_internal_error("benchmarks plugins", details={"error": str(e)})

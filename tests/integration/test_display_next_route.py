@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from PIL import Image
 
 
 def _fixed_now(_device_config):
-    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
 def _add_playlist_with_plugin(device_config):
@@ -32,7 +32,9 @@ def _add_empty_playlist(device_config):
 
 
 @pytest.mark.integration
-def test_display_next_returns_metrics(client, device_config_dev, monkeypatch, flask_app):
+def test_display_next_returns_metrics(
+    client, device_config_dev, monkeypatch, flask_app
+):
     flask_app.config["REFRESH_TASK"].running = False
 
     _add_playlist_with_plugin(device_config_dev)
@@ -68,7 +70,9 @@ def test_display_next_returns_metrics(client, device_config_dev, monkeypatch, fl
 
 
 @pytest.mark.integration
-def test_display_next_no_playlist_returns_error(client, device_config_dev, monkeypatch, flask_app):
+def test_display_next_no_playlist_returns_error(
+    client, device_config_dev, monkeypatch, flask_app
+):
     flask_app.config["REFRESH_TASK"].running = False
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
     pm = device_config_dev.get_playlist_manager()
@@ -82,7 +86,9 @@ def test_display_next_no_playlist_returns_error(client, device_config_dev, monke
 
 
 @pytest.mark.integration
-def test_display_next_no_plugin_returns_error(client, device_config_dev, monkeypatch, flask_app):
+def test_display_next_no_plugin_returns_error(
+    client, device_config_dev, monkeypatch, flask_app
+):
     flask_app.config["REFRESH_TASK"].running = False
     _add_empty_playlist(device_config_dev)
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)

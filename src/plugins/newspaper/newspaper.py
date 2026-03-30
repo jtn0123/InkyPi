@@ -11,6 +11,8 @@ from utils.image_utils import get_image
 logger = logging.getLogger(__name__)
 
 FREEDOM_FORUM_URL = "https://cdn.freedomforum.org/dfp/jpg{}/lg/{}.jpg"
+
+
 class Newspaper(BasePlugin):
     def build_settings_schema(self):
         return schema(
@@ -24,7 +26,7 @@ class Newspaper(BasePlugin):
         )
 
     def generate_image(self, settings, device_config):
-        newspaper_slug = settings.get('newspaperSlug')
+        newspaper_slug = settings.get("newspaperSlug")
 
         if not newspaper_slug:
             raise RuntimeError("Newspaper input not provided.")
@@ -34,14 +36,16 @@ class Newspaper(BasePlugin):
         today = datetime.today()
 
         # check the next day, then today, then prior day
-        days = [today + timedelta(days=diff) for diff in [1,0,-1,-2]]
+        days = [today + timedelta(days=diff) for diff in [1, 0, -1, -2]]
 
         image = None
         for date in days:
             image_url = FREEDOM_FORUM_URL.format(date.day, newspaper_slug)
             image = get_image(image_url)
             if image:
-                logger.info(f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}")
+                logger.info(
+                    f"Found {newspaper_slug} front cover for {date.strftime('%Y-%m-%d')}"
+                )
                 break
 
         if image:
@@ -62,10 +66,10 @@ class Newspaper(BasePlugin):
                 image = new_image
         else:
             raise RuntimeError("Newspaper front cover not found.")
-    
+
         return image
-    
+
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['newspapers'] = sorted(NEWSPAPERS, key=lambda n: n['name'])
+        template_params["newspapers"] = sorted(NEWSPAPERS, key=lambda n: n["name"])
         return template_params

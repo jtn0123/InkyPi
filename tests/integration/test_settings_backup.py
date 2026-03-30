@@ -50,7 +50,7 @@ def test_import_round_trip_updates_config_and_keys(client, device_config_dev):
 
     resp = client.post(
         "/settings/import",
-        data={"file": (io.BytesIO(json.dumps(payload).encode('utf-8')), "backup.json")},
+        data={"file": (io.BytesIO(json.dumps(payload).encode("utf-8")), "backup.json")},
         content_type="multipart/form-data",
     )
     assert resp.status_code == 200
@@ -97,5 +97,3 @@ def test_import_ignores_unknown_config_and_env_keys(client, device_config_dev):
     assert device_config_dev.load_env_key("EVIL_KEY") is None
     # Allowed env key should be set
     assert device_config_dev.load_env_key("OPEN_AI_SECRET") == "sk-ok"
-
-

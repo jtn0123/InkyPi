@@ -10,7 +10,7 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait
+from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
 
 
 def test_plugin_settings_form_has_fields(live_server, browser_page, tmp_path):

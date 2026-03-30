@@ -22,11 +22,13 @@ try:
     # Optional import; code must continue if unavailable
     from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 except Exception:  # pragma: no cover
+
     def save_refresh_event(*args, **kwargs):  # type: ignore
         return None
 
     def save_stage_event(*args, **kwargs):  # type: ignore
         return None
+
 
 try:
     from cysystemd.daemon import notify as _sd_notify
@@ -47,6 +49,7 @@ class ManualUpdateRequest:
 
 def _get_mp_context():
     import sys
+
     # forkserver spawns children from a lean server process, reducing memory
     # on constrained devices like Pi Zero 2W. It requires picklable arguments,
     # so we only prefer it on Linux where the production target runs.
@@ -150,7 +153,9 @@ class RefreshTask:
             self.running = False
             while self.manual_update_requests:
                 request = self.manual_update_requests.popleft()
-                request.exception = RuntimeError("Refresh task stopped before request completed")
+                request.exception = RuntimeError(
+                    "Refresh task stopped before request completed"
+                )
                 request.done.set()
             self.condition.notify_all()  # Wake the thread to let it exit
         if self.thread:
@@ -177,7 +182,7 @@ class RefreshTask:
         5. Updates the refresh metadata in the device configuration.
         6. Repeats the process until `stop()` is called.
 
-        Handles any exceptions that occur during the refresh process and ensures the refresh event is set 
+        Handles any exceptions that occur during the refresh process and ensures the refresh event is set
         to indicate completion.
 
         Exceptions:
@@ -202,7 +207,10 @@ class RefreshTask:
 
                 if refresh_action:
                     refresh_info, used_cached, metrics = self._perform_refresh(
-                        refresh_action, latest_refresh, current_dt, request_id=request_id
+                        refresh_action,
+                        latest_refresh,
+                        current_dt,
+                        request_id=request_id,
                     )
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
@@ -276,7 +284,9 @@ class RefreshTask:
                 refresh_action = PlaylistRefresh(playlist, plugin_instance)
         return refresh_action, request_id
 
-    def _perform_refresh(self, refresh_action, latest_refresh, current_dt, request_id=None):
+    def _perform_refresh(
+        self, refresh_action, latest_refresh, current_dt, request_id=None
+    ):
         """Execute the refresh action and update the display if needed.
 
         Returns a tuple ``(refresh_info, used_cached, metrics)`` where
@@ -294,7 +304,10 @@ class RefreshTask:
             return None, False, {}
 
         isolated_plugins = self.device_config.get_config("isolated_plugins", default=[])
-        if isinstance(isolated_plugins, list) and refresh_action.get_plugin_id() in isolated_plugins:
+        if (
+            isinstance(isolated_plugins, list)
+            and refresh_action.get_plugin_id() in isolated_plugins
+        ):
             raise RuntimeError(
                 f"Plugin '{refresh_action.get_plugin_id()}' is currently isolated/disabled."
             )
@@ -372,7 +385,9 @@ class RefreshTask:
                     int((perf_counter() - stage_t0) * 1000),
                 )
             except Exception:
-                logger.debug("Failed to save generate_image benchmark event", exc_info=True)
+                logger.debug(
+                    "Failed to save generate_image benchmark event", exc_info=True
+                )
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
         # Plugin lifecycle: generate_complete
         logger.info(
@@ -491,7 +506,9 @@ class RefreshTask:
                             extra={"driver": display_driver},
                         )
                 except Exception:
-                    logger.debug("Failed to save display_pipeline benchmark event", exc_info=True)
+                    logger.debug(
+                        "Failed to save display_pipeline benchmark event", exc_info=True
+                    )
         else:
             logger.info(
                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
@@ -585,7 +602,10 @@ class RefreshTask:
         if self.running:
             request = ManualUpdateRequest(str(uuid4()), refresh_action)
             with self.condition:
-                if len(self.manual_update_requests) >= self.manual_update_requests.maxlen:
+                if (
+                    len(self.manual_update_requests)
+                    >= self.manual_update_requests.maxlen
+                ):
                     raise RuntimeError(
                         "Manual update queue is full. Please wait for pending requests to complete."
                     )
@@ -642,9 +662,13 @@ class RefreshTask:
                 raise RuntimeError(str(exc))
             return metrics
         else:
-            logger.warning("Background refresh task is not running, unable to do a manual update")
+            logger.warning(
+                "Background refresh task is not running, unable to do a manual update"
+            )
 
-    def _execute_with_policy(self, refresh_action, plugin_config, current_dt: datetime, request_id=None):
+    def _execute_with_policy(
+        self, refresh_action, plugin_config, current_dt: datetime, request_id=None
+    ):
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
@@ -791,17 +815,19 @@ class RefreshTask:
         for attempt in range(1, attempts + 1):
             result_holder: dict = {}
 
-            def _worker():
+            def _worker(holder=result_holder):
                 try:
                     plugin = get_plugin_instance(plugin_config)
-                    image = refresh_action.execute(plugin, self.device_config, current_dt)
+                    image = refresh_action.execute(
+                        plugin, self.device_config, current_dt
+                    )
                     meta = None
                     if hasattr(plugin, "get_latest_metadata"):
                         meta = plugin.get_latest_metadata()
-                    result_holder["image"] = image
-                    result_holder["meta"] = meta
+                    holder["image"] = image
+                    holder["meta"] = meta
                 except Exception as exc:
-                    result_holder["error"] = exc
+                    holder["error"] = exc
 
             worker_thread = threading.Thread(target=_worker, daemon=True)
             worker_thread.start()

@@ -39,7 +39,9 @@ def test_unsplash_search_success(monkeypatch, device_config_dev):
         return RespApi({"urls": {"full": "http://img"}})
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
-    monkeypatch.setattr("plugins.unsplash.unsplash.get_http_session", lambda: mock_session)
+    monkeypatch.setattr(
+        "plugins.unsplash.unsplash.get_http_session", lambda: mock_session
+    )
 
     img = Unsplash({"id": "unsplash"}).generate_image(
         {"search_query": "cat"}, device_config_dev
@@ -76,7 +78,10 @@ def test_unsplash_random_photo_success(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock PIL Image
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
@@ -114,7 +119,10 @@ def test_unsplash_with_collections(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock PIL Image
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
@@ -153,7 +161,10 @@ def test_unsplash_with_color_filter(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock PIL Image
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
@@ -192,7 +203,10 @@ def test_unsplash_with_orientation(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock PIL Image
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
@@ -335,7 +349,10 @@ def test_unsplash_vertical_orientation(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock grab_image to return a mock image
         with patch("plugins.unsplash.unsplash.grab_image") as mock_grab:
@@ -367,7 +384,9 @@ def test_grab_image_success():
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
             mock_img_instance = MagicMock()
             mock_resized = MagicMock()
-            mock_image.open.return_value.__enter__ = MagicMock(return_value=mock_img_instance)
+            mock_image.open.return_value.__enter__ = MagicMock(
+                return_value=mock_img_instance
+            )
             mock_image.open.return_value.__exit__ = MagicMock(return_value=False)
             mock_img_instance.resize.return_value = mock_resized
 
@@ -435,7 +454,10 @@ def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
         mock_img_response.status_code = 200
         mock_img_response.content = b"fake_image_data"
 
-        mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+        mock_session_fn.return_value.get.side_effect = [
+            mock_api_response,
+            mock_img_response,
+        ]
 
         # Mock PIL Image
         with patch("plugins.unsplash.unsplash.Image") as mock_image:
@@ -448,12 +470,17 @@ def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
             # Test different content filter values
             for content_filter in ["low", "high"]:
                 mock_session_fn.return_value.get.reset_mock()
-                mock_session_fn.return_value.get.side_effect = [mock_api_response, mock_img_response]
+                mock_session_fn.return_value.get.side_effect = [
+                    mock_api_response,
+                    mock_img_response,
+                ]
 
                 settings = {"content_filter": content_filter}
                 result = p.generate_image(settings, device_config_dev)
 
                 # Verify content_filter parameter was passed
-                api_call = mock_session_fn.return_value.get.call_args_list[0]  # Get the API call
+                api_call = mock_session_fn.return_value.get.call_args_list[
+                    0
+                ]  # Get the API call
                 assert api_call[1]["params"]["content_filter"] == content_filter
                 assert result is not None

@@ -104,7 +104,9 @@ def test_take_screenshot_html_failure(monkeypatch):
         stderr = b"boom"
 
     # Mock _playwright_screenshot_html to return None so it falls back to subprocess method
-    monkeypatch.setattr("utils.image_utils._playwright_screenshot_html", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "utils.image_utils._playwright_screenshot_html", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr("utils.image_utils.subprocess.run", lambda *a, **k: Result())
     monkeypatch.setattr("utils.image_utils.os.path.exists", lambda p: False)
 

@@ -1,19 +1,18 @@
 """Tests for HTTP response caching functionality."""
 
-import time
 from unittest.mock import Mock, patch
 
 import pytest
 import requests
 
 from utils.http_cache import (
-    HTTPCache,
     CacheEntry,
     CacheStats,
-    get_cache,
-    clear_cache,
-    get_cache_stats,
+    HTTPCache,
     _reset_cache_for_tests,
+    clear_cache,
+    get_cache,
+    get_cache_stats,
 )
 
 

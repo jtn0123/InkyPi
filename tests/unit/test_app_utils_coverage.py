@@ -1,9 +1,8 @@
 """Tests for app_utils.py to improve code coverage."""
 
-import os
-import pytest
 from io import BytesIO
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
+
 from PIL import Image
 from werkzeug.datastructures import FileStorage, ImmutableMultiDict
 
@@ -44,12 +43,9 @@ def test_parse_form_with_list_params():
     from utils.app_utils import parse_form
 
     # Create mock form with list parameter
-    mock_form = ImmutableMultiDict([
-        ("name", "test"),
-        ("tags[]", "tag1"),
-        ("tags[]", "tag2"),
-        ("tags[]", "tag3")
-    ])
+    mock_form = ImmutableMultiDict(
+        [("name", "test"), ("tags[]", "tag1"), ("tags[]", "tag2"), ("tags[]", "tag3")]
+    )
 
     result = parse_form(mock_form)
     assert result["name"] == "test"
@@ -79,6 +75,7 @@ def test_get_font_path():
     # Test with a known font (if FONTS dict has entries)
     try:
         from utils.app_utils import FONTS
+
         if FONTS:
             first_font = list(FONTS.keys())[0]
             path = get_font_path(first_font)
@@ -100,9 +97,7 @@ def test_handle_request_files_with_valid_file():
     buf.seek(0)
 
     file_storage = FileStorage(
-        stream=buf,
-        filename="test.png",
-        content_type="image/png"
+        stream=buf, filename="test.png", content_type="image/png"
     )
 
     mock_files = ImmutableMultiDict([("image", file_storage)])
@@ -119,9 +114,7 @@ def test_handle_request_files_skips_invalid_extension():
 
     buf = BytesIO(b"text data")
     file_storage = FileStorage(
-        stream=buf,
-        filename="test.txt",  # .txt not allowed
-        content_type="text/plain"
+        stream=buf, filename="test.txt", content_type="text/plain"  # .txt not allowed
     )
 
     mock_files = ImmutableMultiDict([("file", file_storage)])
@@ -137,9 +130,7 @@ def test_handle_request_files_skips_empty_filename():
 
     buf = BytesIO(b"data")
     file_storage = FileStorage(
-        stream=buf,
-        filename="",  # Empty filename
-        content_type="image/png"
+        stream=buf, filename="", content_type="image/png"  # Empty filename
     )
 
     mock_files = ImmutableMultiDict([("file", file_storage)])
@@ -147,4 +138,3 @@ def test_handle_request_files_skips_empty_filename():
 
     # Should skip files with no filename
     assert "file" not in result or not result.get("file")
-

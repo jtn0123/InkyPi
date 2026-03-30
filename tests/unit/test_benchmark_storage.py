@@ -4,8 +4,6 @@ import os
 import sqlite3
 import time
 
-import pytest
-
 
 class MockDeviceConfig:
     """Mock device config for testing benchmark storage."""
@@ -44,9 +42,7 @@ def test_get_db_path_handles_empty_config_value(tmp_path):
     """Empty config value falls back to default path."""
     from benchmarks.benchmark_storage import _get_db_path
 
-    config = MockDeviceConfig(
-        config={"benchmarks_db_path": ""}, base_dir=str(tmp_path)
-    )
+    config = MockDeviceConfig(config={"benchmarks_db_path": ""}, base_dir=str(tmp_path))
     result = _get_db_path(config)
     assert result == os.path.join(str(tmp_path), "benchmarks.db")
 
@@ -281,7 +277,9 @@ def test_save_refresh_event_data_integrity(tmp_path, monkeypatch):
     save_refresh_event(config, event)
 
     conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT * FROM refresh_events WHERE refresh_id = ?", ("integrity-test",))
+    cursor = conn.execute(
+        "SELECT * FROM refresh_events WHERE refresh_id = ?", ("integrity-test",)
+    )
     row = cursor.fetchone()
     conn.close()
 
@@ -317,7 +315,9 @@ def test_save_refresh_event_uses_current_time_if_no_ts(tmp_path, monkeypatch):
     after = time.time()
 
     conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT ts FROM refresh_events WHERE refresh_id = ?", ("no-ts",))
+    cursor = conn.execute(
+        "SELECT ts FROM refresh_events WHERE refresh_id = ?", ("no-ts",)
+    )
     row = cursor.fetchone()
     conn.close()
 
@@ -347,7 +347,9 @@ def test_save_stage_event(tmp_path, monkeypatch):
     )
 
     conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT * FROM stage_events WHERE refresh_id = ?", ("stage-test",))
+    cursor = conn.execute(
+        "SELECT * FROM stage_events WHERE refresh_id = ?", ("stage-test",)
+    )
     row = cursor.fetchone()
     conn.close()
 
@@ -372,7 +374,9 @@ def test_save_stage_event_without_optional_fields(tmp_path, monkeypatch):
     save_stage_event(config, refresh_id="minimal-stage", stage="start")
 
     conn = sqlite3.connect(db_path)
-    cursor = conn.execute("SELECT * FROM stage_events WHERE refresh_id = ?", ("minimal-stage",))
+    cursor = conn.execute(
+        "SELECT * FROM stage_events WHERE refresh_id = ?", ("minimal-stage",)
+    )
     row = cursor.fetchone()
     conn.close()
 

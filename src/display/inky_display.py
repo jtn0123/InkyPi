@@ -4,8 +4,8 @@ from display.abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)
 
-class InkyDisplay(AbstractDisplay):
 
+class InkyDisplay(AbstractDisplay):
     """
     Handles the Inky e-paper display.
 
@@ -14,9 +14,8 @@ class InkyDisplay(AbstractDisplay):
 
     The Inky display driver supports auto configuration.
     """
-   
+
     def initialize_display(self):
-        
         """
         Initializes the Inky display device.
 
@@ -25,7 +24,7 @@ class InkyDisplay(AbstractDisplay):
         Raises:
             ValueError: If the resolution cannot be retrieved or stored.
         """
-        
+
         from inky.auto import auto
 
         self.inky_display = auto()
@@ -35,13 +34,14 @@ class InkyDisplay(AbstractDisplay):
         if not self.device_config.get_config("resolution"):
             self.device_config.update_value(
                 "resolution",
-                [int(self.inky_display.width), int(self.inky_display.height)], 
-                write=True)
+                [int(self.inky_display.width), int(self.inky_display.height)],
+                write=True,
+            )
 
     def display_image(self, image, image_settings=None):
         if image_settings is None:
             image_settings = []
-        
+
         """
         Displays the provided image on the Inky display.
 
@@ -61,7 +61,7 @@ class InkyDisplay(AbstractDisplay):
             raise ValueError("No image provided.")
 
         # Display the image on the Inky display
-        image_settings_cfg = self.device_config.get_config('image_settings') or {}
+        image_settings_cfg = self.device_config.get_config("image_settings") or {}
         inky_saturation = image_settings_cfg.get("inky_saturation", 0.5)
         logger.info("Inky Saturation: %s", inky_saturation)
         try:
