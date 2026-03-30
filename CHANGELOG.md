@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.1.11 (2026-03-30)
+
+### Bug Fixes
+
+- Resolve SonarCloud bugs, vulns, and CSS issues
+  ([`3dc249c`](https://github.com/jtn0123/InkyPi/commit/3dc249c5729ccd13d4b6b861b10587697bb6fbd9))
+
+- Fix 2 log injection vulns in model.py (f-string → %r format) - Remove always-true ternary in
+  refresh_task.py - Use make_response in Flask error handlers for explicit status codes - Add
+  DOCTYPE, lang, charset, title to plugin render template - Add generic font-family fallback
+  (sans-serif) to 8 plugin CSS files - Remove duplicate max-width and font-size in weather/ai_text
+  CSS - Exclude third-party waveshare_epd/ from SonarCloud analysis
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.10 (2026-03-30)
 
 ### Bug Fixes
