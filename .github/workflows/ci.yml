@@ -111,7 +111,7 @@ jobs:
           PYTHONPATH: src
         run: |
           # Keep CI serial while the local pytest-xdist path soaks.
-          pytest --cov=src --cov-report=xml -q
+          pytest --cov --cov-report=xml -q
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4

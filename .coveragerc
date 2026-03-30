@@ -1,0 +1,15 @@
+[run]
+source = src
+branch = true
+omit =
+    src/display/waveshare_epd/*
+    src/benchmarks/*
+
+[report]
+show_missing = true
+fail_under = 70
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    if __name__ == .__main__.:
