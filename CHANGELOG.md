@@ -1,6 +1,63 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-03-31)
+
+### Features
+
+- Make plugin API base URLs configurable via environment variables
+  ([`7d3017b`](https://github.com/jtn0123/InkyPi/commit/7d3017b2d75d187440b6a33696293af87cdd08ca))
+
+Add env var overrides for all hardcoded API base URLs across 7 plugin files. Defaults preserve
+  current behavior. Enables pointing to self-hosted proxies, mock servers, or alternative endpoints.
+
+Env vars added: - INKYPI_OPENWEATHER_API_URL (weather) - INKYPI_OPEN_METEO_API_URL (weather) -
+  INKYPI_OPEN_METEO_AQI_API_URL (weather air quality) - INKYPI_UNSPLASH_API_URL (unsplash) -
+  INKYPI_NASA_API_URL (apod) - INKYPI_WIKIPEDIA_API_URL (wpotd) - INKYPI_GITHUB_API_URL (github
+  stars/contributions/sponsors)
+
+JTN-40
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract hourly value lookup helper in weather_data.py
+  ([`eb7a81a`](https://github.com/jtn0123/InkyPi/commit/eb7a81afd6472f614bbe5aa61ffc9eb6fdb36901))
+
+Replace 5 identical for-loop patterns (humidity, pressure, UV index, visibility, air quality) with a
+  shared _get_current_hourly_value() helper. Net reduction of ~45 lines with no behavior change.
+
+JTN-72
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add coverage for _get_current_hourly_value helper
+  ([`9398b48`](https://github.com/jtn0123/InkyPi/commit/9398b481848fa0cb42d2550889a3c580da797a3b))
+
+5 tests covering match, no-match, empty, invalid time string, and out-of-bounds index paths. Fixes
+  SonarCloud coverage gate.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add critical coverage for scheduling logic and refresh task
+  ([`4055136`](https://github.com/jtn0123/InkyPi/commit/40551364c0d9cbfcbd9945cf84b50a06772ca3da))
+
+Add 22 tests for Playlist.is_active() (normal range, midnight wraparound, edge cases) and
+  PlaylistManager.determine_active_playlist() (priority sorting, multiple active playlists).
+
+Add 14 tests for refresh_task.py: _remote_exception reconstruction, _get_mp_context,
+  _execute_refresh_attempt_worker success/failure/error paths, RefreshTask.stop() cleanup, and
+  _execute_with_policy error handling (empty queue, non-zero exit, error payload,
+  timeout+terminate).
+
+JTN-71
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.13 (2026-03-31)
 
 ### Bug Fixes
