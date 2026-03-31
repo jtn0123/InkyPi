@@ -249,3 +249,57 @@ def test_parse_timezone_invalid_value(weather_plugin):
     # Invalid timezone should raise error
     with pytest.raises(Exception):  # pytz raises an exception for invalid timezones
         w.parse_timezone({"timezone": "Invalid/Timezone"})
+
+
+# ---------------------------------------------------------------------------
+# _get_current_hourly_value helper tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetCurrentHourlyValue:
+    def test_matching_hour(self):
+        from plugins.weather.weather_data import _get_current_hourly_value
+
+        tz = pytz.UTC
+        current = datetime(2025, 6, 15, 10, 30, tzinfo=tz)
+        times = [
+            "2025-06-15T09:00+00:00",
+            "2025-06-15T10:00+00:00",
+            "2025-06-15T11:00+00:00",
+        ]
+        values = [50, 65, 70]
+        assert _get_current_hourly_value(times, values, tz, current, "test") == 65
+
+    def test_no_matching_hour(self):
+        from plugins.weather.weather_data import _get_current_hourly_value
+
+        tz = pytz.UTC
+        current = datetime(2025, 6, 15, 23, 0, tzinfo=tz)
+        times = ["2025-06-15T09:00+00:00", "2025-06-15T10:00+00:00"]
+        values = [50, 65]
+        assert _get_current_hourly_value(times, values, tz, current, "test") == "N/A"
+
+    def test_empty_lists(self):
+        from plugins.weather.weather_data import _get_current_hourly_value
+
+        tz = pytz.UTC
+        current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
+        assert _get_current_hourly_value([], [], tz, current, "test") == "N/A"
+
+    def test_invalid_time_string_skipped(self):
+        from plugins.weather.weather_data import _get_current_hourly_value
+
+        tz = pytz.UTC
+        current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
+        times = ["not-a-date", "2025-06-15T10:00+00:00"]
+        values = [99, 42]
+        assert _get_current_hourly_value(times, values, tz, current, "test") == 42
+
+    def test_index_beyond_values_returns_na(self):
+        from plugins.weather.weather_data import _get_current_hourly_value
+
+        tz = pytz.UTC
+        current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
+        times = ["2025-06-15T10:00+00:00"]
+        values = []  # times has entry but values is empty
+        assert _get_current_hourly_value(times, values, tz, current, "test") == "N/A"
