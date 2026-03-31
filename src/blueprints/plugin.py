@@ -52,7 +52,7 @@ def plugin_page(plugin_id: str):
 
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return ("Plugin not found", 404)
+        abort(404)
 
     try:
         plugin = get_plugin_instance(plugin_config)

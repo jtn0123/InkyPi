@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytz
 
@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class Countdown(BasePlugin):
     def build_settings_schema(self):
+        tomorrow = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
         return schema(
             section(
                 "Countdown",
@@ -21,7 +22,7 @@ class Countdown(BasePlugin):
                         placeholder="Vacation",
                         required=True,
                     ),
-                    field("date", "date", label="Target Date"),
+                    field("date", "date", label="Target Date", default=tomorrow),
                 ),
             )
         )
