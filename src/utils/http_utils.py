@@ -54,7 +54,7 @@ def _get_or_set_request_id() -> str | None:
     try:
         # Ensure we have a request context
         _ = request  # may raise if outside request context
-    except Exception:
+    except RuntimeError:
         return None
     try:
         rid_existing: str | None = getattr(g, "request_id", None)
@@ -71,7 +71,7 @@ def _get_or_set_request_id() -> str | None:
         rid_gen: str = str(uuid.uuid4())
         g.request_id = rid_gen
         return rid_gen
-    except Exception:
+    except RuntimeError:
         return None
 
 
@@ -168,7 +168,7 @@ def _env_float(name: str, default: float) -> float:
         if raw is None or raw.strip() == "":
             return default
         return float(raw)
-    except Exception:
+    except (ValueError, TypeError):
         logger.warning(
             "Failed to parse env var %s as float, using default %s", name, default
         )
@@ -181,7 +181,7 @@ def _env_int(name: str, default: int) -> int:
         if raw is None or raw.strip() == "":
             return default
         return int(raw)
-    except Exception:
+    except (ValueError, TypeError):
         logger.warning(
             "Failed to parse env var %s as int, using default %s", name, default
         )

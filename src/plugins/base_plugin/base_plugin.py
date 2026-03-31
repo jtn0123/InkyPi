@@ -239,7 +239,7 @@ class BasePlugin:
                 raw = os.getenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "").strip()
                 if raw:
                     timeout_ms = int(raw)
-            except Exception:
+            except (ValueError, TypeError):
                 timeout_ms = None
 
             timeout_desc = f" (timeout: {timeout_ms}ms)" if timeout_ms else ""

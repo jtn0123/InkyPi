@@ -106,7 +106,7 @@ class Unsplash(BasePlugin):
     def _request_timeout(self) -> float:
         try:
             return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))
-        except Exception:
+        except (ValueError, TypeError):
             return 20.0
 
     def generate_image(self, settings, device_config):

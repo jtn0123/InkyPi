@@ -150,6 +150,6 @@ class ImageFolder(BasePlugin):
 
             logger.info("=== Image Folder Plugin: Image generation complete ===")
             return img
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Error loading image from {image_url}: {e}")
             raise RuntimeError("Failed to load image, please check logs.") from e

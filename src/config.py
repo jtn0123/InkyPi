@@ -367,7 +367,7 @@ class Config:
                 pass  # Create empty file
             try:
                 os.chmod(env_path, 0o600)
-            except Exception as e:
+            except OSError as e:
                 logger.warning("Could not set .env file permissions to 0600: %s", e)
         # Write without quotes to satisfy tests and common .env style
         try:
@@ -483,7 +483,7 @@ class Config:
                     and hasattr(jsonschema, "exceptions")
                     and isinstance(ex, jsonschema.exceptions.ValidationError)
                 )
-            except Exception:
+            except (AttributeError, TypeError):
                 is_validation_error = False
             if is_validation_error:
                 ve = ex
@@ -497,7 +497,7 @@ class Config:
                     if len(bad_repr) > 200:
                         bad_repr = bad_repr[:197] + "..."
                     msg = f"{msg} (got: {bad_repr})"
-                except Exception:
+                except (AttributeError, TypeError, IndexError):
                     pass
                 raise ValueError(f"device.json failed schema validation: {msg}") from ex
             logger.warning(

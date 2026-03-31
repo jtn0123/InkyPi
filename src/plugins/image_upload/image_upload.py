@@ -76,7 +76,7 @@ class ImageUpload(BasePlugin):
         try:
             with Image.open(image_locations[img_index]) as img:
                 image = img.copy()
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to read image file: {str(e)}")
             raise RuntimeError("Failed to read image file.") from e
         return image
@@ -130,5 +130,5 @@ class ImageUpload(BasePlugin):
                 try:
                     os.remove(image_path)
                     logger.info(f"Deleted uploaded image: {image_path}")
-                except Exception as e:
+                except OSError as e:
                     logger.warning(f"Failed to delete uploaded image {image_path}: {e}")
