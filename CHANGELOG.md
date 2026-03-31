@@ -1,6 +1,81 @@
 # CHANGELOG
 
 
+## v0.1.12 (2026-03-31)
+
+### Bug Fixes
+
+- Correct exit code capture in lint.sh
+  ([`bfc8c85`](https://github.com/jtn0123/InkyPi/commit/bfc8c85c26b283c345e7c678c17c966e387f4acd))
+
+The previous `if ! cmd; then EXIT=$?` pattern always captured 0 because bash inverts the exit code
+  for the if-condition. This meant ruff/black/mypy failures were silently passing in CI.
+
+Switch to capturing exit code directly with `cmd; EXIT=$?`.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Make mypy non-blocking in lint.sh, centralize config in mypy.ini
+  ([`e889ea2`](https://github.com/jtn0123/InkyPi/commit/e889ea222540226b259688a81db658216085c882))
+
+Mypy was never actually enforced (due to the exit code bug). Making it suddenly blocking would fail
+  CI with 149 pre-existing type errors. Keep it advisory until those are resolved in a follow-up.
+
+Move ignore_missing_imports and follow_imports settings from pre-commit args into mypy.ini for
+  consistency.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Resolve all ruff and black violations across codebase
+  ([`36fc75e`](https://github.com/jtn0123/InkyPi/commit/36fc75ed389281f6ae517e0c80037205eecf6ced))
+
+Fix 317+ pre-existing violations (previously hidden by lint.sh bug) and ~89 new violations from the
+  B/SIM/C4/PERF rules:
+
+- B904: add raise-from to 19 bare raises in except blocks - B023: bind loop variable in
+  refresh_task.py closure - B006/B007/B009/B010: fix mutable defaults, unused loop vars -
+  SIM102/SIM103/SIM108/SIM118: simplify conditionals and dict access - SIM115: use context managers
+  for file operations - C4/PERF: use comprehensions instead of append loops - F401: remove unused
+  imports in settings/__init__.py - E402: suppress intentional late imports in test files - E741:
+  rename ambiguous variable names - Fix pre-existing test_parse_form_list_handling failure (missing
+  __iter__ and getlist behavior on FakeForm)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- Add .coveragerc and update CI coverage flags
+  ([`5b9023d`](https://github.com/jtn0123/InkyPi/commit/5b9023dde2f94ba69d36d33e02990fb828819c44))
+
+Centralize coverage configuration with branch coverage enabled, fail_under=70 global floor, and
+  proper omit patterns for vendor code. Update CI pytest command to use .coveragerc instead of
+  inline flags.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Enable B/SIM/C4/PERF ruff rules, fix pre-commit scoping
+  ([`d0fdd8c`](https://github.com/jtn0123/InkyPi/commit/d0fdd8c104f4098da5277b394de580ce833ed23e))
+
+Add flake8-bugbear, flake8-simplify, flake8-comprehensions, and perflint rules to catch real bugs
+  (raise-without-from, mutable defaults, loop variable capture). Ignore noisy rules (B011, B017,
+  SIM105, SIM117).
+
+Expand pre-commit hooks to lint tests/ and scripts/ directories, matching CI behavior.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Eliminate duplicate SonarCloud test run
+  ([`870b590`](https://github.com/jtn0123/InkyPi/commit/870b59068c3bb64571f7887743a1af7a74e63ddf))
+
+Delete standalone sonarcloud.yml that ran its own redundant pytest (~3 min wasted per CI run). Move
+  SonarCloud scan into ci.yml as a job that downloads coverage artifacts from the existing test
+  matrix.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.11 (2026-03-30)
 
 ### Bug Fixes
