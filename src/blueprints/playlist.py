@@ -695,9 +695,7 @@ def playlist_eta(playlist_name: str):
         # Evict stale entries and cap cache size
         with _eta_cache_lock:
             if len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
-                stale_keys = [
-                    k for k, (ts, _) in _eta_cache.items() if ts != floor_min
-                ]
+                stale_keys = [k for k, (ts, _) in _eta_cache.items() if ts != floor_min]
                 for k in stale_keys:
                     _eta_cache.pop(k, None)
                 # If still over limit, drop oldest entries
