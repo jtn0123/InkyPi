@@ -8,6 +8,27 @@ from astral import moon
 
 logger = logging.getLogger(__name__)
 
+
+def _get_current_hourly_value(times, values, tz, current_time, label):
+    """Find the value in *values* whose corresponding entry in *times* matches
+    the current hour.  Returns ``"N/A"`` when no match is found or the time
+    string cannot be parsed.
+    """
+    for i, time_str in enumerate(times):
+        try:
+            if (
+                datetime.fromisoformat(time_str).astimezone(tz).hour
+                == current_time.hour
+            ):
+                if i < len(values):
+                    return values[i]
+                return "N/A"
+        except ValueError:
+            logger.warning("Could not parse time string %s for %s.", time_str, label)
+            continue
+    return "N/A"
+
+
 UNITS = {
     "standard": {"temperature": "K", "speed": "m/s"},
     "metric": {"temperature": "\u00b0C", "speed": "m/s"},
@@ -498,20 +519,14 @@ def parse_open_meteo_data_points(
     )
 
     # Humidity
-    current_humidity = "N/A"
-    humidity_hourly_times = hourly_data.get("time", [])
-    humidity_values = hourly_data.get("relative_humidity_2m", [])
-    for i, time_str in enumerate(humidity_hourly_times):
-        try:
-            if (
-                datetime.fromisoformat(time_str).astimezone(tz).hour
-                == current_time.hour
-            ):
-                current_humidity = int(humidity_values[i])
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} for humidity.")
-            continue
+    raw_humidity = _get_current_hourly_value(
+        hourly_data.get("time", []),
+        hourly_data.get("relative_humidity_2m", []),
+        tz,
+        current_time,
+        "humidity",
+    )
+    current_humidity = int(raw_humidity) if raw_humidity != "N/A" else "N/A"
     data_points.append(
         {
             "label": "Humidity",
@@ -522,20 +537,14 @@ def parse_open_meteo_data_points(
     )
 
     # Pressure
-    current_pressure = "N/A"
-    pressure_hourly_times = hourly_data.get("time", [])
-    pressure_values = hourly_data.get("surface_pressure", [])
-    for i, time_str in enumerate(pressure_hourly_times):
-        try:
-            if (
-                datetime.fromisoformat(time_str).astimezone(tz).hour
-                == current_time.hour
-            ):
-                current_pressure = int(pressure_values[i])
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} for pressure.")
-            continue
+    raw_pressure = _get_current_hourly_value(
+        hourly_data.get("time", []),
+        hourly_data.get("surface_pressure", []),
+        tz,
+        current_time,
+        "pressure",
+    )
+    current_pressure = int(raw_pressure) if raw_pressure != "N/A" else "N/A"
     data_points.append(
         {
             "label": "Pressure",
@@ -546,20 +555,13 @@ def parse_open_meteo_data_points(
     )
 
     # UV Index
-    uv_index_hourly_times = aqi_data.get("hourly", {}).get("time", [])
-    uv_index_values = aqi_data.get("hourly", {}).get("uv_index", [])
-    current_uv_index = "N/A"
-    for i, time_str in enumerate(uv_index_hourly_times):
-        try:
-            if (
-                datetime.fromisoformat(time_str).astimezone(tz).hour
-                == current_time.hour
-            ):
-                current_uv_index = uv_index_values[i]
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} for UV Index.")
-            continue
+    current_uv_index = _get_current_hourly_value(
+        aqi_data.get("hourly", {}).get("time", []),
+        aqi_data.get("hourly", {}).get("uv_index", []),
+        tz,
+        current_time,
+        "UV Index",
+    )
     data_points.append(
         {
             "label": "UV Index",
@@ -572,25 +574,18 @@ def parse_open_meteo_data_points(
     # Visibility
     current_visibility = "N/A"
     unit_label = "mi" if units == "imperial" else "km"
-    visibility_hourly_times = hourly_data.get("time", [])
-    visibility_values = hourly_data.get("visibility", [])
-    for i, time_str in enumerate(visibility_hourly_times):
-        try:
-            if (
-                datetime.fromisoformat(time_str).astimezone(tz).hour
-                == current_time.hour
-            ):
-                visibility = visibility_values[i]
-                if units == "imperial":
-                    current_visibility = round(float(visibility) / 1609.344, 1)
-                    unit_label = "mi"
-                else:
-                    current_visibility = round(visibility / 1000, 1)
-                    unit_label = "km"
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} for visibility.")
-            continue
+    raw_visibility = _get_current_hourly_value(
+        hourly_data.get("time", []),
+        hourly_data.get("visibility", []),
+        tz,
+        current_time,
+        "visibility",
+    )
+    if raw_visibility != "N/A":
+        if units == "imperial":
+            current_visibility = round(float(raw_visibility) / 1609.344, 1)
+        else:
+            current_visibility = round(raw_visibility / 1000, 1)
 
     visibility_str = (
         f">{current_visibility}"
@@ -612,21 +607,14 @@ def parse_open_meteo_data_points(
     )
 
     # Air Quality
-    aqi_hourly_times = aqi_data.get("hourly", {}).get("time", [])
-    aqi_values = aqi_data.get("hourly", {}).get("european_aqi", [])
-    current_aqi = "N/A"
-    for i, time_str in enumerate(aqi_hourly_times):
-        try:
-            if (
-                datetime.fromisoformat(time_str).astimezone(tz).hour
-                == current_time.hour
-            ):
-                if i < len(aqi_values):
-                    current_aqi = round(aqi_values[i], 1)
-                break
-        except ValueError:
-            logger.warning(f"Could not parse time string {time_str} for AQI.")
-            continue
+    raw_aqi = _get_current_hourly_value(
+        aqi_data.get("hourly", {}).get("time", []),
+        aqi_data.get("hourly", {}).get("european_aqi", []),
+        tz,
+        current_time,
+        "AQI",
+    )
+    current_aqi = round(raw_aqi, 1) if raw_aqi != "N/A" else "N/A"
     scale = ""
     if isinstance(current_aqi, int | float):
         scale = ["Good", "Fair", "Moderate", "Poor", "Very Poor", "Ext Poor"][
