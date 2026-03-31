@@ -127,11 +127,12 @@ class Unsplash(BasePlugin):
             "per_page": 100,
         }
 
+        unsplash_base = os.getenv("INKYPI_UNSPLASH_API_URL", "https://api.unsplash.com")
         if search_query:
-            url = "https://api.unsplash.com/search/photos"
+            url = f"{unsplash_base}/search/photos"
             params["query"] = search_query
         else:
-            url = "https://api.unsplash.com/photos/random"
+            url = f"{unsplash_base}/photos/random"
 
         if collections:
             params["collections"] = collections

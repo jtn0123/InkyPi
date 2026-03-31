@@ -22,6 +22,7 @@ Flow:
 """
 
 import logging
+import os
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from random import randint
@@ -38,7 +39,9 @@ logger = logging.getLogger(__name__)
 
 class Wpotd(BasePlugin):
     HEADERS = {"User-Agent": "InkyPi/0.0 (https://github.com/fatihak/InkyPi/)"}
-    API_URL = "https://en.wikipedia.org/w/api.php"
+    API_URL = os.getenv(
+        "INKYPI_WIKIPEDIA_API_URL", "https://en.wikipedia.org/w/api.php"
+    )
 
     def build_settings_schema(self):
         return schema(

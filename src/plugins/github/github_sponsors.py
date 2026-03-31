@@ -1,4 +1,5 @@
 import logging
+import os
 
 from utils.http_client import get_http_session
 
@@ -64,8 +65,11 @@ def sponsors_generate_image(plugin_instance, settings, device_config):
 # -------------------------
 
 
+_GITHUB_API_BASE = os.getenv("INKYPI_GITHUB_API_URL", "https://api.github.com")
+
+
 def fetch_sponsorships(username, api_key):
-    url = "https://api.github.com/graphql"
+    url = f"{_GITHUB_API_BASE}/graphql"
     headers = {"Authorization": f"Bearer {api_key}"}
     variables = {"username": username}
 

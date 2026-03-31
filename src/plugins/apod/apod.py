@@ -84,8 +84,9 @@ class Apod(BasePlugin):
         elif settings.get("customDate"):
             params["date"] = settings["customDate"]
 
+        apod_url = os.getenv("INKYPI_NASA_API_URL", "https://api.nasa.gov")
         response = get_http_session().get(
-            "https://api.nasa.gov/planetary/apod",
+            f"{apod_url}/planetary/apod",
             params=params,
             timeout=self._request_timeout(),
         )

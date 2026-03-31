@@ -1,4 +1,5 @@
 import logging
+import os
 
 from utils.http_client import get_http_session
 
@@ -33,8 +34,11 @@ def stars_generate_image(plugin_instance, settings, device_config):
     )
 
 
+_GITHUB_API_BASE = os.getenv("INKYPI_GITHUB_API_URL", "https://api.github.com")
+
+
 def fetch_stars(github_repository):
-    url = f"https://api.github.com/repos/{github_repository}"
+    url = f"{_GITHUB_API_BASE}/repos/{github_repository}"
     headers = {"Accept": "application/json"}
 
     response = get_http_session().get(url, headers=headers, timeout=30)
