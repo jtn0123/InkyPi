@@ -17,8 +17,8 @@ import socket
 import ssl
 import sys
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 
 @dataclass
@@ -48,7 +48,15 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
         addr_info = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
         dns_ms = int((time.perf_counter() - t0) * 1000)
     except Exception:
-        return Timings(dns_ms=ms(time.perf_counter() - t0), connect_ms=-1, tls_ms=-1, ttfb_ms=-1, total_ms=-1, ok=False, status=None)
+        return Timings(
+            dns_ms=ms(time.perf_counter() - t0),
+            connect_ms=-1,
+            tls_ms=-1,
+            ttfb_ms=-1,
+            total_ms=-1,
+            ok=False,
+            status=None,
+        )
 
     # Connect
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -59,7 +67,15 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
         connect_ms = int((time.perf_counter() - t1) * 1000)
     except Exception:
         s.close()
-        return Timings(dns_ms=dns_ms, connect_ms=ms(time.perf_counter() - t1), tls_ms=-1, ttfb_ms=-1, total_ms=-1, ok=False, status=None)
+        return Timings(
+            dns_ms=dns_ms,
+            connect_ms=ms(time.perf_counter() - t1),
+            tls_ms=-1,
+            ttfb_ms=-1,
+            total_ms=-1,
+            ok=False,
+            status=None,
+        )
 
     # TLS
     tls_ms = 0
@@ -71,7 +87,15 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
             tls_ms = int((time.perf_counter() - t2) * 1000)
         except Exception:
             s.close()
-            return Timings(dns_ms=dns_ms, connect_ms=connect_ms, tls_ms=ms(time.perf_counter() - t2), ttfb_ms=-1, total_ms=-1, ok=False, status=None)
+            return Timings(
+                dns_ms=dns_ms,
+                connect_ms=connect_ms,
+                tls_ms=ms(time.perf_counter() - t2),
+                ttfb_ms=-1,
+                total_ms=-1,
+                ok=False,
+                status=None,
+            )
 
     # HTTP request + TTFB
     req = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: InkyPiDiag/1.0\r\nConnection: close\r\n\r\n".encode()
@@ -102,7 +126,15 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
                 break
     except Exception:
         s.close()
-        return Timings(dns_ms=dns_ms, connect_ms=connect_ms, tls_ms=tls_ms, ttfb_ms=ms(time.perf_counter() - t3), total_ms=-1, ok=False, status=status_code)
+        return Timings(
+            dns_ms=dns_ms,
+            connect_ms=connect_ms,
+            tls_ms=tls_ms,
+            ttfb_ms=ms(time.perf_counter() - t3),
+            total_ms=-1,
+            ok=False,
+            status=status_code,
+        )
     finally:
         try:
             s.close()
@@ -111,7 +143,15 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
 
     total_ms = int((time.perf_counter() - t0) * 1000)
     ok = status_code is not None and 200 <= status_code < 500
-    return Timings(dns_ms=dns_ms, connect_ms=connect_ms, tls_ms=tls_ms, ttfb_ms=ttfb_ms, total_ms=total_ms, ok=ok, status=status_code)
+    return Timings(
+        dns_ms=dns_ms,
+        connect_ms=connect_ms,
+        tls_ms=tls_ms,
+        ttfb_ms=ttfb_ms,
+        total_ms=total_ms,
+        ok=ok,
+        status=status_code,
+    )
 
 
 def ms(x: float) -> int:
@@ -119,8 +159,12 @@ def ms(x: float) -> int:
 
 
 def main(urls: Iterable[str]) -> int:
-    print("url                                       dns  conn  tls  ttfb  total  status  ok")
-    print("--------------------------------------------------------------------------------")
+    print(
+        "url                                       dns  conn  tls  ttfb  total  status  ok"
+    )
+    print(
+        "--------------------------------------------------------------------------------"
+    )
     for u in urls:
         t = measure_http(u)
         print(
@@ -144,5 +188,3 @@ if __name__ == "__main__":
     )
     args = p.parse_args()
     sys.exit(main(args.urls))
-
-

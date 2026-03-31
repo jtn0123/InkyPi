@@ -17,11 +17,17 @@ class FakeForm:
     def to_dict(self):
         return dict(self._data)
 
+    def __iter__(self):
+        return iter(self._data)
+
     def keys(self):
         return list(self._data.keys())
 
     def getlist(self, key):
-        return self._data.get(key)
+        val = self._data.get(key)
+        if isinstance(val, list):
+            return val
+        return [val] if val is not None else []
 
     def get(self, key, default=None):
         return self._data.get(key, default)
@@ -278,7 +284,7 @@ def test_get_fonts(monkeypatch, tmp_path):
     fonts_dir.mkdir(parents=True)
 
     # Create mock font files
-    for font_name, variants in app_utils.FONT_FAMILIES.items():
+    for variants in app_utils.FONT_FAMILIES.values():
         for variant in variants:
             font_file = fonts_dir / variant["file"]
             font_file.parent.mkdir(

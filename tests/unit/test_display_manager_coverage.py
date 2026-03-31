@@ -1,9 +1,7 @@
 # pyright: reportMissingImports=false
 """Tests for display/display_manager.py — additional coverage."""
 import os
-from unittest.mock import MagicMock, patch
 
-import pytest
 from PIL import Image
 
 
@@ -58,7 +56,9 @@ def test_display_image_save_failure_graceful(device_config_dev, monkeypatch):
     img = Image.new("RGB", (800, 480), "red")
 
     # Make save fail by pointing to an invalid path
-    monkeypatch.setattr(device_config_dev, "current_image_file", "/nonexistent/dir/img.png")
+    monkeypatch.setattr(
+        device_config_dev, "current_image_file", "/nonexistent/dir/img.png"
+    )
 
     # Should not raise — save failure is caught gracefully
     dm.display_image(img)

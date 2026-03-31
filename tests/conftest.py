@@ -236,8 +236,9 @@ def device_config_dev(tmp_path, monkeypatch):
 def flask_app(device_config_dev, monkeypatch):
     # Build a Flask app instance similar to inkypi.py but without CLI parsing/threads
     import os
+    import secrets as _secrets
 
-    from flask import Flask
+    from flask import Flask, session as _session
     from jinja2 import ChoiceLoader, FileSystemLoader
 
     from blueprints.apikeys import apikeys_bp
@@ -249,10 +250,6 @@ def flask_app(device_config_dev, monkeypatch):
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
-
-    import secrets as _secrets
-
-    from flask import session as _session
 
     app = Flask(__name__)
     app.secret_key = "test-secret-key-for-csrf"
@@ -326,10 +323,12 @@ def flask_app(device_config_dev, monkeypatch):
 
     @app.errorhandler(404)
     def _handle_not_found(err):
-        from utils.http_utils import wants_json, json_error
+        from utils.http_utils import json_error, wants_json
+
         if wants_json():
             return json_error("Not found", status=404)
         from flask import render_template as _rt
+
         return _rt("404.html"), 404
 
     @app.after_request
@@ -344,6 +343,7 @@ def flask_app(device_config_dev, monkeypatch):
         # Enable HSTS only when under HTTPS/behind a proxy forwarding HTTPS
         try:
             from flask import request
+
             if (
                 request.is_secure
                 or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
@@ -355,9 +355,20 @@ def flask_app(device_config_dev, monkeypatch):
             pass
         # Content Security Policy (Report-Only by default)
         try:
-            csp_value = os.getenv("INKYPI_CSP") or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
-            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in ("1", "true", "yes")
-            header_name = "Content-Security-Policy-Report-Only" if report_only else "Content-Security-Policy"
+            csp_value = (
+                os.getenv("INKYPI_CSP")
+                or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+            )
+            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            header_name = (
+                "Content-Security-Policy-Report-Only"
+                if report_only
+                else "Content-Security-Policy"
+            )
             if header_name not in response.headers:
                 response.headers[header_name] = csp_value
         except Exception:
@@ -373,7 +384,9 @@ def client(flask_app):
 
 
 @pytest.fixture()
-def live_server(flask_app, free_tcp_port_factory):  # free_tcp_port_factory: from anyio pytest plugin
+def live_server(
+    flask_app, free_tcp_port_factory
+):  # free_tcp_port_factory: from anyio pytest plugin
     host = "127.0.0.1"
     port = free_tcp_port_factory()
     server = make_server(host, port, flask_app, threaded=True)

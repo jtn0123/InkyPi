@@ -1,11 +1,11 @@
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 from model import PluginInstance
 
 
 def test_should_refresh_interval_and_initial():
     inst = PluginInstance("x", "A", {}, {"interval": 60}, latest_refresh_time=None)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # No latest -> should refresh
     assert inst.should_refresh(now) is True
 
@@ -20,12 +20,17 @@ def test_should_refresh_interval_and_initial():
 
 def test_should_refresh_scheduled_with_tz_alignment():
     # Schedule at current minute; last refresh earlier today should trigger
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     hhmm = now.strftime("%H:%M")
-    inst = PluginInstance("x", "A", {}, {"scheduled": hhmm}, latest_refresh_time=(now - timedelta(hours=1)).isoformat())
+    inst = PluginInstance(
+        "x",
+        "A",
+        {},
+        {"scheduled": hhmm},
+        latest_refresh_time=(now - timedelta(hours=1)).isoformat(),
+    )
     assert inst.should_refresh(now) is True
 
     # Last refresh after scheduled -> should not refresh
     inst.latest_refresh_time = (now + timedelta(minutes=1)).isoformat()
     assert inst.should_refresh(now) is False
-

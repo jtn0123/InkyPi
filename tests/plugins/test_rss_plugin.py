@@ -221,7 +221,9 @@ def test_rss_sanitize_entities():
     assert Rss._sanitize_text("&#39;quoted&#39;") == "'quoted'"
 
 
-def test_rss_generate_with_realistic_feed(monkeypatch, plugin_config, device_config_dev, realistic_rss_feed):
+def test_rss_generate_with_realistic_feed(
+    monkeypatch, plugin_config, device_config_dev, realistic_rss_feed
+):
     """Test RSS plugin with a realistic feed fixture."""
     from plugins.rss.rss import Rss
 

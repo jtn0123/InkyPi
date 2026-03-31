@@ -1,11 +1,12 @@
 import random
 
-import pytest
 from PIL import Image
+
 
 def _make_img(path: str, size=(64, 48), color=(200, 100, 50)):
     img = Image.new("RGB", size, color)
     img.save(path)
+
 
 def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path):
     from plugins.image_folder.image_folder import list_files_in_folder
@@ -25,6 +26,7 @@ def test_list_files_in_folder_filters_hidden_and_non_images(tmp_path):
     assert str(p2) in result
     assert str(p3) not in result
     assert str(p4) not in result
+
 
 def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
     from plugins.image_folder.image_folder import ImageFolder
@@ -46,6 +48,7 @@ def test_generate_image_happy(monkeypatch, device_config_dev, tmp_path):
     )
     assert img is not None
     assert isinstance(img, Image.Image)
+
 
 def test_generate_image_errors(tmp_path, device_config_dev):
     from plugins.image_folder.image_folder import ImageFolder
@@ -87,6 +90,7 @@ def test_generate_image_errors(tmp_path, device_config_dev):
         assert False
     except RuntimeError as e:
         assert "No image files found" in str(e)
+
 
 def test_image_folder_initializes_without_name_error():
     """Plugin should be importable and instantiable without NameError."""

@@ -59,9 +59,18 @@ def minify_css(css: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bundle CSS partials for production.")
-    parser.add_argument("--minify", action="store_true", help="Strip comments and whitespace")
-    parser.add_argument("--output", type=Path, default=None, help="Output file (default: overwrite main.css)")
-    parser.add_argument("--check", action="store_true", help="Dry-run: print stats without writing")
+    parser.add_argument(
+        "--minify", action="store_true", help="Strip comments and whitespace"
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output file (default: overwrite main.css)",
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="Dry-run: print stats without writing"
+    )
     args = parser.parse_args()
 
     if not IMPORTS_CSS.is_file():

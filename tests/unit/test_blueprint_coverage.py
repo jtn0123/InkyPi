@@ -1,16 +1,18 @@
 """Tests adding coverage for under-tested Flask routes."""
 
-import time
+from datetime import UTC
 
 import pytest
 from PIL import Image
-
 
 # ---------------------------------------------------------------------------
 # 1. /display-next cooldown (429)
 # ---------------------------------------------------------------------------
 
-def test_display_next_cooldown_blocks_rapid_calls(client, device_config_dev, monkeypatch, flask_app):
+
+def test_display_next_cooldown_blocks_rapid_calls(
+    client, device_config_dev, monkeypatch, flask_app
+):
     """Second POST within the cooldown window must return 429."""
     from blueprints.main import _reset_display_next_cooldown
 
@@ -36,14 +38,16 @@ def test_display_next_cooldown_blocks_rapid_calls(client, device_config_dev, mon
     assert resp3.status_code != 429
 
 
-def test_display_next_cooldown_reset_allows_retry(client, device_config_dev, monkeypatch, flask_app):
+def test_display_next_cooldown_reset_allows_retry(
+    client, device_config_dev, monkeypatch, flask_app
+):
     """After resetting the cooldown the endpoint is available again."""
     from blueprints.main import _reset_display_next_cooldown
 
     flask_app.config["REFRESH_TASK"].running = False
     _reset_display_next_cooldown()
 
-    client.post("/display-next")           # arm the cooldown
+    client.post("/display-next")  # arm the cooldown
     resp_blocked = client.post("/display-next")
     assert resp_blocked.status_code == 429
 
@@ -55,6 +59,7 @@ def test_display_next_cooldown_reset_allows_retry(client, device_config_dev, mon
 # ---------------------------------------------------------------------------
 # 2. /api/plugin_order validation
 # ---------------------------------------------------------------------------
+
 
 def test_plugin_order_unknown_id_returns_400(client):
     resp = client.post(
@@ -110,7 +115,10 @@ def test_plugin_order_valid_ids_returns_200(client, device_config_dev):
 # 3. /next-up endpoint
 # ---------------------------------------------------------------------------
 
-def test_next_up_no_playlists_returns_empty_dict(client, device_config_dev, monkeypatch):
+
+def test_next_up_no_playlists_returns_empty_dict(
+    client, device_config_dev, monkeypatch
+):
     """With no active playlist /next-up returns {}."""
     pm = device_config_dev.get_playlist_manager()
     monkeypatch.setattr(pm, "determine_active_playlist", lambda dt: None, raising=True)
@@ -120,13 +128,16 @@ def test_next_up_no_playlists_returns_empty_dict(client, device_config_dev, monk
     assert resp.get_json() == {}
 
 
-def test_next_up_with_active_playlist_and_plugin(client, device_config_dev, monkeypatch, flask_app):
+def test_next_up_with_active_playlist_and_plugin(
+    client, device_config_dev, monkeypatch, flask_app
+):
     """When a playlist has a next plugin, /next-up returns plugin info."""
-    from datetime import datetime, timezone
-    from unittest.mock import MagicMock
+    from datetime import datetime
 
-    fixed_dt = datetime(2025, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
-    monkeypatch.setattr("utils.time_utils.now_device_tz", lambda _cfg: fixed_dt, raising=False)
+    fixed_dt = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
+    monkeypatch.setattr(
+        "utils.time_utils.now_device_tz", lambda _cfg: fixed_dt, raising=False
+    )
 
     # Add a playlist with a clock plugin
     pm = device_config_dev.get_playlist_manager()
@@ -158,6 +169,7 @@ def test_next_up_with_active_playlist_and_plugin(client, device_config_dev, monk
 # 4. /refresh-info endpoint
 # ---------------------------------------------------------------------------
 
+
 def test_refresh_info_returns_json_with_expected_keys(client, device_config_dev):
     resp = client.get("/refresh-info")
     assert resp.status_code == 200
@@ -168,7 +180,9 @@ def test_refresh_info_returns_json_with_expected_keys(client, device_config_dev)
     assert "plugin_id" in data
 
 
-def test_refresh_info_handles_exception_gracefully(client, device_config_dev, monkeypatch):
+def test_refresh_info_handles_exception_gracefully(
+    client, device_config_dev, monkeypatch
+):
     monkeypatch.setattr(
         device_config_dev,
         "get_refresh_info",
@@ -183,6 +197,7 @@ def test_refresh_info_handles_exception_gracefully(client, device_config_dev, mo
 # ---------------------------------------------------------------------------
 # 5. /healthz and /readyz
 # ---------------------------------------------------------------------------
+
 
 def test_healthz_returns_200_ok(client):
     resp = client.get("/healthz")
@@ -210,6 +225,7 @@ def test_readyz_with_web_only_mode_returns_200(client, flask_app):
 # ---------------------------------------------------------------------------
 # 6. Settings rate limiter memory cleanup
 # ---------------------------------------------------------------------------
+
 
 def test_rate_limiter_prunes_expired_keys(monkeypatch):
     """_prune_empty_rate_limit_keys removes keys whose deques became empty.
@@ -263,6 +279,7 @@ def test_rate_limiter_prunes_expired_keys(monkeypatch):
 # 7. Settings mask function via /settings/api-keys route
 # ---------------------------------------------------------------------------
 
+
 def test_api_key_mask_shows_length_and_suffix(client, device_config_dev, monkeypatch):
     """The mask function renders '<suffix> (N chars)' for keys >= 4 chars."""
     key_value = "sk-abcdef1234567890"  # 19 chars; last 4 = "7890"
@@ -280,7 +297,9 @@ def test_api_key_mask_shows_length_and_suffix(client, device_config_dev, monkeyp
     assert b"7890" in resp.data
 
 
-def test_api_key_mask_none_value_not_in_masked_dict(client, device_config_dev, monkeypatch):
+def test_api_key_mask_none_value_not_in_masked_dict(
+    client, device_config_dev, monkeypatch
+):
     """When load_env_key returns None the mask() function returns None, not a chars string."""
     # Import settings module and call mask logic directly via the route
     # mask(None) returns None, so the masked dict values will be None.
@@ -296,24 +315,27 @@ def test_api_key_mask_none_value_not_in_masked_dict(client, device_config_dev, m
     # "N chars" pattern from the mask function should not appear — verify the
     # specific pattern that mask() emits (e.g. "19 chars") is absent.
     import re
+
     # The mask function renders e.g. "...7890 (19 chars)" — look for the digit-chars pattern
-    assert not re.search(rb'\(\d+ chars\)', resp.data), (
-        "Expected no '(N chars)' pattern when all keys are None"
-    )
+    assert not re.search(
+        rb"\(\d+ chars\)", resp.data
+    ), "Expected no '(N chars)' pattern when all keys are None"
 
 
 # ---------------------------------------------------------------------------
 # 8. Response modal has <button> close element, not <span>
 # ---------------------------------------------------------------------------
 
+
 def test_response_modal_close_is_button_not_span(client):
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     html = resp.data.decode("utf-8")
     # Must have a <button with class close-button
-    assert '<button' in html and 'close-button' in html
+    assert "<button" in html and "close-button" in html
     # Must NOT use a <span> as the close trigger
     import re
+
     span_close = re.search(r'<span[^>]*class="[^"]*close-button[^"]*"', html)
     assert span_close is None, "close-button must be a <button>, not a <span>"
 
@@ -322,10 +344,12 @@ def test_response_modal_close_is_button_not_span(client):
 # 9. /preview endpoint
 # ---------------------------------------------------------------------------
 
+
 def test_preview_no_image_returns_404(client, device_config_dev, monkeypatch):
     # Config.__init__ copies a default image into both paths, so we must
     # tell os.path.exists that neither path is present.
     import os as _os
+
     _processed = device_config_dev.processed_image_file
     _current = device_config_dev.current_image_file
     _real_exists = _os.path.exists
@@ -354,9 +378,11 @@ def test_preview_with_image_returns_200(client, device_config_dev, tmp_path):
 # 10. /api/current_image
 # ---------------------------------------------------------------------------
 
+
 def test_current_image_no_file_returns_404(client, device_config_dev, monkeypatch):
     # Config.__init__ copies a default image, so patch os.path.exists to hide it.
     import os as _os
+
     _current = device_config_dev.current_image_file
     _real_exists = _os.path.exists
 
@@ -371,7 +397,9 @@ def test_current_image_no_file_returns_404(client, device_config_dev, monkeypatc
     assert resp.get_json()["error"] == "Image not found"
 
 
-def test_current_image_with_file_returns_200_and_last_modified(client, device_config_dev):
+def test_current_image_with_file_returns_200_and_last_modified(
+    client, device_config_dev
+):
     img = Image.new("RGB", (100, 100), "green")
     img.save(device_config_dev.current_image_file)
 
@@ -397,6 +425,7 @@ def test_current_image_if_modified_since_future_returns_304(client, device_confi
 # ---------------------------------------------------------------------------
 # 11. /refresh alias (backward-compat)
 # ---------------------------------------------------------------------------
+
 
 def test_refresh_alias_behaves_like_display_next(client, device_config_dev, flask_app):
     """POST /refresh should pass through the rate-limiter and return non-429."""

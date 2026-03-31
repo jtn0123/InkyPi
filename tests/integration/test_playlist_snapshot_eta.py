@@ -1,14 +1,12 @@
 # pyright: reportMissingImports=false
-import re
-from datetime import datetime, timezone
-import pytest
+from datetime import UTC, datetime
 
 from model import RefreshInfo
 
 
 def _fixed_now(_device_config):
     # 2025-01-01 08:00:00 UTC for deterministic snapshots/ETA
-    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
 def _prepare_playlist_state(device_config_dev):
@@ -86,5 +84,3 @@ def test_eta_math_renders_expected(client, device_config_dev, monkeypatch):
     # Third instance should be in 10 minutes
     assert eta["Calendar C"]["minutes"] == 10
     assert eta["Calendar C"]["at"] == "08:10"
-
-

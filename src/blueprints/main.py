@@ -22,11 +22,13 @@ logger = logging.getLogger(__name__)
 try:
     from benchmarks.benchmark_storage import save_refresh_event, save_stage_event
 except Exception:  # pragma: no cover
+
     def save_refresh_event(*args, **kwargs):  # type: ignore
         return None
 
     def save_stage_event(*args, **kwargs):  # type: ignore
         return None
+
 
 main_bp = Blueprint("main", __name__)
 
@@ -104,7 +106,9 @@ def get_current_image():
     if if_modified_since:
         try:
             # Parse the If-Modified-Since header
-            client_mtime = datetime.strptime(if_modified_since, "%a, %d %b %Y %H:%M:%S %Z")
+            client_mtime = datetime.strptime(
+                if_modified_since, "%a, %d %b %Y %H:%M:%S %Z"
+            )
             client_mtime_seconds = int(client_mtime.timestamp())
 
             # Compare (both now in seconds, no sub-second precision)
@@ -226,8 +230,13 @@ def display_next():
     global _last_display_next_time
     now = time.monotonic()
     if now - _last_display_next_time < _DISPLAY_NEXT_COOLDOWN_SECONDS:
-        remaining = math.ceil(_DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time))
-        return json_error(f"Please wait {remaining}s before requesting another display update", status=429)
+        remaining = math.ceil(
+            _DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time)
+        )
+        return json_error(
+            f"Please wait {remaining}s before requesting another display update",
+            status=429,
+        )
     _last_display_next_time = now
 
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -272,7 +281,9 @@ def display_next():
             image = plugin.generate_image(plugin_instance.settings, device_config)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             try:
-                save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
+                save_stage_event(
+                    device_config, benchmark_id, "generate_image", generate_ms
+                )
             except Exception:
                 pass
             # Display

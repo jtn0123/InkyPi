@@ -5,8 +5,7 @@ from __future__ import annotations
 import os
 
 import pytest
-
-from tests.integration.browser_helpers import navigate_and_wait, stub_leaflet
+from tests.integration.browser_helpers import navigate_and_wait
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),

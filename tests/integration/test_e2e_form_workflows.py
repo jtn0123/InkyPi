@@ -53,12 +53,16 @@ def test_settings_save_submit(live_server, tmp_path):
             save_responses = []
             page.on(
                 "response",
-                lambda resp: save_responses.append(resp.status)
-                if "/save_settings" in resp.url
-                else None,
+                lambda resp: (
+                    save_responses.append(resp.status)
+                    if "/save_settings" in resp.url
+                    else None
+                ),
             )
 
-            page.goto(f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Click Save
@@ -71,10 +75,13 @@ def test_settings_save_submit(live_server, tmp_path):
 
             # Should have gotten a response (200 or 422 for validation)
             assert len(save_responses) > 0, "Save request was never sent"
-            assert save_responses[0] in (200, 422), f"Unexpected save response: {save_responses[0]}"
+            assert save_responses[0] in (
+                200,
+                422,
+            ), f"Unexpected save response: {save_responses[0]}"
 
             # Toast or modal should appear (check for toast container)
-            toast_or_modal = page.locator(".toast-container, #responseModal[style*='display: block']")
+            page.locator(".toast-container, #responseModal[style*='display: block']")
             # At minimum the page should still be functional
             assert page.locator("#saveSettingsBtn").count() == 1
         finally:
@@ -89,7 +96,9 @@ def test_settings_save_shows_response(live_server, tmp_path):
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 900})
             _stub_leaflet(page)
-            page.goto(f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # The settings form should exist (class-based, not id)
@@ -110,7 +119,9 @@ def test_playlist_page_has_create_button(live_server, tmp_path):
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 900})
             _stub_leaflet(page)
-            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # New Playlist button should be present
@@ -129,7 +140,11 @@ def test_plugin_config_form_exists(live_server, tmp_path):
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 900})
             _stub_leaflet(page)
-            page.goto(f"{live_server}/plugin/clock", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/plugin/clock",
+                wait_until="domcontentloaded",
+                timeout=30000,
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Settings form should exist with inputs
@@ -149,7 +164,9 @@ def test_api_keys_page_has_save_button(live_server, tmp_path):
         try:
             page = browser.new_page(viewport={"width": 1280, "height": 900})
             _stub_leaflet(page)
-            page.goto(f"{live_server}/api-keys", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/api-keys", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Save button should exist

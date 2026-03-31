@@ -73,7 +73,8 @@ def plugin_page(plugin_id: str):
             )
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {plugin_instance_name} does not exist", status=404
+                    f"Plugin instance: {plugin_instance_name} does not exist",
+                    status=404,
                 )
             template_params["plugin_settings"] = plugin_instance.settings
             template_params["plugin_instance"] = plugin_instance_name
@@ -181,7 +182,11 @@ def delete_plugin_instance():
     plugin_id = data.get("plugin_id")
     plugin_instance = data.get("plugin_instance")
 
-    if not playlist_name or not isinstance(playlist_name, str) or not playlist_name.strip():
+    if (
+        not playlist_name
+        or not isinstance(playlist_name, str)
+        or not playlist_name.strip()
+    ):
         return json_error("Playlist name is required", status=400)
     playlist_name = playlist_name.strip()
 
@@ -205,7 +210,8 @@ def delete_plugin_instance():
         except Exception:
             logger.warning(
                 "Could not clean up image for %s/%s",
-                _sanitize_log(plugin_id), _sanitize_log(str(plugin_instance)),
+                _sanitize_log(plugin_id),
+                _sanitize_log(str(plugin_instance)),
                 exc_info=True,
             )
 
@@ -215,7 +221,9 @@ def delete_plugin_instance():
             if plugin_obj and hasattr(plugin_obj, "cleanup"):
                 plugin_obj.cleanup({})
         except Exception:
-            logger.warning("Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True)
+            logger.warning(
+                "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
+            )
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error("An internal error occurred", status=500)
@@ -511,9 +519,10 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
                     meta = json.load(fh)
                 if meta.get("plugin_id") == plugin_id:
                     refresh_time = meta.get("refresh_time")
-                    if refresh_time:
-                        if latest_time is None or refresh_time > latest_time:
-                            latest_time = refresh_time
+                    if refresh_time and (
+                        latest_time is None or refresh_time > latest_time
+                    ):
+                        latest_time = refresh_time
             except Exception:
                 continue
 

@@ -1,9 +1,11 @@
 """Integration tests for enhanced progress tracking in plugin operations."""
 
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from utils.progress import track_progress, get_current_tracker
+
 from plugins.base_plugin.base_plugin import BasePlugin
+from utils.progress import get_current_tracker, track_progress
 
 
 class TestProgressTrackingIntegration:
@@ -12,18 +14,19 @@ class TestProgressTrackingIntegration:
     def test_base_plugin_uses_progress_tracking(self):
         """Test that BasePlugin uses enhanced progress tracking."""
         # Create a mock plugin config
-        mock_config = {
-            'id': 'test_plugin',
-            'display_name': 'Test Plugin'
-        }
+        mock_config = {"id": "test_plugin", "display_name": "Test Plugin"}
 
         # Create plugin instance
         plugin = BasePlugin(mock_config)
 
         # Mock the template environment and screenshot function
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
-             patch('builtins.open', create=True) as mock_open:
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch(
+                "plugins.base_plugin.base_plugin.take_screenshot_html"
+            ) as mock_screenshot,
+            patch("builtins.open", create=True) as mock_open,
+        ):
 
             # Setup mocks
             mock_template = Mock()
@@ -33,7 +36,9 @@ class TestProgressTrackingIntegration:
             mock_screenshot.return_value = Mock()  # Mock PIL Image
 
             # Mock file operations for CSS reading
-            mock_open.return_value.__enter__.return_value.read.return_value = "/* test css */"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "/* test css */"
+            )
 
             # Track progress during render_image call
             with track_progress() as tracker:
@@ -41,7 +46,7 @@ class TestProgressTrackingIntegration:
                     plugin.render_image(
                         dimensions=(400, 300),
                         html_file="test.html",
-                        css_file="test.css"
+                        css_file="test.css",
                     )
                 except Exception:
                     # We expect some exceptions due to mocking, but we're testing progress tracking
@@ -61,21 +66,20 @@ class TestProgressTrackingIntegration:
 
     def test_progress_tracking_with_template_error(self):
         """Test progress tracking when template rendering fails."""
-        mock_config = {'id': 'test_plugin'}
+        mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('builtins.open', create=True):
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch("builtins.open", create=True),
+        ):
 
             # Make template rendering fail
             mock_get_template.side_effect = Exception("Template not found")
 
             with track_progress() as tracker:
                 with pytest.raises(Exception):
-                    plugin.render_image(
-                        dimensions=(400, 300),
-                        html_file="missing.html"
-                    )
+                    plugin.render_image(dimensions=(400, 300), html_file="missing.html")
 
                 # Should have recorded a failed template step
                 steps = tracker.get_steps()
@@ -84,32 +88,39 @@ class TestProgressTrackingIntegration:
 
                 # The template step should be marked as failed
                 assert any(s.status == "failed" for s in template_steps)
-                assert any("Template rendering failed" in s.error_message for s in template_steps if s.error_message)
+                assert any(
+                    "Template rendering failed" in s.error_message
+                    for s in template_steps
+                    if s.error_message
+                )
 
     def test_progress_tracking_with_screenshot_error(self):
         """Test progress tracking when screenshot capture fails."""
-        mock_config = {'id': 'test_plugin'}
+        mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
-             patch('builtins.open', create=True) as mock_open:
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch(
+                "plugins.base_plugin.base_plugin.take_screenshot_html"
+            ) as mock_screenshot,
+            patch("builtins.open", create=True) as mock_open,
+        ):
 
             # Setup successful template rendering
             mock_template = Mock()
             mock_template.render.return_value = "<html>test</html>"
             mock_get_template.return_value = mock_template
-            mock_open.return_value.__enter__.return_value.read.return_value = "/* css */"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "/* css */"
+            )
 
             # Make screenshot fail
             mock_screenshot.side_effect = Exception("Screenshot failed")
 
             with track_progress() as tracker:
                 with pytest.raises(Exception):
-                    plugin.render_image(
-                        dimensions=(400, 300),
-                        html_file="test.html"
-                    )
+                    plugin.render_image(dimensions=(400, 300), html_file="test.html")
 
                 # Should have both template (success) and screenshot (failed) steps
                 steps = tracker.get_steps()
@@ -126,12 +137,16 @@ class TestProgressTrackingIntegration:
 
     def test_progress_tracking_step_timing(self):
         """Test that progress tracking records proper timing information."""
-        mock_config = {'id': 'test_plugin'}
+        mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
-             patch('builtins.open', create=True) as mock_open:
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch(
+                "plugins.base_plugin.base_plugin.take_screenshot_html"
+            ) as mock_screenshot,
+            patch("builtins.open", create=True) as mock_open,
+        ):
 
             # Setup mocks with small delays to ensure timing
             mock_template = Mock()
@@ -140,18 +155,18 @@ class TestProgressTrackingIntegration:
 
             def delayed_screenshot(*args, **kwargs):
                 import time
+
                 time.sleep(0.01)  # Small delay to ensure measurable time
                 return Mock()
 
             mock_screenshot.side_effect = delayed_screenshot
-            mock_open.return_value.__enter__.return_value.read.return_value = "/* css */"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "/* css */"
+            )
 
             with track_progress() as tracker:
                 try:
-                    plugin.render_image(
-                        dimensions=(400, 300),
-                        html_file="test.html"
-                    )
+                    plugin.render_image(dimensions=(400, 300), html_file="test.html")
                 except Exception:
                     pass
 
@@ -170,24 +185,29 @@ class TestProgressTrackingIntegration:
 
     def test_progress_tracking_step_descriptions(self):
         """Test that progress steps have meaningful descriptions."""
-        mock_config = {'id': 'test_plugin'}
+        mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
-             patch('builtins.open', create=True) as mock_open:
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch(
+                "plugins.base_plugin.base_plugin.take_screenshot_html"
+            ) as mock_screenshot,
+            patch("builtins.open", create=True) as mock_open,
+        ):
 
             mock_template = Mock()
             mock_template.render.return_value = "<html>test</html>"
             mock_get_template.return_value = mock_template
             mock_screenshot.return_value = Mock()
-            mock_open.return_value.__enter__.return_value.read.return_value = "/* css */"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "/* css */"
+            )
 
             with track_progress() as tracker:
                 try:
                     plugin.render_image(
-                        dimensions=(400, 300),
-                        html_file="test_template.html"
+                        dimensions=(400, 300), html_file="test_template.html"
                     )
                 except Exception:
                     pass
@@ -209,18 +229,24 @@ class TestProgressTrackingIntegration:
 
     def test_nested_progress_tracking(self):
         """Test that progress tracking works with nested operations."""
-        mock_config = {'id': 'test_plugin'}
+        mock_config = {"id": "test_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template, \
-             patch('plugins.base_plugin.base_plugin.take_screenshot_html') as mock_screenshot, \
-             patch('builtins.open', create=True) as mock_open:
+        with (
+            patch.object(plugin.env, "get_template") as mock_get_template,
+            patch(
+                "plugins.base_plugin.base_plugin.take_screenshot_html"
+            ) as mock_screenshot,
+            patch("builtins.open", create=True) as mock_open,
+        ):
 
             mock_template = Mock()
             mock_template.render.return_value = "<html>test</html>"
             mock_get_template.return_value = mock_template
             mock_screenshot.return_value = Mock()
-            mock_open.return_value.__enter__.return_value.read.return_value = "/* css */"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "/* css */"
+            )
 
             # Outer progress tracker
             with track_progress() as outer_tracker:
@@ -230,8 +256,7 @@ class TestProgressTrackingIntegration:
                 with track_progress() as inner_tracker:
                     try:
                         plugin.render_image(
-                            dimensions=(400, 300),
-                            html_file="test.html"
+                            dimensions=(400, 300), html_file="test.html"
                         )
                     except Exception:
                         pass
@@ -254,7 +279,7 @@ class TestProgressTrackingHelpers:
 
     def test_progress_helpers_in_context(self):
         """Test that global helper functions work within tracking context."""
-        from utils.progress import record_step, start_step, complete_step
+        from utils.progress import complete_step, record_step, start_step
 
         with track_progress() as tracker:
             # Use global helpers
@@ -274,7 +299,7 @@ class TestProgressTrackingHelpers:
 
     def test_progress_helpers_without_context(self):
         """Test that global helpers don't break without tracking context."""
-        from utils.progress import record_step, start_step, complete_step, fail_step
+        from utils.progress import complete_step, fail_step, record_step, start_step
 
         # These should not raise errors even without tracking context
         record_step("orphan_step", "Orphaned step")
@@ -291,20 +316,17 @@ class TestProgressTrackingErrorHandling:
 
     def test_progress_tracking_survives_plugin_errors(self):
         """Test that progress tracking continues to work even if plugin operations fail."""
-        mock_config = {'id': 'failing_plugin'}
+        mock_config = {"id": "failing_plugin"}
         plugin = BasePlugin(mock_config)
 
-        with patch.object(plugin.env, 'get_template') as mock_get_template:
+        with patch.object(plugin.env, "get_template") as mock_get_template:
             # Make everything fail
             mock_get_template.side_effect = RuntimeError("Everything is broken")
 
             with track_progress() as tracker:
                 # Plugin operation should fail but not break progress tracking
                 with pytest.raises(RuntimeError):
-                    plugin.render_image(
-                        dimensions=(400, 300),
-                        html_file="broken.html"
-                    )
+                    plugin.render_image(dimensions=(400, 300), html_file="broken.html")
 
                 # Progress tracking should still work
                 tracker.step("post_failure", "After the failure")
@@ -325,7 +347,9 @@ class TestProgressTrackingErrorHandling:
 
         def worker(worker_id):
             with track_progress() as tracker:
-                tracker.step(f"worker_{worker_id}_start", f"Worker {worker_id} starting")
+                tracker.step(
+                    f"worker_{worker_id}_start", f"Worker {worker_id} starting"
+                )
                 time.sleep(0.01)  # Small delay
                 tracker.step(f"worker_{worker_id}_end", f"Worker {worker_id} ending")
 
@@ -346,4 +370,6 @@ class TestProgressTrackingErrorHandling:
         # Each worker should have recorded exactly 2 steps
         assert len(results) == 3
         for worker_id, step_count in results:
-            assert step_count == 2, f"Worker {worker_id} should have 2 steps, got {step_count}"
+            assert (
+                step_count == 2
+            ), f"Worker {worker_id} should have 2 steps, got {step_count}"

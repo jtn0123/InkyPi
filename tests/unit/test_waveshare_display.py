@@ -89,7 +89,7 @@ def install_fake_epd_module(monkeypatch, module_name: str, epd_class):
         pass
 
     # Assign EPD attribute via setattr to avoid static analyzer complaints
-    setattr(epd_mod, "EPD", EPD)
+    epd_mod.EPD = EPD
 
     sys.modules[f"display.waveshare_epd.{module_name}"] = epd_mod
 

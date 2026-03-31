@@ -3,11 +3,10 @@ import os
 import random
 from io import BytesIO
 
-from requests.exceptions import RequestException
 from PIL import Image
+from requests.exceptions import RequestException
 
 from plugins.base_plugin.base_plugin import BasePlugin
-from utils.http_client import get_http_session
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -16,8 +15,10 @@ from plugins.base_plugin.settings_schema import (
     schema,
     section,
 )
+from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
+
 
 def grab_image(image_url, dimensions, timeout_ms=40000):
     """Grab an image from a URL and resize it to the specified dimensions."""
@@ -30,6 +31,7 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
     except Exception as e:
         logger.error(f"Error grabbing image from {image_url}: {e}")
         return None
+
 
 class Unsplash(BasePlugin):
     def build_settings_schema(self):
@@ -113,33 +115,35 @@ class Unsplash(BasePlugin):
             logger.error("Unsplash API Key not configured")
             raise RuntimeError("Unsplash API Key not configured.")
 
-        search_query = settings.get('search_query')
-        collections = settings.get('collections')
-        content_filter = settings.get('content_filter', 'low')
-        color = settings.get('color')
-        orientation = settings.get('orientation')
-        
+        search_query = settings.get("search_query")
+        collections = settings.get("collections")
+        content_filter = settings.get("content_filter", "low")
+        color = settings.get("color")
+        orientation = settings.get("orientation")
+
         params = {
-            'client_id': access_key,
-            'content_filter': content_filter,
-            'per_page': 100,
+            "client_id": access_key,
+            "content_filter": content_filter,
+            "per_page": 100,
         }
 
         if search_query:
             url = "https://api.unsplash.com/search/photos"
-            params['query'] = search_query
+            params["query"] = search_query
         else:
             url = "https://api.unsplash.com/photos/random"
 
         if collections:
-            params['collections'] = collections
+            params["collections"] = collections
         if color:
-            params['color'] = color
+            params["color"] = color
         if orientation:
-            params['orientation'] = orientation
+            params["orientation"] = orientation
 
         try:
-            response = get_http_session().get(url, params=params, timeout=self._request_timeout())
+            response = get_http_session().get(
+                url, params=params, timeout=self._request_timeout()
+            )
             response.raise_for_status()
             data = response.json()
             if search_query:
@@ -151,11 +155,14 @@ class Unsplash(BasePlugin):
                 image_url = data["urls"]["full"]
         except RequestException as e:
             logger.error(f"Error fetching image from Unsplash API: {e}")
-            raise RuntimeError("Failed to fetch image from Unsplash API, please check logs.") from e
+            raise RuntimeError(
+                "Failed to fetch image from Unsplash API, please check logs."
+            ) from e
         except (KeyError, IndexError) as e:
             logger.error(f"Error parsing Unsplash API response: {e}")
-            raise RuntimeError("Failed to parse Unsplash API response, please check logs.") from e
-
+            raise RuntimeError(
+                "Failed to parse Unsplash API response, please check logs."
+            ) from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 

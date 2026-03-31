@@ -9,18 +9,22 @@ def test_failing_plugin_does_not_block_successful_plugin(client, monkeypatch):
     playlist = pm.get_playlist(names[0])
 
     # Add two plugin instances (use existing plugins in repo if possible)
-    playlist.add_plugin({
-        "plugin_id": "ai_text",
-        "name": "Failer",
-        "plugin_settings": {"text": "bad"},
-        "refresh": {"interval": 1},
-    })
-    playlist.add_plugin({
-        "plugin_id": "clock",
-        "name": "OK",
-        "plugin_settings": {},
-        "refresh": {"interval": 1},
-    })
+    playlist.add_plugin(
+        {
+            "plugin_id": "ai_text",
+            "name": "Failer",
+            "plugin_settings": {"text": "bad"},
+            "refresh": {"interval": 1},
+        }
+    )
+    playlist.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "OK",
+            "plugin_settings": {},
+            "refresh": {"interval": 1},
+        }
+    )
 
     # Force ai_text plugin to raise during generate_image
     import plugins.ai_text.ai_text as ai_text_mod
@@ -28,7 +32,9 @@ def test_failing_plugin_does_not_block_successful_plugin(client, monkeypatch):
     def boom(settings, cfg):
         raise RuntimeError("synthetic failure")
 
-    monkeypatch.setattr(ai_text_mod.AIText, "generate_image", staticmethod(boom), raising=True)
+    monkeypatch.setattr(
+        ai_text_mod.AIText, "generate_image", staticmethod(boom), raising=True
+    )
 
     # Trigger display of the OK plugin explicitly to simulate cycle behavior
     resp = client.post(
@@ -43,4 +49,3 @@ def test_failing_plugin_does_not_block_successful_plugin(client, monkeypatch):
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("success") is True
-

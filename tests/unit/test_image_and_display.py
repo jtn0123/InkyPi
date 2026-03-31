@@ -5,25 +5,26 @@ Tests for image utilities and display manager.
 import io
 import os
 import threading
+
 import pytest
 from PIL import Image
 
+from display.display_manager import DisplayManager
 from utils.image_utils import (
-    change_orientation,
-    resize_image,
     apply_image_enhancement,
+    change_orientation,
     compute_image_hash,
     load_image_from_bytes,
     load_image_from_path,
-    process_image_from_bytes,
     pad_image_blur,
+    process_image_from_bytes,
+    resize_image,
 )
-from display.display_manager import DisplayManager
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_image(width=800, height=480, color="red"):
     """Return a simple RGB PIL Image."""
@@ -40,6 +41,7 @@ def image_to_png_bytes(img):
 # ---------------------------------------------------------------------------
 # change_orientation
 # ---------------------------------------------------------------------------
+
 
 class TestChangeOrientation:
     def test_horizontal_keeps_landscape_size(self):
@@ -74,6 +76,7 @@ class TestChangeOrientation:
 # resize_image
 # ---------------------------------------------------------------------------
 
+
 class TestResizeImage:
     def test_wider_image_resized_to_target(self):
         img = make_image(1600, 800)
@@ -104,6 +107,7 @@ class TestResizeImage:
 # ---------------------------------------------------------------------------
 # apply_image_enhancement
 # ---------------------------------------------------------------------------
+
 
 class TestApplyImageEnhancement:
     def test_no_settings_returns_image(self):
@@ -137,6 +141,7 @@ class TestApplyImageEnhancement:
 # compute_image_hash
 # ---------------------------------------------------------------------------
 
+
 class TestComputeImageHash:
     def test_same_image_same_hash(self):
         img1 = make_image(800, 480, "red")
@@ -157,6 +162,7 @@ class TestComputeImageHash:
 # load_image_from_bytes
 # ---------------------------------------------------------------------------
 
+
 class TestLoadImageFromBytes:
     def test_valid_bytes_returns_image(self):
         png_bytes = image_to_png_bytes(make_image())
@@ -171,6 +177,7 @@ class TestLoadImageFromBytes:
 # ---------------------------------------------------------------------------
 # load_image_from_path
 # ---------------------------------------------------------------------------
+
 
 class TestLoadImageFromPath:
     def test_valid_path_returns_image(self, tmp_path):
@@ -188,6 +195,7 @@ class TestLoadImageFromPath:
 # ---------------------------------------------------------------------------
 # process_image_from_bytes
 # ---------------------------------------------------------------------------
+
 
 class TestProcessImageFromBytes:
     def test_processor_receives_image_and_result_returned(self):
@@ -215,6 +223,7 @@ class TestProcessImageFromBytes:
 # pad_image_blur
 # ---------------------------------------------------------------------------
 
+
 class TestPadImageBlur:
     def test_small_image_padded_to_target_dimensions(self):
         small = make_image(400, 240, "green")
@@ -226,6 +235,7 @@ class TestPadImageBlur:
 # ---------------------------------------------------------------------------
 # DisplayManager
 # ---------------------------------------------------------------------------
+
 
 class TestDisplayManager:
     def test_hash_lock_exists_and_is_lock(self, device_config_dev, tmp_path):
@@ -252,7 +262,7 @@ class TestDisplayManager:
         dm = DisplayManager(device_config_dev)
         img = make_image(800, 480, "red")
 
-        result1 = dm.display_image(img)
+        dm.display_image(img)
         result2 = dm.display_image(img)
 
         # Second call with the same image should skip display

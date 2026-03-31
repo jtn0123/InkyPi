@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 
@@ -23,6 +21,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
 
     # Track call count to return different responses
     call_count = [0]
+
     def mock_http_get(*args, **kwargs):
         call_count[0] += 1
         if call_count[0] == 1:
@@ -37,7 +36,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
 
 
 def test_unsplash_decode_failure(device_config_dev, monkeypatch):
-    from plugins.unsplash.unsplash import Unsplash, grab_image
+    from plugins.unsplash.unsplash import Unsplash
 
     u = Unsplash({"id": "unsplash"})
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "fake")
@@ -55,7 +54,9 @@ def test_unsplash_decode_failure(device_config_dev, monkeypatch):
     monkeypatch.setattr("requests.get", lambda *a, **k: R(), raising=True)
 
     # Make grab_image return None (decode failure path)
-    monkeypatch.setattr("plugins.unsplash.unsplash.grab_image", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(
+        "plugins.unsplash.unsplash.grab_image", lambda *a, **k: None, raising=True
+    )
 
     with pytest.raises(RuntimeError):
         u.generate_image({}, device_config_dev)
@@ -67,9 +68,9 @@ def test_image_url_decode_failure(device_config_dev, monkeypatch):
     p = ImageURL({"id": "image_url"})
 
     # Make grab_image return None (decode failure path)
-    monkeypatch.setattr("plugins.image_url.image_url.grab_image", lambda *a, **k: None, raising=True)
+    monkeypatch.setattr(
+        "plugins.image_url.image_url.grab_image", lambda *a, **k: None, raising=True
+    )
 
     with pytest.raises(RuntimeError):
         p.generate_image({"url": "https://example.com/x.png"}, device_config_dev)
-
-

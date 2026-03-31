@@ -32,7 +32,11 @@ def _load_single_plugin_instance(plugin_config):
     module_name = f"plugins.{plugin_id}.{plugin_id}"
     try:
         reloaded = False
-        no_hot_reload = os.getenv("INKYPI_NO_HOT_RELOAD", "").strip().lower() in ("1", "true", "yes")
+        no_hot_reload = os.getenv("INKYPI_NO_HOT_RELOAD", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
         if _is_dev_mode() and module_name in sys.modules and not no_hot_reload:
             logger.info(f"Hot reloading plugin module {module_name}")
             module = importlib.reload(sys.modules[module_name])

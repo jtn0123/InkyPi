@@ -49,9 +49,7 @@ class TestStartUpdate:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
-        monkeypatch.setattr(
-            mod, "_get_update_script_path", lambda: "/fake/update.sh"
-        )
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake/update.sh")
         monkeypatch.setattr(mod, "_start_update_via_systemd", lambda u, s: None)
         mod._set_update_state(False, None)
 
@@ -152,7 +150,9 @@ class TestUpdateStatus:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
-        monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake/do_update.sh")
+        monkeypatch.setattr(
+            mod, "_get_update_script_path", lambda: "/fake/do_update.sh"
+        )
 
         captured_args = {}
 
@@ -203,7 +203,9 @@ class TestUpdateStatus:
         import blueprints.settings as mod
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
-        monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake/do_update.sh")
+        monkeypatch.setattr(
+            mod, "_get_update_script_path", lambda: "/fake/do_update.sh"
+        )
 
         captured_args = {}
 
@@ -721,7 +723,6 @@ class TestShutdown:
 
     def test_shutdown_rate_limited(self, client, monkeypatch):
         import subprocess
-
 
         monkeypatch.setattr(subprocess, "run", MagicMock())
         # First call succeeds

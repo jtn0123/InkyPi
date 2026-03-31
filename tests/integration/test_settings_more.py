@@ -3,9 +3,7 @@
 
 def test_shutdown_route_logs_and_returns_json(client, monkeypatch):
     calls = {"cmd": None}
-    monkeypatch.setattr(
-        "subprocess.run", lambda cmd, check: calls.update(cmd=cmd)
-    )
+    monkeypatch.setattr("subprocess.run", lambda cmd, check: calls.update(cmd=cmd))
 
     resp = client.post("/shutdown", json={"reboot": False})
     assert resp.status_code == 200

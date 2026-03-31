@@ -1,10 +1,8 @@
 # pyright: reportMissingImports=false
 """Edge-case tests for display_manager.py: init errors, prune, save history, hash skip."""
 
-import json
 import os
-import threading
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
@@ -43,8 +41,8 @@ class TestDisplayManagerInit:
 
     def test_unsupported_display_raises(self, device_config_dev, monkeypatch):
         """Unknown display_type raises ValueError."""
-        import display.display_manager as dm_mod
         import config as config_mod
+        import display.display_manager as dm_mod
 
         cfg = config_mod.Config()
         cfg.update_value("display_type", "unknown_display", write=True)
@@ -168,13 +166,13 @@ class TestSaveHistoryEntry:
         dm._save_history_entry(img)
 
         # Get the filename that was created
-        files_before = set(f for f in os.listdir(history_dir) if f.endswith(".png"))
+        files_before = {f for f in os.listdir(history_dir) if f.endswith(".png")}
         assert len(files_before) == 1
 
         # Save again immediately (same second) - should get suffix
         dm._save_history_entry(img)
 
-        files_after = set(f for f in os.listdir(history_dir) if f.endswith(".png"))
+        files_after = {f for f in os.listdir(history_dir) if f.endswith(".png")}
         assert len(files_after) == 2  # both saved, no clobber
 
     def test_no_history_dir(self, device_config_dev):
@@ -220,7 +218,6 @@ class TestSaveHistoryEntry:
         # Monkeypatch json.dump to fail
         import json as _json
 
-        real_dump = _json.dump
         monkeypatch.setattr(
             _json, "dump", MagicMock(side_effect=TypeError("not serializable"))
         )

@@ -74,5 +74,3 @@ def test_config_logging_is_sanitized(monkeypatch, tmp_path, caplog):
     assert "super-secret-value" not in full_log
     # But summary data should exist
     assert "num_plugins" in full_log
-
-

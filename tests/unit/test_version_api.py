@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -64,7 +63,9 @@ def _mock_github_response(tag_name="v2.0.0", body="Release notes", status_code=2
 
 def test_api_version_returns_current(client):
     """GET /api/version should return a JSON object with a 'current' key."""
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response()):
+    with patch(
+        "blueprints.settings._requests.get", return_value=_mock_github_response()
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -77,7 +78,9 @@ def test_api_version_unknown_when_no_version(flask_app, client):
     """When APP_VERSION is 'unknown', the response should reflect that."""
     flask_app.config["APP_VERSION"] = "unknown"
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response()):
+    with patch(
+        "blueprints.settings._requests.get", return_value=_mock_github_response()
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -108,7 +111,10 @@ def test_api_version_cache_miss_fetches_from_github(flask_app, client):
     """On a cache miss, GitHub API is called and the latest tag is parsed."""
     flask_app.config["APP_VERSION"] = "1.9.0"
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response("v2.0.0")):
+    with patch(
+        "blueprints.settings._requests.get",
+        return_value=_mock_github_response("v2.0.0"),
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -120,7 +126,10 @@ def test_api_version_update_available_true(flask_app, client):
     """update_available should be True when latest > current (semver)."""
     flask_app.config["APP_VERSION"] = "1.9.0"
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response("v2.0.0")):
+    with patch(
+        "blueprints.settings._requests.get",
+        return_value=_mock_github_response("v2.0.0"),
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -132,7 +141,10 @@ def test_api_version_update_available_false(flask_app, client):
     """update_available should be False when current == latest."""
     flask_app.config["APP_VERSION"] = "2.0.0"
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response("v2.0.0")):
+    with patch(
+        "blueprints.settings._requests.get",
+        return_value=_mock_github_response("v2.0.0"),
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -142,7 +154,9 @@ def test_api_version_update_available_false(flask_app, client):
 
 def test_api_version_offline_returns_null_latest(client):
     """When the GitHub API request fails, latest should be None."""
-    with patch("blueprints.settings._requests.get", side_effect=Exception("network error")):
+    with patch(
+        "blueprints.settings._requests.get", side_effect=Exception("network error")
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -156,7 +170,9 @@ def test_api_version_update_running_reflects_state(client):
 
     settings_mod._UPDATE_STATE["running"] = True
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response()):
+    with patch(
+        "blueprints.settings._requests.get", return_value=_mock_github_response()
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -176,7 +192,10 @@ def test_semver_comparison_10_gt_9():
 
 def test_github_api_404(client):
     """When GitHub returns 404, latest should be None."""
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response(status_code=404)):
+    with patch(
+        "blueprints.settings._requests.get",
+        return_value=_mock_github_response(status_code=404),
+    ):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -190,7 +209,9 @@ def test_github_repo_env_override(client, monkeypatch):
 
     monkeypatch.setattr(settings_mod, "_GITHUB_REPO", "other-org/OtherRepo")
 
-    with patch("blueprints.settings._requests.get", return_value=_mock_github_response()) as mock_get:
+    with patch(
+        "blueprints.settings._requests.get", return_value=_mock_github_response()
+    ) as mock_get:
         client.get("/api/version")
         mock_get.assert_called_once()
         url = mock_get.call_args[0][0]

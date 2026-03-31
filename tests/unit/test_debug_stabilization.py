@@ -64,7 +64,9 @@ def _plugin_factory(cfg):
     return FileLoggingPlugin(cfg)
 
 
-def test_manual_updates_are_queued_without_drops(device_config_dev, monkeypatch, tmp_path):
+def test_manual_updates_are_queued_without_drops(
+    device_config_dev, monkeypatch, tmp_path
+):
     log_path = tmp_path / "manual-order.log"
     configs = {
         "one": {"id": "one", "class": "Test", "log_path": str(log_path)},
@@ -72,7 +74,9 @@ def test_manual_updates_are_queued_without_drops(device_config_dev, monkeypatch,
         "three": {"id": "three", "class": "Test", "log_path": str(log_path)},
     }
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: configs[pid])
-    monkeypatch.setattr("refresh_task.get_plugin_instance", _plugin_factory, raising=True)
+    monkeypatch.setattr(
+        "refresh_task.get_plugin_instance", _plugin_factory, raising=True
+    )
 
     task = RefreshTask(device_config_dev, DisplayManager(device_config_dev))
     results = []
@@ -119,7 +123,9 @@ def test_plugin_timeout_terminates_child_before_retry_continues(
         "sleep_s": 0.4,
     }
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: config)
-    monkeypatch.setattr("refresh_task.get_plugin_instance", _plugin_factory, raising=True)
+    monkeypatch.setattr(
+        "refresh_task.get_plugin_instance", _plugin_factory, raising=True
+    )
     monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S", "0.1")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "0")
 
@@ -147,7 +153,9 @@ def test_plugin_retry_succeeds_with_process_isolation(
         "counter_path": str(counter_path),
     }
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: config)
-    monkeypatch.setattr("refresh_task.get_plugin_instance", _plugin_factory, raising=True)
+    monkeypatch.setattr(
+        "refresh_task.get_plugin_instance", _plugin_factory, raising=True
+    )
     monkeypatch.setenv("INKYPI_PLUGIN_TIMEOUT_S", "5")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_MAX", "1")
     monkeypatch.setenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "1")

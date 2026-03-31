@@ -10,6 +10,7 @@ from .comic_parser import COMICS, get_panel
 
 logger = logging.getLogger(__name__)
 
+
 class Comic(BasePlugin):
     def build_settings_schema(self):
         return schema(
@@ -51,7 +52,7 @@ class Comic(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['comics'] = list(COMICS)
+        template_params["comics"] = list(COMICS)
         return template_params
 
     def generate_image(self, settings, device_config):
@@ -67,7 +68,9 @@ class Comic(BasePlugin):
         is_caption = settings.get("titleCaption") == "true"
         caption_font_size = settings.get("fontSize")
 
-        logger.debug(f"Settings: show_caption={is_caption}, font_size={caption_font_size}")
+        logger.debug(
+            f"Settings: show_caption={is_caption}, font_size={caption_font_size}"
+        )
 
         logger.debug("Parsing comic panel...")
         comic_panel = get_panel(comic)
@@ -83,7 +86,9 @@ class Comic(BasePlugin):
         width, height = dimensions
 
         logger.debug("Composing comic image with captions...")
-        image = self._compose_image(comic_panel, is_caption, caption_font_size, width, height)
+        image = self._compose_image(
+            comic_panel, is_caption, caption_font_size, width, height
+        )
 
         logger.info("=== Comic Plugin: Image generation complete ===")
         return image
@@ -94,7 +99,7 @@ class Comic(BasePlugin):
         img = self.image_loader.from_url(
             comic_panel["image_url"],
             dimensions=(width, height),
-            resize=False  # We'll handle custom sizing below
+            resize=False,  # We'll handle custom sizing below
         )
 
         if not img:
@@ -109,16 +114,34 @@ class Comic(BasePlugin):
 
             if is_caption:
                 if comic_panel["title"]:
-                    lines, wrapped_text = self._wrap_text(comic_panel["title"], font, width)
-                    draw.multiline_text((width // 2, 0), wrapped_text, font=font, fill="black", anchor="ma")
+                    lines, wrapped_text = self._wrap_text(
+                        comic_panel["title"], font, width
+                    )
+                    draw.multiline_text(
+                        (width // 2, 0),
+                        wrapped_text,
+                        font=font,
+                        fill="black",
+                        anchor="ma",
+                    )
                     top_padding = font.getbbox(wrapped_text)[3] * lines + 1
 
                 if comic_panel["caption"]:
-                    lines, wrapped_text = self._wrap_text(comic_panel["caption"], font, width)
-                    draw.multiline_text((width // 2, height), wrapped_text, font=font, fill="black", anchor="md")
+                    lines, wrapped_text = self._wrap_text(
+                        comic_panel["caption"], font, width
+                    )
+                    draw.multiline_text(
+                        (width // 2, height),
+                        wrapped_text,
+                        font=font,
+                        fill="black",
+                        anchor="md",
+                    )
                     bottom_padding = font.getbbox(wrapped_text)[3] * lines + 1
 
-            scale = min(width / img.width, (height - top_padding - bottom_padding) / img.height)
+            scale = min(
+                width / img.width, (height - top_padding - bottom_padding) / img.height
+            )
             new_size = (int(img.width * scale), int(img.height * scale))
             img = img.resize(new_size, Image.LANCZOS)
 
@@ -139,8 +162,8 @@ class Comic(BasePlugin):
 
         while words:
             line = words.pop()
-            while words and font.getbbox(line + ' ' + words[-1])[2] < width:
-                line += ' ' + words.pop()
+            while words and font.getbbox(line + " " + words[-1])[2] < width:
+                line += " " + words.pop()
             lines.append(line)
 
-        return len(lines), '\n'.join(lines)
+        return len(lines), "\n".join(lines)

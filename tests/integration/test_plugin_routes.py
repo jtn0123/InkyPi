@@ -169,7 +169,9 @@ def test_update_now_exception_handling(client, flask_app, monkeypatch):
     import blueprints.plugin as plugin_mod
 
     monkeypatch.setattr(
-        plugin_mod, "get_plugin_instance", lambda x: (_ for _ in ()).throw(Exception("test"))
+        plugin_mod,
+        "get_plugin_instance",
+        lambda x: (_ for _ in ()).throw(Exception("test")),
     )
 
     resp = client.post("/update_now", data={"plugin_id": "ai_text"})
@@ -181,7 +183,9 @@ def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch)
     dc = flask_app.config["DEVICE_CONFIG"]
     # Make update_value raise to simulate config failure
     monkeypatch.setattr(
-        dc, "update_value", lambda *args, **kwargs: (_ for _ in ()).throw(Exception("test"))
+        dc,
+        "update_value",
+        lambda *args, **kwargs: (_ for _ in ()).throw(Exception("test")),
     )
 
     resp = client.post("/save_plugin_settings", data={"plugin_id": "ai_text"})
@@ -232,6 +236,7 @@ def test_plugin_instance_image_404(client):
 
 def test_plugin_instance_image_serves_png(client, device_config_dev):
     import os
+
     from PIL import Image
 
     path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
@@ -262,6 +267,7 @@ def _setup_playlist_for_instance(device_config_dev):
 def test_instance_image_generated_from_settings(client, device_config_dev, monkeypatch):
     import io
     import os
+
     from PIL import Image
 
     _setup_playlist_for_instance(device_config_dev)
@@ -292,6 +298,7 @@ def test_instance_image_served_from_history_on_generation_failure(
     import io
     import json
     import os
+
     from PIL import Image
 
     _setup_playlist_for_instance(device_config_dev)
@@ -350,7 +357,9 @@ def test_delete_plugin_instance_cleans_up_cache(client, device_config_dev):
     assert not os.path.isfile(path)
 
 
-def test_delete_plugin_instance_calls_plugin_cleanup(client, device_config_dev, monkeypatch):
+def test_delete_plugin_instance_calls_plugin_cleanup(
+    client, device_config_dev, monkeypatch
+):
     """Deleting a plugin instance calls plugin.cleanup() if available."""
     _setup_playlist_for_instance(device_config_dev)
 

@@ -128,6 +128,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
+
     mod = importlib.reload(sys.modules["inkypi"])
     mod.main(argv[1:])
     return mod
@@ -184,5 +185,3 @@ def test_secret_key_stable_in_prod_after_persist(monkeypatch, tmp_path):
 
     assert isinstance(first, str) and isinstance(second, str)
     assert first == second
-
-

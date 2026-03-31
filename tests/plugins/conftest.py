@@ -43,11 +43,25 @@ def realistic_weather_response():
                 "dt": 1710691200,
                 "sunrise": 1710672000,
                 "sunset": 1710714000,
-                "temp": {"day": 12.5, "min": 5.2, "max": 14.8, "night": 7.1, "eve": 11.0, "morn": 5.8},
+                "temp": {
+                    "day": 12.5,
+                    "min": 5.2,
+                    "max": 14.8,
+                    "night": 7.1,
+                    "eve": 11.0,
+                    "morn": 5.8,
+                },
                 "feels_like": {"day": 10.8, "night": 5.3, "eve": 9.4, "morn": 3.2},
                 "pressure": 1013,
                 "humidity": 65,
-                "weather": [{"id": 802, "main": "Clouds", "description": "scattered clouds", "icon": "03d"}],
+                "weather": [
+                    {
+                        "id": 802,
+                        "main": "Clouds",
+                        "description": "scattered clouds",
+                        "icon": "03d",
+                    }
+                ],
                 "wind_speed": 5.1,
                 "wind_deg": 220,
                 "pop": 0.2,
@@ -61,7 +75,14 @@ def realistic_weather_response():
                 "feels_like": 10.8 + i * 0.2,
                 "pressure": 1013,
                 "humidity": 65 - i,
-                "weather": [{"id": 802, "main": "Clouds", "description": "scattered clouds", "icon": "03d"}],
+                "weather": [
+                    {
+                        "id": 802,
+                        "main": "Clouds",
+                        "description": "scattered clouds",
+                        "icon": "03d",
+                    }
+                ],
                 "pop": 0.1,
                 "wind_speed": 5.1,
             }

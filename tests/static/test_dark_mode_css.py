@@ -9,9 +9,10 @@ _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 
 
 def _read_all_css() -> str:
-    parts = []
-    for p in sorted(_STYLES_DIR.glob("partials/_*.css")):
-        parts.append(p.read_text(encoding="utf-8"))
+    parts = [
+        p.read_text(encoding="utf-8")
+        for p in sorted(_STYLES_DIR.glob("partials/_*.css"))
+    ]
     return "\n".join(parts)
 
 
@@ -27,8 +28,14 @@ def test_dark_mode_defines_core_color_variables(client):
     css = _read_all_css()
 
     core_vars = [
-        "--bg", "--text", "--surface", "--accent", "--muted",
-        "--surface-border", "--primary", "--primary-hover",
+        "--bg",
+        "--text",
+        "--surface",
+        "--accent",
+        "--muted",
+        "--surface-border",
+        "--primary",
+        "--primary-hover",
     ]
 
     # Find all :root blocks and combine their content
@@ -69,10 +76,12 @@ def test_no_hardcoded_white_black_outside_root(client):
         # Remove data URIs (SVG backgrounds etc.)
         cleaned = re.sub(r'url\("data:[^"]*"\)', "", cleaned)
         # Remove rgba() values (they can legitimately use 255)
-        cleaned = re.sub(r'rgba\([^)]+\)', "", cleaned)
+        cleaned = re.sub(r"rgba\([^)]+\)", "", cleaned)
 
         # Check for standalone hex color codes
-        for match in re.finditer(r'(?<!var\()#(?:fff|000|ffffff|000000)\b', cleaned, re.IGNORECASE):
+        for match in re.finditer(
+            r"(?<!var\()#(?:fff|000|ffffff|000000)\b", cleaned, re.IGNORECASE
+        ):
             # Get surrounding context for the error message
             start = max(0, match.start() - 40)
             end = min(len(cleaned), match.end() + 40)
@@ -94,18 +103,20 @@ def test_disabled_styles_exist(client):
     """Verify :disabled rules exist for buttons and inputs."""
     css = _read_all_css()
 
-    assert "button:disabled" in css or ".action-button:disabled" in css, (
-        "No :disabled styles for buttons"
-    )
+    assert (
+        "button:disabled" in css or ".action-button:disabled" in css
+    ), "No :disabled styles for buttons"
     assert "input:disabled" in css, "No :disabled styles for inputs"
     assert "select:disabled" in css, "No :disabled styles for selects"
     assert "textarea:disabled" in css, "No :disabled styles for textareas"
 
     # Verify the rules include visual indicators
-    assert "cursor: not-allowed" in css, "Disabled elements should use not-allowed cursor"
-    assert "opacity: 0.5" in css or "opacity: 0.6" in css, (
-        "Disabled elements should have reduced opacity"
-    )
+    assert (
+        "cursor: not-allowed" in css
+    ), "Disabled elements should use not-allowed cursor"
+    assert (
+        "opacity: 0.5" in css or "opacity: 0.6" in css
+    ), "Disabled elements should have reduced opacity"
 
 
 def test_print_stylesheet_uses_variables(client):
@@ -115,14 +126,14 @@ def test_print_stylesheet_uses_variables(client):
     assert print_css, "_print.css not found"
 
     # Should use var() with fallbacks
-    assert "var(--bg" in print_css or "var(--text" in print_css, (
-        "Print stylesheet should use CSS variables"
-    )
+    assert (
+        "var(--bg" in print_css or "var(--text" in print_css
+    ), "Print stylesheet should use CSS variables"
 
 
 def test_hover_overlay_uses_variable(client):
     """Plugin action button hover should use --hover-overlay variable."""
     css = _read_all_css()
-    assert "var(--hover-overlay" in css, (
-        "Plugin hover should use --hover-overlay CSS variable"
-    )
+    assert (
+        "var(--hover-overlay" in css
+    ), "Plugin hover should use --hover-overlay CSS variable"

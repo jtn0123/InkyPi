@@ -79,7 +79,11 @@ def _list_history_images(history_dir: str) -> list[dict]:
         try:
             # Use device timezone for display
             device_config = current_app.config.get("DEVICE_CONFIG")
-            now = now_device_tz(device_config) if device_config else datetime.now(tz=get_timezone("UTC"))
+            now = (
+                now_device_tz(device_config)
+                if device_config
+                else datetime.now(tz=get_timezone("UTC"))
+            )
             dt = datetime.fromtimestamp(mtime, tz=now.tzinfo)
         except Exception:
             dt = datetime.fromtimestamp(mtime)
@@ -122,7 +126,12 @@ def history_page():
             "display_ms": getattr(ri, "display_ms", None),
         }
     except Exception:
-        metrics = {"request_ms": None, "generate_ms": None, "preprocess_ms": None, "display_ms": None}
+        metrics = {
+            "request_ms": None,
+            "generate_ms": None,
+            "preprocess_ms": None,
+            "display_ms": None,
+        }
     # Compute storage usage for the history directory's filesystem
     free_bytes = None
     total_bytes = None
@@ -152,7 +161,9 @@ def history_page():
         "used_gb": round(used_bytes / gb, 2) if used_bytes is not None else None,
     }
 
-    return render_template("history.html", images=images, storage=storage_ctx, metrics=metrics)
+    return render_template(
+        "history.html", images=images, storage=storage_ctx, metrics=metrics
+    )
 
 
 @history_bp.route("/history/image/<path:filename>")

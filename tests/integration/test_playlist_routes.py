@@ -16,7 +16,12 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
     # Update (also set cycle override to 5 min)
-    upd = {"new_name": "EarlyMorning", "start_time": "05:00", "end_time": "08:00", "cycle_minutes": 5}
+    upd = {
+        "new_name": "EarlyMorning",
+        "start_time": "05:00",
+        "end_time": "08:00",
+        "cycle_minutes": 5,
+    }
     resp = client.put("/update_playlist/Morning", json=upd)
     assert resp.status_code == 200
 
@@ -35,8 +40,22 @@ def test_reorder_plugins_endpoint(client, device_config_dev):
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
-    pl.add_plugin({"plugin_id": "weather", "name": "A", "plugin_settings": {}, "refresh": {"interval": 60}})
-    pl.add_plugin({"plugin_id": "clock", "name": "B", "plugin_settings": {}, "refresh": {"interval": 60}})
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "B",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     device_config_dev.write_config()
 
     payload = {
@@ -62,7 +81,14 @@ def test_toggle_only_fresh_and_snooze(client, device_config_dev):
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
-    pl.add_plugin({"plugin_id": "weather", "name": "A", "plugin_settings": {}, "refresh": {"interval": 60}})
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     device_config_dev.write_config()
 
     # Only-fresh and snooze endpoints removed; nothing to assert here now (keep test for compatibility)

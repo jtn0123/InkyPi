@@ -120,8 +120,22 @@ def test_eta_endpoint_and_request_ids(client, device_config_dev):
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
     pl = pm.get_playlist("Default")
-    pl.add_plugin({"plugin_id": "weather", "name": "A", "plugin_settings": {}, "refresh": {"interval": 60}})
-    pl.add_plugin({"plugin_id": "clock", "name": "B", "plugin_settings": {}, "refresh": {"interval": 60}})
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "A",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "B",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
     device_config_dev.write_config()
 
     # ETA endpoint should return success and include request_id
@@ -338,9 +352,7 @@ def test_update_playlist_rejects_equal_start_end(client):
         json={"new_name": "Updated", "start_time": "10:00", "end_time": "10:00"},
     )
     assert resp.status_code == 400
-    assert "cannot be the same" in resp.get_json().get(
-        "error", ""
-    )
+    assert "cannot be the same" in resp.get_json().get("error", "")
 
 
 def test_update_playlist_allows_overnight_window(client):

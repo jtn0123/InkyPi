@@ -2,6 +2,7 @@
 # Health endpoints
 # ---------------------------------------------------------------------------
 
+
 def test_health_endpoints(client):
     # Liveness is always OK
     r = client.get("/healthz")
@@ -14,6 +15,7 @@ def test_health_endpoints(client):
 # ---------------------------------------------------------------------------
 # Content Security Policy headers
 # ---------------------------------------------------------------------------
+
 
 def test_csp_report_only_header(client, monkeypatch):
     # Ensure default report-only is applied

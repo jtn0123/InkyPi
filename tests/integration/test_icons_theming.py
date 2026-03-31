@@ -1,5 +1,3 @@
-import re
-
 import pytest
 
 
@@ -17,7 +15,7 @@ def _html(client, path: str) -> str:
     resp = client.get(path)
     assert resp.status_code == 200
     data = getattr(resp, "data", b"")
-    if isinstance(data, (bytes, bytearray)):
+    if isinstance(data, bytes | bytearray):
         return data.decode("utf-8", errors="ignore")
     # Fallback for test clients that return string bodies
     return str(data)
@@ -27,8 +25,8 @@ def _has_icon(html: str, class_marker: str, svg_class: str) -> bool:
     # Accept either CDN class-based icon, inline SVG, or PNG img using our class
     # Upstream changed to use <img> tags with PNG icons instead of SVG/Phosphor
     has_class_marker = class_marker in html
-    has_svg_with_class = f'class="{svg_class}"' in html and '<svg' in html
-    has_img_with_class = f'class="{svg_class}"' in html and '<img' in html
+    has_svg_with_class = f'class="{svg_class}"' in html and "<svg" in html
+    has_img_with_class = f'class="{svg_class}"' in html and "<img" in html
     return has_class_marker or has_svg_with_class or has_img_with_class
 
 

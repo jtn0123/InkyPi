@@ -8,22 +8,21 @@ delete modals, and drag-and-drop in the playlist interface.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
-from tests.integration.browser_helpers import navigate_and_wait, stub_leaflet
+from tests.integration.browser_helpers import stub_leaflet
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
     reason="UI interactions skipped by env",
 )
 
-from model import RefreshInfo
+from model import RefreshInfo  # noqa: E402
 
 
 def _fixed_now(_device_config):
-    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
 def _prepare_playlist(device_config_dev):
@@ -88,7 +87,9 @@ def test_playlist_keyboard_reorder(live_server, device_config_dev, monkeypatch):
             # Prevent location.reload from navigating away
             page.add_init_script("window.location.reload = () => {};")
 
-            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Verify plugin items exist
@@ -139,7 +140,9 @@ def test_playlist_delete_modal(live_server, device_config_dev, monkeypatch):
             )
             page.add_init_script("window.location.reload = () => {};")
 
-            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Click delete playlist button
@@ -156,7 +159,9 @@ def test_playlist_delete_modal(live_server, device_config_dev, monkeypatch):
             page.wait_for_timeout(500)
 
             # Verify DELETE request was sent
-            assert any(m == "DELETE" for m in delete_requests), "DELETE request should have been sent"
+            assert any(
+                m == "DELETE" for m in delete_requests
+            ), "DELETE request should have been sent"
         finally:
             browser.close()
 
@@ -190,7 +195,9 @@ def test_playlist_delete_instance_modal(live_server, device_config_dev, monkeypa
             )
             page.add_init_script("window.location.reload = () => {};")
 
-            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000)
+            page.goto(
+                f"{live_server}/playlist", wait_until="domcontentloaded", timeout=30000
+            )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
             # Click delete instance button on first plugin
@@ -207,6 +214,8 @@ def test_playlist_delete_instance_modal(live_server, device_config_dev, monkeypa
             page.wait_for_timeout(500)
 
             # Verify POST request was sent
-            assert any(m == "POST" for m in delete_requests), "POST delete request should have been sent"
+            assert any(
+                m == "POST" for m in delete_requests
+            ), "POST delete request should have been sent"
         finally:
             browser.close()

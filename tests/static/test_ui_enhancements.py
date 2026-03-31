@@ -1,7 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for UI enhancement CSS and styling."""
 
-import pytest
 from pathlib import Path
 
 # CSS is now split into @import partials; read all partials from disk
@@ -10,9 +9,10 @@ _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
 
 def _read_all_css() -> str:
     """Concatenate all CSS partials referenced by main.css."""
-    parts = []
-    for p in sorted(_STYLES_DIR.glob("partials/_*.css")):
-        parts.append(p.read_text(encoding="utf-8"))
+    parts = [
+        p.read_text(encoding="utf-8")
+        for p in sorted(_STYLES_DIR.glob("partials/_*.css"))
+    ]
     return "\n".join(parts)
 
 
@@ -120,7 +120,14 @@ def test_primary_templates_reduce_inline_handlers():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2] / "src" / "templates"
-    for template_name in ("plugin.html", "settings.html", "inky.html", "history.html", "api_keys.html", "playlist.html"):
+    for template_name in (
+        "plugin.html",
+        "settings.html",
+        "inky.html",
+        "history.html",
+        "api_keys.html",
+        "playlist.html",
+    ):
         content = (root / template_name).read_text()
         assert "onclick=" not in content
         assert "window.onclick" not in content
@@ -188,7 +195,7 @@ def test_main_css_contains_theme_variables(client):
     assert "var(--muted)" in css_content
 
     # Check for dark theme support
-    assert "[data-theme=\"dark\"]" in css_content
+    assert '[data-theme="dark"]' in css_content
     assert "--primary:" in css_content
     assert "--primary-hover:" in css_content
     assert "--text-muted:" in css_content
@@ -278,7 +285,7 @@ def test_main_css_contains_preview_overlay_theming(client):
     css_content = _read_all_css()
 
     # Check for dark theme preview overlay
-    assert "[data-theme=\"dark\"] .live-preview-overlay" in css_content
+    assert '[data-theme="dark"] .live-preview-overlay' in css_content
     assert "backdrop-filter: blur" in css_content
     assert "rgba(" in css_content
 
@@ -292,9 +299,13 @@ def test_main_css_contains_mobile_preview_adjustments(client):
     css_content = _read_all_css()
 
     # Check for mobile preview adjustments
-    mobile_preview_section = css_content.find("/* Mobile adjustments for live preview */")
+    mobile_preview_section = css_content.find(
+        "/* Mobile adjustments for live preview */"
+    )
     if mobile_preview_section != -1:
-        mobile_section = css_content[mobile_preview_section:mobile_preview_section + 1000]
+        mobile_section = css_content[
+            mobile_preview_section : mobile_preview_section + 1000
+        ]
         assert "bottom: 20px" in mobile_section
         assert "flex-direction: row" in mobile_section
 
@@ -442,9 +453,9 @@ def test_main_css_contains_status_color_variables(client):
     assert "--primary-bg:" in css_content
 
     # Check for dark theme variants
-    assert "[data-theme=\"dark\"]" in css_content and "--success-bg:" in css_content
-    assert "[data-theme=\"dark\"]" in css_content and "--error-bg:" in css_content
-    assert "[data-theme=\"dark\"]" in css_content and "--primary-bg:" in css_content
+    assert '[data-theme="dark"]' in css_content and "--success-bg:" in css_content
+    assert '[data-theme="dark"]' in css_content and "--error-bg:" in css_content
+    assert '[data-theme="dark"]' in css_content and "--primary-bg:" in css_content
 
 
 def test_main_css_contains_shimmer_animation(client):

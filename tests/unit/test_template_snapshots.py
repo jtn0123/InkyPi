@@ -56,13 +56,16 @@ def test_home_page_structure(client):
     assert "data-page-shell" in html
 
 
-@pytest.mark.parametrize("path,shell_attr", [
-    ("/", "data-page-shell"),
-    ("/settings", "data-page-shell"),
-    ("/playlist", "data-page-shell"),
-    ("/plugin/clock", "data-page-shell"),
-    ("/api-keys", "data-page-shell"),
-])
+@pytest.mark.parametrize(
+    "path,shell_attr",
+    [
+        ("/", "data-page-shell"),
+        ("/settings", "data-page-shell"),
+        ("/playlist", "data-page-shell"),
+        ("/plugin/clock", "data-page-shell"),
+        ("/api-keys", "data-page-shell"),
+    ],
+)
 def test_all_pages_include_shell(client, path, shell_attr):
     """All main pages include the page shell attribute."""
     resp = client.get(path)
@@ -71,9 +74,16 @@ def test_all_pages_include_shell(client, path, shell_attr):
     assert shell_attr in html
 
 
-@pytest.mark.parametrize("path", [
-    "/", "/settings", "/playlist", "/plugin/clock", "/api-keys",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/settings",
+        "/playlist",
+        "/plugin/clock",
+        "/api-keys",
+    ],
+)
 def test_all_pages_include_theme_toggle(client, path):
     """All main pages include the theme toggle."""
     resp = client.get(path)
@@ -82,9 +92,16 @@ def test_all_pages_include_theme_toggle(client, path):
     assert "themeToggle" in html or "theme-toggle" in html
 
 
-@pytest.mark.parametrize("path", [
-    "/", "/settings", "/playlist", "/plugin/clock", "/api-keys",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "/settings",
+        "/playlist",
+        "/plugin/clock",
+        "/api-keys",
+    ],
+)
 def test_all_pages_include_navigation(client, path):
     """All main pages include navigation elements."""
     resp = client.get(path)

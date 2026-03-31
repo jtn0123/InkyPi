@@ -1,17 +1,15 @@
 """Tests for enhanced progress tracking functionality."""
 
-import pytest
-from unittest.mock import Mock, patch
 from src.utils.progress import (
-    ProgressTracker,
     ProgressStep,
-    track_progress,
-    record_step,
-    start_step,
-    update_step,
+    ProgressTracker,
     complete_step,
     fail_step,
-    get_current_tracker
+    get_current_tracker,
+    record_step,
+    start_step,
+    track_progress,
+    update_step,
 )
 
 
@@ -24,7 +22,7 @@ class TestProgressStep:
             name="test_step",
             description="Test step description",
             elapsed_ms=1500,
-            status="completed"
+            status="completed",
         )
 
         assert step.name == "test_step"
@@ -41,7 +39,7 @@ class TestProgressStep:
             description="Failed step",
             elapsed_ms=2000,
             status="failed",
-            error_message="Something went wrong"
+            error_message="Something went wrong",
         )
 
         assert step.status == "failed"
@@ -55,7 +53,7 @@ class TestProgressStep:
             description="Making API call",
             elapsed_ms=3000,
             status="completed",
-            substeps=substeps
+            substeps=substeps,
         )
 
         assert step.substeps == substeps
@@ -106,7 +104,9 @@ class TestProgressTracker:
         assert steps[0].elapsed_ms == 0
 
         # Update the step
-        tracker.update_current_step("Processing data", ["Parse", "Validate", "Transform"])
+        tracker.update_current_step(
+            "Processing data", ["Parse", "Validate", "Transform"]
+        )
         steps = tracker.get_steps()
         assert steps[0].description == "Processing data"
         assert steps[0].substeps == ["Parse", "Validate", "Transform"]
@@ -141,6 +141,7 @@ class TestProgressTracker:
 
         # Add a small delay to ensure elapsed time > 0
         import time
+
         time.sleep(0.01)
 
         total_time = tracker.get_total_elapsed_ms()
@@ -154,6 +155,7 @@ class TestProgressTracker:
 
         # Add delay to ensure different timing
         import time
+
         time.sleep(0.01)
 
         tracker.step("step2", "Second step")

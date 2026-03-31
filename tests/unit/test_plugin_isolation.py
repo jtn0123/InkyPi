@@ -171,15 +171,21 @@ def test_multiple_plugins_concurrent_execution_with_failures(
         # Good plugin should have succeeded at least some times
         # (exact count may vary due to threading/timing)
         good_successes = sum(1 for r in results if r.startswith("good_success"))
-        assert good_successes >= 1, f"Good plugin should succeed at least once, got {good_successes}"
+        assert (
+            good_successes >= 1
+        ), f"Good plugin should succeed at least once, got {good_successes}"
 
         # Bad plugin should have failed at least some times
         bad_errors = sum(1 for e in errors if e.startswith("bad_error"))
-        assert bad_errors >= 1, f"Bad plugin should fail at least once, got {bad_errors}"
+        assert (
+            bad_errors >= 1
+        ), f"Bad plugin should fail at least once, got {bad_errors}"
 
         # Together they should have attempted all iterations
         total_attempts = good_successes + bad_errors
-        assert total_attempts >= 5, f"Should have at least 5 total attempts, got {total_attempts}"
+        assert (
+            total_attempts >= 5
+        ), f"Should have at least 5 total attempts, got {total_attempts}"
 
     finally:
         task.stop()
@@ -211,7 +217,7 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
 
         # Sequence: bad -> good -> bad -> good
         sequence = ["bad", "good", "bad", "good"]
-        for i, plugin_id in enumerate(sequence):
+        for _i, plugin_id in enumerate(sequence):
             if plugin_id == "bad":
                 with pytest.raises(RuntimeError):
                     refresh = ManualRefresh(plugin_id, {})
@@ -229,7 +235,9 @@ def test_plugin_failure_doesnt_affect_subsequent_plugins(
         task.stop()
 
 
-def test_plugin_timeout_isolation(device_config_dev, slow_plugin, good_plugin, monkeypatch):
+def test_plugin_timeout_isolation(
+    device_config_dev, slow_plugin, good_plugin, monkeypatch
+):
     """Test that a slow plugin doesn't block other plugins from executing."""
     dm = DisplayManager(device_config_dev)
     task = RefreshTask(device_config_dev, dm)
@@ -329,7 +337,9 @@ def test_plugin_state_isolation(device_config_dev, monkeypatch):
             self.plugin_id = plugin_id
 
         def generate_image(self, settings, device_config):
-            return Image.new("RGB", device_config.get_resolution(), color=(255, 255, 255))
+            return Image.new(
+                "RGB", device_config.get_resolution(), color=(255, 255, 255)
+            )
 
     def get_plugin_instance(cfg):
         return StatelessPlugin(cfg["id"])
@@ -349,7 +359,7 @@ def test_plugin_state_isolation(device_config_dev, monkeypatch):
         task.start()
 
         # Call plugin1 twice
-        for i in range(2):
+        for _i in range(2):
             refresh = ManualRefresh("plugin1", {})
             task.manual_update(refresh)
 
@@ -382,7 +392,9 @@ def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_
             try:
                 self._increment(allocated_path)
                 # Simulate resource allocation
-                img = Image.new("RGB", device_config.get_resolution(), color=(128, 128, 128))
+                img = Image.new(
+                    "RGB", device_config.get_resolution(), color=(128, 128, 128)
+                )
                 # Simulate failure
                 raise RuntimeError("Simulated failure after resource allocation")
             finally:
@@ -406,7 +418,7 @@ def test_plugin_resource_cleanup_on_failure(device_config_dev, monkeypatch, tmp_
         task.start()
 
         # Run the plugin multiple times, expect failures
-        for i in range(3):
+        for _i in range(3):
             with pytest.raises(RuntimeError):
                 refresh = ManualRefresh("tracking", {})
                 task.manual_update(refresh)

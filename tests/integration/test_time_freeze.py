@@ -7,7 +7,7 @@ import pytest
 import pytz
 
 pytest.importorskip("freezegun")
-from freezegun import freeze_time
+from freezegun import freeze_time  # noqa: E402
 
 
 def test_playlist_rotation_respects_device_timezone_freeze(device_config_dev):

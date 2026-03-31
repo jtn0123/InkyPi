@@ -31,6 +31,7 @@ def _reload_inkypi(monkeypatch, argv=None, env=None):
         del sys.modules["inkypi"]
 
     import inkypi  # noqa: F401
+
     mod = importlib.reload(sys.modules["inkypi"])
     mod.main(argv[1:])
     return mod
@@ -155,10 +156,10 @@ def test_error_handlers_coverage(monkeypatch):
     test_codes = [400, 404, 415]
     for code in test_codes:
         assert code in [
-            c for c in app.error_handler_spec[None].keys() if isinstance(c, int)
+            c for c in app.error_handler_spec[None] if isinstance(c, int)
         ] or any(
             isinstance(k, type) and issubclass(k, Exception)
-            for k in app.error_handler_spec[None].keys()
+            for k in app.error_handler_spec[None]
         )
 
 

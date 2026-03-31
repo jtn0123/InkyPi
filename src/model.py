@@ -285,7 +285,8 @@ class Playlist:
         if self.find_plugin(plugin_data["plugin_id"], plugin_data["name"]):
             logger.warning(
                 "Plugin %r with instance %r already exists.",
-                plugin_data.get("plugin_id"), plugin_data.get("name"),
+                plugin_data.get("plugin_id"),
+                plugin_data.get("name"),
             )
             return False
         self.plugins.append(PluginInstance.from_dict(plugin_data))
@@ -432,9 +433,10 @@ class Playlist:
 
         self.plugins = new_order
         # Reset index within bounds after reorder
-        if self.current_plugin_index is not None:
-            if not (0 <= self.current_plugin_index < len(self.plugins)):
-                self.current_plugin_index = 0
+        if self.current_plugin_index is not None and not (
+            0 <= self.current_plugin_index < len(self.plugins)
+        ):
+            self.current_plugin_index = 0
         return True
 
     def get_priority(self):
@@ -547,7 +549,9 @@ class PluginInstance:
 
             # Align timezone awareness for comparison
             if scheduled_dt.tzinfo and latest_refresh_dt.tzinfo is None:
-                latest_refresh_dt = latest_refresh_dt.replace(tzinfo=scheduled_dt.tzinfo)
+                latest_refresh_dt = latest_refresh_dt.replace(
+                    tzinfo=scheduled_dt.tzinfo
+                )
             elif latest_refresh_dt.tzinfo and scheduled_dt.tzinfo is None:
                 scheduled_dt = scheduled_dt.replace(tzinfo=latest_refresh_dt.tzinfo)
 
@@ -580,10 +584,9 @@ class PluginInstance:
                         self.name,
                     )
 
-            if self.only_show_when_fresh and not self.should_refresh(current_time):
-                return False
-
-            return True
+            return not (
+                self.only_show_when_fresh and not self.should_refresh(current_time)
+            )
         except Exception:
             logger.warning(
                 "Unexpected error in is_show_eligible for plugin '%s'; treating as eligible",

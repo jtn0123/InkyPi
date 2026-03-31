@@ -2,8 +2,8 @@ import time
 
 
 def test_refresh_task_signal_and_stop(monkeypatch, device_config_dev):
-    from refresh_task import RefreshTask
     from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     dm = DisplayManager(device_config_dev)
     rt = RefreshTask(device_config_dev, dm)
@@ -21,9 +21,9 @@ def test_refresh_task_signal_and_stop(monkeypatch, device_config_dev):
 
 
 def test_refresh_task_plugin_exception_isolated(monkeypatch, device_config_dev):
-    from refresh_task import RefreshTask
-    from display.display_manager import DisplayManager
     import plugins.ai_text.ai_text as ai_text_mod
+    from display.display_manager import DisplayManager
+    from refresh_task import RefreshTask
 
     dm = DisplayManager(device_config_dev)
     rt = RefreshTask(device_config_dev, dm)
@@ -32,7 +32,9 @@ def test_refresh_task_plugin_exception_isolated(monkeypatch, device_config_dev):
     def boom(settings, cfg):
         raise RuntimeError("cycle failure")
 
-    monkeypatch.setattr(ai_text_mod.AIText, "generate_image", staticmethod(boom), raising=True)
+    monkeypatch.setattr(
+        ai_text_mod.AIText, "generate_image", staticmethod(boom), raising=True
+    )
 
     # Trigger a manual update path when not running to exercise isolation logic
     from refresh_task import ManualRefresh
@@ -41,4 +43,3 @@ def test_refresh_task_plugin_exception_isolated(monkeypatch, device_config_dev):
     # When not running, manual_update returns any captured metrics (possibly None)
     # The primary assertion is that no exception propagates
     assert metrics is None or isinstance(metrics, dict)
-

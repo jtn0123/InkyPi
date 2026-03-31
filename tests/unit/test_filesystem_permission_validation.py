@@ -28,13 +28,19 @@ def test_config_init_tolerates_preview_copy_permission_error(monkeypatch, tmp_pa
     )
 
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_path))
-    monkeypatch.setattr(shutil, "copyfile", lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("no write")))
+    monkeypatch.setattr(
+        shutil,
+        "copyfile",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PermissionError("no write")),
+    )
 
     cfg = config_mod.Config()
     assert cfg.get_config("name") == "Permission Test"
 
 
-def test_display_manager_tolerates_readonly_preview_paths(device_config_dev, monkeypatch):
+def test_display_manager_tolerates_readonly_preview_paths(
+    device_config_dev, monkeypatch
+):
     from display.display_manager import DisplayManager
 
     manager = DisplayManager(device_config_dev)
@@ -58,7 +64,9 @@ def test_display_manager_tolerates_readonly_preview_paths(device_config_dev, mon
     assert metrics["display_driver"] == manager.display.__class__.__name__
 
 
-def test_history_clear_returns_500_on_permission_error(client, device_config_dev, tmp_path, monkeypatch):
+def test_history_clear_returns_500_on_permission_error(
+    client, device_config_dev, tmp_path, monkeypatch
+):
     history_dir = device_config_dev.history_image_dir
     image_path = os.path.join(history_dir, "display_20250101_000000.png")
     Image.new("RGB", (10, 10), "white").save(image_path)
@@ -75,7 +83,10 @@ def test_history_clear_returns_500_on_permission_error(client, device_config_dev
 
 
 def test_preview_returns_404_when_preview_files_missing(client, device_config_dev):
-    for path in (device_config_dev.processed_image_file, device_config_dev.current_image_file):
+    for path in (
+        device_config_dev.processed_image_file,
+        device_config_dev.current_image_file,
+    ):
         if os.path.exists(path):
             os.remove(path)
 

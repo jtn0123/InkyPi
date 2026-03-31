@@ -43,4 +43,3 @@ def test_plugin_add_config_render_remove_flow(client):
     # Verify it's gone
     pl = pm.get_playlist(playlist_name)
     assert not pl.find_plugin("clock", "Lifecycle")
-

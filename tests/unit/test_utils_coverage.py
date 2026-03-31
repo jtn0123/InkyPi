@@ -1,8 +1,6 @@
 """Tests for utility modules to improve code coverage."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime
 
 
 def test_time_utils_parse_cron():
@@ -23,7 +21,7 @@ def test_time_utils_get_next_occurrence():
         from utils.time_utils import get_next_occurrence
 
         # Test getting next occurrence for a cron expression
-        now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=UTC)
         # Try a simple cron: every hour
         next_time = get_next_occurrence("0 * * * *", now)
         # Should return datetime or None

@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from model import Playlist, PluginInstance
 
@@ -42,10 +42,12 @@ def test_reorder_plugins_rejects_missing_or_wrong_length():
     )
     # Wrong shape
     assert (
-        pl.reorder_plugins([
-            {"pid": "a", "nm": "A"},
-            {"plugin_id": "b", "name": "B"},
-        ])
+        pl.reorder_plugins(
+            [
+                {"pid": "a", "nm": "A"},
+                {"plugin_id": "b", "name": "B"},
+            ]
+        )
         is False
     )
 
@@ -54,7 +56,7 @@ def test_get_next_eligible_advances_and_wraps():
     pl = Playlist("P", "00:00", "24:00")
     pl.plugins = [_mk_inst("a", "A"), _mk_inst("b", "B")]
     pl.current_plugin_index = None
-    now = datetime(2025, 1, 1, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2025, 1, 1, 0, 0, tzinfo=UTC)
 
     p1 = pl.get_next_eligible_plugin(now)
     assert p1.name == "A"
@@ -62,5 +64,3 @@ def test_get_next_eligible_advances_and_wraps():
     assert p2.name == "B"
     p3 = pl.get_next_eligible_plugin(now)
     assert p3.name == "A"
-
-

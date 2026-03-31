@@ -1,14 +1,13 @@
 # pyright: reportMissingImports=false
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-import pytest
 from PIL import Image
 
 from model import RefreshInfo
 
 
 def _fixed_now(_device_config):
-    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
 def _prepare_playlist(device_config_dev):
@@ -44,7 +43,9 @@ def _prepare_playlist(device_config_dev):
     device_config_dev.write_config()
 
 
-def test_display_plugin_instance_endpoint_success(client, device_config_dev, monkeypatch):
+def test_display_plugin_instance_endpoint_success(
+    client, device_config_dev, monkeypatch
+):
     _prepare_playlist(device_config_dev)
 
     resp = client.post(
@@ -69,7 +70,9 @@ def test_display_next_in_playlist_success(client, device_config_dev, monkeypatch
     assert resp.json.get("success") is True
 
 
-def test_main_display_next_happy_path(client, device_config_dev, monkeypatch, flask_app):
+def test_main_display_next_happy_path(
+    client, device_config_dev, monkeypatch, flask_app
+):
     # Force direct path by marking refresh_task.running = False
     rt = flask_app.config["REFRESH_TASK"]
     rt.running = False
@@ -98,5 +101,3 @@ def test_main_display_next_happy_path(client, device_config_dev, monkeypatch, fl
     assert resp.status_code == 200
     assert resp.json.get("success") is True
     assert called["displayed"] is True
-
-

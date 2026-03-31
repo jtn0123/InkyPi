@@ -1,6 +1,8 @@
 def test_api_logs_clamp_and_meta(client, monkeypatch):
     # Request with out-of-range parameters; expect clamped values in meta
-    resp = client.get("/api/logs?hours=9999&limit=999999&level=errors&contains=" + ("x" * 500))
+    resp = client.get(
+        "/api/logs?hours=9999&limit=999999&level=errors&contains=" + ("x" * 500)
+    )
     assert resp.status_code == 200
     data = resp.get_json()
     assert "meta" in data
@@ -59,7 +61,9 @@ def test_download_logs_exception_500(client, monkeypatch):
     """_read_log_lines raising returns 500 text response."""
     import blueprints.settings as mod
 
-    monkeypatch.setattr(mod, "_read_log_lines", lambda h: (_ for _ in ()).throw(RuntimeError("fail")))
+    monkeypatch.setattr(
+        mod, "_read_log_lines", lambda h: (_ for _ in ()).throw(RuntimeError("fail"))
+    )
 
     resp = client.get("/download-logs")
     assert resp.status_code == 500
@@ -117,9 +121,7 @@ def test_api_logs_response_size_guardrail(client, monkeypatch):
 
     resp = client.get("/api/logs?hours=2&limit=2000")
     assert resp.status_code == 200
-    data = resp.get_json()
+    resp.get_json()
     # Response body should be under the guardrail
     raw = resp.data
     assert len(raw) <= mod.MAX_RESPONSE_BYTES + 10000  # some overhead for JSON wrapping
-
-

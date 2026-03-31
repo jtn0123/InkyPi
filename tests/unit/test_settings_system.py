@@ -2,7 +2,7 @@
 """Tests for settings system control endpoints (_system.py)."""
 
 import subprocess
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 class TestClientLog:
@@ -28,7 +28,11 @@ class TestClientLog:
         """
         resp = client.post(
             "/settings/client_log",
-            json={"level": "info", "message": "test", "extra": [1, 2, {"nested": True}]},
+            json={
+                "level": "info",
+                "message": "test",
+                "extra": [1, 2, {"nested": True}],
+            },
         )
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
@@ -85,7 +89,6 @@ class TestShutdown:
 
     def test_rate_limit_remaining_seconds(self, client, monkeypatch):
         """429 error message contains remaining seconds."""
-        import blueprints.settings as mod
 
         mock_run = MagicMock()
         monkeypatch.setattr(subprocess, "run", mock_run)
@@ -101,6 +104,7 @@ class TestShutdown:
         assert "wait" in data["error"].lower()
         # Should contain a number of seconds
         import re
+
         match = re.search(r"\d+", data["error"])
         assert match is not None
 
@@ -120,18 +124,14 @@ class TestShutdown:
 
         resp = client.post("/shutdown", json={})
         assert resp.status_code == 200
-        mock_run.assert_called_once_with(
-            ["sudo", "shutdown", "-h", "now"], check=True
-        )
+        mock_run.assert_called_once_with(["sudo", "shutdown", "-h", "now"], check=True)
 
     def test_called_process_error_500(self, client, monkeypatch):
         """CalledProcessError from subprocess returns 500."""
         monkeypatch.setattr(
             subprocess,
             "run",
-            MagicMock(
-                side_effect=subprocess.CalledProcessError(1, "sudo shutdown")
-            ),
+            MagicMock(side_effect=subprocess.CalledProcessError(1, "sudo shutdown")),
         )
 
         resp = client.post("/shutdown", json={})
@@ -144,9 +144,7 @@ class TestShutdown:
 
         resp = client.post("/shutdown")
         assert resp.status_code == 200
-        mock_run.assert_called_once_with(
-            ["sudo", "shutdown", "-h", "now"], check=True
-        )
+        mock_run.assert_called_once_with(["sudo", "shutdown", "-h", "now"], check=True)
 
     def test_empty_dict_defaults_to_shutdown(self, client, monkeypatch):
         """Explicit empty dict body defaults to shutdown."""
@@ -155,6 +153,4 @@ class TestShutdown:
 
         resp = client.post("/shutdown", json={})
         assert resp.status_code == 200
-        mock_run.assert_called_once_with(
-            ["sudo", "shutdown", "-h", "now"], check=True
-        )
+        mock_run.assert_called_once_with(["sudo", "shutdown", "-h", "now"], check=True)

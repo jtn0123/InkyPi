@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -41,6 +41,7 @@ def _validate_playlist_name(name):
         )
     return name, None
 
+
 # Simple in-memory cache for ETA computations (per playlist, per-minute)
 # Bounded to prevent unbounded growth; entries expire after 1 minute.
 _ETA_CACHE_MAX_SIZE = 64
@@ -59,9 +60,7 @@ def _segments(start_min: int, end_min: int) -> list[tuple[int, int]]:
     return [(start_min, 24 * 60), (0, end_min)]
 
 
-def _windows_overlap(
-    start_a: int, end_a: int, start_b: int, end_b: int
-) -> bool:
+def _windows_overlap(start_a: int, end_a: int, start_b: int, end_b: int) -> bool:
     for a0, a1 in _segments(start_a, end_a):
         for b0, b1 in _segments(start_b, end_b):
             if a0 < b1 and b0 < a1:
@@ -228,14 +227,21 @@ def playlists():
         now_str = ""
         tz_off_min = 0
     try:
-        device_cycle_minutes = int(int(device_config.get_config("plugin_cycle_interval_seconds", default=3600)) // 60)
+        device_cycle_minutes = int(
+            int(device_config.get_config("plugin_cycle_interval_seconds", default=3600))
+            // 60
+        )
     except Exception:
         device_cycle_minutes = 60
 
     # Build per-playlist timing metadata: cycle and next refresh (if active)
     try:
         ri_obj = device_config.get_refresh_info()
-        last_dt = ri_obj.get_refresh_datetime() if hasattr(ri_obj, "get_refresh_datetime") else None
+        last_dt = (
+            ri_obj.get_refresh_datetime()
+            if hasattr(ri_obj, "get_refresh_datetime")
+            else None
+        )
     except Exception:
         last_dt = None
     playlist_timing: dict[str, dict] = {}
@@ -243,8 +249,14 @@ def playlists():
     try:
         for pl in playlist_manager.playlists:
             cycle_sec = getattr(pl, "cycle_interval_seconds", None)
-            cycle_min = int((int(cycle_sec) if cycle_sec else device_cycle_minutes * 60) // 60)
-            item: dict = {"cycle_minutes": cycle_min, "next_in_minutes": None, "next_at": None}
+            cycle_min = int(
+                (int(cycle_sec) if cycle_sec else device_cycle_minutes * 60) // 60
+            )
+            item: dict = {
+                "cycle_minutes": cycle_min,
+                "next_in_minutes": None,
+                "next_at": None,
+            }
             try:
                 if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
                     # compute next time
@@ -275,7 +287,15 @@ def playlists():
                         try:
                             # If this playlist produced the last image, use last_dt; otherwise assume next tick is cycle_min from now
                             if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
-                                until_next_min = max(0, int((last_dt + timedelta(minutes=cycle_min) - now).total_seconds() // 60))
+                                until_next_min = max(
+                                    0,
+                                    int(
+                                        (
+                                            last_dt + timedelta(minutes=cycle_min) - now
+                                        ).total_seconds()
+                                        // 60
+                                    ),
+                                )
                             else:
                                 until_next_min = cycle_min
                         except Exception:
@@ -356,12 +376,15 @@ def create_playlist():
             new_start = _to_minutes(start_time)
             new_end = _to_minutes(end_time)
             for pl in playlist_manager.playlists:
-                if getattr(pl, 'name', '') == 'Default':
+                if getattr(pl, "name", "") == "Default":
                     continue
                 ps = _to_minutes(pl.start_time)
                 pe = _to_minutes(pl.end_time)
                 if _windows_overlap(new_start, new_end, ps, pe):
-                    return json_error("Playlist time range overlaps with existing playlist", status=400)
+                    return json_error(
+                        "Playlist time range overlaps with existing playlist",
+                        status=400,
+                    )
         except Exception:
             # best-effort, fallback to allow
             pass
@@ -419,12 +442,14 @@ def update_playlist(playlist_name):
         for pl in playlist_manager.playlists:
             if pl.name == playlist_name:
                 continue
-            if getattr(pl, 'name', '') == 'Default':
+            if getattr(pl, "name", "") == "Default":
                 continue
             ps = _to_minutes(pl.start_time)
             pe = _to_minutes(pl.end_time)
             if _windows_overlap(new_start, new_end, ps, pe):
-                return json_error("Playlist time range overlaps with existing playlist", status=400)
+                return json_error(
+                    "Playlist time range overlaps with existing playlist", status=400
+                )
     except Exception:
         pass
 
@@ -488,7 +513,9 @@ def update_device_cycle():
             pass
         return json_success("Device refresh cadence updated.")
     except Exception:
-        return json_internal_error("update_device_cycle", details={"hint": "Check config write permissions."})
+        return json_internal_error(
+            "update_device_cycle", details={"hint": "Check config write permissions."}
+        )
 
 
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
@@ -519,7 +546,6 @@ def reorder_plugins():
         )
 
 
-
 # Trigger next eligible instance in a specific playlist immediately
 @playlist_bp.route("/display_next_in_playlist", methods=["POST"])
 def display_next_in_playlist():
@@ -547,7 +573,9 @@ def display_next_in_playlist():
         if not plugin_instance:
             return json_error("No eligible instance in playlist", status=400)
 
-        refresh_task.manual_update(PlaylistRefresh(playlist, plugin_instance, force=True))
+        refresh_task.manual_update(
+            PlaylistRefresh(playlist, plugin_instance, force=True)
+        )
 
         # Include latest metrics from refresh info if available
         metrics = {}
@@ -663,9 +691,7 @@ def playlist_eta(playlist_name: str):
 
         # Evict stale entries and cap cache size
         if len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
-            stale_keys = [
-                k for k, (ts, _) in _eta_cache.items() if ts != floor_min
-            ]
+            stale_keys = [k for k, (ts, _) in _eta_cache.items() if ts != floor_min]
             for k in stale_keys:
                 _eta_cache.pop(k, None)
             # If still over limit, drop oldest entries
@@ -684,8 +710,7 @@ def format_relative_time(iso_date_string):
 
     # Get the timezone from the parsed datetime
     if dt.tzinfo is None:
-        from datetime import timezone as _tz
-        dt = dt.replace(tzinfo=_tz.utc)
+        dt = dt.replace(tzinfo=UTC)
 
     # Get the current time using the device's configured timezone, if available
     if has_app_context():

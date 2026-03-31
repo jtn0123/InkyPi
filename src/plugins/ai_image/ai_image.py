@@ -65,10 +65,15 @@ class AIImage(BasePlugin):
                         options_source_default="openai",
                         options_by_value={
                             "openai": [
-                                option("gpt-image-1.5", "GPT Image 1.5 \u00b7 ~$0.07/img"),
+                                option(
+                                    "gpt-image-1.5", "GPT Image 1.5 \u00b7 ~$0.07/img"
+                                ),
                             ],
                             "google": [
-                                option("imagen-4.0-generate-001", "Imagen 4 \u00b7 ~$0.04/img"),
+                                option(
+                                    "imagen-4.0-generate-001",
+                                    "Imagen 4 \u00b7 ~$0.04/img",
+                                ),
                             ],
                         },
                     ),
@@ -102,7 +107,7 @@ class AIImage(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "OpenAI / Google",
             "expected_key": "OPEN_AI_SECRET",
@@ -115,17 +120,19 @@ class AIImage(BasePlugin):
 
         provider = settings.get("provider", "openai")
         text_prompt = settings.get("textPrompt", "")
-        image_model = settings.get('imageModel', DEFAULT_IMAGE_MODEL)
+        image_model = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
 
         if image_model not in IMAGE_MODELS:
             logger.error(f"Invalid image model: {image_model}")
             raise RuntimeError("Invalid Image Model provided.")
 
-        image_quality = settings.get('quality', DEFAULT_IMAGE_QUALITY)
-        randomize_prompt = settings.get('randomizePrompt') == 'true'
+        image_quality = settings.get("quality", DEFAULT_IMAGE_QUALITY)
+        randomize_prompt = settings.get("randomizePrompt") == "true"
         orientation = device_config.get_config("orientation")
 
-        logger.info(f"Settings: provider={provider}, model={image_model}, quality={image_quality}, orientation={orientation}")
+        logger.info(
+            f"Settings: provider={provider}, model={image_model}, quality={image_quality}, orientation={orientation}"
+        )
 
         image = None
         try:
@@ -136,15 +143,20 @@ class AIImage(BasePlugin):
                     raise RuntimeError("Google AI API Key not configured.")
 
                 from google import genai
+
                 google_client = genai.Client(api_key=api_key)
 
                 if randomize_prompt:
                     logger.debug("Generating randomized prompt using Gemini...")
-                    text_prompt = AIImage.fetch_image_prompt_google(google_client, text_prompt)
+                    text_prompt = AIImage.fetch_image_prompt_google(
+                        google_client, text_prompt
+                    )
                     logger.info(f"Randomized prompt: '{text_prompt}'")
 
                 logger.info(f"Generating image with {image_model}...")
-                image = self.fetch_image_google(google_client, text_prompt, image_model, orientation)
+                image = self.fetch_image_google(
+                    google_client, text_prompt, image_model, orientation
+                )
             else:
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
                 if not api_key:
@@ -168,7 +180,9 @@ class AIImage(BasePlugin):
                 )
 
             if image:
-                logger.info(f"AI image generated successfully: {image.size[0]}x{image.size[1]}")
+                logger.info(
+                    f"AI image generated successfully: {image.size[0]}x{image.size[1]}"
+                )
 
         except RuntimeError:
             raise
@@ -179,9 +193,18 @@ class AIImage(BasePlugin):
         logger.info("=== AI Image Plugin: Image generation complete ===")
         return image
 
-    def fetch_image(self, ai_client, prompt, model="gpt-image-1.5", quality="medium", orientation="horizontal"):
+    def fetch_image(
+        self,
+        ai_client,
+        prompt,
+        model="gpt-image-1.5",
+        quality="medium",
+        orientation="horizontal",
+    ):
         """Fetch image from OpenAI API."""
-        logger.info(f"Generating image for prompt: {prompt}, model: {model}, quality: {quality}")
+        logger.info(
+            f"Generating image for prompt: {prompt}, model: {model}, quality: {quality}"
+        )
         prompt += (
             ". The image should fully occupy the entire canvas without any frames, "
             "borders, or cropped areas. No blank spaces or artificial framing."
@@ -230,11 +253,15 @@ class AIImage(BasePlugin):
 
         config = types.GenerateImagesConfig(number_of_images=1)
         response = client.models.generate_images(
-            model=model, prompt=prompt, config=config,
+            model=model,
+            prompt=prompt,
+            config=config,
         )
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
-        return Image.open(BytesIO(response.generated_images[0].image.image_bytes)).copy()
+        return Image.open(
+            BytesIO(response.generated_images[0].image.image_bytes)
+        ).copy()
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):
@@ -267,7 +294,7 @@ class AIImage(BasePlugin):
                 "period for the theme."
             )
             user_content = (
-                f"Original prompt: \"{from_prompt}\"\n"
+                f'Original prompt: "{from_prompt}"\n'
                 "Rewrite it to make it more detailed, imaginative, and unique while staying "
                 "true to the original idea. Include vivid imagery and descriptive details. "
                 "Avoid changing the subject of the prompt."
@@ -320,7 +347,7 @@ class AIImage(BasePlugin):
                 "period for the theme."
             )
             user_content = (
-                f"Original prompt: \"{from_prompt}\"\n"
+                f'Original prompt: "{from_prompt}"\n'
                 "Rewrite it to make it more detailed, imaginative, and unique while staying "
                 "true to the original idea. Include vivid imagery and descriptive details. "
                 "Avoid changing the subject of the prompt."

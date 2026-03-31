@@ -5,7 +5,6 @@ Supplements test_settings_blueprint.py with untested error branches.
 """
 
 import io
-import json
 from unittest.mock import MagicMock
 
 
@@ -44,9 +43,7 @@ class TestSafeReset:
 
     def test_sets_interval_3600(self, client, device_config_dev):
         """Safe reset sets plugin_cycle_interval_seconds to 3600."""
-        device_config_dev.update_value(
-            "plugin_cycle_interval_seconds", 60, write=True
-        )
+        device_config_dev.update_value("plugin_cycle_interval_seconds", 60, write=True)
 
         resp = client.post("/settings/safe_reset")
         assert resp.status_code == 200
@@ -71,7 +68,6 @@ class TestExportEdge:
 
     def test_load_env_key_raises_partial(self, client, device_config_dev, monkeypatch):
         """One key raising during export → others still exported."""
-        import config as config_mod
 
         call_count = 0
         original = device_config_dev.load_env_key
@@ -94,7 +90,9 @@ class TestExportEdge:
 
 
 class TestImportEdge:
-    def test_env_key_set_failure_continues(self, client, device_config_dev, monkeypatch):
+    def test_env_key_set_failure_continues(
+        self, client, device_config_dev, monkeypatch
+    ):
         """set_env_key raises for first key → subsequent keys still attempted."""
         call_log = []
         original_set = device_config_dev.set_env_key
@@ -176,9 +174,7 @@ class TestSaveSettingsEdge:
     def test_interval_over_24h_rejected(self, client):
         """>86400 seconds returns 422."""
         # 1500 minutes = 90000 seconds > 86400
-        resp = client.post(
-            "/save_settings", data=self._valid_form(interval="1500")
-        )
+        resp = client.post("/save_settings", data=self._valid_form(interval="1500"))
         assert resp.status_code == 422
 
     def test_non_numeric_saturation_500(self, client, device_config_dev):
@@ -214,9 +210,7 @@ class TestSaveSettingsEdge:
     def test_unchanged_interval_no_signal(self, client, device_config_dev, monkeypatch):
         """Same interval as current → signal_config_change NOT called."""
         # Set current interval to match what we'll POST
-        device_config_dev.update_value(
-            "plugin_cycle_interval_seconds", 300, write=True
-        )
+        device_config_dev.update_value("plugin_cycle_interval_seconds", 300, write=True)
 
         rt = client.application.config["REFRESH_TASK"]
         signal_mock = MagicMock()
@@ -231,7 +225,9 @@ class TestApiKeysMask:
     def test_mask_short_key(self, client, device_config_dev, monkeypatch):
         """Key < 4 chars shows 'set (N chars)' pattern."""
         monkeypatch.setattr(
-            device_config_dev, "load_env_key", lambda k: "abc" if k == "NASA_SECRET" else None
+            device_config_dev,
+            "load_env_key",
+            lambda k: "abc" if k == "NASA_SECRET" else None,
         )
 
         resp = client.get("/settings/api-keys")

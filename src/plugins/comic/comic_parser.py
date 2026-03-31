@@ -44,7 +44,7 @@ COMICS = {
         "element": lambda feed: feed.entries[0].description,
         "url": lambda element: _img_src(element),
         "title": lambda feed: _split_safe(feed.entries[0].title, "-", 1),
-        "caption": lambda element: _match(r'Hovertext:<br />(.*?)</p>', element),
+        "caption": lambda element: _match(r"Hovertext:<br />(.*?)</p>", element),
     },
     "The Perry Bible Fellowship": {
         "feed": "https://pbfcomics.com/feed/",
@@ -62,7 +62,9 @@ COMICS = {
     },
     "Poorly Drawn Lines": {
         "feed": "https://poorlydrawnlines.com/feed/",
-        "element": lambda feed: feed.entries[0].get('content', [{}])[0].get('value', ''),
+        "element": lambda feed: feed.entries[0]
+        .get("content", [{}])[0]
+        .get("value", ""),
         "url": lambda element: _img_src(element),
         "title": lambda feed: feed.entries[0].title,
         "caption": lambda element: "",
@@ -72,7 +74,9 @@ COMICS = {
         "element": lambda feed: feed.entries[0].description,
         "url": lambda element: _img_src(element),
         "title": lambda feed: feed.entries[0].title,
-        "caption": lambda element: _match(r'title="(.*?)" />', element.replace('\n', '')),
+        "caption": lambda element: _match(
+            r'title="(.*?)" />', element.replace("\n", "")
+        ),
     },
     "webcomic name": {
         "feed": "https://webcomicname.com/rss",
@@ -89,7 +93,7 @@ def get_panel(comic_name):
     try:
         element = COMICS[comic_name]["element"](feed)
     except (IndexError, AttributeError):
-        raise RuntimeError("Failed to retrieve latest comic.")
+        raise RuntimeError("Failed to retrieve latest comic.") from None
 
     return {
         "image_url": COMICS[comic_name]["url"](element),

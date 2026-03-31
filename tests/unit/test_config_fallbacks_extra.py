@@ -61,7 +61,6 @@ def test_determine_config_path_bootstrap_failure(monkeypatch, tmp_path):
     monkeypatch.delenv("INKYPI_ENV", raising=False)
     # Simulate missing install template so bootstrap fails
     # Also ensure config dir not creatable by mocking shutil.copyfile to raise
-    import shutil
 
     def _boom(*_a, **_kw):
         raise OSError("copy failed")
@@ -75,5 +74,3 @@ def test_determine_config_path_bootstrap_failure(monkeypatch, tmp_path):
     except RuntimeError as ex:  # noqa: F841
         # Pass: raised as expected
         assert True
-
-

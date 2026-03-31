@@ -1,7 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for settings health and progress SSE endpoints (_health.py)."""
 
-import time
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -118,9 +117,9 @@ class TestHealthSystem:
         data = resp.get_json()
         assert data["success"] is True
         # psutil is installed in test env
-        assert isinstance(data["cpu_percent"], (int, float))
-        assert isinstance(data["memory_percent"], (int, float))
-        assert isinstance(data["disk_percent"], (int, float))
+        assert isinstance(data["cpu_percent"], int | float)
+        assert isinstance(data["memory_percent"], int | float)
+        assert isinstance(data["disk_percent"], int | float)
         assert isinstance(data["uptime_seconds"], int)
 
     def test_psutil_unavailable(self, client, monkeypatch):

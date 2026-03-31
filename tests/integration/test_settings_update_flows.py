@@ -1,6 +1,3 @@
-import time
-
-
 def test_settings_update_systemd_and_fallback(client, monkeypatch):
     from blueprints import settings as settings_mod
 
@@ -21,8 +18,12 @@ def test_settings_update_systemd_and_fallback(client, monkeypatch):
         # Do not actually sleep inside the worker; immediately clear running state
         settings_mod._set_update_state(False, None)
 
-    monkeypatch.setattr(settings_mod, "_start_update_via_systemd", fake_systemd, raising=True)
-    monkeypatch.setattr(settings_mod, "_start_update_fallback_thread", fake_thread, raising=True)
+    monkeypatch.setattr(
+        settings_mod, "_start_update_via_systemd", fake_systemd, raising=True
+    )
+    monkeypatch.setattr(
+        settings_mod, "_start_update_fallback_thread", fake_thread, raising=True
+    )
 
     # Start update
     r = client.post("/settings/update")
@@ -54,7 +55,9 @@ def test_settings_update_duplicate_returns_409(client, monkeypatch):
         # Mark running and do not clear
         settings_mod._set_update_state(True, None)
 
-    monkeypatch.setattr(settings_mod, "_start_update_fallback_thread", fake_thread, raising=True)
+    monkeypatch.setattr(
+        settings_mod, "_start_update_fallback_thread", fake_thread, raising=True
+    )
 
     r1 = client.post("/settings/update")
     assert r1.status_code == 200
@@ -66,4 +69,3 @@ def test_settings_update_duplicate_returns_409(client, monkeypatch):
     assert r2.status_code == 409
     data2 = r2.get_json()
     assert data2["running"] is True
-

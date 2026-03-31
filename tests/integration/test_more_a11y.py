@@ -54,7 +54,7 @@ import pytest
     reason="A11y checks skipped by env",
 )
 def test_plugin_settings_accessibility(client):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
@@ -74,9 +74,15 @@ def test_plugin_settings_accessibility(client):
 
     # Filter out known violations from upstream merge (HTML template issues)
     # These should be fixed separately - see upstream issue tracker
-    known_violations = {'label', 'landmark-one-main', 'region', 'select-name'}
-    violations = [v for v in (result.get("violations") or []) if v.get('id') not in known_violations]
-    assert not violations, f"New A11y violations detected: {[v.get('id') for v in violations]}"
+    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    violations = [
+        v
+        for v in (result.get("violations") or [])
+        if v.get("id") not in known_violations
+    ]
+    assert (
+        not violations
+    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"
 
 
 @pytest.mark.skipif(
@@ -84,7 +90,7 @@ def test_plugin_settings_accessibility(client):
     reason="A11y checks skipped by env",
 )
 def test_settings_page_accessibility(client):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/settings")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
@@ -103,9 +109,15 @@ def test_settings_page_accessibility(client):
         browser.close()
 
     # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {'label', 'landmark-one-main', 'region', 'select-name'}
-    violations = [v for v in (result.get("violations") or []) if v.get('id') not in known_violations]
-    assert not violations, f"New A11y violations detected: {[v.get('id') for v in violations]}"
+    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    violations = [
+        v
+        for v in (result.get("violations") or [])
+        if v.get("id") not in known_violations
+    ]
+    assert (
+        not violations
+    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"
 
 
 @pytest.mark.skipif(
@@ -113,7 +125,7 @@ def test_settings_page_accessibility(client):
     reason="A11y checks skipped by env",
 )
 def test_history_page_accessibility(client):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
     resp = client.get("/history")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
@@ -132,8 +144,12 @@ def test_history_page_accessibility(client):
         browser.close()
 
     # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {'label', 'landmark-one-main', 'region', 'select-name'}
-    violations = [v for v in (result.get("violations") or []) if v.get('id') not in known_violations]
-    assert not violations, f"New A11y violations detected: {[v.get('id') for v in violations]}"
-
-
+    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    violations = [
+        v
+        for v in (result.get("violations") or [])
+        if v.get("id") not in known_violations
+    ]
+    assert (
+        not violations
+    ), f"New A11y violations detected: {[v.get('id') for v in violations]}"

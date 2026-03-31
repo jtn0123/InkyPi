@@ -75,7 +75,11 @@ def test_image_album_generate_success(monkeypatch, plugin_config, device_config_
     with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
-            {"albumProvider": "Immich", "url": "http://immich.local", "album": "Vacation"},
+            {
+                "albumProvider": "Immich",
+                "url": "http://immich.local",
+                "album": "Vacation",
+            },
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
@@ -90,7 +94,11 @@ def test_image_album_missing_key(monkeypatch, plugin_config, device_config_dev):
     p = ImageAlbum(plugin_config)
     with pytest.raises(RuntimeError, match="API Key"):
         p.generate_image(
-            {"albumProvider": "Immich", "url": "http://immich.local", "album": "Vacation"},
+            {
+                "albumProvider": "Immich",
+                "url": "http://immich.local",
+                "album": "Vacation",
+            },
             device_config_dev,
         )
 
@@ -121,7 +129,9 @@ def test_image_album_missing_album(monkeypatch, plugin_config, device_config_dev
         )
 
 
-def test_image_album_unsupported_provider(monkeypatch, plugin_config, device_config_dev):
+def test_image_album_unsupported_provider(
+    monkeypatch, plugin_config, device_config_dev
+):
     from plugins.image_album.image_album import ImageAlbum
 
     p = ImageAlbum(plugin_config)
@@ -143,7 +153,11 @@ def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev)
         p = ImageAlbum(plugin_config)
         with pytest.raises(RuntimeError, match="Failed to load image"):
             p.generate_image(
-                {"albumProvider": "Immich", "url": "http://immich.local", "album": "Empty"},
+                {
+                    "albumProvider": "Immich",
+                    "url": "http://immich.local",
+                    "album": "Empty",
+                },
                 device_config_dev,
             )
 
@@ -213,7 +227,11 @@ def test_image_album_vertical(monkeypatch, plugin_config, device_config_dev):
     with _patched_album_sessions(session):
         p = ImageAlbum(plugin_config)
         result = p.generate_image(
-            {"albumProvider": "Immich", "url": "http://immich.local", "album": "Vacation"},
+            {
+                "albumProvider": "Immich",
+                "url": "http://immich.local",
+                "album": "Vacation",
+            },
             device_config_dev,
         )
     assert isinstance(result, Image.Image)

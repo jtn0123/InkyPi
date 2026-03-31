@@ -448,7 +448,9 @@ def test_fetch_calendar_decode_error(monkeypatch):
         def raise_for_status(self):
             return None
 
-    mock_session = type("S", (), {"get": staticmethod(lambda url, **kwargs: BadResponse())})()
+    mock_session = type(
+        "S", (), {"get": staticmethod(lambda url, **kwargs: BadResponse())}
+    )()
     monkeypatch.setattr(
         "plugins.calendar.calendar.get_http_session", lambda: mock_session
     )

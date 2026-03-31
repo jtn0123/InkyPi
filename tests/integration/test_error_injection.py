@@ -1,18 +1,20 @@
 # pyright: reportMissingImports=false
 import json
 import os
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
-from unittest.mock import patch, MagicMock
 
 
 def _valid_ai_text_settings():
     return {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"}
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
-def test_manual_update_propagates_plugin_exception(mock_openai, device_config_dev, monkeypatch):
+@patch("plugins.ai_text.ai_text.OpenAI")
+def test_manual_update_propagates_plugin_exception(
+    mock_openai, device_config_dev, monkeypatch
+):
     # Ensure plugin registry is loaded
     from plugins.plugin_registry import load_plugins
 
@@ -67,7 +69,7 @@ def test_manual_update_propagates_plugin_exception(mock_openai, device_config_de
         task.stop()
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
+@patch("plugins.ai_text.ai_text.OpenAI")
 def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeypatch):
     # Mock OpenAI to avoid API calls
     class FakeMsg:
@@ -122,7 +124,7 @@ def test_update_now_returns_500_when_display_raises(mock_openai, client, monkeyp
     assert resp.status_code == 500
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
+@patch("plugins.ai_text.ai_text.OpenAI")
 def test_display_plugin_instance_returns_500_on_plugin_error(
     mock_openai, client, device_config_dev, monkeypatch
 ):
@@ -203,13 +205,15 @@ def test_plugin_settings_page_returns_500_on_template_error(client, monkeypatch)
     def raise_settings(self):
         raise RuntimeError("template error")
 
-    monkeypatch.setattr(ai_text_mod.AIText, "generate_settings_template", raise_settings, raising=True)
+    monkeypatch.setattr(
+        ai_text_mod.AIText, "generate_settings_template", raise_settings, raising=True
+    )
 
     resp = client.get("/plugin/ai_text")
     assert resp.status_code == 500
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
+@patch("plugins.ai_text.ai_text.OpenAI")
 def test_add_plugin_returns_500_when_write_config_fails(
     mock_openai, client, device_config_dev, monkeypatch
 ):

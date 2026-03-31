@@ -6,15 +6,15 @@ Each test validates a specific fix described in the audit.
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # 1. Rate limiter memory cleanup
 # ---------------------------------------------------------------------------
+
 
 def test_prune_empty_rate_limit_keys_removes_expired_ip(monkeypatch):
     """After all timestamps expire, _prune_empty_rate_limit_keys removes the IP key."""
@@ -43,9 +43,9 @@ def test_prune_empty_rate_limit_keys_removes_expired_ip(monkeypatch):
     fresh_requests[addr].clear()
     settings_mod._prune_empty_rate_limit_keys()
 
-    assert addr not in fresh_requests, (
-        "IP key should be removed from _REQUESTS after all timestamps expire"
-    )
+    assert (
+        addr not in fresh_requests
+    ), "IP key should be removed from _REQUESTS after all timestamps expire"
 
 
 def test_rate_limit_ok_adds_timestamp(monkeypatch):
@@ -68,9 +68,10 @@ def test_rate_limit_ok_adds_timestamp(monkeypatch):
 # 2. Manual update queue full rejection
 # ---------------------------------------------------------------------------
 
+
 def test_manual_update_raises_when_queue_full():
     """manual_update raises RuntimeError when the deque is at capacity."""
-    from refresh_task import RefreshTask, ManualRefresh
+    from refresh_task import ManualRefresh, RefreshTask
 
     device_config = MagicMock()
     device_config.get_plugins.return_value = []
@@ -93,7 +94,7 @@ def test_manual_update_raises_when_queue_full():
 
 def test_manual_update_succeeds_when_queue_has_space():
     """manual_update enqueues without raising when there is room in the deque."""
-    from refresh_task import RefreshTask, ManualRefresh
+    from refresh_task import ManualRefresh, RefreshTask
 
     device_config = MagicMock()
     device_config.get_plugins.return_value = []
@@ -131,6 +132,7 @@ def test_manual_update_succeeds_when_queue_has_space():
 # 3. Malformed scheduled time handling
 # ---------------------------------------------------------------------------
 
+
 def test_should_refresh_invalid_scheduled_time_returns_false():
     """PluginInstance.should_refresh returns False for invalid scheduled time strings."""
     from model import PluginInstance
@@ -145,7 +147,9 @@ def test_should_refresh_invalid_scheduled_time_returns_false():
 
     now = datetime.now(UTC)
     result = instance.should_refresh(now)
-    assert result is False, "should_refresh should return False for invalid scheduled time"
+    assert (
+        result is False
+    ), "should_refresh should return False for invalid scheduled time"
 
 
 def test_should_refresh_none_scheduled_time_returns_false():
@@ -169,6 +173,7 @@ def test_should_refresh_none_scheduled_time_returns_false():
 # 4. Plugin health recovery resets failure_count
 # ---------------------------------------------------------------------------
 
+
 def test_update_plugin_health_resets_failure_count_on_recovery():
     """_update_plugin_health resets failure_count to 0 when ok=True."""
     from refresh_task import RefreshTask
@@ -183,16 +188,22 @@ def test_update_plugin_health_resets_failure_count_on_recovery():
     metrics = {}
 
     # Record a failure
-    task._update_plugin_health(plugin_id, instance, ok=False, metrics=metrics, error="oops")
+    task._update_plugin_health(
+        plugin_id, instance, ok=False, metrics=metrics, error="oops"
+    )
     health = task.plugin_health.get(plugin_id, {})
-    assert health.get("failure_count", 0) == 1, "failure_count should be 1 after one failure"
+    assert (
+        health.get("failure_count", 0) == 1
+    ), "failure_count should be 1 after one failure"
 
     # Now mark as recovered
-    task._update_plugin_health(plugin_id, instance, ok=True, metrics=metrics, error=None)
-    health = task.plugin_health.get(plugin_id, {})
-    assert health.get("failure_count", -1) == 0, (
-        "failure_count should reset to 0 after successful health update"
+    task._update_plugin_health(
+        plugin_id, instance, ok=True, metrics=metrics, error=None
     )
+    health = task.plugin_health.get(plugin_id, {})
+    assert (
+        health.get("failure_count", -1) == 0
+    ), "failure_count should reset to 0 after successful health update"
 
 
 def test_update_plugin_health_accumulates_failures():
@@ -208,16 +219,21 @@ def test_update_plugin_health_accumulates_failures():
     instance = MagicMock()
     metrics = {}
 
-    for i in range(3):
-        task._update_plugin_health(plugin_id, instance, ok=False, metrics=metrics, error="err")
+    for _i in range(3):
+        task._update_plugin_health(
+            plugin_id, instance, ok=False, metrics=metrics, error="err"
+        )
 
     health = task.plugin_health.get(plugin_id, {})
-    assert health.get("failure_count", 0) == 3, "failure_count should be 3 after three failures"
+    assert (
+        health.get("failure_count", 0) == 3
+    ), "failure_count should be 3 after three failures"
 
 
 # ---------------------------------------------------------------------------
 # 5. History count estimate recount
 # ---------------------------------------------------------------------------
+
 
 def test_prune_history_recount_after_interval():
     """_prune_history triggers a full recount every _RECOUNT_INTERVAL calls."""
@@ -230,9 +246,11 @@ def test_prune_history_recount_after_interval():
     dm._hash_lock = threading.Lock()
 
     # Stub out filesystem interactions
-    with patch("os.listdir", return_value=[]), \
-         patch("os.path.isdir", return_value=True), \
-         patch("os.path.exists", return_value=True):
+    with (
+        patch("os.listdir", return_value=[]),
+        patch("os.path.isdir", return_value=True),
+        patch("os.path.exists", return_value=True),
+    ):
 
         interval = DisplayManager._RECOUNT_INTERVAL
         for _ in range(interval):
@@ -242,14 +260,15 @@ def test_prune_history_recount_after_interval():
                 # We only care that the counter resets, ignore FS errors
                 pass
 
-    assert dm._history_increment_count == 0, (
-        f"_history_increment_count should reset to 0 after {interval} calls"
-    )
+    assert (
+        dm._history_increment_count == 0
+    ), f"_history_increment_count should reset to 0 after {interval} calls"
 
 
 # ---------------------------------------------------------------------------
 # 6. Display hash lock
 # ---------------------------------------------------------------------------
+
 
 def test_display_manager_has_hash_lock():
     """DisplayManager has a _hash_lock that is a threading.Lock instance."""
@@ -262,9 +281,11 @@ def test_display_manager_has_hash_lock():
     device_config.get_config_value.return_value = None
     device_config.get_plugins.return_value = []
 
-    with patch("display.display_manager.InkyDisplay", MagicMock()), \
-         patch("os.makedirs", return_value=None), \
-         patch("os.path.exists", return_value=False):
+    with (
+        patch("display.display_manager.InkyDisplay", MagicMock()),
+        patch("os.makedirs", return_value=None),
+        patch("os.path.exists", return_value=False),
+    ):
         try:
             dm2 = DisplayManager(device_config)
             target = dm2
@@ -273,17 +294,20 @@ def test_display_manager_has_hash_lock():
             dm._hash_lock = threading.Lock()
             target = dm
 
-    assert hasattr(target, "_hash_lock"), "DisplayManager should have a _hash_lock attribute"
+    assert hasattr(
+        target, "_hash_lock"
+    ), "DisplayManager should have a _hash_lock attribute"
     # threading.Lock() returns a _thread.lock; check it behaves like a lock
     lock = target._hash_lock
-    assert hasattr(lock, "acquire") and hasattr(lock, "release"), (
-        "_hash_lock should be a lock-like object with acquire/release"
-    )
+    assert hasattr(lock, "acquire") and hasattr(
+        lock, "release"
+    ), "_hash_lock should be a lock-like object with acquire/release"
 
 
 # ---------------------------------------------------------------------------
 # 7. /display-next cooldown
 # ---------------------------------------------------------------------------
+
 
 def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch):
     """Second immediate POST to /display-next returns 429."""
@@ -293,13 +317,15 @@ def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch
 
     # First request — expect 200 or 400 (no playlist), not 429
     r1 = client.post("/display-next")
-    assert r1.status_code != 429, f"First request should not be rate-limited, got {r1.status_code}"
+    assert (
+        r1.status_code != 429
+    ), f"First request should not be rate-limited, got {r1.status_code}"
 
     # Second immediate request — expect 429
     r2 = client.post("/display-next")
-    assert r2.status_code == 429, (
-        f"Second immediate request should be rate-limited (429), got {r2.status_code}"
-    )
+    assert (
+        r2.status_code == 429
+    ), f"Second immediate request should be rate-limited (429), got {r2.status_code}"
 
 
 def test_display_next_cooldown_resets(client, monkeypatch):
@@ -312,22 +338,23 @@ def test_display_next_cooldown_resets(client, monkeypatch):
 
     _reset_display_next_cooldown()
     r2 = client.post("/display-next")
-    assert r2.status_code != 429, (
-        "After cooldown reset, request should be allowed again"
-    )
+    assert (
+        r2.status_code != 429
+    ), "After cooldown reset, request should be allowed again"
 
 
 def test_display_next_cooldown_constant_exists():
     """_DISPLAY_NEXT_COOLDOWN_SECONDS is defined and positive."""
     from blueprints.main import _DISPLAY_NEXT_COOLDOWN_SECONDS
 
-    assert isinstance(_DISPLAY_NEXT_COOLDOWN_SECONDS, (int, float))
+    assert isinstance(_DISPLAY_NEXT_COOLDOWN_SECONDS, int | float)
     assert _DISPLAY_NEXT_COOLDOWN_SECONDS > 0
 
 
 # ---------------------------------------------------------------------------
 # 8. save_plugin_order validates IDs
 # ---------------------------------------------------------------------------
+
 
 def test_plugin_order_rejects_unknown_ids(client):
     """POST /api/plugin_order with unknown IDs returns 400 with 'Unknown plugin IDs'."""
@@ -340,14 +367,15 @@ def test_plugin_order_rejects_unknown_ids(client):
     assert data is not None, "Response should be JSON"
     # The error message should mention unknown IDs
     error_text = str(data).lower()
-    assert "unknown" in error_text or "invalid" in error_text, (
-        f"Response should mention unknown/invalid IDs, got: {data}"
-    )
+    assert (
+        "unknown" in error_text or "invalid" in error_text
+    ), f"Response should mention unknown/invalid IDs, got: {data}"
 
 
 # ---------------------------------------------------------------------------
 # 9. ETA cache bounded
 # ---------------------------------------------------------------------------
+
 
 def test_eta_cache_max_size_defined():
     """_ETA_CACHE_MAX_SIZE is defined and reasonable."""
@@ -362,10 +390,12 @@ def test_eta_cache_max_size_defined():
 # 10. is_show_eligible logs exceptions for bad snooze_until
 # ---------------------------------------------------------------------------
 
+
 def test_is_show_eligible_bad_snooze_until_returns_true(caplog):
     """is_show_eligible returns True and logs a warning for malformed snooze_until."""
-    from model import PluginInstance
     import logging
+
+    from model import PluginInstance
 
     instance = PluginInstance(
         plugin_id="test_plugin",
@@ -379,14 +409,15 @@ def test_is_show_eligible_bad_snooze_until_returns_true(caplog):
     with caplog.at_level(logging.WARNING):
         result = instance.is_show_eligible(now)
 
-    assert result is True, (
-        "is_show_eligible should return True when snooze_until is malformed"
-    )
+    assert (
+        result is True
+    ), "is_show_eligible should return True when snooze_until is malformed"
 
 
 # ---------------------------------------------------------------------------
 # 11. Response modal close button is <button> not <span>
 # ---------------------------------------------------------------------------
+
 
 def test_api_keys_page_close_button_is_button_element(client):
     """GET /settings/api-keys has a <button class='close-button'>, not a <span>."""
@@ -401,23 +432,30 @@ def test_api_keys_page_close_button_is_button_element(client):
 
     # Find the close-button and confirm it's on a <button, not a <span
     import re
+
     # Match any tag that has close-button in its class attribute
-    close_btn_tags = re.findall(r"<(\w+)[^>]*class=['\"][^'\"]*close-button[^'\"]*['\"]", html)
-    assert len(close_btn_tags) > 0, "Could not find any element with class 'close-button'"
+    close_btn_tags = re.findall(
+        r"<(\w+)[^>]*class=['\"][^'\"]*close-button[^'\"]*['\"]", html
+    )
+    assert (
+        len(close_btn_tags) > 0
+    ), "Could not find any element with class 'close-button'"
     for tag in close_btn_tags:
-        assert tag.lower() == "button", (
-            f"close-button should be a <button>, found <{tag}>"
-        )
+        assert (
+            tag.lower() == "button"
+        ), f"close-button should be a <button>, found <{tag}>"
 
 
 # ---------------------------------------------------------------------------
 # 12. API key masking shows length
 # ---------------------------------------------------------------------------
 
+
 def test_api_key_status_shows_chars(client, device_config_dev, monkeypatch):
     """API key status display includes length information ('chars')."""
     monkeypatch.setattr(
-        device_config_dev, "load_env_key",
+        device_config_dev,
+        "load_env_key",
         lambda k: "sk-abcdef1234567890xx" if k == "OPEN_AI_SECRET" else None,
     )
     response = client.get("/settings/api-keys")
@@ -425,6 +463,7 @@ def test_api_key_status_shows_chars(client, device_config_dev, monkeypatch):
 
     html = response.data.decode("utf-8")
     import re
-    assert re.search(r"\(\d+ chars\)", html), (
-        "API key status should display length info like '(N chars)'"
-    )
+
+    assert re.search(
+        r"\(\d+ chars\)", html
+    ), "API key status should display length info like '(N chars)'"

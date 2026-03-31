@@ -10,7 +10,6 @@ from urllib.parse import urlencode
 import requests
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
 
-
 TOP_LEVEL_ROUTES = [
     ("home", "/"),
     ("settings", "/settings"),
@@ -20,7 +19,12 @@ TOP_LEVEL_ROUTES = [
 ]
 
 VIEWPORTS = {
-    "desktop_light": {"width": 1440, "height": 1200, "scheme": "light", "mobile": False},
+    "desktop_light": {
+        "width": 1440,
+        "height": 1200,
+        "scheme": "light",
+        "mobile": False,
+    },
     "desktop_dark": {"width": 1440, "height": 1200, "scheme": "dark", "mobile": False},
     "mobile_light": {"width": 430, "height": 932, "scheme": "light", "mobile": True},
     "mobile_dark": {"width": 430, "height": 932, "scheme": "dark", "mobile": True},
@@ -139,7 +143,11 @@ def create_plugin_scenarios(base_url: str, plugin_id: str) -> list[Scenario]:
         browser = p.chromium.launch()
         page = browser.new_page()
         stub_external_assets(page)
-        page.goto(f"{base_url}/plugin/{plugin_id}", wait_until="domcontentloaded", timeout=30000)
+        page.goto(
+            f"{base_url}/plugin/{plugin_id}",
+            wait_until="domcontentloaded",
+            timeout=30000,
+        )
         page.wait_for_timeout(600)
         payload = fill_form_and_extract(page)
         browser.close()
@@ -168,7 +176,10 @@ def create_plugin_scenarios(base_url: str, plugin_id: str) -> list[Scenario]:
         )
         session.post(f"{base_url}/add_plugin", data=add_payload, timeout=20)
         scenarios.append(
-            Scenario("instance", f"/plugin/{plugin_id}?{urlencode({'instance': instance_name})}")
+            Scenario(
+                "instance",
+                f"/plugin/{plugin_id}?{urlencode({'instance': instance_name})}",
+            )
         )
     except Exception:
         pass
@@ -282,30 +293,36 @@ def create_runtime_tracker(page, base_url: str):
     page.on("console", handle_console)
     page.on(
         "requestfailed",
-        lambda request: tracker["request_failures"].append(
-            {
-                "url": request.url,
-                "resource_type": request.resource_type,
-                "failure": request.failure or "",
-            }
-        )
-        if request.url.startswith(base_url)
-        and request.resource_type in {"document", "script", "stylesheet", "xhr", "fetch"}
-        else None,
+        lambda request: (
+            tracker["request_failures"].append(
+                {
+                    "url": request.url,
+                    "resource_type": request.resource_type,
+                    "failure": request.failure or "",
+                }
+            )
+            if request.url.startswith(base_url)
+            and request.resource_type
+            in {"document", "script", "stylesheet", "xhr", "fetch"}
+            else None
+        ),
     )
     page.on(
         "response",
-        lambda response: tracker["response_failures"].append(
-            {
-                "url": response.url,
-                "status": response.status,
-                "resource_type": response.request.resource_type,
-            }
-        )
-        if response.url.startswith(base_url)
-        and response.status >= 400
-        and response.request.resource_type in {"document", "script", "stylesheet", "xhr", "fetch"}
-        else None,
+        lambda response: (
+            tracker["response_failures"].append(
+                {
+                    "url": response.url,
+                    "status": response.status,
+                    "resource_type": response.request.resource_type,
+                }
+            )
+            if response.url.startswith(base_url)
+            and response.status >= 400
+            and response.request.resource_type
+            in {"document", "script", "stylesheet", "xhr", "fetch"}
+            else None
+        ),
     )
     return tracker
 
@@ -343,7 +360,9 @@ def collect_runtime_issues(tracker):
     return issues
 
 
-def capture_route(browser, base_url: str, route_name: str, route_path: str, output_dir: Path):
+def capture_route(
+    browser, base_url: str, route_name: str, route_path: str, output_dir: Path
+):
     matrix = []
     for viewport_name, cfg in VIEWPORTS.items():
         print(f"[capture] {route_name} {viewport_name}", flush=True)
@@ -358,9 +377,13 @@ def capture_route(browser, base_url: str, route_name: str, route_path: str, outp
         tracker = create_runtime_tracker(scoped_page, base_url)
         screenshot_path = output_dir / f"{route_name}__{viewport_name}.png"
         try:
-            scoped_page.goto(f"{base_url}{route_path}", wait_until="commit", timeout=15000)
+            scoped_page.goto(
+                f"{base_url}{route_path}", wait_until="commit", timeout=15000
+            )
             scoped_page.wait_for_timeout(1200)
-            scoped_page.screenshot(path=str(screenshot_path), full_page=True, timeout=5000)
+            scoped_page.screenshot(
+                path=str(screenshot_path), full_page=True, timeout=5000
+            )
             issues = collect_dom_issues(scoped_page, route_name)
             issues.extend(collect_runtime_issues(tracker))
         except PlaywrightTimeoutError:
@@ -413,11 +436,10 @@ def write_artifacts(output_dir: Path, matrix: list[dict]):
     backlog = build_backlog(matrix)
     (output_dir / "audit_matrix.json").write_text(json.dumps(matrix, indent=2))
     (output_dir / "audit_backlog.json").write_text(json.dumps(backlog, indent=2))
-    lines = ["# UI Audit Backlog", ""]
-    for item in backlog:
-        lines.append(
-            f"{item['id']}. [{item['severity']}] `{item['route']}` `{item['viewport']}` - {item['issue']} ({item['screenshot']})"
-        )
+    lines = ["# UI Audit Backlog", ""] + [
+        f"{item['id']}. [{item['severity']}] `{item['route']}` `{item['viewport']}` - {item['issue']} ({item['screenshot']})"
+        for item in backlog
+    ]
     if not backlog:
         lines.append("No issues detected by the automated heuristics.")
     (output_dir / "audit_backlog.md").write_text("\n".join(lines) + "\n")
@@ -446,7 +468,11 @@ def main():
         browser = p.chromium.launch()
         for scenario in routes:
             print(f"[route] {scenario.name} -> {scenario.path}", flush=True)
-            matrix.extend(capture_route(browser, args.base_url, scenario.name, scenario.path, output_dir))
+            matrix.extend(
+                capture_route(
+                    browser, args.base_url, scenario.name, scenario.path, output_dir
+                )
+            )
             write_artifacts(output_dir, matrix)
         browser.close()
     write_artifacts(output_dir, matrix)

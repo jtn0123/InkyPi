@@ -76,7 +76,7 @@ class BasePlugin:
         The refresh task can read this and persist into `RefreshInfo.plugin_meta`.
         """
         try:
-            setattr(self, "_latest_metadata", metadata or None)
+            self._latest_metadata = metadata or None
         except Exception:
             # Never crash plugin flow due to metadata bookkeeping
             pass
@@ -178,9 +178,7 @@ class BasePlugin:
             try:
                 f["url"] = self.to_file_url(f.get("url", ""))
             except Exception as e:
-                logger.warning(
-                    "Failed to convert font URL %s: %s", f.get("url", ""), e
-                )
+                logger.warning("Failed to convert font URL %s: %s", f.get("url", ""), e)
         template_params["font_faces"] = fonts
 
         # Optionally inline CSS when running in headless screenshot mode to avoid any
@@ -195,8 +193,8 @@ class BasePlugin:
                 raise RuntimeError(f"Unable to read CSS file {css_path}") from e
         # Allow per-render extra CSS injection via plugin_settings.extra_css
         try:
-            extra_css = (
-                (template_params.get("plugin_settings", {}) or {}).get("extra_css")
+            extra_css = (template_params.get("plugin_settings", {}) or {}).get(
+                "extra_css"
             )
             if isinstance(extra_css, str) and extra_css.strip():
                 inline_css.append(extra_css)
@@ -214,7 +212,9 @@ class BasePlugin:
             t0 = perf_counter()
             rendered_html = template.render(template_params)
             elapsed_ms = int((perf_counter() - t0) * 1000)
-            complete_step(f"Template rendered successfully for {html_file} ({elapsed_ms}ms)")
+            complete_step(
+                f"Template rendered successfully for {html_file} ({elapsed_ms}ms)"
+            )
             logger.info(
                 "Render template complete | plugin=%s template=%s elapsed_ms=%s",
                 self.get_plugin_id(),
@@ -223,8 +223,12 @@ class BasePlugin:
             )
         except Exception as e:
             fail_step(f"Template rendering failed: {str(e)}")
-            logger.error("Template rendering failed | plugin=%s template=%s error=%s",
-                        self.get_plugin_id(), html_file, str(e))
+            logger.error(
+                "Template rendering failed | plugin=%s template=%s error=%s",
+                self.get_plugin_id(),
+                html_file,
+                str(e),
+            )
             raise
 
         # Screenshot with optional timeout from environment
@@ -242,7 +246,9 @@ class BasePlugin:
             update_step(f"Taking screenshot of rendered HTML{timeout_desc}")
 
             t1 = perf_counter()
-            image = take_screenshot_html(rendered_html, dimensions, timeout_ms=timeout_ms)
+            image = take_screenshot_html(
+                rendered_html, dimensions, timeout_ms=timeout_ms
+            )
             elapsed_ms = int((perf_counter() - t1) * 1000)
 
             if image is None:
@@ -251,14 +257,16 @@ class BasePlugin:
                     "Rendering HTML to image returned None. Check screenshot backend."
                 )
                 try:
-                    image = Image.new("RGB", (int(dimensions[0]), int(dimensions[1])), "white")
+                    image = Image.new(
+                        "RGB", (int(dimensions[0]), int(dimensions[1])), "white"
+                    )
                     update_step("Created fallback white image")
                     complete_step(f"Fallback image created ({elapsed_ms}ms)")
                 except Exception:
                     fail_step("Failed to create fallback image")
                     raise RuntimeError(
                         "Failed to render plugin image. See logs for details."
-                    )
+                    ) from None
             else:
                 complete_step(f"Screenshot captured successfully ({elapsed_ms}ms)")
                 logger.info(
@@ -269,6 +277,8 @@ class BasePlugin:
                 )
         except Exception as e:
             fail_step(f"Screenshot capture failed: {str(e)}")
-            logger.error("Screenshot failed | plugin=%s error=%s", self.get_plugin_id(), str(e))
+            logger.error(
+                "Screenshot failed | plugin=%s error=%s", self.get_plugin_id(), str(e)
+            )
             raise
         return image

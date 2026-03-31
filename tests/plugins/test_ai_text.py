@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
@@ -56,8 +57,10 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
     assert "Text Prompt" in body["error"]
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
-def test_ai_text_generate_image_openai_error(mock_openai, client, flask_app, monkeypatch):
+@patch("plugins.ai_text.ai_text.OpenAI")
+def test_ai_text_generate_image_openai_error(
+    mock_openai, client, flask_app, monkeypatch
+):
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -78,9 +81,13 @@ def test_ai_text_generate_image_openai_error(mock_openai, client, flask_app, mon
     assert "API request failure" in body["error"]
 
 
-@pytest.mark.parametrize("orientation,resolution", [("vertical", (400, 300)), ("horizontal", (800, 480))])
-@patch('plugins.ai_text.ai_text.OpenAI')
-def test_ai_text_generate_image_orientation(mock_openai, client, flask_app, monkeypatch, orientation, resolution):
+@pytest.mark.parametrize(
+    "orientation,resolution", [("vertical", (400, 300)), ("horizontal", (800, 480))]
+)
+@patch("plugins.ai_text.ai_text.OpenAI")
+def test_ai_text_generate_image_orientation(
+    mock_openai, client, flask_app, monkeypatch, orientation, resolution
+):
     import os
 
     os.environ["OPEN_AI_SECRET"] = "test"
@@ -116,7 +123,9 @@ def test_ai_text_generate_image_orientation(mock_openai, client, flask_app, monk
             return resolution
         return None
 
-    monkeypatch.setattr(flask_app.config["DEVICE_CONFIG"], "get_config", mock_get_config)
+    monkeypatch.setattr(
+        flask_app.config["DEVICE_CONFIG"], "get_config", mock_get_config
+    )
 
     data = {
         "plugin_id": "ai_text",
@@ -148,7 +157,7 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
     assert body["error"] == "OpenAI API Key not configured."
 
 
-@patch('plugins.ai_text.ai_text.OpenAI')
+@patch("plugins.ai_text.ai_text.OpenAI")
 def test_ai_text_generate_image_success(mock_openai, client, flask_app, monkeypatch):
     import os
 

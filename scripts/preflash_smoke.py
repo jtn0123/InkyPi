@@ -31,7 +31,9 @@ def _truthy(value: str | None) -> bool:
     return (value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-def _prepare_env(runtime_dir: str, config_path: str | None = None, web_only: bool = True) -> None:
+def _prepare_env(
+    runtime_dir: str, config_path: str | None = None, web_only: bool = True
+) -> None:
     os.environ["INKYPI_ENV"] = "dev"
     os.environ["INKYPI_RUNTIME_DIR"] = runtime_dir
     if web_only:
@@ -93,7 +95,9 @@ def _write_config(runtime_dir: str, overrides: dict | None = None) -> str:
     return str(config_path)
 
 
-def _load_inkypi(runtime_dir: str, config_path: str | None = None, web_only: bool = True):
+def _load_inkypi(
+    runtime_dir: str, config_path: str | None = None, web_only: bool = True
+):
     _prepare_env(runtime_dir, config_path=config_path, web_only=web_only)
     _ensure_src_on_path()
     sys.modules.pop("inkypi", None)
@@ -170,7 +174,9 @@ def run_render_smoke() -> None:
             if not path.exists()
         ]
         if missing:
-            raise RuntimeError(f"Expected render artifacts missing: {', '.join(missing)}")
+            raise RuntimeError(
+                f"Expected render artifacts missing: {', '.join(missing)}"
+            )
 
 
 def run_import_smoke() -> None:
@@ -388,7 +394,9 @@ def run_benchmark_smoke() -> None:
         if max(generate_vals) > 8000:
             raise RuntimeError(f"generate_ms threshold exceeded: {max(generate_vals)}")
         if max(preprocess_vals) > 5000:
-            raise RuntimeError(f"preprocess_ms threshold exceeded: {max(preprocess_vals)}")
+            raise RuntimeError(
+                f"preprocess_ms threshold exceeded: {max(preprocess_vals)}"
+            )
         if max(display_vals) > 5000:
             raise RuntimeError(f"display_ms threshold exceeded: {max(display_vals)}")
 
@@ -463,7 +471,10 @@ def run_install_idempotency_smoke() -> None:
         initial = device_json.read_text(encoding="utf-8")
         device_json.write_text('{"name":"Existing","startup":false}', encoding="utf-8")
         _run_bash(bootstrap)
-        if device_json.read_text(encoding="utf-8") != '{"name":"Existing","startup":false}':
+        if (
+            device_json.read_text(encoding="utf-8")
+            != '{"name":"Existing","startup":false}'
+        ):
             raise RuntimeError("Bootstrap logic overwrote existing device.json")
         if "Template" not in initial:
             raise RuntimeError("Bootstrap logic failed to create initial device.json")
@@ -471,11 +482,14 @@ def run_install_idempotency_smoke() -> None:
         ws_config = temp / "waveshare.json"
         ws_config.write_text('{"display_type": "inky"}', encoding="utf-8")
         update_display = (
-            f"sed -i 's/\\\"display_type\\\": \\\".*\\\"/\\\"display_type\\\": \\\"epd7in3f\\\"/' '{ws_config}'; "
-            f"sed -i 's/\\\"display_type\\\": \\\".*\\\"/\\\"display_type\\\": \\\"epd7in3f\\\"/' '{ws_config}'"
+            f'sed -i \'s/\\"display_type\\": \\".*\\"/\\"display_type\\": \\"epd7in3f\\"/\' \'{ws_config}\'; '
+            f'sed -i \'s/\\"display_type\\": \\".*\\"/\\"display_type\\": \\"epd7in3f\\"/\' \'{ws_config}\''
         )
         _run_bash(update_display)
-        if ws_config.read_text(encoding="utf-8").count('"display_type": "epd7in3f"') != 1:
+        if (
+            ws_config.read_text(encoding="utf-8").count('"display_type": "epd7in3f"')
+            != 1
+        ):
             raise RuntimeError("Waveshare display_type update was not idempotent")
 
 
@@ -507,7 +521,9 @@ def run_soak_smoke() -> None:
             def generate_image(self, settings, device_config):
                 self.calls += 1
                 color = (self.calls * 17) % 255
-                return Image.new("RGB", device_config.get_resolution(), (color, 120, 200))
+                return Image.new(
+                    "RGB", device_config.get_resolution(), (color, 120, 200)
+                )
 
         device_config = Config()
         display_manager = DisplayManager(device_config)
@@ -539,7 +555,9 @@ def run_soak_smoke() -> None:
         final_rss = process.memory_info().rss
         rss_growth_mb = (final_rss - baseline_rss) / 1024 / 1024
         if rss_growth_mb > 50:
-            raise RuntimeError(f"Soak smoke memory growth too high: {rss_growth_mb:.2f}MB")
+            raise RuntimeError(
+                f"Soak smoke memory growth too high: {rss_growth_mb:.2f}MB"
+            )
         if refresh_task.manual_update_requests:
             raise RuntimeError("Soak smoke left queued manual updates behind")
         refresh_rows = _query_single_value(

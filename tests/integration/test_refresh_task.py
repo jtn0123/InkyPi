@@ -79,6 +79,7 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
 
     # Mock psutil import
     import builtins as _builtins
+
     _orig_import = _builtins.__import__
 
     def mock_import(name, *args, **kwargs):
@@ -101,10 +102,12 @@ def test_refresh_task_system_stats_logging(device_config_dev, monkeypatch):
     monkeypatch.setattr("builtins.__import__", _orig_import, raising=True)
 
 
-def test_refresh_task_system_stats_logging_no_getloadavg(device_config_dev, monkeypatch):
+def test_refresh_task_system_stats_logging_no_getloadavg(
+    device_config_dev, monkeypatch
+):
     """Ensure system stats logging handles missing getloadavg gracefully."""
-    from display.display_manager import DisplayManager
     import refresh_task
+    from display.display_manager import DisplayManager
 
     display_manager = DisplayManager(device_config_dev)
     task = refresh_task.RefreshTask(device_config_dev, display_manager)
@@ -121,6 +124,7 @@ def test_refresh_task_system_stats_logging_no_getloadavg(device_config_dev, monk
 
     # Mock psutil import
     import builtins as _builtins
+
     _orig_import = _builtins.__import__
 
     def mock_import(name, *args, **kwargs):
@@ -320,7 +324,6 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
 def test_refresh_task_not_time_to_update(device_config_dev, monkeypatch):
     """Test handling when it's not time to update."""
 
-
     # Mock should_refresh to return False
     monkeypatch.setattr("model.PlaylistManager.should_refresh", lambda *args: False)
 
@@ -481,28 +484,36 @@ def test_determine_next_plugin_not_time_to_update_path(device_config_dev, monkey
         {
             "plugin_id": "ai_text",
             "name": "inst",
-            "plugin_settings": {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"},
+            "plugin_settings": {
+                "title": "T",
+                "textModel": "gpt-4o",
+                "textPrompt": "Hi",
+            },
             "refresh": {"interval": 60},
         },
     )
 
     import pytz
+
     tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
     now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
-    playlist, plugin_instance = task._determine_next_plugin(pm, device_config_dev.get_refresh_info(), now)
+    playlist, plugin_instance = task._determine_next_plugin(
+        pm, device_config_dev.get_refresh_info(), now
+    )
     assert playlist is None and plugin_instance is None
 
 
 def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
-    from display.display_manager import DisplayManager
-    from plugins.plugin_registry import load_plugins, get_plugin_instance
-    from refresh_task import PlaylistRefresh, RefreshTask
-    from model import RefreshInfo
     from PIL import Image
+
+    from display.display_manager import DisplayManager
+    from model import RefreshInfo
+    from plugins.plugin_registry import get_plugin_instance, load_plugins
+    from refresh_task import PlaylistRefresh, RefreshTask
 
     load_plugins(device_config_dev.get_plugins())
     dm = DisplayManager(device_config_dev)
-    task = RefreshTask(device_config_dev, dm)
+    RefreshTask(device_config_dev, dm)
 
     # Build a minimal playlist with one plugin instance
     pm = device_config_dev.get_playlist_manager()
@@ -512,15 +523,22 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
         {
             "plugin_id": "ai_text",
             "name": "inst",
-            "plugin_settings": {"title": "T", "textModel": "gpt-4o", "textPrompt": "Hi"},
+            "plugin_settings": {
+                "title": "T",
+                "textModel": "gpt-4o",
+                "textPrompt": "Hi",
+            },
             "refresh": {"interval": 60},
         },
     )
 
     # Mock plugin generate_image to a deterministic image
     import plugins.ai_text.ai_text as ai_text_mod
+
     img = Image.new("RGB", device_config_dev.get_resolution(), "white")
-    monkeypatch.setattr(ai_text_mod.AIText, "generate_image", lambda self, s, c: img, raising=True)
+    monkeypatch.setattr(
+        ai_text_mod.AIText, "generate_image", lambda self, s, c: img, raising=True
+    )
 
     # Make latest_refresh have same image hash so branch logs skip
     plugin_cfg = device_config_dev.get_plugin("ai_text")
@@ -528,6 +546,7 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
 
     # Execute once to compute hash
     import pytz
+
     tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
     now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
 
@@ -538,6 +557,7 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
 
     # Set latest refresh with that hash
     from utils.image_utils import compute_image_hash
+
     same_hash = compute_image_hash(image)
     device_config_dev.refresh_info = RefreshInfo(
         refresh_type="Playlist",
@@ -555,12 +575,17 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
 
     # Patch display to count calls
     calls = {"display": 0}
-    monkeypatch.setattr(dm, "display_image", lambda *a, **k: calls.__setitem__("display", calls["display"] + 1))
+    monkeypatch.setattr(
+        dm,
+        "display_image",
+        lambda *a, **k: calls.__setitem__("display", calls["display"] + 1),
+    )
 
     plugin = get_plugin_instance(plugin_cfg)
     image2 = refresh_action.execute(plugin, device_config_dev, now)
     # Same image hash should not trigger display when compared
     from utils.image_utils import compute_image_hash as _h
+
     h2 = _h(image2)
     assert h2 == same_hash
     # Emulate the same branch that checks equality and ensure used_cached path doesn't break

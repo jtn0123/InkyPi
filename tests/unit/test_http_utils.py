@@ -1,5 +1,3 @@
-import types
-
 import requests
 
 
@@ -41,6 +39,7 @@ def test_http_get_timeout_override(monkeypatch):
     # Reset cache to ensure clean state
     try:
         from utils.http_cache import _reset_cache_for_tests
+
         _reset_cache_for_tests()
     except ImportError:
         pass
@@ -67,8 +66,9 @@ def test_http_get_timeout_override(monkeypatch):
 
 
 def test_shared_session_retry_configuration(monkeypatch):
-    import utils.http_utils as http_utils
     from urllib3.util.retry import Retry
+
+    import utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
     session = http_utils.get_shared_session()
@@ -83,7 +83,9 @@ def test_shared_session_retry_configuration(monkeypatch):
 
 def test_shared_session_thread_isolation():
     import threading
+
     import requests
+
     import utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
@@ -106,12 +108,13 @@ def test_shared_session_thread_isolation():
     assert other_session, "worker thread failed to store session"
     assert s1 is not other_session[0]
 
-from unittest.mock import Mock, patch
 
-import pytest
-from flask import Flask
+from unittest.mock import Mock, patch  # noqa: E402
 
-from src.utils.http_utils import (
+import pytest  # noqa: E402
+from flask import Flask  # noqa: E402
+
+from src.utils.http_utils import (  # noqa: E402
     APIError,
     json_error,
     json_internal_error,
@@ -181,6 +184,7 @@ class TestJsonError:
 
 def test_http_get_timeout_tuple_from_env(monkeypatch):
     import requests
+
     import src.utils.http_utils as http_utils
 
     # Force split timeout tuple via module-level variables (evaluated at import)
@@ -192,6 +196,7 @@ def test_http_get_timeout_tuple_from_env(monkeypatch):
     # Reset cache to ensure clean state
     try:
         from utils.http_cache import _reset_cache_for_tests
+
         _reset_cache_for_tests()
     except ImportError:
         pass
@@ -219,7 +224,9 @@ def test_http_get_timeout_tuple_from_env(monkeypatch):
 
 def test_http_get_latency_logging_success_and_failure(monkeypatch, caplog):
     import logging
+
     import requests
+
     import src.utils.http_utils as http_utils
 
     http_utils._reset_shared_session_for_tests()
@@ -337,7 +344,10 @@ class TestJsonInternalError:
             response_data = response.get_json()
             assert response_data["error"] == "An internal error occurred"
             assert response_data["code"] == "internal_error"
-            assert response_data["details"] == {"context": "processing", "hint": "try again"}
+            assert response_data["details"] == {
+                "context": "processing",
+                "hint": "try again",
+            }
 
     def test_json_internal_error_custom_status_and_code(self, app):
         """Test custom status and error code propagation."""

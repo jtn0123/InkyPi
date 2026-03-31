@@ -7,6 +7,7 @@ Specifically targeting previously uncovered lines:
 
 import json
 import os
+
 import pytest
 
 
@@ -174,12 +175,10 @@ def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
         validate_called["count"] += 1
         return original_validate(self, config_dict)
 
-    monkeypatch.setattr(
-        config_mod.Config, "_validate_device_config", track_validate
-    )
+    monkeypatch.setattr(config_mod.Config, "_validate_device_config", track_validate)
 
     # Create Config - should call validate during read_config
-    cfg = config_mod.Config()
+    config_mod.Config()
 
     # Verify validation was called
     assert validate_called["count"] > 0, "_validate_device_config should be called"

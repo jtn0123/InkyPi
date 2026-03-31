@@ -3,9 +3,9 @@
 import io
 import re
 
-import blueprints.settings as _mod
-
 from flask import Response, current_app, jsonify, request
+
+import blueprints.settings as _mod
 from utils.http_utils import json_error
 from utils.time_utils import now_device_tz
 
@@ -14,7 +14,9 @@ from utils.time_utils import now_device_tz
 def download_logs():
     try:
         # Guardrail hours clamp
-        hours = _mod._clamp_int(request.args.get("hours"), 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS)
+        hours = _mod._clamp_int(
+            request.args.get("hours"), 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS
+        )
         lines = _mod._read_log_lines(hours)
         buffer = io.StringIO("\n".join(lines))
         buffer.seek(0)

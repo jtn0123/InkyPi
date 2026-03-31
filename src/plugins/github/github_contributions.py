@@ -23,6 +23,7 @@ query($username: String!) {
 }
 """
 
+
 def contributions_generate_image(plugin_instance, settings, device_config):
     dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
@@ -31,7 +32,13 @@ def contributions_generate_image(plugin_instance, settings, device_config):
         logger.error("GitHub API Key not configured")
         raise RuntimeError("GitHub API Key not configured.")
 
-    colors = settings.get("contributionColor[]") or ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"]
+    colors = settings.get("contributionColor[]") or [
+        "#ebedf0",
+        "#9be9a8",
+        "#40c463",
+        "#30a14e",
+        "#216e39",
+    ]
     github_username = settings.get("githubUsername")
     if not github_username:
         raise RuntimeError("GitHub username is required.")
@@ -45,30 +52,37 @@ def contributions_generate_image(plugin_instance, settings, device_config):
         "grid": grid,
         "month_positions": month_positions,
         "metrics": metrics,
-        "plugin_settings": settings
+        "plugin_settings": settings,
     }
 
     return plugin_instance.render_image(
-        dimensions,
-        "github_contributions.html",
-        "github.css",
-        template_params
+        dimensions, "github_contributions.html", "github.css", template_params
     )
+
 
 # -------------------------
 # Helper functions
 # -------------------------
 
+
 def fetch_contributions(username, api_key):
     url = "https://api.github.com/graphql"
     headers = {"Authorization": f"Bearer {api_key}"}
     variables = {"username": username}
-    resp = get_http_session().post(url, json={"query": GRAPHQL_QUERY, "variables": variables}, headers=headers, timeout=30)
+    resp = get_http_session().post(
+        url,
+        json={"query": GRAPHQL_QUERY, "variables": variables},
+        headers=headers,
+        timeout=30,
+    )
     resp.raise_for_status()
     return resp.json()
 
+
 def parse_contributions(data, colors):
-    weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"]["weeks"]
+    weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"][
+        "weeks"
+    ]
 
     grid = [list(week["contributionDays"]) for week in weeks]
     max_contrib = max(day["contributionCount"] for week in grid for day in week)
@@ -98,8 +112,11 @@ def parse_contributions(data, colors):
 
     return grid, month_positions
 
+
 def calculate_metrics(data):
-    weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"]["weeks"]
+    weeks = data["data"]["user"]["contributionsCollection"]["contributionCalendar"][
+        "weeks"
+    ]
     days = [day for week in weeks for day in week["contributionDays"]]
     days = sorted(days, key=lambda d: d["date"])
 

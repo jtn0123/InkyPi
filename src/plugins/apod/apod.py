@@ -19,6 +19,7 @@ from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
+
 class Apod(BasePlugin):
     def build_settings_schema(self):
         today = datetime.today().strftime("%Y-%m-%d")
@@ -56,12 +57,12 @@ class Apod(BasePlugin):
 
     def generate_settings_template(self):
         template_params = super().generate_settings_template()
-        template_params['api_key'] = {
+        template_params["api_key"] = {
             "required": True,
             "service": "NASA",
-            "expected_key": "NASA_SECRET"
+            "expected_key": "NASA_SECRET",
         }
-        template_params['style_settings'] = False
+        template_params["style_settings"] = False
         return template_params
 
     def generate_image(self, settings, device_config):
@@ -101,9 +102,13 @@ class Apod(BasePlugin):
         image_url = data.get("hdurl") or data.get("url")
 
         try:
-            img_data = get_http_session().get(image_url, timeout=self._request_timeout())
+            img_data = get_http_session().get(
+                image_url, timeout=self._request_timeout()
+            )
             if not 200 <= img_data.status_code < 300:
-                logger.error(f"Failed to fetch APOD image: status {img_data.status_code}")
+                logger.error(
+                    f"Failed to fetch APOD image: status {img_data.status_code}"
+                )
                 raise RuntimeError("Failed to fetch APOD image.")
             with Image.open(BytesIO(img_data.content)) as img:
                 image = img.copy()
@@ -111,6 +116,6 @@ class Apod(BasePlugin):
             raise
         except Exception as e:
             logger.error(f"Failed to load APOD image: {str(e)}")
-            raise RuntimeError("Failed to load APOD image.")
+            raise RuntimeError("Failed to load APOD image.") from e
 
         return image

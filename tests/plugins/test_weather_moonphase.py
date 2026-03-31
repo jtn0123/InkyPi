@@ -1,7 +1,5 @@
 from unittest.mock import patch
 
-import pytest
-
 
 def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch):
     """Generated forecast should include moon phase info without external calls."""
@@ -30,7 +28,11 @@ def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch)
 
     # Fake OpenMeteo responses
     mock_weather = {
-        "current_weather": {"time": "2025-01-01T12:00", "temperature": 21, "weathercode": 1},
+        "current_weather": {
+            "time": "2025-01-01T12:00",
+            "temperature": 21,
+            "weathercode": 1,
+        },
         "daily": {
             "time": ["2025-01-01"],
             "temperature_2m_max": [25],
@@ -51,11 +53,16 @@ def test_weather_moon_phase_included_in_forecast(device_config_dev, monkeypatch)
     }
     mock_aqi = {"hourly": {"time": ["2025-01-01T12:00"], "uv_index": [3.5]}}
 
-    monkeypatch.setattr(Weather, "get_open_meteo_data", lambda self, lat, lon, units, d: mock_weather)
-    monkeypatch.setattr(Weather, "get_open_meteo_air_quality", lambda self, lat, lon: mock_aqi)
+    monkeypatch.setattr(
+        Weather, "get_open_meteo_data", lambda self, lat, lon, units, d: mock_weather
+    )
+    monkeypatch.setattr(
+        Weather, "get_open_meteo_air_quality", lambda self, lat, lon: mock_aqi
+    )
 
     # Provide deterministic moon phase result (upstream uses astral library)
     from astral import moon
+
     monkeypatch.setattr(moon, "phase", lambda dt: 14.75)  # Full moon phase age
 
     with patch.object(w, "render_image", return_value=object()) as mock_render:

@@ -8,6 +8,7 @@ from PIL import Image
 def make_image(w=320, h=240, color="white"):
     return Image.new("RGB", (w, h), color)
 
+
 def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path):
     # Force mock display
     device_config_dev.update_value("display_type", "mock")
@@ -68,6 +69,7 @@ def test_display_manager_mock_pipeline(device_config_dev, monkeypatch, tmp_path)
     # processed preview image saved
     assert Path(device_config_dev.processed_image_file).exists()
 
+
 def test_display_manager_selects_display_type_mock(device_config_dev):
     device_config_dev.update_value("display_type", "mock")
     from display.display_manager import DisplayManager
@@ -75,12 +77,14 @@ def test_display_manager_selects_display_type_mock(device_config_dev):
     dm = DisplayManager(device_config_dev)
     assert dm.display.__class__.__name__ == "MockDisplay"
 
+
 def test_display_manager_rejects_unsupported_type(device_config_dev):
     device_config_dev.update_value("display_type", "unknown")
     from display.display_manager import DisplayManager
 
     with pytest.raises(ValueError):
         DisplayManager(device_config_dev)
+
 
 def test_display_manager_selects_inky(monkeypatch, device_config_dev):
     # Patch inky display import in display_manager
@@ -109,6 +113,7 @@ def test_display_manager_selects_inky(monkeypatch, device_config_dev):
 
     dm = DisplayManager(device_config_dev)
     assert dm.display.__class__.__name__ == "FakeInky"
+
 
 def test_display_manager_selects_waveshare(monkeypatch, device_config_dev):
     # display_type pattern epd*in* triggers waveshare

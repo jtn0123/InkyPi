@@ -32,7 +32,9 @@ def _is_enabled(device_config) -> bool:
     if os.getenv("PYTEST_CURRENT_TEST"):
         return False
     try:
-        sample_rate = float(device_config.get_config("benchmark_sample_rate", default=1.0))
+        sample_rate = float(
+            device_config.get_config("benchmark_sample_rate", default=1.0)
+        )
     except Exception:
         sample_rate = 1.0
     sample_rate = max(0.0, min(1.0, sample_rate))
@@ -44,22 +46,28 @@ def _should_record_event(device_config, refresh_event: dict[str, Any]) -> bool:
         return False
     # Optional include/exclude plugin filters
     try:
-        include_list = device_config.get_config("benchmark_include_plugins", default=None)
+        include_list = device_config.get_config(
+            "benchmark_include_plugins", default=None
+        )
     except Exception:
         include_list = None
     try:
-        exclude_list = device_config.get_config("benchmark_exclude_plugins", default=None)
+        exclude_list = device_config.get_config(
+            "benchmark_exclude_plugins", default=None
+        )
     except Exception:
         exclude_list = None
 
     plugin_id = refresh_event.get("plugin_id")
-    if include_list and isinstance(include_list, list):
-        if plugin_id not in include_list:
-            return False
-    if exclude_list and isinstance(exclude_list, list):
-        if plugin_id in exclude_list:
-            return False
-    return True
+    if (
+        include_list
+        and isinstance(include_list, list)
+        and plugin_id not in include_list
+    ):
+        return False
+    return not (
+        exclude_list and isinstance(exclude_list, list) and plugin_id in exclude_list
+    )
 
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
@@ -129,15 +137,12 @@ def _ensure_optional_columns(
     expected_columns: dict[str, str],
 ) -> None:
     existing = {
-        row[1]
-        for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
     }
     for column_name, column_type in expected_columns.items():
         if column_name in existing:
             continue
-        conn.execute(
-            f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
-        )
+        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
 
 def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
@@ -157,7 +162,7 @@ def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
             _ensure_schema(conn)
             cur = conn.cursor()
             # Resolve timestamp safely
-            ts_raw = refresh_event.get("ts", None)
+            ts_raw = refresh_event.get("ts")
             try:
                 ts_value = float(ts_raw) if ts_raw is not None else time.time()
             except Exception:
@@ -222,7 +227,11 @@ def save_stage_event(
                     float(time.time()),
                     stage,
                     int(duration_ms) if duration_ms is not None else None,
-                    json.dumps(extra, ensure_ascii=False) if extra is not None else None,
+                    (
+                        json.dumps(extra, ensure_ascii=False)
+                        if extra is not None
+                        else None
+                    ),
                 ),
             )
             conn.commit()
@@ -230,4 +239,3 @@ def save_stage_event(
             conn.close()
     except Exception:
         pass
-

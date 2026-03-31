@@ -24,14 +24,13 @@ except ImportError:
     WaveshareDisplay = None
     logger.info("Waveshare display not available, hardware support disabled")
 
-class DisplayManager:
 
+class DisplayManager:
     """Manages the display and rendering of images."""
 
     def __init__(self, device_config):
-
         """
-        Initializes the display manager and selects the correct display type 
+        Initializes the display manager and selects the correct display type
         based on the configuration.
 
         Args:
@@ -40,11 +39,11 @@ class DisplayManager:
         Raises:
             ValueError: If an unsupported display type is specified.
         """
-        
+
         self._last_image_hash = None
         self._hash_lock = threading.Lock()
         self.device_config = device_config
-     
+
         display_type = device_config.get_config("display_type", default="inky")
 
         if display_type == "mock":
@@ -55,13 +54,13 @@ class DisplayManager:
                     "Display type 'inky' requested but the Inky hardware driver is unavailable."
                 )
             self.display = InkyDisplay(device_config)
-        elif fnmatch.fnmatch(display_type, "epd*in*"):  
+        elif fnmatch.fnmatch(display_type, "epd*in*"):
             if WaveshareDisplay is None:
                 raise RuntimeError(
                     f"Display type '{display_type}' requested but the Waveshare driver is unavailable."
                 )
             # derived from waveshare epd - we assume here that will be consistent
-            # otherwise we will have to enshring the manufacturer in the 
+            # otherwise we will have to enshring the manufacturer in the
             # display_type and then have a display_model parameter.  Will leave
             # that for future use if the need arises.
             #
@@ -117,7 +116,11 @@ class DisplayManager:
                         except FileNotFoundError:
                             pass
                 self._history_count_estimate = len(png_files) - excess
-                logger.info("Pruned %d old history entries (max %d)", excess, self.HISTORY_MAX_ENTRIES)
+                logger.info(
+                    "Pruned %d old history entries (max %d)",
+                    excess,
+                    self.HISTORY_MAX_ENTRIES,
+                )
             except OSError:
                 logger.debug("Could not prune history directory", exc_info=True)
 
@@ -155,7 +158,6 @@ class DisplayManager:
         self._prune_history(history_dir)
 
     def display_image(self, image, image_settings=None, history_meta=None):
-
         """
         Delegates image rendering to the appropriate display instance.
 
@@ -173,11 +175,16 @@ class DisplayManager:
             raise ValueError("No valid display instance initialized.")
 
         from utils.image_utils import compute_image_hash
+
         image_hash = compute_image_hash(image)
         with self._hash_lock:
             if image_hash == self._last_image_hash:
                 logger.info("Image unchanged, skipping display writes")
-                return {"preprocess_ms": 0, "display_ms": 0, "display_driver": self.display.__class__.__name__}
+                return {
+                    "preprocess_ms": 0,
+                    "display_ms": 0,
+                    "display_driver": self.display.__class__.__name__,
+                }
             self._last_image_hash = image_hash
 
         preprocess_t0 = perf_counter()
@@ -189,12 +196,8 @@ class DisplayManager:
             logger.exception("Failed to save current image preview")
 
         # Resize and adjust orientation
-        image = change_orientation(
-            image, self.device_config.get_config("orientation")
-        )
-        image = resize_image(
-            image, self.device_config.get_resolution(), image_settings
-        )
+        image = change_orientation(image, self.device_config.get_config("orientation"))
+        image = resize_image(image, self.device_config.get_resolution(), image_settings)
         if self.device_config.get_config("inverted_image"):
             image = image.rotate(180)
         image = apply_image_enhancement(

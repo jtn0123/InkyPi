@@ -1,8 +1,8 @@
 """Tests for image_utils.py to improve code coverage."""
 
-import pytest
 from io import BytesIO
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
 from PIL import Image
 
 
@@ -41,6 +41,7 @@ def test_load_image_from_path_error_handling():
 
     # Test with invalid image file
     import tempfile
+
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         f.write(b"Not an image")
         temp_path = f.name
@@ -50,6 +51,7 @@ def test_load_image_from_path_error_handling():
         assert result is None
     finally:
         import os
+
         os.unlink(temp_path)
 
 
@@ -58,7 +60,9 @@ def test_get_image_with_bad_url():
     from utils.image_utils import get_image
 
     # Test with invalid URL
-    result = get_image("http://this-domain-does-not-exist-12345.com/image.png", timeout_seconds=1.0)
+    result = get_image(
+        "http://this-domain-does-not-exist-12345.com/image.png", timeout_seconds=1.0
+    )
     assert result is None
 
 
@@ -88,8 +92,6 @@ def test_get_image_with_invalid_image_data():
     with patch("utils.image_utils.http_get", return_value=mock_response):
         result = get_image("http://example.com/image.png")
         assert result is None
-
-
 
 
 def test_change_orientation_horizontal():
@@ -129,7 +131,7 @@ def test_resize_image_with_zero_dimension():
 
     # Test with zero width
     try:
-        result = resize_image(img, (0, 100), [])
+        resize_image(img, (0, 100), [])
         # Should either handle gracefully or raise expected error
     except (ValueError, ZeroDivisionError):
         # Expected for zero dimensions

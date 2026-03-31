@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,7 +9,7 @@ from model import RefreshInfo
 
 
 def _fixed_now(_device_config):
-    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
+    return datetime(2025, 1, 1, 8, 0, 0, tzinfo=UTC)
 
 
 @pytest.mark.skipif(
@@ -17,7 +17,7 @@ def _fixed_now(_device_config):
     reason="A11y checks skipped by env",
 )
 def test_playlist_accessibility_with_axe(client, device_config_dev, monkeypatch):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
     monkeypatch.setattr("utils.time_utils.now_device_tz", _fixed_now, raising=True)
 
     # Prepare minimal state
@@ -62,9 +62,7 @@ def test_playlist_accessibility_with_axe(client, device_config_dev, monkeypatch)
         browser.close()
 
     # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {'label', 'landmark-one-main', 'region', 'select-name'}
+    known_violations = {"label", "landmark-one-main", "region", "select-name"}
     all_violations = result.get("violations") or []
-    violations = [v for v in all_violations if v.get('id') not in known_violations]
+    violations = [v for v in all_violations if v.get("id") not in known_violations]
     assert not violations, f"New A11y violations: {[v.get('id') for v in violations]}"
-
-

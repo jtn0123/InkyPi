@@ -1,4 +1,3 @@
-import json
 import os
 
 import pytest
@@ -9,9 +8,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.skip(reason="Weather template image loading broken by upstream merge - needs investigation")
+@pytest.mark.skip(
+    reason="Weather template image loading broken by upstream merge - needs investigation"
+)
 def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
-    pw = __import__("pytest").importorskip(
+    __import__("pytest").importorskip(
         "playwright.sync_api", reason="playwright not available"
     )
 
@@ -78,10 +79,18 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
     # Build template params as generate_image would, but render HTML directly
     tzname = device_config_dev.get_config("timezone", default="America/New_York")
     import pytz
+
     tz = pytz.timezone(tzname)
     time_format = device_config_dev.get_config("time_format", default="12h")
 
-    data = w.parse_weather_data(fake_get_weather_data("k", "imperial", 0, 0), fake_get_air_quality("k", 0, 0), tz, "imperial", time_format, settings["latitude"])
+    data = w.parse_weather_data(
+        fake_get_weather_data("k", "imperial", 0, 0),
+        fake_get_air_quality("k", 0, 0),
+        tz,
+        "imperial",
+        time_format,
+        settings["latitude"],
+    )
     data["title"] = settings["customTitle"]
 
     # Dimensions and assets
@@ -89,14 +98,17 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
     if device_config_dev.get_config("orientation") == "vertical":
         dims = dims[::-1]
 
-    from plugins.base_plugin.base_plugin import BASE_PLUGIN_RENDER_DIR
     import os
+
+    from plugins.base_plugin.base_plugin import BASE_PLUGIN_RENDER_DIR
+
     style_sheets = [
         w.to_file_url(os.path.join(BASE_PLUGIN_RENDER_DIR, "plugin.css")),
         w.to_file_url(os.path.join(w.render_dir, "weather.css")),
     ]
 
     from utils.app_utils import get_fonts
+
     fonts = get_fonts()
     for f in fonts:
         f["url"] = w.to_file_url(f["url"])
@@ -118,18 +130,22 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
     template = w.env.get_template("weather.html")
     html = template.render(template_params)
 
+    import os
+    import tempfile
+
     from playwright.sync_api import sync_playwright
 
-    import tempfile, os
     with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
         f.write(html.encode("utf-8"))
         html_path = f.name
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=[
-            "--allow-file-access-from-files",
-            "--enable-local-file-accesses",
-        ])
+        browser = p.chromium.launch(
+            args=[
+                "--allow-file-access-from-files",
+                "--enable-local-file-accesses",
+            ]
+        )
         page = browser.new_page()
         page.goto("file://" + html_path)
 
@@ -154,5 +170,3 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
             os.remove(html_path)
         except Exception:
             pass
-
-

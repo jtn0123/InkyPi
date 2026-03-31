@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-
 # --- Abstract Display ---
 
 
@@ -137,8 +136,8 @@ def test_inky_display_image_calls_set_image_and_show(monkeypatch, device_config_
     image = Image.new("RGB", (100, 50), "white")
     driver.display_image(image)
 
-    assert getattr(driver, "inky_display")._image is not None
-    assert getattr(driver, "inky_display").shown is True
+    assert driver.inky_display._image is not None
+    assert driver.inky_display.shown is True
 
 
 def test_inky_display_image_raises_on_none(monkeypatch, device_config_dev):

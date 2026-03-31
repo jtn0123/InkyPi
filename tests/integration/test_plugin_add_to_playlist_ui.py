@@ -9,7 +9,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_plugin_add_to_playlist_flow(client):
-    pw = pytest.importorskip("playwright.sync_api", reason="playwright not available")
+    pytest.importorskip("playwright.sync_api", reason="playwright not available")
 
     # Choose a simple plugin page that renders without external deps
     resp = client.get("/plugin/clock")
@@ -24,10 +24,11 @@ def test_plugin_add_to_playlist_flow(client):
         page.set_content(html)
 
         # Inject response modal helpers and stub fetch
-        with open("src/static/scripts/response_modal.js", "r", encoding="utf-8") as f:
+        with open("src/static/scripts/response_modal.js", encoding="utf-8") as f:
             js_modal = f.read()
         page.add_script_tag(content=js_modal)
-        page.evaluate("""
+        page.evaluate(
+            """
             window.__requests__ = [];
             const ok = (body) => new Response(JSON.stringify(Object.assign({success:true,message:"Added"}, body||{})), {status:200, headers:{'Content-Type':'application/json'}});
             window.fetch = (url, opts) => {
@@ -64,7 +65,8 @@ def test_plugin_add_to_playlist_flow(client):
                     fetch("/add_plugin", { method: "POST", body: formData });
                 });
             });
-        """)
+        """
+        )
 
         # Open Add to Playlist modal and fill fields (scope to the modal)
         page.click("text=Add to Playlist")
@@ -73,13 +75,20 @@ def test_plugin_add_to_playlist_flow(client):
         page.fill("#scheduleModal #scheduleInterval", "15")
         page.select_option("#scheduleModal #scheduleUnit", "minute")
         # Save using the modal's Save button
-        page.click("#scheduleModal button:has-text(\"Save\")")
+        page.click('#scheduleModal button:has-text("Save")')
 
         # Small wait for async fetch stub to fire
         page.wait_for_timeout(500)
 
         # Verify our stubbed fetch captured a request to add_plugin (Add to Playlist)
-        posts = [r for r in page.evaluate("() => window.__requests__") if r and r.get('method','GET') == 'POST']
-        assert any((isinstance(p.get('url'), str) and '/add_plugin' in p.get('url')) for p in posts)
+        posts = [
+            r
+            for r in page.evaluate("() => window.__requests__")
+            if r and r.get("method", "GET") == "POST"
+        ]
+        assert any(
+            (isinstance(p.get("url"), str) and "/add_plugin" in p.get("url"))
+            for p in posts
+        )
 
         browser.close()

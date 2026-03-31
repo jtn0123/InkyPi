@@ -179,7 +179,9 @@ def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
     img = ImageOps.contain(img, dimensions)
 
     img_size = img.size
-    bkg.paste(img, ((dimensions[0] - img_size[0]) // 2, (dimensions[1] - img_size[1]) // 2))
+    bkg.paste(
+        img, ((dimensions[0] - img_size[0]) // 2, (dimensions[1] - img_size[1]) // 2)
+    )
     return bkg
 
 
