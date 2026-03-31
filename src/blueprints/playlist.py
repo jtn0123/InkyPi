@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import threading
 from datetime import UTC, datetime, timedelta
 
 from flask import (
@@ -46,6 +47,7 @@ def _validate_playlist_name(name):
 # Bounded to prevent unbounded growth; entries expire after 1 minute.
 _ETA_CACHE_MAX_SIZE = 64
 _eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
+_eta_cache_lock = threading.Lock()
 
 
 def _to_minutes(time_str: str) -> int:
@@ -615,7 +617,8 @@ def playlist_eta(playlist_name: str):
         now = datetime.now()
     floor_min = now.replace(second=0, microsecond=0)
 
-    cached = _eta_cache.get(playlist_name)
+    with _eta_cache_lock:
+        cached = _eta_cache.get(playlist_name)
     if cached and cached[0] == floor_min:
         return json_success("ok", eta=cached[1])
 
@@ -690,14 +693,17 @@ def playlist_eta(playlist_name: str):
                     continue
 
         # Evict stale entries and cap cache size
-        if len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
-            stale_keys = [k for k, (ts, _) in _eta_cache.items() if ts != floor_min]
-            for k in stale_keys:
-                _eta_cache.pop(k, None)
-            # If still over limit, drop oldest entries
-            while len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
-                _eta_cache.pop(next(iter(_eta_cache)), None)
-        _eta_cache[playlist_name] = (floor_min, eta_map)
+        with _eta_cache_lock:
+            if len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
+                stale_keys = [
+                    k for k, (ts, _) in _eta_cache.items() if ts != floor_min
+                ]
+                for k in stale_keys:
+                    _eta_cache.pop(k, None)
+                # If still over limit, drop oldest entries
+                while len(_eta_cache) >= _ETA_CACHE_MAX_SIZE:
+                    _eta_cache.pop(next(iter(_eta_cache)), None)
+            _eta_cache[playlist_name] = (floor_min, eta_map)
         return json_success("ok", eta=eta_map)
     except Exception:
         return json_internal_error("compute playlist eta")
