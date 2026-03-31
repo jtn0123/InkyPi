@@ -577,7 +577,7 @@ class PluginInstance:
                         snooze_dt = snooze_dt.replace(tzinfo=UTC)
                     if current_time < snooze_dt:
                         return False
-                except Exception:
+                except (ValueError, TypeError):
                     logger.warning(
                         "Malformed snooze_until value '%s' for plugin '%s'; treating as eligible",
                         self.snooze_until,

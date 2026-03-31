@@ -128,7 +128,7 @@ class HTTPCache:
                 if directive.startswith("max-age="):
                     max_age_str = directive.split("=", 1)[1]
                     return float(max_age_str)
-        except Exception:
+        except (ValueError, IndexError):
             pass
 
         return None

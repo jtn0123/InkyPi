@@ -250,7 +250,7 @@ def handle_request_files(request_files, form_data=None):
                 file.stream.seek(0)
             elif hasattr(file, "seek"):
                 file.seek(0)
-        except Exception:
+        except (OSError, AttributeError):
             logger.debug("Failed to rewind file stream", exc_info=True)
 
         # Save PDFs as-is. Validate and save images.
@@ -262,14 +262,14 @@ def handle_request_files(request_files, form_data=None):
                 with Image.open(BytesIO(content)) as img:
                     img = ImageOps.exif_transpose(img)
                     img.save(file_path)
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 raise RuntimeError("Invalid image upload") from e
         else:
             # Verify decoder can read it before persisting.
             try:
                 with Image.open(BytesIO(content)) as img_verify:
                     img_verify.verify()
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 raise RuntimeError("Invalid image upload") from e
             with open(file_path, "wb") as out:
                 out.write(content)

@@ -35,7 +35,7 @@ def load_image_from_bytes(
         with opener(BytesIO(content)) as _img:
             img: Image.Image = _img
             return img.copy()
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error(f"Failed to decode image from bytes: {e}")
         return None
 
@@ -56,7 +56,7 @@ def process_image_from_bytes(
         with opener(BytesIO(content)) as _img:
             result = processor(_img)
             return result
-    except Exception as e:
+    except (OSError, ValueError, TypeError) as e:
         logger.error(f"Failed to process image from bytes: {e}")
         return None
 
@@ -70,7 +70,7 @@ def load_image_from_path(
         with opener(path) as _img:
             img: Image.Image = _img
             return img.copy()
-    except Exception as e:
+    except (OSError, ValueError) as e:
         logger.error(f"Failed to open image file '{path}': {e}")
         return None
 
@@ -208,7 +208,7 @@ def _playwright_screenshot_html(
     """Try to render a local HTML file using Playwright (if available)."""
     try:
         from playwright.sync_api import sync_playwright
-    except Exception:
+    except ImportError:
         return None
 
     img: Image.Image | None = None

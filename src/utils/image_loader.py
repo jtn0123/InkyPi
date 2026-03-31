@@ -115,7 +115,7 @@ class AdaptiveImageLoader:
                 return self._load_from_file_lowmem(path, dimensions, resize)
             else:
                 return self._load_from_file_fast(path, dimensions, resize)
-        except Exception as e:
+        except (OSError, ValueError, MemoryError) as e:
             logger.error(f"Error loading image from {path}: {e}")
             return None
 
@@ -152,7 +152,7 @@ class AdaptiveImageLoader:
                     )
 
             return img
-        except Exception as e:
+        except (OSError, ValueError, MemoryError) as e:
             logger.error(f"Error loading image from BytesIO: {e}")
             return None
 
@@ -313,7 +313,7 @@ class AdaptiveImageLoader:
 
             return img
 
-        except Exception as e:
+        except (OSError, ValueError, MemoryError) as e:
             logger.error(f"Error loading image from {path}: {e}")
             return None
 
