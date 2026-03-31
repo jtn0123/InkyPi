@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.1.13 (2026-03-31)
+
+### Bug Fixes
+
+- Thread-safe ETA cache and bounded screenshot timeout
+  ([`6a73e58`](https://github.com/jtn0123/InkyPi/commit/6a73e585fd98d8340efca16a855a31399a75c333))
+
+Add threading.Lock to _eta_cache in playlist.py to prevent RuntimeError from concurrent dict
+  mutation during Flask requests (JTN-69). Add default/max timeout ceiling for browser subprocess in
+  take_screenshot() to prevent indefinite thread blocking (JTN-70).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Code Style
+
+- Black formatting for playlist.py
+  ([`33b27a3`](https://github.com/jtn0123/InkyPi/commit/33b27a354f23d3d4f9ed5882df6032a48257be54))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.1.12 (2026-03-31)
 
 ### Bug Fixes
