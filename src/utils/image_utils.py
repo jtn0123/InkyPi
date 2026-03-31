@@ -17,6 +17,10 @@ LANCZOS = Resampling.LANCZOS
 
 logger = logging.getLogger(__name__)
 
+# Default and maximum timeout for browser subprocess screenshots (seconds).
+_DEFAULT_SCREENSHOT_TIMEOUT_S = 30
+_MAX_SCREENSHOT_TIMEOUT_S = 60
+
 
 def load_image_from_bytes(
     content: bytes, image_open: Callable[[Any], Image.Image] | None = None
@@ -331,7 +335,10 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             )
             return None
 
-        timeout_seconds = (timeout_ms / 1000) if timeout_ms else None
+        timeout_seconds = min(
+            (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+            _MAX_SCREENSHOT_TIMEOUT_S,
+        )
 
         try:
             result = subprocess.run(

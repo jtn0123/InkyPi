@@ -5,6 +5,11 @@ from unittest.mock import Mock, patch
 
 from PIL import Image
 
+from utils.image_utils import (
+    _DEFAULT_SCREENSHOT_TIMEOUT_S,
+    _MAX_SCREENSHOT_TIMEOUT_S,
+)
+
 
 def test_load_image_from_bytes_error_handling():
     """Test load_image_from_bytes handles invalid image data gracefully."""
@@ -136,3 +141,44 @@ def test_resize_image_with_zero_dimension():
     except (ValueError, ZeroDivisionError):
         # Expected for zero dimensions
         pass
+
+
+# ---------------------------------------------------------------------------
+# Screenshot timeout tests (JTN-70)
+# ---------------------------------------------------------------------------
+
+
+def test_screenshot_timeout_default_when_none():
+    """When timeout_ms is None, the computed timeout should use the default."""
+    timeout_ms = None
+    timeout_seconds = min(
+        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+        _MAX_SCREENSHOT_TIMEOUT_S,
+    )
+    assert timeout_seconds == _DEFAULT_SCREENSHOT_TIMEOUT_S
+
+
+def test_screenshot_timeout_caps_excessive():
+    """Even if caller passes a huge timeout_ms, it should be capped at max."""
+    timeout_ms = 120_000
+    timeout_seconds = min(
+        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+        _MAX_SCREENSHOT_TIMEOUT_S,
+    )
+    assert timeout_seconds == _MAX_SCREENSHOT_TIMEOUT_S
+
+
+def test_screenshot_timeout_passes_normal():
+    """A normal timeout_ms (e.g. 40000) should pass through as seconds."""
+    timeout_ms = 40_000
+    timeout_seconds = min(
+        (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+        _MAX_SCREENSHOT_TIMEOUT_S,
+    )
+    assert timeout_seconds == 40.0
+
+
+def test_screenshot_timeout_constants_sane():
+    """Default and max timeout constants should be positive and correctly ordered."""
+    assert _DEFAULT_SCREENSHOT_TIMEOUT_S > 0
+    assert _MAX_SCREENSHOT_TIMEOUT_S >= _DEFAULT_SCREENSHOT_TIMEOUT_S

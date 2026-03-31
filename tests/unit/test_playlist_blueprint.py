@@ -2,6 +2,7 @@
 """Comprehensive tests for playlist blueprint routes."""
 
 import json
+import threading
 from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
@@ -708,3 +709,43 @@ class TestPlaylistNameValidation:
         resp = _create_playlist(client, "My Playlist", "08:00", "12:00")
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# ETA cache thread safety (JTN-69)
+# ---------------------------------------------------------------------------
+
+
+class TestEtaCacheThreadSafety:
+    def test_concurrent_eta_requests_no_crash(self, client, device_config_dev):
+        """Concurrent ETA requests must not raise RuntimeError from dict mutation."""
+        _create_playlist(client, "Conc", "00:00", "24:00")
+        _add_plugin_to_playlist(client, "Conc", "P1", "weather")
+        _add_plugin_to_playlist(client, "Conc", "P2", "weather")
+
+        errors: list[Exception] = []
+        barrier = threading.Barrier(4, timeout=5)
+
+        def _hit_eta():
+            try:
+                barrier.wait()
+                for _ in range(10):
+                    resp = client.get("/playlist/eta/Conc")
+                    assert resp.status_code == 200
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [threading.Thread(target=_hit_eta) for _ in range(4)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=10)
+
+        assert not errors, f"Concurrent ETA requests raised: {errors}"
+
+    def test_eta_cache_lock_exists(self):
+        """Verify the lock is present at module level."""
+        import blueprints.playlist as pl_mod
+
+        assert hasattr(pl_mod, "_eta_cache_lock")
+        assert isinstance(pl_mod._eta_cache_lock, type(threading.Lock()))
