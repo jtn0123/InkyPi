@@ -84,6 +84,23 @@ _setup_logging()
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+_TRUTHY = frozenset({"1", "true", "yes"})
+
+# Named constants (formerly magic numbers)
+_CACHE_1_YEAR = 31_536_000
+_CACHE_1_DAY = 86_400
+_DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
+
+
+def _env_bool(name: str, default: str = "") -> bool:
+    """Return True when the environment variable *name* holds a truthy value."""
+    return os.getenv(name, default).strip().lower() in _TRUTHY
+
+
 """Runtime configuration.
 
 When imported, values are derived from environment variables only. The
@@ -99,16 +116,8 @@ def _env_dev_mode() -> bool:
 
 
 DEV_MODE = _env_dev_mode()
-WEB_ONLY = os.getenv("INKYPI_NO_REFRESH", "").strip().lower() in (
-    "1",
-    "true",
-    "yes",
-)
-FAST_DEV = os.getenv("INKYPI_FAST_DEV", "").strip().lower() in (
-    "1",
-    "true",
-    "yes",
-)
+WEB_ONLY = _env_bool("INKYPI_NO_REFRESH")
+FAST_DEV = _env_bool("INKYPI_FAST_DEV")
 
 
 def _env_port() -> int:
@@ -160,10 +169,7 @@ def main(argv: list[str] | None = None):
     DEV_MODE = bool(args.dev or env_mode in ("dev", "development"))
 
     # Toggle for disabling background refresh thread
-    WEB_ONLY = bool(
-        args.web_only
-        or (os.getenv("INKYPI_NO_REFRESH", "").strip().lower() in ("1", "true", "yes"))
-    )
+    WEB_ONLY = bool(args.web_only or _env_bool("INKYPI_NO_REFRESH"))
 
     # If --dev explicitly passed, set env var for downstream logic and logs
     if args.dev:
@@ -195,10 +201,7 @@ def main(argv: list[str] | None = None):
     else:
         logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
     logging.getLogger("waitress.queue").setLevel(logging.ERROR)
-    FAST_DEV = bool(
-        args.fast_dev
-        or (os.getenv("INKYPI_FAST_DEV", "").strip().lower() in ("1", "true", "yes"))
-    )
+    FAST_DEV = bool(args.fast_dev or _env_bool("INKYPI_FAST_DEV"))
 
     app = create_app()
 
@@ -225,6 +228,49 @@ def _read_version() -> str:
             return f.read().strip()
     except Exception:
         return "unknown"
+
+
+def _register_error_handlers(app: Flask) -> None:
+    """Register JSON-aware error handlers for common HTTP status codes."""
+
+    @app.errorhandler(APIError)
+    def _handle_api_error(err: APIError):
+        return json_error(
+            err.message, status=err.status, code=err.code, details=err.details
+        )
+
+    @app.errorhandler(400)
+    def _handle_bad_request(err):
+        if wants_json():
+            return json_error("Bad request", status=400)
+        return make_response("Bad request", 400)
+
+    @app.errorhandler(404)
+    def _handle_not_found(err):
+        if wants_json():
+            return json_error("Not found", status=404)
+        return render_template("404.html"), 404
+
+    @app.errorhandler(415)
+    def _handle_unsupported_media_type(err):
+        if wants_json():
+            return json_error("Unsupported media type", status=415)
+        return make_response("Unsupported media type", 415)
+
+    @app.errorhandler(Exception)
+    def _handle_unexpected_error(err: Exception):
+        try:
+            logger.exception("Unhandled exception: %s", err)
+        except Exception:
+            pass
+        if wants_json():
+            return json_internal_error(
+                "unhandled application error",
+                details={
+                    "hint": "Check server logs for stack trace; enable DEV mode for more diagnostics.",
+                },
+            )
+        return make_response("Internal Server Error", 500)
 
 
 def create_app():
@@ -302,9 +348,9 @@ def create_app():
     # Enforce maximum request payload size (bytes)
     try:
         _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
-        _max_len = int(_max_len_env) if _max_len_env else 10 * 1024 * 1024
+        _max_len = int(_max_len_env) if _max_len_env else _DEFAULT_MAX_UPLOAD
     except Exception:
-        _max_len = 10 * 1024 * 1024
+        _max_len = _DEFAULT_MAX_UPLOAD
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
     # Register Blueprints
@@ -361,9 +407,7 @@ def create_app():
             pass
 
     # --- HTTPS redirect (opt-in via INKYPI_FORCE_HTTPS=1) ---
-    _force_https = not DEV_MODE and os.getenv(
-        "INKYPI_FORCE_HTTPS", "0"
-    ).strip().lower() in ("1", "true", "yes")
+    _force_https = not DEV_MODE and _env_bool("INKYPI_FORCE_HTTPS")
 
     @app.before_request
     def _redirect_to_https():
@@ -451,54 +495,13 @@ def create_app():
             return json_error("Rate limit exceeded — try again shortly", status=429)
         _MUTATE_REQUESTS[addr].append(now)
 
-    @app.errorhandler(APIError)
-    def _handle_api_error(err: APIError):
-        return json_error(
-            err.message, status=err.status, code=err.code, details=err.details
-        )
-
-    @app.errorhandler(400)
-    def _handle_bad_request(err):
-        if wants_json():
-            return json_error("Bad request", status=400)
-        return make_response("Bad request", 400)
-
-    @app.errorhandler(404)
-    def _handle_not_found(err):
-        if wants_json():
-            return json_error("Not found", status=404)
-        return render_template("404.html"), 404
-
-    @app.errorhandler(415)
-    def _handle_unsupported_media_type(err):
-        if wants_json():
-            return json_error("Unsupported media type", status=415)
-        return make_response("Unsupported media type", 415)
-
-    @app.errorhandler(Exception)
-    def _handle_unexpected_error(err: Exception):
-        try:
-            logger.exception("Unhandled exception: %s", err)
-        except Exception:
-            pass
-        if wants_json():
-            return json_internal_error(
-                "unhandled application error",
-                details={
-                    "hint": "Check server logs for stack trace; enable DEV mode for more diagnostics.",
-                },
-            )
-        return make_response("Internal Server Error", 500)
+    _register_error_handlers(app)
 
     @app.after_request
     def _set_security_headers(response):
         # Request timing log (env-gated)
         try:
-            if os.getenv("INKYPI_REQUEST_TIMING", "").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-            ):
+            if _env_bool("INKYPI_REQUEST_TIMING"):
                 t0 = getattr(g, "_t0", None)
                 if t0 is not None:
                     elapsed_ms = int((perf_counter() - t0) * 1000)
@@ -531,11 +534,14 @@ def create_app():
                 ]
             ):
                 response.headers.setdefault(
-                    "Cache-Control", "public, max-age=31536000, immutable"
+                    "Cache-Control",
+                    f"public, max-age={_CACHE_1_YEAR}, immutable",
                 )
             else:
                 # Other static files: 1 day cache
-                response.headers.setdefault("Cache-Control", "public, max-age=86400")
+                response.headers.setdefault(
+                    "Cache-Control", f"public, max-age={_CACHE_1_DAY}"
+                )
 
         # Basic hardening headers
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -561,13 +567,7 @@ def create_app():
                 os.getenv("INKYPI_CSP")
                 or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
             )
-            report_only = DEV_MODE or os.getenv(
-                "INKYPI_CSP_REPORT_ONLY", "0"
-            ).strip().lower() in (
-                "1",
-                "true",
-                "yes",
-            )
+            report_only = DEV_MODE or _env_bool("INKYPI_CSP_REPORT_ONLY")
             header_name = (
                 "Content-Security-Policy-Report-Only"
                 if report_only
