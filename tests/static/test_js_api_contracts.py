@@ -185,3 +185,31 @@ def test_image_modal_script_guards_missing_container(client):
     assert "if (!imageContainer) return;" in js
     assert "const img = imageContainer.querySelector('img');" in js
     assert "if (!img) return;" in js
+
+
+def test_csrf_script_preserves_existing_headers_without_empty_object_copy(client):
+    resp = client.get("/static/scripts/csrf.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "init.headers = init.headers ? { ...init.headers } : {};" in js
+    assert "{ ...(init.headers || {}) }" not in js
+
+
+def test_history_page_script_uses_outer_scope_modal_helper(client):
+    resp = client.get("/static/scripts/history_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "function getOpenHistoryModal()" in js
+    assert "const openModal = getOpenHistoryModal();" in js
+
+
+def test_plugin_page_script_uses_globalthis_for_plugin_hooks(client):
+    resp = client.get("/static/scripts/plugin_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "function validateAddToPlaylistAction(action)" in js
+    assert 'typeof globalThis.validatePluginSettings === "function"' in js
+    assert "globalThis.PluginForm" in js

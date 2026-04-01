@@ -251,6 +251,32 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
     assert "100 B" in body or "0.1 KB" in body or "KB" in body
 
 
+def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(device_config_dev):
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    names = [
+        "display_20250101_174133.png",
+        "display_20250101_211633.png",
+        "display_20250101_185438.png",
+    ]
+    for name in names:
+        Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+
+    identical_time = 1_735_689_600
+    for name in names:
+        os.utime(os.path.join(d, name), (identical_time, identical_time))
+
+    images = history_mod._list_history_images(d)
+    ordered_names = [img["filename"] for img in images[:3]]
+    assert ordered_names == [
+        "display_20250101_211633.png",
+        "display_20250101_185438.png",
+        "display_20250101_174133.png",
+    ]
+
+
 def test_history_server_renders_storage_when_disk_usage_ok(client, monkeypatch):
     class Usage:
         total = 4 * (1024**3)

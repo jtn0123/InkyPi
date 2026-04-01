@@ -112,7 +112,14 @@ class Wpotd(BasePlugin):
             delta_days = (datetime.today() - start).days
             return (start + timedelta(days=randint(0, delta_days))).date()
         elif settings.get("customDate"):
-            return datetime.strptime(settings["customDate"], "%Y-%m-%d").date()
+            try:
+                return datetime.strptime(settings["customDate"], "%Y-%m-%d").date()
+            except ValueError:
+                logger.warning(
+                    "Invalid customDate %r for WPOTD, defaulting to today",
+                    settings["customDate"],
+                )
+                return datetime.today().date()
         else:
             return datetime.today().date()
 

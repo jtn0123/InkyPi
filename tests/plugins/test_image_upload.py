@@ -340,3 +340,32 @@ def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev
             device_config_dev,
         )
         assert result is not None
+
+
+def test_image_upload_invalid_background_color_falls_back(
+    monkeypatch, device_config_dev
+):
+    import tempfile
+
+    from plugins.image_upload.image_upload import ImageUpload
+
+    plugin = ImageUpload({"id": "image_upload"})
+
+    buf = BytesIO()
+    Image.new("RGB", (100, 100), "white").save(buf, format="PNG")
+    content = buf.getvalue()
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
+        tf.write(content)
+        tf.flush()
+
+        result = plugin.generate_image(
+            {
+                "imageFiles[]": [tf.name],
+                "padImage": "true",
+                "backgroundOption": "color",
+                "backgroundColor": "notacolor",
+            },
+            device_config_dev,
+        )
+        assert result is not None

@@ -44,6 +44,46 @@
         syncModalOpenState();
     }
 
+    function getOpenModalId(){
+        const modalIds = [
+            'deleteInstanceModal',
+            'deletePlaylistModal',
+            'thumbnailPreviewModal',
+            'refreshSettingsModal',
+            'deviceCycleModal',
+            'playlistModal',
+        ];
+        return modalIds.find((modalId) => {
+            const modal = document.getElementById(modalId);
+            return modal && !modal.hidden;
+        }) || null;
+    }
+
+    function closeModalById(modalId){
+        switch (modalId) {
+            case 'deleteInstanceModal':
+                closeDeleteInstanceModal();
+                return;
+            case 'deletePlaylistModal':
+                closeDeletePlaylistModal();
+                return;
+            case 'thumbnailPreviewModal':
+                closeThumbnailPreview();
+                return;
+            case 'refreshSettingsModal':
+                closeRefreshModal();
+                return;
+            case 'deviceCycleModal':
+                closeDeviceCycleModal();
+                return;
+            case 'playlistModal':
+                closeModal();
+                return;
+            default:
+                return;
+        }
+    }
+
     function buildProgressKey(ctx){
         try {
             if (ctx && ctx.page === 'playlist'){
@@ -422,8 +462,7 @@
             const input = document.getElementById('device_cycle_minutes');
             if (input) input.value = (C.device_cycle_minutes || 60);
         } catch(e){}
-        const m = document.getElementById('deviceCycleModal');
-        if (m) m.style.display = 'block';
+        setModalOpen('deviceCycleModal', true);
     }
     function closeDeviceCycleModal(){
         setModalOpen('deviceCycleModal', false);
@@ -723,6 +762,16 @@
             if (event.target?.id === 'playlistModal') closeModal();
             if (event.target?.id === 'refreshSettingsModal') closeRefreshModal();
             if (event.target?.id === 'thumbnailPreviewModal') closeThumbnailPreview();
+            if (event.target?.id === 'deviceCycleModal') closeDeviceCycleModal();
+            if (event.target?.id === 'deletePlaylistModal') closeDeletePlaylistModal();
+            if (event.target?.id === 'deleteInstanceModal') closeDeleteInstanceModal();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            const modalId = getOpenModalId();
+            if (!modalId) return;
+            event.preventDefault();
+            closeModalById(modalId);
         });
     }
 

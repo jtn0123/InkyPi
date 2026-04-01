@@ -19,6 +19,7 @@ from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.http_utils import APIError, json_error
+from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.progress import track_progress
 
 logger = logging.getLogger(__name__)
@@ -193,7 +194,7 @@ def delete_plugin_instance():
         or not isinstance(playlist_name, str)
         or not playlist_name.strip()
     ):
-        return json_error("Playlist name is required", status=400)
+        return json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
     playlist_name = playlist_name.strip()
 
     try:
