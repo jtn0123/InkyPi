@@ -24,20 +24,7 @@
             </div>
         </div>
     </div>
-    <fieldset class="form-group" style="border: none; padding: 0; margin: 0;">
-        <legend class="form-label">Background Fill</legend>
-        <div class="radio-segment">
-            <label class="radio-option">
-                <input type="radio" id="backgroundOptionBlur" name="backgroundOption" value="blur" checked>
-                <span>Blur</span>
-            </label>
-            <label class="radio-option">
-                <input type="radio" id="backgroundOptionColor" name="backgroundOption" value="color">
-                <span>Solid Color</span>
-            </label>
-            <input type="color" id="backgroundColor" name="backgroundColor" value="#ffffff" class="color-picker"/>
-        </div>
-    </fieldset>
+    {% include 'widgets/background_fill.html' %}
 </div>
 
 <div class="settings-card">

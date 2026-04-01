@@ -125,6 +125,14 @@ def test_all_pages_include_navigation(client, path):
 def test_image_plugin_background_fill_markup_is_accessible(template_path):
     content = Path(template_path).read_text(encoding="utf-8")
 
+    assert "{% include 'widgets/background_fill.html' %}" in content
+
+
+def test_background_fill_widget_markup_is_accessible():
+    content = Path("src/templates/widgets/background_fill.html").read_text(
+        encoding="utf-8"
+    )
+
     assert "Background Fill" in content
     assert "<fieldset" in content
     assert "<legend" in content
