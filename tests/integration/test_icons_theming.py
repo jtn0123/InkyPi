@@ -77,7 +77,15 @@ def test_settings_icons_and_toggle(icons_csp_env, client):
     # CDN may not be present if all icons inline; accept either
     # assert "@phosphor-icons/web" in html
     assert _has_icon(html, "ph-gear-six", "app-icon")
+    assert "&lt;svg" not in html
     assert 'id="themeToggle"' in html
+
+
+def test_plugin_page_icon_is_not_escaped(icons_csp_env, client):
+    html = _html(client, "/plugin/clock")
+
+    assert _has_icon(html, "ph-clock", "app-icon")
+    assert "&lt;svg" not in html
 
 
 def test_history_icon_present(icons_csp_env, client):

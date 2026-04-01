@@ -30,7 +30,7 @@
                 <p class="page-subtitle">Review generated images, redisplay successful renders, and clean up storage when the local cache grows too large.</p>
             </div>
             <div class="page-summary">
-                <span class="status-chip info">{{ images|length }} items</span>
+                <span class="status-chip info">{{ total }} items</span>
                 {% if storage and storage.pct_free is not none %}
                 <span class="status-chip">{{ storage.pct_free|round(1) }}% free</span>
                 {% endif %}
@@ -84,7 +84,7 @@
         {% endif %}
         <div class="separator"></div>
 
-        {% if images|length == 0 %}
+        {% if total == 0 %}
             {{ empty_state('clock-counter-clockwise', 'No history yet.', 'Your generated images will appear here after the first successful render.', compact=true) }}
         {% else %}
         <div class="history-grid">
@@ -119,6 +119,21 @@
             </div>
             {% endfor %}
         </div>
+        {% if total_pages > 1 %}
+        <nav class="pagination" aria-label="History pages">
+            {% if page > 1 %}
+            <a class="btn" href="{{ url_for('history.history_page', page=page - 1, per_page=per_page) }}">Previous</a>
+            {% else %}
+            <span class="btn" style="opacity: 0.4; pointer-events: none;">Previous</span>
+            {% endif %}
+            <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
+            {% if page < total_pages %}
+            <a class="btn" href="{{ url_for('history.history_page', page=page + 1, per_page=per_page) }}">Next</a>
+            {% else %}
+            <span class="btn" style="opacity: 0.4; pointer-events: none;">Next</span>
+            {% endif %}
+        </nav>
+        {% endif %}
         <div class="danger-zone history-danger-zone">
             <div>
                 <h3>Reset cache</h3>

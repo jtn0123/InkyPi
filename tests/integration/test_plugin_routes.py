@@ -7,6 +7,14 @@ def test_plugin_page_not_found(client):
     assert b"not found" in resp.data.lower()
 
 
+def test_plugin_page_sanitizes_missing_instance_name(client):
+    resp = client.get("/plugin/ai_text?instance=%3Cscript%3Ealert(1)%3C%2Fscript%3E")
+    assert resp.status_code == 404
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
+
+
 # Skip this test - the exception handling is already covered by existing tests
 
 
@@ -84,6 +92,17 @@ def test_update_plugin_instance_plugin_not_found(client):
     assert "Plugin instance: test does not exist" in resp.get_json().get("error", "")
 
 
+def test_update_plugin_instance_sanitizes_missing_instance_name(client):
+    resp = client.put(
+        "/update_plugin_instance/%3Cscript%3Ealert(1)%3E",
+        data={"plugin_id": "ai_text"},
+    )
+    assert resp.status_code == 404
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&gt;" in error
+
+
 def test_update_plugin_instance_api_error_handling(client, flask_app, monkeypatch):
     from utils.http_utils import APIError
 
@@ -139,6 +158,21 @@ def test_display_plugin_instance_plugin_not_found(client):
     )
     assert resp.status_code == 400
     assert "Plugin instance 'nonexistent' not found" in resp.get_json().get("error", "")
+
+
+def test_display_plugin_instance_sanitizes_missing_instance_name(client):
+    resp = client.post(
+        "/display_plugin_instance",
+        json={
+            "playlist_name": "Default",
+            "plugin_id": "ai_text",
+            "plugin_instance": "<script>alert(1)</script>",
+        },
+    )
+    assert resp.status_code == 400
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
 
 
 def test_display_plugin_instance_exception_handling(client, flask_app, monkeypatch):
@@ -327,6 +361,49 @@ def test_instance_image_served_from_history_on_generation_failure(
     assert resp.status_code == 200
     img = Image.open(io.BytesIO(resp.data))
     assert img.getpixel((0, 0)) == (255, 0, 0)
+
+
+def test_instance_image_uses_latest_matching_history_entry(
+    client, device_config_dev, monkeypatch
+):
+    import io
+    import json
+    import os
+
+    from PIL import Image
+
+    _setup_playlist_for_instance(device_config_dev)
+
+    path = device_config_dev.get_plugin_image_path("ai_text", "Inst One")
+    if os.path.exists(path):
+        os.remove(path)
+
+    history_dir = device_config_dev.history_image_dir
+
+    older_png_path = os.path.join(history_dir, "display_000001.png")
+    older_json_path = os.path.join(history_dir, "display_000001.json")
+    Image.new("RGB", (10, 10), "red").save(older_png_path)
+    with open(older_json_path, "w", encoding="utf-8") as fh:
+        json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
+
+    newer_png_path = os.path.join(history_dir, "display_000002.png")
+    newer_json_path = os.path.join(history_dir, "display_000002.json")
+    Image.new("RGB", (10, 10), "green").save(newer_png_path)
+    with open(newer_json_path, "w", encoding="utf-8") as fh:
+        json.dump({"plugin_id": "ai_text", "plugin_instance": "Inst One"}, fh)
+
+    class _StubPlugin:
+        def generate_image(self, settings, device_config):
+            raise RuntimeError("fail")
+
+    monkeypatch.setattr(
+        "blueprints.plugin.get_plugin_instance", lambda cfg: _StubPlugin(), raising=True
+    )
+
+    resp = client.get("/instance_image/ai_text/Inst One")
+    assert resp.status_code == 200
+    img = Image.open(io.BytesIO(resp.data))
+    assert img.getpixel((0, 0)) == (0, 128, 0)
 
 
 def test_delete_plugin_instance_cleans_up_cache(client, device_config_dev):

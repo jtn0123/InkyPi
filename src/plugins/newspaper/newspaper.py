@@ -11,6 +11,9 @@ from utils.image_utils import get_image
 logger = logging.getLogger(__name__)
 
 FREEDOM_FORUM_URL = "https://cdn.freedomforum.org/dfp/jpg{}/lg/{}.jpg"
+VALID_NEWSPAPER_SLUGS = {
+    entry["slug"].upper() for entry in NEWSPAPERS if entry.get("slug")
+}
 
 
 class Newspaper(BasePlugin):
@@ -28,9 +31,11 @@ class Newspaper(BasePlugin):
     def generate_image(self, settings, device_config):
         newspaper_slug = settings.get("newspaperSlug")
 
-        if not newspaper_slug:
+        if not newspaper_slug or not str(newspaper_slug).strip():
             raise RuntimeError("Newspaper input not provided.")
-        newspaper_slug = newspaper_slug.upper()
+        newspaper_slug = str(newspaper_slug).strip().upper()
+        if newspaper_slug not in VALID_NEWSPAPER_SLUGS:
+            raise RuntimeError("Invalid newspaper selection.")
 
         # Get today's date
         today = datetime.today()

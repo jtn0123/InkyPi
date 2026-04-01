@@ -1,6 +1,111 @@
 # CHANGELOG
 
 
+## v0.3.3 (2026-04-01)
+
+### Bug Fixes
+
+- Update test mocks to match new http_get and fetch_and_resize_remote_image APIs
+  ([`dcd0906`](https://github.com/jtn0123/InkyPi/commit/dcd09061209926847110144203f5c1c94f1cf3e0))
+
+- test_unsplash_search_success: mock fetch_and_resize_remote_image since grab_image now delegates to
+  it instead of using the HTTP session directly - test_cache_ttl_respected: monkeypatch
+  blueprints.settings.http_get instead of removed _requests.get alias
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Code Style
+
+- Format updated tests for black
+  ([`7f6e3bd`](https://github.com/jtn0123/InkyPi/commit/7f6e3bde77b852f87cb029be73c4f1f4a8f2505c))
+
+- Sort settings imports for ruff
+  ([`b84792f`](https://github.com/jtn0123/InkyPi/commit/b84792f575e57cb493844469c958a5386c7553f4))
+
+### Testing
+
+- Add coverage for fetch_and_resize_remote_image
+  ([`a22d6b9`](https://github.com/jtn0123/InkyPi/commit/a22d6b96acc473e39ac127d56154939b521ff129))
+
+Tests success path, HTTP failure, invalid image bytes, and raise_for_status error to satisfy
+  SonarCloud ≥80% new code coverage gate.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.3.2 (2026-04-01)
+
+### Bug Fixes
+
+- Harden backend issue handling for JTN-109 JTN-111 JTN-112
+  ([`57e717d`](https://github.com/jtn0123/InkyPi/commit/57e717dfd0f0a9c2382be3e6a8878a1cd4e7bb03))
+
+
+## v0.3.1 (2026-04-01)
+
+### Bug Fixes
+
+- Apply Black formatting to test_js_api_contracts.py
+  ([`952f79b`](https://github.com/jtn0123/InkyPi/commit/952f79bf4a87c2a2a26ba83cfae806f1e4af3f5d))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden playlist UI edge cases
+  ([`c6970dd`](https://github.com/jtn0123/InkyPi/commit/c6970dd43f05e48513a905d688a7c70e64762749))
+
+### Refactoring
+
+- Split refresh_task.py into package (JTN-73)
+  ([`a073a70`](https://github.com/jtn0123/InkyPi/commit/a073a70a41e6f16707e6c86f67e73bff71c55ceb))
+
+Convert src/refresh_task.py (1,075 lines) into src/refresh_task/ package:
+
+- __init__.py: re-exports all public API for zero-breakage imports - task.py: RefreshTask class
+  (main coordinator, ~850 lines) - worker.py: subprocess helpers (_get_mp_context,
+  _restore_child_config, _remote_exception, _execute_refresh_attempt_worker, ~85 lines) -
+  actions.py: RefreshAction, ManualRefresh, PlaylistRefresh, ManualUpdateRequest (~125 lines)
+
+Updated 11 test files to patch correct submodule paths. Updated coverage_gate.py threshold key.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.3.0 (2026-04-01)
+
+### Code Style
+
+- Fix black formatting in history.py
+  ([`653cfcc`](https://github.com/jtn0123/InkyPi/commit/653cfcc098cfdb9c61e1967d2f570678948ca239))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Fix black formatting in test_history.py
+  ([`9fa27e3`](https://github.com/jtn0123/InkyPi/commit/9fa27e39194d769f9e75fbde4a7adbce5b84ced4))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add server-side pagination to history page (JTN-91)
+  ([`0e6144e`](https://github.com/jtn0123/InkyPi/commit/0e6144ee9bb4797b5280c0c1ae44e92423b4f82a))
+
+History page now paginates at 24 items per page instead of loading all items at once. Adds
+  Previous/Next navigation and page indicator. Keeps lazy-loading on images for additional
+  performance.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add pagination tests for history page
+  ([`c1a87d1`](https://github.com/jtn0123/InkyPi/commit/c1a87d178c6b4c359867dd8f9a0af5a784a2b38f))
+
+Covers multi-page navigation, invalid params, and edge cases to satisfy SonarCloud 80% coverage gate
+  on new code.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.1 (2026-04-01)
 
 ### Bug Fixes

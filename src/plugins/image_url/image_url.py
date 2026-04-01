@@ -1,26 +1,17 @@
 import logging
-from io import BytesIO
-
-from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
-from utils.http_client import get_http_session
+from utils.image_utils import fetch_and_resize_remote_image
 
 logger = logging.getLogger(__name__)
 
 
 def grab_image(image_url, dimensions, timeout_ms=40000):
     """Grab an image from a URL and resize it to the specified dimensions."""
-    try:
-        response = get_http_session().get(image_url, timeout=timeout_ms / 1000)
-        response.raise_for_status()
-        with Image.open(BytesIO(response.content)) as img:
-            resized = img.resize(dimensions, Image.LANCZOS)
-            return resized.copy()
-    except Exception as e:
-        logger.error(f"Error grabbing image from {image_url}: {e}")
-        return None
+    return fetch_and_resize_remote_image(
+        image_url, dimensions, timeout_seconds=timeout_ms / 1000
+    )
 
 
 class ImageURL(BasePlugin):

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from html import escape
 from time import perf_counter
 
 from flask import (
@@ -30,6 +31,11 @@ PLUGINS_DIR = resolve_path("plugins")
 def _sanitize_log(value: str) -> str:
     """Strip control characters from user input before logging to prevent log injection."""
     return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:200]
+
+
+def _sanitize_response_value(value: object) -> str:
+    """Sanitize user-controlled values before reflecting them in JSON messages."""
+    return escape(_sanitize_log(str(value)), quote=False)
 
 
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
@@ -74,7 +80,7 @@ def plugin_page(plugin_id: str):
             )
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {plugin_instance_name} does not exist",
+                    f"Plugin instance: {_sanitize_response_value(plugin_instance_name)} does not exist",
                     status=404,
                 )
             template_params["plugin_settings"] = plugin_instance.settings
@@ -260,7 +266,8 @@ def update_plugin_instance(instance_name: str):
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             return json_error(
-                f"Plugin instance: {instance_name} does not exist", status=404
+                f"Plugin instance: {_sanitize_response_value(instance_name)} does not exist",
+                status=404,
             )
 
         plugin_instance.settings = plugin_settings
@@ -300,7 +307,8 @@ def display_plugin_instance():
         plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
         if not plugin_instance:
             return json_error(
-                f"Plugin instance '{plugin_instance_name}' not found", status=400
+                f"Plugin instance '{_sanitize_response_value(plugin_instance_name)}' not found",
+                status=400,
             )
 
         refresh_task.manual_update(
@@ -480,7 +488,7 @@ def _find_history_image(
         history_dir: str = str(device_config.history_image_dir)
         if not os.path.isdir(history_dir):
             return None
-        for name in sorted(os.listdir(history_dir)):
+        for name in sorted(os.listdir(history_dir), reverse=True):
             if not name.endswith(".json"):
                 continue
             json_path = os.path.join(history_dir, name)

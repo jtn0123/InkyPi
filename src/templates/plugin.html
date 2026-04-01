@@ -42,7 +42,7 @@
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
-                        {% if ph_icon %}{{ icon(ph_icon, 'app-icon') }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
+                        {% if ph_icon %}{{ icon(ph_icon, 'app-icon') | safe }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
                         <div class="title-stack">
                             <h1 class="app-title">{{ plugin.display_name }}</h1>
                             <span class="app-subtitle">{{ plugin.id }}</span>

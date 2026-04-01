@@ -52,7 +52,14 @@ def test_get_panel_xkcd():
     )
     mock_feed = _make_mock_feed(description, "XKCD Title")
 
-    with patch("plugins.comic.comic_parser.feedparser") as mock_feedparser:
+    mock_response = MagicMock()
+    mock_response.content = b"<feed />"
+    mock_response.raise_for_status.return_value = None
+
+    with (
+        patch("plugins.comic.comic_parser.http_get", return_value=mock_response),
+        patch("plugins.comic.comic_parser.feedparser") as mock_feedparser,
+    ):
         mock_feedparser.parse.return_value = mock_feed
         result = get_panel("XKCD")
 
@@ -68,7 +75,14 @@ def test_get_panel_empty_feed():
     empty_feed = MagicMock()
     empty_feed.entries = []
 
-    with patch("plugins.comic.comic_parser.feedparser") as mock_feedparser:
+    mock_response = MagicMock()
+    mock_response.content = b"<feed />"
+    mock_response.raise_for_status.return_value = None
+
+    with (
+        patch("plugins.comic.comic_parser.http_get", return_value=mock_response),
+        patch("plugins.comic.comic_parser.feedparser") as mock_feedparser,
+    ):
         mock_feedparser.parse.return_value = empty_feed
         with pytest.raises(RuntimeError, match="Failed to retrieve latest comic"):
             get_panel("XKCD")

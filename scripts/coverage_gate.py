@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 THRESHOLDS: dict[str, tuple[float, float]] = {
-    "refresh_task.py": (0.65, 0.50),
+    "refresh_task/task.py": (0.65, 0.50),
     "display/display_manager.py": (0.75, 0.65),
     "config.py": (0.72, 0.58),
 }
