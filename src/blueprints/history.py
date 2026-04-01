@@ -111,11 +111,30 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
     return candidate
 
 
+_DEFAULT_PER_PAGE = 24
+
+
 @history_bp.route("/history")
 def history_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
-    images = _list_history_images(history_dir)
+    all_images = _list_history_images(history_dir)
+    total = len(all_images)
+
+    # Pagination
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per_page = max(1, min(120, int(request.args.get("per_page", _DEFAULT_PER_PAGE))))
+    except (ValueError, TypeError):
+        per_page = _DEFAULT_PER_PAGE
+
+    start = (page - 1) * per_page
+    images = all_images[start : start + per_page]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
     # Pull latest timing metrics if available
     try:
         ri = device_config.get_refresh_info()
@@ -162,7 +181,14 @@ def history_page():
     }
 
     return render_template(
-        "history.html", images=images, storage=storage_ctx, metrics=metrics
+        "history.html",
+        images=images,
+        storage=storage_ctx,
+        metrics=metrics,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        per_page=per_page,
     )
 
 
