@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for blueprints/main.py — additional coverage."""
+
 import os
 import time
 from unittest.mock import MagicMock, patch

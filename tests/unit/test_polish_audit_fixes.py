@@ -330,7 +330,9 @@ def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch
     client.application.config["DEVICE_CONFIG"].write_config()
 
     r1 = client.post("/display-next")
-    assert r1.status_code == 200, f"Expected first request to succeed, got {r1.status_code}"
+    assert (
+        r1.status_code == 200
+    ), f"Expected first request to succeed, got {r1.status_code}"
 
     # Second immediate request — expect 429
     r2 = client.post("/display-next")
@@ -363,7 +365,9 @@ def test_display_next_cooldown_resets(client, monkeypatch):
 
     _reset_display_next_cooldown()
     r2 = client.post("/display-next")
-    assert r2.status_code == 200, "After cooldown reset, request should be allowed again"
+    assert (
+        r2.status_code == 200
+    ), "After cooldown reset, request should be allowed again"
 
 
 def test_display_next_cooldown_constant_exists():
