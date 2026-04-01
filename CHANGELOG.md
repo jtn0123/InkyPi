@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v0.3.8 (2026-04-01)
+
+### Bug Fixes
+
+- Address CodeRabbit review feedback
+  ([`2addb23`](https://github.com/jtn0123/InkyPi/commit/2addb23ce03655f71dd3eb8c99a0ef979ce37194))
+
+- Validate keepExisting as boolean in API key save (apikeys.py) - Validate plugin_id not None in
+  add_plugin (playlist.py) - Reject NaN/Infinity in image settings validation (_config.py) - Fix
+  TOCTOU race in shutdown cooldown with lock-based reservation (_system.py) - Use per-test tmp_path
+  for env files in tests (isolation) - Strengthen error assertions (explicit status codes, non-empty
+  error) - Remove unused fixture args, guard against empty plugin lists - Add NaN/Infinity rejection
+  tests
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden history and plugin route validation
+  ([`4b5e49a`](https://github.com/jtn0123/InkyPi/commit/4b5e49a6253598031fb09295e3d59d4987d68359))
+
+- Harden input validation across 8 endpoints (JTN-134–142)
+  ([`ddaf3eb`](https://github.com/jtn0123/InkyPi/commit/ddaf3eb5ed205913e4724022c374551ef4e80558))
+
+Replace 500 internal errors with proper 400/422 validation responses for malformed client input, fix
+  log injection, prevent exception text leaks, correct shutdown cooldown logic, and fix plugin
+  cleanup type bug.
+
+Closes JTN-134, JTN-136, JTN-137, JTN-138, JTN-139, JTN-140, JTN-141, JTN-142
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Format validation coverage files
+  ([`262eb91`](https://github.com/jtn0123/InkyPi/commit/262eb91622fff9d9e2a1976e998793fcaf846ec3))
+
+- Remove duplicate plugin order coverage
+  ([`9bcdce4`](https://github.com/jtn0123/InkyPi/commit/9bcdce44021ab16628ec8436b5d27203324c1ff7))
+
+
 ## v0.3.7 (2026-04-01)
 
 ### Bug Fixes
