@@ -27,7 +27,7 @@
             document.getElementById('padImage').checked = pluginSettings.padImage == 'false';
             document.getElementById('backgroundColor').value = pluginSettings.backgroundColor;
 
-            backgroundOption = pluginSettings.backgroundOption;
+            backgroundOption = pluginSettings.backgroundOption || 'blur';
         }
         document.querySelector(`input[name="backgroundOption"][value="${backgroundOption}"]`).checked = true;
     });

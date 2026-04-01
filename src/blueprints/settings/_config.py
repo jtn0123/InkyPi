@@ -107,7 +107,8 @@ def _include_export_keys() -> bool:
     return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
-@_mod.settings_bp.route("/settings/export", methods=["GET", "POST"])
+@_mod.settings_bp.route("/settings/export", methods=["GET"])
+@_mod.settings_bp.route("/settings/export", methods=["POST"], endpoint="export_settings_post")
 def export_settings():
     try:
         include_keys = _include_export_keys()
