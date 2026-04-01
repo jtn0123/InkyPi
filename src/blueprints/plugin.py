@@ -479,7 +479,7 @@ def _find_history_image(
         history_dir: str = str(device_config.history_image_dir)
         if not os.path.isdir(history_dir):
             return None
-        for name in sorted(os.listdir(history_dir)):
+        for name in sorted(os.listdir(history_dir), reverse=True):
             if not name.endswith(".json"):
                 continue
             json_path = os.path.join(history_dir, name)
