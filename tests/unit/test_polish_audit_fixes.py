@@ -315,11 +315,24 @@ def test_display_next_cooldown_returns_429_on_second_request(client, monkeypatch
 
     _reset_display_next_cooldown()
 
-    # First request — expect 200 or 400 (no playlist), not 429
+    pm = client.application.config["DEVICE_CONFIG"].get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    client.application.config["DEVICE_CONFIG"].write_config()
+
     r1 = client.post("/display-next")
     assert (
-        r1.status_code != 429
-    ), f"First request should not be rate-limited, got {r1.status_code}"
+        r1.status_code == 200
+    ), f"Expected first request to succeed, got {r1.status_code}"
 
     # Second immediate request — expect 429
     r2 = client.post("/display-next")
@@ -332,14 +345,28 @@ def test_display_next_cooldown_resets(client, monkeypatch):
     """After _reset_display_next_cooldown, /display-next is allowed again."""
     from blueprints.main import _reset_display_next_cooldown
 
+    pm = client.application.config["DEVICE_CONFIG"].get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    client.application.config["DEVICE_CONFIG"].write_config()
+
     _reset_display_next_cooldown()
     r1 = client.post("/display-next")
-    assert r1.status_code != 429
+    assert r1.status_code == 200
 
     _reset_display_next_cooldown()
     r2 = client.post("/display-next")
     assert (
-        r2.status_code != 429
+        r2.status_code == 200
     ), "After cooldown reset, request should be allowed again"
 
 
@@ -370,6 +397,15 @@ def test_plugin_order_rejects_unknown_ids(client):
     assert (
         "unknown" in error_text or "invalid" in error_text
     ), f"Response should mention unknown/invalid IDs, got: {data}"
+
+
+def test_plugin_order_rejects_duplicate_ids(client):
+    plugins = client.application.config["DEVICE_CONFIG"].get_plugins()
+    assert plugins, "No plugins registered in dev config"
+    plugin_id = plugins[0]["id"]
+    response = client.post("/api/plugin_order", json={"order": [plugin_id, plugin_id]})
+    assert response.status_code == 400
+    assert "duplicate" in response.get_json()["error"].lower()
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for blueprints/main.py — additional coverage."""
+
 import os
 import time
 from unittest.mock import MagicMock, patch
@@ -100,41 +101,80 @@ def test_display_next_first_request_not_rate_limited(client, device_config_dev):
 def test_display_next_second_request_within_cooldown_returns_429(
     client, device_config_dev
 ):
-    """Second immediate POST within cooldown returns 429."""
+    """Second immediate successful POST within cooldown returns 429."""
     from blueprints.main import _reset_display_next_cooldown
 
     _reset_display_next_cooldown()
-    client.post("/display-next")
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
     resp = client.post("/display-next")
-    assert resp.status_code == 429
-    body = resp.get_json()
+    assert resp.status_code == 200
+
+    blocked = client.post("/display-next")
+    assert blocked.status_code == 429
+    body = blocked.get_json()
     assert body["success"] is False
     assert "wait" in body["error"].lower()
 
 
-def test_display_next_after_cooldown_expires_succeeds(
+def test_display_next_failed_requests_do_not_arm_cooldown(client):
+    from blueprints.main import _reset_display_next_cooldown
+
+    _reset_display_next_cooldown()
+    first = client.post("/display-next")
+    assert first.status_code == 400
+
+    second = client.post("/display-next")
+    assert second.status_code == 400
+
+
+def test_display_next_after_successful_request_respects_cooldown(
     client, device_config_dev, monkeypatch
 ):
-    """After the cooldown period elapses, the endpoint should accept requests again."""
+    """After the cooldown period elapses, the endpoint should accept successful requests again."""
     from blueprints.main import _reset_display_next_cooldown
 
     _reset_display_next_cooldown()
 
-    # First request at t=1000
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
     fake_time = [1000.0]
     monkeypatch.setattr(time, "monotonic", lambda: fake_time[0])
-    resp1 = client.post("/display-next")
-    assert resp1.status_code == 400  # no playlist, but not 429
 
-    # Second request still within cooldown (t=1005, cooldown=10s)
+    resp1 = client.post("/display-next")
+    assert resp1.status_code == 200
+
     fake_time[0] = 1005.0
     resp2 = client.post("/display-next")
     assert resp2.status_code == 429
 
-    # Third request after cooldown expires (t=1011)
     fake_time[0] = 1011.0
     resp3 = client.post("/display-next")
-    assert resp3.status_code == 400  # no playlist, but not 429
+    assert resp3.status_code == 200
 
 
 def test_display_next_exception(client, flask_app, device_config_dev):
@@ -181,3 +221,20 @@ def test_plugin_order_non_list(client):
 def test_plugin_order_non_string_items(client):
     resp = client.post("/api/plugin_order", json={"order": [1, 2, 3]})
     assert resp.status_code == 400
+
+
+def test_plugin_order_duplicate_items(client, device_config_dev):
+    plugins = device_config_dev.get_plugins()
+    assert plugins, "No plugins registered in dev config"
+    plugin_id = plugins[0]["id"]
+    resp = client.post("/api/plugin_order", json={"order": [plugin_id, plugin_id]})
+    assert resp.status_code == 400
+    assert "duplicate" in resp.get_json()["error"].lower()
+
+
+def test_plugin_order_missing_items(client, device_config_dev):
+    plugins = device_config_dev.get_plugins()
+    assert plugins, "No plugins registered in dev config"
+    resp = client.post("/api/plugin_order", json={"order": [plugins[0]["id"]]})
+    assert resp.status_code == 400
+    assert "include every plugin id exactly once" in resp.get_json()["error"].lower()

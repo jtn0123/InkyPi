@@ -85,8 +85,26 @@ def add_plugin():
 
     try:
         plugin_settings = parse_form(request.form)
-        refresh_settings = json.loads(plugin_settings.pop("refresh_settings"))
-        plugin_id = plugin_settings.pop("plugin_id")
+        raw_refresh = plugin_settings.pop("refresh_settings", None)
+        if not raw_refresh or not isinstance(raw_refresh, str):
+            return json_error(
+                "refresh_settings is required",
+                status=400,
+            )
+        try:
+            refresh_settings = json.loads(raw_refresh)
+        except (json.JSONDecodeError, ValueError):
+            return json_error("Invalid JSON in refresh_settings", status=400)
+        if not isinstance(refresh_settings, dict):
+            return json_error("refresh_settings must be a JSON object", status=400)
+        plugin_id = plugin_settings.pop("plugin_id", None)
+        if not plugin_id or not isinstance(plugin_id, str):
+            return json_error(
+                "plugin_id is required",
+                status=422,
+                code="validation_error",
+                details={"field": "plugin_id"},
+            )
 
         playlist = refresh_settings.get("playlist")
         instance_name = refresh_settings.get("instance_name")
@@ -534,7 +552,9 @@ def reorder_plugins():
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        data = request.get_json(force=True, silent=False)
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return json_error("Invalid or missing JSON payload", status=400)
         playlist_name = data.get("playlist_name")
         ordered = data.get("ordered")  # list of {plugin_id, name}
         if not playlist_name or not isinstance(ordered, list):
@@ -564,7 +584,9 @@ def display_next_in_playlist():
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        data = request.get_json(force=True, silent=False)
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return json_error("Invalid or missing JSON payload", status=400)
         playlist_name = data.get("playlist_name")
         if not playlist_name:
             return json_error("playlist_name required", status=400)

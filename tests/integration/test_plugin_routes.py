@@ -227,6 +227,18 @@ def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch)
     assert "An internal error occurred" in resp.get_json().get("error", "")
 
 
+def test_save_plugin_settings_rejects_unknown_plugin_id(client):
+    resp = client.post("/save_plugin_settings", data={"plugin_id": "not_real_plugin"})
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "Plugin 'not_real_plugin' not found"
+
+
+def test_save_plugin_settings_alias_rejects_unknown_plugin_id(client):
+    resp = client.post("/plugin/not_real_plugin/save", data={"title": "Test"})
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "Plugin 'not_real_plugin' not found"
+
+
 def test_delete_plugin_instance_missing(client):
     resp = client.post(
         "/delete_plugin_instance",

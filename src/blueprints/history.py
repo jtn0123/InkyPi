@@ -12,6 +12,7 @@ from flask import (
     request,
     send_from_directory,
 )
+from werkzeug.exceptions import BadRequest
 
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import get_timezone, now_device_tz
@@ -229,7 +230,10 @@ def history_redisplay():
     history_dir = device_config.history_image_dir
 
     try:
-        data = request.get_json(force=True)
+        try:
+            data = request.get_json(force=True)
+        except BadRequest:
+            return json_error("Invalid JSON payload", status=400)
         if not isinstance(data, dict):
             return json_error("Request body must be a JSON object", status=400)
         filename = data.get("filename")
@@ -259,7 +263,10 @@ def history_delete():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
     try:
-        data = request.get_json(force=True)
+        try:
+            data = request.get_json(force=True)
+        except BadRequest:
+            return json_error("Invalid JSON payload", status=400)
         if not isinstance(data, dict):
             return json_error("Request body must be a JSON object", status=400)
         filename = data.get("filename")

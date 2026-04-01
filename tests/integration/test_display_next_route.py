@@ -84,6 +84,10 @@ def test_display_next_no_playlist_returns_error(
     assert body.get("success") is False
     assert body.get("error") == "No active playlist"
 
+    retry = client.post("/display-next")
+    assert retry.status_code == 400
+    assert retry.get_json()["error"] == "No active playlist"
+
 
 @pytest.mark.integration
 def test_display_next_no_plugin_returns_error(
@@ -98,3 +102,7 @@ def test_display_next_no_plugin_returns_error(
     body = resp.get_json()
     assert body.get("success") is False
     assert body.get("error") == "No eligible plugin to display"
+
+    retry = client.post("/display-next")
+    assert retry.status_code == 400
+    assert retry.get_json()["error"] == "No eligible plugin to display"

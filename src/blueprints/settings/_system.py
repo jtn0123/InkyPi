@@ -9,6 +9,11 @@ import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
 
 
+def _sanitize_log_value(value: str, max_len: int = 500) -> str:
+    """Strip control characters from client input to prevent log injection."""
+    return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:max_len]
+
+
 @_mod.settings_bp.route("/settings/client_log", methods=["POST"])
 def client_log():
     """Accept lightweight client logs and emit them to server logs.
@@ -33,6 +38,9 @@ def client_log():
         except Exception:
             extra_str = str(extra)
 
+        level = _sanitize_log_value(level, max_len=20)
+        message = _sanitize_log_value(message)
+        extra_str = _sanitize_log_value(extra_str)
         line = f"client_log | level={level} msg={message} extra={extra_str}"
         if level == "debug":
             _mod.logger.debug(line)
@@ -66,6 +74,7 @@ def shutdown():
                 f"Please wait {remaining}s before requesting another reboot/shutdown",
                 status=429,
             )
+        # Reserve the slot under lock to prevent concurrent requests
         _mod._last_shutdown_time = now
 
     data = request.get_json(silent=True)
@@ -74,6 +83,9 @@ def shutdown():
         and request.content_type
         and "application/json" in request.content_type
     ):
+        # Roll back reservation on input validation failure
+        with _mod._shutdown_lock:
+            _mod._last_shutdown_time = 0.0
         return json_error("Invalid JSON payload", status=400)
     if not isinstance(data, dict):
         data = {}
@@ -84,7 +96,13 @@ def shutdown():
         else:
             _mod.logger.info("Shutdown requested")
             subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
+        # Refresh the cooldown timestamp to the actual success time
+        with _mod._shutdown_lock:
+            _mod._last_shutdown_time = time.monotonic()
         return jsonify({"success": True})
     except subprocess.CalledProcessError as e:
+        # Roll back so the cooldown isn't consumed by a failed attempt
+        with _mod._shutdown_lock:
+            _mod._last_shutdown_time = 0.0
         _mod.logger.exception("Failed to execute shutdown command")
         return json_internal_error("shutdown", details={"error": str(e)})

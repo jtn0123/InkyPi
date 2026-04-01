@@ -13,29 +13,38 @@ from PIL import Image
 def test_display_next_cooldown_blocks_rapid_calls(
     client, device_config_dev, monkeypatch, flask_app
 ):
-    """Second POST within the cooldown window must return 429."""
+    """Second successful POST within the cooldown window must return 429."""
     from blueprints.main import _reset_display_next_cooldown
 
     flask_app.config["REFRESH_TASK"].running = False
 
-    # Ensure cooldown is clear before we start
     _reset_display_next_cooldown()
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
 
-    # First POST — no active playlist so expect 400, not 429
     resp1 = client.post("/display-next")
-    assert resp1.status_code != 429, "First call should not be rate-limited"
+    assert resp1.status_code == 200
 
-    # Second POST immediately — cooldown should block it
     resp2 = client.post("/display-next")
     assert resp2.status_code == 429
     body = resp2.get_json()
     assert body["success"] is False
     assert "wait" in body["error"].lower()
 
-    # Reset and POST again — should pass the rate-limiter (still 400 for no playlist)
     _reset_display_next_cooldown()
     resp3 = client.post("/display-next")
-    assert resp3.status_code != 429
+    assert resp3.status_code == 200
 
 
 def test_display_next_cooldown_reset_allows_retry(
@@ -46,14 +55,27 @@ def test_display_next_cooldown_reset_allows_retry(
 
     flask_app.config["REFRESH_TASK"].running = False
     _reset_display_next_cooldown()
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
 
-    client.post("/display-next")  # arm the cooldown
+    client.post("/display-next")
     resp_blocked = client.post("/display-next")
     assert resp_blocked.status_code == 429
 
     _reset_display_next_cooldown()
     resp_after_reset = client.post("/display-next")
-    assert resp_after_reset.status_code != 429
+    assert resp_after_reset.status_code == 200
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +103,13 @@ def test_plugin_order_non_string_entries_returns_400(client):
     assert "strings" in body["error"].lower()
 
 
-def test_plugin_order_empty_list_returns_200(client):
+def test_plugin_order_empty_list_returns_400(client):
     resp = client.post(
         "/api/plugin_order",
         json={"order": []},
     )
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["success"] is True
+    assert resp.status_code == 400
+    assert "include every plugin id exactly once" in resp.get_json()["error"].lower()
 
 
 def test_plugin_order_non_dict_payload_returns_400(client):
@@ -439,13 +460,29 @@ def test_refresh_alias_behaves_like_display_next(client, device_config_dev, flas
     assert resp.status_code != 429
 
 
-def test_refresh_alias_is_rate_limited_after_first_call(client, flask_app):
-    """Two rapid POSTs to /refresh should trigger the cooldown on the second."""
+def test_refresh_alias_is_rate_limited_after_first_success(
+    client, device_config_dev, flask_app
+):
+    """Two rapid successful POSTs to /refresh should trigger the cooldown on the second."""
     from blueprints.main import _reset_display_next_cooldown
 
     flask_app.config["REFRESH_TASK"].running = False
     _reset_display_next_cooldown()
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock A",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
 
-    client.post("/refresh")
+    first = client.post("/refresh")
+    assert first.status_code == 200
     resp = client.post("/refresh")
     assert resp.status_code == 429

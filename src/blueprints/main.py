@@ -177,11 +177,18 @@ def save_plugin_order():
         return json_error("Order must be a list", status=400)
     if any(not isinstance(item, str) for item in order):
         return json_error("Order entries must be strings", status=400)
-    # Validate plugin IDs exist in the registry
     registered_ids = {p["id"] for p in device_config.get_plugins()}
+    if len(order) != len(set(order)):
+        return json_error("Order must not contain duplicate plugin IDs", status=400)
     invalid_ids = [pid for pid in order if pid not in registered_ids]
     if invalid_ids:
         return json_error(f"Unknown plugin IDs: {', '.join(invalid_ids)}", status=400)
+    missing_ids = registered_ids.difference(order)
+    if missing_ids:
+        return json_error(
+            f"Order must include every plugin ID exactly once; missing: {', '.join(sorted(missing_ids))}",
+            status=400,
+        )
     device_config.set_plugin_order(order)
     return jsonify({"success": True})
 
@@ -237,7 +244,6 @@ def display_next():
             f"Please wait {remaining}s before requesting another display update",
             status=429,
         )
-    _last_display_next_time = now
 
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
@@ -331,6 +337,8 @@ def display_next():
     except Exception:
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)
+
+    _last_display_next_time = now
 
     # Gather metrics from refresh_info if available
     try:

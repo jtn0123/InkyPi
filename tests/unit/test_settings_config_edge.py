@@ -128,7 +128,7 @@ class TestImportEdge:
             data=data,
             content_type="multipart/form-data",
         )
-        assert resp.status_code == 500  # json.loads will raise
+        assert resp.status_code == 400  # malformed JSON → 400 (not 500)
 
     def test_only_env_keys_no_config(self, client, device_config_dev, monkeypatch):
         """Payload with env_keys but no config key still processes env keys."""
@@ -177,13 +177,13 @@ class TestSaveSettingsEdge:
         resp = client.post("/save_settings", data=self._valid_form(interval="1500"))
         assert resp.status_code == 422
 
-    def test_non_numeric_saturation_500(self, client, device_config_dev):
-        """Non-float saturation causes ValueError → 500."""
+    def test_non_numeric_saturation_422(self, client):
+        """Non-float saturation causes validation error → 422."""
         resp = client.post(
             "/save_settings",
             data=self._valid_form(saturation="not-a-number"),
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 422
 
     def test_runtime_error_500(self, client, device_config_dev, monkeypatch):
         """update_config raising RuntimeError → 500."""

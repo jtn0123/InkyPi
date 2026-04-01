@@ -190,6 +190,16 @@ def test_history_redisplay_errors(client):
     assert resp.status_code == 400
 
 
+def test_history_redisplay_invalid_json_returns_400(client):
+    resp = client.post(
+        "/history/redisplay",
+        data="not json",
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Invalid JSON payload"
+
+
 def test_history_redisplay_success(client, device_config_dev):
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
@@ -214,6 +224,16 @@ def test_history_delete_errors(client):
     # Traversal attempt
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400
+
+
+def test_history_delete_invalid_json_returns_400(client):
+    resp = client.post(
+        "/history/delete",
+        data="not json",
+        content_type="application/json",
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "Invalid JSON payload"
 
 
 def test_history_sorting_and_size_formatting(client, device_config_dev):
