@@ -3,9 +3,10 @@
 import time
 
 from flask import current_app, jsonify, request
+from werkzeug.exceptions import BadRequest
 
 import blueprints.settings as _mod
-from utils.http_utils import json_internal_error
+from utils.http_utils import json_error, json_internal_error
 
 
 @_mod.settings_bp.route("/settings/update", methods=["POST"])  # start update
@@ -33,13 +34,20 @@ def start_update():
 
         # Accept optional target tag from JSON body
         target_tag: str | None = None
-        try:
-            body = request.get_json(silent=True) or {}
-            raw = body.get("target_version")
-            if raw and isinstance(raw, str):
-                target_tag = raw.strip()
-        except Exception:
-            pass
+        raw_body = request.get_data(cache=True)
+        if request.is_json and raw_body.strip():
+            try:
+                body = request.get_json(silent=False)
+            except BadRequest:
+                return json_error("Invalid JSON payload", status=400)
+            if not isinstance(body, dict):
+                return json_error("Request body must be a JSON object", status=400)
+        else:
+            body = {}
+
+        raw = body.get("target_version")
+        if raw and isinstance(raw, str):
+            target_tag = raw.strip()
 
         if target_tag and not _mod._TAG_RE.fullmatch(target_tag):
             return (
@@ -63,10 +71,10 @@ def start_update():
                 _mod.logger.exception(
                     "systemd-run failed; falling back to thread runner"
                 )
-                _mod._start_update_fallback_thread(script_path)
+                _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
         else:
             _mod._set_update_state(True, None)
-            _mod._start_update_fallback_thread(script_path)
+            _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
 
         return jsonify(
             {

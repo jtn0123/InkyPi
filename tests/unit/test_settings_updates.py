@@ -175,6 +175,45 @@ class TestStartUpdateEdge:
         finally:
             mod._set_update_state(False, None)
 
+    def test_no_systemd_preserves_target_tag_for_fallback(self, client, monkeypatch):
+        """Fallback runner receives the requested target version."""
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        fallback_mock = MagicMock()
+        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
+        mod._set_update_state(False, None)
+
+        try:
+            resp = client.post("/settings/update", json={"target_version": "v1.2.3"})
+            assert resp.status_code == 200
+            fallback_mock.assert_called_once_with(None, target_tag="v1.2.3")
+        finally:
+            mod._set_update_state(False, None)
+
+    def test_invalid_json_body_returns_400(self, client, monkeypatch):
+        """Malformed JSON should be rejected instead of starting an update."""
+        import blueprints.settings as mod
+
+        fallback_mock = MagicMock()
+        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
+        mod._set_update_state(False, None)
+
+        try:
+            resp = client.post(
+                "/settings/update",
+                data='{"target_version":',
+                content_type="application/json",
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert data["success"] is False
+            assert data["error"] == "Invalid JSON payload"
+            fallback_mock.assert_not_called()
+        finally:
+            mod._set_update_state(False, None)
+
     def test_systemd_run_exception_falls_back(self, client, monkeypatch):
         """If systemd-run raises, falls back to thread runner."""
         import blueprints.settings as mod
@@ -194,5 +233,27 @@ class TestStartUpdateEdge:
             resp = client.post("/settings/update")
             assert resp.status_code == 200
             fallback_mock.assert_called_once()
+        finally:
+            mod._set_update_state(False, None)
+
+    def test_systemd_run_exception_preserves_target_tag(self, client, monkeypatch):
+        """Systemd fallback still receives the requested target version."""
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake.sh")
+        monkeypatch.setattr(
+            mod,
+            "_start_update_via_systemd",
+            MagicMock(side_effect=RuntimeError("systemd fail")),
+        )
+        fallback_mock = MagicMock()
+        monkeypatch.setattr(mod, "_start_update_fallback_thread", fallback_mock)
+        mod._set_update_state(False, None)
+
+        try:
+            resp = client.post("/settings/update", json={"target_version": "v2.0.0"})
+            assert resp.status_code == 200
+            fallback_mock.assert_called_once_with("/fake.sh", target_tag="v2.0.0")
         finally:
             mod._set_update_state(False, None)
