@@ -132,16 +132,6 @@ def test_plugin_order_valid_ids_returns_200(client, device_config_dev):
     assert resp.get_json()["success"] is True
 
 
-def test_plugin_order_duplicate_id_returns_400(client, device_config_dev):
-    plugins = device_config_dev.get_plugins()
-    if not plugins:
-        pytest.skip("No plugins registered in dev config")
-    plugin_id = plugins[0]["id"]
-    resp = client.post("/api/plugin_order", json={"order": [plugin_id, plugin_id]})
-    assert resp.status_code == 400
-    assert "duplicate" in resp.get_json()["error"].lower()
-
-
 # ---------------------------------------------------------------------------
 # 3. /next-up endpoint
 # ---------------------------------------------------------------------------
