@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.3.4 (2026-04-01)
+
+### Bug Fixes
+
+- Address sonar findings
+  ([`cf63147`](https://github.com/jtn0123/InkyPi/commit/cf63147b88ad446d206fb7253cf157de61c6efd6))
+
+### Chores
+
+- Format sonar regression tests
+  ([`72d4b33`](https://github.com/jtn0123/InkyPi/commit/72d4b33655d67c966475a7f407cbf92d39a5414c))
+
+
 ## v0.3.3 (2026-04-01)
 
 ### Bug Fixes
@@ -71,6 +84,16 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
 
 ## v0.3.0 (2026-04-01)
+
+### Bug Fixes
+
+- Ship linear bugfix batch
+  ([`24b7d46`](https://github.com/jtn0123/InkyPi/commit/24b7d46ccf802b64887a44a384d5c0ffcf52f54b))
+
+### Chores
+
+- Format linear bugfix batch
+  ([`8ddc5ad`](https://github.com/jtn0123/InkyPi/commit/8ddc5adebb334cfba50fa683227d87937bb09939))
 
 ### Code Style
 
