@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.3.0 (2026-04-01)
+
+### Code Style
+
+- Fix black formatting in history.py
+  ([`653cfcc`](https://github.com/jtn0123/InkyPi/commit/653cfcc098cfdb9c61e1967d2f570678948ca239))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Fix black formatting in test_history.py
+  ([`9fa27e3`](https://github.com/jtn0123/InkyPi/commit/9fa27e39194d769f9e75fbde4a7adbce5b84ced4))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add server-side pagination to history page (JTN-91)
+  ([`0e6144e`](https://github.com/jtn0123/InkyPi/commit/0e6144ee9bb4797b5280c0c1ae44e92423b4f82a))
+
+History page now paginates at 24 items per page instead of loading all items at once. Adds
+  Previous/Next navigation and page indicator. Keeps lazy-loading on images for additional
+  performance.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add pagination tests for history page
+  ([`c1a87d1`](https://github.com/jtn0123/InkyPi/commit/c1a87d178c6b4c359867dd8f9a0af5a784a2b38f))
+
+Covers multi-page navigation, invalid params, and edge cases to satisfy SonarCloud 80% coverage gate
+  on new code.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.1 (2026-04-01)
 
 ### Bug Fixes
