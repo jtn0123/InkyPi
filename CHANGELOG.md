@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.3.7 (2026-04-01)
+
+### Bug Fixes
+
+- Harden settings update and isolation routes
+  ([`a5945bb`](https://github.com/jtn0123/InkyPi/commit/a5945bb1c8a566d836c8d691b316b22e9c7087a8))
+
+### Testing
+
+- Align settings update flow stubs with fallback args
+  ([`59255c3`](https://github.com/jtn0123/InkyPi/commit/59255c35fdccc9c3a1773edb8a0bd08ecad0bbd0))
+
+- Cover settings update helper paths
+  ([`3d0d6d8`](https://github.com/jtn0123/InkyPi/commit/3d0d6d8e7e2fec7b24c5044bf23220de7339cd9d))
+
+
 ## v0.3.6 (2026-04-01)
 
 ### Code Style
