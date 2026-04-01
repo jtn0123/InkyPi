@@ -1,19 +1,24 @@
+"""RefreshTask — main coordinator for display refresh operations."""
+
 import io
 import logging
-import multiprocessing
 import os
 import queue
 import threading
-import traceback
 from collections import deque
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from time import perf_counter, sleep
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
-from utils.image_utils import compute_image_hash, load_image_from_path
+from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh
+from refresh_task.worker import (
+    _execute_refresh_attempt_worker,
+    _get_mp_context,
+    _remote_exception,
+)
+from utils.image_utils import compute_image_hash
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
@@ -36,90 +41,6 @@ except Exception:
     _sd_notify = None
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ManualUpdateRequest:
-    request_id: str
-    refresh_action: "RefreshAction"
-    done: threading.Event = field(default_factory=threading.Event)
-    metrics: dict | None = None
-    exception: BaseException | None = None
-
-
-def _get_mp_context():
-    import sys
-
-    # forkserver spawns children from a lean server process, reducing memory
-    # on constrained devices like Pi Zero 2W. It requires picklable arguments,
-    # so we only prefer it on Linux where the production target runs.
-    prefer = ("forkserver", "fork") if sys.platform == "linux" else ("fork",)
-    for method in prefer:
-        try:
-            return multiprocessing.get_context(method)
-        except ValueError:
-            continue
-    return multiprocessing.get_context()
-
-
-def _restore_child_config(device_config):
-    from config import Config
-
-    Config.config_file = device_config.config_file
-    Config.current_image_file = device_config.current_image_file
-    Config.processed_image_file = device_config.processed_image_file
-    Config.plugin_image_dir = device_config.plugin_image_dir
-    Config.history_image_dir = device_config.history_image_dir
-    return Config()
-
-
-def _remote_exception(error_type: str, error_message: str) -> BaseException:
-    exc_types = {
-        "RuntimeError": RuntimeError,
-        "ValueError": ValueError,
-        "TimeoutError": TimeoutError,
-        "KeyError": KeyError,
-        "TypeError": TypeError,
-        "FileNotFoundError": FileNotFoundError,
-    }
-    exc_cls = exc_types.get(error_type, RuntimeError)
-    return exc_cls(error_message)
-
-
-def _execute_refresh_attempt_worker(
-    result_queue,
-    plugin_config: dict,
-    refresh_action,
-    device_config,
-    current_dt: datetime,
-):
-    try:
-        child_config = _restore_child_config(device_config)
-        plugin = get_plugin_instance(plugin_config)
-        image = refresh_action.execute(plugin, child_config, current_dt)
-        plugin_meta = None
-        if hasattr(plugin, "get_latest_metadata"):
-            plugin_meta = plugin.get_latest_metadata()
-        if image is None:
-            raise RuntimeError("Plugin returned None image")
-        image_bytes = io.BytesIO()
-        image.save(image_bytes, format="PNG")
-        result_queue.put(
-            {
-                "ok": True,
-                "image_bytes": image_bytes.getvalue(),
-                "plugin_meta": plugin_meta,
-            }
-        )
-    except Exception as exc:
-        result_queue.put(
-            {
-                "ok": False,
-                "error_type": exc.__class__.__name__,
-                "error_message": str(exc),
-                "traceback": traceback.format_exc(),
-            }
-        )
 
 
 class RefreshTask:
@@ -972,104 +893,3 @@ class RefreshTask:
             metrics["load_avg_1_5_15"] = None
 
         logger.info(f"System Stats: {metrics}")
-
-
-class RefreshAction:
-    """Base class for a refresh action.
-
-    Subclasses must implement :meth:`execute` to perform the refresh operation
-    and return the resulting image.
-    """
-
-    def execute(self, plugin, device_config, current_dt):
-        """Execute the refresh operation and return the updated image."""
-        raise NotImplementedError("Subclasses must implement the execute method.")
-
-    def get_refresh_info(self):
-        """Return refresh metadata as a dictionary."""
-        raise NotImplementedError(
-            "Subclasses must implement the get_refresh_info method."
-        )
-
-    def get_plugin_id(self):
-        """Return the plugin ID associated with this refresh."""
-        raise NotImplementedError("Subclasses must implement the get_plugin_id method.")
-
-
-class ManualRefresh(RefreshAction):
-    """Performs a manual refresh based on a plugin's ID and its associated settings.
-
-    Attributes:
-        plugin_id (str): The ID of the plugin to refresh.
-        plugin_settings (dict): The settings for the manual refresh.
-    """
-
-    def __init__(self, plugin_id: str, plugin_settings: dict):
-        self.plugin_id = plugin_id
-        self.plugin_settings = plugin_settings
-
-    def execute(self, plugin, device_config, current_dt: datetime):
-        """Performs a manual refresh using the stored plugin ID and settings."""
-        return plugin.generate_image(self.plugin_settings, device_config)
-
-    def get_refresh_info(self):
-        """Return refresh metadata as a dictionary."""
-        return {"refresh_type": "Manual Update", "plugin_id": self.plugin_id}
-
-    def get_plugin_id(self):
-        """Return the plugin ID associated with this refresh."""
-        return self.plugin_id
-
-
-class PlaylistRefresh(RefreshAction):
-    """Performs a refresh using a plugin instance within a playlist context.
-
-    Attributes:
-        playlist: The playlist object associated with the refresh.
-        plugin_instance: The plugin instance to refresh.
-    """
-
-    def __init__(self, playlist, plugin_instance, force=False):
-        self.playlist = playlist
-        self.plugin_instance = plugin_instance
-        self.force = force
-
-    def get_refresh_info(self):
-        """Return refresh metadata as a dictionary."""
-        return {
-            "refresh_type": "Playlist",
-            "playlist": self.playlist.name,
-            "plugin_id": self.plugin_instance.plugin_id,
-            "plugin_instance": self.plugin_instance.name,
-        }
-
-    def get_plugin_id(self):
-        """Return the plugin ID associated with this refresh."""
-        return self.plugin_instance.plugin_id
-
-    def execute(self, plugin, device_config, current_dt: datetime):
-        """Performs a refresh for the specified plugin instance within its playlist context."""
-        # Determine the file path for the plugin's image
-        plugin_image_path = os.path.join(
-            device_config.plugin_image_dir, self.plugin_instance.get_image_path()
-        )
-
-        # Check if a refresh is needed based on the plugin instance's criteria
-        if self.plugin_instance.should_refresh(current_dt) or self.force:
-            logger.info(
-                f"Refreshing plugin instance. | plugin_instance: '{self.plugin_instance.name}'"
-            )
-            # Generate a new image
-            image = plugin.generate_image(self.plugin_instance.settings, device_config)
-            image.save(plugin_image_path)
-            self.plugin_instance.latest_refresh_time = current_dt.isoformat()
-        else:
-            logger.info(
-                f"Not time to refresh plugin instance, using latest image. | plugin_instance: {self.plugin_instance.name}."
-            )
-            # Load the existing image from disk using standardized helper
-            image = load_image_from_path(plugin_image_path)
-            if image is None:
-                raise RuntimeError("Failed to load existing plugin image from disk")
-
-        return image

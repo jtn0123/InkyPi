@@ -3687,6 +3687,19 @@ textarea:focus-visible {
   font-size: 0.9rem;
 }
 
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 0;
+}
+
+.pagination-info {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
 /* Enhanced skeleton loader system */
 .skeleton,
 .img-skeleton,
