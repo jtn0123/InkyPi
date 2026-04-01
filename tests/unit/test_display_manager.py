@@ -162,7 +162,9 @@ def test_display_manager_writes_history_sidecar(device_config_dev):
     assert "refresh_time" in payload
 
 
-def test_display_manager_history_uses_device_timezone(device_config_dev, monkeypatch):
+def test_display_manager_history_uses_device_timezone(
+    device_config_dev, monkeypatch, tmp_path
+):
     device_config_dev.update_value("display_type", "mock")
     import json
     from pathlib import Path
@@ -170,6 +172,7 @@ def test_display_manager_history_uses_device_timezone(device_config_dev, monkeyp
     import display.display_manager as dm_mod
     from display.display_manager import DisplayManager
 
+    device_config_dev.history_image_dir = str(tmp_path / "history_tz")
     frozen_now = datetime(2026, 3, 31, 22, 45, 12, tzinfo=UTC)
     monkeypatch.setattr(dm_mod, "now_device_tz", lambda _config: frozen_now)
 

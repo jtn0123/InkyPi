@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Template structure snapshot tests."""
+import re
 from pathlib import Path
 
 import pytest
@@ -127,5 +128,7 @@ def test_image_plugin_background_fill_markup_is_accessible(template_path):
     assert "Background Fill" in content
     assert "<fieldset" in content
     assert "<legend" in content
-    assert 'name="backgroundOption" value="blur" checked' in content
+    assert 'name="backgroundOption"' in content
+    assert 'value="blur"' in content
+    assert re.search(r'<input[^>]*value="blur"[^>]*checked', content)
     assert "Solid Color" in content

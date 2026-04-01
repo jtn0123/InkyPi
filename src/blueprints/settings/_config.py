@@ -104,7 +104,7 @@ def _include_export_keys() -> bool:
     if isinstance(value, bool):
         return value
 
-    return str(value or "").strip().lower() in ("1", "true", "yes")
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
 @_mod.settings_bp.route("/settings/export", methods=["GET", "POST"])

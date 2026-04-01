@@ -102,6 +102,10 @@ class DisplayManager:
             try:
                 png_files = sorted(
                     (f for f in os.listdir(history_dir) if f.endswith(".png")),
+                    key=lambda name: (
+                        os.path.getmtime(os.path.join(history_dir, name)),
+                        name,
+                    ),
                 )
                 self._history_count_estimate = len(png_files)
                 excess = len(png_files) - self.HISTORY_MAX_ENTRIES
