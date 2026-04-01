@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.3.1 (2026-04-01)
+
+### Bug Fixes
+
+- Apply Black formatting to test_js_api_contracts.py
+  ([`952f79b`](https://github.com/jtn0123/InkyPi/commit/952f79bf4a87c2a2a26ba83cfae806f1e4af3f5d))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden playlist UI edge cases
+  ([`c6970dd`](https://github.com/jtn0123/InkyPi/commit/c6970dd43f05e48513a905d688a7c70e64762749))
+
+### Refactoring
+
+- Split refresh_task.py into package (JTN-73)
+  ([`a073a70`](https://github.com/jtn0123/InkyPi/commit/a073a70a41e6f16707e6c86f67e73bff71c55ceb))
+
+Convert src/refresh_task.py (1,075 lines) into src/refresh_task/ package:
+
+- __init__.py: re-exports all public API for zero-breakage imports - task.py: RefreshTask class
+  (main coordinator, ~850 lines) - worker.py: subprocess helpers (_get_mp_context,
+  _restore_child_config, _remote_exception, _execute_refresh_attempt_worker, ~85 lines) -
+  actions.py: RefreshAction, ManualRefresh, PlaylistRefresh, ManualUpdateRequest (~125 lines)
+
+Updated 11 test files to patch correct submodule paths. Updated coverage_gate.py threshold key.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.0 (2026-04-01)
 
 ### Code Style
