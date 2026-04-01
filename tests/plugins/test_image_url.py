@@ -1,27 +1,9 @@
-# pyright: reportMissingImports=false
-from io import BytesIO
-
-from PIL import Image
-
-
 def test_image_url_happy(monkeypatch, device_config_dev):
     from plugins.image_url.image_url import ImageURL
 
-    class Resp:
-        def __init__(self, content):
-            self.content = content
-
-        def raise_for_status(self):
-            pass
-
-    def fake_get(url, timeout=None):
-        buf = BytesIO()
-        Image.new("RGB", (10, 10), "white").save(buf, format="PNG")
-        return Resp(buf.getvalue())
-
-    mock_session = type("S", (), {"get": staticmethod(fake_get)})()
     monkeypatch.setattr(
-        "plugins.image_url.image_url.get_http_session", lambda: mock_session
+        "plugins.image_url.image_url.fetch_and_resize_remote_image",
+        lambda *args, **kwargs: object(),
     )
 
     img = ImageURL({"id": "image_url"}).generate_image(

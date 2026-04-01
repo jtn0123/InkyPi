@@ -10,13 +10,13 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 
-import requests as _requests
 from flask import (
     Blueprint,
     current_app,
 )
 
 from utils.progress_events import get_progress_bus
+from utils.http_utils import http_get
 from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
@@ -472,10 +472,11 @@ def _check_latest_version() -> str | None:
     ):
         return _VERSION_CACHE["latest"]  # type: ignore[return-value]
     try:
-        resp = _requests.get(
+        resp = http_get(
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
+            use_cache=False,
         )
         resp.raise_for_status()
         data = resp.json()
