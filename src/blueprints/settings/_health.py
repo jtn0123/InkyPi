@@ -2,7 +2,7 @@
 
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from flask import Response, current_app, jsonify, request, stream_with_context
@@ -15,7 +15,7 @@ from utils.progress_events import get_progress_bus, to_sse
 def _filter_health_by_window(health, window_min):
     if not isinstance(health, dict) or window_min <= 0:
         return health
-    cutoff = datetime.now() - timedelta(minutes=window_min)
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_min)
     filtered = {}
     for plugin_id, item in health.items():
         last_seen = item.get("last_seen") if isinstance(item, dict) else None
@@ -27,6 +27,8 @@ def _filter_health_by_window(health, window_min):
         except Exception:
             filtered[plugin_id] = item
             continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
         if dt >= cutoff:
             filtered[plugin_id] = item
     return filtered

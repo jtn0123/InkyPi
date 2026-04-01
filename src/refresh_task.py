@@ -478,6 +478,7 @@ class RefreshTask:
         stage_t1 = perf_counter()
         display_duration_ms = None
         preprocess_ms = None
+        display_driver = None
         try:
             display_metrics = self.display_manager.display_image(
                 image,

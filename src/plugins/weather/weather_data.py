@@ -100,7 +100,7 @@ def parse_timezone(weatherdata):
 
 _WEATHER_CODE_TO_ICON = {
     0: "01d",
-    1: "022d",
+    1: "02d",
     2: "02d",
     3: "04d",
     51: "51d",
@@ -356,7 +356,8 @@ def _format_owm_visibility(visibility_raw):
 
 def _format_owm_aqi(aqi):
     if aqi is not None:
-        return _AQI_SCALE[int(aqi) - 1]
+        idx = max(0, min(int(aqi) - 1, len(_AQI_SCALE) - 1))
+        return _AQI_SCALE[idx]
     return ""
 
 

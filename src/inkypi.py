@@ -279,7 +279,6 @@ def _register_error_handlers(app: Flask) -> None:
 
 _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
-_MUTATE_REQUESTS: dict[str, deque] = defaultdict(deque)
 _MUTATE_WINDOW = 60  # seconds
 _MUTATE_MAX = 60  # requests per IP per window
 _RATE_EXEMPT = frozenset({"/healthz", "/readyz"})
@@ -390,6 +389,8 @@ def _setup_csrf_protection(app: Flask) -> None:
 
 
 def _setup_rate_limiting(app: Flask) -> None:
+    mutate_requests: dict[str, deque] = defaultdict(deque)
+
     @app.before_request
     def _rate_limit_mutations():
         if request.method in _CSRF_SAFE_METHODS:
@@ -400,14 +401,14 @@ def _setup_rate_limiting(app: Flask) -> None:
 
         addr = request.remote_addr or "unknown"
         now = _time.monotonic()
-        dq = _MUTATE_REQUESTS[addr]
+        dq = mutate_requests[addr]
         while dq and dq[0] < now - _MUTATE_WINDOW:
             dq.popleft()
         if not dq:
-            _MUTATE_REQUESTS.pop(addr, None)
+            mutate_requests.pop(addr, None)
         if len(dq) >= _MUTATE_MAX:
             return json_error("Rate limit exceeded — try again shortly", status=429)
-        _MUTATE_REQUESTS[addr].append(now)
+        mutate_requests[addr].append(now)
 
 
 def _setup_security_headers(app: Flask) -> None:
