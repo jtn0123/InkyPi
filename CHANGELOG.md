@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.3.2 (2026-04-01)
+
+### Bug Fixes
+
+- Harden backend issue handling for JTN-109 JTN-111 JTN-112
+  ([`57e717d`](https://github.com/jtn0123/InkyPi/commit/57e717dfd0f0a9c2382be3e6a8878a1cd4e7bb03))
+
+
 ## v0.3.1 (2026-04-01)
 
 ### Bug Fixes
