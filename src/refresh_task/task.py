@@ -6,7 +6,7 @@ import os
 import queue
 import threading
 from collections import deque
-from datetime import datetime
+from datetime import UTC, datetime
 from time import perf_counter, sleep
 from uuid import uuid4
 
@@ -778,7 +778,7 @@ class RefreshTask:
         metrics: dict | None,
         error: str | None,
     ) -> None:
-        now_iso = datetime.now().isoformat()
+        now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
         entry = self.plugin_health.get(plugin_id, {})
         entry.setdefault("success_count", 0)
         entry.setdefault("failure_count", 0)

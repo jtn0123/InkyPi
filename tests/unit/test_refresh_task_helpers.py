@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PIL import Image
 
 
@@ -165,6 +167,7 @@ def test_update_plugin_health_tracks_retained_display(device_config_dev):
     snapshot = task.get_health_snapshot()
     assert snapshot["dummy"]["retained_display"] is True
     assert snapshot["dummy"]["timeout_count"] == 1
+    assert datetime.fromisoformat(snapshot["dummy"]["last_seen"]).tzinfo is not None
 
 
 def test_stale_display_path_prefers_processed_image(device_config_dev, tmp_path):

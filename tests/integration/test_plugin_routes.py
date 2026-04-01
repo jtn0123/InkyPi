@@ -7,6 +7,14 @@ def test_plugin_page_not_found(client):
     assert b"not found" in resp.data.lower()
 
 
+def test_plugin_page_sanitizes_missing_instance_name(client):
+    resp = client.get("/plugin/ai_text?instance=%3Cscript%3Ealert(1)%3C%2Fscript%3E")
+    assert resp.status_code == 404
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
+
+
 # Skip this test - the exception handling is already covered by existing tests
 
 
@@ -84,6 +92,17 @@ def test_update_plugin_instance_plugin_not_found(client):
     assert "Plugin instance: test does not exist" in resp.get_json().get("error", "")
 
 
+def test_update_plugin_instance_sanitizes_missing_instance_name(client):
+    resp = client.put(
+        "/update_plugin_instance/%3Cscript%3Ealert(1)%3E",
+        data={"plugin_id": "ai_text"},
+    )
+    assert resp.status_code == 404
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&gt;" in error
+
+
 def test_update_plugin_instance_api_error_handling(client, flask_app, monkeypatch):
     from utils.http_utils import APIError
 
@@ -139,6 +158,21 @@ def test_display_plugin_instance_plugin_not_found(client):
     )
     assert resp.status_code == 400
     assert "Plugin instance 'nonexistent' not found" in resp.get_json().get("error", "")
+
+
+def test_display_plugin_instance_sanitizes_missing_instance_name(client):
+    resp = client.post(
+        "/display_plugin_instance",
+        json={
+            "playlist_name": "Default",
+            "plugin_id": "ai_text",
+            "plugin_instance": "<script>alert(1)</script>",
+        },
+    )
+    assert resp.status_code == 400
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
 
 
 def test_display_plugin_instance_exception_handling(client, flask_app, monkeypatch):
