@@ -2,8 +2,7 @@ import json
 import logging
 import os
 import shutil
-from datetime import UTC
-from datetime import datetime
+from datetime import UTC, datetime
 
 from flask import (
     Blueprint,

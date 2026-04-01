@@ -154,9 +154,7 @@ class AIImage(BasePlugin):
                     logger.info(f"Randomized prompt: '{text_prompt}'")
 
                 logger.info(f"Generating image with {image_model}...")
-                image = self.fetch_image_google(
-                    google_client, text_prompt, image_model
-                )
+                image = self.fetch_image_google(google_client, text_prompt, image_model)
             else:
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
                 if not api_key:

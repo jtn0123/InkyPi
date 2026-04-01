@@ -3,7 +3,6 @@
 
 from pathlib import Path
 
-
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
 
 
@@ -15,8 +14,8 @@ def test_history_page_script_handles_escape_for_open_modals():
     content = _read_script("history_page.js")
 
     assert 'event.key !== "Escape"' in content
-    assert 'deleteHistoryModal' in content
-    assert 'clearHistoryModal' in content
+    assert "deleteHistoryModal" in content
+    assert "clearHistoryModal" in content
 
 
 def test_playlist_script_handles_escape_for_playlist_modals():

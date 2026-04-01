@@ -319,8 +319,12 @@ def _get_update_script_path() -> str | None:
 
     def add_install_candidates(base_dir: str) -> None:
         install_dir = os.path.join(base_dir, "install")
-        for script_name in UPDATE_SCRIPT_NAMES:
-            candidates.append(os.path.join(install_dir, script_name))
+        candidates.extend(
+            [
+                os.path.join(install_dir, script_name)
+                for script_name in UPDATE_SCRIPT_NAMES
+            ]
+        )
 
     # Resolve the real repo root by following the src symlink (production layout)
     if project_dir:
@@ -334,8 +338,9 @@ def _get_update_script_path() -> str | None:
     # Repo-relative path (this file: src/blueprints/settings/__init__.py → repo_root/install/)
     here = os.path.dirname(os.path.abspath(__file__))
     repo_install = os.path.abspath(os.path.join(here, "..", "..", "..", "install"))
-    for script_name in UPDATE_SCRIPT_NAMES:
-        candidates.append(os.path.join(repo_install, script_name))
+    candidates.extend(
+        [os.path.join(repo_install, script_name) for script_name in UPDATE_SCRIPT_NAMES]
+    )
 
     for path in candidates:
         if os.path.isfile(path):

@@ -18,7 +18,9 @@ from utils.image_utils import pad_image_blur
 logger = logging.getLogger(__name__)
 
 
-def _resolve_background_color(color_value: str | None, mode: str) -> tuple[int, ...] | int:
+def _resolve_background_color(
+    color_value: str | None, mode: str
+) -> tuple[int, ...] | int:
     """Return a safe background color, falling back to white on invalid input."""
     try:
         return ImageColor.getcolor(color_value or "#ffffff", mode)

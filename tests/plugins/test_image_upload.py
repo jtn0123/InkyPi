@@ -342,7 +342,9 @@ def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev
         assert result is not None
 
 
-def test_image_upload_invalid_background_color_falls_back(monkeypatch, device_config_dev):
+def test_image_upload_invalid_background_color_falls_back(
+    monkeypatch, device_config_dev
+):
     import tempfile
 
     from plugins.image_upload.image_upload import ImageUpload
