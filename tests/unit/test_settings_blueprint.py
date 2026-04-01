@@ -1087,6 +1087,12 @@ class TestHelpers:
         # Should default to 24h ago
         assert abs(result - (time.time() - 24 * 3600)) < 2
 
+    def test_window_since_seconds_invalid_defaults_to_24h(self):
+        from blueprints.settings import _window_since_seconds
+
+        result = _window_since_seconds("abch")
+        assert abs(result - (time.time() - 24 * 3600)) < 2
+
     def test_pct_empty(self):
         from blueprints.settings import _pct
 

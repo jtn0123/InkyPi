@@ -16,6 +16,7 @@ from model import Playlist
 from refresh_task import PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import json_error, json_internal_error, json_success
+from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.time_utils import calculate_seconds, now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ _PLAYLIST_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
 def _validate_playlist_name(name):
     """Validate playlist name format. Returns (cleaned_name, error_response) tuple."""
     if not name or not name.strip():
-        return None, json_error("Playlist name is required", status=400)
+        return None, json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
     name = name.strip()
     if len(name) > _PLAYLIST_NAME_MAX_LEN:
         return None, json_error(
@@ -84,7 +85,7 @@ def add_plugin():
         instance_name = refresh_settings.get("instance_name")
         if not playlist:
             return json_error(
-                "Playlist name is required",
+                PLAYLIST_NAME_REQUIRED_ERROR,
                 status=422,
                 code="validation_error",
                 details={"field": "playlist"},
@@ -483,7 +484,7 @@ def delete_playlist(playlist_name):
     playlist_manager = device_config.get_playlist_manager()
 
     if not playlist_name:
-        return json_error("Playlist name is required", status=400)
+        return json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:

@@ -6,12 +6,13 @@ from flask import jsonify, request
 
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error
+from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 
 @_mod.settings_bp.route("/api/benchmarks/summary")
 def benchmarks_summary():
     if not _mod._benchmarks_enabled():
-        return json_error("Benchmarks API disabled", status=404)
+        return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
     try:
         since = _mod._window_since_seconds(request.args.get("window", "24h"))
@@ -65,7 +66,7 @@ def benchmarks_summary():
 @_mod.settings_bp.route("/api/benchmarks/refreshes")
 def benchmarks_refreshes():
     if not _mod._benchmarks_enabled():
-        return json_error("Benchmarks API disabled", status=404)
+        return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
     try:
         limit = max(1, min(200, int(request.args.get("limit", "50"))))
@@ -116,7 +117,7 @@ def benchmarks_refreshes():
 @_mod.settings_bp.route("/api/benchmarks/plugins")
 def benchmarks_plugins():
     if not _mod._benchmarks_enabled():
-        return json_error("Benchmarks API disabled", status=404)
+        return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     conn = None
     try:
         since = _mod._window_since_seconds(request.args.get("window", "24h"))
@@ -170,7 +171,7 @@ def benchmarks_plugins():
 @_mod.settings_bp.route("/api/benchmarks/stages")
 def benchmarks_stages():
     if not _mod._benchmarks_enabled():
-        return json_error("Benchmarks API disabled", status=404)
+        return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
     refresh_id = request.args.get("refresh_id")
     if not refresh_id:
         return json_error(

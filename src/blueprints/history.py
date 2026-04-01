@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+from datetime import UTC
 from datetime import datetime
 
 from flask import (
@@ -19,6 +20,19 @@ from utils.time_utils import get_timezone, now_device_tz
 logger = logging.getLogger(__name__)
 
 history_bp = Blueprint("history", __name__)
+
+
+def _timestamp_from_history_filename(filename: str) -> float:
+    """Extract an epoch timestamp from display_YYYYMMDD_HHMMSS-style filenames."""
+    stem, _ext = os.path.splitext(filename)
+    parts = stem.split("_")
+    if len(parts) < 3:
+        return 0.0
+    try:
+        dt = datetime.strptime(f"{parts[-2]}_{parts[-1]}", "%Y%m%d_%H%M%S")
+    except ValueError:
+        return 0.0
+    return dt.replace(tzinfo=UTC).timestamp()
 
 
 def _format_size(num_bytes: int) -> str:
@@ -53,7 +67,11 @@ def _list_history_images(history_dir: str) -> list[dict]:
             return 0.0
 
     files.sort(
-        key=lambda f: (_safe_mtime(os.path.join(history_dir, f)), f),
+        key=lambda f: (
+            _safe_mtime(os.path.join(history_dir, f)),
+            _timestamp_from_history_filename(f),
+            f,
+        ),
         reverse=True,
     )
     result: list[dict] = []

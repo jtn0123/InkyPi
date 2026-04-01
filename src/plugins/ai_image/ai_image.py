@@ -155,7 +155,7 @@ class AIImage(BasePlugin):
 
                 logger.info(f"Generating image with {image_model}...")
                 image = self.fetch_image_google(
-                    google_client, text_prompt, image_model, orientation
+                    google_client, text_prompt, image_model
                 )
             else:
                 api_key = device_config.load_env_key("OPEN_AI_SECRET")
@@ -236,7 +236,7 @@ class AIImage(BasePlugin):
             img = opened_img.copy()
         return img
 
-    def fetch_image_google(self, client, prompt, model, orientation):
+    def fetch_image_google(self, client, prompt, model):
         """Fetch image from Google Imagen API."""
         from google.genai import types
 

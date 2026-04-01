@@ -18,6 +18,15 @@ from utils.image_utils import pad_image_blur
 logger = logging.getLogger(__name__)
 
 
+def _resolve_background_color(color_value: str | None, mode: str) -> tuple[int, ...] | int:
+    """Return a safe background color, falling back to white on invalid input."""
+    try:
+        return ImageColor.getcolor(color_value or "#ffffff", mode)
+    except ValueError:
+        logger.warning("Invalid background color %r, defaulting to white", color_value)
+        return ImageColor.getcolor("#ffffff", mode)
+
+
 class ImageUpload(BasePlugin):
     def build_settings_schema(self):
         return schema(
@@ -108,8 +117,8 @@ class ImageUpload(BasePlugin):
             if settings.get("backgroundOption") == "blur":
                 return pad_image_blur(image, dimensions)
             else:
-                background_color = ImageColor.getcolor(
-                    settings.get("backgroundColor") or "#ffffff", "RGB"
+                background_color = _resolve_background_color(
+                    settings.get("backgroundColor"), "RGB"
                 )
                 return ImageOps.pad(
                     image,

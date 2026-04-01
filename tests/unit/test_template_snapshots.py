@@ -13,6 +13,7 @@ def test_settings_page_structure(client):
     assert "saveSettingsBtn" in html or "save" in html.lower()
     assert "timezone" in html.lower()
     assert "data-page-shell" in html
+    assert 'id="main-content"' in html
 
 
 def test_playlist_page_structure(client):

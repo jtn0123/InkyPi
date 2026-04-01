@@ -15,6 +15,13 @@
       node.style.display = open ? "block" : "none";
     }
 
+    function getOpenModal() {
+      return [
+        document.getElementById("deleteHistoryModal"),
+        document.getElementById("clearHistoryModal"),
+      ].find((modal) => modal && !modal.hidden);
+    }
+
     function showStoredMessage() {
       const stored = sessionStorage.getItem("storedMessage");
       if (!stored) return;
@@ -210,6 +217,18 @@
           closeDeleteModal();
         }
         if (event.target === document.getElementById("clearHistoryModal")) {
+          closeClearModal();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        const openModal = getOpenModal();
+        if (!openModal) return;
+        event.preventDefault();
+        if (openModal.id === "deleteHistoryModal") {
+          closeDeleteModal();
+        } else if (openModal.id === "clearHistoryModal") {
           closeClearModal();
         }
       });

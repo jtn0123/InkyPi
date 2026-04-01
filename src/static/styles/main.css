@@ -30,7 +30,6 @@
 /* Base body styling */
 body {
     font-family: Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    font-display: swap;
     background-color: var(--bg);
     color: var(--text);
     line-height: 1.6;
@@ -6447,4 +6446,3 @@ body.modal-open {
     color: var(--muted, #555);
   }
 }
-
