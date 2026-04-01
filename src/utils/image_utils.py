@@ -99,6 +99,28 @@ def get_image(image_url, timeout_seconds: float = 10.0):
     return img
 
 
+def fetch_and_resize_remote_image(
+    image_url: str,
+    dimensions: tuple[int, int],
+    timeout_seconds: float = 40.0,
+) -> Image.Image | None:
+    """Fetch a remote image and return a resized detached copy."""
+    try:
+        response = http_get(image_url, timeout=timeout_seconds)
+        response.raise_for_status()
+    except Exception as e:
+        logger.error(f"Failed to fetch remote image from {image_url}: {e}")
+        return None
+
+    def _resize(img: Image.Image) -> Image.Image:
+        return img.resize(dimensions, LANCZOS).copy()
+
+    resized = process_image_from_bytes(response.content, _resize)
+    if resized is None:
+        logger.error(f"Failed to decode remote image from {image_url}")
+    return resized
+
+
 def change_orientation(image, orientation, inverted: bool = False):
     """Rotate an image based on the given orientation.
 

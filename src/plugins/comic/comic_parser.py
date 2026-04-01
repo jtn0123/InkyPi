@@ -3,6 +3,8 @@ import re
 
 import feedparser
 
+from utils.http_utils import http_get
+
 
 def _match(pattern, text):
     """Extract first capture group from pattern, or return empty string on failure."""
@@ -89,7 +91,9 @@ COMICS = {
 
 
 def get_panel(comic_name):
-    feed = feedparser.parse(COMICS[comic_name]["feed"])
+    response = http_get(COMICS[comic_name]["feed"], timeout=20.0, use_cache=False)
+    response.raise_for_status()
+    feed = feedparser.parse(response.content)
     try:
         element = COMICS[comic_name]["element"](feed)
     except (IndexError, AttributeError):

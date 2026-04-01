@@ -183,6 +183,9 @@ class AIImage(BasePlugin):
                 logger.info(
                     f"AI image generated successfully: {image.size[0]}x{image.size[1]}"
                 )
+            else:
+                logger.error("Image generation completed without returning an image")
+                raise RuntimeError("Failed to generate image")
 
         except RuntimeError:
             raise

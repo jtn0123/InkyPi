@@ -75,7 +75,7 @@ class TestApiVersion:
         try:
             # If it tried to call the API, this mock would be invoked
             mock_get = MagicMock(side_effect=AssertionError("should not call API"))
-            monkeypatch.setattr("blueprints.settings._requests.get", mock_get)
+            monkeypatch.setattr("blueprints.settings.http_get", mock_get)
 
             resp = client.get("/api/version")
             data = resp.get_json()
