@@ -163,3 +163,25 @@ def test_theme_script_exists(client):
     assert "getPreferredTheme()" in js
     assert "applyTheme(theme)" in js
     assert "themeToggle" in js
+
+
+def test_playlist_script_handles_invalid_stored_message_json(client):
+    resp = client.get("/static/scripts/playlist.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert 'const storedMessage = sessionStorage.getItem("storedMessage");' in js
+    assert 'const { type, text } = JSON.parse(storedMessage);' in js
+    assert "try {" in js
+    assert "sessionStorage.removeItem(\"storedMessage\");" in js
+
+
+def test_image_modal_script_guards_missing_container(client):
+    resp = client.get("/static/scripts/image_modal.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "const imageContainer = document.querySelector('.image-container');" in js
+    assert "if (!imageContainer) return;" in js
+    assert "const img = imageContainer.querySelector('img');" in js
+    assert "if (!img) return;" in js

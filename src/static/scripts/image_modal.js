@@ -1,11 +1,13 @@
 document.addEventListener('DOMContentLoaded', function() {
     const imageContainer = document.querySelector('.image-container');
+    if (!imageContainer) return;
+
     const img = imageContainer.querySelector('img');
     let modalOverlay = null;
     let modalImg = null;
     let observer = null;
-    
-    if (!imageContainer || !img) return;
+
+    if (!img) return;
 
     // Handle click on image to show modal
     img.addEventListener('click', function(e) {
