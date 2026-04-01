@@ -63,9 +63,7 @@ def _mock_github_response(tag_name="v2.0.0", body="Release notes", status_code=2
 
 def test_api_version_returns_current(client):
     """GET /api/version should return a JSON object with a 'current' key."""
-    with patch(
-        "blueprints.settings.http_get", return_value=_mock_github_response()
-    ):
+    with patch("blueprints.settings.http_get", return_value=_mock_github_response()):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -78,9 +76,7 @@ def test_api_version_unknown_when_no_version(flask_app, client):
     """When APP_VERSION is 'unknown', the response should reflect that."""
     flask_app.config["APP_VERSION"] = "unknown"
 
-    with patch(
-        "blueprints.settings.http_get", return_value=_mock_github_response()
-    ):
+    with patch("blueprints.settings.http_get", return_value=_mock_github_response()):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -154,9 +150,7 @@ def test_api_version_update_available_false(flask_app, client):
 
 def test_api_version_offline_returns_null_latest(client):
     """When the GitHub API request fails, latest should be None."""
-    with patch(
-        "blueprints.settings.http_get", side_effect=Exception("network error")
-    ):
+    with patch("blueprints.settings.http_get", side_effect=Exception("network error")):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200
@@ -170,9 +164,7 @@ def test_api_version_update_running_reflects_state(client):
 
     settings_mod._UPDATE_STATE["running"] = True
 
-    with patch(
-        "blueprints.settings.http_get", return_value=_mock_github_response()
-    ):
+    with patch("blueprints.settings.http_get", return_value=_mock_github_response()):
         resp = client.get("/api/version")
 
     assert resp.status_code == 200

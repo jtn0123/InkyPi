@@ -380,7 +380,9 @@ def test_grab_image_download_failure():
     """Test grab_image function with download failure."""
     from plugins.unsplash.unsplash import grab_image
 
-    with patch("plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None):
+    with patch(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None
+    ):
         result = grab_image("http://example.com/image.png", (800, 600))
 
         assert result is None
@@ -390,7 +392,9 @@ def test_grab_image_invalid_image_data():
     """Test grab_image function with invalid image data."""
     from plugins.unsplash.unsplash import grab_image
 
-    with patch("plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None):
+    with patch(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None
+    ):
         result = grab_image("http://example.com/image.png", (800, 600))
 
         assert result is None
