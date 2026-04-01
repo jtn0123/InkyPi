@@ -19,7 +19,9 @@ class TestStartUpdate:
         monkeypatch.setattr(mod, "_systemd_available", lambda: False)
         monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
         # Prevent the background thread from actually sleeping
-        monkeypatch.setattr(mod, "_start_update_fallback_thread", lambda sp: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
         mod._set_update_state(False, None)
 
         resp = client.post("/settings/update")
@@ -68,7 +70,9 @@ class TestStartUpdate:
         monkeypatch.setattr(
             mod, "_start_update_via_systemd", MagicMock(side_effect=OSError("fail"))
         )
-        monkeypatch.setattr(mod, "_start_update_fallback_thread", lambda sp: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
         mod._set_update_state(False, None)
 
         resp = client.post("/settings/update")
@@ -252,6 +256,13 @@ class TestPluginIsolation:
         data = resp.get_json()
         assert data["isolated_plugins"].count("weather") == 1
 
+    def test_post_isolation_trims_plugin_id(self, client):
+        resp = client.post("/settings/isolation", json={"plugin_id": " weather "})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "weather" in data["isolated_plugins"]
+        assert " weather " not in data["isolated_plugins"]
+
     def test_delete_isolation_remove_plugin(self, client):
         client.post("/settings/isolation", json={"plugin_id": "weather"})
         resp = client.delete("/settings/isolation", json={"plugin_id": "weather"})
@@ -277,12 +288,13 @@ class TestPluginIsolation:
         resp = client.post("/settings/isolation", json={"plugin_id": 123})
         assert resp.status_code == 422
 
-    def test_delete_nonexistent_plugin(self, client):
-        """DELETE for a plugin that isn't isolated should succeed gracefully."""
+    def test_isolation_unknown_plugin_id(self, client):
+        resp = client.post("/settings/isolation", json={"plugin_id": "nonexistent"})
+        assert resp.status_code == 422
+
+    def test_delete_unknown_plugin_id(self, client):
         resp = client.delete("/settings/isolation", json={"plugin_id": "nonexistent"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["success"] is True
+        assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ def test_settings_update_systemd_and_fallback(client, monkeypatch):
         called["systemd"] = True
         raise RuntimeError("systemd-run failed")
 
-    def fake_thread(script_path):
+    def fake_thread(script_path, target_tag=None):
         called["thread"] = True
         # Do not actually sleep inside the worker; immediately clear running state
         settings_mod._set_update_state(False, None)
@@ -51,7 +51,7 @@ def test_settings_update_duplicate_returns_409(client, monkeypatch):
     monkeypatch.setattr(settings_mod, "_systemd_available", lambda: False, raising=True)
 
     # Make fallback thread just mark running and keep it until we check 409
-    def fake_thread(script_path):
+    def fake_thread(script_path, target_tag=None):
         # Mark running and do not clear
         settings_mod._set_update_state(True, None)
 

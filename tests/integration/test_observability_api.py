@@ -47,7 +47,7 @@ def test_isolation_endpoints(client):
     assert g.status_code == 200
     assert g.get_json().get("success") is True
 
-    p = client.post("/settings/isolation", json={"plugin_id": "clock"})
+    p = client.post("/settings/isolation", json={"plugin_id": " clock "})
     assert p.status_code == 200
     assert "clock" in p.get_json().get("isolated_plugins", [])
 

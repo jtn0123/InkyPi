@@ -398,9 +398,12 @@ def _log_and_publish(msg: str, level: str = "info"):
         pass
 
 
-def _run_real_update(script_path: str) -> None:
+def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
+    cmd = ["/bin/bash", script_path]
+    if target_tag:
+        cmd.append(target_tag)
     proc = subprocess.Popen(
-        ["/bin/bash", script_path],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -417,20 +420,25 @@ def _run_real_update(script_path: str) -> None:
         _log_and_publish(f"web_update: failed with return code {rc}", "error")
 
 
-def _run_simulated_update() -> None:
-    for msg in [
-        "Simulated update starting...",
-        "Checking connectivity...",
-        "Fetching latest dependencies...",
-        "Updating application files...",
-        "Restarting service...",
-        "Update completed.",
-    ]:
+def _run_simulated_update(target_tag: str | None = None) -> None:
+    messages = ["Simulated update starting..."]
+    if target_tag:
+        messages.append(f"Requested target version: {target_tag}")
+    messages.extend(
+        [
+            "Checking connectivity...",
+            "Fetching latest dependencies...",
+            "Updating application files...",
+            "Restarting service...",
+            "Update completed.",
+        ]
+    )
+    for msg in messages:
         _log_and_publish(msg)
         time.sleep(0.5)
 
 
-def _update_runner(script_path: str | None) -> None:
+def _update_runner(script_path: str | None, target_tag: str | None = None) -> None:
     try:
         _log_and_publish("web_update: starting")
         if (
@@ -445,13 +453,15 @@ def _update_runner(script_path: str | None) -> None:
                 "yes",
             )
             if allow_real:
-                _run_real_update(script_path)
+                _run_real_update(script_path, target_tag=target_tag)
             else:
-                _run_simulated_update()
+                _run_simulated_update(target_tag=target_tag)
         else:
             for i in range(6):
                 _log_and_publish(f"step {i + 1}/6")
                 time.sleep(0.5)
+            if target_tag:
+                _log_and_publish(f"Requested target version: {target_tag}")
             _log_and_publish("done (simulated)")
     except Exception:
         logger.exception("web_update: exception while running update")
@@ -459,11 +469,16 @@ def _update_runner(script_path: str | None) -> None:
         _set_update_state(False, None)
 
 
-def _start_update_fallback_thread(script_path: str | None) -> None:
+def _start_update_fallback_thread(
+    script_path: str | None, target_tag: str | None = None
+) -> None:
     # Development/macOS path: run a simulated update and pipe output into our logger
     # to make it visible in inkypi.service logs and the UI viewer.
     t = threading.Thread(
-        target=_update_runner, args=(script_path,), name="update-fallback", daemon=True
+        target=_update_runner,
+        args=(script_path, target_tag),
+        name="update-fallback",
+        daemon=True,
     )
     t.start()
 

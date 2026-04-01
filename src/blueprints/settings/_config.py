@@ -14,6 +14,7 @@ def plugin_isolation():
     isolated = device_config.get_config("isolated_plugins", default=[])
     if not isinstance(isolated, list):
         isolated = []
+    registered_ids = {plugin["id"] for plugin in device_config.get_plugins()}
 
     if request.method == "GET":
         return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
@@ -29,17 +30,25 @@ def plugin_isolation():
             code="validation_error",
             details={"field": "plugin_id"},
         )
+    normalized_plugin_id = plugin_id.strip()
+    if normalized_plugin_id not in registered_ids:
+        return json_error(
+            "plugin_id must reference a registered plugin",
+            status=422,
+            code="validation_error",
+            details={"field": "plugin_id"},
+        )
 
     if request.method == "POST":
-        if plugin_id not in isolated:
-            isolated.append(plugin_id)
+        if normalized_plugin_id not in isolated:
+            isolated.append(normalized_plugin_id)
             device_config.update_value(
                 "isolated_plugins", sorted(set(isolated)), write=True
             )
         return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
 
     # DELETE
-    isolated = [p for p in isolated if p != plugin_id]
+    isolated = [p for p in isolated if p != normalized_plugin_id]
     device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
     return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
 
