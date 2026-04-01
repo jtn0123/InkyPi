@@ -1,6 +1,8 @@
 # pyright: reportMissingImports=false
+from datetime import UTC
 from typing import cast
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
 import requests
@@ -272,12 +274,10 @@ def test_moon_phase_name_handling():
 
 def test_openmeteo_forecast_parsing():
     """Test OpenMeteo forecast parsing."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     _weather = Weather({"id": "weather"})
-    _tz = pytz.timezone("UTC")
+    _tz = UTC
 
     # Mock OpenMeteo forecast data
     forecast_data = {
@@ -853,12 +853,10 @@ def test_weather_24h_time_format(device_config_dev, monkeypatch):
 
 def test_weather_parse_weather_data_missing_current():
     """Test parsing weather data with missing current weather info."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     # Weather data missing current section
     weather_data: dict[str, list] = {"daily": [], "hourly": []}
@@ -870,12 +868,10 @@ def test_weather_parse_weather_data_missing_current():
 
 def test_weather_parse_open_meteo_data_missing_current():
     """Test parsing OpenMeteo data with missing current weather info handles gracefully."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     # Weather data missing current_weather section
     weather_data: dict[str, dict] = {"daily": {}, "hourly": {}}
@@ -906,12 +902,10 @@ def test_weather_map_weather_code_to_icon():
 
 def test_weather_parse_forecast_empty_data():
     """Test parsing forecast with empty data."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     result = p.parse_forecast([], tz, "d", 40.7)
     assert result == []
@@ -919,12 +913,10 @@ def test_weather_parse_forecast_empty_data():
 
 def test_weather_parse_hourly_empty_data():
     """Test parsing hourly data with empty data."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     result = p.parse_hourly([], tz, "12h", "metric")
     assert result == []
@@ -932,12 +924,10 @@ def test_weather_parse_hourly_empty_data():
 
 def test_weather_parse_data_points_openweathermap():
     """Test parsing data points for OpenWeatherMap."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     weather_data = {
         "current": {
@@ -957,12 +947,10 @@ def test_weather_parse_data_points_openweathermap():
 
 def test_weather_parse_data_points_openmeteo():
     """Test parsing data points for OpenMeteo."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    tz = pytz.timezone("UTC")
+    tz = UTC
 
     weather_data = {
         "hourly": {
@@ -990,15 +978,13 @@ def test_weather_parse_timezone():
 
 def test_weather_parse_timezone_invalid():
     """Test timezone parsing with invalid timezone."""
-    import pytz
-
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
 
     weather_data = {"timezone": "Invalid/Timezone"}
-    # Should raise UnknownTimeZoneError
-    with pytest.raises(pytz.exceptions.UnknownTimeZoneError):
+    # Should raise ZoneInfoNotFoundError
+    with pytest.raises(ZoneInfoNotFoundError):
         p.parse_timezone(weather_data)
 
 

@@ -1,8 +1,7 @@
 import logging
 import os
 from datetime import datetime
-
-import pytz
+from zoneinfo import ZoneInfo
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
@@ -223,7 +222,7 @@ class Weather(BasePlugin):
 
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
-        tz = pytz.timezone(timezone)
+        tz = ZoneInfo(timezone)
         self._request_timeout()
         self.get_plugin_dir()
 

@@ -1,7 +1,5 @@
 # pyright: reportMissingImports=false
-from datetime import datetime
-
-import pytz
+from datetime import UTC, datetime
 
 from model import Playlist, PlaylistManager, PluginInstance, RefreshInfo
 
@@ -47,7 +45,7 @@ def test_plugin_instance_update_and_image_path():
 
 
 def test_refresh_info_helpers():
-    now = datetime.now(tz=pytz.UTC)
+    now = datetime.now(tz=UTC)
     ri = RefreshInfo("Manual Update", "ai_text", now.isoformat(), 123)
     assert ri.get_refresh_datetime().date() == now.date()
     d = ri.to_dict()

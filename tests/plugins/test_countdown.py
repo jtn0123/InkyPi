@@ -1,9 +1,8 @@
 # pyright: reportMissingImports=false
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
-import pytz
 from PIL import Image
 
 
@@ -13,8 +12,7 @@ def plugin_config():
 
 
 def _frozen_now(year, month, day):
-    tz = pytz.UTC
-    return tz.localize(datetime(year, month, day, 12, 0, 0))
+    return datetime(year, month, day, 12, 0, 0, tzinfo=UTC)
 
 
 def test_countdown_future_date(plugin_config, device_config_dev):

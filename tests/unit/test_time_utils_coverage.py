@@ -1,6 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for utils/time_utils.py — additional coverage."""
-import pytz
+from datetime import UTC
 
 from utils.time_utils import (
     get_timezone,
@@ -18,12 +18,12 @@ def test_get_timezone_valid():
 
 def test_get_timezone_invalid():
     tz = get_timezone("Invalid/Timezone")
-    assert tz == pytz.UTC
+    assert tz == UTC
 
 
 def test_get_timezone_none():
     tz = get_timezone(None)
-    assert tz == pytz.UTC
+    assert tz == UTC
 
 
 def test_now_in_timezone_returns_aware_datetime():

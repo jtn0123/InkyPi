@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 
 pytest.importorskip("freezegun")
 from freezegun import freeze_time  # noqa: E402
@@ -124,7 +124,7 @@ def test_logs_api_uses_device_timezone_for_since(client, flask_app, monkeypatch)
         assert resp.status_code == 200
 
         # Expected since is 06:00 ET → compute in ET
-        tz = pytz.timezone("US/Eastern")
+        tz = ZoneInfo("US/Eastern")
         now_et = datetime.now(tz)
         since_et = (now_et - timedelta(hours=2)).timestamp()
         expected_usec = int(since_et * 1_000_000)

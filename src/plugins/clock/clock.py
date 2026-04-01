@@ -1,9 +1,9 @@
 import logging
 import math
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import numpy as np
-import pytz
 from PIL import Image, ImageColor, ImageDraw
 
 from plugins.base_plugin.base_plugin import BasePlugin
@@ -88,7 +88,7 @@ class Clock(BasePlugin):
         dimensions = self.get_oriented_dimensions(device_config)
 
         timezone_name = device_config.get_config("timezone") or DEFAULT_TIMEZONE
-        tz = pytz.timezone(timezone_name)
+        tz = ZoneInfo(timezone_name)
         current_time = datetime.now(tz)
 
         img = None

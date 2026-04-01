@@ -1,7 +1,6 @@
 from datetime import UTC, datetime
 
 import pytest
-import pytz
 
 from src.plugins.weather.weather import Weather
 
@@ -81,7 +80,7 @@ def test_parse_forecast_basic(weather_plugin):
             "temp": {"max": 12, "min": 3},
         },
     ]
-    res = w.parse_forecast(daily, pytz.timezone("UTC"), "d", 40.7)
+    res = w.parse_forecast(daily, UTC, "d", 40.7)
     assert len(res) == 2
     assert res[0]["high"] == 10
     assert res[1]["icon"].endswith("01d.png")
@@ -89,7 +88,7 @@ def test_parse_forecast_basic(weather_plugin):
 
 def test_parse_open_meteo_forecast_uses_local_phase(monkeypatch, weather_plugin):
     w = weather_plugin
-    tz = pytz.timezone("UTC")
+    tz = UTC
     daily = {
         "time": ["2023-01-01T00:00"],
         "weathercode": [0],
@@ -121,9 +120,9 @@ def test_parse_hourly_and_unit_conversion(weather_plugin):
         }
         for i in range(3)
     ]
-    res_metric = w.parse_hourly(hourly, pytz.timezone("UTC"), "24h", "metric")
+    res_metric = w.parse_hourly(hourly, UTC, "24h", "metric")
     assert res_metric[0]["rain"] == 10.0
-    res_imperial = w.parse_hourly(hourly, pytz.timezone("UTC"), "24h", "imperial")
+    res_imperial = w.parse_hourly(hourly, UTC, "24h", "imperial")
     # 10 mm -> inches conversion approx 0.3937
     assert round(res_imperial[0]["rain"], 2) == round(10 / 25.4, 2)
 
@@ -155,9 +154,7 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
         }
     }
     air_quality = {"list": [{"main": {"aqi": 2}}]}
-    points = w.parse_data_points(
-        weather, air_quality, pytz.timezone("UTC"), "metric", "24h"
-    )
+    points = w.parse_data_points(weather, air_quality, UTC, "metric", "24h")
     labels = [p["label"] for p in points]
     assert "Sunrise" in labels and "Sunset" in labels and "Air Quality" in labels
 
@@ -181,7 +178,7 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
         "hourly": {"time": ["2020-01-01T00:00"], "uv_index": [1], "european_aqi": [10]}
     }
     points2 = w.parse_open_meteo_data_points(
-        weather_data, aqi_data, pytz.timezone("UTC"), "metric", "24h"
+        weather_data, aqi_data, UTC, "metric", "24h"
     )
     labels2 = [p["label"] for p in points2]
     assert "Visibility" in labels2 and "Air Quality" in labels2
@@ -189,7 +186,7 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
 
 def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
     w = weather_plugin
-    tz = pytz.timezone("UTC")
+    tz = UTC
     daily = {
         "time": ["2025-01-01T00:00"],
         "weathercode": [0],
@@ -245,7 +242,7 @@ def test_parse_timezone_missing_field(weather_plugin):
 def test_parse_timezone_invalid_value(weather_plugin):
     w = weather_plugin
     # Invalid timezone should raise error
-    with pytest.raises(Exception):  # pytz raises an exception for invalid timezones
+    with pytest.raises(Exception):  # zoneinfo raises an exception for invalid timezones
         w.parse_timezone({"timezone": "Invalid/Timezone"})
 
 
@@ -258,7 +255,7 @@ class TestGetCurrentHourlyValue:
     def test_matching_hour(self):
         from plugins.weather.weather_data import _get_current_hourly_value
 
-        tz = pytz.UTC
+        tz = UTC
         current = datetime(2025, 6, 15, 10, 30, tzinfo=tz)
         times = [
             "2025-06-15T09:00+00:00",
@@ -271,7 +268,7 @@ class TestGetCurrentHourlyValue:
     def test_no_matching_hour(self):
         from plugins.weather.weather_data import _get_current_hourly_value
 
-        tz = pytz.UTC
+        tz = UTC
         current = datetime(2025, 6, 15, 23, 0, tzinfo=tz)
         times = ["2025-06-15T09:00+00:00", "2025-06-15T10:00+00:00"]
         values = [50, 65]
@@ -280,14 +277,14 @@ class TestGetCurrentHourlyValue:
     def test_empty_lists(self):
         from plugins.weather.weather_data import _get_current_hourly_value
 
-        tz = pytz.UTC
+        tz = UTC
         current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
         assert _get_current_hourly_value([], [], tz, current, "test") == "N/A"
 
     def test_invalid_time_string_skipped(self):
         from plugins.weather.weather_data import _get_current_hourly_value
 
-        tz = pytz.UTC
+        tz = UTC
         current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
         times = ["not-a-date", "2025-06-15T10:00+00:00"]
         values = [99, 42]
@@ -296,7 +293,7 @@ class TestGetCurrentHourlyValue:
     def test_index_beyond_values_returns_na(self):
         from plugins.weather.weather_data import _get_current_hourly_value
 
-        tz = pytz.UTC
+        tz = UTC
         current = datetime(2025, 6, 15, 10, 0, tzinfo=tz)
         times = ["2025-06-15T10:00+00:00"]
         values = []  # times has entry but values is empty

@@ -1,9 +1,9 @@
 # pyright: reportMissingImports=false
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
-import pytz
 
 
 def _make_calendar_settings(
@@ -125,10 +125,10 @@ def test_parse_data_points_datetime_with_dtend():
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
-    tz = pytz.timezone("US/Eastern")
+    tz = ZoneInfo("US/Eastern")
 
-    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
-    dt_end = datetime(2025, 1, 1, 13, 0, tzinfo=pytz.UTC)
+    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
+    dt_end = datetime(2025, 1, 1, 13, 0, tzinfo=UTC)
     event = FakeEvent(
         {
             "dtstart": dt_start,
@@ -145,7 +145,7 @@ def test_parse_data_points_date_all_day_and_duration():
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
-    tz = pytz.UTC
+    tz = UTC
 
     d = date(2025, 1, 1)
     event = FakeEvent(
@@ -270,9 +270,9 @@ def test_parse_data_points_datetime_without_dtend():
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
-    tz = pytz.timezone("US/Eastern")
+    tz = ZoneInfo("US/Eastern")
 
-    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
+    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
     event = FakeEvent(
         {
             "dtstart": dt_start,
@@ -288,9 +288,9 @@ def test_parse_data_points_datetime_with_duration():
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
-    tz = pytz.timezone("US/Eastern")
+    tz = ZoneInfo("US/Eastern")
 
-    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC)
+    dt_start = datetime(2025, 1, 1, 12, 0, tzinfo=UTC)
     duration = timedelta(hours=2)
     event = FakeEvent(
         {
@@ -308,7 +308,7 @@ def test_parse_data_points_date_all_day():
     from plugins.calendar.calendar import Calendar
 
     p = Calendar({"id": "calendar"})
-    tz = pytz.timezone("US/Eastern")
+    tz = ZoneInfo("US/Eastern")
 
     d = date(2025, 1, 1)
     event = FakeEvent(
@@ -365,7 +365,7 @@ def test_fetch_ics_events_empty_calendar():
             events = p.fetch_ics_events(
                 ["http://example.com"],
                 ["#000"],
-                pytz.UTC,
+                UTC,
                 datetime.now(),
                 datetime.now() + timedelta(days=1),
             )
@@ -386,7 +386,7 @@ def test_fetch_ics_events_multiple_calendars():
     mock_event = FakeEvent(
         {
             "summary": "Test Event",
-            "dtstart": datetime(2025, 1, 1, 12, 0, tzinfo=pytz.UTC),
+            "dtstart": datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
         }
     )
 
@@ -398,7 +398,7 @@ def test_fetch_ics_events_multiple_calendars():
             events = p.fetch_ics_events(
                 ["http://example1.com", "http://example2.com"],
                 ["#FF0000", "#00FF00"],
-                pytz.UTC,
+                UTC,
                 datetime(2025, 1, 1),
                 datetime(2025, 1, 2),
             )

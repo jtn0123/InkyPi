@@ -5,7 +5,7 @@ urllib3==2.6.3
 werkzeug==3.1.6
 pillow==12.1.1
 pi-heif==1.2.0
-pytz==2025.2
+tzdata>=2024.1
 openai==2.20.0
 numpy==2.4.2
 icalendar==6.3.2
