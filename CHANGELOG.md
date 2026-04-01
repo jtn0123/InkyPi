@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## v0.3.6 (2026-04-01)
+
+### Code Style
+
+- Use datetime.UTC alias per ruff UP017
+  ([`3f1f19b`](https://github.com/jtn0123/InkyPi/commit/3f1f19b12abeb5d4a091eb93c8176e4cb00b125b))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.5 (2026-04-01)
 
 ### Bug Fixes
@@ -122,6 +132,16 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
 ### Bug Fixes
 
+- Address CodeRabbit review feedback
+  ([`d5f564e`](https://github.com/jtn0123/InkyPi/commit/d5f564ed22b219f8d0026e13704773c014227ddc))
+
+- Fix typo "022d" → "02d" in weather code lookup (weather_data.py) - Initialize display_driver
+  before try block (refresh_task.py) - Use timezone-aware datetime in health window filter
+  (_health.py) - Scope rate-limit buckets to app instance (inkypi.py) - Add bounds checking for AQI
+  index lookup (weather_data.py) - Update test expectation for corrected weather code
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
 - Ship linear bugfix batch
   ([`24b7d46`](https://github.com/jtn0123/InkyPi/commit/24b7d46ccf802b64887a44a384d5c0ffcf52f54b))
 
@@ -150,6 +170,47 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 History page now paginates at 24 items per page instead of loading all items at once. Adds
   Previous/Next navigation and page indicator. Keeps lazy-loading on images for additional
   performance.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract create_app() helpers to reduce complexity (JTN-113)
+  ([`85a138f`](https://github.com/jtn0123/InkyPi/commit/85a138f780060a6160985dd1cfb165c467278ed5))
+
+Extract 8 focused helper functions from the 337-line create_app() monolith to bring cognitive
+  complexity well under the SonarCloud limit of 15. No behavior changes — pure structural
+  extraction.
+
+Extracted: _setup_secret_key, _register_blueprints, _register_health_endpoints,
+  _setup_https_redirect, _setup_csrf_protection, _setup_rate_limiting, _setup_security_headers,
+  _setup_signal_handlers.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract refresh_task helpers to reduce complexity (JTN-119)
+  ([`ff357a4`](https://github.com/jtn0123/InkyPi/commit/ff357a4abb75b54bd619145ecb0262c494dfa9be))
+
+Extract _push_to_display(), _save_benchmark(), _notify_watchdog(), and _complete_manual_request()
+  from the 287-line _perform_refresh() and _run() methods to bring cognitive complexity under the
+  SonarCloud limit of 15. No behavior changes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract settings blueprint helpers to reduce complexity (JTN-115)
+  ([`963ab5a`](https://github.com/jtn0123/InkyPi/commit/963ab5a1337eb4af3f54ee1c20e77814aeb3a069))
+
+Extract focused helper functions from 5 settings blueprint functions that exceeded SonarCloud's
+  cognitive complexity limit of 15. No behavior changes — pure structural extraction.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract weather_data helpers to reduce complexity (JTN-120)
+  ([`5471ad2`](https://github.com/jtn0123/InkyPi/commit/5471ad2e5f9d86cfc138c81947344bb9b526e191))
+
+Replace if-elif chains with lookup tables and extract per-datapoint builder functions from the 4
+  weather_data.py functions that exceeded SonarCloud's cognitive complexity limit of 15. No behavior
+  changes.
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
