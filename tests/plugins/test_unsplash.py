@@ -1,9 +1,7 @@
 # pyright: reportMissingImports=false
-from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PIL import Image
 
 
 def test_unsplash_search_success(monkeypatch, device_config_dev):
@@ -22,25 +20,20 @@ def test_unsplash_search_success(monkeypatch, device_config_dev):
         def json(self):
             return self._data
 
-    class RespImg:
-        def __init__(self):
-            buf = BytesIO()
-            Image.new("RGB", (5, 5), "white").save(buf, format="PNG")
-            self.content = buf.getvalue()
-
-        def raise_for_status(self):
-            pass
-
     def fake_get(url, params=None, **kwargs):
         if "search" in url:
             return RespApi({"results": [{"urls": {"full": "http://img"}}]})
-        if "http://img" in url:
-            return RespImg()
         return RespApi({"urls": {"full": "http://img"}})
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
     monkeypatch.setattr(
         "plugins.unsplash.unsplash.get_http_session", lambda: mock_session
+    )
+
+    mock_image = MagicMock()
+    monkeypatch.setattr(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+        lambda *args, **kwargs: mock_image,
     )
 
     img = Unsplash({"id": "unsplash"}).generate_image(
