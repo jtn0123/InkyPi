@@ -1,4 +1,22 @@
 (function () {
+  function validateAddToPlaylistAction(action) {
+    if (action !== "add_to_playlist") return true;
+    const instanceInput = document.getElementById("instance");
+    const instanceError = document.getElementById("instance-error");
+    const name = (instanceInput?.value || "").trim();
+    if (!name) {
+      if (instanceInput) {
+        instanceInput.setAttribute("aria-invalid", "true");
+        instanceInput.focus();
+      }
+      if (instanceError) instanceError.textContent = "Instance name is required";
+      return false;
+    }
+    if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
+    if (instanceError) instanceError.textContent = "";
+    return true;
+  }
+
   function createPluginPage(config) {
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -163,28 +181,10 @@
       setHidden(metaDiv, metaContent.childNodes.length === 0);
     }
 
-    function validateAddToPlaylistAction(action) {
-      if (action !== "add_to_playlist") return true;
-      const instanceInput = document.getElementById("instance");
-      const instanceError = document.getElementById("instance-error");
-      const name = (instanceInput?.value || "").trim();
-      if (!name) {
-        if (instanceInput) {
-          instanceInput.setAttribute("aria-invalid", "true");
-          instanceInput.focus();
-        }
-        if (instanceError) instanceError.textContent = "Instance name is required";
-        return false;
-      }
-      if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
-      if (instanceError) instanceError.textContent = "";
-      return true;
-    }
-
     function runPluginValidation(action) {
       try {
-        if (typeof window.validatePluginSettings === "function") {
-          return !!window.validatePluginSettings(action);
+        if (typeof globalThis.validatePluginSettings === "function") {
+          return !!globalThis.validatePluginSettings(action);
         }
       } catch (e) {
         console.warn("Plugin validation threw an error:", e);
@@ -193,7 +193,10 @@
     }
 
     function ensurePluginFormAvailable() {
-      if (window.PluginForm && typeof window.PluginForm.sendForm === "function") {
+      if (
+        globalThis.PluginForm &&
+        typeof globalThis.PluginForm.sendForm === "function"
+      ) {
         return true;
       }
       showResponseModal(
@@ -211,7 +214,7 @@
 
       if (triggerButton) triggerButton.disabled = true;
       try {
-        await window.PluginForm.sendForm({
+        await globalThis.PluginForm.sendForm({
           action,
           urls: config.urls,
           uploadedFiles,

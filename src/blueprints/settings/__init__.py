@@ -97,7 +97,7 @@ def _window_since_seconds(window: str | None) -> float:
         if val.endswith("d"):
             return now - (int(val[:-1]) * 86400)
     except ValueError:
-        logger.warning("Invalid benchmark window %r, defaulting to 24h", window)
+        logger.warning("Invalid benchmark window provided, defaulting to 24h")
     return now - 24 * 3600
 
 

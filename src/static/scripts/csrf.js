@@ -29,7 +29,7 @@
       return;
     }
 
-    init.headers = { ...(init.headers || {}) };
+    init.headers = init.headers ? { ...init.headers } : {};
     if (!init.headers["X-CSRFToken"]) {
       init.headers["X-CSRFToken"] = token;
     }

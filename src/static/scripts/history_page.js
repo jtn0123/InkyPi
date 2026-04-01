@@ -1,4 +1,11 @@
 (function () {
+  function getOpenHistoryModal() {
+    return [
+      document.getElementById("deleteHistoryModal"),
+      document.getElementById("clearHistoryModal"),
+    ].find((modal) => modal && !modal.hidden);
+  }
+
   function createHistoryPage(config) {
     const state = {
       pendingDelete: "",
@@ -13,13 +20,6 @@
       if (!node) return;
       node.hidden = !open;
       node.style.display = open ? "block" : "none";
-    }
-
-    function getOpenModal() {
-      return [
-        document.getElementById("deleteHistoryModal"),
-        document.getElementById("clearHistoryModal"),
-      ].find((modal) => modal && !modal.hidden);
     }
 
     function showStoredMessage() {
@@ -223,7 +223,7 @@
 
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
-        const openModal = getOpenModal();
+        const openModal = getOpenHistoryModal();
         if (!openModal) return;
         event.preventDefault();
         if (openModal.id === "deleteHistoryModal") {
