@@ -165,7 +165,10 @@ def _extract_import_payload():
         if file:
             import json as _json
 
-            payload = _json.loads(file.stream.read().decode("utf-8"))
+            try:
+                payload = _json.loads(file.stream.read().decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                return None
     if not payload or not isinstance(payload, dict):
         return None
     return payload
@@ -343,6 +346,26 @@ def _validate_settings_form(form_data):
             code="validation_error",
             details={"field": "interval"},
         )
+
+    # Validate numeric image settings
+    for field in (
+        "saturation",
+        "brightness",
+        "sharpness",
+        "contrast",
+        "inky_saturation",
+    ):
+        raw = form_data.get(field)
+        if raw is not None:
+            try:
+                float(raw)
+            except (ValueError, TypeError):
+                return json_error(
+                    f"Invalid numeric value for {field}",
+                    status=422,
+                    code="validation_error",
+                    details={"field": field},
+                )
     return None
 
 

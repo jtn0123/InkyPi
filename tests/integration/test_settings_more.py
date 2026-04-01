@@ -322,7 +322,8 @@ def test_api_logs_exception_handling(client, monkeypatch):
 
     resp = client.get("/api/logs")
     assert resp.status_code == 500
-    assert "test error" in resp.get_json().get("error", "")
+    # Exception details should NOT leak to the client (JTN-141)
+    assert "test error" not in resp.get_json().get("error", "")
 
 
 def test_settings_time_format_12h():

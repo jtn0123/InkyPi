@@ -31,9 +31,9 @@ def download_logs():
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
-    except Exception as e:
+    except Exception:
         _mod.logger.exception("Error reading logs")
-        return Response(f"Error reading logs: {e}", status=500, mimetype="text/plain")
+        return Response("Error reading logs", status=500, mimetype="text/plain")
 
 
 def _parse_log_params(args):
@@ -132,6 +132,6 @@ def api_logs():
                 },
             }
         )
-    except Exception as e:
+    except Exception:
         _mod.logger.exception("/api/logs error")
-        return json_error(str(e), status=500)
+        return json_error("An error occurred while reading logs", status=500)

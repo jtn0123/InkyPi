@@ -126,7 +126,13 @@ def save_apikeys():
         # Validate and process entries
         valid_entries = []
         for entry in entries:
-            key = entry.get("key", "").strip()
+            if not isinstance(entry, dict):
+                return json_error("Each entry must be an object", status=400)
+
+            raw_key = entry.get("key", "")
+            if not isinstance(raw_key, str):
+                return json_error("Entry key must be a string", status=400)
+            key = raw_key.strip()
             keep_existing = entry.get("keepExisting", False)
 
             if not key:
@@ -138,10 +144,15 @@ def save_apikeys():
 
             if keep_existing:
                 # Use existing value from .env file
-                value = existing_values.get(key, "")
+                value = existing_values.get(key) or ""
             else:
                 # Use provided value
-                value = entry.get("value", "").strip()
+                raw_value = entry.get("value", "")
+                if not isinstance(raw_value, str):
+                    return json_error(
+                        f"Value for key {key} must be a string", status=400
+                    )
+                value = raw_value.strip()
             if any(
                 (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r")
                 for ch in value
