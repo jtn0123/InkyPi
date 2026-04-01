@@ -98,6 +98,13 @@ def add_plugin():
         if not isinstance(refresh_settings, dict):
             return json_error("refresh_settings must be a JSON object", status=400)
         plugin_id = plugin_settings.pop("plugin_id", None)
+        if not plugin_id or not isinstance(plugin_id, str):
+            return json_error(
+                "plugin_id is required",
+                status=422,
+                code="validation_error",
+                details={"field": "plugin_id"},
+            )
 
         playlist = refresh_settings.get("playlist")
         instance_name = refresh_settings.get("instance_name")

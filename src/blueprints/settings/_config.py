@@ -348,6 +348,8 @@ def _validate_settings_form(form_data):
         )
 
     # Validate numeric image settings
+    import math
+
     for field in (
         "saturation",
         "brightness",
@@ -358,8 +360,15 @@ def _validate_settings_form(form_data):
         raw = form_data.get(field)
         if raw is not None:
             try:
-                float(raw)
+                value = float(raw)
             except (ValueError, TypeError):
+                return json_error(
+                    f"Invalid numeric value for {field}",
+                    status=422,
+                    code="validation_error",
+                    details={"field": field},
+                )
+            if not math.isfinite(value):
                 return json_error(
                     f"Invalid numeric value for {field}",
                     status=422,

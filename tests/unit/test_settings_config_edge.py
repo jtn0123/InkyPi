@@ -177,7 +177,7 @@ class TestSaveSettingsEdge:
         resp = client.post("/save_settings", data=self._valid_form(interval="1500"))
         assert resp.status_code == 422
 
-    def test_non_numeric_saturation_422(self, client, device_config_dev):
+    def test_non_numeric_saturation_422(self, client):
         """Non-float saturation causes validation error → 422."""
         resp = client.post(
             "/save_settings",

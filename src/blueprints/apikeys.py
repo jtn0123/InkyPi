@@ -134,6 +134,11 @@ def save_apikeys():
                 return json_error("Entry key must be a string", status=400)
             key = raw_key.strip()
             keep_existing = entry.get("keepExisting", False)
+            if not isinstance(keep_existing, bool):
+                return json_error(
+                    f"keepExisting for key {key or raw_key!r} must be a boolean",
+                    status=400,
+                )
 
             if not key:
                 continue

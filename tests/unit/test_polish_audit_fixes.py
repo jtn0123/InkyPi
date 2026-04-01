@@ -401,6 +401,7 @@ def test_plugin_order_rejects_unknown_ids(client):
 
 def test_plugin_order_rejects_duplicate_ids(client):
     plugins = client.application.config["DEVICE_CONFIG"].get_plugins()
+    assert plugins, "No plugins registered in dev config"
     plugin_id = plugins[0]["id"]
     response = client.post("/api/plugin_order", json={"order": [plugin_id, plugin_id]})
     assert response.status_code == 400

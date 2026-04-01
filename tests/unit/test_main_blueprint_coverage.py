@@ -129,7 +129,7 @@ def test_display_next_second_request_within_cooldown_returns_429(
     assert "wait" in body["error"].lower()
 
 
-def test_display_next_failed_requests_do_not_arm_cooldown(client, device_config_dev):
+def test_display_next_failed_requests_do_not_arm_cooldown(client):
     from blueprints.main import _reset_display_next_cooldown
 
     _reset_display_next_cooldown()
@@ -225,6 +225,7 @@ def test_plugin_order_non_string_items(client):
 
 def test_plugin_order_duplicate_items(client, device_config_dev):
     plugins = device_config_dev.get_plugins()
+    assert plugins, "No plugins registered in dev config"
     plugin_id = plugins[0]["id"]
     resp = client.post("/api/plugin_order", json={"order": [plugin_id, plugin_id]})
     assert resp.status_code == 400
@@ -233,6 +234,7 @@ def test_plugin_order_duplicate_items(client, device_config_dev):
 
 def test_plugin_order_missing_items(client, device_config_dev):
     plugins = device_config_dev.get_plugins()
+    assert plugins, "No plugins registered in dev config"
     resp = client.post("/api/plugin_order", json={"order": [plugins[0]["id"]]})
     assert resp.status_code == 400
     assert "include every plugin id exactly once" in resp.get_json()["error"].lower()

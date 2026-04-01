@@ -74,6 +74,8 @@ def shutdown():
                 f"Please wait {remaining}s before requesting another reboot/shutdown",
                 status=429,
             )
+        # Reserve the slot under lock to prevent concurrent requests
+        _mod._last_shutdown_time = now
 
     data = request.get_json(silent=True)
     if (
@@ -81,6 +83,9 @@ def shutdown():
         and request.content_type
         and "application/json" in request.content_type
     ):
+        # Roll back reservation on input validation failure
+        with _mod._shutdown_lock:
+            _mod._last_shutdown_time = 0.0
         return json_error("Invalid JSON payload", status=400)
     if not isinstance(data, dict):
         data = {}
@@ -91,10 +96,13 @@ def shutdown():
         else:
             _mod.logger.info("Shutdown requested")
             subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
-        # Only consume the cooldown after a successful command
+        # Refresh the cooldown timestamp to the actual success time
         with _mod._shutdown_lock:
             _mod._last_shutdown_time = time.monotonic()
         return jsonify({"success": True})
     except subprocess.CalledProcessError as e:
+        # Roll back so the cooldown isn't consumed by a failed attempt
+        with _mod._shutdown_lock:
+            _mod._last_shutdown_time = 0.0
         _mod.logger.exception("Failed to execute shutdown command")
         return json_internal_error("shutdown", details={"error": str(e)})

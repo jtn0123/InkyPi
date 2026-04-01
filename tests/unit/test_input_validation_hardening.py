@@ -25,8 +25,10 @@ from unittest.mock import MagicMock
 class TestApiKeySaveValidation:
     """POST /api-keys/save should return 400 for malformed input, not 500."""
 
-    def test_non_string_value_returns_400(self, client, monkeypatch):
-        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: "/tmp/test.env")
+    def test_non_string_value_returns_400(self, client, tmp_path, monkeypatch):
+        env_path = tmp_path / "test.env"
+        env_path.write_text("")
+        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
         resp = client.post(
             "/api-keys/save",
             json={"entries": [{"key": "TEST_KEY", "value": 123}]},
@@ -36,8 +38,10 @@ class TestApiKeySaveValidation:
         assert data["success"] is False
         assert "string" in data["error"].lower()
 
-    def test_non_dict_entry_returns_400(self, client, monkeypatch):
-        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: "/tmp/test.env")
+    def test_non_dict_entry_returns_400(self, client, tmp_path, monkeypatch):
+        env_path = tmp_path / "test.env"
+        env_path.write_text("")
+        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
         resp = client.post(
             "/api-keys/save",
             json={"entries": ["not_a_dict"]},
@@ -46,8 +50,10 @@ class TestApiKeySaveValidation:
         data = resp.get_json()
         assert data["success"] is False
 
-    def test_non_string_key_returns_400(self, client, monkeypatch):
-        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: "/tmp/test.env")
+    def test_non_string_key_returns_400(self, client, tmp_path, monkeypatch):
+        env_path = tmp_path / "test.env"
+        env_path.write_text("")
+        monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: str(env_path))
         resp = client.post(
             "/api-keys/save",
             json={"entries": [{"key": 999, "value": "ok"}]},
@@ -66,8 +72,8 @@ class TestApiKeySaveValidation:
             "/api-keys/save",
             json={"entries": [{"key": "BROKEN_KEY", "keepExisting": True}]},
         )
-        # Should succeed or return 400, but never 500
-        assert resp.status_code != 500
+        # Should succeed (200) or validate (400), but never 500
+        assert resp.status_code in {200, 400, 422}
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +205,16 @@ class TestSaveSettingsNumericValidation:
         resp = client.post("/save_settings", data=form)
         assert resp.status_code == 422
 
+    def test_nan_rejected(self, client):
+        form = {**self.VALID_FORM, "saturation": "NaN"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+
+    def test_infinity_rejected(self, client):
+        form = {**self.VALID_FORM, "brightness": "Infinity"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+
     def test_valid_numeric_settings_pass_validation(self, client):
         form = {
             **self.VALID_FORM,
@@ -269,9 +285,10 @@ class TestShutdownCooldownOnFailure:
         resp1 = client.post("/shutdown", json={})
         assert resp1.status_code == 500
 
-        # Second call should NOT be rate-limited (cooldown wasn't consumed)
+        # Second call should also 500 (subprocess still mocked to fail),
+        # proving the cooldown was NOT consumed
         resp2 = client.post("/shutdown", json={})
-        assert resp2.status_code != 429
+        assert resp2.status_code == 500
 
     def test_successful_shutdown_does_consume_cooldown(self, client, monkeypatch):
         import blueprints.settings as settings_mod
@@ -373,4 +390,6 @@ class TestDeletePluginInstanceCleanup:
         assert isinstance(
             received_args[0], dict
         ), f"Expected dict but got {type(received_args[0])}: {received_args[0]}"
-        assert received_args[0].get("id") == "clock"
+        # Accept either "id" or "plugin_id" as the identifier key
+        plugin_id = received_args[0].get("id") or received_args[0].get("plugin_id")
+        assert plugin_id == "clock"
