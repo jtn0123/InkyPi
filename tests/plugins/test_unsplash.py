@@ -1,9 +1,7 @@
 # pyright: reportMissingImports=false
-from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PIL import Image
 
 
 def test_unsplash_search_success(monkeypatch, device_config_dev):
@@ -22,25 +20,20 @@ def test_unsplash_search_success(monkeypatch, device_config_dev):
         def json(self):
             return self._data
 
-    class RespImg:
-        def __init__(self):
-            buf = BytesIO()
-            Image.new("RGB", (5, 5), "white").save(buf, format="PNG")
-            self.content = buf.getvalue()
-
-        def raise_for_status(self):
-            pass
-
     def fake_get(url, params=None, **kwargs):
         if "search" in url:
             return RespApi({"results": [{"urls": {"full": "http://img"}}]})
-        if "http://img" in url:
-            return RespImg()
         return RespApi({"urls": {"full": "http://img"}})
 
     mock_session = type("S", (), {"get": staticmethod(fake_get)})()
     monkeypatch.setattr(
         "plugins.unsplash.unsplash.get_http_session", lambda: mock_session
+    )
+
+    mock_image = MagicMock()
+    monkeypatch.setattr(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+        lambda *args, **kwargs: mock_image,
     )
 
     img = Unsplash({"id": "unsplash"}).generate_image(
@@ -83,12 +76,10 @@ def test_unsplash_random_photo_success(device_config_dev, monkeypatch):
             mock_img_response,
         ]
 
-        # Mock PIL Image
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.resize.return_value = (
-                MagicMock()
-            )
-
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
             p = Unsplash({"id": "unsplash"})
             result = p.generate_image({}, device_config_dev)
 
@@ -124,12 +115,10 @@ def test_unsplash_with_collections(device_config_dev, monkeypatch):
             mock_img_response,
         ]
 
-        # Mock PIL Image
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.resize.return_value = (
-                MagicMock()
-            )
-
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
             p = Unsplash({"id": "unsplash"})
             settings = {"collections": "12345,67890"}
             result = p.generate_image(settings, device_config_dev)
@@ -166,12 +155,10 @@ def test_unsplash_with_color_filter(device_config_dev, monkeypatch):
             mock_img_response,
         ]
 
-        # Mock PIL Image
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.resize.return_value = (
-                MagicMock()
-            )
-
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
             p = Unsplash({"id": "unsplash"})
             settings = {"color": "blue"}
             result = p.generate_image(settings, device_config_dev)
@@ -208,12 +195,10 @@ def test_unsplash_with_orientation(device_config_dev, monkeypatch):
             mock_img_response,
         ]
 
-        # Mock PIL Image
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.resize.return_value = (
-                MagicMock()
-            )
-
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
             p = Unsplash({"id": "unsplash"})
             settings = {"orientation": "landscape"}
             result = p.generate_image(settings, device_config_dev)
@@ -373,41 +358,24 @@ def test_grab_image_success():
     """Test grab_image function with successful image download."""
     from plugins.unsplash.unsplash import grab_image
 
-    # Mock requests
-    with patch("plugins.unsplash.unsplash.get_http_session") as mock_session_fn:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"fake_image_data"
-        mock_session_fn.return_value.get.return_value = mock_response
+    with patch(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=object()
+    ) as mock_fetch:
+        result = grab_image("http://example.com/image.png", (800, 600))
 
-        # Mock PIL Image (grab_image uses context manager)
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_img_instance = MagicMock()
-            mock_resized = MagicMock()
-            mock_image.open.return_value.__enter__ = MagicMock(
-                return_value=mock_img_instance
-            )
-            mock_image.open.return_value.__exit__ = MagicMock(return_value=False)
-            mock_img_instance.resize.return_value = mock_resized
-
-            result = grab_image("http://example.com/image.png", (800, 600))
-
-            assert result is not None
-            mock_session_fn.return_value.get.assert_called_with(
-                "http://example.com/image.png", timeout=40.0
-            )
-            mock_img_instance.resize.assert_called_with((800, 600), mock_image.LANCZOS)
-            mock_resized.copy.assert_called_once()
+        assert result is not None
+        mock_fetch.assert_called_once_with(
+            "http://example.com/image.png", (800, 600), timeout_seconds=40.0
+        )
 
 
 def test_grab_image_download_failure():
     """Test grab_image function with download failure."""
     from plugins.unsplash.unsplash import grab_image
 
-    # Mock requests to raise exception
-    with patch("plugins.unsplash.unsplash.get_http_session") as mock_session_fn:
-        mock_session_fn.return_value.get.side_effect = Exception("Download failed")
-
+    with patch(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None
+    ):
         result = grab_image("http://example.com/image.png", (800, 600))
 
         assert result is None
@@ -417,20 +385,12 @@ def test_grab_image_invalid_image_data():
     """Test grab_image function with invalid image data."""
     from plugins.unsplash.unsplash import grab_image
 
-    # Mock requests
-    with patch("plugins.unsplash.unsplash.get_http_session") as mock_session_fn:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"invalid_image_data"
-        mock_session_fn.return_value.get.return_value = mock_response
+    with patch(
+        "plugins.unsplash.unsplash.fetch_and_resize_remote_image", return_value=None
+    ):
+        result = grab_image("http://example.com/image.png", (800, 600))
 
-        # Mock PIL Image to raise exception
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.side_effect = Exception("Invalid image format")
-
-            result = grab_image("http://example.com/image.png", (800, 600))
-
-            assert result is None
+        assert result is None
 
 
 def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
@@ -459,12 +419,10 @@ def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
             mock_img_response,
         ]
 
-        # Mock PIL Image
-        with patch("plugins.unsplash.unsplash.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.resize.return_value = (
-                MagicMock()
-            )
-
+        with patch(
+            "plugins.unsplash.unsplash.fetch_and_resize_remote_image",
+            return_value=MagicMock(),
+        ):
             p = Unsplash({"id": "unsplash"})
 
             # Test different content filter values

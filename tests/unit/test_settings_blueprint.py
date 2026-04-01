@@ -883,11 +883,19 @@ class TestExportSettings:
         assert "env_keys" not in data["data"]
 
     def test_export_with_keys(self, client, device_config_dev):
-        resp = client.get("/settings/export?include_keys=1")
+        resp = client.post("/settings/export", json={"include_keys": True})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert "env_keys" in data["data"]
+
+    def test_export_get_never_includes_keys(self, client, device_config_dev):
+        device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
+        resp = client.get("/settings/export?include_keys=1")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert "env_keys" not in data["data"]
 
 
 # ---------------------------------------------------------------------------
@@ -1086,6 +1094,24 @@ class TestHelpers:
         result = _window_since_seconds(None)
         # Should default to 24h ago
         assert abs(result - (time.time() - 24 * 3600)) < 2
+
+    def test_window_since_seconds_invalid_defaults_to_24h(self):
+        from blueprints.settings import _window_since_seconds
+
+        result = _window_since_seconds("abch")
+        assert abs(result - (time.time() - 24 * 3600)) < 2
+
+    def test_window_since_seconds_invalid_does_not_log_raw_input(self):
+        from blueprints.settings import _window_since_seconds
+
+        raw_window = "not-a-number\nforged-log-lineh"
+        logger = _window_since_seconds.__globals__["logger"]
+        with patch.object(logger, "warning") as warning_mock:
+            _window_since_seconds(raw_window)
+
+        warning_mock.assert_called_once_with(
+            "Invalid benchmark window provided, defaulting to 24h"
+        )
 
     def test_pct_empty(self):
         from blueprints.settings import _pct

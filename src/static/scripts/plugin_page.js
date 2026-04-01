@@ -1,4 +1,22 @@
 (function () {
+  function validateAddToPlaylistAction(action) {
+    if (action !== "add_to_playlist") return true;
+    const instanceInput = document.getElementById("instance");
+    const instanceError = document.getElementById("instance-error");
+    const name = (instanceInput?.value || "").trim();
+    if (!name) {
+      if (instanceInput) {
+        instanceInput.setAttribute("aria-invalid", "true");
+        instanceInput.focus();
+      }
+      if (instanceError) instanceError.textContent = "Instance name is required";
+      return false;
+    }
+    if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
+    if (instanceError) instanceError.textContent = "";
+    return true;
+  }
+
   function createPluginPage(config) {
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -163,41 +181,40 @@
       setHidden(metaDiv, metaContent.childNodes.length === 0);
     }
 
-    async function handleAction(action, triggerButton) {
-      // Client-side validation for Add to Playlist
-      if (action === "add_to_playlist") {
-        const instanceInput = document.getElementById("instance");
-        const instanceError = document.getElementById("instance-error");
-        const name = (instanceInput?.value || "").trim();
-        if (!name) {
-          if (instanceInput) { instanceInput.setAttribute("aria-invalid", "true"); instanceInput.focus(); }
-          if (instanceError) instanceError.textContent = "Instance name is required";
-          return;
-        }
-        if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
-        if (instanceError) instanceError.textContent = "";
-      }
-
+    function runPluginValidation(action) {
       try {
-        if (typeof window.validatePluginSettings === "function") {
-          const isValid = window.validatePluginSettings(action);
-          if (!isValid) return;
+        if (typeof globalThis.validatePluginSettings === "function") {
+          return !!globalThis.validatePluginSettings(action);
         }
       } catch (e) {
         console.warn("Plugin validation threw an error:", e);
       }
+      return true;
+    }
 
-      if (!window.PluginForm || typeof window.PluginForm.sendForm !== "function") {
-        showResponseModal(
-          "failure",
-          "Plugin form module failed to load. Refresh and try again."
-        );
-        return;
+    function ensurePluginFormAvailable() {
+      if (
+        globalThis.PluginForm &&
+        typeof globalThis.PluginForm.sendForm === "function"
+      ) {
+        return true;
       }
+      showResponseModal(
+        "failure",
+        "Plugin form module failed to load. Refresh and try again."
+      );
+      return false;
+    }
+
+    async function handleAction(action, triggerButton) {
+      if (!validateAddToPlaylistAction(action)) return;
+
+      if (!runPluginValidation(action)) return;
+      if (!ensurePluginFormAvailable()) return;
 
       if (triggerButton) triggerButton.disabled = true;
       try {
-        await window.PluginForm.sendForm({
+        await globalThis.PluginForm.sendForm({
           action,
           urls: config.urls,
           uploadedFiles,

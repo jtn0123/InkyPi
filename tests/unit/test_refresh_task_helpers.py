@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PIL import Image
 
 
@@ -98,12 +100,12 @@ def test_perform_refresh_skips_when_cached(device_config_dev, monkeypatch):
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance",
+        "refresh_task.task.get_plugin_instance",
         lambda cfg: _dummy_plugin(device_config_dev),
         raising=True,
     )
     monkeypatch.setattr(
-        "refresh_task.compute_image_hash", lambda img: "same", raising=True
+        "refresh_task.task.compute_image_hash", lambda img: "same", raising=True
     )
 
     called = {"val": False}
@@ -165,6 +167,7 @@ def test_update_plugin_health_tracks_retained_display(device_config_dev):
     snapshot = task.get_health_snapshot()
     assert snapshot["dummy"]["retained_display"] is True
     assert snapshot["dummy"]["timeout_count"] == 1
+    assert datetime.fromisoformat(snapshot["dummy"]["last_seen"]).tzinfo is not None
 
 
 def test_stale_display_path_prefers_processed_image(device_config_dev, tmp_path):

@@ -340,9 +340,16 @@
 
     async function exportConfig() {
       const include = document.getElementById("includeKeys")?.checked;
-      const url = `${config.exportSettingsUrl}?include_keys=${include ? "1" : "0"}`;
       try {
-        const resp = await fetch(url, { cache: "no-store" });
+        const requestInit = include
+          ? {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ include_keys: true }),
+              cache: "no-store",
+            }
+          : { cache: "no-store" };
+        const resp = await fetch(config.exportSettingsUrl, requestInit);
         const data = await resp.json();
         if (!resp.ok || !data.success) {
           showResponseModal("failure", "Export failed");

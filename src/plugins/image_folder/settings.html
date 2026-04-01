@@ -9,16 +9,7 @@
         <input type="hidden" name="padImage" value="true">
     </div>
 
-    <div class="form-group">
-        <label class="form-label" for="backgroundOption">Background:</label>
-        <div class="form-group">
-            <input type="radio" id="backgroundOptionBlur" name="backgroundOption" value="blur">
-            <label for="backgroundOptionBlur">Blur</label>
-            <input type="radio" id="backgroundOptionColor" name="backgroundOption" value="color">
-            <label for="backgroundOptionColor">Color</label>
-            <input type="color" id="backgroundColor" name="backgroundColor" value="#ffffff" class="color-picker"/>
-        </div>
-    </div>
+    {% include 'widgets/background_fill.html' %}
 </div>
 
 <div class="form-group">
@@ -36,7 +27,7 @@
             document.getElementById('padImage').checked = pluginSettings.padImage == 'false';
             document.getElementById('backgroundColor').value = pluginSettings.backgroundColor;
 
-            backgroundOption = pluginSettings.backgroundOption;
+            backgroundOption = pluginSettings.backgroundOption || 'blur';
         }
         document.querySelector(`input[name="backgroundOption"][value="${backgroundOption}"]`).checked = true;
     });

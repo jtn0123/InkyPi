@@ -81,7 +81,7 @@ class TestExportEdge:
 
         monkeypatch.setattr(device_config_dev, "load_env_key", _flaky_load)
 
-        resp = client.get("/settings/export?include_keys=1")
+        resp = client.post("/settings/export", json={"include_keys": True})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True

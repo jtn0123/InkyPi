@@ -100,3 +100,28 @@ def test_image_folder_initializes_without_name_error():
         {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
     )
     assert plugin is not None
+
+
+def test_generate_image_invalid_background_color_falls_back(
+    monkeypatch, device_config_dev, tmp_path
+):
+    from plugins.image_folder.image_folder import ImageFolder
+
+    folder = tmp_path / "imgs"
+    folder.mkdir()
+    _make_img(folder / "img_0.jpg", size=(320, 240))
+    monkeypatch.setattr(random, "choice", lambda seq: seq[0], raising=True)
+
+    plugin = ImageFolder(
+        {"id": "image_folder", "class": "ImageFolder", "name": "Image Folder"}
+    )
+    img = plugin.generate_image(
+        {
+            "folder_path": str(folder),
+            "padImage": "true",
+            "backgroundOption": "color",
+            "backgroundColor": "notacolor",
+        },
+        device_config_dev,
+    )
+    assert img is not None

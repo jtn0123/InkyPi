@@ -11,6 +11,17 @@ from utils.image_utils import pad_image_blur
 logger = logging.getLogger(__name__)
 
 
+def _resolve_background_color(
+    color_value: str | None, mode: str
+) -> tuple[int, ...] | int:
+    """Return a safe background color, falling back to white on invalid input."""
+    try:
+        return ImageColor.getcolor(color_value or "#ffffff", mode)
+    except ValueError:
+        logger.warning("Invalid background color %r, defaulting to white", color_value)
+        return ImageColor.getcolor("#ffffff", mode)
+
+
 def list_files_in_folder(folder_path):
     """Return a list of image file paths in the given folder, excluding hidden files."""
     image_extensions = (
@@ -132,8 +143,8 @@ class ImageFolder(BasePlugin):
                 if background_option == "blur":
                     img = pad_image_blur(img, dimensions)
                 else:
-                    background_color = ImageColor.getcolor(
-                        settings.get("backgroundColor") or "white", img.mode
+                    background_color = _resolve_background_color(
+                        settings.get("backgroundColor"), img.mode
                     )
                     img = ImageOps.pad(
                         img,

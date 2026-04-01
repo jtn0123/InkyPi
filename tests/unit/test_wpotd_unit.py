@@ -28,6 +28,25 @@ def test_determine_date_custom():
     assert d == date(2020, 2, 3)
 
 
+def test_determine_date_invalid_custom_date_falls_back(monkeypatch):
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+
+    class FrozenDateTime:
+        @staticmethod
+        def today():
+            return datetime(2024, 1, 2)
+
+        @staticmethod
+        def strptime(value, fmt):
+            return datetime.strptime(value, fmt)
+
+    from datetime import datetime
+
+    monkeypatch.setattr(wpotd_mod, "datetime", FrozenDateTime)
+    d = p._determine_date({"customDate": "2024-99-99"})
+    assert d == date(2024, 1, 2)
+
+
 def test_download_image_svg_unsupported():
     p = wpotd_mod.Wpotd({"id": "wpotd"})
     with pytest.raises(RuntimeError):

@@ -10,12 +10,12 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 
-import requests as _requests
 from flask import (
     Blueprint,
     current_app,
 )
 
+from utils.http_utils import http_get
 from utils.progress_events import get_progress_bus
 from utils.time_utils import get_timezone, now_device_tz
 
@@ -38,6 +38,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
+
+LOG_TIMESTAMP_FORMAT = "%b %d %H:%M:%S"
+UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
@@ -86,12 +89,15 @@ def _window_since_seconds(window: str | None) -> float:
     if not window:
         return now - 24 * 3600
     val = window.strip().lower()
-    if val.endswith("h"):
-        return now - (int(val[:-1]) * 3600)
-    if val.endswith("m"):
-        return now - (int(val[:-1]) * 60)
-    if val.endswith("d"):
-        return now - (int(val[:-1]) * 86400)
+    try:
+        if val.endswith("h"):
+            return now - (int(val[:-1]) * 3600)
+        if val.endswith("m"):
+            return now - (int(val[:-1]) * 60)
+        if val.endswith("d"):
+            return now - (int(val[:-1]) * 86400)
+    except ValueError:
+        logger.warning("Invalid benchmark window provided, defaulting to 24h")
     return now - 24 * 3600
 
 
@@ -110,7 +116,7 @@ class DevModeLogHandler(logging.Handler):
         try:
             msg = self.format(record)
             timestamp = datetime.fromtimestamp(record.created).strftime(
-                "%b %d %H:%M:%S"
+                LOG_TIMESTAMP_FORMAT
             )
             log_line = f"{timestamp} [{record.levelname}] {record.name}: {msg}"
             with _dev_log_lock:
@@ -203,7 +209,7 @@ def _read_log_lines(hours: int) -> list[str]:
         for record in reader:
             try:
                 ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
-                formatted_ts = ts.strftime("%b %d %H:%M:%S")
+                formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
             except Exception:
                 formatted_ts = "??? ?? ??:??:??"
 
@@ -265,7 +271,7 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
                     continue
                 ts_usec = record.get_realtime_usec()
                 ts = datetime.fromtimestamp(ts_usec / 1_000_000)
-                formatted_ts = ts.strftime("%b %d %H:%M:%S")
+                formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
                 hostname = data.get("_HOSTNAME", "unknown-host")
                 identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
                 pid = data.get("_PID", "?")
@@ -311,22 +317,30 @@ def _get_update_script_path() -> str | None:
     candidates: list[str] = []
     project_dir = os.getenv("PROJECT_DIR")
 
+    def add_install_candidates(base_dir: str) -> None:
+        install_dir = os.path.join(base_dir, "install")
+        candidates.extend(
+            [
+                os.path.join(install_dir, script_name)
+                for script_name in UPDATE_SCRIPT_NAMES
+            ]
+        )
+
     # Resolve the real repo root by following the src symlink (production layout)
     if project_dir:
         src_link = os.path.join(project_dir, "src")
         if os.path.islink(src_link):
             repo_root = os.path.dirname(os.path.realpath(src_link))
-            candidates.append(os.path.join(repo_root, "install", "do_update.sh"))
-            candidates.append(os.path.join(repo_root, "install", "update.sh"))
+            add_install_candidates(repo_root)
         # Direct PROJECT_DIR/install paths
-        candidates.append(os.path.join(project_dir, "install", "do_update.sh"))
-        candidates.append(os.path.join(project_dir, "install", "update.sh"))
+        add_install_candidates(project_dir)
 
     # Repo-relative path (this file: src/blueprints/settings/__init__.py → repo_root/install/)
     here = os.path.dirname(os.path.abspath(__file__))
     repo_install = os.path.abspath(os.path.join(here, "..", "..", "..", "install"))
-    candidates.append(os.path.join(repo_install, "do_update.sh"))
-    candidates.append(os.path.join(repo_install, "update.sh"))
+    candidates.extend(
+        [os.path.join(repo_install, script_name) for script_name in UPDATE_SCRIPT_NAMES]
+    )
 
     for path in candidates:
         if os.path.isfile(path):
@@ -481,10 +495,11 @@ def _check_latest_version() -> str | None:
     ):
         return _VERSION_CACHE["latest"]  # type: ignore[return-value]
     try:
-        resp = _requests.get(
+        resp = http_get(
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
+            use_cache=False,
         )
         resp.raise_for_status()
         data = resp.json()

@@ -2,7 +2,7 @@ import json
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import UTC, datetime
 
 from flask import (
     Blueprint,
@@ -19,6 +19,19 @@ from utils.time_utils import get_timezone, now_device_tz
 logger = logging.getLogger(__name__)
 
 history_bp = Blueprint("history", __name__)
+
+
+def _timestamp_from_history_filename(filename: str) -> float:
+    """Extract an epoch timestamp from display_YYYYMMDD_HHMMSS-style filenames."""
+    stem, _ext = os.path.splitext(filename)
+    parts = stem.split("_")
+    if len(parts) < 3:
+        return 0.0
+    try:
+        dt = datetime.strptime(f"{parts[-2]}_{parts[-1]}", "%Y%m%d_%H%M%S")
+    except ValueError:
+        return 0.0
+    return dt.replace(tzinfo=UTC).timestamp()
 
 
 def _format_size(num_bytes: int) -> str:
@@ -53,7 +66,11 @@ def _list_history_images(history_dir: str) -> list[dict]:
             return 0.0
 
     files.sort(
-        key=lambda f: (_safe_mtime(os.path.join(history_dir, f)), f),
+        key=lambda f: (
+            _safe_mtime(os.path.join(history_dir, f)),
+            _timestamp_from_history_filename(f),
+            f,
+        ),
         reverse=True,
     )
     result: list[dict] = []
@@ -111,11 +128,32 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
     return candidate
 
 
+_DEFAULT_PER_PAGE = 24
+
+
 @history_bp.route("/history")
 def history_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
-    images = _list_history_images(history_dir)
+    all_images = _list_history_images(history_dir)
+    total = len(all_images)
+
+    # Pagination
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        per_page = max(
+            1, min(120, int(request.args.get("per_page", _DEFAULT_PER_PAGE)))
+        )
+    except (ValueError, TypeError):
+        per_page = _DEFAULT_PER_PAGE
+
+    start = (page - 1) * per_page
+    images = all_images[start : start + per_page]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+
     # Pull latest timing metrics if available
     try:
         ri = device_config.get_refresh_info()
@@ -162,7 +200,14 @@ def history_page():
     }
 
     return render_template(
-        "history.html", images=images, storage=storage_ctx, metrics=metrics
+        "history.html",
+        images=images,
+        storage=storage_ctx,
+        metrics=metrics,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        per_page=per_page,
     )
 
 
@@ -224,18 +269,20 @@ def history_delete():
             safe_path = _resolve_history_path(history_dir, filename)
         except ValueError:
             return json_error("invalid filename", status=400)
-        if os.path.exists(safe_path):
-            os.remove(safe_path)
-            # Remove matching sidecar on png/json deletions.
-            base, ext = os.path.splitext(safe_path)
-            if ext.lower() == ".png":
-                sidecar = f"{base}.json"
-                if os.path.exists(sidecar):
-                    os.remove(sidecar)
-            elif ext.lower() == ".json":
-                sidecar = f"{base}.png"
-                if os.path.exists(sidecar):
-                    os.remove(sidecar)
+        if not os.path.exists(safe_path):
+            return json_error("File not found", status=404)
+
+        os.remove(safe_path)
+        # Remove matching sidecar on png/json deletions.
+        base, ext = os.path.splitext(safe_path)
+        if ext.lower() == ".png":
+            sidecar = f"{base}.json"
+            if os.path.exists(sidecar):
+                os.remove(sidecar)
+        elif ext.lower() == ".json":
+            sidecar = f"{base}.png"
+            if os.path.exists(sidecar):
+                os.remove(sidecar)
         return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")

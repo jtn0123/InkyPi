@@ -203,6 +203,30 @@ def test_ai_image_openai_api_failure(device_config_dev, monkeypatch):
             p.generate_image(settings, device_config_dev)
 
 
+def test_ai_image_raises_when_provider_returns_no_image(device_config_dev, monkeypatch):
+    """AI image generation should not return None on a falsy provider response."""
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with (
+        patch("plugins.ai_image.ai_image.OpenAI") as mock_openai,
+        patch.object(AIImage, "fetch_image", return_value=None),
+    ):
+        mock_openai.return_value = MagicMock()
+
+        with pytest.raises(RuntimeError, match="Failed to generate image"):
+            p.generate_image(
+                {
+                    "textPrompt": "a cat",
+                    "imageModel": "gpt-image-1.5",
+                    "quality": "medium",
+                },
+                device_config_dev,
+            )
+
+
 def test_ai_image_randomize_prompt_enabled(device_config_dev, monkeypatch):
     """Test ai_image plugin with prompt randomization enabled."""
     from plugins.ai_image.ai_image import AIImage

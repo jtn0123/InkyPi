@@ -2,19 +2,29 @@
 // Relies on the /settings/client_log endpoint already present in settings.py.
 (function () {
   "use strict";
-  var ENDPOINT = "/settings/client_log";
-  var _lastReport = 0;
-  var THROTTLE_MS = 5000; // at most one report per 5 seconds
+  const ENDPOINT = "/settings/client_log";
+  const THROTTLE_MS = 5000; // at most one report per 5 seconds
+  let lastReport = 0;
+
+  function getRejectionMessage(reason) {
+    if (reason instanceof Error) {
+      return reason.message;
+    }
+    if (typeof reason === "string") {
+      return reason;
+    }
+    return "Unhandled promise rejection";
+  }
 
   function report(message, extra) {
-    var now = Date.now();
-    if (now - _lastReport < THROTTLE_MS) return;
-    _lastReport = now;
+    const now = Date.now();
+    if (now - lastReport < THROTTLE_MS) return;
+    lastReport = now;
     try {
-      var body = JSON.stringify({
+      const body = JSON.stringify({
         level: "error",
-        message: message,
-        extra: extra,
+        message,
+        extra,
       });
       // Use navigator.sendBeacon if available (works during page unload)
       if (navigator.sendBeacon) {
@@ -41,13 +51,8 @@
   });
 
   window.addEventListener("unhandledrejection", function (event) {
-    var reason = event.reason;
-    var message =
-      reason instanceof Error
-        ? reason.message
-        : typeof reason === "string"
-        ? reason
-        : "Unhandled promise rejection";
+    const reason = event.reason;
+    const message = getRejectionMessage(reason);
     report(message, {
       stack: reason instanceof Error ? (reason.stack || "").slice(0, 500) : "",
       url: location.pathname,

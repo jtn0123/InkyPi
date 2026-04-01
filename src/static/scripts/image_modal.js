@@ -1,11 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
     const imageContainer = document.querySelector('.image-container');
+    if (!imageContainer) return;
     const img = imageContainer.querySelector('img');
     let modalOverlay = null;
     let modalImg = null;
     let observer = null;
-    
-    if (!imageContainer || !img) return;
+
+    if (!img) return;
 
     // Handle click on image to show modal
     img.addEventListener('click', function(e) {
@@ -52,6 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle click on overlay to close modal
     document.addEventListener('click', function(e) {
         if (imageContainer.classList.contains('maximized') && modalOverlay && !img.contains(e.target)) {
+            closeModal();
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && imageContainer.classList.contains('maximized')) {
             closeModal();
         }
     });

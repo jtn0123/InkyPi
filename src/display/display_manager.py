@@ -3,11 +3,11 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime
 from time import perf_counter
 
 from display.mock_display import MockDisplay
 from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class DisplayManager:
     # Force a full recount every N increments to correct estimate drift
     _RECOUNT_INTERVAL = 50
     _history_increment_count = 0
-    _history_lock = threading.Lock()
+    _history_lock = threading.RLock()
 
     def _prune_history(self, history_dir):
         """Remove oldest history entries when the total exceeds HISTORY_MAX_ENTRIES.
@@ -102,6 +102,10 @@ class DisplayManager:
             try:
                 png_files = sorted(
                     (f for f in os.listdir(history_dir) if f.endswith(".png")),
+                    key=lambda name: (
+                        os.path.getmtime(os.path.join(history_dir, name)),
+                        name,
+                    ),
                 )
                 self._history_count_estimate = len(png_files)
                 excess = len(png_files) - self.HISTORY_MAX_ENTRIES
@@ -130,23 +134,32 @@ class DisplayManager:
         if not history_dir:
             return
         try:
-            os.makedirs(history_dir, exist_ok=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_name = f"display_{ts}"
-            png_path = os.path.join(history_dir, f"{base_name}.png")
-            # Avoid clobbering snapshots generated in the same second.
-            if os.path.exists(png_path):
-                suffix = datetime.now().strftime("%f")
-                base_name = f"{base_name}_{suffix}"
-                png_path = os.path.join(history_dir, f"{base_name}.png")
+            with self._history_lock:
+                os.makedirs(history_dir, exist_ok=True)
+                timestamp = now_device_tz(self.device_config)
+                base_name = f"display_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
-            processed_image.save(png_path, optimize=True)
+                png_path = None
+                for attempt in range(1000):
+                    candidate = (
+                        base_name if attempt == 0 else f"{base_name}_{attempt:03d}"
+                    )
+                    candidate_path = os.path.join(history_dir, f"{candidate}.png")
+                    if os.path.exists(candidate_path):
+                        continue
+                    processed_image.save(candidate_path, optimize=True)
+                    base_name = candidate
+                    png_path = candidate_path
+                    break
+
+                if png_path is None:
+                    raise OSError("Unable to allocate a unique history snapshot path")
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save history snapshot image")
             return
         try:
             meta_payload = dict(history_meta or {})
-            meta_payload.setdefault("refresh_time", datetime.now().isoformat())
+            meta_payload.setdefault("refresh_time", timestamp.isoformat())
             with open(
                 os.path.join(history_dir, f"{base_name}.json"),
                 "w",

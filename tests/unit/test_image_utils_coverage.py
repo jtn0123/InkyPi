@@ -182,3 +182,80 @@ def test_screenshot_timeout_constants_sane():
     """Default and max timeout constants should be positive and correctly ordered."""
     assert _DEFAULT_SCREENSHOT_TIMEOUT_S > 0
     assert _MAX_SCREENSHOT_TIMEOUT_S >= _DEFAULT_SCREENSHOT_TIMEOUT_S
+
+
+# ---------------------------------------------------------------------------
+# fetch_and_resize_remote_image tests
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_and_resize_remote_image_success():
+    """Test successful fetch and resize of a remote image."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    img = Image.new("RGB", (200, 200), color="blue")
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    img_bytes = buf.getvalue()
+
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.content = img_bytes
+    mock_response.raise_for_status.return_value = None
+
+    with patch("utils.image_utils.http_get", return_value=mock_response):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is not None
+    assert isinstance(result, Image.Image)
+    assert result.size == (100, 50)
+
+
+def test_fetch_and_resize_remote_image_http_failure():
+    """Test fetch_and_resize_remote_image when HTTP request fails."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    with patch(
+        "utils.image_utils.http_get", side_effect=Exception("Connection refused")
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None
+
+
+def test_fetch_and_resize_remote_image_invalid_bytes():
+    """Test fetch_and_resize_remote_image with non-image response body."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.content = b"not an image at all"
+    mock_response.raise_for_status.return_value = None
+
+    with patch("utils.image_utils.http_get", return_value=mock_response):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None
+
+
+def test_fetch_and_resize_remote_image_raise_for_status():
+    """Test fetch_and_resize_remote_image when raise_for_status raises."""
+    from requests.exceptions import HTTPError
+
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    mock_response = Mock()
+    mock_response.raise_for_status.side_effect = HTTPError("404 Not Found")
+
+    with patch("utils.image_utils.http_get", return_value=mock_response):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None
