@@ -1,6 +1,79 @@
 # CHANGELOG
 
 
+## v0.2.1 (2026-04-01)
+
+### Bug Fixes
+
+- Ui/ux polish batch from dogfood session
+  ([`72074c8`](https://github.com/jtn0123/InkyPi/commit/72074c836c513a9b214f48ec47f23685912466c9))
+
+- JTN-86: Plugin not found now uses styled 404 page instead of plain text - JTN-87: Add visible "to"
+  label on playlist modal end-time combobox - JTN-88: Countdown date fields default to tomorrow
+  instead of 0/0/0 - JTN-89: Plugin tabs scroll to target panel on desktop click - JTN-90: 404 page
+  "Back to Home" uses prominent action-button style - JTN-92: Image Upload radio buttons wrapped in
+  fieldset with legend
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract helpers and constants from create_app()
+  ([`8a3ab9d`](https://github.com/jtn0123/InkyPi/commit/8a3ab9d93db327b7021b6ab760e340744eb91768))
+
+- Add _env_bool() helper to replace 7 repeated ("1","true","yes") checks - Extract
+  _register_error_handlers() (38 lines) from create_app() - Add named constants: _CACHE_1_YEAR,
+  _CACHE_1_DAY, _DEFAULT_MAX_UPLOAD - create_app() reduced from 382 to ~340 lines
+
+JTN-74
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Replace bare except Exception in utils, plugins, and config
+  ([`6b7c5b2`](https://github.com/jtn0123/InkyPi/commit/6b7c5b2ebb3bb349a0892c16f2fc97fece99d5e8))
+
+Replace 26 bare `except Exception` blocks with specific exception types across 13 files (utils,
+  plugins, config, model). Intentional catch-alls for logging safety, cleanup, and top-level
+  fallbacks are preserved.
+
+Key changes: - Flask context checks → RuntimeError - Env var parsing (float/int) → (ValueError,
+  TypeError) - PIL image operations → (OSError, ValueError) - File I/O → OSError - Playwright import
+  → ImportError - Cache-Control parsing → (ValueError, IndexError) - Schema validation →
+  (AttributeError, TypeError, IndexError)
+
+JTN-41
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add coverage for specific exception paths (JTN-41)
+  ([`697a482`](https://github.com/jtn0123/InkyPi/commit/697a48231b305211019dd6ba174df328e722e7d6))
+
+9 tests covering: RuntimeError on Flask context access, ValueError on env var parsing, malformed
+  Cache-Control header, psutil failure fallback, invalid snooze datetime, playwright ImportError,
+  AttributeError on file stream rewind.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Improve coverage for exception paths to satisfy SonarCloud
+  ([`50b7e1e`](https://github.com/jtn0123/InkyPi/commit/50b7e1e9e5dcf6926a2c79caffffccd9ea98222a))
+
+Cover chmod OSError, image loader wrapper, image upload cleanup, apod/weather/unsplash timeout
+  parsing, and base_plugin timeout.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Increase coverage for specific exception paths (JTN-41)
+  ([`ea0ffd2`](https://github.com/jtn0123/InkyPi/commit/ea0ffd2a55105160c8a11a493ebee040bf793f6f))
+
+11 tests covering changed except blocks: RuntimeError on Flask context, ValueError on env var
+  parsing, malformed Cache-Control, psutil failure, invalid snooze datetime, playwright ImportError,
+  AttributeError on seek, unsplash timeout fallback, image upload deletion OSError.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.2.0 (2026-03-31)
 
 ### Features
