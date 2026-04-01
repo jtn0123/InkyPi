@@ -9,16 +9,20 @@
         <input type="hidden" name="padImage" value="true">
     </div>
 
-    <div class="form-group">
-        <label class="form-label" for="backgroundOption">Background:</label>
-        <div class="form-group">
-            <input type="radio" id="backgroundOptionBlur" name="backgroundOption" value="blur">
-            <label for="backgroundOptionBlur">Blur</label>
-            <input type="radio" id="backgroundOptionColor" name="backgroundOption" value="color">
-            <label for="backgroundOptionColor">Color</label>
+    <fieldset class="form-group" style="border: none; padding: 0; margin: 0;">
+        <legend class="form-label">Background Fill</legend>
+        <div class="radio-segment">
+            <label class="radio-option">
+                <input type="radio" id="backgroundOptionBlur" name="backgroundOption" value="blur" checked>
+                <span>Blur</span>
+            </label>
+            <label class="radio-option">
+                <input type="radio" id="backgroundOptionColor" name="backgroundOption" value="color">
+                <span>Solid Color</span>
+            </label>
             <input type="color" id="backgroundColor" name="backgroundColor" value="#ffffff" class="color-picker"/>
         </div>
-    </div>
+    </fieldset>
 </div>
 
 <div class="form-group">

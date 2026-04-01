@@ -3,11 +3,11 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime
 from time import perf_counter
 
 from display.mock_display import MockDisplay
 from utils.image_utils import apply_image_enhancement, change_orientation, resize_image
+from utils.time_utils import now_device_tz
 
 logger = logging.getLogger(__name__)
 
@@ -131,22 +131,42 @@ class DisplayManager:
             return
         try:
             os.makedirs(history_dir, exist_ok=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            base_name = f"display_{ts}"
-            png_path = os.path.join(history_dir, f"{base_name}.png")
-            # Avoid clobbering snapshots generated in the same second.
-            if os.path.exists(png_path):
-                suffix = datetime.now().strftime("%f")
-                base_name = f"{base_name}_{suffix}"
-                png_path = os.path.join(history_dir, f"{base_name}.png")
+            timestamp = now_device_tz(self.device_config)
+            base_name = f"display_{timestamp.strftime('%Y%m%d_%H%M%S')}"
 
-            processed_image.save(png_path, optimize=True)
+            png_path = None
+            for attempt in range(1000):
+                candidate = base_name if attempt == 0 else f"{base_name}_{attempt:03d}"
+                candidate_path = os.path.join(history_dir, f"{candidate}.png")
+                try:
+                    fd = os.open(
+                        candidate_path,
+                        os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+                        0o644,
+                    )
+                except FileExistsError:
+                    continue
+                try:
+                    with os.fdopen(fd, "wb") as image_file:
+                        processed_image.save(image_file, format="PNG", optimize=True)
+                except (OSError, ValueError, RuntimeError):
+                    try:
+                        os.remove(candidate_path)
+                    except OSError:
+                        pass
+                    raise
+                base_name = candidate
+                png_path = candidate_path
+                break
+
+            if png_path is None:
+                raise OSError("Unable to allocate a unique history snapshot path")
         except (OSError, ValueError, RuntimeError):
             logger.exception("Failed to save history snapshot image")
             return
         try:
             meta_payload = dict(history_meta or {})
-            meta_payload.setdefault("refresh_time", datetime.now().isoformat())
+            meta_payload.setdefault("refresh_time", timestamp.isoformat())
             with open(
                 os.path.join(history_dir, f"{base_name}.json"),
                 "w",

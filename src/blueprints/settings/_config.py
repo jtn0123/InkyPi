@@ -90,14 +90,27 @@ def backup_restore_page():
     )
 
 
-@_mod.settings_bp.route("/settings/export", methods=["GET"])
+def _include_export_keys() -> bool:
+    """Allow keyed exports only on POST requests."""
+    if request.method != "POST":
+        return False
+
+    body = request.get_json(silent=True)
+    if isinstance(body, dict):
+        value = body.get("include_keys")
+    else:
+        value = request.form.get("include_keys")
+
+    if isinstance(value, bool):
+        return value
+
+    return str(value or "").strip().lower() in ("1", "true", "yes")
+
+
+@_mod.settings_bp.route("/settings/export", methods=["GET", "POST"])
 def export_settings():
     try:
-        include_keys = request.args.get("include_keys", "0").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        )
+        include_keys = _include_export_keys()
         device_config = current_app.config["DEVICE_CONFIG"]
 
         # Build export object with config plus env keys when requested

@@ -1,5 +1,6 @@
 import builtins
 import types
+from datetime import UTC, datetime
 
 import pytest
 from PIL import Image
@@ -159,6 +160,29 @@ def test_display_manager_writes_history_sidecar(device_config_dev):
     assert payload["plugin_id"] == "clock"
     assert payload["plugin_instance"] == "A"
     assert "refresh_time" in payload
+
+
+def test_display_manager_history_uses_device_timezone(device_config_dev, monkeypatch):
+    device_config_dev.update_value("display_type", "mock")
+    import json
+    from pathlib import Path
+
+    import display.display_manager as dm_mod
+    from display.display_manager import DisplayManager
+
+    frozen_now = datetime(2026, 3, 31, 22, 45, 12, tzinfo=UTC)
+    monkeypatch.setattr(dm_mod, "now_device_tz", lambda _config: frozen_now)
+
+    dm = DisplayManager(device_config_dev)
+    dm.display_image(make_image(200, 100), history_meta={"plugin_id": "clock"})
+
+    history_dir = Path(device_config_dev.history_image_dir)
+    jsons = sorted(history_dir.glob("display_*.json"))
+    with open(jsons[-1], encoding="utf-8") as fh:
+        payload = json.load(fh)
+
+    assert payload["refresh_time"] == frozen_now.isoformat()
+    assert jsons[-1].stem == "display_20260331_224512"
 
 
 def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path):
