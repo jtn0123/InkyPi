@@ -62,7 +62,7 @@ def test_rapid_manual_updates(device_config_dev, mock_plugin, monkeypatch):
     dummy_cfg = {"id": "test", "class": "Test"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
+        "refresh_task.task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
     )
 
     try:
@@ -92,7 +92,7 @@ def test_concurrent_manual_updates_from_multiple_threads(
     dummy_cfg = {"id": "test", "class": "Test"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
+        "refresh_task.task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
     )
 
     try:
@@ -302,7 +302,7 @@ def test_manual_update_returns_metrics_after_update(
     dummy_cfg = {"id": "test", "class": "Test"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
+        "refresh_task.task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
     )
 
     try:
@@ -327,7 +327,7 @@ def test_high_frequency_updates_dont_deadlock(
     dummy_cfg = {"id": "test", "class": "Test"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
+        "refresh_task.task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
     )
 
     try:
@@ -361,7 +361,7 @@ def test_memory_not_growing_with_many_updates(
     dummy_cfg = {"id": "test", "class": "Test"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
+        "refresh_task.task.get_plugin_instance", lambda cfg: mock_plugin, raising=True
     )
 
     try:

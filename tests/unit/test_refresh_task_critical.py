@@ -91,9 +91,9 @@ class TestExecuteRefreshAttemptWorker:
 
         # Mock get_plugin_instance and _restore_child_config
         with (
-            patch("refresh_task.get_plugin_instance", return_value=FakePlugin()),
+            patch("refresh_task.worker.get_plugin_instance", return_value=FakePlugin()),
             patch(
-                "refresh_task._restore_child_config",
+                "refresh_task.worker._restore_child_config",
                 return_value=device_config_dev,
             ),
         ):
@@ -126,9 +126,9 @@ class TestExecuteRefreshAttemptWorker:
                 return None
 
         with (
-            patch("refresh_task.get_plugin_instance", return_value=NullPlugin()),
+            patch("refresh_task.worker.get_plugin_instance", return_value=NullPlugin()),
             patch(
-                "refresh_task._restore_child_config",
+                "refresh_task.worker._restore_child_config",
                 return_value=device_config_dev,
             ),
         ):
@@ -155,9 +155,9 @@ class TestExecuteRefreshAttemptWorker:
                 raise ValueError("bad config")
 
         with (
-            patch("refresh_task.get_plugin_instance", return_value=MagicMock()),
+            patch("refresh_task.worker.get_plugin_instance", return_value=MagicMock()),
             patch(
-                "refresh_task._restore_child_config",
+                "refresh_task.worker._restore_child_config",
                 return_value=device_config_dev,
             ),
         ):
@@ -261,7 +261,7 @@ class TestExecuteWithPolicyErrors:
         ctx.Queue.return_value = fake_queue
 
         with (
-            patch("refresh_task._get_mp_context", return_value=ctx),
+            patch("refresh_task.task._get_mp_context", return_value=ctx),
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
@@ -290,7 +290,7 @@ class TestExecuteWithPolicyErrors:
         ctx.Queue.return_value = fake_queue
 
         with (
-            patch("refresh_task._get_mp_context", return_value=ctx),
+            patch("refresh_task.task._get_mp_context", return_value=ctx),
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
@@ -323,7 +323,7 @@ class TestExecuteWithPolicyErrors:
         ctx.Queue.return_value = fake_queue
 
         with (
-            patch("refresh_task._get_mp_context", return_value=ctx),
+            patch("refresh_task.task._get_mp_context", return_value=ctx),
             patch.dict(os.environ, {"INKYPI_PLUGIN_ISOLATION": "process"}),
         ):
             try:
@@ -354,7 +354,7 @@ class TestExecuteWithPolicyErrors:
         ctx.Queue.return_value = fake_queue
 
         with (
-            patch("refresh_task._get_mp_context", return_value=ctx),
+            patch("refresh_task.task._get_mp_context", return_value=ctx),
             patch.dict(
                 os.environ,
                 {
