@@ -12,6 +12,26 @@ from utils.http_utils import json_error, json_internal_error
 from utils.progress_events import get_progress_bus, to_sse
 
 
+def _filter_health_by_window(health, window_min):
+    if not isinstance(health, dict) or window_min <= 0:
+        return health
+    cutoff = datetime.now() - timedelta(minutes=window_min)
+    filtered = {}
+    for plugin_id, item in health.items():
+        last_seen = item.get("last_seen") if isinstance(item, dict) else None
+        if not last_seen:
+            filtered[plugin_id] = item
+            continue
+        try:
+            dt = datetime.fromisoformat(last_seen)
+        except Exception:
+            filtered[plugin_id] = item
+            continue
+        if dt >= cutoff:
+            filtered[plugin_id] = item
+    return filtered
+
+
 @_mod.settings_bp.route("/api/health/plugins")
 def health_plugins():
     try:
@@ -21,22 +41,7 @@ def health_plugins():
             window_min = int(os.getenv("INKYPI_HEALTH_WINDOW_MIN", "1440") or "1440")
         except Exception:
             window_min = 1440
-        if isinstance(health, dict) and window_min > 0:
-            cutoff = datetime.now() - timedelta(minutes=window_min)
-            filtered = {}
-            for plugin_id, item in health.items():
-                last_seen = item.get("last_seen") if isinstance(item, dict) else None
-                if not last_seen:
-                    filtered[plugin_id] = item
-                    continue
-                try:
-                    dt = datetime.fromisoformat(last_seen)
-                except Exception:
-                    filtered[plugin_id] = item
-                    continue
-                if dt >= cutoff:
-                    filtered[plugin_id] = item
-            health = filtered
+        health = _filter_health_by_window(health, window_min)
         return jsonify({"success": True, "items": health})
     except Exception as e:
         return json_internal_error("health plugins", details={"error": str(e)})

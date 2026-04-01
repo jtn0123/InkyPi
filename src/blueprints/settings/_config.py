@@ -131,21 +131,28 @@ def export_settings():
         )
 
 
+def _extract_import_payload():
+    payload = None
+    if request.is_json:
+        payload = request.get_json(silent=True)
+    if payload is None:
+        file = request.files.get("file")
+        if file:
+            import json as _json
+
+            payload = _json.loads(file.stream.read().decode("utf-8"))
+    if not payload or not isinstance(payload, dict):
+        return None
+    return payload
+
+
 @_mod.settings_bp.route("/settings/import", methods=["POST"])
 def import_settings():
     try:
         device_config = current_app.config["DEVICE_CONFIG"]
         # Accept JSON body or form upload with a JSON file
-        payload = None
-        if request.is_json:
-            payload = request.get_json(silent=True)
+        payload = _extract_import_payload()
         if payload is None:
-            file = request.files.get("file")
-            if file:
-                import json as _json
-
-                payload = _json.loads(file.stream.read().decode("utf-8"))
-        if not payload or not isinstance(payload, dict):
             return json_error("Invalid import payload", status=400)
 
         cfg = payload.get("config")
@@ -269,6 +276,79 @@ def delete_api_key():
         )
 
 
+def _validate_settings_form(form_data):
+    unit = form_data.get("unit")
+    interval = form_data.get("interval")
+    time_format = form_data.get("timeFormat")
+
+    if not unit or unit not in ["minute", "hour"]:
+        return json_error(
+            "Plugin cycle interval unit is required",
+            status=422,
+            code="validation_error",
+            details={"field": "unit"},
+        )
+    if not interval or not interval.isnumeric():
+        return json_error(
+            "Refresh interval is required",
+            status=422,
+            code="validation_error",
+            details={"field": "interval"},
+        )
+    if not form_data.get("timezoneName"):
+        return json_error(
+            "Time Zone is required",
+            status=422,
+            code="validation_error",
+            details={"field": "timezoneName"},
+        )
+    if not time_format or time_format not in ["12h", "24h"]:
+        return json_error(
+            "Time format is required",
+            status=422,
+            code="validation_error",
+            details={"field": "timeFormat"},
+        )
+
+    plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
+    if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
+        return json_error(
+            "Plugin cycle interval must be less than 24 hours",
+            status=422,
+            code="validation_error",
+            details={"field": "interval"},
+        )
+    return None
+
+
+def _build_settings_dict(form_data):
+    unit = form_data.get("unit")
+    interval = form_data.get("interval")
+    plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
+
+    settings = {
+        "name": form_data.get("deviceName"),
+        "orientation": form_data.get("orientation"),
+        "inverted_image": form_data.get("invertImage"),
+        "log_system_stats": form_data.get("logSystemStats"),
+        "timezone": form_data.get("timezoneName"),
+        "time_format": form_data.get("timeFormat"),
+        "plugin_cycle_interval_seconds": plugin_cycle_interval_seconds,
+        "image_settings": {
+            "saturation": float(form_data.get("saturation", "1.0")),
+            "brightness": float(form_data.get("brightness", "1.0")),
+            "sharpness": float(form_data.get("sharpness", "1.0")),
+            "contrast": float(form_data.get("contrast", "1.0")),
+        },
+        "preview_size_mode": form_data.get("previewSizeMode", "native"),
+    }
+    if "inky_saturation" in form_data:
+        settings["image_settings"]["inky_saturation"] = float(
+            form_data.get("inky_saturation", "0.5")
+        )
+    return settings, plugin_cycle_interval_seconds
+
+
 @_mod.settings_bp.route("/save_settings", methods=["POST"])
 def save_settings():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -276,71 +356,14 @@ def save_settings():
     try:
         form_data = request.form.to_dict()
 
-        unit, interval, time_format = (
-            form_data.get("unit"),
-            form_data.get("interval"),
-            form_data.get("timeFormat"),
-        )
-        if not unit or unit not in ["minute", "hour"]:
-            return json_error(
-                "Plugin cycle interval unit is required",
-                status=422,
-                code="validation_error",
-                details={"field": "unit"},
-            )
-        if not interval or not interval.isnumeric():
-            return json_error(
-                "Refresh interval is required",
-                status=422,
-                code="validation_error",
-                details={"field": "interval"},
-            )
-        if not form_data.get("timezoneName"):
-            return json_error(
-                "Time Zone is required",
-                status=422,
-                code="validation_error",
-                details={"field": "timezoneName"},
-            )
-        if not time_format or time_format not in ["12h", "24h"]:
-            return json_error(
-                "Time format is required",
-                status=422,
-                code="validation_error",
-                details={"field": "timeFormat"},
-            )
+        error = _validate_settings_form(form_data)
+        if error:
+            return error
+
         previous_interval_seconds = device_config.get_config(
             "plugin_cycle_interval_seconds"
         )
-        plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
-        if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
-            return json_error(
-                "Plugin cycle interval must be less than 24 hours",
-                status=422,
-                code="validation_error",
-                details={"field": "interval"},
-            )
-
-        settings = {
-            "name": form_data.get("deviceName"),
-            "orientation": form_data.get("orientation"),
-            "inverted_image": form_data.get("invertImage"),
-            "log_system_stats": form_data.get("logSystemStats"),
-            "timezone": form_data.get("timezoneName"),
-            "time_format": form_data.get("timeFormat"),
-            "plugin_cycle_interval_seconds": plugin_cycle_interval_seconds,
-            "image_settings": {
-                "saturation": float(form_data.get("saturation", "1.0")),
-                "brightness": float(form_data.get("brightness", "1.0")),
-                "sharpness": float(form_data.get("sharpness", "1.0")),
-                "contrast": float(form_data.get("contrast", "1.0")),
-            },
-            "preview_size_mode": form_data.get("previewSizeMode", "native"),
-        }
-        if "inky_saturation" in form_data:
-            settings["image_settings"]["inky_saturation"] = float(
-                form_data.get("inky_saturation", "0.5")
-            )
+        settings, plugin_cycle_interval_seconds = _build_settings_dict(form_data)
         device_config.update_config(settings)
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:

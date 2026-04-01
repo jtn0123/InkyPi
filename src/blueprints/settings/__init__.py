@@ -374,74 +374,83 @@ def _start_update_via_systemd(
     subprocess.Popen(cmd)  # nosec: commands are fixed, script path validated
 
 
+def _log_and_publish(msg: str, level: str = "info"):
+    """Log and publish update progress to the SSE bus."""
+    getattr(logger, level)("update | %s", msg)
+    try:
+        bus = get_progress_bus()
+        bus.publish({"type": "update_log", "line": msg})
+    except Exception:
+        pass
+
+
+def _run_real_update(script_path: str) -> None:
+    proc = subprocess.Popen(
+        ["/bin/bash", script_path],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True,
+    )
+    for line in proc.stdout or []:
+        _log_and_publish(line.rstrip())
+    proc.wait()
+    rc = proc.returncode if proc.returncode is not None else 0
+    if rc == 0:
+        _log_and_publish("web_update: completed successfully")
+    else:
+        _log_and_publish(f"web_update: failed with return code {rc}", "error")
+
+
+def _run_simulated_update() -> None:
+    for msg in [
+        "Simulated update starting...",
+        "Checking connectivity...",
+        "Fetching latest dependencies...",
+        "Updating application files...",
+        "Restarting service...",
+        "Update completed.",
+    ]:
+        _log_and_publish(msg)
+        time.sleep(0.5)
+
+
+def _update_runner(script_path: str | None) -> None:
+    try:
+        _log_and_publish("web_update: starting")
+        if (
+            script_path
+            and os.path.isfile(script_path)
+            and os.access(script_path, os.X_OK)
+        ):
+            # Do not run the real script unless explicitly enabled
+            allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in (
+                "1",
+                "true",
+                "yes",
+            )
+            if allow_real:
+                _run_real_update(script_path)
+            else:
+                _run_simulated_update()
+        else:
+            for i in range(6):
+                _log_and_publish(f"step {i + 1}/6")
+                time.sleep(0.5)
+            _log_and_publish("done (simulated)")
+    except Exception:
+        logger.exception("web_update: exception while running update")
+    finally:
+        _set_update_state(False, None)
+
+
 def _start_update_fallback_thread(script_path: str | None) -> None:
     # Development/macOS path: run a simulated update and pipe output into our logger
     # to make it visible in inkypi.service logs and the UI viewer.
-    def _log_and_publish(msg: str, level: str = "info"):
-        """Log and publish update progress to the SSE bus."""
-        getattr(logger, level)("update | %s", msg)
-        try:
-            bus = get_progress_bus()
-            bus.publish({"type": "update_log", "line": msg})
-        except Exception:
-            pass
-
-    def _runner():
-        try:
-            _log_and_publish("web_update: starting")
-            if (
-                script_path
-                and os.path.isfile(script_path)
-                and os.access(script_path, os.X_OK)
-            ):
-                # Do not run the real script unless explicitly enabled
-                allow_real = os.getenv("INKYPI_ALLOW_REAL_UPDATE", "0").strip() in (
-                    "1",
-                    "true",
-                    "yes",
-                )
-                if allow_real:
-                    proc = subprocess.Popen(
-                        ["/bin/bash", script_path],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        bufsize=1,
-                        universal_newlines=True,
-                    )
-                    for line in proc.stdout or []:
-                        _log_and_publish(line.rstrip())
-                    proc.wait()
-                    rc = proc.returncode if proc.returncode is not None else 0
-                    if rc == 0:
-                        _log_and_publish("web_update: completed successfully")
-                    else:
-                        _log_and_publish(
-                            f"web_update: failed with return code {rc}", "error"
-                        )
-                else:
-                    # Simulated update to avoid privileged operations in development and tests
-                    for msg in [
-                        "Simulated update starting...",
-                        "Checking connectivity...",
-                        "Fetching latest dependencies...",
-                        "Updating application files...",
-                        "Restarting service...",
-                        "Update completed.",
-                    ]:
-                        _log_and_publish(msg)
-                        time.sleep(0.5)
-            else:
-                for i in range(6):
-                    _log_and_publish(f"step {i + 1}/6")
-                    time.sleep(0.5)
-                _log_and_publish("done (simulated)")
-        except Exception:
-            logger.exception("web_update: exception while running update")
-        finally:
-            _set_update_state(False, None)
-
-    t = threading.Thread(target=_runner, name="update-fallback", daemon=True)
+    t = threading.Thread(
+        target=_update_runner, args=(script_path,), name="update-fallback", daemon=True
+    )
     t.start()
 
 
