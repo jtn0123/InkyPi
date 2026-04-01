@@ -171,9 +171,9 @@ def test_playlist_script_handles_invalid_stored_message_json(client):
     js = resp.get_data(as_text=True)
 
     assert 'const storedMessage = sessionStorage.getItem("storedMessage");' in js
-    assert 'const { type, text } = JSON.parse(storedMessage);' in js
+    assert "const { type, text } = JSON.parse(storedMessage);" in js
     assert "try {" in js
-    assert "sessionStorage.removeItem(\"storedMessage\");" in js
+    assert 'sessionStorage.removeItem("storedMessage");' in js
 
 
 def test_image_modal_script_guards_missing_container(client):
