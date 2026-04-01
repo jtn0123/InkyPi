@@ -211,5 +211,5 @@ def test_plugin_page_script_uses_globalthis_for_plugin_hooks(client):
     js = resp.get_data(as_text=True)
 
     assert "function validateAddToPlaylistAction(action)" in js
-    assert "typeof globalThis.validatePluginSettings === \"function\"" in js
+    assert 'typeof globalThis.validatePluginSettings === "function"' in js
     assert "globalThis.PluginForm" in js
