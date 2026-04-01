@@ -50,6 +50,13 @@ _eta_cache: dict[str, tuple[datetime, dict[str, dict]]] = {}
 _eta_cache_lock = threading.Lock()
 
 
+def _safe_now_device_tz(device_config) -> datetime:
+    try:
+        return now_device_tz(device_config)
+    except Exception:
+        return datetime.now(UTC)
+
+
 def _to_minutes(time_str: str) -> int:
     return Playlist._to_minutes(time_str)
 
@@ -566,10 +573,7 @@ def display_next_in_playlist():
             return json_error(f"Playlist '{playlist_name}' not found", status=400)
 
         # Determine current time and next eligible
-        try:
-            current_dt = now_device_tz(device_config)
-        except Exception:
-            current_dt = datetime.now()
+        current_dt = _safe_now_device_tz(device_config)
 
         plugin_instance = playlist.get_next_eligible_plugin(current_dt)
         if not plugin_instance:
@@ -611,10 +615,7 @@ def playlist_eta(playlist_name: str):
         return json_error(f"Playlist '{playlist_name}' not found", status=404)
 
     # Cache key is playlist name; invalidate once per minute
-    try:
-        now = now_device_tz(device_config)
-    except Exception:
-        now = datetime.now()
+    now = _safe_now_device_tz(device_config)
     floor_min = now.replace(second=0, microsecond=0)
 
     with _eta_cache_lock:

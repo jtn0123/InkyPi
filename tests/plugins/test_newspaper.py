@@ -27,7 +27,7 @@ def test_newspaper_success_with_expand_height(monkeypatch, device_config_dev):
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
     img = Newspaper({"id": "newspaper"}).generate_image(
-        {"newspaperSlug": "NYT"}, device_config_dev
+        {"newspaperSlug": "wsj"}, device_config_dev
     )
     assert img is not None
     # device_config_dev has horizontal orientation, so dimensions stay (800, 480)
@@ -87,6 +87,16 @@ def test_newspaper_missing_slug_raises(device_config_dev):
         plugin.generate_image({}, device_config_dev)
 
 
+def test_newspaper_invalid_slug_raises(device_config_dev):
+    from plugins.newspaper.newspaper import Newspaper
+
+    with pytest.raises(RuntimeError, match="Invalid newspaper selection"):
+        Newspaper({"id": "newspaper"}).generate_image(
+            {"newspaperSlug": "<script>alert(1)</script>"},
+            device_config_dev,
+        )
+
+
 def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     """Image wider than display ratio is returned without height expansion."""
     from plugins.newspaper.newspaper import Newspaper
@@ -101,7 +111,7 @@ def test_newspaper_image_wider_than_display(monkeypatch, device_config_dev):
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
     img = Newspaper({"id": "newspaper"}).generate_image(
-        {"newspaperSlug": "NYT"}, device_config_dev
+        {"newspaperSlug": "WSJ"}, device_config_dev
     )
     assert img is not None
     # Image should be unchanged since img_ratio >= desired_ratio
@@ -121,7 +131,7 @@ def test_newspaper_vertical_orientation(monkeypatch, device_config_dev):
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
     img = Newspaper({"id": "newspaper"}).generate_image(
-        {"newspaperSlug": "NYT"}, device_config_dev
+        {"newspaperSlug": "wsj"}, device_config_dev
     )
     assert img is not None
     # In vertical mode, dimensions are swapped to (480, 800)
@@ -148,7 +158,7 @@ def test_newspaper_finds_on_second_day(monkeypatch, device_config_dev):
     monkeypatch.setattr("plugins.newspaper.newspaper.get_image", fake_get_image)
 
     img = Newspaper({"id": "newspaper"}).generate_image(
-        {"newspaperSlug": "NYT"}, device_config_dev
+        {"newspaperSlug": "WSJ"}, device_config_dev
     )
     assert img is not None
     assert call_count[0] == 2  # First call failed, second succeeded
