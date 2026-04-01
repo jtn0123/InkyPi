@@ -15,8 +15,8 @@ from flask import (
     current_app,
 )
 
-from utils.progress_events import get_progress_bus
 from utils.http_utils import http_get
+from utils.progress_events import get_progress_bus
 from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
