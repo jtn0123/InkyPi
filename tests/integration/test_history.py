@@ -368,6 +368,72 @@ def test_history_clear_exception_handling(client, flask_app, monkeypatch):
     assert "error" in resp.get_json().get("error", "").lower()
 
 
+def test_history_pagination_defaults(client, device_config_dev):
+    """Page 1 returns first 24 items; pagination nav hidden with few items."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(5):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_page_{i:03d}.png")
+        )
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "5 items" in body
+    # With only 5 items and per_page=24, no pagination nav
+    assert "Page " not in body
+
+
+def test_history_pagination_multi_page(client, device_config_dev):
+    """With more items than per_page, pagination nav appears."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(30):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_multi_{i:03d}.png")
+        )
+    resp = client.get("/history?per_page=10")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "30 items" in body
+    assert "Page 1 of 3" in body
+    assert "Next" in body
+
+    # Page 2
+    resp2 = client.get("/history?page=2&per_page=10")
+    assert resp2.status_code == 200
+    body2 = resp2.data.decode("utf-8")
+    assert "Page 2 of 3" in body2
+    assert "Previous" in body2
+    assert "Next" in body2
+
+    # Page 3 (last)
+    resp3 = client.get("/history?page=3&per_page=10")
+    assert resp3.status_code == 200
+    body3 = resp3.data.decode("utf-8")
+    assert "Page 3 of 3" in body3
+
+
+def test_history_pagination_invalid_params(client, device_config_dev):
+    """Invalid page/per_page params default gracefully."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    Image.new("RGB", (10, 10), "white").save(
+        os.path.join(d, "display_inv_001.png")
+    )
+    # Invalid page
+    resp = client.get("/history?page=abc")
+    assert resp.status_code == 200
+    # Invalid per_page
+    resp = client.get("/history?per_page=-5")
+    assert resp.status_code == 200
+    # Page beyond range
+    resp = client.get("/history?page=999")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "1 items" in body
+
+
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     import shutil as _shutil
 
