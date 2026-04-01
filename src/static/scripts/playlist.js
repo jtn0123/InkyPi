@@ -736,8 +736,10 @@
     window.addEventListener("load", function () {
         const storedMessage = sessionStorage.getItem("storedMessage");
         if (storedMessage) {
-            const { type, text } = JSON.parse(storedMessage);
-            showResponseModal(type, text);
+            try {
+                const { type, text } = JSON.parse(storedMessage);
+                showResponseModal(type, text);
+            } catch(e) {}
             sessionStorage.removeItem("storedMessage");
         }
     });

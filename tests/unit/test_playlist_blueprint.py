@@ -646,6 +646,33 @@ class TestPlaylistPage:
         assert resp.status_code == 200
         assert b"html" in resp.data.lower() or b"<!doctype" in resp.data.lower()
 
+    def test_uses_singular_labels_for_single_playlist_and_item(
+        self, client, device_config_dev
+    ):
+        device_config = client.application.config["DEVICE_CONFIG"]
+        playlist_manager = device_config.get_playlist_manager()
+        playlist_manager.delete_playlist("Default")
+        playlist_manager.add_playlist("Solo", "00:00", "24:00")
+        playlist_manager.add_plugin_to_playlist(
+            "Solo",
+            {
+                "plugin_id": "ai_text",
+                "name": "Only Item",
+                "plugin_settings": {"title": "T"},
+                "refresh": {"interval": 60},
+            },
+        )
+        device_config.write_config()
+
+        resp = client.get("/playlist")
+
+        assert resp.status_code == 200
+        normalized_html = " ".join(resp.get_data(as_text=True).split())
+        assert "1 playlist" in normalized_html
+        assert "1 item" in normalized_html
+        assert "1 playlists" not in normalized_html
+        assert "1 items" not in normalized_html
+
 
 # ---------------------------------------------------------------------------
 # /playlist/eta/<name> (GET) - ETA endpoint
