@@ -504,11 +504,16 @@
         panel.classList.toggle("active", isActive);
         panel.setAttribute("aria-hidden", isActive ? "false" : "true");
       });
+      const targetPanel = document.querySelector(
+        `[data-workflow-panel="${mode}"]`,
+      );
       if (mobileQuery.matches) {
         document.querySelector(".workflow-mode-bar")?.scrollIntoView({
           block: "start",
           behavior: "smooth",
         });
+      } else if (targetPanel) {
+        targetPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }
     }
 
