@@ -19,7 +19,7 @@ def test_export_includes_api_keys_when_opted_in(client, device_config_dev, monke
     device_config_dev.set_env_key("OPEN_WEATHER_MAP_SECRET", "owm")
 
     # Act
-    resp = client.get("/settings/export?include_keys=1")
+    resp = client.post("/settings/export", json={"include_keys": True})
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["success"] is True
@@ -32,6 +32,16 @@ def test_export_includes_api_keys_when_opted_in(client, device_config_dev, monke
 
 def test_export_excludes_api_keys_when_opted_out(client):
     resp = client.get("/settings/export?include_keys=0")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    payload = data["data"]
+    assert "env_keys" not in payload or not payload["env_keys"]
+
+
+def test_export_get_ignores_include_keys_query(client, device_config_dev):
+    device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
+    resp = client.get("/settings/export?include_keys=1")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["success"] is True

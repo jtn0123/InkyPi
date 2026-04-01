@@ -883,11 +883,19 @@ class TestExportSettings:
         assert "env_keys" not in data["data"]
 
     def test_export_with_keys(self, client, device_config_dev):
-        resp = client.get("/settings/export?include_keys=1")
+        resp = client.post("/settings/export", json={"include_keys": True})
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
         assert "env_keys" in data["data"]
+
+    def test_export_get_never_includes_keys(self, client, device_config_dev):
+        device_config_dev.set_env_key("OPEN_AI_SECRET", "sk-test")
+        resp = client.get("/settings/export?include_keys=1")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["success"] is True
+        assert "env_keys" not in data["data"]
 
 
 # ---------------------------------------------------------------------------
