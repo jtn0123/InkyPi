@@ -418,9 +418,7 @@ def test_history_pagination_invalid_params(client, device_config_dev):
     """Invalid page/per_page params default gracefully."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
-    Image.new("RGB", (10, 10), "white").save(
-        os.path.join(d, "display_inv_001.png")
-    )
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, "display_inv_001.png"))
     # Invalid page
     resp = client.get("/history?page=abc")
     assert resp.status_code == 200
