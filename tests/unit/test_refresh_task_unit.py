@@ -74,7 +74,7 @@ def test_manual_refresh_uses_execute(device_config_dev, monkeypatch, tmp_path):
     dummy_cfg = {"id": "dummy", "class": "Dummy"}
     monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
     monkeypatch.setattr(
-        "refresh_task.get_plugin_instance",
+        "refresh_task.task.get_plugin_instance",
         lambda cfg: _dummy_plugin(device_config_dev),
         raising=True,
     )
