@@ -127,7 +127,9 @@ def history_page():
     except (ValueError, TypeError):
         page = 1
     try:
-        per_page = max(1, min(120, int(request.args.get("per_page", _DEFAULT_PER_PAGE))))
+        per_page = max(
+            1, min(120, int(request.args.get("per_page", _DEFAULT_PER_PAGE)))
+        )
     except (ValueError, TypeError):
         per_page = _DEFAULT_PER_PAGE
 
