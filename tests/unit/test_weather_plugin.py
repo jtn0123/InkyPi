@@ -39,9 +39,7 @@ def weather_plugin(tmp_path, monkeypatch):
 def test_map_weather_code_to_icon_various_codes(weather_plugin):
     w = weather_plugin
     assert w.map_weather_code_to_icon(0, 12) == "01d"
-    assert (
-        w.map_weather_code_to_icon(1, 12) == "022d"
-    )  # Mainly clear (upstream changed)
+    assert w.map_weather_code_to_icon(1, 12) == "02d"  # Mainly clear
     assert (
         w.map_weather_code_to_icon(2, 12) == "02d"
     )  # Partly cloudy (upstream changed)

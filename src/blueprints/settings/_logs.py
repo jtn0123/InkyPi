@@ -36,6 +36,50 @@ def download_logs():
         return Response(f"Error reading logs: {e}", status=500, mimetype="text/plain")
 
 
+def _parse_log_params(args):
+    raw_hours = args.get("hours")
+    raw_limit = args.get("limit")
+    raw_contains_full = args.get("contains") or ""
+
+    try:
+        pre_hours = int(raw_hours) if raw_hours is not None else 2
+    except Exception:
+        pre_hours = 2
+    try:
+        pre_limit = int(raw_limit) if raw_limit is not None else 500
+    except Exception:
+        pre_limit = 500
+
+    hours = _mod._clamp_int(raw_hours, 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS)
+    limit = _mod._clamp_int(raw_limit, 500, _mod.MIN_LOG_LINES, _mod.MAX_LOG_LINES)
+
+    contains = raw_contains_full.strip()
+    contains_trimmed = False
+    if len(contains) > 200:
+        contains = contains[:200]
+        contains_trimmed = True
+
+    level = (args.get("level") or "all").lower()
+
+    return hours, limit, contains, contains_trimmed, level, pre_hours, pre_limit
+
+
+def _filter_log_lines(lines, contains, level):
+    if contains:
+        lc = contains.lower()
+        lines = [ln for ln in lines if lc in ln.lower()]
+
+    if level == "errors":
+        err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+        lines = [ln for ln in lines if err_re.search(ln)]
+    elif level in ("warn", "warnings", "warn_errors"):
+        err_re = re.compile(r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE)
+        warn_re = re.compile(r"\bWARNING\b", re.IGNORECASE)
+        lines = [ln for ln in lines if err_re.search(ln) or warn_re.search(ln)]
+
+    return lines
+
+
 @_mod.settings_bp.route("/api/logs")
 def api_logs():
     """JSON logs API with server-side filter, level selection and limits."""
@@ -43,30 +87,9 @@ def api_logs():
         if not _mod._rate_limit_ok(request.remote_addr):
             return json_error("Too many requests", status=429)
 
-        # Capture raw inputs and determine if clamped/trimmed
-        raw_hours = request.args.get("hours")
-        raw_limit = request.args.get("limit")
-        raw_contains_full = request.args.get("contains") or ""
-
-        try:
-            pre_hours = int(raw_hours) if raw_hours is not None else 2
-        except Exception:
-            pre_hours = 2
-        try:
-            pre_limit = int(raw_limit) if raw_limit is not None else 500
-        except Exception:
-            pre_limit = 500
-
-        hours = _mod._clamp_int(raw_hours, 2, _mod.MIN_LOG_HOURS, _mod.MAX_LOG_HOURS)
-        limit = _mod._clamp_int(raw_limit, 500, _mod.MIN_LOG_LINES, _mod.MAX_LOG_LINES)
-
-        contains = raw_contains_full.strip()
-        contains_trimmed = False
-        if len(contains) > 200:
-            contains = contains[:200]
-            contains_trimmed = True
-
-        level = (request.args.get("level") or "all").lower()
+        hours, limit, contains, contains_trimmed, level, pre_hours, pre_limit = (
+            _parse_log_params(request.args)
+        )
 
         # Read raw lines for the main service; include update unit if running
         units = ["inkypi.service"]
@@ -78,21 +101,7 @@ def api_logs():
         else:
             lines = _mod._read_units_log_lines(hours, units)
 
-        if contains:
-            lc = contains.lower()
-            lines = [ln for ln in lines if lc in ln.lower()]
-
-        if level == "errors":
-            err_re = re.compile(
-                r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE
-            )
-            lines = [ln for ln in lines if err_re.search(ln)]
-        elif level in ("warn", "warnings", "warn_errors"):
-            err_re = re.compile(
-                r"\b(ERROR|CRITICAL|Exception|Traceback)\b", re.IGNORECASE
-            )
-            warn_re = re.compile(r"\bWARNING\b", re.IGNORECASE)
-            lines = [ln for ln in lines if err_re.search(ln) or warn_re.search(ln)]
+        lines = _filter_log_lines(lines, contains, level)
 
         truncated = (pre_hours != hours) or (pre_limit != limit) or contains_trimmed
         if len(lines) > limit:

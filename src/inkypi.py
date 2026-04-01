@@ -273,55 +273,18 @@ def _register_error_handlers(app: Flask) -> None:
         return make_response("Internal Server Error", 500)
 
 
-def create_app():
-    app = Flask(__name__)
-    template_dirs = [
-        os.path.join(os.path.dirname(__file__), "templates"),  # Default template folder
-        os.path.join(os.path.dirname(__file__), "plugins"),  # Plugin templates
-    ]
-    app.jinja_loader = ChoiceLoader(
-        [FileSystemLoader(directory) for directory in template_dirs]
-    )
-    # No server-side helper required; icons via CDN classes
+# ---------------------------------------------------------------------------
+# create_app helpers — extracted for cognitive-complexity (SonarCloud S3776)
+# ---------------------------------------------------------------------------
 
-    app.config["APP_VERSION"] = _read_version()
+_CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
+_MUTATE_WINDOW = 60  # seconds
+_MUTATE_MAX = 60  # requests per IP per window
+_RATE_EXEMPT = frozenset({"/healthz", "/readyz"})
 
-    @app.context_processor
-    def _inject_app_version():
-        version = app.config["APP_VERSION"]
 
-        def versioned_url_for(endpoint, **values):
-            if endpoint == "static":
-                values.setdefault("v", version)
-            return flask_url_for(endpoint, **values)
-
-        return {"app_version": version, "url_for": versioned_url_for}
-
-    device_config = Config()
-    display_manager = DisplayManager(device_config)
-    refresh_task = RefreshTask(device_config, display_manager)
-
-    # Fast dev tuning: reduce intervals and disable startup image without persisting to disk
-    if FAST_DEV:
-        try:
-            device_config.update_value("plugin_cycle_interval_seconds", 30)
-            device_config.update_value("startup", False)
-            logger.info(
-                "Fast dev mode enabled: plugin cycle set to 30s; startup image disabled"
-            )
-        except Exception:
-            # Best-effort; continue if config lacks these keys
-            pass
-
-    load_plugins(device_config.get_plugins())
-
-    # Store dependencies
-    app.config["DEVICE_CONFIG"] = device_config
-    app.config["DISPLAY_MANAGER"] = display_manager
-    app.config["REFRESH_TASK"] = refresh_task
-    app.config["WEB_ONLY"] = WEB_ONLY
-
-    # Configure Flask SECRET_KEY: prefer env/.env; persist a dev fallback for stability
+def _setup_secret_key(app: Flask, device_config: Config) -> None:
     secret = os.getenv("SECRET_KEY")
     if not secret:
         try:
@@ -343,17 +306,8 @@ def create_app():
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
-    # Set additional parameters
-    app.config["MAX_FORM_PARTS"] = 10_000
-    # Enforce maximum request payload size (bytes)
-    try:
-        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
-        _max_len = int(_max_len_env) if _max_len_env else _DEFAULT_MAX_UPLOAD
-    except Exception:
-        _max_len = _DEFAULT_MAX_UPLOAD
-    app.config["MAX_CONTENT_LENGTH"] = _max_len
 
-    # Register Blueprints
+def _register_blueprints(app: Flask) -> None:
     from blueprints.apikeys import apikeys_bp
     from blueprints.history import history_bp
     from blueprints.main import main_bp
@@ -368,7 +322,8 @@ def create_app():
     app.register_blueprint(playlist_bp)
     app.register_blueprint(history_bp)
 
-    # Lightweight health endpoints for probes/CI
+
+def _register_health_endpoints(app: Flask) -> None:
     @app.route("/healthz")
     def healthz():
         return ("OK", 200)
@@ -386,32 +341,13 @@ def create_app():
         except Exception:
             return ("not-ready", 503)
 
-    # If running via Flask dev server, lazily start refresh task on first request
-    @app.before_request
-    def _ensure_refresh_task_started():
-        if WEB_ONLY:
-            return
-        # Only start in the reloader's main process to avoid double-starts
-        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-            rt = app.config.get("REFRESH_TASK")
-            if rt and not rt.running:
-                logger.info("Starting refresh task (flask dev server lazy start)")
-                rt.start()
 
-    # Consistent JSON error handling
-    @app.before_request
-    def _start_request_timer():
-        try:
-            g._t0 = perf_counter()
-        except Exception:
-            pass
-
-    # --- HTTPS redirect (opt-in via INKYPI_FORCE_HTTPS=1) ---
-    _force_https = not DEV_MODE and _env_bool("INKYPI_FORCE_HTTPS")
+def _setup_https_redirect(app: Flask) -> None:
+    force_https = not DEV_MODE and _env_bool("INKYPI_FORCE_HTTPS")
 
     @app.before_request
     def _redirect_to_https():
-        if not _force_https:
+        if not force_https:
             return
         if (
             request.is_secure
@@ -421,26 +357,14 @@ def create_app():
         url = request.url.replace("http://", "https://", 1)
         return redirect(url, code=301)
 
-    @app.before_request
-    def _attach_request_id():
-        # Ensure each request has a request_id stored in g and echoed in responses
-        try:
-            from utils.http_utils import _get_or_set_request_id
 
-            _get_or_set_request_id()
-        except Exception:
-            pass
+def _generate_csrf_token() -> str:
+    if "_csrf_token" not in session:
+        session["_csrf_token"] = secrets.token_hex(32)
+    return session["_csrf_token"]
 
-    # --- CSRF protection ---
-    _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-    _CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
 
-    def _generate_csrf_token() -> str:
-        """Return the CSRF token for the current session, creating one if needed."""
-        if "_csrf_token" not in session:
-            session["_csrf_token"] = secrets.token_hex(32)
-        return session["_csrf_token"]
-
+def _setup_csrf_protection(app: Flask) -> None:
     @app.context_processor
     def _inject_csrf_token():
         return {"csrf_token": _generate_csrf_token}
@@ -451,16 +375,10 @@ def create_app():
             return
         if request.path in _CSRF_EXEMPT_PATHS:
             return
-        # Ensure a token exists in the session
         token = session.get("_csrf_token")
         if not token:
-            # First POST before any page load -- skip enforcement so the
-            # initial session can be established.  The next request will
-            # have a token.
             _generate_csrf_token()
             return
-        # Accept the token from the X-CSRFToken header (preferred for fetch)
-        # or from a form field named csrf_token.
         request_token = request.headers.get("X-CSRFToken") or (
             request.form.get("csrf_token")
             if request.content_type and "form" in request.content_type
@@ -469,11 +387,9 @@ def create_app():
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
 
-    # --- Global rate limiting for mutating requests ---
-    _MUTATE_REQUESTS: dict[str, deque] = defaultdict(deque)
-    _MUTATE_WINDOW = 60  # seconds
-    _MUTATE_MAX = 60  # requests per IP per window
-    _RATE_EXEMPT = frozenset({"/healthz", "/readyz"})
+
+def _setup_rate_limiting(app: Flask) -> None:
+    mutate_requests: dict[str, deque] = defaultdict(deque)
 
     @app.before_request
     def _rate_limit_mutations():
@@ -485,21 +401,19 @@ def create_app():
 
         addr = request.remote_addr or "unknown"
         now = _time.monotonic()
-        dq = _MUTATE_REQUESTS[addr]
+        dq = mutate_requests[addr]
         while dq and dq[0] < now - _MUTATE_WINDOW:
             dq.popleft()
-        # Prune empty entries to prevent memory leak from inactive IPs
         if not dq:
-            _MUTATE_REQUESTS.pop(addr, None)
+            mutate_requests.pop(addr, None)
         if len(dq) >= _MUTATE_MAX:
             return json_error("Rate limit exceeded — try again shortly", status=429)
-        _MUTATE_REQUESTS[addr].append(now)
+        mutate_requests[addr].append(now)
 
-    _register_error_handlers(app)
 
+def _setup_security_headers(app: Flask) -> None:
     @app.after_request
     def _set_security_headers(response):
-        # Request timing log (env-gated)
         try:
             if _env_bool("INKYPI_REQUEST_TIMING"):
                 t0 = getattr(g, "_t0", None)
@@ -515,9 +429,7 @@ def create_app():
         except Exception:
             pass
 
-        # Static asset caching for better performance
         if request.path.startswith("/static/"):
-            # Cache CSS, JS, and images for 1 year (versioned via ?v= query param)
             if any(
                 request.path.endswith(ext)
                 for ext in [
@@ -538,30 +450,27 @@ def create_app():
                     f"public, max-age={_CACHE_1_YEAR}, immutable",
                 )
             else:
-                # Other static files: 1 day cache
                 response.headers.setdefault(
                     "Cache-Control", f"public, max-age={_CACHE_1_DAY}"
                 )
 
-        # Basic hardening headers
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers.setdefault(
             "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
         )
-        # Enable HSTS only when under HTTPS/behind a proxy forwarding HTTPS
         try:
             if (
                 request.is_secure
                 or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
             ):
                 response.headers.setdefault(
-                    "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+                    "Strict-Transport-Security",
+                    "max-age=31536000; includeSubDomains",
                 )
         except Exception:
             pass
-        # Content Security Policy (Report-Only by default)
         try:
             csp_value = (
                 os.getenv("INKYPI_CSP")
@@ -578,7 +487,6 @@ def create_app():
         except Exception:
             pass
         try:
-            # Surface dev hot-reload info via a response header for visibility
             info = pop_hot_reload_info()
             if info and DEV_MODE:
                 response.headers.setdefault(
@@ -589,25 +497,119 @@ def create_app():
             pass
         return response
 
-    # Register signal handlers for graceful shutdown (main process only)
-    if not is_running_from_reloader():
 
-        def _shutdown_handler(signum, frame):
-            sig_name = signal.Signals(signum).name
-            logger.info("Received %s — shutting down gracefully", sig_name)
+def _setup_signal_handlers(app: Flask) -> None:
+    if is_running_from_reloader():
+        return
+
+    def _shutdown_handler(signum, frame):
+        sig_name = signal.Signals(signum).name
+        logger.info("Received %s — shutting down gracefully", sig_name)
+        rt = app.config.get("REFRESH_TASK")
+        if rt is not None:
+            rt.stop()
+        try:
+            from utils.http_client import close_http_session
+
+            close_http_session()
+        except Exception:
+            pass
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown_handler)
+    signal.signal(signal.SIGINT, _shutdown_handler)
+
+
+def create_app():
+    app = Flask(__name__)
+    template_dirs = [
+        os.path.join(os.path.dirname(__file__), "templates"),
+        os.path.join(os.path.dirname(__file__), "plugins"),
+    ]
+    app.jinja_loader = ChoiceLoader(
+        [FileSystemLoader(directory) for directory in template_dirs]
+    )
+
+    app.config["APP_VERSION"] = _read_version()
+
+    @app.context_processor
+    def _inject_app_version():
+        version = app.config["APP_VERSION"]
+
+        def versioned_url_for(endpoint, **values):
+            if endpoint == "static":
+                values.setdefault("v", version)
+            return flask_url_for(endpoint, **values)
+
+        return {"app_version": version, "url_for": versioned_url_for}
+
+    device_config = Config()
+    display_manager = DisplayManager(device_config)
+    refresh_task = RefreshTask(device_config, display_manager)
+
+    if FAST_DEV:
+        try:
+            device_config.update_value("plugin_cycle_interval_seconds", 30)
+            device_config.update_value("startup", False)
+            logger.info(
+                "Fast dev mode enabled: plugin cycle set to 30s; startup image disabled"
+            )
+        except Exception:
+            pass
+
+    load_plugins(device_config.get_plugins())
+
+    app.config["DEVICE_CONFIG"] = device_config
+    app.config["DISPLAY_MANAGER"] = display_manager
+    app.config["REFRESH_TASK"] = refresh_task
+    app.config["WEB_ONLY"] = WEB_ONLY
+
+    _setup_secret_key(app, device_config)
+
+    app.config["MAX_FORM_PARTS"] = 10_000
+    try:
+        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
+        _max_len = int(_max_len_env) if _max_len_env else _DEFAULT_MAX_UPLOAD
+    except Exception:
+        _max_len = _DEFAULT_MAX_UPLOAD
+    app.config["MAX_CONTENT_LENGTH"] = _max_len
+
+    _register_blueprints(app)
+    _register_health_endpoints(app)
+
+    @app.before_request
+    def _ensure_refresh_task_started():
+        if WEB_ONLY:
+            return
+        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             rt = app.config.get("REFRESH_TASK")
-            if rt is not None:
-                rt.stop()
-            try:
-                from utils.http_client import close_http_session
+            if rt and not rt.running:
+                logger.info("Starting refresh task (flask dev server lazy start)")
+                rt.start()
 
-                close_http_session()
-            except Exception:
-                pass
-            raise SystemExit(0)
+    @app.before_request
+    def _start_request_timer():
+        try:
+            g._t0 = perf_counter()
+        except Exception:
+            pass
 
-        signal.signal(signal.SIGTERM, _shutdown_handler)
-        signal.signal(signal.SIGINT, _shutdown_handler)
+    _setup_https_redirect(app)
+
+    @app.before_request
+    def _attach_request_id():
+        try:
+            from utils.http_utils import _get_or_set_request_id
+
+            _get_or_set_request_id()
+        except Exception:
+            pass
+
+    _setup_csrf_protection(app)
+    _setup_rate_limiting(app)
+    _register_error_handlers(app)
+    _setup_security_headers(app)
+    _setup_signal_handlers(app)
 
     return app
 

@@ -85,38 +85,30 @@ class RefreshTask:
             if self.thread.is_alive():
                 logger.warning("Refresh task thread did not stop within timeout")
 
+    @staticmethod
+    def _notify_watchdog():
+        if _sd_notify:
+            try:
+                _sd_notify("WATCHDOG=1")
+            except Exception:
+                pass
+
+    @staticmethod
+    def _complete_manual_request(manual_request, metrics=None, exception=None):
+        if manual_request is None:
+            return
+        if exception is not None:
+            manual_request.exception = exception
+        if metrics is not None:
+            manual_request.metrics = metrics
+        manual_request.done.set()
+
     def _run(self):
-        """Background thread loop coordinating refresh operations.
-
-        This function runs in a loop, sleeping for a configured duration (`plugin_cycle_interval_seconds`) or until
-        manually triggered via `manual_update()`. Determines the next plugin to refresh based on active playlists and
-        updates the display accordingly.
-
-        Workflow:
-        1. Waits for the configured sleep duration or until notified of a manual update.
-        2. Checks if a manual update has been requested:
-        - If so, refreshes the specified plugin immediately.
-        3. Otherwise, determines the next plugin to refresh based on the active playlist and generates an image.
-        4. Compares the image hash with the last displayed image hash.
-        - If the image has changed, updates the display.
-        - If the image is the same, skips the refresh.
-        5. Updates the refresh metadata in the device configuration.
-        6. Repeats the process until `stop()` is called.
-
-        Handles any exceptions that occur during the refresh process and ensures the refresh event is set
-        to indicate completion.
-
-        Exceptions:
-        - Captures and logs any unexpected errors during execution to prevent the thread from exiting.
-        """
+        """Background thread loop coordinating refresh operations."""
         while True:
             result = None
             try:
-                if _sd_notify:
-                    try:
-                        _sd_notify("WATCHDOG=1")
-                    except Exception:
-                        pass
+                self._notify_watchdog()
                 result = self._wait_for_trigger()
                 if result is None:
                     break
@@ -135,16 +127,12 @@ class RefreshTask:
                     )
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
-                    if manual_request is not None:
-                        manual_request.metrics = metrics
-                        manual_request.done.set()
+                    self._complete_manual_request(manual_request, metrics=metrics)
 
             except Exception as e:
                 logger.exception("Exception during refresh")
-                if result is not None and result[-1] is not None:
-                    manual_request = result[-1]
-                    manual_request.exception = e
-                    manual_request.done.set()
+                if result is not None:
+                    self._complete_manual_request(result[-1], exception=e)
 
     def _wait_for_trigger(self):
         """Wait for the next refresh trigger while holding the condition lock.
@@ -334,103 +322,19 @@ class RefreshTask:
             {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
         )
         used_cached = image_hash == latest_refresh.image_hash
-        display_duration_ms = None
-        preprocess_ms = None
         if not used_cached:
-            logger.info(f"Updating display. | refresh_info: {refresh_info}")
-            history_meta = {
-                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
-                "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
-                "playlist": refresh_action.get_refresh_info().get("playlist"),
-                "plugin_instance": refresh_action.get_refresh_info().get(
-                    "plugin_instance"
-                ),
-            }
-            # Plugin lifecycle: display_start
-            logger.info(
-                "plugin_lifecycle: display_start",
-                extra={
-                    "stage": "display_start",
-                    "plugin_id": plugin_id,
-                    "instance": instance_name,
-                    "refresh_id": benchmark_id,
-                    "request_id": request_id,
-                },
+            display_duration_ms, preprocess_ms = self._push_to_display(
+                image,
+                plugin_config,
+                refresh_action,
+                refresh_info,
+                benchmark_id,
+                plugin_id,
+                instance_name,
+                request_id,
             )
-            stage_t1 = perf_counter()
-            try:
-                display_metrics = self.display_manager.display_image(
-                    image,
-                    image_settings=plugin_config.get("image_settings", []),
-                    history_meta=history_meta,
-                )
-                if isinstance(display_metrics, dict):
-                    preprocess_ms = display_metrics.get("preprocess_ms")
-                    display_duration_ms = display_metrics.get("display_ms")
-                    display_driver = display_metrics.get("display_driver")
-                else:
-                    display_driver = None
-            except Exception as exc:
-                logger.error(
-                    "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
-                    plugin_id,
-                    instance_name,
-                    exc,
-                )
-                self._update_plugin_health(
-                    plugin_id=plugin_id,
-                    instance=instance_name,
-                    ok=False,
-                    metrics={"retained_display": bool(self._stale_display_path())},
-                    error=str(exc),
-                )
-                self.progress_bus.publish(
-                    {
-                        "state": "error",
-                        "plugin_id": plugin_id,
-                        "instance": instance_name,
-                        "refresh_id": benchmark_id,
-                        "request_id": request_id,
-                        "error": str(exc),
-                        "retained_display": bool(self._stale_display_path()),
-                    }
-                )
-                raise
-            finally:
-                if display_duration_ms is None:
-                    display_duration_ms = int((perf_counter() - stage_t1) * 1000)
-                # Plugin lifecycle: display_complete
-                logger.info(
-                    "plugin_lifecycle: display_complete",
-                    extra={
-                        "stage": "display_complete",
-                        "plugin_id": plugin_id,
-                        "instance": instance_name,
-                        "duration_ms": display_duration_ms,
-                        "refresh_id": benchmark_id,
-                        "request_id": request_id,
-                    },
-                )
-                try:
-                    save_stage_event(
-                        self.device_config,
-                        benchmark_id,
-                        "display_pipeline",
-                        display_duration_ms,
-                    )
-                    if display_driver:
-                        save_stage_event(
-                            self.device_config,
-                            benchmark_id,
-                            "display_driver",
-                            display_duration_ms,
-                            extra={"driver": display_driver},
-                        )
-                except Exception:
-                    logger.debug(
-                        "Failed to save display_pipeline benchmark event", exc_info=True
-                    )
         else:
+            display_duration_ms = preprocess_ms = None
             logger.info(
                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
             )
@@ -443,37 +347,7 @@ class RefreshTask:
             "preprocess_ms": preprocess_ms,
             "steps": tracker.get_steps(),
         }
-        # Persist a refresh_event row best-effort
-        try:
-            # capture lightweight system snapshot
-            cpu_percent = memory_percent = None
-            try:
-                import psutil  # type: ignore
-
-                cpu_percent = psutil.cpu_percent(interval=None)
-                memory_percent = psutil.virtual_memory().percent
-            except Exception:
-                logger.debug("psutil metrics unavailable", exc_info=True)
-            save_refresh_event(
-                self.device_config,
-                {
-                    "refresh_id": benchmark_id,
-                    "ts": None,
-                    "plugin_id": refresh_info.get("plugin_id"),
-                    "instance": refresh_info.get("plugin_instance"),
-                    "playlist": refresh_info.get("playlist"),
-                    "used_cached": used_cached,
-                    "request_ms": request_ms,
-                    "generate_ms": generate_ms,
-                    "preprocess_ms": preprocess_ms,
-                    "display_ms": display_duration_ms,
-                    "cpu_percent": cpu_percent,
-                    "memory_percent": memory_percent,
-                    "notes": None,
-                },
-            )
-        except Exception:
-            logger.debug("Failed to save refresh benchmark event", exc_info=True)
+        self._save_benchmark(benchmark_id, refresh_info, used_cached, metrics)
         self._update_plugin_health(
             plugin_id=plugin_id,
             instance=instance_name,
@@ -492,6 +366,144 @@ class RefreshTask:
             }
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
+
+    def _push_to_display(
+        self,
+        image,
+        plugin_config,
+        refresh_action,
+        refresh_info,
+        benchmark_id,
+        plugin_id,
+        instance_name,
+        request_id,
+    ):
+        """Push image to the display hardware and record benchmark stages."""
+        logger.info(f"Updating display. | refresh_info: {refresh_info}")
+        history_meta = {
+            "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
+            "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
+            "playlist": refresh_action.get_refresh_info().get("playlist"),
+            "plugin_instance": refresh_action.get_refresh_info().get("plugin_instance"),
+        }
+        logger.info(
+            "plugin_lifecycle: display_start",
+            extra={
+                "stage": "display_start",
+                "plugin_id": plugin_id,
+                "instance": instance_name,
+                "refresh_id": benchmark_id,
+                "request_id": request_id,
+            },
+        )
+        stage_t1 = perf_counter()
+        display_duration_ms = None
+        preprocess_ms = None
+        display_driver = None
+        try:
+            display_metrics = self.display_manager.display_image(
+                image,
+                image_settings=plugin_config.get("image_settings", []),
+                history_meta=history_meta,
+            )
+            if isinstance(display_metrics, dict):
+                preprocess_ms = display_metrics.get("preprocess_ms")
+                display_duration_ms = display_metrics.get("display_ms")
+                display_driver = display_metrics.get("display_driver")
+            else:
+                display_driver = None
+        except Exception as exc:
+            logger.error(
+                "plugin_lifecycle: display_failure | plugin_id=%s instance=%s error=%s",
+                plugin_id,
+                instance_name,
+                exc,
+            )
+            self._update_plugin_health(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                ok=False,
+                metrics={"retained_display": bool(self._stale_display_path())},
+                error=str(exc),
+            )
+            self.progress_bus.publish(
+                {
+                    "state": "error",
+                    "plugin_id": plugin_id,
+                    "instance": instance_name,
+                    "refresh_id": benchmark_id,
+                    "request_id": request_id,
+                    "error": str(exc),
+                    "retained_display": bool(self._stale_display_path()),
+                }
+            )
+            raise
+        finally:
+            if display_duration_ms is None:
+                display_duration_ms = int((perf_counter() - stage_t1) * 1000)
+            logger.info(
+                "plugin_lifecycle: display_complete",
+                extra={
+                    "stage": "display_complete",
+                    "plugin_id": plugin_id,
+                    "instance": instance_name,
+                    "duration_ms": display_duration_ms,
+                    "refresh_id": benchmark_id,
+                    "request_id": request_id,
+                },
+            )
+            try:
+                save_stage_event(
+                    self.device_config,
+                    benchmark_id,
+                    "display_pipeline",
+                    display_duration_ms,
+                )
+                if display_driver:
+                    save_stage_event(
+                        self.device_config,
+                        benchmark_id,
+                        "display_driver",
+                        display_duration_ms,
+                        extra={"driver": display_driver},
+                    )
+            except Exception:
+                logger.debug(
+                    "Failed to save display_pipeline benchmark event", exc_info=True
+                )
+        return display_duration_ms, preprocess_ms
+
+    def _save_benchmark(self, benchmark_id, refresh_info, used_cached, metrics):
+        """Persist a refresh_event row best-effort."""
+        try:
+            cpu_percent = memory_percent = None
+            try:
+                import psutil  # type: ignore
+
+                cpu_percent = psutil.cpu_percent(interval=None)
+                memory_percent = psutil.virtual_memory().percent
+            except Exception:
+                logger.debug("psutil metrics unavailable", exc_info=True)
+            save_refresh_event(
+                self.device_config,
+                {
+                    "refresh_id": benchmark_id,
+                    "ts": None,
+                    "plugin_id": refresh_info.get("plugin_id"),
+                    "instance": refresh_info.get("plugin_instance"),
+                    "playlist": refresh_info.get("playlist"),
+                    "used_cached": used_cached,
+                    "request_ms": metrics.get("request_ms"),
+                    "generate_ms": metrics.get("generate_ms"),
+                    "preprocess_ms": metrics.get("preprocess_ms"),
+                    "display_ms": metrics.get("display_ms"),
+                    "cpu_percent": cpu_percent,
+                    "memory_percent": memory_percent,
+                    "notes": None,
+                },
+            )
+        except Exception:
+            logger.debug("Failed to save refresh benchmark event", exc_info=True)
 
     def _stale_display_path(self) -> str | None:
         for path in (

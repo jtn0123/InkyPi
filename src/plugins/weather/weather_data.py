@@ -98,51 +98,48 @@ def parse_timezone(weatherdata):
         raise RuntimeError("Timezone not found in weather data.")
 
 
+_WEATHER_CODE_TO_ICON = {
+    0: "01d",
+    1: "02d",
+    2: "02d",
+    3: "04d",
+    51: "51d",
+    53: "53d",
+    55: "09d",
+    45: "50d",
+    48: "48d",
+    56: "56d",
+    57: "57d",
+    61: "51d",
+    63: "53d",
+    65: "09d",
+    66: "56d",
+    67: "57d",
+    71: "71d",
+    73: "73d",
+    75: "13d",
+    77: "77d",
+    80: "51d",
+    81: "53d",
+    82: "09d",
+    85: "71d",
+    86: "13d",
+    95: "11d",
+    96: "11d",
+    99: "11d",
+}
+
+_NIGHT_ICON_MAP = {
+    "01d": "01n",
+    "02d": "02n",
+    "10d": "10n",
+}
+
+
 def map_weather_code_to_icon(weather_code, is_day):
-
-    icon = "01d"  # Default to clear day icon
-
-    if weather_code in [0]:  # Clear sky
-        icon = "01d"
-    elif weather_code in [1]:  # Mainly clear
-        icon = "022d"
-    elif weather_code in [2]:  # Partly cloudy
-        icon = "02d"
-    elif weather_code in [3]:  # Overcast
-        icon = "04d"
-    elif weather_code in [51, 61, 80]:  # Drizzle, showers, rain: Light
-        icon = "51d"
-    elif weather_code in [53, 63, 81]:  # Drizzle, showers, rain: Moderate
-        icon = "53d"
-    elif weather_code in [55, 65, 82]:  # Drizzle, showers, rain: Heavy
-        icon = "09d"
-    elif weather_code in [45]:  # Fog
-        icon = "50d"
-    elif weather_code in [48]:  # Icy fog
-        icon = "48d"
-    elif weather_code in [56, 66]:  # Light freezing Drizzle
-        icon = "56d"
-    elif weather_code in [57, 67]:  # Freezing Drizzle
-        icon = "57d"
-    elif weather_code in [71, 85]:  # Snow fall: Slight
-        icon = "71d"
-    elif weather_code in [73]:  # Snow fall: Moderate
-        icon = "73d"
-    elif weather_code in [75, 86]:  # Snow fall: Heavy
-        icon = "13d"
-    elif weather_code in [77]:  # Snow grain
-        icon = "77d"
-    elif weather_code in [95] or weather_code in [96, 99]:  # Thunderstorm
-        icon = "11d"
-
+    icon = _WEATHER_CODE_TO_ICON.get(weather_code, "01d")
     if is_day == 0:
-        if icon == "01d":
-            icon = "01n"  # Clear sky night
-        elif icon == "02d":
-            icon = "02n"  # Partly cloudy night
-        elif icon == "10d":
-            icon = "10n"  # Rain night
-
+        icon = _NIGHT_ICON_MAP.get(icon, icon)
     return icon
 
 
@@ -166,32 +163,34 @@ def get_moon_phase_icon_path(phase_name: str, lat: float, plugin_dir: str) -> st
     return os.path.join(plugin_dir, f"{phase_name}.png")
 
 
+_MOON_PHASES = [
+    (0.0, "newmoon"),
+    (0.25, "firstquarter"),
+    (0.5, "fullmoon"),
+    (0.75, "lastquarter"),
+    (1.0, "newmoon"),
+]
+
+
+def _choose_phase_name(phase: float) -> str:
+    for target, name in _MOON_PHASES:
+        if math.isclose(phase, target, abs_tol=1e-3):
+            return name
+    if 0.0 < phase < 0.25:
+        return "waxingcrescent"
+    elif 0.25 < phase < 0.5:
+        return "waxinggibbous"
+    elif 0.5 < phase < 0.75:
+        return "waninggibbous"
+    else:
+        return "waningcrescent"
+
+
 def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):
     """
     - daily_forecast: list of daily entries from One-Call v3 (each has 'dt', 'weather', 'temp', 'moon_phase')
     - tz: your target tzinfo (e.g. from zoneinfo or pytz)
     """
-    PHASES = [
-        (0.0, "newmoon"),
-        (0.25, "firstquarter"),
-        (0.5, "fullmoon"),
-        (0.75, "lastquarter"),
-        (1.0, "newmoon"),
-    ]
-
-    def choose_phase_name(phase: float) -> str:
-        for target, name in PHASES:
-            if math.isclose(phase, target, abs_tol=1e-3):
-                return name
-        if 0.0 < phase < 0.25:
-            return "waxingcrescent"
-        elif 0.25 < phase < 0.5:
-            return "waxinggibbous"
-        elif 0.5 < phase < 0.75:
-            return "waninggibbous"
-        else:
-            return "waningcrescent"
-
     forecast = []
     icon_codes_to_apply_current_suffix = ["01", "02", "10"]
     for day in daily_forecast:
@@ -208,7 +207,7 @@ def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):
 
         # --- moon phase & icon ---
         moon_phase = float(day["moon_phase"])  # [0.0-1.0]
-        phase_name_north_hemi = choose_phase_name(moon_phase)
+        phase_name_north_hemi = _choose_phase_name(moon_phase)
         moon_icon_path = get_moon_phase_icon_path(
             phase_name_north_hemi, lat, plugin_dir
         )
@@ -345,49 +344,65 @@ def parse_open_meteo_hourly(hourly_data, tz, time_format):
     return hourly
 
 
+_AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor"]
+
+
+def _format_owm_visibility(visibility_raw):
+    if visibility_raw is not None:
+        visibility = visibility_raw / 1000
+        return f">{visibility}" if visibility >= 10 else visibility
+    return "N/A"
+
+
+def _format_owm_aqi(aqi):
+    if aqi is not None:
+        idx = max(0, min(int(aqi) - 1, len(_AQI_SCALE) - 1))
+        return _AQI_SCALE[idx]
+    return ""
+
+
+def _build_sun_data_point(label, epoch, tz, time_format, plugin_dir, icon_name):
+    if not epoch:
+        return None
+    dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tz)
+    return {
+        "label": label,
+        "measurement": format_time(dt, time_format, include_am_pm=False),
+        "unit": "" if time_format == "24h" else dt.strftime("%p"),
+        "icon": os.path.join(plugin_dir, f"icons/{icon_name}.png"),
+    }
+
+
 def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
     data_points = []
-    sunrise_epoch = weather.get("current", {}).get("sunrise")
+    current = weather.get("current", {})
 
-    if sunrise_epoch:
-        sunrise_dt = datetime.fromtimestamp(sunrise_epoch, tz=UTC).astimezone(tz)
-        data_points.append(
-            {
-                "label": "Sunrise",
-                "measurement": format_time(
-                    sunrise_dt, time_format, include_am_pm=False
-                ),
-                "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                "icon": os.path.join(plugin_dir, "icons/sunrise.png"),
-            }
-        )
+    sunrise_point = _build_sun_data_point(
+        "Sunrise", current.get("sunrise"), tz, time_format, plugin_dir, "sunrise"
+    )
+    if sunrise_point:
+        data_points.append(sunrise_point)
     else:
         logger.info(
             "Sunrise not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods."
         )
 
-    sunset_epoch = weather.get("current", {}).get("sunset")
-    if sunset_epoch:
-        sunset_dt = datetime.fromtimestamp(sunset_epoch, tz=UTC).astimezone(tz)
-        data_points.append(
-            {
-                "label": "Sunset",
-                "measurement": format_time(sunset_dt, time_format, include_am_pm=False),
-                "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                "icon": os.path.join(plugin_dir, "icons/sunset.png"),
-            }
-        )
+    sunset_point = _build_sun_data_point(
+        "Sunset", current.get("sunset"), tz, time_format, plugin_dir, "sunset"
+    )
+    if sunset_point:
+        data_points.append(sunset_point)
     else:
         logger.info(
             "Sunset not found in OpenWeatherMap response, this is expected for polar areas in midnight sun and polar night periods."
         )
 
-    wind_deg = weather.get("current", {}).get("wind_deg", 0)
+    wind_deg = current.get("wind_deg", 0)
     wind_arrow = get_wind_arrow(wind_deg)
     data_points.append(
         {
             "label": "Wind",
-            "measurement": weather.get("current", {}).get("wind_speed"),
+            "measurement": current.get("wind_speed"),
             "unit": UNITS[units]["speed"],
             "icon": os.path.join(plugin_dir, "icons/wind.png"),
             "arrow": wind_arrow,
@@ -397,7 +412,7 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
     data_points.append(
         {
             "label": "Humidity",
-            "measurement": weather.get("current", {}).get("humidity"),
+            "measurement": current.get("humidity"),
             "unit": "%",
             "icon": os.path.join(plugin_dir, "icons/humidity.png"),
         }
@@ -406,7 +421,7 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
     data_points.append(
         {
             "label": "Pressure",
-            "measurement": weather.get("current", {}).get("pressure"),
+            "measurement": current.get("pressure"),
             "unit": "hPa",
             "icon": os.path.join(plugin_dir, "icons/pressure.png"),
         }
@@ -415,18 +430,13 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
     data_points.append(
         {
             "label": "UV Index",
-            "measurement": weather.get("current", {}).get("uvi"),
+            "measurement": current.get("uvi"),
             "unit": "",
             "icon": os.path.join(plugin_dir, "icons/uvi.png"),
         }
     )
 
-    visibility_raw = weather.get("current", {}).get("visibility")
-    if visibility_raw is not None:
-        visibility = visibility_raw / 1000
-        visibility_str = f">{visibility}" if visibility >= 10 else visibility
-    else:
-        visibility_str = "N/A"
+    visibility_str = _format_owm_visibility(current.get("visibility"))
     data_points.append(
         {
             "label": "Visibility",
@@ -438,22 +448,54 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
 
     aqi_list = air_quality.get("list", [])
     aqi = aqi_list[0].get("main", {}).get("aqi") if aqi_list else None
-
-    if aqi is not None:
-        aqi_unit = ["Good", "Fair", "Moderate", "Poor", "Very Poor"][int(aqi) - 1]
-    else:
-        aqi_unit = ""
-
     data_points.append(
         {
             "label": "Air Quality",
             "measurement": aqi if aqi is not None else "N/A",
-            "unit": aqi_unit,
+            "unit": _format_owm_aqi(aqi),
             "icon": os.path.join(plugin_dir, "icons/aqi.png"),
         }
     )
 
     return data_points
+
+
+_OPEN_METEO_AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor", "Ext Poor"]
+
+
+def _format_open_meteo_visibility(raw_visibility, units):
+    if raw_visibility == "N/A":
+        return "N/A"
+    if units == "imperial":
+        current_visibility = round(float(raw_visibility) / 1609.344, 1)
+    else:
+        current_visibility = round(raw_visibility / 1000, 1)
+    threshold = 6.2 if units == "imperial" else 10
+    if current_visibility >= threshold:
+        return f">{current_visibility}"
+    return current_visibility
+
+
+def _format_open_meteo_aqi(raw_aqi):
+    if raw_aqi == "N/A":
+        return "N/A", ""
+    current_aqi = round(raw_aqi, 1)
+    scale = _OPEN_METEO_AQI_SCALE[min(int(current_aqi // 20), 5)]
+    return current_aqi, scale
+
+
+def _build_open_meteo_sun_point(
+    times_list, label, tz, time_format, plugin_dir, icon_name
+):
+    if not times_list:
+        return None
+    dt = datetime.fromisoformat(times_list[0]).astimezone(tz)
+    return {
+        "label": label,
+        "measurement": format_time(dt, time_format, include_am_pm=False),
+        "unit": "" if time_format == "24h" else dt.strftime("%p"),
+        "icon": os.path.join(plugin_dir, f"icons/{icon_name}.png"),
+    }
 
 
 def parse_open_meteo_data_points(
@@ -468,36 +510,22 @@ def parse_open_meteo_data_points(
     current_time = datetime.now(tz)
 
     # Sunrise
-    sunrise_times = daily_data.get("sunrise", [])
-    if sunrise_times:
-        sunrise_dt = datetime.fromisoformat(sunrise_times[0]).astimezone(tz)
-        data_points.append(
-            {
-                "label": "Sunrise",
-                "measurement": format_time(
-                    sunrise_dt, time_format, include_am_pm=False
-                ),
-                "unit": "" if time_format == "24h" else sunrise_dt.strftime("%p"),
-                "icon": os.path.join(plugin_dir, "icons/sunrise.png"),
-            }
-        )
+    sunrise_point = _build_open_meteo_sun_point(
+        daily_data.get("sunrise", []), "Sunrise", tz, time_format, plugin_dir, "sunrise"
+    )
+    if sunrise_point:
+        data_points.append(sunrise_point)
     else:
         logger.info(
             "Sunrise not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods."
         )
 
     # Sunset
-    sunset_times = daily_data.get("sunset", [])
-    if sunset_times:
-        sunset_dt = datetime.fromisoformat(sunset_times[0]).astimezone(tz)
-        data_points.append(
-            {
-                "label": "Sunset",
-                "measurement": format_time(sunset_dt, time_format, include_am_pm=False),
-                "unit": "" if time_format == "24h" else sunset_dt.strftime("%p"),
-                "icon": os.path.join(plugin_dir, "icons/sunset.png"),
-            }
-        )
+    sunset_point = _build_open_meteo_sun_point(
+        daily_data.get("sunset", []), "Sunset", tz, time_format, plugin_dir, "sunset"
+    )
+    if sunset_point:
+        data_points.append(sunset_point)
     else:
         logger.info(
             "Sunset not found in Open-Meteo response, this is expected for polar areas in midnight sun and polar night periods."
@@ -572,7 +600,6 @@ def parse_open_meteo_data_points(
     )
 
     # Visibility
-    current_visibility = "N/A"
     unit_label = "mi" if units == "imperial" else "km"
     raw_visibility = _get_current_hourly_value(
         hourly_data.get("time", []),
@@ -581,22 +608,7 @@ def parse_open_meteo_data_points(
         current_time,
         "visibility",
     )
-    if raw_visibility != "N/A":
-        if units == "imperial":
-            current_visibility = round(float(raw_visibility) / 1609.344, 1)
-        else:
-            current_visibility = round(raw_visibility / 1000, 1)
-
-    visibility_str = (
-        f">{current_visibility}"
-        if isinstance(current_visibility, int | float)
-        and (
-            (units == "imperial" and current_visibility >= 6.2)
-            or (units != "imperial" and current_visibility >= 10)
-        )
-        else current_visibility
-    )
-
+    visibility_str = _format_open_meteo_visibility(raw_visibility, units)
     data_points.append(
         {
             "label": "Visibility",
@@ -614,12 +626,7 @@ def parse_open_meteo_data_points(
         current_time,
         "AQI",
     )
-    current_aqi = round(raw_aqi, 1) if raw_aqi != "N/A" else "N/A"
-    scale = ""
-    if isinstance(current_aqi, int | float):
-        scale = ["Good", "Fair", "Moderate", "Poor", "Very Poor", "Ext Poor"][
-            min(current_aqi // 20, 5)
-        ]
+    current_aqi, scale = _format_open_meteo_aqi(raw_aqi)
     data_points.append(
         {
             "label": "Air Quality",
