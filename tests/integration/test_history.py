@@ -206,6 +206,11 @@ def test_history_delete_errors(client):
     resp = client.post("/history/delete", json={})
     assert resp.status_code == 400
 
+    # Non-existent file
+    resp = client.post("/history/delete", json={"filename": "missing.png"})
+    assert resp.status_code == 404
+    assert resp.get_json()["error"] == "File not found"
+
     # Traversal attempt
     resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
     assert resp.status_code == 400

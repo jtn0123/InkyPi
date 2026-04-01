@@ -224,18 +224,20 @@ def history_delete():
             safe_path = _resolve_history_path(history_dir, filename)
         except ValueError:
             return json_error("invalid filename", status=400)
-        if os.path.exists(safe_path):
-            os.remove(safe_path)
-            # Remove matching sidecar on png/json deletions.
-            base, ext = os.path.splitext(safe_path)
-            if ext.lower() == ".png":
-                sidecar = f"{base}.json"
-                if os.path.exists(sidecar):
-                    os.remove(sidecar)
-            elif ext.lower() == ".json":
-                sidecar = f"{base}.png"
-                if os.path.exists(sidecar):
-                    os.remove(sidecar)
+        if not os.path.exists(safe_path):
+            return json_error("File not found", status=404)
+
+        os.remove(safe_path)
+        # Remove matching sidecar on png/json deletions.
+        base, ext = os.path.splitext(safe_path)
+        if ext.lower() == ".png":
+            sidecar = f"{base}.json"
+            if os.path.exists(sidecar):
+                os.remove(sidecar)
+        elif ext.lower() == ".json":
+            sidecar = f"{base}.png"
+            if os.path.exists(sidecar):
+                os.remove(sidecar)
         return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")
