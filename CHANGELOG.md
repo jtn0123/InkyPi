@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.3.5 (2026-04-01)
+
+### Bug Fixes
+
+- Address review feedback on exports and history
+  ([`e9b1cce`](https://github.com/jtn0123/InkyPi/commit/e9b1ccecd619340bde9d6a244514e700be7b1728))
+
+- Avoid history snapshot hotspot and cover collisions
+  ([`15da29f`](https://github.com/jtn0123/InkyPi/commit/15da29f0aa869517ce69390102481e7ac9f24c9f))
+
+- Harden exports, history snapshots, and plugin a11y
+  ([`4dfda65`](https://github.com/jtn0123/InkyPi/commit/4dfda6550b95ba90ab2659112a0a03646f43e2d7))
+
+- Resolve SonarCloud CSRF hotspot and backgroundOption fallback
+  ([`767d097`](https://github.com/jtn0123/InkyPi/commit/767d097c2294b60ac87bbe15ac5905674a5dca80))
+
+Split export route into separate GET/POST decorators to satisfy SonarCloud rule S3752 (mixed
+  safe/unsafe HTTP methods). Add missing 'blur' fallback for backgroundOption in image_folder
+  settings template to match sibling plugins and prevent null-reference errors.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Code Style
+
+- Fix Black formatting on export route decorator
+  ([`597f5a4`](https://github.com/jtn0123/InkyPi/commit/597f5a4270936ddf37883ff6d7c8ee85ee64f8f8))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Share image plugin background fill markup
+  ([`c8e50d8`](https://github.com/jtn0123/InkyPi/commit/c8e50d8f48c20164787aeb16a55ce0d368d24a6f))
+
+
 ## v0.3.4 (2026-04-01)
 
 ### Bug Fixes
