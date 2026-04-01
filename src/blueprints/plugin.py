@@ -224,9 +224,11 @@ def delete_plugin_instance():
 
         # Run plugin-specific cleanup (e.g., image_upload deletes uploaded files)
         try:
-            plugin_obj = get_plugin_instance(plugin_id)
-            if plugin_obj and hasattr(plugin_obj, "cleanup"):
-                plugin_obj.cleanup({})
+            plugin_config = device_config.get_plugin(plugin_id)
+            if plugin_config:
+                plugin_obj = get_plugin_instance(plugin_config)
+                if plugin_obj and hasattr(plugin_obj, "cleanup"):
+                    plugin_obj.cleanup({})
         except Exception:
             logger.warning(
                 "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
@@ -445,6 +447,13 @@ def save_plugin_settings_alias(plugin_id: str):
 def _save_plugin_settings_common(
     plugin_id, plugin_settings, device_config, playlist_manager
 ):
+    plugin_config = device_config.get_plugin(plugin_id)
+    if not plugin_config:
+        return json_error(
+            f"Plugin '{_sanitize_response_value(plugin_id)}' not found",
+            status=404,
+        )
+
     default_playlist_name = "Default"
     playlist = playlist_manager.get_playlist(default_playlist_name)
     if not playlist:
