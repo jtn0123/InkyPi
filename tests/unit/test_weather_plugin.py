@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfoNotFoundError
 
 import pytest
 
@@ -242,7 +243,7 @@ def test_parse_timezone_missing_field(weather_plugin):
 def test_parse_timezone_invalid_value(weather_plugin):
     w = weather_plugin
     # Invalid timezone should raise error
-    with pytest.raises(Exception):  # zoneinfo raises an exception for invalid timezones
+    with pytest.raises(ZoneInfoNotFoundError):
         w.parse_timezone({"timezone": "Invalid/Timezone"})
 
 

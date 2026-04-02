@@ -180,6 +180,8 @@ def run_render_smoke() -> None:
 
 
 def run_import_smoke() -> None:
+    import zoneinfo  # noqa: F401
+
     import astral  # noqa: F401
     import feedparser  # noqa: F401
     import flask  # noqa: F401
@@ -190,7 +192,6 @@ def run_import_smoke() -> None:
     import pi_heif  # noqa: F401
     import PIL  # noqa: F401
     import psutil  # noqa: F401
-    import pytz  # noqa: F401
     import recurring_ical_events  # noqa: F401
     import requests  # noqa: F401
     import urllib3  # noqa: F401

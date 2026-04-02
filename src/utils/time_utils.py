@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from config import Config
 
@@ -28,8 +28,8 @@ def get_timezone(tz_name: str | None):
     try:
         if tz_name:
             return ZoneInfo(str(tz_name))
-    except Exception as exc:
-        logger.warning(f"Invalid timezone '{tz_name}', defaulting to UTC: {exc}")
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        logger.warning("Invalid timezone '%s', defaulting to UTC: %s", tz_name, exc)
     return UTC
 
 
