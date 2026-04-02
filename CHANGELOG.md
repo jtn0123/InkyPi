@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.3.9 (2026-04-02)
+
+### Bug Fixes
+
+- Migrate pytz→zoneinfo and align settings API key flows (JTN-114, JTN-135)
+  ([`30d6247`](https://github.com/jtn0123/InkyPi/commit/30d6247ef31fce78155d31fe2ac46e94a04fa0e8))
+
+JTN-114: Replace deprecated pytz with stdlib zoneinfo across 8 source files and all test files.
+  Removes pytz==2025.2 from both requirements files and adds tzdata>=2024.1 as a cross-platform IANA
+  timezone database fallback. Fixes 8 SonarCloud CRITICAL findings (python:S6890).
+
+JTN-135: Extend settings-managed API key flows to include GITHUB_SECRET and GOOGLE_AI_SECRET —
+  aligning export_settings, api_keys_page, save_api_keys, and delete_api_key with the full set of
+  secrets already supported by apikeys.py and the import allowlist.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Remove stale pytz imports from CI smoke tests and narrow exception handling
+  ([`888df30`](https://github.com/jtn0123/InkyPi/commit/888df30cc6962c8c5007646841a534578dd7b9ad))
+
+- Replace `import pytz` with `import zoneinfo` in preflash_smoke.py and CI container smoke test
+  (fixes 3 CI failures after pytz removal) - Narrow `except Exception` to `except
+  (ZoneInfoNotFoundError, ValueError)` in get_timezone() per CodeRabbit review - Use specific
+  ZoneInfoNotFoundError in weather timezone test
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Split compound assertion for clearer test failure output
+  ([`6f9307c`](https://github.com/jtn0123/InkyPi/commit/6f9307cfb26c80f63de2ca8a0ab7e222e3556933))
+
+Address CodeRabbit review: separate "Visibility" and "Air Quality" membership checks into individual
+  assert statements.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.8 (2026-04-01)
 
 ### Bug Fixes
