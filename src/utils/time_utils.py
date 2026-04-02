@@ -1,7 +1,6 @@
 import logging
-from datetime import datetime
-
-import pytz
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from config import Config
 
@@ -22,16 +21,16 @@ def calculate_seconds(interval: int, unit: str) -> int:
 
 
 def get_timezone(tz_name: str | None):
-    """Return a tzinfo for the provided timezone name using pytz.
+    """Return a tzinfo for the provided timezone name using zoneinfo.
 
     Falls back to UTC if the timezone string is invalid or missing.
     """
     try:
         if tz_name:
-            return pytz.timezone(str(tz_name))
-    except Exception as exc:
-        logger.warning(f"Invalid timezone '{tz_name}', defaulting to UTC: {exc}")
-    return pytz.UTC
+            return ZoneInfo(str(tz_name))
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        logger.warning("Invalid timezone '%s', defaulting to UTC: %s", tz_name, exc)
+    return UTC
 
 
 def now_in_timezone(tz_name: str | None = "UTC") -> datetime:
@@ -85,7 +84,7 @@ def get_next_occurrence(cron_expr: str, now: datetime | None = None) -> datetime
     Supported fields: minute hour day-of-month month day-of-week.
     """
     if now is None:
-        now = datetime.now(pytz.UTC)
+        now = datetime.now(UTC)
 
     parts = cron_expr.split()
     if len(parts) != 5:

@@ -78,9 +78,9 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
 
     # Build template params as generate_image would, but render HTML directly
     tzname = device_config_dev.get_config("timezone", default="America/New_York")
-    import pytz
+    from zoneinfo import ZoneInfo
 
-    tz = pytz.timezone(tzname)
+    tz = ZoneInfo(tzname)
     time_format = device_config_dev.get_config("time_format", default="12h")
 
     data = w.parse_weather_data(

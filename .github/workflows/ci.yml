@@ -171,7 +171,7 @@ jobs:
           . .venv/bin/activate
           python - <<'PY'
           import flask, PIL, requests, urllib3, numpy, icalendar, psutil, waitress
-          import pytz, feedparser
+          import zoneinfo, feedparser
           print("Imports OK")
           PY
       - name: Boot web-only and probe routes

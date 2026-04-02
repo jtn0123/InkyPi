@@ -333,9 +333,8 @@ def test_api_logs_exception_handling(client, monkeypatch):
 
 def test_settings_time_format_12h():
     """Test 12-hour time format handling."""
-    from datetime import datetime
+    from datetime import UTC, datetime
 
-    import pytz
     from flask import Flask
 
     from blueprints.settings import settings_bp
@@ -345,8 +344,7 @@ def test_settings_time_format_12h():
 
     with app.app_context():
         # This should trigger the 12-hour time format logic
-        tz = pytz.timezone("UTC")
-        now = datetime.now(tz)
+        now = datetime.now(UTC)
 
         if 0 <= now.hour < 12:
             pass  # AM case

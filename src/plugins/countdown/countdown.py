@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
-
-import pytz
+from zoneinfo import ZoneInfo
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
@@ -42,11 +41,11 @@ class Countdown(BasePlugin):
         dimensions = self.get_oriented_dimensions(device_config)
 
         tz_name = device_config.get_config("timezone", default="America/New_York")
-        tz = pytz.timezone(tz_name)
+        tz = ZoneInfo(tz_name)
         current_time = datetime.now(tz)
 
         countdown_date = datetime.strptime(countdown_date_str, "%Y-%m-%d")
-        countdown_date = tz.localize(countdown_date)
+        countdown_date = countdown_date.replace(tzinfo=tz)
 
         day_count = (countdown_date.date() - current_time.date()).days
         label = "Days Left" if day_count > 0 else "Days Passed"

@@ -1,6 +1,8 @@
 # pyright: reportMissingImports=false
 import os
+from datetime import UTC
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from PIL import Image
 
@@ -250,8 +252,6 @@ def test_refresh_task_signal_config_change(device_config_dev, monkeypatch):
 
 def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monkeypatch):
     """Test determine next plugin when no playlist is active."""
-    import pytz
-
     from display.display_manager import DisplayManager
     from model import RefreshInfo
     from refresh_task import RefreshTask
@@ -271,8 +271,7 @@ def test_refresh_task_determine_next_plugin_no_playlist(device_config_dev, monke
         plugin_id="test",
     )
 
-    tz = pytz.timezone("UTC")
-    current_dt = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 30, 0))
+    current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
     # This should trigger the "no active playlist" logic
     playlist, plugin_instance = task._determine_next_plugin(
@@ -286,8 +285,6 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
     device_config_dev, monkeypatch
 ):
     """Test determine next plugin when playlist has no plugins."""
-    import pytz
-
     from display.display_manager import DisplayManager
     from model import Playlist, RefreshInfo
     from refresh_task import RefreshTask
@@ -310,8 +307,7 @@ def test_refresh_task_determine_next_plugin_empty_playlist(
         plugin_id="test",
     )
 
-    tz = pytz.timezone("UTC")
-    current_dt = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 30, 0))
+    current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
     # This should trigger the "playlist has no plugins" logic
     playlist, plugin_instance = task._determine_next_plugin(
@@ -381,7 +377,6 @@ def test_playlist_refresh_info():
 
 def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
     """Test PlaylistRefresh execute with force refresh."""
-    import pytz
     from PIL import Image
 
     from model import PluginInstance
@@ -412,8 +407,7 @@ def test_playlist_refresh_execute_force_refresh(device_config_dev, monkeypatch):
         },
     )()
 
-    tz = pytz.timezone("UTC")
-    current_dt = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 30, 0))
+    current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
     # This should trigger the force refresh logic
     image = refresh.execute(mock_plugin, device_config_dev, current_dt)
@@ -424,7 +418,6 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
     """Test PlaylistRefresh execute using cached image."""
     import os
 
-    import pytz
     from PIL import Image
 
     from model import PluginInstance
@@ -454,8 +447,7 @@ def test_playlist_refresh_execute_use_cached_image(device_config_dev, monkeypatc
         # Mock plugin
         mock_plugin = type("MockPlugin", (), {"config": {"image_settings": []}})()
 
-        tz = pytz.timezone("UTC")
-        current_dt = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 30, 0))
+        current_dt = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=UTC)
 
         # This should trigger the cached image logic
         image = refresh.execute(mock_plugin, device_config_dev, current_dt)
@@ -493,10 +485,8 @@ def test_determine_next_plugin_not_time_to_update_path(device_config_dev, monkey
         },
     )
 
-    import pytz
-
-    tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
-    now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
+    tz = ZoneInfo(device_config_dev.get_config("timezone", default="UTC"))
+    now = __import__("datetime").datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
     playlist, plugin_instance = task._determine_next_plugin(
         pm, device_config_dev.get_refresh_info(), now
     )
@@ -545,10 +535,8 @@ def test_same_image_hash_skips_display(device_config_dev, monkeypatch):
     plugin = get_plugin_instance(plugin_cfg)
 
     # Execute once to compute hash
-    import pytz
-
-    tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
-    now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 0, 0))
+    tz = ZoneInfo(device_config_dev.get_config("timezone", default="UTC"))
+    now = __import__("datetime").datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
 
     playlist = pm.get_playlist("P")
     plugin_instance = playlist.get_next_plugin()

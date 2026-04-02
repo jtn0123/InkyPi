@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
-
-import pytz
+from zoneinfo import ZoneInfo
 
 from plugins.base_plugin.base_plugin import BasePlugin
 
@@ -18,11 +17,11 @@ class YearProgress(BasePlugin):
         dimensions = self.get_oriented_dimensions(device_config)
 
         tz_name = device_config.get_config("timezone", default="America/New_York")
-        tz = pytz.timezone(tz_name)
+        tz = ZoneInfo(tz_name)
         current_time = datetime.now(tz)
 
-        start_of_year = tz.localize(datetime(current_time.year, 1, 1))
-        start_of_next_year = tz.localize(datetime(current_time.year + 1, 1, 1))
+        start_of_year = datetime(current_time.year, 1, 1, tzinfo=tz)
+        start_of_next_year = datetime(current_time.year + 1, 1, 1, tzinfo=tz)
 
         total_days = (start_of_next_year - start_of_year).days
         days_left = (start_of_next_year - current_time).total_seconds() / (24 * 3600)

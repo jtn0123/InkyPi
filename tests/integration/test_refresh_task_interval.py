@@ -1,4 +1,6 @@
 # pyright: reportMissingImports=false
+from zoneinfo import ZoneInfo
+
 from PIL import Image
 
 
@@ -54,10 +56,8 @@ def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
     task = RefreshTask(device_config_dev, dm)
 
     # Force current time to 12:30 so P1 is active and has higher priority than Default
-    import pytz
-
-    tz = pytz.timezone(device_config_dev.get_config("timezone", default="UTC"))
-    fixed_now = tz.localize(__import__("datetime").datetime(2025, 1, 1, 12, 30, 0))
+    tz = ZoneInfo(device_config_dev.get_config("timezone", default="UTC"))
+    fixed_now = __import__("datetime").datetime(2025, 1, 1, 12, 30, 0, tzinfo=tz)
     monkeypatch.setattr(task, "_get_current_datetime", lambda: fixed_now, raising=True)
     now = task._get_current_datetime()
     playlist, plugin_instance = task._determine_next_plugin(

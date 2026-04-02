@@ -1,6 +1,7 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
-import pytz
+from zoneinfo import available_timezones
+
 from flask import current_app, jsonify, render_template, request
 
 import blueprints.settings as _mod
@@ -82,7 +83,7 @@ def safe_reset():
 @_mod.settings_bp.route("/settings")
 def settings_page():
     device_config = current_app.config["DEVICE_CONFIG"]
-    timezones = sorted(pytz.all_timezones_set)
+    timezones = sorted(available_timezones())
     return render_template(
         "settings.html", device_settings=device_config.get_config(), timezones=timezones
     )
@@ -95,7 +96,7 @@ def backup_restore_page():
     return render_template(
         "settings.html",
         device_settings=device_config.get_config(),
-        timezones=sorted(pytz.all_timezones_set),
+        timezones=sorted(available_timezones()),
     )
 
 
@@ -137,6 +138,8 @@ def export_settings():
                 "OPEN_WEATHER_MAP_SECRET",
                 "NASA_SECRET",
                 "UNSPLASH_ACCESS_KEY",
+                "GITHUB_SECRET",
+                "GOOGLE_AI_SECRET",
             ):
                 try:
                     v = device_config.load_env_key(k)
@@ -234,6 +237,8 @@ def api_keys_page():
         ),
         "NASA_SECRET": device_config.load_env_key("NASA_SECRET"),
         "UNSPLASH_ACCESS_KEY": device_config.load_env_key("UNSPLASH_ACCESS_KEY"),
+        "GITHUB_SECRET": device_config.load_env_key("GITHUB_SECRET"),
+        "GOOGLE_AI_SECRET": device_config.load_env_key("GOOGLE_AI_SECRET"),
     }
     masked = {k: mask(v) for k, v in keys.items()}
     api_key_plugins = {
@@ -242,6 +247,7 @@ def api_keys_page():
         "NASA_SECRET": ["NASA APOD"],
         "UNSPLASH_ACCESS_KEY": ["Unsplash Background"],
         "GITHUB_SECRET": ["GitHub"],
+        "GOOGLE_AI_SECRET": ["AI Image", "AI Text"],
     }
     return render_template(
         "api_keys.html",
@@ -263,6 +269,8 @@ def save_api_keys():
             "OPEN_WEATHER_MAP_SECRET",
             "NASA_SECRET",
             "UNSPLASH_ACCESS_KEY",
+            "GITHUB_SECRET",
+            "GOOGLE_AI_SECRET",
         ):
             value = form_data.get(key)
             if value:
@@ -290,6 +298,8 @@ def delete_api_key():
         "OPEN_WEATHER_MAP_SECRET",
         "NASA_SECRET",
         "UNSPLASH_ACCESS_KEY",
+        "GITHUB_SECRET",
+        "GOOGLE_AI_SECRET",
     }
     if key not in valid_keys:
         return json_error("Invalid key name", status=400)

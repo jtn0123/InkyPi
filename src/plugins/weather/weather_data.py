@@ -2,8 +2,8 @@ import logging
 import math
 import os
 from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
-import pytz
 from astral import moon
 
 logger = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def parse_timezone(weatherdata):
     """Parse timezone from weather data"""
     if "timezone" in weatherdata:
         logger.info(f"Using timezone from weather data: {weatherdata['timezone']}")
-        return pytz.timezone(weatherdata["timezone"])
+        return ZoneInfo(weatherdata["timezone"])
     else:
         logger.error("Failed to retrieve Timezone from weather data")
         raise RuntimeError("Timezone not found in weather data.")
@@ -189,7 +189,7 @@ def _choose_phase_name(phase: float) -> str:
 def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):
     """
     - daily_forecast: list of daily entries from One-Call v3 (each has 'dt', 'weather', 'temp', 'moon_phase')
-    - tz: your target tzinfo (e.g. from zoneinfo or pytz)
+    - tz: your target tzinfo (e.g. from zoneinfo)
     """
     forecast = []
     icon_codes_to_apply_current_suffix = ["01", "02", "10"]

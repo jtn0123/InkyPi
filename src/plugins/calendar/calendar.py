@@ -1,8 +1,8 @@
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import icalendar
-import pytz
 import recurring_ical_events
 from PIL import ImageColor
 
@@ -221,7 +221,7 @@ class Calendar(BasePlugin):
 
         timezone = device_config.get_config("timezone", default="America/New_York")
         time_format = device_config.get_config("time_format", default="12h")
-        tz = pytz.timezone(timezone)
+        tz = ZoneInfo(timezone)
 
         current_dt = datetime.now(tz)
         start, end = self.get_view_range(view, current_dt, settings)

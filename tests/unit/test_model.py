@@ -1,6 +1,4 @@
-from datetime import datetime, timedelta
-
-import pytz
+from datetime import UTC, datetime, timedelta
 
 import model
 from model import Playlist, PlaylistManager, PluginInstance
@@ -125,7 +123,7 @@ def test_should_refresh_interval_false():
 
 
 def test_determine_active_playlist_priority():
-    tz = pytz.UTC
+    tz = UTC
     now = datetime(2025, 1, 1, 12, 0, 0, tzinfo=tz)
     p1 = Playlist(
         "All Day",
@@ -159,7 +157,7 @@ def test_determine_active_playlist_priority():
 
 
 def test_plugin_instance_should_refresh_interval_and_scheduled():
-    tz = pytz.UTC
+    tz = UTC
     now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
     pi = PluginInstance(
         "x",
@@ -182,7 +180,7 @@ def test_plugin_instance_should_refresh_interval_and_scheduled():
 
 
 def test_plugin_instance_scheduled_across_day_boundary_once():
-    tz = pytz.UTC
+    tz = UTC
     schedule = "12:00"
     yesterday = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)  # after schedule yesterday
     today_before = datetime(2025, 1, 2, 11, 0, 0, tzinfo=tz)
@@ -226,7 +224,7 @@ def test_get_time_range_minutes_wraparound():
 
 
 def test_plugin_instance_only_show_when_fresh_respected():
-    tz = pytz.UTC
+    tz = UTC
     now = datetime(2025, 1, 1, 13, 0, 0, tzinfo=tz)
     pi = PluginInstance(
         "x",

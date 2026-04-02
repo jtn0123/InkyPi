@@ -1,9 +1,8 @@
 # pyright: reportMissingImports=false
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
-import pytz
 from PIL import Image
 
 
@@ -14,8 +13,7 @@ def plugin_config():
 
 def _patch_now(year, month, day, hour=12):
     """Return a tz-aware datetime suitable for patching datetime.now."""
-    tz = pytz.UTC
-    return tz.localize(datetime(year, month, day, hour, 0, 0))
+    return datetime(year, month, day, hour, 0, 0, tzinfo=UTC)
 
 
 def test_year_progress_mid_year(plugin_config, device_config_dev):
