@@ -182,7 +182,8 @@ def test_parse_data_points_and_open_meteo_points(weather_plugin):
         weather_data, aqi_data, UTC, "metric", "24h"
     )
     labels2 = [p["label"] for p in points2]
-    assert "Visibility" in labels2 and "Air Quality" in labels2
+    assert "Visibility" in labels2
+    assert "Air Quality" in labels2
 
 
 def test_open_meteo_moon_phase_error_fallback(monkeypatch, weather_plugin):
