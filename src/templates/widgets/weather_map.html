@@ -13,10 +13,10 @@
 </div>
 <button type="button" id="openMap" class="action-button compact">Select Location</button>
 
-<div id="mapModal" class="modal">
+<div id="mapModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="mapModalTitle">
     <div class="modal-content">
-        <span class="close-button" aria-label="Close">×</span>
-        <h2>Select Location</h2>
+        <button type="button" class="close-button" aria-label="Close">&times;</button>
+        <h2 id="mapModalTitle">Select Location</h2>
         <div class="separator"></div>
         <div id="map" class="settings-map"></div>
         <button id="closeMap" type="button" class="action-button">Save</button>

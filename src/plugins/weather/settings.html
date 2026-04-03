@@ -135,9 +135,9 @@
     </div>
 </div>
 
-<div id="mapModal" class="modal">
+<div id="mapModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
-        <span class="close-button" onclick="closeModal('mapModal')">×</span>
+        <button type="button" class="close-button" onclick="closeModal('mapModal')" aria-label="Close">&times;</button>
         <h2 id="modalTitle">Select Location</h2>
         <div class="separator"></div>
         <div id="map" class="settings-map"></div>
