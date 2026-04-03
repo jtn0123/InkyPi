@@ -47,7 +47,10 @@ def _format_size(num_bytes: int) -> str:
         return "-"
 
 
-def _list_history_images(history_dir: str) -> list[dict]:
+def _list_history_images(
+    history_dir: str, offset: int = 0, limit: int | None = None
+) -> tuple[list[dict], int]:
+    # Phase 1: cheap directory listing + sort
     try:
         files = [
             f
@@ -74,8 +77,15 @@ def _list_history_images(history_dir: str) -> list[dict]:
         ),
         reverse=True,
     )
+
+    total = len(files)
+
+    # Slice to requested page before doing expensive per-file work
+    page_files = files[offset : offset + limit] if limit is not None else files
+
+    # Phase 2: expensive stat + sidecar load only for the page slice
     result: list[dict] = []
-    for f in files:
+    for f in page_files:
         full_path = os.path.join(history_dir, f)
         try:
             mtime = os.path.getmtime(full_path)
@@ -117,7 +127,7 @@ def _list_history_images(history_dir: str) -> list[dict]:
                 "meta": meta,
             }
         )
-    return result
+    return result, total
 
 
 def _resolve_history_path(history_dir: str, filename: str) -> str:
@@ -136,10 +146,8 @@ _DEFAULT_PER_PAGE = 24
 def history_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     history_dir = device_config.history_image_dir
-    all_images = _list_history_images(history_dir)
-    total = len(all_images)
 
-    # Pagination
+    # Parse pagination parameters BEFORE listing so we can push them down
     try:
         page = max(1, int(request.args.get("page", 1)))
     except (ValueError, TypeError):
@@ -152,7 +160,7 @@ def history_page():
         per_page = _DEFAULT_PER_PAGE
 
     start = (page - 1) * per_page
-    images = all_images[start : start + per_page]
+    images, total = _list_history_images(history_dir, offset=start, limit=per_page)
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     # Pull latest timing metrics if available
