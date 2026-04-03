@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.3.11 (2026-04-03)
+
+### Bug Fixes
+
+- History page — add delete loading state and normalize metadata display (JTN-168, JTN-169)
+  ([`50d0114`](https://github.com/jtn0123/InkyPi/commit/50d011457dc82735f99ba93bc6a3efc8e1bf9c82))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Plugin validation and API key UX — enforce form checks, disable actions when key missing (JTN-162,
+  JTN-163, JTN-170, JTN-171)
+  ([`7587def`](https://github.com/jtn0123/InkyPi/commit/7587def1764fda6f8202fb66419cc46aaee6f081))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Replace var with const in new JS code for SonarCloud compliance
+  ([`7b31bd8`](https://github.com/jtn0123/InkyPi/commit/7b31bd85d752bf6e83ba7b3c9987196c4a3731ee))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Replace var with const/let in new JS code for SonarCloud compliance
+  ([`2b8236b`](https://github.com/jtn0123/InkyPi/commit/2b8236bdacc5fb22505c462fc5c741f861cc9ea0))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.10 (2026-04-03)
 
 ### Bug Fixes
