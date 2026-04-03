@@ -101,8 +101,8 @@
 
     async function confirmDelete() {
       if (!state.pendingDelete) return;
-      var confirmBtn = document.getElementById("confirmDeleteHistoryBtn");
-      var cancelBtn = document.getElementById("cancelDeleteHistoryBtn");
+      const confirmBtn = document.getElementById("confirmDeleteHistoryBtn");
+      const cancelBtn = document.getElementById("cancelDeleteHistoryBtn");
       if (confirmBtn) {
         confirmBtn.disabled = true;
         confirmBtn.textContent = "Deleting\u2026";
@@ -110,12 +110,12 @@
       }
       if (cancelBtn) cancelBtn.disabled = true;
       try {
-        var resp = await fetch(config.deleteUrl, {
+        const resp = await fetch(config.deleteUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: state.pendingDelete }),
         });
-        var result = await resp.json();
+        const result = await resp.json();
         if (!resp.ok) {
           closeDeleteModal();
           showResponseModal("failure", "Error! " + result.error);
@@ -141,8 +141,8 @@
     }
 
     async function confirmClear() {
-      var confirmBtn = document.getElementById("confirmClearHistoryBtn");
-      var cancelBtn = document.getElementById("cancelClearHistoryBtn");
+      const confirmBtn = document.getElementById("confirmClearHistoryBtn");
+      const cancelBtn = document.getElementById("cancelClearHistoryBtn");
       if (confirmBtn) {
         confirmBtn.disabled = true;
         confirmBtn.textContent = "Clearing\u2026";
@@ -150,8 +150,8 @@
       }
       if (cancelBtn) cancelBtn.disabled = true;
       try {
-        var resp = await fetch(config.clearUrl, { method: "POST" });
-        var result = await resp.json();
+        const resp = await fetch(config.clearUrl, { method: "POST" });
+        const result = await resp.json();
         if (!resp.ok) {
           closeClearModal();
           showResponseModal("failure", "Error! " + result.error);
