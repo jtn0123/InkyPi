@@ -381,6 +381,8 @@
     }
 
     async function exportConfig() {
+      const btn = document.getElementById("exportConfigBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Downloading\u2026"; }
       const include = document.getElementById("includeKeys")?.checked;
       try {
         const requestInit = include
@@ -407,13 +409,18 @@
         URL.revokeObjectURL(a.href);
         showResponseModal("success", "Backup downloaded");
       } catch (e) {
+        console.error("Export failed", e);
         showResponseModal("failure", "Export failed");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Download Backup"; }
       }
     }
 
     async function importConfig() {
+      const btn = document.getElementById("importConfigBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Restoring\u2026"; }
       const fileInput = document.getElementById("importFile");
-      const file = fileInput && fileInput.files && fileInput.files[0];
+      const file = fileInput?.files?.[0];
       if (!file) {
         showResponseModal("failure", "Choose a backup file first");
         return;
@@ -432,7 +439,15 @@
         }
         showResponseModal("success", data.message || "Import complete");
       } catch (e) {
+        console.error("Import failed", e);
         showResponseModal("failure", "Import failed");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Restore from File";
+        }
+        const input = document.getElementById("importFile");
+        if (btn) btn.disabled = !input?.files?.length;
       }
     }
 
@@ -699,6 +714,13 @@
       document.getElementById("saveSettingsBtn")?.addEventListener("click", handleAction);
       document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
       document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
+      const importFileInput = document.getElementById("importFile");
+      const importBtn = document.getElementById("importConfigBtn");
+      if (importFileInput && importBtn) {
+        importFileInput.addEventListener("change", () => {
+          importBtn.disabled = !importFileInput.files?.length;
+        });
+      }
       document.getElementById("refreshBenchmarksBtn")?.addEventListener("click", refreshBenchmarks);
       document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
       document.getElementById("isolatePluginBtn")?.addEventListener("click", isolatePlugin);
