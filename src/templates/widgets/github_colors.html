@@ -1,5 +1,9 @@
+{% set color_levels = ['None', 'Low', 'Medium', 'High', 'Very High'] %}
 <div class="options-grid">
     {% for idx in range(5) %}
-    <input type="color" name="contributionColor[]" class="color-picker">
+    <div class="form-group">
+        <label for="contributionColor{{ idx }}" class="form-label">{{ color_levels[idx] }}</label>
+        <input type="color" id="contributionColor{{ idx }}" name="contributionColor[]" class="color-picker" aria-label="{{ color_levels[idx] }} contribution level">
+    </div>
     {% endfor %}
 </div>
