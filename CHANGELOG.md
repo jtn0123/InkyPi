@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.4.1 (2026-04-03)
+
+### Bug Fixes
+
+- Add fetch timeout, AbortError handling, and failure visibility in plugin preview
+  ([`4054d92`](https://github.com/jtn0123/InkyPi/commit/4054d9226a799c5cbba84e7e18e49619bbe80ad4))
+
+- Wrap fetch with AbortController + 90s timeout so requests don't hang indefinitely (JTN-160) -
+  Handle AbortError in catch block with user-friendly timeout message - Show "Failed — see error
+  above" instead of "Done" when request errors (JTN-161) - Display elapsed time in progress step
+  text after 15s for long-running requests
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Consolidate rate limiters into shared module (JTN-103)
+  ([`5ce8c06`](https://github.com/jtn0123/InkyPi/commit/5ce8c069596469ad54d96fc6cd8e85267b03cb99))
+
+Extract four ad-hoc rate limiter implementations into two reusable, thread-safe classes in
+  src/utils/rate_limiter.py:
+
+- CooldownLimiter: fixed-window cooldown (display-next, shutdown) - SlidingWindowLimiter: per-key
+  sliding window (logs API, mutation guard)
+
+Migrate all four call sites (main.py, settings/__init__.py, _system.py, inkypi.py) to use the new
+  classes, removing ~70 lines of duplicated timing/locking logic. Existing _rate_limit_ok wrapper
+  kept for test compatibility. Add 16 new unit tests covering both classes plus thread safety. All
+  1967 tests pass.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.0 (2026-04-03)
 
 ### Bug Fixes
