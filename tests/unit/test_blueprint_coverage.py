@@ -249,51 +249,44 @@ def test_readyz_with_web_only_mode_returns_200(client, flask_app):
 
 
 def test_rate_limiter_prunes_expired_keys(monkeypatch):
-    """_prune_empty_rate_limit_keys removes keys whose deques became empty.
+    """SlidingWindowLimiter's amortised pruning removes keys with empty deques.
 
-    The pruning is lazy: a key's entries are only evicted when _rate_limit_ok is
-    called *for that same key*.  Once a key's deque is empty, the prune step
-    removes it.  We simulate this by calling _rate_limit_ok for each old IP after
-    time-travelling past the window so every deque drains to empty, then verify
-    that all those keys have been removed from _REQUESTS.
+    We simulate stale IPs by injecting empty deques, then verify the pruning
+    logic removes them correctly.
     """
+    from collections import deque
+
     import blueprints.settings as settings_mod
 
+    limiter = settings_mod._logs_limiter
+
     # Clear state from any previous test
-    settings_mod._REQUESTS.clear()
+    limiter._requests.clear()
 
-    window = settings_mod._RATE_LIMIT_WINDOW_SECONDS  # typically 60
-
-    # Simulate 100 unique IPs that each made one request at t=1000
-    fake_past = 1000.0
+    # Inject 100 keys with empty deques (simulating expired entries)
     old_ips = [f"10.1.{i // 256}.{i % 256}" for i in range(100)]
     for ip in old_ips:
-        settings_mod._REQUESTS[ip].append(fake_past)
+        limiter._requests[ip] = deque()
 
-    assert len(settings_mod._REQUESTS) == 100
+    assert len(limiter._requests) == 100
 
-    # Time-travel: now = fake_past + window + 1  →  all old timestamps are expired
-    future_now = fake_past + window + 1.0
-    monkeypatch.setattr(settings_mod.time, "time", lambda: future_now)
+    # Force prune
+    limiter._prune_empty_keys()
 
-    # Call _rate_limit_ok for each old IP — this drains their expired entries and
-    # the pruner removes the now-empty deques.
+    # All empty keys should be gone
     for ip in old_ips:
-        settings_mod._rate_limit_ok(ip)
+        assert ip not in limiter._requests
 
-    # Each old key's deque was drained to empty *and then* a fresh timestamp was
-    # appended, so the key still exists but with exactly one entry.
-    # What matters is that the new IP "10.0.0.1" (never seen before) is allowed:
+    # A new IP is still allowed
     result = settings_mod._rate_limit_ok("10.0.0.1")
     assert result is True
 
-    # Also confirm that _prune_empty_rate_limit_keys works in isolation:
-    # artificially make one key's deque empty and verify it gets pruned.
+    # Confirm prune in isolation
     test_ip = "prune-test-ip"
-    settings_mod._REQUESTS[test_ip]  # touch to create empty deque
-    assert test_ip in settings_mod._REQUESTS
-    settings_mod._prune_empty_rate_limit_keys()
-    assert test_ip not in settings_mod._REQUESTS
+    limiter._requests[test_ip] = deque()
+    assert test_ip in limiter._requests
+    limiter._prune_empty_keys()
+    assert test_ip not in limiter._requests
 
 
 # ---------------------------------------------------------------------------

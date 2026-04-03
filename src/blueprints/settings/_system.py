@@ -1,7 +1,6 @@
 """System control route handlers (shutdown, client logging)."""
 
 import subprocess
-import time
 
 from flask import jsonify, request
 
@@ -64,18 +63,15 @@ def shutdown():
 
     Rate-limited to one call per 30 seconds to prevent accidental repeats.
     """
-    now = time.monotonic()
-    with _mod._shutdown_lock:
-        if now - _mod._last_shutdown_time < _mod._SHUTDOWN_COOLDOWN_SECONDS:
-            remaining = int(
-                _mod._SHUTDOWN_COOLDOWN_SECONDS - (now - _mod._last_shutdown_time)
-            )
-            return json_error(
-                f"Please wait {remaining}s before requesting another reboot/shutdown",
-                status=429,
-            )
-        # Reserve the slot under lock to prevent concurrent requests
-        _mod._last_shutdown_time = now
+    allowed, retry_after = _mod._shutdown_limiter.check()
+    if not allowed:
+        remaining = int(retry_after)
+        return json_error(
+            f"Please wait {remaining}s before requesting another reboot/shutdown",
+            status=429,
+        )
+    # Reserve the slot to prevent concurrent requests
+    _mod._shutdown_limiter.record()
 
     data = request.get_json(silent=True)
     if (
@@ -84,8 +80,7 @@ def shutdown():
         and "application/json" in request.content_type
     ):
         # Roll back reservation on input validation failure
-        with _mod._shutdown_lock:
-            _mod._last_shutdown_time = 0.0
+        _mod._shutdown_limiter.reset()
         return json_error("Invalid JSON payload", status=400)
     if not isinstance(data, dict):
         data = {}
@@ -97,12 +92,10 @@ def shutdown():
             _mod.logger.info("Shutdown requested")
             subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
         # Refresh the cooldown timestamp to the actual success time
-        with _mod._shutdown_lock:
-            _mod._last_shutdown_time = time.monotonic()
+        _mod._shutdown_limiter.record()
         return jsonify({"success": True})
     except subprocess.CalledProcessError as e:
         # Roll back so the cooldown isn't consumed by a failed attempt
-        with _mod._shutdown_lock:
-            _mod._last_shutdown_time = 0.0
+        _mod._shutdown_limiter.reset()
         _mod.logger.exception("Failed to execute shutdown command")
         return json_internal_error("shutdown", details={"error": str(e)})

@@ -5,7 +5,7 @@ Each test validates a specific fix described in the audit.
 
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -16,52 +16,33 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
-def test_prune_empty_rate_limit_keys_removes_expired_ip(monkeypatch):
-    """After all timestamps expire, _prune_empty_rate_limit_keys removes the IP key."""
-    import blueprints.settings as settings_mod
+def test_sliding_window_limiter_prunes_stale_keys():
+    """SlidingWindowLimiter's amortised pruning removes empty keys."""
+    from utils.rate_limiter import SlidingWindowLimiter
 
-    addr = "192.0.2.1"
+    limiter = SlidingWindowLimiter(10, 60)
+    # Manually inject an empty deque for a stale key
+    limiter._requests["stale-ip"] = deque()
+    assert "stale-ip" in limiter._requests
 
-    # Patch _REQUESTS to a fresh defaultdict so we don't affect other tests
-    fresh_requests = defaultdict(deque)
-    monkeypatch.setattr(settings_mod, "_REQUESTS", fresh_requests)
-
-    # Use a very short window so we can time-travel cheaply
-    monkeypatch.setattr(settings_mod, "_RATE_LIMIT_WINDOW_SECONDS", 1)
-
-    # Inject a stale timestamp (well in the past)
-    stale_time = time.time() - 100
-    fresh_requests[addr].append(stale_time)
-
-    assert addr in fresh_requests, "Setup: IP key should exist before pruning"
-
-    # Calling _rate_limit_ok for this addr will expire the old timestamp
-    # and then the finally block calls _prune_empty_rate_limit_keys.
-    # The new timestamp gets appended after the check, so the key will
-    # have 1 fresh entry. We need to verify pruning works on truly empty keys.
-    # Simulate: clear the deque manually, then prune.
-    fresh_requests[addr].clear()
-    settings_mod._prune_empty_rate_limit_keys()
-
-    assert (
-        addr not in fresh_requests
-    ), "IP key should be removed from _REQUESTS after all timestamps expire"
+    # Force prune (normally happens every _PRUNE_INTERVAL calls)
+    limiter._prune_empty_keys()
+    assert "stale-ip" not in limiter._requests
 
 
-def test_rate_limit_ok_adds_timestamp(monkeypatch):
-    """_rate_limit_ok records a timestamp for the given address."""
+def test_rate_limit_ok_adds_timestamp():
+    """_rate_limit_ok records a timestamp for the given address via SlidingWindowLimiter."""
     import blueprints.settings as settings_mod
 
     addr = "192.0.2.99"
-    fresh_requests = defaultdict(deque)
-    monkeypatch.setattr(settings_mod, "_REQUESTS", fresh_requests)
-    monkeypatch.setattr(settings_mod, "_RATE_LIMIT_WINDOW_SECONDS", 60)
+    # Clear any prior state for this key
+    settings_mod._logs_limiter._requests.pop(addr, None)
 
     result = settings_mod._rate_limit_ok(addr)
 
     # Should have allowed the request and recorded a timestamp
     assert result is True
-    assert len(fresh_requests[addr]) >= 1
+    assert len(settings_mod._logs_limiter._requests.get(addr, [])) >= 1
 
 
 # ---------------------------------------------------------------------------
@@ -371,11 +352,10 @@ def test_display_next_cooldown_resets(client, monkeypatch):
 
 
 def test_display_next_cooldown_constant_exists():
-    """_DISPLAY_NEXT_COOLDOWN_SECONDS is defined and positive."""
-    from blueprints.main import _DISPLAY_NEXT_COOLDOWN_SECONDS
+    """_display_next_limiter has a positive cooldown configured."""
+    from blueprints.main import _display_next_limiter
 
-    assert isinstance(_DISPLAY_NEXT_COOLDOWN_SECONDS, int | float)
-    assert _DISPLAY_NEXT_COOLDOWN_SECONDS > 0
+    assert _display_next_limiter._cooldown > 0
 
 
 # ---------------------------------------------------------------------------

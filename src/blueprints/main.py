@@ -1,7 +1,6 @@
 import logging
 import math
 import os
-import time
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -16,6 +15,7 @@ from flask import (
 )
 
 from utils.http_utils import json_error
+from utils.rate_limiter import CooldownLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -222,26 +222,21 @@ def _configure_app_static(state):
         pass
 
 
-_DISPLAY_NEXT_COOLDOWN_SECONDS = 10
-_last_display_next_time: float = 0.0
+_display_next_limiter = CooldownLimiter(10)
 
 
 def _reset_display_next_cooldown():
     """Reset the display-next rate limiter. Exposed for testing."""
-    global _last_display_next_time
-    _last_display_next_time = 0.0
+    _display_next_limiter.reset()
 
 
 @main_bp.route("/display-next", methods=["POST"])
 def display_next():
-    global _last_display_next_time
-    now = time.monotonic()
-    if now - _last_display_next_time < _DISPLAY_NEXT_COOLDOWN_SECONDS:
-        remaining = math.ceil(
-            _DISPLAY_NEXT_COOLDOWN_SECONDS - (now - _last_display_next_time)
-        )
+    allowed, retry_after = _display_next_limiter.check()
+    if not allowed:
+        remaining = math.ceil(retry_after)
         return json_error(
-            f"Please wait {remaining}s before requesting another display update",
+            f"Please wait {remaining}s before refreshing again.",
             status=429,
         )
 
@@ -345,7 +340,7 @@ def display_next():
         logger.exception("display_next failed")
         return json_error("An internal error occurred", status=500)
 
-    _last_display_next_time = now
+    _display_next_limiter.record()
 
     # Gather metrics from refresh_info if available
     try:

@@ -7,7 +7,6 @@ import os
 import secrets
 import signal
 import warnings
-from collections import defaultdict, deque
 from time import perf_counter
 
 from flask import (
@@ -30,6 +29,7 @@ from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image, get_ip_address
 from utils.http_utils import APIError, json_error, json_internal_error, wants_json
+from utils.rate_limiter import SlidingWindowLimiter
 
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
@@ -388,27 +388,20 @@ def _setup_csrf_protection(app: Flask) -> None:
             return json_error("CSRF token missing or invalid", status=403)
 
 
-def _setup_rate_limiting(app: Flask) -> None:
-    mutate_requests: dict[str, deque] = defaultdict(deque)
+_mutation_limiter = SlidingWindowLimiter(_MUTATE_MAX, _MUTATE_WINDOW)
 
+
+def _setup_rate_limiting(app: Flask) -> None:
     @app.before_request
     def _rate_limit_mutations():
         if request.method in _CSRF_SAFE_METHODS:
             return
         if request.path in _RATE_EXEMPT:
             return
-        import time as _time
-
         addr = request.remote_addr or "unknown"
-        now = _time.monotonic()
-        dq = mutate_requests[addr]
-        while dq and dq[0] < now - _MUTATE_WINDOW:
-            dq.popleft()
-        if not dq:
-            mutate_requests.pop(addr, None)
-        if len(dq) >= _MUTATE_MAX:
+        allowed, _ = _mutation_limiter.check(addr)
+        if not allowed:
             return json_error("Rate limit exceeded — try again shortly", status=429)
-        mutate_requests[addr].append(now)
 
 
 def _setup_security_headers(app: Flask) -> None:
