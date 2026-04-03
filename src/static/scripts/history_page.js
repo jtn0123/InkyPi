@@ -101,48 +101,78 @@
 
     async function confirmDelete() {
       if (!state.pendingDelete) return;
+      var confirmBtn = document.getElementById("confirmDeleteHistoryBtn");
+      var cancelBtn = document.getElementById("cancelDeleteHistoryBtn");
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Deleting\u2026";
+        confirmBtn.classList.add("loading");
+      }
+      if (cancelBtn) cancelBtn.disabled = true;
       try {
-        const resp = await fetch(config.deleteUrl, {
+        var resp = await fetch(config.deleteUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filename: state.pendingDelete }),
         });
-        const result = await resp.json();
+        var result = await resp.json();
         if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
+          closeDeleteModal();
+          showResponseModal("failure", "Error! " + result.error);
           return;
         }
         sessionStorage.setItem(
           "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+          JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         window.location.reload();
       } catch (e) {
         console.error(e);
+        closeDeleteModal();
         showResponseModal("failure", "Failed to delete image");
       } finally {
-        closeDeleteModal();
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Delete";
+          confirmBtn.classList.remove("loading");
+        }
+        if (cancelBtn) cancelBtn.disabled = false;
       }
     }
 
     async function confirmClear() {
+      var confirmBtn = document.getElementById("confirmClearHistoryBtn");
+      var cancelBtn = document.getElementById("cancelClearHistoryBtn");
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Clearing\u2026";
+        confirmBtn.classList.add("loading");
+      }
+      if (cancelBtn) cancelBtn.disabled = true;
       try {
-        const resp = await fetch(config.clearUrl, { method: "POST" });
-        const result = await resp.json();
+        var resp = await fetch(config.clearUrl, { method: "POST" });
+        var result = await resp.json();
         if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
+          closeClearModal();
+          showResponseModal("failure", "Error! " + result.error);
           return;
         }
         sessionStorage.setItem(
           "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+          JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         window.location.reload();
       } catch (e) {
         console.error(e);
+        closeClearModal();
         showResponseModal("failure", "Failed to clear history");
       } finally {
-        closeClearModal();
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Clear";
+          confirmBtn.classList.remove("loading");
+        }
+        if (cancelBtn) cancelBtn.disabled = false;
       }
     }
 
