@@ -269,9 +269,13 @@ def display_next():
         if getattr(refresh_task, "running", False):
             from refresh_task import PlaylistRefresh
 
-            refresh_task.manual_update(
-                PlaylistRefresh(playlist, plugin_instance, force=True)
-            )
+            try:
+                refresh_task.manual_update(
+                    PlaylistRefresh(playlist, plugin_instance, force=True)
+                )
+            except Exception as exc:
+                logger.exception("manual_update failed")
+                return json_error(f"Plugin update failed: {exc}", status=400)
         else:
             # Direct path similar to update_now
             from time import perf_counter
@@ -284,7 +288,10 @@ def display_next():
                 return json_error("Plugin config not found", status=404)
             plugin = get_plugin_instance(plugin_config)
             _t_gen_start = perf_counter()
-            image = plugin.generate_image(plugin_instance.settings, device_config)
+            try:
+                image = plugin.generate_image(plugin_instance.settings, device_config)
+            except RuntimeError as exc:
+                return json_error(str(exc), status=400)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             try:
                 save_stage_event(
