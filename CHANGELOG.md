@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.3.13 (2026-04-03)
+
+### Bug Fixes
+
+- Add loading feedback to backup/restore buttons and disable restore when no file selected (JTN-179,
+  JTN-180)
+  ([`7e8446e`](https://github.com/jtn0123/InkyPi/commit/7e8446e4b53de1eca787156b72a97bdf1262954d))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract syncImportButton helper to resolve SonarCloud shadowing and line length
+  ([`9718f04`](https://github.com/jtn0123/InkyPi/commit/9718f04be9a7234d63c7d432bf3248783af6af80))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Resolve SonarCloud issues — optional chaining, catch logging, inline helper
+  ([`7dec520`](https://github.com/jtn0123/InkyPi/commit/7dec5206ca0998dbfb0f2f06788af8806757fac2))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.12 (2026-04-03)
 
 ### Bug Fixes
