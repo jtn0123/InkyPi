@@ -21,12 +21,12 @@
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
     const uploadedFiles = (window.uploadedFiles = window.uploadedFiles || {});
-    var actionInFlight = false;
+    let actionInFlight = false;
     let workflowMode = "configure";
 
     function syncModalOpenState() {
       if (ui.syncModalOpenState) return ui.syncModalOpenState();
-      var open = document.querySelector(".modal.is-open");
+      const open = document.querySelector(".modal.is-open");
       document.body.classList.toggle("modal-open", !!open);
     }
 
@@ -211,26 +211,26 @@
       if (!validateAddToPlaylistAction(action)) return;
 
       // Validate settingsForm required fields (catches empty calendar URLs, etc.)
-      var settingsForm = document.getElementById("settingsForm");
+      const settingsForm = document.getElementById("settingsForm");
       if (settingsForm && window.FormValidator) {
-        var errorCount = window.FormValidator.validateAllInputs(settingsForm);
+        const errorCount = window.FormValidator.validateAllInputs(settingsForm);
         if (errorCount > 0) {
           showResponseModal("failure",
             errorCount + (errorCount === 1 ? " field needs" : " fields need") + " fixing before saving.");
-          var firstInvalid = settingsForm.querySelector("[aria-invalid=\"true\"]");
+          const firstInvalid = settingsForm.querySelector("[aria-invalid=\"true\"]");
           if (firstInvalid) firstInvalid.focus();
           return;
         }
       }
 
       if (action === "add_to_playlist") {
-        var scheduleForm = document.getElementById("scheduleForm");
+        const scheduleForm = document.getElementById("scheduleForm");
         if (scheduleForm && window.FormValidator) {
-          var scheduleErrors = window.FormValidator.validateAllInputs(scheduleForm);
+          const scheduleErrors = window.FormValidator.validateAllInputs(scheduleForm);
           if (scheduleErrors > 0) {
             showResponseModal("failure",
               scheduleErrors + (scheduleErrors === 1 ? " field needs" : " fields need") + " fixing before saving.");
-            var firstScheduleInvalid = scheduleForm.querySelector("[aria-invalid=\"true\"]");
+            const firstScheduleInvalid = scheduleForm.querySelector("[aria-invalid=\"true\"]");
             if (firstScheduleInvalid) firstScheduleInvalid.focus();
             return;
           }
@@ -650,7 +650,7 @@
     function init() {
       populateStyleSettings();
       bindControls();
-      var scheduleForm = document.getElementById("scheduleForm");
+      const scheduleForm = document.getElementById("scheduleForm");
       if (scheduleForm && window.FormValidator && window.FormValidator.initFormValidation) {
         window.FormValidator.initFormValidation(scheduleForm);
       }
