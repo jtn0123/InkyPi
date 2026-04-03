@@ -10,11 +10,13 @@
     <div class="frame api-keys-frame">
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
         {% if api_keys_mode == 'managed' %}
-            {% set key_summary.provider_count = 4 %}
+            {% set key_summary.provider_count = 6 %}
             {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
             {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
             {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
             {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.GITHUB_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
+            {% if masked.GOOGLE_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
         {% else %}
             {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
         {% endif %}
@@ -53,6 +55,8 @@
                 {{ api_key_card('OpenWeatherMap', 'OPEN_WEATHER_MAP_SECRET', 'openweather-input', 'openweather-status', 'Enter OpenWeatherMap API key', masked, api_key_plugins) }}
                 {{ api_key_card('NASA APOD', 'NASA_SECRET', 'nasa-input', 'nasa-status', 'Enter NASA API key', masked, api_key_plugins) }}
                 {{ api_key_card('Unsplash', 'UNSPLASH_ACCESS_KEY', 'unsplash-input', 'unsplash-status', 'Enter Unsplash access key', masked, api_key_plugins) }}
+                {{ api_key_card('GitHub', 'GITHUB_SECRET', 'github-input', 'github-status', 'Enter GitHub personal access token', masked, api_key_plugins) }}
+                {{ api_key_card('Google AI', 'GOOGLE_AI_SECRET', 'googleai-input', 'googleai-status', 'Enter Google AI API key', masked, api_key_plugins) }}
             </div>
         </form>
         {% else %}
@@ -79,6 +83,7 @@
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY" title="Used by: {{ api_key_plugins.get('UNSPLASH_ACCESS_KEY', []) | join(', ') }}">UNSPLASH_ACCESS_KEY</button>
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET" title="Used by: {{ api_key_plugins.get('GITHUB_SECRET', []) | join(', ') }}">GITHUB_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GOOGLE_AI_SECRET" title="Used by: {{ api_key_plugins.get('GOOGLE_AI_SECRET', []) | join(', ') }}">GOOGLE_AI_SECRET</button>
             </div>
         </div>
         {% endif %}
