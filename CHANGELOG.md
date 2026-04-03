@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.4.0 (2026-04-03)
+
+### Bug Fixes
+
+- Add accessibility labels to color pickers and dialog semantics to modals (JTN-155, JTN-156)
+  ([`76feedd`](https://github.com/jtn0123/InkyPi/commit/76feedd727279ade6e701b5477c2ee46809cb55b))
+
+Add labeled form groups with aria-labels to GitHub contribution color pickers in both the widget
+  template and legacy settings page. Add role="dialog", aria-modal, and aria-labelledby to weather
+  map modals, and convert close-button spans to semantic button elements.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Hide Display Next on empty playlists and add calendar editor empty state (JTN-151, JTN-172)
+  ([`acb7ea1`](https://github.com/jtn0123/InkyPi/commit/acb7ea1c1a8e6c71150ec14195c3e3ee04d5b210))
+
+Hide the "Display Next" button when a playlist has no plugins to prevent dead-end clicks. Add
+  empty-state messaging to both the schema-driven and legacy calendar repeater editors so users see
+  guidance when the calendar list is empty. Includes JS safety-net guard and integration tests.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add SSRF and path-traversal input validation (JTN-96)
+  ([`c5130be`](https://github.com/jtn0123/InkyPi/commit/c5130be46767ba1255351c52472175a316b3054e))
+
+Add security_utils module with validate_url (SSRF protection blocking
+  private/loopback/link-local/reserved IPs and non-HTTP schemes) and validate_file_path
+  (directory-traversal prevention). Wire them into the screenshot and image_upload plugins, and add
+  comprehensive unit and integration tests.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.13 (2026-04-03)
 
 ### Bug Fixes
