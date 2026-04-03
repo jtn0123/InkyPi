@@ -125,3 +125,53 @@ def test_api_logs_response_size_guardrail(client, monkeypatch):
     # Response body should be under the guardrail
     raw = resp.data
     assert len(raw) <= mod.MAX_RESPONSE_BYTES + 10000  # some overhead for JSON wrapping
+
+
+def test_format_journal_line_strips_internals():
+    """_format_journal_line maps priority to level and omits hostname/PID."""
+    from blueprints.settings import _format_journal_line
+
+    data = {
+        "PRIORITY": "3",
+        "_HOSTNAME": "raspberrypi",
+        "SYSLOG_IDENTIFIER": "python3",
+        "_PID": "1234",
+        "MESSAGE": "Something failed",
+    }
+    result = _format_journal_line("Apr 02 10:00:00", data)
+    assert result == "Apr 02 10:00:00 [ERROR] Something failed"
+    assert "raspberrypi" not in result
+    assert "python3" not in result
+    assert "1234" not in result
+
+
+def test_format_journal_line_defaults_to_info():
+    """Missing PRIORITY defaults to INFO level."""
+    from blueprints.settings import _format_journal_line
+
+    result = _format_journal_line("Apr 02 10:00:00", {"MESSAGE": "hello"})
+    assert result == "Apr 02 10:00:00 [INFO] hello"
+
+
+def test_log_lines_exclude_internal_details(client, monkeypatch):
+    """Log lines should not expose hostname, PID, or process identifiers."""
+    import re
+
+    import blueprints.settings as mod
+
+    # Simulate journal-style lines that the formatter would produce
+    fake_lines = [
+        "Apr 02 10:00:00 [INFO] Application started",
+        "Apr 02 10:00:01 [ERROR] Something went wrong",
+        "Apr 02 10:00:02 [DEBUG] Detailed trace info",
+    ]
+    monkeypatch.setattr(mod, "_read_log_lines", lambda h: fake_lines)
+
+    resp = client.get("/api/logs?hours=2")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    for line in data.get("lines", []):
+        assert "unknown-host" not in line
+        assert not re.search(
+            r"\w+\[\d+\]:", line
+        ), f"Found identifier[pid] pattern in: {line}"

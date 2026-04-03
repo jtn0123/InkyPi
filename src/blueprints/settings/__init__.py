@@ -40,6 +40,16 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint("settings", __name__)
 
 LOG_TIMESTAMP_FORMAT = "%b %d %H:%M:%S"
+_PRIORITY_TO_LEVEL = {
+    "0": "CRITICAL",
+    "1": "CRITICAL",
+    "2": "CRITICAL",
+    "3": "ERROR",
+    "4": "WARNING",
+    "5": "INFO",
+    "6": "INFO",
+    "7": "DEBUG",
+}
 UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 
 # Guardrails and limits for logs APIs
@@ -166,6 +176,13 @@ def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) 
         return default
 
 
+def _format_journal_line(formatted_ts: str, data: dict) -> str:
+    priority = str(data.get("PRIORITY", "6"))
+    level = _PRIORITY_TO_LEVEL.get(priority, "INFO")
+    msg = (data.get("MESSAGE", "") or "").rstrip()
+    return f"{formatted_ts} [{level}] {msg}"
+
+
 def _read_log_lines(hours: int) -> list[str]:
     """Read service logs for the last N hours and return as list of formatted lines."""
     # Use device timezone for consistency in all time computations
@@ -214,11 +231,7 @@ def _read_log_lines(hours: int) -> list[str]:
                 formatted_ts = "??? ?? ??:??:??"
 
             data = record.data
-            hostname = data.get("_HOSTNAME", "unknown-host")
-            identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
-            pid = data.get("_PID", "?")
-            msg = data.get("MESSAGE", "").rstrip()
-            lines.append(f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}")
+            lines.append(_format_journal_line(formatted_ts, data))
     finally:
         try:
             reader.close()
@@ -272,11 +285,7 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
                 ts_usec = record.get_realtime_usec()
                 ts = datetime.fromtimestamp(ts_usec / 1_000_000)
                 formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
-                hostname = data.get("_HOSTNAME", "unknown-host")
-                identifier = data.get("SYSLOG_IDENTIFIER") or data.get("_COMM", "?")
-                pid = data.get("_PID", "?")
-                msg = (data.get("MESSAGE", "") or "").rstrip()
-                line = f"{formatted_ts} {hostname} {identifier}[{pid}]: {msg}"
+                line = _format_journal_line(formatted_ts, data)
                 merged.append((ts.timestamp(), line))
             except Exception:
                 # Skip malformed records
