@@ -96,6 +96,15 @@ class Unsplash(BasePlugin):
             ),
         )
 
+    def generate_settings_template(self):
+        template_params = super().generate_settings_template()
+        template_params["api_key"] = {
+            "required": True,
+            "service": "Unsplash",
+            "expected_key": "UNSPLASH_ACCESS_KEY",
+        }
+        return template_params
+
     def _request_timeout(self) -> float:
         try:
             return float(os.getenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "20"))

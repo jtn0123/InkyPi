@@ -393,6 +393,17 @@ def test_grab_image_invalid_image_data():
         assert result is None
 
 
+def test_unsplash_settings_template_declares_api_key():
+    from plugins.unsplash.unsplash import Unsplash
+
+    plugin = Unsplash({"id": "unsplash"})
+    params = plugin.generate_settings_template()
+    assert "api_key" in params
+    assert params["api_key"]["required"] is True
+    assert params["api_key"]["expected_key"] == "UNSPLASH_ACCESS_KEY"
+    assert params["api_key"]["service"] == "Unsplash"
+
+
 def test_unsplash_content_filter_settings(device_config_dev, monkeypatch):
     """Test Unsplash plugin with different content filter settings."""
     from plugins.unsplash.unsplash import Unsplash

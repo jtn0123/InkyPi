@@ -252,6 +252,45 @@ def test_api_key_indicator_shows_configured_when_key_present(client, device_conf
     assert "API Key is configured" in body or "✓" in body
 
 
+def test_action_buttons_disabled_when_api_key_missing(client, device_config_dev):
+    """Buttons that need an API key are disabled when the key is absent.
+
+    Regression test for JTN-162: action buttons should be disabled when the
+    required API key is not configured, preventing users from triggering
+    actions that will inevitably fail.
+    """
+    # Ensure no Unsplash key is present
+    device_config_dev.unset_env_key("UNSPLASH_ACCESS_KEY")
+
+    resp = client.get("/plugin/unsplash")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    # "Update Preview" should be disabled
+    assert 'disabled title="Configure Unsplash API key first"' in body
+    # "Save Settings" should NOT be disabled
+    assert 'aria-describedby="save-settings-help">Save Settings</button>' in body
+    assert (
+        "disabled" not in body.split("Save Settings")[0].split("save-settings-help")[1]
+    )
+
+
+def test_action_buttons_enabled_when_api_key_present(client, device_config_dev):
+    """Buttons are enabled when the required API key is present."""
+    device_config_dev.set_env_key("UNSPLASH_ACCESS_KEY", "test-key-123")
+
+    resp = client.get("/plugin/unsplash")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    # "Update Preview" should NOT be disabled
+    update_btn = 'data-plugin-action="update_now"'
+    assert update_btn in body
+    # Find the button and check it doesn't have disabled
+    btn_section = body.split(update_btn)[1].split(">")[0]
+    assert "disabled" not in btn_section
+
+
 def test_plugin_latest_image_endpoint(client, device_config_dev):
     """Test that /plugin_latest_image serves the most recent image for a plugin.
 

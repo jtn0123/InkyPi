@@ -21,6 +21,7 @@
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
     const uploadedFiles = (window.uploadedFiles = window.uploadedFiles || {});
+    var actionInFlight = false;
     let workflowMode = "configure";
 
     function syncModalOpenState() {
@@ -209,9 +210,37 @@
     async function handleAction(action, triggerButton) {
       if (!validateAddToPlaylistAction(action)) return;
 
+      // Validate settingsForm required fields (catches empty calendar URLs, etc.)
+      var settingsForm = document.getElementById("settingsForm");
+      if (settingsForm && window.FormValidator) {
+        var errorCount = window.FormValidator.validateAllInputs(settingsForm);
+        if (errorCount > 0) {
+          showResponseModal("failure",
+            errorCount + (errorCount === 1 ? " field needs" : " fields need") + " fixing before saving.");
+          var firstInvalid = settingsForm.querySelector("[aria-invalid=\"true\"]");
+          if (firstInvalid) firstInvalid.focus();
+          return;
+        }
+      }
+
+      if (action === "add_to_playlist") {
+        var scheduleForm = document.getElementById("scheduleForm");
+        if (scheduleForm && window.FormValidator) {
+          var scheduleErrors = window.FormValidator.validateAllInputs(scheduleForm);
+          if (scheduleErrors > 0) {
+            showResponseModal("failure",
+              scheduleErrors + (scheduleErrors === 1 ? " field needs" : " fields need") + " fixing before saving.");
+            var firstScheduleInvalid = scheduleForm.querySelector("[aria-invalid=\"true\"]");
+            if (firstScheduleInvalid) firstScheduleInvalid.focus();
+            return;
+          }
+        }
+      }
+
       if (!runPluginValidation(action)) return;
       if (!ensurePluginFormAvailable()) return;
 
+      actionInFlight = true;
       if (triggerButton) triggerButton.disabled = true;
       try {
         await globalThis.PluginForm.sendForm({
@@ -228,6 +257,7 @@
         });
         saveLastProgressSnapshot(config.progressContext);
       } finally {
+        actionInFlight = false;
         if (triggerButton) triggerButton.disabled = false;
       }
     }
@@ -501,6 +531,7 @@
 
     function bindModalClose() {
       window.addEventListener("click", (event) => {
+        if (actionInFlight) return;
         const modal = document.getElementById("scheduleModal");
         if (event.target === modal) {
           closeModal("scheduleModal");
@@ -619,6 +650,10 @@
     function init() {
       populateStyleSettings();
       bindControls();
+      var scheduleForm = document.getElementById("scheduleForm");
+      if (scheduleForm && window.FormValidator && window.FormValidator.initFormValidation) {
+        window.FormValidator.initFormValidation(scheduleForm);
+      }
       bindWorkflowMode();
       initStatusBar();
       initPreviewInteractions();
