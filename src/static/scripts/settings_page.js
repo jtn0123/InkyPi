@@ -373,6 +373,12 @@
       }
     }
 
+    function syncImportButton() {
+      const input = document.getElementById("importFile");
+      const btn = document.getElementById("importConfigBtn");
+      if (btn) btn.disabled = !(input && input.files && input.files.length);
+    }
+
     async function importConfig() {
       const btn = document.getElementById("importConfigBtn");
       if (btn) { btn.disabled = true; btn.textContent = "Restoring\u2026"; }
@@ -398,7 +404,11 @@
       } catch (_e) {
         showResponseModal("failure", "Import failed");
       } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Restore from File"; const fileInput = document.getElementById("importFile"); btn.disabled = !(fileInput && fileInput.files && fileInput.files.length); }
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Restore from File";
+        }
+        syncImportButton();
       }
     }
 
@@ -665,11 +675,8 @@
       document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
       document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
       const importFileInput = document.getElementById("importFile");
-      const importBtn = document.getElementById("importConfigBtn");
-      if (importFileInput && importBtn) {
-        importFileInput.addEventListener("change", () => {
-          importBtn.disabled = !importFileInput.files.length;
-        });
+      if (importFileInput) {
+        importFileInput.addEventListener("change", syncImportButton);
       }
       document.getElementById("refreshBenchmarksBtn")?.addEventListener("click", refreshBenchmarks);
       document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
