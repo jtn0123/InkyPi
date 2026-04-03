@@ -13,9 +13,15 @@ from plugins.base_plugin.settings_schema import (
     section,
     widget,
 )
+from utils.app_utils import resolve_path
 from utils.image_utils import pad_image_blur
+from utils.security_utils import validate_file_path
 
 logger = logging.getLogger(__name__)
+
+
+def _get_upload_dir():
+    return resolve_path(os.path.join("static", "images", "saved"))
 
 
 def _resolve_background_color(
@@ -83,12 +89,20 @@ class ImageUpload(BasePlugin):
     def open_image(self, img_index: int, image_locations: list) -> Image:
         if not image_locations:
             raise RuntimeError("No images provided.")
+
+        image_path = image_locations[img_index]
+        try:
+            image_path = validate_file_path(image_path, _get_upload_dir())
+        except ValueError:
+            logger.error("Image path outside allowed directory: %s", image_path)
+            raise RuntimeError("Invalid image file path.") from None
+
         # Open the image using Pillow
         try:
-            with Image.open(image_locations[img_index]) as img:
+            with Image.open(image_path) as img:
                 image = img.copy()
         except (OSError, ValueError) as e:
-            logger.error(f"Failed to read image file: {str(e)}")
+            logger.error("Failed to read image file: %s", e)
             raise RuntimeError("Failed to read image file.") from e
         return image
 
@@ -137,9 +151,18 @@ class ImageUpload(BasePlugin):
             return
 
         for image_path in image_locations:
-            if os.path.exists(image_path):
+            try:
+                safe_path = validate_file_path(image_path, _get_upload_dir())
+            except ValueError:
+                logger.warning(
+                    "Skipping cleanup of path outside upload dir: %s", image_path
+                )
+                continue
+            if os.path.exists(safe_path):
                 try:
-                    os.remove(image_path)
-                    logger.info(f"Deleted uploaded image: {image_path}")
+                    os.remove(safe_path)
+                    logger.info("Deleted uploaded image: %s", safe_path)
                 except OSError as e:
-                    logger.warning(f"Failed to delete uploaded image {image_path}: {e}")
+                    logger.warning(
+                        "Failed to delete uploaded image %s: %s", safe_path, e
+                    )
