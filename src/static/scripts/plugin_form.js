@@ -9,6 +9,7 @@
     const state = {
       t0: 0,
       clockTimer: null,
+      lastStepBase: '',
       els: {
         block: $('requestProgress'),
         text: $('requestProgressText'),
@@ -20,8 +21,8 @@
     };
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
-    function tickClock(){ try { if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.elapsed) state.els.elapsed.textContent = fmtElapsed(Date.now() - state.t0); } catch(e){} }
-    function setStep(text, pct){ if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') { state.els.bar.style.width = pct + '%'; state.els.bar.setAttribute('aria-valuenow', pct); }
+    function tickClock(){ try { if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - state.t0; if (state.els.elapsed) state.els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && state.lastStepBase && state.els.text && !state.lastStepBase.includes('Done') && !state.lastStepBase.includes('Failed')) { state.els.text.textContent = state.lastStepBase + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
+    function setStep(text, pct){ state.lastStepBase = text; if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') { state.els.bar.style.width = pct + '%'; state.els.bar.setAttribute('aria-valuenow', pct); }
       if (state.els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); state.els.list.appendChild(li); try { state.els.list.scrollTop = state.els.list.scrollHeight; } catch(e){} }
     }
     function start(){ state.t0 = Date.now(); try { if (state.els.list) state.els.list.innerHTML = ''; if (state.els.elapsed) state.els.elapsed.textContent = '0s'; if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.bar) state.els.bar.style.width = '10%'; } catch(e){} tickClock(); state.clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
@@ -52,9 +53,11 @@
 
     if (loadingIndicator) loadingIndicator.style.display = 'block';
     progress.start();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
     try {
       progress.setStep('Sending…', 30);
-      const response = await fetch(url, { method, body: formData });
+      const response = await fetch(url, { method, body: formData, signal: controller.signal });
       progress.setStep('Waiting (device)…', 60);
       result = await response.json();
       if (response.ok){
@@ -76,7 +79,9 @@
     } catch (e){
       console.error('Error in plugin form submission:', e);
       console.error('Error stack:', e.stack);
-      if (e instanceof TypeError) {
+      if (e.name === 'AbortError') {
+        if (window.showResponseModal) window.showResponseModal('failure', 'Request timed out. The plugin may still be processing \u2014 check back in a moment.');
+      } else if (e instanceof TypeError) {
         const msg = navigator.onLine === false
           ? 'You appear to be offline. Check your connection.'
           : 'Unable to reach the device. Check that InkyPi is running.';
@@ -85,8 +90,9 @@
         if (window.showResponseModal) window.showResponseModal('failure', 'An error occurred. Please try again.');
       }
     } finally {
+      clearTimeout(timeoutId);
       if (loadingIndicator) loadingIndicator.style.display = 'none';
-      progress.setStep('Done', 100);
+      progress.setStep(success ? 'Done' : 'Failed \u2014 see error above', 100);
       progress.stop();
     }
     return { success, result };
