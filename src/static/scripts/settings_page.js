@@ -256,6 +256,48 @@
     function clearLogsView() {
       const viewer = document.getElementById("logsViewer");
       if (viewer) viewer.textContent = "";
+      state.lastLogsRaw = "";
+      const filterInput = document.getElementById("logsFilter");
+      const levelSelect = document.getElementById("logsLevel");
+      if (filterInput) filterInput.value = "";
+      if (levelSelect) levelSelect.value = "all";
+      if (ui.savePref) {
+        ui.savePref("", prefKey("filter"), "");
+        ui.savePref("", prefKey("level"), "all");
+      }
+      showResponseModal("success", "Log view cleared");
+    }
+
+    async function downloadLogs() {
+      const btn = document.getElementById("downloadLogsBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Downloading\u2026"; }
+      try {
+        const resp = await fetch(config.downloadLogsUrl, { cache: "no-store" });
+        if (!resp.ok) {
+          showResponseModal("failure", "Failed to download logs");
+          return;
+        }
+        const text = await resp.text();
+        if (!text || text.trim().length === 0) {
+          showResponseModal("failure", "No logs available to download");
+          return;
+        }
+        const disposition = resp.headers.get("Content-Disposition") || "";
+        const filenameRe = /filename=([^\s;]+)/;
+        const match = filenameRe.exec(disposition);
+        const filename = match ? match[1] : "inkypi_logs.log";
+        const blob = new Blob([text], { type: "text/plain" });
+        const anchor = document.createElement("a");
+        anchor.href = URL.createObjectURL(blob);
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(anchor.href);
+        showResponseModal("success", "Logs downloaded");
+      } catch (_e) {
+        showResponseModal("failure", "Failed to download logs");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Download Logs"; }
+      }
     }
 
     function toggleLogsWrap() {
@@ -573,6 +615,7 @@
       if (copyBtn) copyBtn.addEventListener("click", copyLogsToClipboard);
       if (clearBtn) clearBtn.addEventListener("click", clearLogsView);
       if (wrapBtn) wrapBtn.addEventListener("click", toggleLogsWrap);
+      document.getElementById("downloadLogsBtn")?.addEventListener("click", downloadLogs);
       fetchAndRenderLogs();
     }
 

@@ -21,7 +21,7 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <a class="header-button is-secondary" href="{{ url_for('settings.download_logs', hours=24) }}" download>Download Logs</a>
+                    <button type="button" class="header-button is-secondary" id="downloadLogsBtn">Download Logs</button>
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                 </div>
             </div>
@@ -360,6 +360,7 @@
     </main>
     <script>
         window.__INKYPI_SETTINGS_BOOT__ = {
+            downloadLogsUrl: {{ url_for('settings.download_logs', hours=24) | tojson }},
             exportSettingsUrl: {{ url_for('settings.export_settings') | tojson }},
             importSettingsUrl: {{ url_for('settings.import_settings') | tojson }},
             logsUrl: {{ url_for('settings.api_logs') | tojson }},
