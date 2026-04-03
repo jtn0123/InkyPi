@@ -1,8 +1,20 @@
 # pyright: reportMissingImports=false
+import tempfile
 from io import BytesIO
 
 import pytest
 from PIL import Image
+
+import plugins.image_upload.image_upload as _image_upload_mod
+
+
+@pytest.fixture(autouse=True)
+def _patch_upload_dir(monkeypatch):
+    """Point _get_upload_dir to the system temp directory so that tests using
+    tempfile.NamedTemporaryFile pass path validation."""
+    monkeypatch.setattr(
+        _image_upload_mod, "_get_upload_dir", lambda: tempfile.gettempdir()
+    )
 
 
 def build_upload(name: str, content: bytes, content_type: str = "image/png"):
@@ -61,6 +73,11 @@ def test_image_upload_success(client, monkeypatch, device_config_dev, tmp_path):
 
     # Intercept handle_request_files to feed our upload through the real validator
     import utils.app_utils as app_utils
+
+    # Re-patch _get_upload_dir to match the actual upload path used by
+    # handle_request_files so that path validation accepts saved files.
+    real_upload_dir = app_utils.resolve_path("static/images/saved")
+    monkeypatch.setattr(_image_upload_mod, "_get_upload_dir", lambda: real_upload_dir)
 
     def fake_handle_request_files(request_files, form_data=None):
         if form_data is None:
@@ -190,21 +207,25 @@ def test_image_upload_open_image_no_images():
         plugin.open_image(0, [])
 
 
-def test_image_upload_open_image_invalid_file(monkeypatch):
+def test_image_upload_open_image_invalid_file(monkeypatch, tmp_path):
     from PIL import Image
 
     from plugins.image_upload.image_upload import ImageUpload
 
     plugin = ImageUpload({"id": "image_upload"})
 
-    # Mock Image.open to raise exception (upstream uses Image.open directly)
+    # Use a path inside the allowed dir so path validation passes,
+    # then mock Image.open to raise an exception
+    monkeypatch.setattr(_image_upload_mod, "_get_upload_dir", lambda: str(tmp_path))
+    fake_path = str(tmp_path / "missing.png")
+
     def mock_open(path):
         raise OSError("File not found")
 
     monkeypatch.setattr(Image, "open", mock_open)
 
     with pytest.raises(RuntimeError, match="Failed to read image file"):
-        plugin.open_image(0, ["/fake/path.png"])
+        plugin.open_image(0, [fake_path])
 
 
 def test_image_upload_generate_image_index_out_of_range(monkeypatch, device_config_dev):

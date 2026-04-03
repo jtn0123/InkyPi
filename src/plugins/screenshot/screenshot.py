@@ -3,6 +3,7 @@ import logging
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.image_utils import take_screenshot
+from utils.security_utils import validate_url
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,11 @@ class Screenshot(BasePlugin):
         url = settings.get("url")
         if not url:
             raise RuntimeError("URL is required.")
+
+        try:
+            validate_url(url)
+        except ValueError as e:
+            raise RuntimeError(f"Invalid URL: {e}") from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 
