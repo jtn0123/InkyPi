@@ -101,6 +101,14 @@
 
     async function confirmDelete() {
       if (!state.pendingDelete) return;
+      const confirmBtn = document.getElementById("confirmDeleteHistoryBtn");
+      const cancelBtn = document.getElementById("cancelDeleteHistoryBtn");
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Deleting\u2026";
+        confirmBtn.classList.add("loading");
+      }
+      if (cancelBtn) cancelBtn.disabled = true;
       try {
         const resp = await fetch(config.deleteUrl, {
           method: "POST",
@@ -109,40 +117,62 @@
         });
         const result = await resp.json();
         if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
+          closeDeleteModal();
+          showResponseModal("failure", "Error! " + result.error);
           return;
         }
         sessionStorage.setItem(
           "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+          JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         window.location.reload();
       } catch (e) {
         console.error(e);
+        closeDeleteModal();
         showResponseModal("failure", "Failed to delete image");
       } finally {
-        closeDeleteModal();
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Delete";
+          confirmBtn.classList.remove("loading");
+        }
+        if (cancelBtn) cancelBtn.disabled = false;
       }
     }
 
     async function confirmClear() {
+      const confirmBtn = document.getElementById("confirmClearHistoryBtn");
+      const cancelBtn = document.getElementById("cancelClearHistoryBtn");
+      if (confirmBtn) {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Clearing\u2026";
+        confirmBtn.classList.add("loading");
+      }
+      if (cancelBtn) cancelBtn.disabled = true;
       try {
         const resp = await fetch(config.clearUrl, { method: "POST" });
         const result = await resp.json();
         if (!resp.ok) {
-          showResponseModal("failure", `Error! ${result.error}`);
+          closeClearModal();
+          showResponseModal("failure", "Error! " + result.error);
           return;
         }
         sessionStorage.setItem(
           "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+          JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
         window.location.reload();
       } catch (e) {
         console.error(e);
+        closeClearModal();
         showResponseModal("failure", "Failed to clear history");
       } finally {
-        closeClearModal();
+        if (confirmBtn) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = "Clear";
+          confirmBtn.classList.remove("loading");
+        }
+        if (cancelBtn) cancelBtn.disabled = false;
       }
     }
 

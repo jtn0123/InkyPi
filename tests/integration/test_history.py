@@ -1,3 +1,4 @@
+import json
 import os
 
 from PIL import Image
@@ -29,8 +30,6 @@ def test_history_sidecar_metadata_rendered(client, device_config_dev):
         "playlist": "Default",
         "plugin_instance": "ai_text_saved_settings",
     }
-    import json
-
     with open(
         os.path.join(d, "display_20250101_010000.json"), "w", encoding="utf-8"
     ) as fh:
@@ -493,3 +492,62 @@ def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     resp = client.get("/history/storage")
     assert resp.status_code == 500
     assert "failed to get storage info" in resp.get_json().get("error", "")
+
+
+def test_history_manual_metadata_rendered(client, device_config_dev):
+    """Manual Update entries show Source with refresh_type and plugin_id."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_030000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    sidecar = {"refresh_type": "Manual Update", "plugin_id": "weather"}
+    with open(
+        os.path.join(d, "display_20250101_030000.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump(sidecar, fh)
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "Source:" in text
+    assert "Manual Update" in text
+    assert "weather" in text
+
+
+def test_history_no_sidecar_no_source(client, device_config_dev):
+    """Entries without JSON sidecars should not show a Source line."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_040000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    # No sidecar JSON created
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "display_20250101_040000" in text
+    assert "Source:" not in text
+
+
+def test_history_metadata_deduplicates_instance(client, device_config_dev):
+    """When plugin_instance equals plugin_id, it should not be shown twice."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_050000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    sidecar = {
+        "refresh_type": "Playlist",
+        "plugin_id": "weather",
+        "playlist": "Default",
+        "plugin_instance": "weather",
+    }
+    with open(
+        os.path.join(d, "display_20250101_050000.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump(sidecar, fh)
+
+    resp = client.get("/history")
+    text = resp.get_data(as_text=True)
+    # "weather" should appear exactly once (as plugin_id), not twice
+    source_section = text[text.index("Source:") : text.index("Source:") + 200]
+    assert source_section.count("weather") == 1
