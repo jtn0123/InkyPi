@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.3.10 (2026-04-03)
+
+### Bug Fixes
+
+- Rename unused lambda parameter per CodeRabbit review
+  ([`206a160`](https://github.com/jtn0123/InkyPi/commit/206a160dbb8e3007db4c06e4ead85d955617e395))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Replace var with const, use RegExp.exec per SonarCloud review
+  ([`3bfd5eb`](https://github.com/jtn0123/InkyPi/commit/3bfd5eb76f5d45db9268feb5b5313ee394160ce2))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Settings log viewer — sanitize output, add clear/download feedback (JTN-166, JTN-167, JTN-175)
+  ([`5469e4c`](https://github.com/jtn0123/InkyPi/commit/5469e4ccc7f415a40e6997c9324869ed89f8c05a))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.9 (2026-04-02)
 
 ### Bug Fixes
