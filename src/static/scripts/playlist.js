@@ -535,6 +535,11 @@
     }
 
     async function displayNextInPlaylist(name){
+        const card = document.querySelector(`[data-playlist-name="${CSS.escape(name)}"]`);
+        if (card && !card.querySelectorAll('.plugin-item').length) {
+            showResponseModal('failure', 'Cannot display next — playlist has no items.');
+            return;
+        }
         try{
             const resp = await fetch(C.display_next_url, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
             const j = await handleJsonResponse(resp);

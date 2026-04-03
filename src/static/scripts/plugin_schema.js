@@ -224,7 +224,11 @@
     icon.className = "ph ph-trash ph-thin action-icon";
     icon.setAttribute("aria-hidden", "true");
     removeBtn.appendChild(icon);
-    removeBtn.addEventListener("click", () => entry.remove());
+    removeBtn.addEventListener("click", () => {
+      const list = entry.parentElement;
+      entry.remove();
+      updateRepeaterEmptyState(list);
+    });
     toolbar.appendChild(urlInput);
     toolbar.appendChild(removeBtn);
 
@@ -245,12 +249,28 @@
     return entry;
   }
 
+  function updateRepeaterEmptyState(list) {
+    const items = list.querySelectorAll(".dynamic-list-item").length;
+    let msg = list.querySelector(".empty-state-message");
+    if (items === 0 && !msg) {
+      msg = document.createElement("p");
+      msg.className = "empty-state-message";
+      msg.textContent = 'No calendars configured. Click "Add Calendar" to get started.';
+      list.appendChild(msg);
+    } else if (items > 0 && msg) {
+      msg.remove();
+    }
+  }
+
   function bindRemoveButtons(list) {
     list.querySelectorAll(".remove-btn").forEach((button) => {
       if (button.dataset.boundRemove === "true") return;
       button.dataset.boundRemove = "true";
       button.addEventListener("click", () => {
-        button.closest(".dynamic-list-item")?.remove();
+        const item = button.closest(".dynamic-list-item");
+        const parentList = item?.parentElement;
+        item?.remove();
+        if (parentList) updateRepeaterEmptyState(parentList);
       });
     });
   }
@@ -261,12 +281,16 @@
     if (!list || !addButton) return;
     bindRemoveButtons(list);
     if (!list.children.length) {
-    const urls = config["calendarURLs[]"] || [""];
-    const colors = config["calendarColors[]"] || ["#007BFF"];
-    urls.forEach((url, index) => list.appendChild(createCalendarEntry(url, colors[index] || "#007BFF")));
-    if (!urls.length) list.appendChild(createCalendarEntry("", "#007BFF"));
+      const urls = config["calendarURLs[]"] || [""];
+      const colors = config["calendarColors[]"] || ["#007BFF"];
+      urls.forEach((url, index) => list.appendChild(createCalendarEntry(url, colors[index] || "#007BFF")));
+      if (!urls.length) list.appendChild(createCalendarEntry("", "#007BFF"));
     }
-    addButton.addEventListener("click", () => list.appendChild(createCalendarEntry("", "#007BFF")));
+    updateRepeaterEmptyState(list);
+    addButton.addEventListener("click", () => {
+      list.appendChild(createCalendarEntry("", "#007BFF"));
+      updateRepeaterEmptyState(list);
+    });
   }
 
   function createTodoEntry(title, body) {
