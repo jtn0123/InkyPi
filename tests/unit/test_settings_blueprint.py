@@ -727,7 +727,7 @@ class TestShutdown:
 
         import blueprints.settings as mod
 
-        mod._last_shutdown_time = 0.0
+        mod._shutdown_limiter.reset()
         monkeypatch.setattr(subprocess, "run", MagicMock())
         resp = client.post("/shutdown", json={"reboot": True})
         assert resp.status_code == 200
@@ -749,7 +749,7 @@ class TestShutdown:
 
         import blueprints.settings as mod
 
-        mod._last_shutdown_time = 0.0
+        mod._shutdown_limiter.reset()
         monkeypatch.setattr(
             subprocess,
             "run",
@@ -764,7 +764,7 @@ class TestShutdown:
 
         import blueprints.settings as mod
 
-        mod._last_shutdown_time = 0.0
+        mod._shutdown_limiter.reset()
         mock_run = MagicMock()
         monkeypatch.setattr(subprocess, "run", mock_run)
         resp = client.post("/shutdown")
@@ -1145,9 +1145,9 @@ class TestHelpers:
         assert _clamp_int("abc", 10, 1, 100) == 10
 
     def test_rate_limit_ok(self):
-        from blueprints.settings import _REQUESTS, _rate_limit_ok
+        from blueprints.settings import _logs_limiter, _rate_limit_ok
 
-        _REQUESTS.clear()
+        _logs_limiter._requests.clear()
         assert _rate_limit_ok("127.0.0.1") is True
 
     def test_benchmarks_enabled_default(self, monkeypatch):

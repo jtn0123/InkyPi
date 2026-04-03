@@ -7,7 +7,7 @@ import sqlite3
 import subprocess
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from datetime import datetime, timedelta
 
 from flask import (
@@ -17,6 +17,7 @@ from flask import (
 
 from utils.http_utils import http_get
 from utils.progress_events import get_progress_bus
+from utils.rate_limiter import CooldownLimiter, SlidingWindowLimiter
 from utils.time_utils import get_timezone, now_device_tz
 
 # Try to import cysystemd for journal reading (Linux only)
@@ -53,9 +54,7 @@ MAX_RESPONSE_BYTES = 512 * 1024
 _TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[\w.]+)?$")  # 512 KB safety cap
 
 # Simple in-process rate limiter (per remote addr)
-_REQUESTS: dict[str, deque] = defaultdict(deque)
-_RATE_LIMIT_WINDOW_SECONDS = 60
-_RATE_LIMIT_MAX_REQUESTS = 120
+_logs_limiter = SlidingWindowLimiter(120, 60)
 
 # Dev mode in-memory log buffer (circular buffer)
 DEV_LOG_BUFFER_SIZE = 1000
@@ -126,34 +125,10 @@ class DevModeLogHandler(logging.Handler):
 
 
 def _rate_limit_ok(remote_addr: str | None) -> bool:
-    try:
-        key = remote_addr or "unknown"
-        q = _REQUESTS[key]
-        now = time.time()
-        # drop old timestamps
-        cutoff = now - _RATE_LIMIT_WINDOW_SECONDS
-        while q and q[0] < cutoff:
-            q.popleft()
-        if len(q) >= _RATE_LIMIT_MAX_REQUESTS:
-            return False
-        q.append(now)
-        return True
-    except Exception:
-        # On any failure, allow rather than block
-        return True
-    finally:
-        # Prune empty deques to prevent unbounded memory growth from unique IPs
-        try:
-            _prune_empty_rate_limit_keys()
-        except Exception:
-            pass
-
-
-def _prune_empty_rate_limit_keys():
-    """Remove IP keys with empty deques from the rate limiter."""
-    empty_keys = [k for k, v in _REQUESTS.items() if not v]
-    for k in empty_keys:
-        del _REQUESTS[k]
+    """Thin wrapper kept for test compatibility (monkeypatching)."""
+    key = remote_addr or "unknown"
+    allowed, _ = _logs_limiter.check(key)
+    return allowed
 
 
 def _clamp_int(value: str | None, default: int, min_value: int, max_value: int) -> int:
@@ -564,9 +539,7 @@ _ALLOWED_IMPORT_ENV_KEYS = frozenset(
 )
 
 # Shutdown rate limiting
-_last_shutdown_time: float = 0.0
-_SHUTDOWN_COOLDOWN_SECONDS: float = 30.0
-_shutdown_lock = threading.Lock()
+_shutdown_limiter = CooldownLimiter(30)
 
 
 # ---------------------------------------------------------------------------

@@ -426,13 +426,14 @@ def test_settings_log_contains_filter():
 def test_rate_limit_ok_threshold(monkeypatch):
     import blueprints.settings as settings_mod
 
-    # Use a local deque for a fake addr so we can manipulate it
     addr = "1.2.3.4"
-    q = settings_mod._REQUESTS[addr]
-    q.clear()
+    # Clear any prior state for this key
+    settings_mod._logs_limiter._requests.pop(addr, None)
+
+    max_requests = settings_mod._logs_limiter._max
 
     # Fill to just under the limit
-    for _ in range(settings_mod._RATE_LIMIT_MAX_REQUESTS - 1):
+    for _ in range(max_requests - 1):
         assert settings_mod._rate_limit_ok(addr) is True
 
     # Next should still pass (reaches limit)

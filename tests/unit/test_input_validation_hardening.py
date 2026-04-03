@@ -275,7 +275,7 @@ class TestShutdownCooldownOnFailure:
         import blueprints.settings as settings_mod
 
         # Reset cooldown
-        settings_mod._last_shutdown_time = 0.0
+        settings_mod._shutdown_limiter.reset()
 
         # First call: subprocess fails
         monkeypatch.setattr(
@@ -293,7 +293,7 @@ class TestShutdownCooldownOnFailure:
     def test_successful_shutdown_does_consume_cooldown(self, client, monkeypatch):
         import blueprints.settings as settings_mod
 
-        settings_mod._last_shutdown_time = 0.0
+        settings_mod._shutdown_limiter.reset()
 
         monkeypatch.setattr("subprocess.run", MagicMock())
         resp1 = client.post("/shutdown", json={})
