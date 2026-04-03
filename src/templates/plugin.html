@@ -264,13 +264,14 @@
             <label class="workflow-device-toggle" for="toggleDeviceFrame">
                 <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
             </label>
+            {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
             <div class="workflow-action-group">
-                <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help">Update Preview</button>
+                <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
                 <button type="button" data-plugin-action="save_settings" class="action-button is-secondary" aria-describedby="save-settings-help">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help">Update Instance</button>
+                    <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
                 {% else %}
-                    <button type="button" data-open-modal="scheduleModal" class="action-button compact" aria-describedby="add-playlist-help">Add to Playlist</button>
+                    <button type="button" data-open-modal="scheduleModal" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
                 {% endif %}
             </div>
             <div class="form-help workflow-help">
