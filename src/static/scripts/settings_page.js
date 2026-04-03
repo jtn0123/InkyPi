@@ -257,8 +257,8 @@
       const viewer = document.getElementById("logsViewer");
       if (viewer) viewer.textContent = "";
       state.lastLogsRaw = "";
-      var filterInput = document.getElementById("logsFilter");
-      var levelSelect = document.getElementById("logsLevel");
+      const filterInput = document.getElementById("logsFilter");
+      const levelSelect = document.getElementById("logsLevel");
       if (filterInput) filterInput.value = "";
       if (levelSelect) levelSelect.value = "all";
       if (ui.savePref) {
@@ -269,30 +269,31 @@
     }
 
     async function downloadLogs() {
-      var btn = document.getElementById("downloadLogsBtn");
+      const btn = document.getElementById("downloadLogsBtn");
       if (btn) { btn.disabled = true; btn.textContent = "Downloading\u2026"; }
       try {
-        var resp = await fetch(config.downloadLogsUrl, { cache: "no-store" });
+        const resp = await fetch(config.downloadLogsUrl, { cache: "no-store" });
         if (!resp.ok) {
           showResponseModal("failure", "Failed to download logs");
           return;
         }
-        var text = await resp.text();
+        const text = await resp.text();
         if (!text || text.trim().length === 0) {
           showResponseModal("failure", "No logs available to download");
           return;
         }
-        var disposition = resp.headers.get("Content-Disposition") || "";
-        var match = disposition.match(/filename=([^\s;]+)/);
-        var filename = match ? match[1] : "inkypi_logs.log";
-        var blob = new Blob([text], { type: "text/plain" });
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const disposition = resp.headers.get("Content-Disposition") || "";
+        const filenameRe = /filename=([^\s;]+)/;
+        const match = filenameRe.exec(disposition);
+        const filename = match ? match[1] : "inkypi_logs.log";
+        const blob = new Blob([text], { type: "text/plain" });
+        const anchor = document.createElement("a");
+        anchor.href = URL.createObjectURL(blob);
+        anchor.download = filename;
+        anchor.click();
+        URL.revokeObjectURL(anchor.href);
         showResponseModal("success", "Logs downloaded");
-      } catch (e) {
+      } catch (_e) {
         showResponseModal("failure", "Failed to download logs");
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Download Logs"; }
