@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.3.12 (2026-04-03)
+
+### Bug Fixes
+
+- Improve display-next error handling, preview a11y, and plugin empty state (JTN-178, JTN-177,
+  JTN-173)
+  ([`fbcbeaa`](https://github.com/jtn0123/InkyPi/commit/fbcbeaad056593b7b14cde09c091f707ad89ea61))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Render all 6 API key provider cards in managed mode (JTN-176, JTN-159)
+  ([`b963857`](https://github.com/jtn0123/InkyPi/commit/b963857b42f08cde9bbc0b273ccb58cf9da9000e))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.3.11 (2026-04-03)
 
 ### Bug Fixes
