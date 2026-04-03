@@ -339,6 +339,8 @@
     }
 
     async function exportConfig() {
+      const btn = document.getElementById("exportConfigBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Downloading\u2026"; }
       const include = document.getElementById("includeKeys")?.checked;
       try {
         const requestInit = include
@@ -364,12 +366,16 @@
         a.click();
         URL.revokeObjectURL(a.href);
         showResponseModal("success", "Backup downloaded");
-      } catch (e) {
+      } catch (_e) {
         showResponseModal("failure", "Export failed");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Download Backup"; }
       }
     }
 
     async function importConfig() {
+      const btn = document.getElementById("importConfigBtn");
+      if (btn) { btn.disabled = true; btn.textContent = "Restoring\u2026"; }
       const fileInput = document.getElementById("importFile");
       const file = fileInput && fileInput.files && fileInput.files[0];
       if (!file) {
@@ -389,8 +395,10 @@
           return;
         }
         showResponseModal("success", data.message || "Import complete");
-      } catch (e) {
+      } catch (_e) {
         showResponseModal("failure", "Import failed");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Restore from File"; const fileInput = document.getElementById("importFile"); btn.disabled = !(fileInput && fileInput.files && fileInput.files.length); }
       }
     }
 
@@ -656,6 +664,13 @@
       document.getElementById("saveSettingsBtn")?.addEventListener("click", handleAction);
       document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
       document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
+      const importFileInput = document.getElementById("importFile");
+      const importBtn = document.getElementById("importConfigBtn");
+      if (importFileInput && importBtn) {
+        importFileInput.addEventListener("change", () => {
+          importBtn.disabled = !importFileInput.files.length;
+        });
+      }
       document.getElementById("refreshBenchmarksBtn")?.addEventListener("click", refreshBenchmarks);
       document.getElementById("safeResetBtn")?.addEventListener("click", safeReset);
       document.getElementById("isolatePluginBtn")?.addEventListener("click", isolatePlugin);
