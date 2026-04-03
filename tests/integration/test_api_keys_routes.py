@@ -7,7 +7,7 @@ def test_api_keys_page_loads(client):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert 'data-page-shell="management"' in body
-    assert "4 providers" in body
+    assert "6 providers" in body
 
 
 def test_api_keys_page_shows_configured_count(client, device_config_dev):

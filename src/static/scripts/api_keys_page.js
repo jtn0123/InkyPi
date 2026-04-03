@@ -7,7 +7,7 @@
       const configuredChip = document.getElementById("configuredCountSummary");
       const providerChip = document.getElementById("providerCountSummary");
       if (configuredChip) configuredChip.textContent = `${configured} configured`;
-      if (providerChip && config.mode === "managed") providerChip.textContent = "4 providers";
+      if (providerChip && config.mode === "managed") providerChip.textContent = "6 providers";
     }
 
     function clearField(inputId) {
@@ -28,6 +28,8 @@
           ],
           NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
           UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
+          GITHUB_SECRET: ["github-status", "github-input", "github"],
+          GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
         };
         const entry = mapping[key];
         if (!entry) return;
@@ -143,6 +145,8 @@
         ],
         NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
         UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
+        GITHUB_SECRET: ["github-status", "github-input", "github"],
+        GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
       };
       const entry = mapping[keyName];
       if (!entry) return;
