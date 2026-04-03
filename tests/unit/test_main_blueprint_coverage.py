@@ -178,7 +178,7 @@ def test_display_next_after_successful_request_respects_cooldown(
 
 
 def test_display_next_exception(client, flask_app, device_config_dev):
-    """Plugin generation error returns 500."""
+    """Plugin generation error via manual_update returns 400 with message."""
     mock_playlist = MagicMock()
     mock_plugin_inst = MagicMock()
     mock_plugin_inst.plugin_id = "test_plugin"
@@ -198,7 +198,10 @@ def test_display_next_exception(client, flask_app, device_config_dev):
         )
 
         resp = client.post("/display-next")
-    assert resp.status_code == 500
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert "Plugin update failed" in body["error"]
+    assert "generation failed" in body["error"]
 
 
 # ---- /api/plugin_order ----

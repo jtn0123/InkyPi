@@ -201,6 +201,15 @@
         previewImg.addEventListener("click", () => {
           if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt);
         });
+        previewImg.style.cursor = "pointer";
+        previewImg.setAttribute("role", "button");
+        previewImg.setAttribute("tabindex", "0");
+        previewImg.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt);
+          }
+        });
       }
       if (previewImg && container) {
         const nativeWidth = previewImg.dataset.nativeWidth || config.resolution[0];
