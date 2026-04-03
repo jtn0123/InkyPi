@@ -149,6 +149,20 @@
         });
     }
 
+    function updateCalendarEmptyState() {
+        const calendarList = document.getElementById('calendarList');
+        const items = calendarList.querySelectorAll('.calendar-entry').length;
+        let msg = calendarList.querySelector('.empty-state-message');
+        if (items === 0 && !msg) {
+            msg = document.createElement('p');
+            msg.className = 'empty-state-message';
+            msg.textContent = 'No calendars configured. Click "Add Calendar" to get started.';
+            calendarList.appendChild(msg);
+        } else if (items > 0 && msg) {
+            msg.remove();
+        }
+    }
+
     function addCalendarInput(url = '', color = '#007BFF') {
         const calendarList = document.getElementById('calendarList');
 
@@ -174,7 +188,10 @@
         removeBtn.type = 'button';
         removeBtn.innerText = '✕';
         removeBtn.classList.add('remove-btn');
-        removeBtn.onclick = () => wrapper.remove();
+        removeBtn.onclick = () => {
+            wrapper.remove();
+            updateCalendarEmptyState();
+        };
         const toolbar = document.createElement('div');
         toolbar.classList.add('dynamic-list-toolbar');
         toolbar.appendChild(urlInput);
@@ -184,6 +201,7 @@
         wrapper.appendChild(colorInput);
 
         calendarList.appendChild(wrapper);
+        updateCalendarEmptyState();
     }
 
     // populate form values from plugin settings
@@ -251,6 +269,7 @@
         calendars.forEach(({ url, color }) => {
             addCalendarInput(url, color);
         });
+        updateCalendarEmptyState();
 
         updateViewDependentOptions(viewMode)
     });
