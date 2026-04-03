@@ -165,7 +165,7 @@ def test_log_lines_exclude_internal_details(client, monkeypatch):
         "Apr 02 10:00:01 [ERROR] Something went wrong",
         "Apr 02 10:00:02 [DEBUG] Detailed trace info",
     ]
-    monkeypatch.setattr(mod, "_read_log_lines", lambda h: fake_lines)
+    monkeypatch.setattr(mod, "_read_log_lines", lambda _hours: fake_lines)
 
     resp = client.get("/api/logs?hours=2")
     assert resp.status_code == 200
