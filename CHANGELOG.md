@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.4.13 (2026-04-04)
+
+### Bug Fixes
+
+- Address Sonar issues and CodeRabbit feedback for dirty-state tracking
+  ([`296e195`](https://github.com/jtn0123/InkyPi/commit/296e195486a8609fcd7ae3d0f2ec04b0a79c5ce5))
+
+- Extract appendGeoData to reduce handleAction cognitive complexity - Accept form parameter in
+  getFormSnapshot to satisfy outer-scope rule - Use optional chaining (saveBtn?.disabled,
+  saveBtn?.textContent) - Replace form.reset() with restoreFormFromSnapshot on save failure - Add
+  sonar.qualitygate.wait=true to enforce quality gate in CI
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Disable Save until form is dirty and reset after successful save (JTN-204)
+  ([`e37b071`](https://github.com/jtn0123/InkyPi/commit/e37b0715ef1f6bf33c6d3b5122f1cf3f95cdb433))
+
+Track a form snapshot on init so the Settings Save button starts disabled and only enables when a
+  value actually changes. After a successful save the snapshot resets and the button is disabled
+  again, giving clear feedback that nothing further needs saving. Add integration tests confirming
+  the Save button and Image Processing sliders are present in the rendered page.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Move helper functions to outer scope and handle catch for Sonar
+  ([`eb67fc4`](https://github.com/jtn0123/InkyPi/commit/eb67fc48fd7e6a9265950eff39f0f6ad96e47e85))
+
+- Move getFormSnapshot and restoreFormFromSnapshot to IIFE level (S7721) - Log error in catch block
+  instead of discarding (S2486)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.12 (2026-04-04)
 
 ### Bug Fixes
