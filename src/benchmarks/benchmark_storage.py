@@ -11,7 +11,8 @@ def _get_db_path(device_config) -> str:
         base_dir = getattr(device_config, "BASE_DIR", os.path.dirname(__file__))
     except Exception:
         base_dir = os.path.dirname(__file__)
-    default_path = os.path.join(base_dir, "benchmarks.db")
+    project_root = os.path.dirname(base_dir)
+    default_path = os.path.join(project_root, "runtime", "benchmarks.db")
     try:
         value = device_config.get_config("benchmarks_db_path", default=default_path)
         if not value:

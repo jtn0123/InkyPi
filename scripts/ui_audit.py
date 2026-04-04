@@ -448,7 +448,7 @@ def write_artifacts(output_dir: Path, matrix: list[dict]):
 def main():
     parser = argparse.ArgumentParser(description="Capture a batched UI audit backlog.")
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
-    parser.add_argument("--output-dir", default="mock_display_output/ui_audit")
+    parser.add_argument("--output-dir", default="runtime/mock_display_output/ui_audit")
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]

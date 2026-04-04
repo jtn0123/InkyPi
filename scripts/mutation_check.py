@@ -94,7 +94,7 @@ def _copy_repo(destination: Path) -> None:
             ".pytest_cache",
             "htmlcov",
             "coverage.xml",
-            "mock_display_output",
+            "runtime",
         ),
     )
 

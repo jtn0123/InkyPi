@@ -222,7 +222,7 @@ jobs:
           curl -fsS "${SERVER_URL}/api/logs?hours=2&limit=200" >/dev/null
           curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/save_plugin_settings >/dev/null
           curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/update_now >/dev/null
-          if [ ! -f src/static/images/processed_image.png ] && [ ! -f mock_display_output/latest.png ]; then
+          if [ ! -f src/static/images/processed_image.png ] && [ ! -f runtime/mock_display_output/latest.png ]; then
             echo "Expected preview image not found" >&2
             kill $SERVER_PID 2>/dev/null || true
             exit 1
@@ -527,7 +527,7 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Run browser smoke suite
         env:
-          BROWSER_SMOKE_ARTIFACT_DIR: mock_display_output/browser_smoke_failures
+          BROWSER_SMOKE_ARTIFACT_DIR: runtime/mock_display_output/browser_smoke_failures
           INKYPI_ENV: dev
           INKYPI_NO_REFRESH: '1'
           PYTHONPATH: src
@@ -539,5 +539,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: browser-smoke-failures
-          path: mock_display_output/browser_smoke_failures
+          path: runtime/mock_display_output/browser_smoke_failures
           if-no-files-found: ignore

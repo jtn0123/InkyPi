@@ -67,7 +67,7 @@ devbox run dev # alternatively run `devbox shell` and then run `python src/inkyp
 - **Develop plugins** - Create new plugins without hardware (no Raspberry Pi, nor physical displays)
 - **Test UI changes** - Instant feedback on web interface modifications
 - **Debug issues** - Full error messages in terminal
-- **Verify rendering** - Check output in `mock_display_output/latest.png`
+- **Verify rendering** - Check output in `runtime/mock_display_output/latest.png`
 - **Cross-platform development** - Works on macOS, Linux, Windows
 
 ## Essential Commands
@@ -108,7 +108,7 @@ exit                                 # Exit devbox shell and deactivates Python 
 
 ## Development Tips
 
-1. **Check rendered output**: Images are saved to `mock_display_output/`
+1. **Check rendered output**: Images are saved to `runtime/mock_display_output/`
 2. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
 3. **Configuration**: Edit `src/config/device_dev.json` for display settings
 4. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
@@ -136,7 +136,7 @@ python scripts/plugin_validator.py clock   # validate a single plugin
 
 1. Configure a plugin through the web UI
 2. Click "Display" button
-3. Check `mock_display_output/latest.png` for result
+3. Check `runtime/mock_display_output/latest.png` for result
 4. Iterate quickly without deployment
 5. BasePlugin notes:
    - Jinja environment is initialized even if a plugin lacks its own `render/` directory. Base templates under `plugins/base_plugin/render/` are always available.
