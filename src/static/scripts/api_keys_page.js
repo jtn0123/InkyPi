@@ -342,8 +342,18 @@
         toggle.title = "Toggle visibility";
         input.parentElement.insertBefore(toggle, input.nextSibling);
       });
-      document.getElementById("addApiKeyBtn")?.addEventListener("click", () => addRow());
-      document.getElementById("saveApiKeysBtn")?.addEventListener("click", saveKeys);
+      var addBtn = document.getElementById("addApiKeyBtn");
+      var saveBtn = document.getElementById("saveApiKeysBtn");
+      if (addBtn) {
+        addBtn.addEventListener("click", () => addRow());
+      } else if (config.mode === "generic") {
+        console.warn("api_keys_page: #addApiKeyBtn not found in DOM");
+      }
+      if (saveBtn) {
+        saveBtn.addEventListener("click", saveKeys);
+      } else {
+        console.warn("api_keys_page: #saveApiKeysBtn not found in DOM");
+      }
       document.addEventListener("click", (event) => {
         const actionEl = event.target.closest("[data-api-action]");
         if (!actionEl) return;

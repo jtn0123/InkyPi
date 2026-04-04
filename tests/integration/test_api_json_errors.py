@@ -34,6 +34,9 @@ def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):
 
     monkeypatch.setattr(dc, "update_value", boom_update_value, raising=True)
 
-    resp = client.post("/save_plugin_settings", data={"plugin_id": "ai_text"})
+    resp = client.post(
+        "/save_plugin_settings",
+        data={"plugin_id": "ai_text", "textPrompt": "Hello"},
+    )
     assert resp.status_code == 500
     assert "error" in resp.get_json()

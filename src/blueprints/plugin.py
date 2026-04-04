@@ -28,6 +28,39 @@ plugin_bp = Blueprint("plugin", __name__)
 PLUGINS_DIR = resolve_path("plugins")
 
 
+def _validate_required_fields(plugin, form_data):
+    """Validate required fields from plugin schema against form data.
+
+    Returns an error message string if any required fields are empty/missing,
+    or None if validation passes.
+    """
+    if not hasattr(plugin, "build_settings_schema"):
+        return None
+    try:
+        schema = plugin.build_settings_schema()
+    except Exception:
+        return None
+
+    missing = []
+
+    def _check_items(items):
+        for item in items:
+            kind = item.get("kind", "")
+            if kind == "row":
+                _check_items(item.get("items", []))
+            elif kind == "field":
+                name = item.get("name", "")
+                if item.get("required") and not str(form_data.get(name, "")).strip():
+                    missing.append(item.get("label", name))
+
+    for section in schema.get("sections", []):
+        _check_items(section.get("items", []))
+
+    if missing:
+        return f"Required fields missing: {', '.join(missing)}"
+    return None
+
+
 def _sanitize_log(value: str) -> str:
     """Strip control characters from user input before logging to prevent log injection."""
     return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:200]
@@ -270,6 +303,17 @@ def update_plugin_instance(instance_name: str):
                 status=404,
             )
 
+        # Validate required fields defined in the plugin schema
+        plugin_config = device_config.get_plugin(plugin_id)
+        if plugin_config:
+            try:
+                plugin = get_plugin_instance(plugin_config)
+                validation_error = _validate_required_fields(plugin, plugin_settings)
+                if validation_error:
+                    return json_error(validation_error, status=400)
+            except Exception:
+                logger.debug("Could not validate plugin schema for %s", plugin_id)
+
         plugin_instance.settings = plugin_settings
         device_config.write_config()
     except APIError as e:
@@ -451,6 +495,15 @@ def _save_plugin_settings_common(
             f"Plugin '{_sanitize_response_value(plugin_id)}' not found",
             status=404,
         )
+
+    # Validate required fields defined in the plugin schema
+    try:
+        plugin = get_plugin_instance(plugin_config)
+        validation_error = _validate_required_fields(plugin, plugin_settings)
+        if validation_error:
+            return json_error(validation_error, status=400)
+    except Exception:
+        logger.debug("Could not validate plugin schema for %s", plugin_id)
 
     default_playlist_name = "Default"
     playlist = playlist_manager.get_playlist(default_playlist_name)
