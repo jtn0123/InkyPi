@@ -7,11 +7,13 @@ from typing import Any
 
 
 def _get_db_path(device_config) -> str:
+    # BASE_DIR is src/; fallback from __file__ (src/benchmarks/) goes up one level
+    fallback = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     try:
-        base_dir = getattr(device_config, "BASE_DIR", os.path.dirname(__file__))
+        base_dir = getattr(device_config, "BASE_DIR", fallback)
     except Exception:
-        base_dir = os.path.dirname(__file__)
-    project_root = os.path.dirname(base_dir)
+        base_dir = fallback
+    project_root = os.path.abspath(os.path.join(base_dir, ".."))
     default_path = os.path.join(project_root, "runtime", "benchmarks.db")
     try:
         value = device_config.get_config("benchmarks_db_path", default=default_path)
