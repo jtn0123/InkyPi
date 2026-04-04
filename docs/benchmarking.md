@@ -5,7 +5,7 @@ This document describes production-grade benchmarking for InkyPi. It persists pe
 ### Configuration
 
 - `enable_benchmarks` (bool): Enable/disable recording. Default: true.
-- `benchmarks_db_path` (str): Path to the SQLite DB file. Default: `<BASE_DIR>/benchmarks.db`.
+- `benchmarks_db_path` (str): Path to the SQLite DB file. Default: `<PROJECT_ROOT>/runtime/benchmarks.db`.
 - `benchmark_sample_rate` (float 0..1): Probability to record a refresh. Default: 1.0.
 
 Add these to `src/config/device.json` as needed. Defaults are safe in production.

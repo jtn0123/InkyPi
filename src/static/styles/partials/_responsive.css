@@ -182,11 +182,6 @@
         line-height: 1.35;
     }
 
-    .logs-panel {
-        position: static;
-        max-height: none;
-    }
-
     .logs-viewer {
         min-height: 260px;
         max-height: 50vh;
@@ -685,28 +680,10 @@
         text-align: center;
     }
 
-    .logs-panel {
-        display: none;
-    }
-
-    .logs-panel.is-open {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .settings-logs-toggle {
-        display: block;
-    }
-
     .settings-console-main,
     .settings-console-panel.active {
         display: grid;
         gap: 12px;
-    }
-
-    .logs-panel {
-        position: static;
-        max-height: none;
     }
 
     .logs-viewer,

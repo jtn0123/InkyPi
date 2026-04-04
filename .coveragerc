@@ -3,7 +3,6 @@ source = src
 branch = true
 omit =
     src/display/waveshare_epd/*
-    src/benchmarks/*
 
 [report]
 show_missing = true

@@ -16,11 +16,13 @@ class MockDisplay(AbstractDisplay):
         self.width = resolution[0]
         self.height = resolution[1]
         runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip()
-        default_output_dir = (
-            os.path.join(runtime_dir, "mock_display_output")
-            if runtime_dir
-            else "mock_display_output"
-        )
+        if runtime_dir:
+            default_output_dir = os.path.join(runtime_dir, "mock_display_output")
+        else:
+            project_root = os.path.dirname(device_config.BASE_DIR)
+            default_output_dir = os.path.join(
+                project_root, "runtime", "mock_display_output"
+            )
         self.output_dir = device_config.get_config("output_dir", default_output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
 

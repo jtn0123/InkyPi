@@ -152,7 +152,9 @@ def main():
     ap.add_argument("--new-dir", required=True, help="Path to candidate icon pack root")
     ap.add_argument(
         "--out",
-        default=os.path.join(REPO_ROOT, "mock_display_output", "icon_compare.html"),
+        default=os.path.join(
+            REPO_ROOT, "runtime", "mock_display_output", "icon_compare.html"
+        ),
     )
     ap.add_argument(
         "--map",

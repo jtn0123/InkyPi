@@ -25,7 +25,7 @@ def test_get_db_path_defaults(tmp_path, monkeypatch):
 
     config = MockDeviceConfig(base_dir=str(tmp_path))
     result = _get_db_path(config)
-    assert result == os.path.join(str(tmp_path), "benchmarks.db")
+    assert result == os.path.join(str(tmp_path.parent), "runtime", "benchmarks.db")
 
 
 def test_get_db_path_from_config(tmp_path):
@@ -44,7 +44,17 @@ def test_get_db_path_handles_empty_config_value(tmp_path):
 
     config = MockDeviceConfig(config={"benchmarks_db_path": ""}, base_dir=str(tmp_path))
     result = _get_db_path(config)
-    assert result == os.path.join(str(tmp_path), "benchmarks.db")
+    assert result == os.path.join(str(tmp_path.parent), "runtime", "benchmarks.db")
+
+
+def test_get_db_path_falsy_base_dir_uses_fallback():
+    """Falsy BASE_DIR falls back to __file__-relative path."""
+    from benchmarks.benchmark_storage import _get_db_path
+
+    config = MockDeviceConfig()
+    config.BASE_DIR = ""  # force falsy after init normalization
+    result = _get_db_path(config)
+    assert result.endswith(os.path.join("runtime", "benchmarks.db"))
 
 
 def test_get_db_path_handles_exception():

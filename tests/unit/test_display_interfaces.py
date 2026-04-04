@@ -218,3 +218,17 @@ def test_mock_display_display_image_with_none_image_settings(
     # Verify files were created
     latest = tmp_path / "mock_output" / "latest.png"
     assert latest.exists()
+
+
+def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_config_dev):
+    """Without INKYPI_RUNTIME_DIR or output_dir config, default goes to runtime/."""
+    monkeypatch.delenv("INKYPI_RUNTIME_DIR", raising=False)
+    # Remove output_dir from config so get_config returns the computed default
+    device_config_dev.config.pop("output_dir", None)
+    device_config_dev.update_value("display_type", "mock")
+
+    from display.mock_display import MockDisplay
+
+    display = MockDisplay(device_config_dev)
+    assert os.path.basename(display.output_dir) == "mock_display_output"
+    assert os.path.basename(os.path.dirname(display.output_dir)) == "runtime"

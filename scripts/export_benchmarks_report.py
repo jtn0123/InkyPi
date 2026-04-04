@@ -14,8 +14,10 @@ def main():
     from config import Config
 
     cfg = Config()
+    project_root = os.path.dirname(cfg.BASE_DIR)
     db_path = cfg.get_config(
-        "benchmarks_db_path", default=os.path.join(cfg.BASE_DIR, "benchmarks.db")
+        "benchmarks_db_path",
+        default=os.path.join(project_root, "runtime", "benchmarks.db"),
     )
     if not os.path.exists(db_path):
         print("No benchmarks database found at:", db_path)

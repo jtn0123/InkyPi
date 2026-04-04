@@ -219,7 +219,7 @@
 /* Settings grid layout */
 .settings-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.9fr);
+  grid-template-columns: 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -229,10 +229,14 @@
 }
 
 .logs-panel {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
+  display: none;
   overflow: hidden;
+}
+
+.logs-panel.is-open {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
 }
 
 .logs-toolbar,
@@ -390,7 +394,7 @@
 
 /* Mobile logs toggle */
 .settings-logs-toggle {
-  display: none;
+  display: block;
   position: fixed;
   bottom: 16px;
   right: 16px;
