@@ -27,6 +27,12 @@ playlist_bp = Blueprint("playlist", __name__)
 _PLAYLIST_NAME_MAX_LEN = 64
 _PLAYLIST_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
 
+# Shared string constants to avoid duplication
+_CODE_VALIDATION = "validation_error"
+_MSG_INVALID_TIME_FORMAT = "Invalid start/end time format"
+_MSG_SAME_TIME = "Start time and End time cannot be the same"
+_MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
+
 
 def _validate_playlist_name(name):
     """Validate playlist name format. Returns (cleaned_name, error_response) tuple."""
@@ -80,6 +86,136 @@ def _windows_overlap(start_a: int, end_a: int, start_b: int, end_b: int) -> bool
     return False
 
 
+def _check_playlist_overlap(new_start, new_end, playlists, exclude_name=None):
+    """Check for time window overlap with existing playlists.
+
+    Returns an error response if an overlap is found, or None if clear.
+    Skips the playlist named ``exclude_name`` (used when updating an existing
+    playlist) and always skips the built-in "Default" playlist.
+    """
+    for pl in playlists:
+        if pl.name == exclude_name or getattr(pl, "name", "") == "Default":
+            continue
+        ps = _to_minutes(pl.start_time)
+        pe = _to_minutes(pl.end_time)
+        if _windows_overlap(new_start, new_end, ps, pe):
+            return json_error(_MSG_TIME_OVERLAP, status=400)
+    return None
+
+
+def _validate_plugin_refresh_settings(refresh_settings):
+    """Validate the refresh portion of an add_plugin request.
+
+    Returns ``(refresh_config, error_response)``.  Exactly one of the two
+    values will be non-None.
+    """
+    refresh_type = refresh_settings.get("refreshType")
+    if not refresh_type or refresh_type not in ["interval", "scheduled"]:
+        return None, json_error(
+            "Refresh type is required",
+            status=422,
+            code=_CODE_VALIDATION,
+            details={"field": "refreshType"},
+        )
+
+    if refresh_type == "interval":
+        unit = refresh_settings.get("unit")
+        interval = refresh_settings.get("interval")
+        if not unit or unit not in ["minute", "hour", "day"]:
+            return None, json_error(
+                "Refresh interval unit is required",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "unit"},
+            )
+        if not interval:
+            return None, json_error(
+                "Refresh interval is required",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "interval"},
+            )
+        try:
+            interval_int = int(interval)
+        except (ValueError, TypeError):
+            return None, json_error(
+                "Refresh interval must be a number",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "interval"},
+            )
+        if interval_int < 1 or interval_int > 999:
+            return None, json_error(
+                "Refresh interval must be between 1 and 999",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "interval"},
+            )
+        refresh_config = {"interval": calculate_seconds(interval_int, unit)}
+    else:
+        if not refresh_settings.get("refreshTime"):
+            return None, json_error(
+                "Refresh time is required",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "refreshTime"},
+            )
+        refresh_config = {"scheduled": refresh_settings.get("refreshTime")}
+
+    return refresh_config, None
+
+
+def _safe_next_index(pl, num: int) -> int:
+    """Return the index of the plugin that will be shown on the next cycle tick."""
+    if num == 0:
+        return 0
+    try:
+        if pl.current_plugin_index is None:
+            return 0
+        if not (0 <= pl.current_plugin_index < num):
+            return 0
+        return (pl.current_plugin_index + 1) % num
+    except Exception:
+        return 0
+
+
+def _safe_until_next_min(is_active, last_dt, cycle_min: int, now) -> int:
+    """Return minutes until the next cycle tick for a playlist.
+
+    ``is_active`` should be True when ``last_dt`` belongs to this playlist.
+    Falls back to ``cycle_min`` on any error.
+    """
+    if not is_active or last_dt is None:
+        return cycle_min
+    try:
+        return max(
+            0,
+            int((last_dt + timedelta(minutes=cycle_min) - now).total_seconds() // 60),
+        )
+    except Exception:
+        return cycle_min
+
+
+def _compute_playlist_rotation_eta(pl, next_index, until_next_min, cycle_min, now):
+    """Compute per-instance rotation ETA for a single playlist.
+
+    Returns a dict mapping instance name to ``{"minutes": int, "at": "HH:MM"}``.
+    """
+    eta_for_pl: dict[str, dict] = {}
+    num = len(pl.plugins)
+    if num == 0:
+        return eta_for_pl
+    for idx, inst in enumerate(pl.plugins):
+        steps = (idx - next_index + num) % num
+        total_min = until_next_min + steps * cycle_min
+        eta_dt = now + timedelta(minutes=total_min)
+        eta_for_pl[inst.name] = {
+            "minutes": total_min,
+            "at": eta_dt.strftime("%H:%M"),
+        }
+    return eta_for_pl
+
+
 @playlist_bp.route("/add_plugin", methods=["POST"])
 def add_plugin():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -104,7 +240,7 @@ def add_plugin():
             return json_error(
                 "plugin_id is required",
                 status=422,
-                code="validation_error",
+                code=_CODE_VALIDATION,
                 details={"field": "plugin_id"},
             )
 
@@ -114,7 +250,7 @@ def add_plugin():
             return json_error(
                 PLAYLIST_NAME_REQUIRED_ERROR,
                 status=422,
-                code="validation_error",
+                code=_CODE_VALIDATION,
                 details={"field": "playlist"},
             )
         instance_name = instance_name.strip() if instance_name else ""
@@ -122,14 +258,14 @@ def add_plugin():
             return json_error(
                 "Instance name is required",
                 status=422,
-                code="validation_error",
+                code=_CODE_VALIDATION,
                 details={"field": "instance_name"},
             )
         if len(instance_name) > 64:
             return json_error(
                 "Instance name must be 64 characters or fewer",
                 status=422,
-                code="validation_error",
+                code=_CODE_VALIDATION,
                 details={"field": "instance_name"},
             )
         if not all(
@@ -139,16 +275,8 @@ def add_plugin():
             return json_error(
                 "Instance name can only contain alphanumeric characters and spaces",
                 status=422,
-                code="validation_error",
+                code=_CODE_VALIDATION,
                 details={"field": "instance_name"},
-            )
-        refresh_type = refresh_settings.get("refreshType")
-        if not refresh_type or refresh_type not in ["interval", "scheduled"]:
-            return json_error(
-                "Refresh type is required",
-                status=422,
-                code="validation_error",
-                details={"field": "refreshType"},
             )
 
         existing = playlist_manager.find_plugin(plugin_id, instance_name)
@@ -157,52 +285,11 @@ def add_plugin():
                 f"Plugin instance '{instance_name}' already exists", status=400
             )
 
-        if refresh_type == "interval":
-            unit, interval = refresh_settings.get("unit"), refresh_settings.get(
-                "interval"
-            )
-            if not unit or unit not in ["minute", "hour", "day"]:
-                return json_error(
-                    "Refresh interval unit is required",
-                    status=422,
-                    code="validation_error",
-                    details={"field": "unit"},
-                )
-            if not interval:
-                return json_error(
-                    "Refresh interval is required",
-                    status=422,
-                    code="validation_error",
-                    details={"field": "interval"},
-                )
-            try:
-                interval_int = int(interval)
-            except (ValueError, TypeError):
-                return json_error(
-                    "Refresh interval must be a number",
-                    status=422,
-                    code="validation_error",
-                    details={"field": "interval"},
-                )
-            if interval_int < 1 or interval_int > 999:
-                return json_error(
-                    "Refresh interval must be between 1 and 999",
-                    status=422,
-                    code="validation_error",
-                    details={"field": "interval"},
-                )
-            refresh_interval_seconds = calculate_seconds(interval_int, unit)
-            refresh_config = {"interval": refresh_interval_seconds}
-        else:
-            refresh_time = refresh_settings.get("refreshTime")
-            if not refresh_settings.get("refreshTime"):
-                return json_error(
-                    "Refresh time is required",
-                    status=422,
-                    code="validation_error",
-                    details={"field": "refreshTime"},
-                )
-            refresh_config = {"scheduled": refresh_time}
+        refresh_config, refresh_err = _validate_plugin_refresh_settings(
+            refresh_settings
+        )
+        if refresh_err:
+            return refresh_err
 
         plugin_settings.update(handle_request_files(request.files))
         plugin_dict = {
@@ -293,7 +380,8 @@ def playlists():
                 "next_at": None,
             }
             try:
-                if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
+                is_active = last_dt and getattr(ri_obj, "playlist", None) == pl.name
+                if is_active:
                     # compute next time
                     next_dt = last_dt + timedelta(minutes=cycle_min)
                     delta_min = int(max(0, (next_dt - now).total_seconds() // 60))
@@ -304,47 +392,14 @@ def playlists():
                         item["next_at"] = None
                 # Also compute rotation ETA for each plugin in this playlist
                 try:
-                    eta_for_pl: dict[str, dict] = {}
                     num = len(pl.plugins)
-                    if num > 0:
-                        # Determine the index that will be displayed on the next cycle
-                        if pl.current_plugin_index is None:
-                            next_index = 0
-                        else:
-                            try:
-                                if not (0 <= pl.current_plugin_index < num):
-                                    next_index = 0
-                                else:
-                                    next_index = (pl.current_plugin_index + 1) % num
-                            except Exception:
-                                next_index = 0
-                        # Time until the next cycle tick for this playlist
-                        try:
-                            # If this playlist produced the last image, use last_dt; otherwise assume next tick is cycle_min from now
-                            if last_dt and getattr(ri_obj, "playlist", None) == pl.name:
-                                until_next_min = max(
-                                    0,
-                                    int(
-                                        (
-                                            last_dt + timedelta(minutes=cycle_min) - now
-                                        ).total_seconds()
-                                        // 60
-                                    ),
-                                )
-                            else:
-                                until_next_min = cycle_min
-                        except Exception:
-                            until_next_min = cycle_min
-
-                        for idx, inst in enumerate(pl.plugins):
-                            steps = (idx - next_index + num) % num
-                            total_min = until_next_min + steps * cycle_min
-                            eta_dt = now + timedelta(minutes=total_min)
-                            eta_for_pl[inst.name] = {
-                                "minutes": total_min,
-                                "at": eta_dt.strftime("%H:%M"),
-                            }
-                    rotation_eta[pl.name] = eta_for_pl
+                    next_index = _safe_next_index(pl, num)
+                    until_next_min = _safe_until_next_min(
+                        is_active, last_dt, cycle_min, now
+                    )
+                    rotation_eta[pl.name] = _compute_playlist_rotation_eta(
+                        pl, next_index, until_next_min, cycle_min, now
+                    )
                 except Exception:
                     rotation_eta[pl.name] = {}
             except Exception:
@@ -395,9 +450,9 @@ def create_playlist():
         start_min = _to_minutes(start_time)
         end_min = _to_minutes(end_time)
     except Exception:
-        return json_error("Invalid start/end time format", status=400)
+        return json_error(_MSG_INVALID_TIME_FORMAT, status=400)
     if start_min == end_min:
-        return json_error("Start time and End time cannot be the same", status=400)
+        return json_error(_MSG_SAME_TIME, status=400)
 
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
@@ -408,18 +463,11 @@ def create_playlist():
 
         # Prevent overlapping time windows
         try:
-            new_start = _to_minutes(start_time)
-            new_end = _to_minutes(end_time)
-            for pl in playlist_manager.playlists:
-                if getattr(pl, "name", "") == "Default":
-                    continue
-                ps = _to_minutes(pl.start_time)
-                pe = _to_minutes(pl.end_time)
-                if _windows_overlap(new_start, new_end, ps, pe):
-                    return json_error(
-                        "Playlist time range overlaps with existing playlist",
-                        status=400,
-                    )
+            overlap_err = _check_playlist_overlap(
+                start_min, end_min, playlist_manager.playlists
+            )
+            if overlap_err:
+                return overlap_err
         except Exception:
             # best-effort, fallback to allow
             pass
@@ -462,9 +510,9 @@ def update_playlist(playlist_name):
         start_min = _to_minutes(start_time)
         end_min = _to_minutes(end_time)
     except Exception:
-        return json_error("Invalid start/end time format", status=400)
+        return json_error(_MSG_INVALID_TIME_FORMAT, status=400)
     if start_min == end_min:
-        return json_error("Start time and End time cannot be the same", status=400)
+        return json_error(_MSG_SAME_TIME, status=400)
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -472,19 +520,11 @@ def update_playlist(playlist_name):
 
     # Prevent overlapping (exclude the playlist being updated)
     try:
-        new_start = _to_minutes(start_time)
-        new_end = _to_minutes(end_time)
-        for pl in playlist_manager.playlists:
-            if pl.name == playlist_name:
-                continue
-            if getattr(pl, "name", "") == "Default":
-                continue
-            ps = _to_minutes(pl.start_time)
-            pe = _to_minutes(pl.end_time)
-            if _windows_overlap(new_start, new_end, ps, pe):
-                return json_error(
-                    "Playlist time range overlaps with existing playlist", status=400
-                )
+        overlap_err = _check_playlist_overlap(
+            start_min, end_min, playlist_manager.playlists, exclude_name=playlist_name
+        )
+        if overlap_err:
+            return overlap_err
     except Exception:
         pass
 
@@ -682,46 +722,12 @@ def playlist_eta(playlist_name: str):
         except Exception:
             num = 0
 
-        eta_map: dict[str, dict] = {}
-        if num > 0:
-            try:
-                if pl.current_plugin_index is None:
-                    next_index = 0
-                else:
-                    if not (0 <= pl.current_plugin_index < num):
-                        next_index = 0
-                    else:
-                        next_index = (pl.current_plugin_index + 1) % num
-            except Exception:
-                next_index = 0
-
-            try:
-                if last_dt and getattr(ri_obj, "playlist", None) == playlist_name:
-                    until_next_min = max(
-                        0,
-                        int(
-                            (
-                                last_dt + timedelta(minutes=cycle_min) - now
-                            ).total_seconds()
-                            // 60
-                        ),
-                    )
-                else:
-                    until_next_min = cycle_min
-            except Exception:
-                until_next_min = cycle_min
-
-            for idx, inst in enumerate(pl.plugins):
-                try:
-                    steps = (idx - next_index + num) % num
-                    total_min = until_next_min + steps * cycle_min
-                    eta_dt = now + timedelta(minutes=total_min)
-                    eta_map[inst.name] = {
-                        "minutes": total_min,
-                        "at": eta_dt.strftime("%H:%M"),
-                    }
-                except Exception:
-                    continue
+        is_active = last_dt and getattr(ri_obj, "playlist", None) == playlist_name
+        next_index = _safe_next_index(pl, num)
+        until_next_min = _safe_until_next_min(is_active, last_dt, cycle_min, now)
+        eta_map = _compute_playlist_rotation_eta(
+            pl, next_index, until_next_min, cycle_min, now
+        )
 
         # Evict stale entries and cap cache size
         with _eta_cache_lock:
