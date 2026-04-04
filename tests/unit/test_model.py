@@ -33,6 +33,15 @@ class TestSanitizeLogValue:
         assert _sanitize_log_value("") == ""
 
 
+def test_add_plugin_to_nonexistent_playlist_warns():
+    """Cover the sanitized warning path when playlist doesn't exist."""
+    pm = PlaylistManager()
+    result = pm.add_plugin_to_playlist(
+        "no_such_playlist", {"plugin_id": "test", "name": "inst"}
+    )
+    assert result is False
+
+
 def test_refresh_info_to_from_dict_and_datetime():
     now_iso = datetime.utcnow().isoformat()
     ri = model.RefreshInfo(
