@@ -1,6 +1,81 @@
 # CHANGELOG
 
 
+## v0.4.16 (2026-04-04)
+
+### Bug Fixes
+
+- Remove unused timeout_s param and add tests for extracted helpers
+  ([`778fb1c`](https://github.com/jtn0123/InkyPi/commit/778fb1c4ae0c0570fd53c61e4cdf87327d905572))
+
+- Remove unused timeout_s parameter from _cleanup_subprocess (CodeRabbit) - Add 7 tests for
+  _timeout_msg, _cleanup_subprocess, and _handle_process_result to satisfy 80% new code coverage
+  gate
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Validate refreshTime as HH:MM format per CodeRabbit review
+  ([`6bcfe87`](https://github.com/jtn0123/InkyPi/commit/6bcfe877e87da914c21a90cada4fdda469702d5c))
+
+Reject non-string, empty, and malformed refreshTime values with a 422 response before persisting
+  them to the playlist config.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Add fork comparison table to README
+  ([`1bf8dfa`](https://github.com/jtn0123/InkyPi/commit/1bf8dfa10d28a09af229fc087449a74c9c3325d1))
+
+Add "What's New in This Fork" section with a feature comparison table showing what this fork adds
+  (security, UX, performance) and what upstream has that we plan to port (tracked in JTN-219).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract helpers to reduce cognitive complexity in _execute_with_policy (JTN-209)
+  ([`e5f4b60`](https://github.com/jtn0123/InkyPi/commit/e5f4b60ec9cd6d4871b6fe1486b9646b2c19b67a))
+
+Extract _timeout_msg(), _cleanup_subprocess(), and _handle_process_result() from the 43-complexity
+  _execute_with_policy() method to flatten nested conditionals and eliminate duplicate timeout
+  message strings.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Reduce cognitive complexity in playlist blueprint (JTN-207)
+  ([`beecf87`](https://github.com/jtn0123/InkyPi/commit/beecf87c1e5d9b502a4c1bca34d6b8cb78f57523))
+
+Extract shared helpers to eliminate duplicate logic and flatten deeply nested control flow in
+  playlist.py:
+
+- Add _CODE_VALIDATION, _MSG_INVALID_TIME_FORMAT, _MSG_SAME_TIME, _MSG_TIME_OVERLAP constants —
+  eliminates ~9 duplicated string literals - Extract _check_playlist_overlap() — deduplicate
+  overlap-check loops shared by create_playlist and update_playlist - Extract
+  _validate_plugin_refresh_settings() — pull the deeply-nested interval/scheduled refresh validation
+  out of add_plugin - Extract _safe_next_index() and _safe_until_next_min() — isolate the
+  error-prone index/time arithmetic that fed the rotation ETA logic - Extract
+  _compute_playlist_rotation_eta() — replace the 40-line nested ETA block in playlists() and the
+  duplicate in playlist_eta() with one clean loop; both callers now use the same helper
+
+No behavior changes; all 2096 tests pass.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **JTN-208**: Reduce cognitive complexity in config and utility modules
+  ([`7441923`](https://github.com/jtn0123/InkyPi/commit/744192373c23947a7fd3e223e9ff5f8009dfb53f))
+
+Extract helper functions to flatten nested logic in _validate_device_config,
+  _sanitize_config_for_log, handle_request_files, http_get, and take_screenshot. Pure refactor — no
+  behavior changes.
+
+- config.py: _format_validation_message(), _sanitize_playlist() - app_utils.py:
+  _process_uploaded_file() - http_utils.py: _resolve_timeout() - image_utils.py:
+  _find_browser_command(), _SCREENSHOT_ERROR_PREFIX constant
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.15 (2026-04-04)
 
 ### Bug Fixes
