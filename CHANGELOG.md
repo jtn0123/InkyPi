@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.4.12 (2026-04-04)
+
+### Bug Fixes
+
+- **a11y**: Add aria-labels with filenames/key names to history and API key rows (JTN-202)
+  ([`1bf0f67`](https://github.com/jtn0123/InkyPi/commit/1bf0f67d42ea6d9edfbc9ba9dc959afe99d0d08f))
+
+History action buttons (Display, Download, Delete) now include aria-label="<action> <filename>" so
+  screen readers can distinguish each row. API keys list-view delete button and inputs now include
+  the key name in their aria-labels; card-view delete button includes the provider label.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.11 (2026-04-04)
 
 ### Bug Fixes
