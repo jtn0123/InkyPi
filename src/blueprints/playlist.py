@@ -8,8 +8,10 @@ from flask import (
     Blueprint,
     current_app,
     has_app_context,
+    redirect,
     render_template,
     request,
+    url_for,
 )
 
 from model import Playlist
@@ -222,6 +224,11 @@ def add_plugin():
             },
         )
     return json_success("Scheduled refresh configured.")
+
+
+@playlist_bp.route("/playlists")
+def playlists_redirect():
+    return redirect(url_for("playlist.playlists"))
 
 
 @playlist_bp.route("/playlist")

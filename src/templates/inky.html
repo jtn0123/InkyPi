@@ -5,6 +5,8 @@
     <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}" defer></script>
 {% endblock %}
 {% block body %}
+    {% set plugin_names = {} %}
+    {% for p in plugins %}{% if p.display_name %}{% set _ = plugin_names.update({p.id: p.display_name}) %}{% endif %}{% endfor %}
     <!-- Subtle frame container -->
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP, empty_state %}
@@ -36,7 +38,7 @@
                 <span class="status-chip">Playlist: {{ refresh_info.playlist }}</span>
                 {% endif %}
                 {% if refresh_info.plugin_id %}
-                <span class="status-chip">{{ refresh_info.plugin_id }}</span>
+                <span class="status-chip">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}</span>
                 {% endif %}
             </div>
         </div>
@@ -65,7 +67,7 @@
                         <div id="nowShowingBlock" class="dashboard-status-meta" aria-live="polite" {% if not refresh_info.plugin_id %}hidden{% endif %}>
                             <h3>Now showing:</h3>
                             <div>
-                                <strong id="nsPlugin">{{ refresh_info.plugin_id or '' }}</strong>
+                                <strong id="nsPlugin">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) if refresh_info.plugin_id else '' }}</strong>
                                 {% if refresh_info.plugin_instance %}
                                 <span>(<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)</span>
                                 {% else %}
@@ -81,7 +83,7 @@
                         <div id="nextUpBlock" class="dashboard-status-meta" aria-live="polite" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
                             <h3>Next up:</h3>
                             <div>
-                                <strong id="nuPlugin">{{ next_up.plugin_id if next_up else '' }}</strong>
+                                <strong id="nuPlugin">{{ plugin_names.get(next_up.plugin_id, next_up.plugin_id) if next_up and next_up.plugin_id else '' }}</strong>
                                 {% if next_up and next_up.plugin_instance %}
                                 <span>(<span id="nuInstance">{{ next_up.plugin_instance }}</span>)</span>
                                 {% else %}
