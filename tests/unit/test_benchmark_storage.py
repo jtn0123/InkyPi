@@ -47,6 +47,17 @@ def test_get_db_path_handles_empty_config_value(tmp_path):
     assert result == os.path.join(str(tmp_path.parent), "runtime", "benchmarks.db")
 
 
+def test_get_db_path_falsy_base_dir_uses_fallback():
+    """Falsy BASE_DIR falls back to __file__-relative path."""
+    from benchmarks.benchmark_storage import _get_db_path
+
+    config = MockDeviceConfig(base_dir="")
+    result = _get_db_path(config)
+    # Should use the fallback (src/benchmarks/.. = src/) not empty string
+    assert "runtime" in result
+    assert result.endswith("benchmarks.db")
+
+
 def test_get_db_path_handles_exception():
     """Handles exception when get_config fails."""
     from benchmarks.benchmark_storage import _get_db_path

@@ -10,7 +10,7 @@ def _get_db_path(device_config) -> str:
     # BASE_DIR is src/; fallback from __file__ (src/benchmarks/) goes up one level
     fallback = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     try:
-        base_dir = getattr(device_config, "BASE_DIR", fallback)
+        base_dir = getattr(device_config, "BASE_DIR", fallback) or fallback
     except Exception:
         base_dir = fallback
     project_root = os.path.abspath(os.path.join(base_dir, ".."))
