@@ -65,9 +65,9 @@
                 {% if entries %}
                     {% for entry in entries %}
                     <div class="apikey-row" data-existing="true">
-                        <input type="text" class="apikey-key" value="{{ entry.key }}" placeholder="KEY_NAME" readonly>
-                        <input type="text" class="apikey-value masked" value="{{ entry.masked }}" placeholder="(unchanged)" readonly>
-                        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete API key">×</button>
+                        <input type="text" class="apikey-key" value="{{ entry.key }}" placeholder="KEY_NAME" readonly aria-label="{{ entry.key }} key name">
+                        <input type="text" class="apikey-value masked" value="{{ entry.masked }}" placeholder="(unchanged)" readonly aria-label="{{ entry.key }} value">
+                        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete {{ entry.key }} API key">×</button>
                     </div>
                     {% endfor %}
                 {% else %}
