@@ -179,6 +179,36 @@ def parse_form(request_form):
     return request_dict
 
 
+def _process_uploaded_file(extension: str, file_path: str, content: bytes) -> None:
+    """Persist an uploaded file, applying type-specific validation.
+
+    - PDFs are written as-is.
+    - JPEG files are EXIF-transposed before saving.
+    - All other images are verified by the decoder before writing.
+
+    Raises RuntimeError on invalid image content.
+    """
+    if extension == "pdf":
+        with open(file_path, "wb") as out:
+            out.write(content)
+    elif extension in {"jpg", "jpeg"}:
+        try:
+            with Image.open(BytesIO(content)) as img:
+                img = ImageOps.exif_transpose(img)
+                img.save(file_path)
+        except (OSError, ValueError) as e:
+            raise RuntimeError("Invalid image upload") from e
+    else:
+        # Verify decoder can read it before persisting.
+        try:
+            with Image.open(BytesIO(content)) as img_verify:
+                img_verify.verify()
+        except (OSError, ValueError) as e:
+            raise RuntimeError("Invalid image upload") from e
+        with open(file_path, "wb") as out:
+            out.write(content)
+
+
 def handle_request_files(request_files, form_data=None):
     if form_data is None:
         form_data = {}
@@ -254,25 +284,7 @@ def handle_request_files(request_files, form_data=None):
             logger.debug("Failed to rewind file stream", exc_info=True)
 
         # Save PDFs as-is. Validate and save images.
-        if extension == "pdf":
-            with open(file_path, "wb") as out:
-                out.write(content)
-        elif extension in {"jpg", "jpeg"}:
-            try:
-                with Image.open(BytesIO(content)) as img:
-                    img = ImageOps.exif_transpose(img)
-                    img.save(file_path)
-            except (OSError, ValueError) as e:
-                raise RuntimeError("Invalid image upload") from e
-        else:
-            # Verify decoder can read it before persisting.
-            try:
-                with Image.open(BytesIO(content)) as img_verify:
-                    img_verify.verify()
-            except (OSError, ValueError) as e:
-                raise RuntimeError("Invalid image upload") from e
-            with open(file_path, "wb") as out:
-                out.write(content)
+        _process_uploaded_file(extension, file_path, content)
 
         if is_list:
             file_location_map.setdefault(key, [])

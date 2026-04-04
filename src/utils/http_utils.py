@@ -261,6 +261,27 @@ def get_shared_session() -> requests.Session:
     return session
 
 
+def _resolve_timeout(
+    timeout: float | tuple[float, float] | None,
+    connect: float | None,
+    read: float | None,
+) -> float | tuple[float, float]:
+    """Return the effective request timeout value.
+
+    If *timeout* is explicitly provided it is used as-is.  Otherwise, if either
+    *connect* or *read* split-timeout is configured, a ``(connect, read)`` tuple
+    is built using ``DEFAULT_TIMEOUT_SECONDS`` as the fallback for whichever is
+    absent.  When neither split timeout is set the module-level default is used.
+    """
+    if timeout is not None:
+        return timeout
+    if connect is not None or read is not None:
+        ct = connect if connect is not None else DEFAULT_TIMEOUT_SECONDS
+        rt = read if read is not None else DEFAULT_TIMEOUT_SECONDS
+        return (float(ct), float(rt))
+    return DEFAULT_TIMEOUT_SECONDS
+
+
 def http_get(
     url: str,
     *,
@@ -312,24 +333,9 @@ def http_get(
         final_headers.update(headers)
 
     # Determine timeout to use
-    effective_timeout: float | tuple[float, float]
-    if timeout is not None:
-        effective_timeout = timeout
-    else:
-        if CONNECT_TIMEOUT_SECONDS is not None or READ_TIMEOUT_SECONDS is not None:
-            ct = (
-                CONNECT_TIMEOUT_SECONDS
-                if CONNECT_TIMEOUT_SECONDS is not None
-                else DEFAULT_TIMEOUT_SECONDS
-            )
-            rt = (
-                READ_TIMEOUT_SECONDS
-                if READ_TIMEOUT_SECONDS is not None
-                else DEFAULT_TIMEOUT_SECONDS
-            )
-            effective_timeout = (float(ct), float(rt))
-        else:
-            effective_timeout = DEFAULT_TIMEOUT_SECONDS
+    effective_timeout = _resolve_timeout(
+        timeout, CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
+    )
 
     # Optional latency logging
     log_latency = _env_bool("INKYPI_HTTP_LOG_LATENCY", False)

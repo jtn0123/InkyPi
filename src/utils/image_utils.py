@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 _DEFAULT_SCREENSHOT_TIMEOUT_S = 30
 _MAX_SCREENSHOT_TIMEOUT_S = 60
 
+# Common prefix for all screenshot failure log messages.
+_SCREENSHOT_ERROR_PREFIX = "Failed to take screenshot:"
+
 
 def load_image_from_bytes(
     content: bytes, image_open: Callable[[Any], Image.Image] | None = None
@@ -292,7 +295,7 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
         if image is None:
             image = take_screenshot(f"file://{html_file_path}", dimensions, timeout_ms)
     except Exception as e:
-        logger.error(f"Failed to take screenshot: {str(e)}")
+        logger.error("%s %s", _SCREENSHOT_ERROR_PREFIX, str(e))
     finally:
         if html_file_path and os.path.exists(html_file_path):
             try:
@@ -303,6 +306,59 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
     return image
 
 
+def _find_browser_command(
+    target: str,
+    img_file_path: str,
+    dimensions: tuple,
+    timeout_ms: int | None,
+) -> list[str] | None:
+    """Return the browser subprocess command for a headless screenshot, or None.
+
+    Iterates through known browser binary paths/names and returns a fully-formed
+    argument list for the first one that exists on the system.  Returns ``None``
+    when no suitable browser is found.
+    """
+    browsers = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "chromium",
+        "chromium-headless-shell",
+        "google-chrome",
+    ]
+
+    for browser in browsers:
+        if os.path.exists(browser) or shutil.which(browser):
+            command = [
+                browser,
+                "--headless",
+                f"--screenshot={img_file_path}",
+                f"--window-size={dimensions[0]},{dimensions[1]}",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--use-gl=swiftshader",
+                "--hide-scrollbars",
+                "--in-process-gpu",
+                "--js-flags=--jitless",
+                "--disable-zero-copy",
+                "--disable-gpu-memory-buffer-compositor-resources",
+                "--disable-extensions",
+                "--disable-plugins",
+                "--mute-audio",
+                "--no-sandbox",
+                # Allow loading local file-based resources referenced by templates
+                "--allow-file-access-from-files",
+                "--enable-local-file-accesses",
+                # Relax same-origin so file:// linked assets load predictably
+                "--disable-web-security",
+                target,
+            ]
+            if timeout_ms:
+                command.append(f"--timeout={timeout_ms}")
+            return command
+
+    return None
+
+
 def take_screenshot(target, dimensions, timeout_ms=None):
     image = None
     img_file_path = None
@@ -311,49 +367,12 @@ def take_screenshot(target, dimensions, timeout_ms=None):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
             img_file_path = img_file.name
 
-        # Try different browser binaries in order of preference
-        browsers = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-            "chromium",
-            "chromium-headless-shell",
-            "google-chrome",
-        ]
-
-        command = None
-        for browser in browsers:
-            if os.path.exists(browser) or shutil.which(browser):
-                command = [
-                    browser,
-                    "--headless",
-                    f"--screenshot={img_file_path}",
-                    f"--window-size={dimensions[0]},{dimensions[1]}",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--use-gl=swiftshader",
-                    "--hide-scrollbars",
-                    "--in-process-gpu",
-                    "--js-flags=--jitless",
-                    "--disable-zero-copy",
-                    "--disable-gpu-memory-buffer-compositor-resources",
-                    "--disable-extensions",
-                    "--disable-plugins",
-                    "--mute-audio",
-                    "--no-sandbox",
-                    # Allow loading local file-based resources referenced by templates
-                    "--allow-file-access-from-files",
-                    "--enable-local-file-accesses",
-                    # Relax same-origin so file:// linked assets load predictably
-                    "--disable-web-security",
-                    target,
-                ]
-                if timeout_ms:
-                    command.append(f"--timeout={timeout_ms}")
-                break
+        command = _find_browser_command(target, img_file_path, dimensions, timeout_ms)
 
         if command is None:
             logger.error(
-                "Failed to take screenshot: No supported browser found. Install Chromium or Google Chrome."
+                "%s No supported browser found. Install Chromium or Google Chrome.",
+                _SCREENSHOT_ERROR_PREFIX,
             )
             return None
 
@@ -367,21 +386,24 @@ def take_screenshot(target, dimensions, timeout_ms=None):
                 command, capture_output=True, timeout=timeout_seconds
             )
         except FileNotFoundError:
-            logger.error("Failed to take screenshot: Browser binary not found.")
+            logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
             return None
         except subprocess.TimeoutExpired:
-            logger.error("Failed to take screenshot: Browser process timed out.")
+            logger.error("%s Browser process timed out.", _SCREENSHOT_ERROR_PREFIX)
             return None
 
         # Check if the process failed or the output file is missing
         if result.returncode != 0:
             stderr = result.stderr.decode("utf-8", errors="replace").strip()
             logger.error(
-                f"Failed to take screenshot (exit code {result.returncode}): {stderr}"
+                "%s (exit code %s): %s",
+                _SCREENSHOT_ERROR_PREFIX,
+                result.returncode,
+                stderr,
             )
             return None
         if not (img_file_path and os.path.exists(img_file_path)):
-            logger.error("Failed to take screenshot: screenshot file not found")
+            logger.error("%s screenshot file not found", _SCREENSHOT_ERROR_PREFIX)
             return None
 
         # Load the image using standardized helper
@@ -391,7 +413,7 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             return None
 
     except Exception as e:
-        logger.error(f"Failed to take screenshot: {str(e)}")
+        logger.error("%s %s", _SCREENSHOT_ERROR_PREFIX, str(e))
     finally:
         if img_file_path and os.path.exists(img_file_path):
             try:
