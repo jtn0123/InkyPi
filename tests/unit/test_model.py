@@ -42,6 +42,13 @@ def test_add_plugin_to_nonexistent_playlist_warns():
     assert result is False
 
 
+def test_update_nonexistent_playlist_warns():
+    """Cover the sanitized warning path in update_playlist."""
+    pm = PlaylistManager()
+    result = pm.update_playlist("no_such", "new_name", "08:00", "20:00")
+    assert result is False
+
+
 def test_refresh_info_to_from_dict_and_datetime():
     now_iso = datetime.utcnow().isoformat()
     ri = model.RefreshInfo(
