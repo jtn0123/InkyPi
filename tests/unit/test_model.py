@@ -33,20 +33,30 @@ class TestSanitizeLogValue:
         assert _sanitize_log_value("") == ""
 
 
-def test_add_plugin_to_nonexistent_playlist_warns():
+def test_add_plugin_to_nonexistent_playlist_warns(caplog):
     """Cover the sanitized warning path when playlist doesn't exist."""
     pm = PlaylistManager()
-    result = pm.add_plugin_to_playlist(
-        "no_such_playlist", {"plugin_id": "test", "name": "inst"}
-    )
+    bad_name = "no_such\nplaylist\t\x00"
+    with caplog.at_level("WARNING", logger="model"):
+        result = pm.add_plugin_to_playlist(
+            bad_name, {"plugin_id": "test", "name": "inst"}
+        )
     assert result is False
+    assert len(caplog.records) == 1
+    assert "no_suchplaylist" in caplog.records[0].message
+    assert "\n" not in caplog.records[0].message
 
 
-def test_update_nonexistent_playlist_warns():
+def test_update_nonexistent_playlist_warns(caplog):
     """Cover the sanitized warning path in update_playlist."""
     pm = PlaylistManager()
-    result = pm.update_playlist("no_such", "new_name", "08:00", "20:00")
+    bad_name = "no_such\nplaylist"
+    with caplog.at_level("WARNING", logger="model"):
+        result = pm.update_playlist(bad_name, "new_name", "08:00", "20:00")
     assert result is False
+    assert len(caplog.records) == 1
+    assert "no_suchplaylist" in caplog.records[0].message
+    assert "\n" not in caplog.records[0].message
 
 
 def test_refresh_info_to_from_dict_and_datetime():
