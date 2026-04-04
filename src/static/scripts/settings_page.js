@@ -317,7 +317,10 @@
       const notesBody = document.getElementById("releaseNotesBody");
       if (badge) { badge.textContent = "Checking..."; badge.className = "status-chip"; }
       try {
-        const resp = await fetch(config.versionUrl, { cache: "no-store" });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(config.versionUrl, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await resp.json();
         if (latestEl) latestEl.textContent = data.latest || "—";
         if (data.update_available) {
