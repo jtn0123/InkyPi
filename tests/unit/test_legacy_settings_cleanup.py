@@ -4,7 +4,6 @@ These tests prevent drift back to legacy hand-built plugin templates now
 that all plugins use the schema-driven form system.
 """
 
-import glob
 import os
 import pathlib
 import sys
@@ -51,8 +50,13 @@ def _get_plugin_class(plugin_id):
 @pytest.mark.parametrize("plugin_id", _ACTIVE_PLUGINS)
 def test_all_active_plugins_have_settings_schema(plugin_id):
     """Every active plugin must return a non-None settings schema."""
+    from plugins.base_plugin.base_plugin import BasePlugin
+
     plugin_cls = _get_plugin_class(plugin_id)
     assert plugin_cls is not None, f"No BasePlugin subclass found in {plugin_id}"
+    assert (
+        plugin_cls.build_settings_schema is not BasePlugin.build_settings_schema
+    ), f"Plugin '{plugin_id}' must override build_settings_schema()"
     instance = plugin_cls({"id": plugin_id})
     schema = instance.build_settings_schema()
     assert schema is not None, (
@@ -63,9 +67,14 @@ def test_all_active_plugins_have_settings_schema(plugin_id):
 
 def test_no_orphaned_settings_html():
     """No plugin directory (other than base_plugin) should contain a settings.html."""
-    matches = sorted(glob.glob("src/plugins/*/settings.html"))
-    allowed = {"src/plugins/base_plugin/settings.html"}
-    orphans = [m for m in matches if m not in allowed]
+    repo_root = pathlib.Path(__file__).parents[2]
+    matches = sorted((repo_root / "src" / "plugins").glob("*/settings.html"))
+    allowed = {
+        (repo_root / "src" / "plugins" / "base_plugin" / "settings.html").resolve()
+    }
+    orphans = [
+        str(m.relative_to(repo_root)) for m in matches if m.resolve() not in allowed
+    ]
     assert orphans == [], (
         f"Orphaned legacy settings.html found: {orphans}. "
         f"Use build_settings_schema() instead."
@@ -76,6 +85,7 @@ def test_no_orphaned_settings_html():
 def test_image_plugins_have_background_fields_in_schema(plugin_id):
     """Image plugins must define backgroundOption and backgroundColor in their schema."""
     plugin_cls = _get_plugin_class(plugin_id)
+    assert plugin_cls is not None, f"No BasePlugin subclass found in {plugin_id}"
     instance = plugin_cls({"id": plugin_id})
     schema = instance.build_settings_schema()
 
