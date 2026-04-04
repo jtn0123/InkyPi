@@ -445,6 +445,27 @@ class Config:
         """Return absolute path to the config schemas directory."""
         return os.path.join(self.BASE_DIR, "config", "schemas")
 
+    @staticmethod
+    def _format_validation_message(ve) -> str:
+        """Build a user-friendly error message from a jsonschema ValidationError.
+
+        Prepends the failing field path (if any) and appends a (safely truncated)
+        representation of the invalid value.
+        """
+        msg = getattr(ve, "message", str(ve))
+        try:
+            if hasattr(ve, "path") and ve.path:
+                path = ".".join(str(p) for p in ve.path)
+                msg = f"{path}: {msg}"
+            bad = getattr(ve, "instance", None)
+            bad_repr = repr(bad)
+            if len(bad_repr) > 200:
+                bad_repr = bad_repr[:197] + "..."
+            msg = f"{msg} (got: {bad_repr})"
+        except (AttributeError, TypeError, IndexError):
+            pass
+        return msg
+
     def _validate_device_config(self, config: dict):
         """Validate device.json against the bundled JSON Schema.
 
@@ -486,19 +507,7 @@ class Config:
             except (AttributeError, TypeError):
                 is_validation_error = False
             if is_validation_error:
-                ve = ex
-                msg = getattr(ve, "message", str(ve))
-                try:
-                    if hasattr(ve, "path") and ve.path:
-                        path = ".".join(str(p) for p in ve.path)
-                        msg = f"{path}: {msg}"
-                    bad = getattr(ve, "instance", None)
-                    bad_repr = repr(bad)
-                    if len(bad_repr) > 200:
-                        bad_repr = bad_repr[:197] + "..."
-                    msg = f"{msg} (got: {bad_repr})"
-                except (AttributeError, TypeError, IndexError):
-                    pass
+                msg = self._format_validation_message(ex)
                 raise ValueError(f"device.json failed schema validation: {msg}") from ex
             logger.warning(
                 "device.json validation encountered a non-fatal error: %s", ex
@@ -541,6 +550,29 @@ class Config:
                 )
             return "<omitted>"
 
+        def _sanitize_playlist(pl) -> dict:
+            """Summarize a single playlist entry, stripping per-plugin settings."""
+            try:
+                pl_name = pl.get("name")
+                plugins = (
+                    pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
+                )
+                return {
+                    "name": pl_name,
+                    "num_plugins": len(plugins),
+                    # Do not expose per-plugin settings; only summarize ids/names
+                    "plugins": [
+                        {
+                            "plugin_id": p.get("plugin_id"),
+                            "name": p.get("name"),
+                            "has_settings": bool(p.get("plugin_settings")),
+                        }
+                        for p in plugins
+                    ],
+                }
+            except Exception:
+                return {"name": "<unknown>", "num_plugins": 0}
+
         sanitized: dict[str, Any] = {}
         for key, value in (config_dict or {}).items():
             if key == "playlist_config" and isinstance(value, dict):
@@ -549,37 +581,9 @@ class Config:
                     if isinstance(value.get("playlists"), list)
                     else []
                 )
-                sanitized_playlists = []
-                for pl in playlists:
-                    try:
-                        pl_name = pl.get("name")
-                        plugins = (
-                            pl.get("plugins", [])
-                            if isinstance(pl.get("plugins"), list)
-                            else []
-                        )
-                        sanitized_playlists.append(
-                            {
-                                "name": pl_name,
-                                "num_plugins": len(plugins),
-                                # Do not expose per-plugin settings; only summarize ids/names
-                                "plugins": [
-                                    {
-                                        "plugin_id": p.get("plugin_id"),
-                                        "name": p.get("name"),
-                                        "has_settings": bool(p.get("plugin_settings")),
-                                    }
-                                    for p in plugins
-                                ],
-                            }
-                        )
-                    except Exception:
-                        sanitized_playlists.append(
-                            {"name": "<unknown>", "num_plugins": 0}
-                        )
                 sanitized[key] = {
                     "active_playlist": value.get("active_playlist"),
-                    "playlists": sanitized_playlists,
+                    "playlists": [_sanitize_playlist(pl) for pl in playlists],
                 }
             elif _looks_sensitive(key):
                 sanitized[key] = "***"
