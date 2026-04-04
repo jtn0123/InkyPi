@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v0.4.14 (2026-04-04)
+
+### Bug Fixes
+
+- Resolve merge conflicts with main after PRs 146+148 merged
+  ([`5e21a6c`](https://github.com/jtn0123/InkyPi/commit/5e21a6c44a02a32f28c65023d8770531dc8929e6))
+
+- Keep both IIFE-level helpers (copy + form snapshot/restore) - Include all tests from both branches
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.13 (2026-04-04)
 
 ### Bug Fixes
@@ -119,6 +131,14 @@ Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
 ### Bug Fixes
 
+- Move copy helpers to outer scope and handle catch for Sonar
+  ([`2b92fef`](https://github.com/jtn0123/InkyPi/commit/2b92fef244d568b449a414cf71f04916dfa1252e))
+
+- Move showCopyFeedback and copyViaExecCommand to IIFE level (S7721) - Log error in catch block
+  instead of discarding (S2486) - Remove eslint-disable-line comment (S7724)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
 - Prevent Settings page thread starvation (JTN-195, JTN-196)
   ([`aa50e39`](https://github.com/jtn0123/InkyPi/commit/aa50e393c2075609781eaa1c2c45d653a7b00f9b))
 
@@ -134,6 +154,15 @@ Changes: - Add 8-second AbortController timeout to the client-side version check
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 
+- Resolve Sonar issues in copyLogsToClipboard and enforce quality gate
+  ([`fa548f9`](https://github.com/jtn0123/InkyPi/commit/fa548f96522b18fc20e062ee5874d85f4f5320cb))
+
+- Replace var with const/let, extract nested functions to reduce depth - Use globalThis instead of
+  window, el.remove() instead of removeChild - Handle catch exception, add
+  sonar.qualitygate.wait=true
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
 - Set inert attribute on background elements when lightbox opens
   ([`8bf8f8e`](https://github.com/jtn0123/InkyPi/commit/8bf8f8ed4f2586c0006ffbb81c81112c623bc5a3))
 
@@ -144,6 +173,16 @@ When the lightbox modal opens, background elements remained interactable despite
 Fixes JTN-203
 
 Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Settings timezone default and log copy fallback (JTN-216, JTN-197)
+  ([`a38c23b`](https://github.com/jtn0123/InkyPi/commit/a38c23babc870794604b548e81a417cad5cc8fd8))
+
+- JTN-216: Use Jinja get() with 'UTC' default for timezone input so it renders correctly when config
+  has no timezone key - JTN-197: Replace silent clipboard write with HTTP-fallback (execCommand) and
+  visual button feedback ('Copied!'/'Copy failed') using correct button id logsCopyBtn - Tests: two
+  new integration tests verify UTC default and configured value rendering
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 
 ## v0.4.9 (2026-04-04)
