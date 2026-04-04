@@ -129,3 +129,127 @@ def test_perform_refresh_calls_execute_with_policy(device_config_dev, monkeypatc
     task._perform_refresh(refresh, fake_latest, __import__("datetime").datetime.now())
     assert "action" in called
     assert called["action"] is refresh
+
+
+# ---------------------------------------------------------------------------
+# Static helper tests (extracted for JTN-209)
+# ---------------------------------------------------------------------------
+
+
+def test_timeout_msg():
+    from refresh_task import RefreshTask
+
+    msg = RefreshTask._timeout_msg("weather", 30.0)
+    assert msg == "Plugin 'weather' timed out after 30s"
+
+
+def test_timeout_msg_truncates_float():
+    from refresh_task import RefreshTask
+
+    msg = RefreshTask._timeout_msg("clock", 10.7)
+    assert "10s" in msg
+
+
+def test_cleanup_subprocess_terminates(monkeypatch):
+    from refresh_task import RefreshTask
+
+    calls = []
+
+    class FakeProc:
+        pid = 999
+        _alive = True
+
+        def terminate(self):
+            calls.append("terminate")
+            self._alive = False
+
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+
+        def is_alive(self):
+            return self._alive
+
+        def kill(self):
+            calls.append("kill")
+
+    proc = FakeProc()
+    RefreshTask._cleanup_subprocess(proc, "test_plugin")
+    assert "terminate" in calls
+    assert not proc.is_alive()
+
+
+def test_cleanup_subprocess_escalates_to_kill(monkeypatch):
+    from refresh_task import RefreshTask
+
+    class StubbornProc:
+        pid = 123
+        _kill_count = 0
+
+        def terminate(self):
+            pass
+
+        def join(self, timeout=None):
+            pass
+
+        def is_alive(self):
+            return self._kill_count < 1
+
+        def kill(self):
+            self._kill_count += 1
+
+    proc = StubbornProc()
+    RefreshTask._cleanup_subprocess(proc, "stubborn")
+    assert proc._kill_count >= 1
+
+
+def test_handle_process_result_success():
+    import io
+    import queue
+
+    from refresh_task import RefreshTask
+
+    img = Image.new("RGB", (100, 100), "red")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+
+    q = queue.Queue()
+    q.put({"ok": True, "image_bytes": buf.getvalue(), "plugin_meta": {"key": "val"}})
+
+    class FakeProc:
+        exitcode = 0
+
+    result_img, meta = RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
+    assert result_img is not None
+    assert meta == {"key": "val"}
+
+
+def test_handle_process_result_error():
+    import queue
+
+    from refresh_task import RefreshTask
+
+    q = queue.Queue()
+    q.put({"ok": False, "error_type": "ValueError", "error_message": "bad input"})
+
+    class FakeProc:
+        exitcode = 1
+
+    result_img, exc = RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
+    assert result_img is None
+    assert isinstance(exc, Exception)
+
+
+def test_handle_process_result_empty_queue_raises():
+    import queue
+
+    import pytest
+
+    from refresh_task import RefreshTask
+
+    q = queue.Queue()
+
+    class FakeProc:
+        exitcode = 1
+
+    with pytest.raises(RuntimeError, match="exited with code"):
+        RefreshTask._handle_process_result(q, FakeProc(), "test", 1)

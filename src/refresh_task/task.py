@@ -605,7 +605,7 @@ class RefreshTask:
         return f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
 
     @staticmethod
-    def _cleanup_subprocess(proc, timeout_s: float, plugin_id: str) -> None:
+    def _cleanup_subprocess(proc, plugin_id: str) -> None:
         """Terminate a subprocess that is still alive after its timeout.
 
         Attempts graceful termination first, escalates to SIGKILL if needed,
@@ -701,7 +701,7 @@ class RefreshTask:
                 proc.start()
                 proc.join(timeout=timeout_s)
                 if proc.is_alive():
-                    self._cleanup_subprocess(proc, timeout_s, plugin_id)
+                    self._cleanup_subprocess(proc, plugin_id)
                     last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
                 else:
                     result = self._handle_process_result(
