@@ -10,12 +10,13 @@ from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
     field,
     option,
+    option_group,
     row,
     schema,
     section,
     widget,
 )
-from plugins.calendar.constants import FONT_SIZES, LOCALE_MAP
+from plugins.calendar.constants import FONT_SIZES, LOCALE_GROUPS, LOCALE_MAP
 from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,11 @@ class Calendar(BasePlugin):
                         label="Language",
                         default="en",
                         options=[
-                            option(code, name) for code, name in LOCALE_MAP.items()
+                            option_group(
+                                group_label,
+                                *[option(code, name) for code, name in locales],
+                            )
+                            for group_label, locales in LOCALE_GROUPS
                         ],
                     ),
                     field(

@@ -36,7 +36,15 @@
 
 {% macro render_options(options, selected_value) -%}
     {% for opt in options %}
+        {% if opt.kind is defined and opt.kind == 'option_group' %}
+        <optgroup label="{{ opt.label }}">
+            {% for child in opt.options %}
+            <option value="{{ child.value }}" {% if (selected_value | string) == (child.value | string) %}selected{% endif %}>{{ child.label }}</option>
+            {% endfor %}
+        </optgroup>
+        {% else %}
         <option value="{{ opt.value }}" {% if (selected_value | string) == (opt.value | string) %}selected{% endif %}>{{ opt.label }}</option>
+        {% endif %}
     {% endfor %}
 {%- endmacro %}
 

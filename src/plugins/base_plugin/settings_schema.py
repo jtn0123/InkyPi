@@ -7,6 +7,10 @@ def option(value, label, **kwargs):
     return data
 
 
+def option_group(label, *options):
+    return {"kind": "option_group", "label": label, "options": list(options)}
+
+
 def field(name, field_type="text", label=None, **kwargs):
     data = {
         "kind": "field",
