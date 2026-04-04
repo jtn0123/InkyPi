@@ -342,8 +342,8 @@
         toggle.title = "Toggle visibility";
         input.parentElement.insertBefore(toggle, input.nextSibling);
       });
-      var addBtn = document.getElementById("addApiKeyBtn");
-      var saveBtn = document.getElementById("saveApiKeysBtn");
+      const addBtn = document.getElementById("addApiKeyBtn");
+      const saveBtn = document.getElementById("saveApiKeysBtn");
       if (addBtn) {
         addBtn.addEventListener("click", () => addRow());
       } else if (config.mode === "generic") {
