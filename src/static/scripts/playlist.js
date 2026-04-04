@@ -651,6 +651,23 @@
                 openDeleteInstanceModal(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'));
             });
         });
+        document.querySelectorAll('.refresh-settings-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const t = e.currentTarget;
+                let refreshSettings = {};
+                try {
+                    refreshSettings = JSON.parse(t.getAttribute('data-refresh') || '{}');
+                } catch (_err) {
+                    refreshSettings = {};
+                }
+                openRefreshModal(
+                    t.getAttribute('data-playlist'),
+                    t.getAttribute('data-plugin-id'),
+                    t.getAttribute('data-instance'),
+                    refreshSettings
+                );
+            });
+        });
         document.querySelectorAll('.plugin-display-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const t = e.currentTarget;
