@@ -1,4 +1,28 @@
 (function () {
+  function showCopyFeedback(btn, success) {
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.textContent = success ? "Copied!" : "Copy failed";
+    setTimeout(function() { btn.textContent = original; }, 1500);
+  }
+
+  function copyViaExecCommand(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      console.warn("execCommand copy not supported:", e);
+    }
+    ta.remove();
+    return ok;
+  }
+
   function getFormSnapshot(form) {
     const target = form || document.querySelector(".settings-form");
     if (!target) return {};
@@ -303,8 +327,18 @@
 
     function copyLogsToClipboard() {
       const viewer = document.getElementById("logsViewer");
+      const copyBtn = document.getElementById("logsCopyBtn");
       if (!viewer) return;
-      navigator.clipboard?.writeText(viewer.textContent || "").catch(() => {});
+      const text = viewer.textContent || "";
+
+      if (navigator.clipboard && globalThis.isSecureContext) {
+        navigator.clipboard.writeText(text).then(
+          function() { showCopyFeedback(copyBtn, true); },
+          function() { showCopyFeedback(copyBtn, false); }
+        );
+      } else {
+        showCopyFeedback(copyBtn, copyViaExecCommand(text));
+      }
     }
 
     function clearLogsView() {

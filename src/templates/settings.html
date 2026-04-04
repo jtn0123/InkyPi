@@ -92,7 +92,7 @@
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group nowrap">
                             <label for="timezone" class="form-label">Time Zone</label>
-                            <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.timezone }}" />
+                            <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.get('timezone', 'UTC') }}" />
                             <datalist id="timezoneList">
                                 {% for timezone in timezones %}
                                 <option value="{{ timezone }}"></option>
