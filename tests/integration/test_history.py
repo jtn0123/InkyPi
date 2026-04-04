@@ -258,9 +258,10 @@ def test_history_sorting_and_size_formatting(client, device_config_dev):
 
     from blueprints import history as history_mod
 
-    images = history_mod._list_history_images(d)
+    images, total = history_mod._list_history_images(d)
     names = [img["filename"] for img in images]
     assert "b.png" in names and "a.png" in names
+    assert total == 2
 
     resp = client.get("/history")
     assert resp.status_code == 200
@@ -287,7 +288,8 @@ def test_history_sorting_uses_embedded_timestamp_when_mtimes_match(device_config
     for name in names:
         os.utime(os.path.join(d, name), (identical_time, identical_time))
 
-    images = history_mod._list_history_images(d)
+    images, total = history_mod._list_history_images(d)
+    assert total == 3
     ordered_names = [img["filename"] for img in images[:3]]
     assert ordered_names == [
         "display_20250101_211633.png",
@@ -388,8 +390,11 @@ def test_list_history_images_exception_handling(client, device_config_dev, monke
         history_mod.os, "listdir", lambda p: (_ for _ in ()).throw(Exception("test"))
     )
 
-    result = history_mod._list_history_images(device_config_dev.history_image_dir)
+    result, total = history_mod._list_history_images(
+        device_config_dev.history_image_dir
+    )
     assert result == []
+    assert total == 0
 
 
 def test_history_delete_exception_handling(client, flask_app, monkeypatch):
@@ -551,3 +556,120 @@ def test_history_metadata_deduplicates_instance(client, device_config_dev):
     # "weather" should appear exactly once (as plugin_id), not twice
     source_section = text[text.index("Source:") : text.index("Source:") + 200]
     assert source_section.count("weather") == 1
+
+
+# ---------------------------------------------------------------------------
+# Lazy sidecar loading tests (JTN-97, JTN-91)
+# ---------------------------------------------------------------------------
+
+
+def test_list_history_images_total_count_accurate(device_config_dev):
+    """Total count reflects all PNG files, not just the returned page."""
+    import json
+
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(10):
+        name = f"display_20250201_{i:06d}.png"
+        Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+        # Write sidecar for half
+        if i % 2 == 0:
+            sidecar = {"plugin_id": "test"}
+            with open(
+                os.path.join(d, name.replace(".png", ".json")), "w", encoding="utf-8"
+            ) as fh:
+                json.dump(sidecar, fh)
+
+    images, total = history_mod._list_history_images(d)
+    assert total == 10
+    assert len(images) == 10
+
+
+def test_list_history_images_offset_limit_slicing(device_config_dev):
+    """offset/limit correctly slices: 10 items, offset=2, limit=3 -> items 2,3,4."""
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    # Create files with timestamps so sort order is deterministic (newest first)
+    for i in range(10):
+        name = f"display_20250201_{i:06d}.png"
+        Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+
+    all_images, total = history_mod._list_history_images(d)
+    assert total == 10
+    all_names = [img["filename"] for img in all_images]
+
+    page_images, page_total = history_mod._list_history_images(d, offset=2, limit=3)
+    assert page_total == 10
+    assert len(page_images) == 3
+    page_names = [img["filename"] for img in page_images]
+    assert page_names == all_names[2:5]
+
+
+def test_list_history_images_offset_beyond_total(device_config_dev):
+    """Offset beyond total returns empty list but correct total count."""
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(5):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_20250201_{i:06d}.png")
+        )
+
+    images, total = history_mod._list_history_images(d, offset=100, limit=10)
+    assert total == 5
+    assert images == []
+
+
+def test_list_history_images_no_limit_returns_all(device_config_dev):
+    """When limit=None (default), all items are returned for backward compat."""
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(7):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_20250201_{i:06d}.png")
+        )
+
+    images, total = history_mod._list_history_images(d)
+    assert total == 7
+    assert len(images) == 7
+
+
+def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkeypatch):
+    """Only `limit` number of sidecar JSON files are read, not all."""
+    import json as _json
+
+    from blueprints import history as history_mod
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for i in range(10):
+        name = f"display_20250201_{i:06d}.png"
+        Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+        sidecar = {"plugin_id": "test"}
+        with open(
+            os.path.join(d, name.replace(".png", ".json")), "w", encoding="utf-8"
+        ) as fh:
+            _json.dump(sidecar, fh)
+
+    load_count = {"n": 0}
+    original_load = _json.load
+
+    def counting_load(fh):
+        load_count["n"] += 1
+        return original_load(fh)
+
+    monkeypatch.setattr(history_mod.json, "load", counting_load)
+
+    limit = 3
+    images, total = history_mod._list_history_images(d, offset=0, limit=limit)
+    assert total == 10
+    assert len(images) == limit
+    # Should have loaded at most `limit` sidecars, not all 10
+    assert load_count["n"] <= limit

@@ -140,6 +140,9 @@ def latest_plugin_image(plugin_id: str):
 
     Searches the history directory for the latest PNG matching the plugin_id,
     regardless of instance name. Used by the plugin page to show "Latest from this plugin".
+
+    JSON files are sorted by filename descending (newest first) so the first
+    match is the most recent, giving O(1) reads in the common case.
     """
     device_config = current_app.config["DEVICE_CONFIG"]
     try:
@@ -147,11 +150,13 @@ def latest_plugin_image(plugin_id: str):
         if not os.path.isdir(history_dir):
             return ("Not Found", 404)
 
-        # Find all history images for this plugin, sorted by timestamp (newest first)
-        matching_images = []
-        for name in os.listdir(history_dir):
-            if not name.endswith(".json"):
-                continue
+        # Pre-filter to .json files and sort newest-first by filename
+        json_files = sorted(
+            (n for n in os.listdir(history_dir) if n.endswith(".json")),
+            reverse=True,
+        )
+
+        for name in json_files:
             json_path = os.path.join(history_dir, name)
             try:
                 with open(json_path, encoding="utf-8") as fh:
@@ -159,18 +164,11 @@ def latest_plugin_image(plugin_id: str):
                 if meta.get("plugin_id") == plugin_id:
                     png_path = os.path.join(history_dir, name.replace(".json", ".png"))
                     if os.path.exists(png_path):
-                        # Extract timestamp from filename (format: display_YYYYMMDD_HHMMSS)
-                        matching_images.append((name, png_path))
+                        return _cacheable_send_file(png_path)
             except Exception:
                 continue
 
-        if not matching_images:
-            return ("Not Found", 404)
-
-        # Sort by filename (which includes timestamp) to get most recent
-        matching_images.sort(reverse=True)
-        latest_image_path = matching_images[0][1]
-        return _cacheable_send_file(latest_image_path)
+        return ("Not Found", 404)
 
     except Exception:
         return ("Not Found", 404)
@@ -492,14 +490,20 @@ def _save_plugin_settings_common(
 def _find_history_image(
     device_config, plugin_id: str, instance_name: str
 ) -> str | None:
-    """Return path to a history PNG that matches plugin and instance, if any."""
+    """Return path to a history PNG that matches plugin and instance, if any.
+
+    Pre-filters directory listing to only .json filenames and sorts newest-first
+    so the first match wins.
+    """
     try:
         history_dir: str = str(device_config.history_image_dir)
         if not os.path.isdir(history_dir):
             return None
-        for name in sorted(os.listdir(history_dir), reverse=True):
-            if not name.endswith(".json"):
-                continue
+        json_files = sorted(
+            (n for n in os.listdir(history_dir) if n.endswith(".json")),
+            reverse=True,
+        )
+        for name in json_files:
             json_path = os.path.join(history_dir, name)
             try:
                 with open(json_path, encoding="utf-8") as fh:
@@ -521,30 +525,35 @@ def _find_history_image(
 
 
 def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | None:
-    """Return the most recent refresh time for any instance of this plugin."""
+    """Return the most recent refresh time for any instance of this plugin.
+
+    Filenames follow the display_YYYYMMDD_HHMMSS pattern, so sorting by
+    filename descending mirrors refresh_time ordering.  We iterate
+    newest-first and return the refresh_time from the first match.
+    """
     try:
         history_dir = str(device_config.history_image_dir)
         if not os.path.isdir(history_dir):
             return None
 
-        latest_time = None
-        for name in os.listdir(history_dir):
-            if not name.endswith(".json"):
-                continue
+        json_files = sorted(
+            (n for n in os.listdir(history_dir) if n.endswith(".json")),
+            reverse=True,
+        )
+
+        for name in json_files:
             json_path = os.path.join(history_dir, name)
             try:
                 with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
                 if meta.get("plugin_id") == plugin_id:
                     refresh_time = meta.get("refresh_time")
-                    if refresh_time and (
-                        latest_time is None or refresh_time > latest_time
-                    ):
-                        latest_time = refresh_time
+                    if refresh_time:
+                        return refresh_time
             except Exception:
                 continue
 
-        return latest_time
+        return None
     except Exception:
         return None
 
