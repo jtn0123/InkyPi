@@ -153,14 +153,32 @@ def _validate_plugin_refresh_settings(refresh_settings):
             )
         refresh_config = {"interval": calculate_seconds(interval_int, unit)}
     else:
-        if not refresh_settings.get("refreshTime"):
+        refresh_time = refresh_settings.get("refreshTime")
+        if not refresh_time:
             return None, json_error(
                 "Refresh time is required",
                 status=422,
                 code=_CODE_VALIDATION,
                 details={"field": "refreshTime"},
             )
-        refresh_config = {"scheduled": refresh_settings.get("refreshTime")}
+        if not isinstance(refresh_time, str):
+            return None, json_error(
+                "Refresh time must be in HH:MM format",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "refreshTime"},
+            )
+        refresh_time = refresh_time.strip()
+        try:
+            datetime.strptime(refresh_time, "%H:%M")
+        except ValueError:
+            return None, json_error(
+                "Refresh time must be in HH:MM format",
+                status=422,
+                code=_CODE_VALIDATION,
+                details={"field": "refreshTime"},
+            )
+        refresh_config = {"scheduled": refresh_time}
 
     return refresh_config, None
 
