@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.4.4 (2026-04-04)
+
+### Bug Fixes
+
+- Make playlist refresh button test robust to attribute ordering
+  ([`3cf87f5`](https://github.com/jtn0123/InkyPi/commit/3cf87f50b120d70f71da405535d1e9993ba2a7fb))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Wire Edit Refresh Settings button listener on playlist page (JTN-185, JTN-151)
+  ([`07c03b4`](https://github.com/jtn0123/InkyPi/commit/07c03b44ba0260fadc53849c402316f730406cda))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Code Style
+
+- Fix black formatting in test file
+  ([`028203a`](https://github.com/jtn0123/InkyPi/commit/028203ac744858ddff34f31b716ee66ba560fed5))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.3 (2026-04-04)
 
 ### Bug Fixes
