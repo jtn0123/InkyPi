@@ -27,9 +27,43 @@
       }
     }
 
+    // Dirty-state tracking for the Save button
+    let _formSnapshot = null;
+
+    function getFormSnapshot() {
+      const form = document.querySelector(".settings-form");
+      if (!form) return {};
+      const snap = {};
+      form.querySelectorAll("input, select, textarea").forEach(function (el) {
+        const key = el.name || el.id;
+        if (!key) return;
+        snap[key] = el.type === "checkbox" ? el.checked : el.value;
+      });
+      return snap;
+    }
+
+    function checkDirty() {
+      const saveBtn = document.getElementById("saveSettingsBtn");
+      if (!saveBtn || !_formSnapshot) return;
+      const current = getFormSnapshot();
+      let dirty = false;
+      const allKeys = new Set([...Object.keys(_formSnapshot), ...Object.keys(current)]);
+      for (const key of allKeys) {
+        if (_formSnapshot[key] !== current[key]) {
+          dirty = true;
+          break;
+        }
+      }
+      saveBtn.disabled = !dirty;
+    }
+
     async function handleAction() {
       const form = document.querySelector(".settings-form");
       const saveBtn = document.getElementById("saveSettingsBtn");
+      if (saveBtn && saveBtn.disabled) {
+        showResponseModal("success", "No changes to save.");
+        return;
+      }
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       const formData = new FormData(form);
       try {
@@ -57,10 +91,13 @@
         });
         const result = await response.json();
         if (response.ok) {
+          _formSnapshot = getFormSnapshot();
+          if (saveBtn) saveBtn.disabled = true;
           showResponseModal("success", `Success! ${result.message}`);
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
           form.reset();
+          checkDirty();
         }
       } catch (error) {
         showResponseModal(
@@ -68,7 +105,9 @@
           "An error occurred while processing your request. Please try again."
         );
       } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+        if (saveBtn && saveBtn.textContent === "Saving\u2026") {
+          saveBtn.textContent = "Save";
+        }
       }
     }
 
@@ -711,7 +750,18 @@
       document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
         button.addEventListener("click", () => ui.toggleCollapsible && ui.toggleCollapsible(button));
       });
-      document.getElementById("saveSettingsBtn")?.addEventListener("click", handleAction);
+
+      // Dirty-state: snapshot initial form values and disable Save until something changes
+      const saveBtn = document.getElementById("saveSettingsBtn");
+      _formSnapshot = getFormSnapshot();
+      if (saveBtn) saveBtn.disabled = true;
+      const settingsForm = document.querySelector(".settings-form");
+      if (settingsForm) {
+        settingsForm.addEventListener("input", checkDirty);
+        settingsForm.addEventListener("change", checkDirty);
+      }
+
+      saveBtn?.addEventListener("click", handleAction);
       document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
       document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
       const importFileInput = document.getElementById("importFile");
