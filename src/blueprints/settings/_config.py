@@ -319,6 +319,16 @@ def _validate_settings_form(form_data):
     interval = form_data.get("interval")
     time_format = form_data.get("timeFormat")
 
+    # Validate device name (required, non-empty)
+    device_name = form_data.get("deviceName", "").strip()
+    if not device_name:
+        return json_error(
+            "Device Name is required",
+            status=422,
+            code="validation_error",
+            details={"field": "deviceName"},
+        )
+
     if not unit or unit not in ["minute", "hour"]:
         return json_error(
             "Plugin cycle interval unit is required",
@@ -329,6 +339,13 @@ def _validate_settings_form(form_data):
     if not interval or not interval.isnumeric():
         return json_error(
             "Refresh interval is required",
+            status=422,
+            code="validation_error",
+            details={"field": "interval"},
+        )
+    if int(interval) <= 0:
+        return json_error(
+            "Plugin Cycle Interval must be greater than zero",
             status=422,
             code="validation_error",
             details={"field": "interval"},
