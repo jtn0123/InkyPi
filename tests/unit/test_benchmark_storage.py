@@ -51,11 +51,10 @@ def test_get_db_path_falsy_base_dir_uses_fallback():
     """Falsy BASE_DIR falls back to __file__-relative path."""
     from benchmarks.benchmark_storage import _get_db_path
 
-    config = MockDeviceConfig(base_dir="")
+    config = MockDeviceConfig()
+    config.BASE_DIR = ""  # force falsy after init normalization
     result = _get_db_path(config)
-    # Should use the fallback (src/benchmarks/.. = src/) not empty string
-    assert "runtime" in result
-    assert result.endswith("benchmarks.db")
+    assert result.endswith(os.path.join("runtime", "benchmarks.db"))
 
 
 def test_get_db_path_handles_exception():

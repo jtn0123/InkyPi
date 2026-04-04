@@ -230,5 +230,5 @@ def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_confi
     from display.mock_display import MockDisplay
 
     display = MockDisplay(device_config_dev)
-    assert "runtime" in display.output_dir
-    assert display.output_dir.endswith("mock_display_output")
+    assert os.path.basename(display.output_dir) == "mock_display_output"
+    assert os.path.basename(os.path.dirname(display.output_dir)) == "runtime"
