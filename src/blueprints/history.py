@@ -156,7 +156,7 @@ def _validate_and_resolve_history_file(history_dir, filename):
         safe_path = _resolve_history_path(history_dir, filename)
     except ValueError:
         return None, json_error(_ERR_INVALID_FILENAME, status=400)
-    if not os.path.exists(safe_path):
+    if not os.path.isfile(safe_path):
         return None, json_error("File not found", status=404)
     return safe_path, None
 

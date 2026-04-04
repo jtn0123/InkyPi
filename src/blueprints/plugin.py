@@ -213,15 +213,23 @@ def latest_plugin_image(plugin_id: str):
         return (_ERR_NOT_FOUND, 404)
 
 
-def _cleanup_plugin_resources(device_config, plugin_id, plugin_instance) -> None:
+def _cleanup_plugin_resources(
+    device_config, plugin_id, plugin_instance_name, plugin_settings=None
+) -> None:
     """Clean up cached image and run plugin-specific teardown after instance deletion.
 
     Both cleanup steps are best-effort: failures are logged as warnings but do not
     propagate so the caller's success response is unaffected.
+
+    ``plugin_settings`` should be the deleted instance's settings dict so that
+    plugin-specific cleanup (e.g. image_upload removing uploaded files) can
+    inspect its own configuration.
     """
     # Clean up cached plugin instance image
     try:
-        image_path = device_config.get_plugin_image_path(plugin_id, plugin_instance)
+        image_path = device_config.get_plugin_image_path(
+            plugin_id, plugin_instance_name
+        )
         if image_path and os.path.isfile(image_path):
             os.remove(image_path)
             logger.info("Removed cached image: %s", image_path)
@@ -229,7 +237,7 @@ def _cleanup_plugin_resources(device_config, plugin_id, plugin_instance) -> None
         logger.warning(
             "Could not clean up image for %s/%s",
             _sanitize_log(plugin_id),
-            _sanitize_log(str(plugin_instance)),
+            _sanitize_log(str(plugin_instance_name)),
             exc_info=True,
         )
 
@@ -239,7 +247,7 @@ def _cleanup_plugin_resources(device_config, plugin_id, plugin_instance) -> None
         if plugin_config:
             plugin_obj = get_plugin_instance(plugin_config)
             if plugin_obj and hasattr(plugin_obj, "cleanup"):
-                plugin_obj.cleanup({})
+                plugin_obj.cleanup(plugin_settings or {})
     except Exception:
         logger.warning(
             "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
@@ -272,12 +280,17 @@ def delete_plugin_instance():
         if not playlist:
             return json_error("Playlist not found", status=400)
 
+        existing = playlist.find_plugin(plugin_id, plugin_instance)
+        plugin_settings = dict(existing.settings) if existing else {}
+
         result = playlist.delete_plugin(plugin_id, plugin_instance)
         if not result:
             return json_error("Plugin instance not found", status=400)
 
         device_config.write_config()
-        _cleanup_plugin_resources(device_config, plugin_id, plugin_instance)
+        _cleanup_plugin_resources(
+            device_config, plugin_id, plugin_instance, plugin_settings
+        )
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error(_ERR_INTERNAL, status=500)
