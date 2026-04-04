@@ -1,7 +1,38 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 import model
-from model import Playlist, PlaylistManager, PluginInstance
+from model import Playlist, PlaylistManager, PluginInstance, _sanitize_log_value
+
+
+class TestSanitizeLogValue:
+    """Tests for _sanitize_log_value log-injection helper."""
+
+    def test_strips_newline(self):
+        assert _sanitize_log_value("hello\nworld") == "helloworld"
+
+    def test_strips_carriage_return(self):
+        assert _sanitize_log_value("hello\rworld") == "helloworld"
+
+    def test_strips_tab(self):
+        assert _sanitize_log_value("hello\tworld") == "helloworld"
+
+    def test_strips_null_byte(self):
+        assert _sanitize_log_value("hello\x00world") == "helloworld"
+
+    def test_strips_mixed_control_chars(self):
+        assert _sanitize_log_value("a\r\nb\tc\x00d") == "abcd"
+
+    def test_clean_string_unchanged(self):
+        assert _sanitize_log_value("clean string") == "clean string"
+
+    def test_non_string_converted(self):
+        assert _sanitize_log_value(42) == "42"
+        assert _sanitize_log_value(None) == "None"
+
+    def test_empty_string(self):
+        assert _sanitize_log_value("") == ""
 
 
 def test_refresh_info_to_from_dict_and_datetime():
