@@ -60,3 +60,20 @@ def test_update_status_endpoint(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert "running" in data
+
+
+def test_settings_page_save_button_present(client):
+    """Save button must be present; dirty-checking disables it client-side via JS."""
+    resp = client.get("/settings")
+    assert resp.status_code == 200
+    assert b'id="saveSettingsBtn"' in resp.data
+
+
+def test_settings_page_image_sliders_present(client):
+    """Image Processing sliders (saturation, contrast, sharpness, brightness) must render."""
+    resp = client.get("/settings")
+    assert resp.status_code == 200
+    for slider_name in ("saturation", "contrast", "sharpness", "brightness"):
+        assert (
+            slider_name.encode() in resp.data
+        ), f"Slider '{slider_name}' missing from settings page"
