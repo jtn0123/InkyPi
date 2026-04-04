@@ -11,6 +11,10 @@ from utils.http_utils import json_error, json_internal_error, json_success
 logger = logging.getLogger(__name__)
 apikeys_bp = Blueprint("apikeys", __name__)
 
+# Sonar S1192 — readable alternatives to chr() escape sequences
+_BACKSLASH = "\\"
+_DOUBLE_QUOTE = '"'
+
 
 # Path to .env file
 def get_env_path():
@@ -35,6 +39,66 @@ def parse_env_file(filepath):
         return []
 
 
+def _has_invalid_control_chars(value: str) -> bool:
+    """Return True if *value* contains control characters that are not safe in .env files."""
+    return any(
+        (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r") for ch in value
+    )
+
+
+def _validate_api_key_entry(entry, existing_values: dict):
+    """Validate a single API key entry dict and resolve its value.
+
+    Returns ``(key, value, None)`` on success, or ``(None, None, error_response)``
+    when validation fails.  Empty keys are returned as ``("", "", None)`` to signal
+    "skip this entry" without an error.
+    """
+    if not isinstance(entry, dict):
+        return None, None, json_error("Each entry must be an object", status=400)
+
+    raw_key = entry.get("key", "")
+    if not isinstance(raw_key, str):
+        return None, None, json_error("Entry key must be a string", status=400)
+    key = raw_key.strip()
+
+    keep_existing = entry.get("keepExisting", False)
+    if not isinstance(keep_existing, bool):
+        return (
+            None,
+            None,
+            json_error(
+                f"keepExisting for key {key or raw_key!r} must be a boolean", status=400
+            ),
+        )
+
+    if not key:
+        return "", "", None
+
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+        return None, None, json_error(f"Invalid key format: {key}", status=400)
+
+    if keep_existing:
+        value = existing_values.get(key) or ""
+    else:
+        raw_value = entry.get("value", "")
+        if not isinstance(raw_value, str):
+            return (
+                None,
+                None,
+                json_error(f"Value for key {key} must be a string", status=400),
+            )
+        value = raw_value.strip()
+
+    if _has_invalid_control_chars(value):
+        return (
+            None,
+            None,
+            json_error(f"Invalid characters in value for key: {key}", status=400),
+        )
+
+    return key, value, None
+
+
 def write_env_file(filepath, entries):
     """Write entries to .env file atomically via tempfile + os.replace."""
     try:
@@ -45,16 +109,13 @@ def write_env_file(filepath, entries):
                 f.write("# InkyPi API Keys and Secrets\n")
                 f.write("# Managed via web interface\n\n")
                 for key, value in entries:
-                    if any(
-                        (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r")
-                        for ch in value
-                    ):
+                    if _has_invalid_control_chars(value):
                         raise ValueError(
                             f"Invalid control character in value for key: {key}"
                         )
                     # Quote values with spaces or special characters
-                    if " " in value or '"' in value or "'" in value:
-                        value = f'"{value.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))}"'
+                    if " " in value or _DOUBLE_QUOTE in value or "'" in value:
+                        value = f'"{value.replace(_BACKSLASH, _BACKSLASH * 2).replace(_DOUBLE_QUOTE, _BACKSLASH + _DOUBLE_QUOTE)}"'
                     f.write(f"{key}={value}\n")
                 f.flush()
                 os.fsync(f.fileno())
@@ -126,46 +187,11 @@ def save_apikeys():
         # Validate and process entries
         valid_entries = []
         for entry in entries:
-            if not isinstance(entry, dict):
-                return json_error("Each entry must be an object", status=400)
-
-            raw_key = entry.get("key", "")
-            if not isinstance(raw_key, str):
-                return json_error("Entry key must be a string", status=400)
-            key = raw_key.strip()
-            keep_existing = entry.get("keepExisting", False)
-            if not isinstance(keep_existing, bool):
-                return json_error(
-                    f"keepExisting for key {key or raw_key!r} must be a boolean",
-                    status=400,
-                )
-
+            key, value, err = _validate_api_key_entry(entry, existing_values)
+            if err is not None:
+                return err
             if not key:
                 continue
-
-            # Validate key format
-            if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
-                return json_error(f"Invalid key format: {key}", status=400)
-
-            if keep_existing:
-                # Use existing value from .env file
-                value = existing_values.get(key) or ""
-            else:
-                # Use provided value
-                raw_value = entry.get("value", "")
-                if not isinstance(raw_value, str):
-                    return json_error(
-                        f"Value for key {key} must be a string", status=400
-                    )
-                value = raw_value.strip()
-            if any(
-                (ord(ch) < 32 and ch not in ("\t",)) or ch in ("\n", "\r")
-                for ch in value
-            ):
-                return json_error(
-                    f"Invalid characters in value for key: {key}", status=400
-                )
-
             valid_entries.append((key, value))
 
         if write_env_file(env_path, valid_entries):
