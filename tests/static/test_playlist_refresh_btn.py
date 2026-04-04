@@ -42,17 +42,24 @@ class TestRefreshSettingsBtnTemplate:
 
     def test_html_btn_has_required_data_attributes(self):
         html_text = PLAYLIST_HTML.read_text()
+        btn_pattern = re.search(
+            r'<button[^>]*class="[^"]*refresh-settings-btn[^"]*"[^>]*>',
+            html_text,
+            re.DOTALL,
+        )
+        assert btn_pattern, (
+            "playlist.html must contain a button with refresh-settings-btn class"
+        )
+        btn_match = btn_pattern.group(0)
         for attr in (
             "data-playlist",
             "data-plugin-id",
             "data-instance",
             "data-refresh",
         ):
-            assert re.search(
-                rf'class="[^"]*refresh-settings-btn[^"]*"[^>]*{attr}=',
-                html_text,
-                re.DOTALL,
-            ), f"refresh-settings-btn must have {attr} attribute"
+            assert attr in btn_match, (
+                f"refresh-settings-btn must have {attr} attribute"
+            )
 
     def test_html_has_refresh_modal(self):
         html_text = PLAYLIST_HTML.read_text()
