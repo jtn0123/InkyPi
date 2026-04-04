@@ -12,16 +12,16 @@ from utils.time_utils import now_device_tz
 logger = logging.getLogger(__name__)
 
 # Try to import hardware displays, but don't fail if they're not available
+InkyDisplay = None
 try:
     from display.inky_display import InkyDisplay
 except ImportError:
-    InkyDisplay = None
     logger.info("Inky display not available, hardware support disabled")
 
+WaveshareDisplay = None
 try:
     from display.waveshare_display import WaveshareDisplay
 except ImportError:
-    WaveshareDisplay = None
     logger.info("Waveshare display not available, hardware support disabled")
 
 

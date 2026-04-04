@@ -4,6 +4,13 @@ from datetime import UTC, datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_log_value(value: object) -> str:
+    """Sanitize a value for safe inclusion in log messages."""
+    text = str(value) if not isinstance(value, str) else value
+    # Strip control characters that could enable log injection
+    return text.translate(str.maketrans("", "", "\r\n\t\x00"))
+
+
 class RefreshInfo:
     """Keeps track of refresh metadata.
 
@@ -180,7 +187,9 @@ class PlaylistManager:
             if playlist.add_plugin(plugin_data):
                 return True
         else:
-            logger.warning(f"Playlist '{playlist_name}' not found.")
+            logger.warning(
+                "Playlist '%s' not found.", _sanitize_log_value(playlist_name)
+            )
         return False
 
     def add_playlist(self, name, start_time=None, end_time=None):
@@ -200,7 +209,7 @@ class PlaylistManager:
             playlist.start_time = start_time
             playlist.end_time = end_time
             return True
-        logger.warning("Playlist %r not found.", old_name)
+        logger.warning("Playlist '%s' not found.", _sanitize_log_value(old_name))
         return False
 
     def delete_playlist(self, name):
@@ -284,9 +293,9 @@ class Playlist:
         """Add a new plugin instance to the playlist."""
         if self.find_plugin(plugin_data["plugin_id"], plugin_data["name"]):
             logger.warning(
-                "Plugin %r with instance %r already exists.",
-                plugin_data.get("plugin_id"),
-                plugin_data.get("name"),
+                "Plugin '%s' with instance '%s' already exists.",
+                _sanitize_log_value(plugin_data.get("plugin_id")),
+                _sanitize_log_value(plugin_data.get("name")),
             )
             return False
         self.plugins.append(PluginInstance.from_dict(plugin_data))
@@ -298,7 +307,11 @@ class Playlist:
         if plugin:
             plugin.update(updated_data)
             return True
-        logger.warning("Plugin %r with name %r not found.", plugin_id, instance_name)
+        logger.warning(
+            "Plugin '%s' with name '%s' not found.",
+            _sanitize_log_value(plugin_id),
+            _sanitize_log_value(instance_name),
+        )
         return False
 
     def delete_plugin(self, plugin_id, name):
@@ -309,7 +322,11 @@ class Playlist:
         ]
 
         if len(self.plugins) == initial_count:
-            logger.warning("Plugin %r with instance %r not found.", plugin_id, name)
+            logger.warning(
+                "Plugin '%s' with instance '%s' not found.",
+                _sanitize_log_value(plugin_id),
+                _sanitize_log_value(name),
+            )
             return False
         return True
 
@@ -535,8 +552,8 @@ class PluginInstance:
             except (ValueError, TypeError):
                 logger.warning(
                     "Malformed scheduled time '%s' for plugin '%s'; skipping scheduled check",
-                    scheduled_time_str,
-                    self.name,
+                    _sanitize_log_value(scheduled_time_str),
+                    _sanitize_log_value(self.name),
                 )
                 return False
 
@@ -580,8 +597,8 @@ class PluginInstance:
                 except (ValueError, TypeError):
                     logger.warning(
                         "Malformed snooze_until value '%s' for plugin '%s'; treating as eligible",
-                        self.snooze_until,
-                        self.name,
+                        _sanitize_log_value(self.snooze_until),
+                        _sanitize_log_value(self.name),
                     )
 
             return not (
@@ -590,7 +607,7 @@ class PluginInstance:
         except Exception:
             logger.warning(
                 "Unexpected error in is_show_eligible for plugin '%s'; treating as eligible",
-                self.name,
+                _sanitize_log_value(self.name),
                 exc_info=True,
             )
             return True

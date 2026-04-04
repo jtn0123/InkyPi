@@ -1,7 +1,62 @@
 from datetime import UTC, datetime, timedelta
 
 import model
-from model import Playlist, PlaylistManager, PluginInstance
+from model import Playlist, PlaylistManager, PluginInstance, _sanitize_log_value
+
+
+class TestSanitizeLogValue:
+    """Tests for _sanitize_log_value log-injection helper."""
+
+    def test_strips_newline(self):
+        assert _sanitize_log_value("hello\nworld") == "helloworld"
+
+    def test_strips_carriage_return(self):
+        assert _sanitize_log_value("hello\rworld") == "helloworld"
+
+    def test_strips_tab(self):
+        assert _sanitize_log_value("hello\tworld") == "helloworld"
+
+    def test_strips_null_byte(self):
+        assert _sanitize_log_value("hello\x00world") == "helloworld"
+
+    def test_strips_mixed_control_chars(self):
+        assert _sanitize_log_value("a\r\nb\tc\x00d") == "abcd"
+
+    def test_clean_string_unchanged(self):
+        assert _sanitize_log_value("clean string") == "clean string"
+
+    def test_non_string_converted(self):
+        assert _sanitize_log_value(42) == "42"
+        assert _sanitize_log_value(None) == "None"
+
+    def test_empty_string(self):
+        assert _sanitize_log_value("") == ""
+
+
+def test_add_plugin_to_nonexistent_playlist_warns(caplog):
+    """Cover the sanitized warning path when playlist doesn't exist."""
+    pm = PlaylistManager()
+    bad_name = "no_such\nplaylist\t\x00"
+    with caplog.at_level("WARNING", logger="model"):
+        result = pm.add_plugin_to_playlist(
+            bad_name, {"plugin_id": "test", "name": "inst"}
+        )
+    assert result is False
+    assert len(caplog.records) == 1
+    assert "no_suchplaylist" in caplog.records[0].message
+    assert "\n" not in caplog.records[0].message
+
+
+def test_update_nonexistent_playlist_warns(caplog):
+    """Cover the sanitized warning path in update_playlist."""
+    pm = PlaylistManager()
+    bad_name = "no_such\nplaylist"
+    with caplog.at_level("WARNING", logger="model"):
+        result = pm.update_playlist(bad_name, "new_name", "08:00", "20:00")
+    assert result is False
+    assert len(caplog.records) == 1
+    assert "no_suchplaylist" in caplog.records[0].message
+    assert "\n" not in caplog.records[0].message
 
 
 def test_refresh_info_to_from_dict_and_datetime():
