@@ -187,7 +187,9 @@ class PlaylistManager:
             if playlist.add_plugin(plugin_data):
                 return True
         else:
-            logger.warning(f"Playlist '{playlist_name}' not found.")
+            logger.warning(
+                "Playlist '%s' not found.", _sanitize_log_value(playlist_name)
+            )
         return False
 
     def add_playlist(self, name, start_time=None, end_time=None):
@@ -605,7 +607,7 @@ class PluginInstance:
         except Exception:
             logger.warning(
                 "Unexpected error in is_show_eligible for plugin '%s'; treating as eligible",
-                self.name,
+                _sanitize_log_value(self.name),
                 exc_info=True,
             )
             return True
