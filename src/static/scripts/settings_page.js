@@ -1,4 +1,28 @@
 (function () {
+  function showCopyFeedback(btn, success) {
+    if (!btn) return;
+    const original = btn.textContent;
+    btn.textContent = success ? "Copied!" : "Copy failed";
+    setTimeout(function() { btn.textContent = original; }, 1500);
+  }
+
+  function copyViaExecCommand(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch (e) {
+      console.warn("execCommand copy not supported:", e);
+    }
+    ta.remove();
+    return ok;
+  }
+
   function createSettingsPage(config) {
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -245,28 +269,6 @@
           btn.textContent = "Refresh";
         }
       }
-    }
-
-    function showCopyFeedback(btn, success) {
-      if (!btn) return;
-      const original = btn.textContent;
-      btn.textContent = success ? "Copied!" : "Copy failed";
-      setTimeout(function() { btn.textContent = original; }, 1500);
-    }
-
-    function copyViaExecCommand(text) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      let ok = false;
-      try {
-        ok = document.execCommand("copy"); // eslint-disable-line -- fallback for HTTP
-      } catch (_e) { /* execCommand not supported */ }
-      ta.remove();
-      return ok;
     }
 
     function copyLogsToClipboard() {
