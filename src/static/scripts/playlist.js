@@ -430,8 +430,8 @@
         document.getElementById("modalTitle").textContent = "New Playlist";
         document.getElementById("playlist_name").value = "";
         document.getElementById("editingPlaylistName").value = "";
-        document.getElementById("start_time").value = "00:00";
-        document.getElementById("end_time").value = "24:00";
+        document.getElementById("start_time").value = "09:00";
+        document.getElementById("end_time").value = "17:00";
         const cycleInput = document.getElementById('cycle_minutes');
         if (cycleInput) cycleInput.value = "";
         if (modal) modal.dataset.mode = "create";
