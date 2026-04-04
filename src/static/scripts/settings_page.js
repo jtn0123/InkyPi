@@ -23,6 +23,32 @@
     return ok;
   }
 
+  function getFormSnapshot(form) {
+    const target = form || document.querySelector(".settings-form");
+    if (!target) return {};
+    const snap = {};
+    target.querySelectorAll("input, select, textarea").forEach(function (el) {
+      const key = el.name || el.id;
+      if (!key) return;
+      snap[key] = el.type === "checkbox" ? el.checked : el.value;
+    });
+    return snap;
+  }
+
+  function restoreFormFromSnapshot(form, snapshot) {
+    if (!form || !snapshot) return;
+    form.querySelectorAll("input, select, textarea").forEach(function (el) {
+      const key = el.name || el.id;
+      if (!key || !(key in snapshot)) return;
+      if (el.type === "checkbox") {
+        el.checked = snapshot[key];
+      } else {
+        el.value = snapshot[key];
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
   function createSettingsPage(config) {
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -51,28 +77,50 @@
       }
     }
 
-    async function handleAction() {
-      const form = document.querySelector(".settings-form");
+    // Dirty-state tracking for the Save button
+    let _formSnapshot = null;
+
+    function checkDirty() {
       const saveBtn = document.getElementById("saveSettingsBtn");
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
-      const formData = new FormData(form);
+      if (!saveBtn || !_formSnapshot) return;
+      const current = getFormSnapshot();
+      let dirty = false;
+      const allKeys = new Set([...Object.keys(_formSnapshot), ...Object.keys(current)]);
+      for (const key of allKeys) {
+        if (_formSnapshot[key] !== current[key]) { dirty = true; break; }
+      }
+      saveBtn.disabled = !dirty;
+    }
+
+    async function appendGeoData(formData) {
+      if (!state.attachGeo || !navigator.geolocation) return;
       try {
-        if (state.attachGeo && navigator.geolocation) {
-          const pos = await new Promise((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              maximumAge: 60000,
-              timeout: 4000,
-            })
-          );
-          if (pos && pos.coords) {
-            formData.set("deviceLat", String(pos.coords.latitude));
-            formData.set("deviceLon", String(pos.coords.longitude));
-          }
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 60000,
+            timeout: 4000,
+          })
+        );
+        if (pos?.coords) {
+          formData.set("deviceLat", String(pos.coords.latitude));
+          formData.set("deviceLon", String(pos.coords.longitude));
         }
       } catch (e) {
         console.warn("Geolocation unavailable:", e.message || e);
       }
+    }
+
+    async function handleAction() {
+      const form = document.querySelector(".settings-form");
+      const saveBtn = document.getElementById("saveSettingsBtn");
+      if (saveBtn?.disabled) {
+        showResponseModal("success", "No changes to save.");
+        return;
+      }
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+      const formData = new FormData(form);
+      await appendGeoData(formData);
 
       try {
         const response = await fetch(config.saveSettingsUrl, {
@@ -81,18 +129,24 @@
         });
         const result = await response.json();
         if (response.ok) {
+          _formSnapshot = getFormSnapshot(form);
+          if (saveBtn) saveBtn.disabled = true;
           showResponseModal("success", `Success! ${result.message}`);
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
-          form.reset();
+          restoreFormFromSnapshot(form, _formSnapshot);
         }
       } catch (error) {
+        console.error("Settings save failed:", error);
         showResponseModal(
           "failure",
           "An error occurred while processing your request. Please try again."
         );
+        checkDirty();
       } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+        if (saveBtn?.textContent === "Saving\u2026") {
+          saveBtn.textContent = "Save";
+        }
       }
     }
 
@@ -351,7 +405,10 @@
       const notesBody = document.getElementById("releaseNotesBody");
       if (badge) { badge.textContent = "Checking..."; badge.className = "status-chip"; }
       try {
-        const resp = await fetch(config.versionUrl, { cache: "no-store" });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(config.versionUrl, { cache: "no-store", signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await resp.json();
         if (latestEl) latestEl.textContent = data.latest || "—";
         if (data.update_available) {
@@ -745,7 +802,18 @@
       document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
         button.addEventListener("click", () => ui.toggleCollapsible && ui.toggleCollapsible(button));
       });
-      document.getElementById("saveSettingsBtn")?.addEventListener("click", handleAction);
+
+      // Dirty-state: snapshot initial form values and disable Save until something changes
+      const saveBtn = document.getElementById("saveSettingsBtn");
+      _formSnapshot = getFormSnapshot();
+      if (saveBtn) saveBtn.disabled = true;
+      const settingsForm = document.querySelector(".settings-form");
+      if (settingsForm) {
+        settingsForm.addEventListener("input", checkDirty);
+        settingsForm.addEventListener("change", checkDirty);
+      }
+
+      saveBtn?.addEventListener("click", handleAction);
       document.getElementById("exportConfigBtn")?.addEventListener("click", exportConfig);
       document.getElementById("importConfigBtn")?.addEventListener("click", importConfig);
       const importFileInput = document.getElementById("importFile");

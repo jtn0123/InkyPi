@@ -496,7 +496,7 @@ def _check_latest_version() -> str | None:
     try:
         resp = http_get(
             f"https://api.github.com/repos/{_GITHUB_REPO}/releases/latest",
-            timeout=10,
+            timeout=5,
             headers={"Accept": "application/vnd.github.v3+json"},
             use_cache=False,
         )

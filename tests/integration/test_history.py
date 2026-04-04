@@ -641,6 +641,22 @@ def test_list_history_images_no_limit_returns_all(device_config_dev):
     assert len(images) == 7
 
 
+def test_history_action_buttons_have_aria_labels(client, device_config_dev):
+    """JTN-202: action buttons include aria-label with filename for assistive tech."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20250101_060000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert f'aria-label="Display {fname}"' in body
+    assert f'aria-label="Download {fname}"' in body
+    assert f'aria-label="Delete {fname}"' in body
+
+
 def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkeypatch):
     """Only `limit` number of sidecar JSON files are read, not all."""
     import json as _json

@@ -1,6 +1,151 @@
 # CHANGELOG
 
 
+## v0.4.13 (2026-04-04)
+
+### Bug Fixes
+
+- Address Sonar issues and CodeRabbit feedback for dirty-state tracking
+  ([`296e195`](https://github.com/jtn0123/InkyPi/commit/296e195486a8609fcd7ae3d0f2ec04b0a79c5ce5))
+
+- Extract appendGeoData to reduce handleAction cognitive complexity - Accept form parameter in
+  getFormSnapshot to satisfy outer-scope rule - Use optional chaining (saveBtn?.disabled,
+  saveBtn?.textContent) - Replace form.reset() with restoreFormFromSnapshot on save failure - Add
+  sonar.qualitygate.wait=true to enforce quality gate in CI
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Disable Save until form is dirty and reset after successful save (JTN-204)
+  ([`e37b071`](https://github.com/jtn0123/InkyPi/commit/e37b0715ef1f6bf33c6d3b5122f1cf3f95cdb433))
+
+Track a form snapshot on init so the Settings Save button starts disabled and only enables when a
+  value actually changes. After a successful save the snapshot resets and the button is disabled
+  again, giving clear feedback that nothing further needs saving. Add integration tests confirming
+  the Save button and Image Processing sliders are present in the rendered page.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Move helper functions to outer scope and handle catch for Sonar
+  ([`eb67fc4`](https://github.com/jtn0123/InkyPi/commit/eb67fc48fd7e6a9265950eff39f0f6ad96e47e85))
+
+- Move getFormSnapshot and restoreFormFromSnapshot to IIFE level (S7721) - Log error in catch block
+  instead of discarding (S2486)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.4.12 (2026-04-04)
+
+### Bug Fixes
+
+- **a11y**: Add aria-labels with filenames/key names to history and API key rows (JTN-202)
+  ([`1bf0f67`](https://github.com/jtn0123/InkyPi/commit/1bf0f67d42ea6d9edfbc9ba9dc959afe99d0d08f))
+
+History action buttons (Display, Download, Delete) now include aria-label="<action> <filename>" so
+  screen readers can distinguish each row. API keys list-view delete button and inputs now include
+  the key name in their aria-labels; card-view delete button includes the provider label.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
+## v0.4.11 (2026-04-04)
+
+### Bug Fixes
+
+- Apply log sanitization consistently across all model.py warning paths
+  ([`97f07fe`](https://github.com/jtn0123/InkyPi/commit/97f07fe0d1f9848681f9686330eda251e8e69405))
+
+Address CodeRabbit review: extend _sanitize_log_value() usage to all remaining user-controlled log
+  parameters (update_plugin, delete_plugin, scheduled time, snooze_until) for complete log-injection
+  mitigation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove unused pytest import flagged by ruff
+  ([`2c030b9`](https://github.com/jtn0123/InkyPi/commit/2c030b9ddf75d450a1c420d05fd319441f84f87b))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Resolve Sonar S2583 and S5145 in display_manager.py and model.py
+  ([`01d07f5`](https://github.com/jtn0123/InkyPi/commit/01d07f5d264f1bd866fe6817646581a1db1a1b9d))
+
+Initialize InkyDisplay and WaveshareDisplay to None before try/except import blocks so Sonar flow
+  analysis correctly recognizes the variables may remain None (S2583). Add _sanitize_log_value
+  helper in model.py to strip control characters from user-controlled data before logging (S5145).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Sanitize remaining user-controlled log values in model.py
+  ([`0b3bb30`](https://github.com/jtn0123/InkyPi/commit/0b3bb3022042414312716e0b2dce5278132b5b11))
+
+Address second CodeRabbit review: apply _sanitize_log_value() to add_plugin_to_playlist
+  playlist_name and is_show_eligible self.name for complete log-injection coverage.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add coverage for _sanitize_log_value helper to meet Sonar gate
+  ([`0e991e5`](https://github.com/jtn0123/InkyPi/commit/0e991e5ac3f41736faa8038a44e95b9380a4b672))
+
+Add 8 tests covering control char stripping, clean passthrough, non-string conversion, and empty
+  input to bring new code coverage above the 80% quality gate threshold.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Assert sanitized log content per CodeRabbit review
+  ([`7f182df`](https://github.com/jtn0123/InkyPi/commit/7f182dfe83437485442e95991e764576e0fbf8d7))
+
+Use caplog to verify warning messages are emitted with control characters stripped, not just that
+  the return value is False.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Cover add_plugin_to_nonexistent_playlist warning path
+  ([`6ce9878`](https://github.com/jtn0123/InkyPi/commit/6ce987855d20b6bda82d5c63853dc4471abda94b))
+
+Exercises the sanitized log line at model.py:190 to bring new code coverage above the 80% Sonar
+  quality gate.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Cover update_playlist warning path for Sonar 80% gate
+  ([`457ecc9`](https://github.com/jtn0123/InkyPi/commit/457ecc992493f9573594080ea4149c611e67f818))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.4.10 (2026-04-04)
+
+### Bug Fixes
+
+- Prevent Settings page thread starvation (JTN-195, JTN-196)
+  ([`aa50e39`](https://github.com/jtn0123/InkyPi/commit/aa50e393c2075609781eaa1c2c45d653a7b00f9b))
+
+The Settings page suffered from thread starvation under Waitress's 4-thread pool: initProgressSSE()
+  holds one thread, then checkForUpdates() fires a fetch to /api/version whose backend
+  _check_latest_version() makes a 10-second GitHub API call—blocking a second thread. With other
+  requests competing, all threads get exhausted, causing the "Manage API Keys" link to hang
+  (JTN-195) and the version check to show "CHECKING..." forever (JTN-196).
+
+Changes: - Add 8-second AbortController timeout to the client-side version check fetch so it
+  resolves to "Check failed" instead of hanging indefinitely - Reduce backend GitHub API timeout
+  from 10s to 5s to free threads faster
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Set inert attribute on background elements when lightbox opens
+  ([`8bf8f8e`](https://github.com/jtn0123/InkyPi/commit/8bf8f8ed4f2586c0006ffbb81c81112c623bc5a3))
+
+When the lightbox modal opens, background elements remained interactable despite aria-modal and
+  focus trap. This adds the inert attribute to all sibling elements of the modal on open and removes
+  it on close, ensuring screen readers and keyboard navigation cannot reach background content.
+
+Fixes JTN-203
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.9 (2026-04-04)
 
 ### Bug Fixes
