@@ -270,9 +270,13 @@
             <div class="form-help workflow-help">
                 <div id="update-now-help" class="sr-only">Generate and display image immediately with current settings</div>
                 <div id="save-settings-help" class="sr-only">Save settings for future use without generating image</div>
+                {% if plugin_instance %}
                 <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
+                <p>Use <strong>Update Instance</strong> to save and refresh the displayed image.</p>
+                {% else %}
                 <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist</div>
                 <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.</p>
+                {% endif %}
             </div>
         </div>
         </aside>
