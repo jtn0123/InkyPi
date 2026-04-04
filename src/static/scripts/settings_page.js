@@ -247,39 +247,41 @@
       }
     }
 
+    function showCopyFeedback(btn, success) {
+      if (!btn) return;
+      const original = btn.textContent;
+      btn.textContent = success ? "Copied!" : "Copy failed";
+      setTimeout(function() { btn.textContent = original; }, 1500);
+    }
+
+    function copyViaExecCommand(text) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try {
+        ok = document.execCommand("copy"); // eslint-disable-line -- fallback for HTTP
+      } catch (_e) { /* execCommand not supported */ }
+      ta.remove();
+      return ok;
+    }
+
     function copyLogsToClipboard() {
-      var viewer = document.getElementById("logsViewer");
-      var copyBtn = document.getElementById("logsCopyBtn");
+      const viewer = document.getElementById("logsViewer");
+      const copyBtn = document.getElementById("logsCopyBtn");
       if (!viewer) return;
-      var text = viewer.textContent || "";
+      const text = viewer.textContent || "";
 
-      function showFeedback(success) {
-        if (!copyBtn) return;
-        var original = copyBtn.textContent;
-        copyBtn.textContent = success ? "Copied!" : "Copy failed";
-        setTimeout(function() { copyBtn.textContent = original; }, 1500);
-      }
-
-      if (navigator.clipboard && window.isSecureContext) {
+      if (navigator.clipboard && globalThis.isSecureContext) {
         navigator.clipboard.writeText(text).then(
-          function() { showFeedback(true); },
-          function() { showFeedback(false); }
+          function() { showCopyFeedback(copyBtn, true); },
+          function() { showCopyFeedback(copyBtn, false); }
         );
       } else {
-        // Fallback for HTTP contexts
-        var ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-          var ok = document.execCommand("copy");
-          showFeedback(ok);
-        } catch (e) {
-          showFeedback(false);
-        }
-        document.body.removeChild(ta);
+        showCopyFeedback(copyBtn, copyViaExecCommand(text));
       }
     }
 
