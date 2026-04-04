@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.4.2 (2026-04-04)
+
+### Performance Improvements
+
+- Lazy sidecar loading and early-exit in history/plugin lookups (JTN-97, JTN-91)
+  ([`8d5290b`](https://github.com/jtn0123/InkyPi/commit/8d5290bf8264dbc3954cfa98bb63d14818990d37))
+
+Push pagination offset/limit into _list_history_images so expensive stat + sidecar JSON reads only
+  happen for the requested page, not all files. In plugin.py, sort .json files by filename
+  descending and return on first match in latest_plugin_image, _find_history_image, and
+  _find_latest_plugin_refresh_time for O(1) reads in the common case.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.1 (2026-04-03)
 
 ### Bug Fixes
