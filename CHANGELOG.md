@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.4.10 (2026-04-04)
+
+### Bug Fixes
+
+- Prevent Settings page thread starvation (JTN-195, JTN-196)
+  ([`aa50e39`](https://github.com/jtn0123/InkyPi/commit/aa50e393c2075609781eaa1c2c45d653a7b00f9b))
+
+The Settings page suffered from thread starvation under Waitress's 4-thread pool: initProgressSSE()
+  holds one thread, then checkForUpdates() fires a fetch to /api/version whose backend
+  _check_latest_version() makes a 10-second GitHub API call—blocking a second thread. With other
+  requests competing, all threads get exhausted, causing the "Manage API Keys" link to hang
+  (JTN-195) and the version check to show "CHECKING..." forever (JTN-196).
+
+Changes: - Add 8-second AbortController timeout to the client-side version check fetch so it
+  resolves to "Check failed" instead of hanging indefinitely - Reduce backend GitHub API timeout
+  from 10s to 5s to free threads faster
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Set inert attribute on background elements when lightbox opens
+  ([`8bf8f8e`](https://github.com/jtn0123/InkyPi/commit/8bf8f8ed4f2586c0006ffbb81c81112c623bc5a3))
+
+When the lightbox modal opens, background elements remained interactable despite aria-modal and
+  focus trap. This adds the inert attribute to all sibling elements of the modal on open and removes
+  it on close, ensuring screen readers and keyboard navigation cannot reach background content.
+
+Fixes JTN-203
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.9 (2026-04-04)
 
 ### Bug Fixes
