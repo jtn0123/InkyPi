@@ -30,16 +30,30 @@
     // Dirty-state tracking for the Save button
     let _formSnapshot = null;
 
-    function getFormSnapshot() {
-      const form = document.querySelector(".settings-form");
-      if (!form) return {};
+    function getFormSnapshot(form) {
+      const target = form || document.querySelector(".settings-form");
+      if (!target) return {};
       const snap = {};
-      form.querySelectorAll("input, select, textarea").forEach(function (el) {
+      target.querySelectorAll("input, select, textarea").forEach(function (el) {
         const key = el.name || el.id;
         if (!key) return;
         snap[key] = el.type === "checkbox" ? el.checked : el.value;
       });
       return snap;
+    }
+
+    function restoreFormFromSnapshot(form, snapshot) {
+      if (!form || !snapshot) return;
+      form.querySelectorAll("input, select, textarea").forEach(function (el) {
+        const key = el.name || el.id;
+        if (!key || !(key in snapshot)) return;
+        if (el.type === "checkbox") {
+          el.checked = snapshot[key];
+        } else {
+          el.value = snapshot[key];
+        }
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      });
     }
 
     function checkDirty() {
@@ -49,40 +63,40 @@
       let dirty = false;
       const allKeys = new Set([...Object.keys(_formSnapshot), ...Object.keys(current)]);
       for (const key of allKeys) {
-        if (_formSnapshot[key] !== current[key]) {
-          dirty = true;
-          break;
-        }
+        if (_formSnapshot[key] !== current[key]) { dirty = true; break; }
       }
       saveBtn.disabled = !dirty;
+    }
+
+    async function appendGeoData(formData) {
+      if (!state.attachGeo || !navigator.geolocation) return;
+      try {
+        const pos = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 60000,
+            timeout: 4000,
+          })
+        );
+        if (pos?.coords) {
+          formData.set("deviceLat", String(pos.coords.latitude));
+          formData.set("deviceLon", String(pos.coords.longitude));
+        }
+      } catch (e) {
+        console.warn("Geolocation unavailable:", e.message || e);
+      }
     }
 
     async function handleAction() {
       const form = document.querySelector(".settings-form");
       const saveBtn = document.getElementById("saveSettingsBtn");
-      if (saveBtn && saveBtn.disabled) {
+      if (saveBtn?.disabled) {
         showResponseModal("success", "No changes to save.");
         return;
       }
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       const formData = new FormData(form);
-      try {
-        if (state.attachGeo && navigator.geolocation) {
-          const pos = await new Promise((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              maximumAge: 60000,
-              timeout: 4000,
-            })
-          );
-          if (pos && pos.coords) {
-            formData.set("deviceLat", String(pos.coords.latitude));
-            formData.set("deviceLon", String(pos.coords.longitude));
-          }
-        }
-      } catch (e) {
-        console.warn("Geolocation unavailable:", e.message || e);
-      }
+      await appendGeoData(formData);
 
       try {
         const response = await fetch(config.saveSettingsUrl, {
@@ -91,21 +105,21 @@
         });
         const result = await response.json();
         if (response.ok) {
-          _formSnapshot = getFormSnapshot();
+          _formSnapshot = getFormSnapshot(form);
           if (saveBtn) saveBtn.disabled = true;
           showResponseModal("success", `Success! ${result.message}`);
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
-          form.reset();
-          checkDirty();
+          restoreFormFromSnapshot(form, _formSnapshot);
         }
-      } catch (error) {
+      } catch (_error) {
         showResponseModal(
           "failure",
           "An error occurred while processing your request. Please try again."
         );
+        checkDirty();
       } finally {
-        if (saveBtn && saveBtn.textContent === "Saving\u2026") {
+        if (saveBtn?.textContent === "Saving\u2026") {
           saveBtn.textContent = "Save";
         }
       }
