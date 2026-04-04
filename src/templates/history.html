@@ -111,9 +111,9 @@
                         {% endif %}
                     </div>
                     <div class="history-actions">
-                        <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}">Display</button>
-                        <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download>Download</a>
-                        <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}">Delete</button>
+                        <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}" aria-label="Display {{ img.filename }}">Display</button>
+                        <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download aria-label="Download {{ img.filename }}">Download</a>
+                        <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}" aria-label="Delete {{ img.filename }}">Delete</button>
                     </div>
                 </div>
             </div>

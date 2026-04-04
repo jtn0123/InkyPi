@@ -19,7 +19,7 @@
     <div class="input-container api-key-actions">
         <input type="password" id="{{ input_id }}" name="{{ key_name }}" placeholder="{{ placeholder }}" class="form-input" value="{{ '••••••••••••••••••••••••••••••••' if masked[key_name] else '' }}">
         {% if masked[key_name] %}<button type="button" class="clear-button" data-api-action="clear-field" data-input-id="{{ input_id }}" aria-label="Clear {{ label }} key">×</button>{% endif %}
-        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}">Delete</button>{% endif %}
+        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}" aria-label="Delete {{ label }} key">Delete</button>{% endif %}
     </div>
 </div>
 {% endmacro %}
