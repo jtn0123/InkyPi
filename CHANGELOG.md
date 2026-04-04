@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.4.7 (2026-04-04)
+
+### Bug Fixes
+
+- Remove orphaned vendor/icons/makin_things submodule index entry
+  ([`16d6d4b`](https://github.com/jtn0123/InkyPi/commit/16d6d4bf6bd3a235249f1610ae9e022452146ed3))
+
+The git index contained a submodule entry for vendor/icons/makin_things with no corresponding URL in
+  .gitmodules, causing git submodule commands to fail with "no submodule mapping found" errors.
+
+Fixes JTN-201
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Polish README for fork — expand plugins, add badges, trim verbose sections
+  ([`cd059cb`](https://github.com/jtn0123/InkyPi/commit/cd059cb7874d109723e394703ee794ace6a40388))
+
+- Re-point repo links to jtn0123/InkyPi - Add CI, SonarCloud, Python, and license badges - Expand
+  plugin list from 6 to all 20 in a categorized table - Add Development quick-start section - Add
+  Documentation links section - Trim Testing section (detail moved to docs/testing.md) - Remove
+  upstream-only sections (Sponsoring, Roadmap/Trello, Acknowledgements, wiki) - Fix typos
+  (aesthetic, LEDs, uninstall) - Add single-line attribution to original repo
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.6 (2026-04-04)
 
 ### Bug Fixes
