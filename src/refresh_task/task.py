@@ -599,6 +599,65 @@ class RefreshTask:
                 "Background refresh task is not running, unable to do a manual update"
             )
 
+    @staticmethod
+    def _timeout_msg(plugin_id: str, timeout_s: float) -> str:
+        """Return a canonical timeout error message string."""
+        return f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+
+    @staticmethod
+    def _cleanup_subprocess(proc, timeout_s: float, plugin_id: str) -> None:
+        """Terminate a subprocess that is still alive after its timeout.
+
+        Attempts graceful termination first, escalates to SIGKILL if needed,
+        and logs a warning if the process becomes a zombie.
+        """
+        proc.terminate()
+        proc.join(timeout=2)
+        if proc.is_alive():
+            proc.kill()
+            proc.join(timeout=2)
+        if proc.is_alive():
+            logger.warning(
+                "plugin_lifecycle: zombie_process | plugin_id=%s pid=%s "
+                "- process did not exit after kill",
+                plugin_id,
+                proc.pid,
+            )
+
+    @staticmethod
+    def _handle_process_result(result_queue, proc, plugin_id: str, attempt: int):
+        """Read and validate the result queue from a finished subprocess.
+
+        Returns ``(image, metadata)`` on success, or ``(None, exception)``
+        on failure.  Raises ``RuntimeError`` directly for unrecoverable exit
+        conditions.
+        """
+        try:
+            payload = result_queue.get_nowait()
+        except queue.Empty:
+            payload = None
+        if not payload:
+            if proc.exitcode == 0:
+                raise RuntimeError(
+                    f"Plugin '{plugin_id}' exited without returning a result"
+                )
+            raise RuntimeError(f"Plugin '{plugin_id}' exited with code {proc.exitcode}")
+        if payload.get("ok"):
+            from PIL import Image
+
+            with Image.open(io.BytesIO(payload["image_bytes"])) as image:
+                result_image = image.copy()
+            logger.info(
+                "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
+                plugin_id,
+                attempt,
+            )
+            return result_image, payload.get("plugin_meta")
+        return None, _remote_exception(
+            str(payload.get("error_type") or "RuntimeError"),
+            str(payload.get("error_message") or "unknown error"),
+        )
+
     def _execute_with_policy(
         self, refresh_action, plugin_config, current_dt: datetime, request_id=None
     ):
@@ -642,53 +701,18 @@ class RefreshTask:
                 proc.start()
                 proc.join(timeout=timeout_s)
                 if proc.is_alive():
-                    proc.terminate()
-                    proc.join(timeout=2)
-                    if proc.is_alive():
-                        proc.kill()
-                        proc.join(timeout=2)
-                    if proc.is_alive():
-                        logger.warning(
-                            "plugin_lifecycle: zombie_process | plugin_id=%s pid=%s "
-                            "- process did not exit after kill",
-                            plugin_id,
-                            proc.pid,
-                        )
-                    last_exc = TimeoutError(
-                        f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
-                    )
+                    self._cleanup_subprocess(proc, timeout_s, plugin_id)
+                    last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
                 else:
-                    try:
-                        payload = result_queue.get_nowait()
-                    except queue.Empty:
-                        payload = None
-                    if not payload:
-                        if proc.exitcode == 0:
-                            raise RuntimeError(
-                                f"Plugin '{plugin_id}' exited without returning a result"
-                            )
-                        raise RuntimeError(
-                            f"Plugin '{plugin_id}' exited with code {proc.exitcode}"
-                        )
-                    if payload.get("ok"):
-                        from PIL import Image
-
-                        with Image.open(io.BytesIO(payload["image_bytes"])) as image:
-                            result_image = image.copy()
-                        logger.info(
-                            "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
-                            plugin_id,
-                            attempt,
-                        )
-                        return result_image, payload.get("plugin_meta")
-                    last_exc = _remote_exception(
-                        str(payload.get("error_type") or "RuntimeError"),
-                        str(payload.get("error_message") or "unknown error"),
+                    result = self._handle_process_result(
+                        result_queue, proc, plugin_id, attempt
                     )
+                    image, exc_or_meta = result
+                    if image is not None:
+                        return image, exc_or_meta
+                    last_exc = exc_or_meta
             except TimeoutError:
-                last_exc = TimeoutError(
-                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
-                )
+                last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
             except Exception as exc:
                 last_exc = exc
             finally:
@@ -702,9 +726,7 @@ class RefreshTask:
                     pass
 
             if isinstance(last_exc, TimeoutError):
-                last_exc = TimeoutError(
-                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
-                )
+                last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
 
             if attempt < attempts:
                 logger.warning(
