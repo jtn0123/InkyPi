@@ -4,6 +4,13 @@ from datetime import UTC, datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_log_value(value: object) -> str:
+    """Sanitize a value for safe inclusion in log messages."""
+    text = str(value) if not isinstance(value, str) else value
+    # Strip control characters that could enable log injection
+    return text.translate(str.maketrans("", "", "\r\n\t\x00"))
+
+
 class RefreshInfo:
     """Keeps track of refresh metadata.
 
@@ -200,7 +207,7 @@ class PlaylistManager:
             playlist.start_time = start_time
             playlist.end_time = end_time
             return True
-        logger.warning("Playlist %r not found.", old_name)
+        logger.warning("Playlist '%s' not found.", _sanitize_log_value(old_name))
         return False
 
     def delete_playlist(self, name):
@@ -284,9 +291,9 @@ class Playlist:
         """Add a new plugin instance to the playlist."""
         if self.find_plugin(plugin_data["plugin_id"], plugin_data["name"]):
             logger.warning(
-                "Plugin %r with instance %r already exists.",
-                plugin_data.get("plugin_id"),
-                plugin_data.get("name"),
+                "Plugin '%s' with instance '%s' already exists.",
+                _sanitize_log_value(plugin_data.get("plugin_id")),
+                _sanitize_log_value(plugin_data.get("name")),
             )
             return False
         self.plugins.append(PluginInstance.from_dict(plugin_data))
