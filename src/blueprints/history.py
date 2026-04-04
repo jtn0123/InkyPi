@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 history_bp = Blueprint("history", __name__)
 
+# Sonar S1192 — duplicate string constants
+_CONFIG_KEY = "DEVICE_CONFIG"
+_ERR_INVALID_FILENAME = "invalid filename"
+_EXT_PNG = ".png"
+_EXT_JSON = ".json"
+
 
 def _timestamp_from_history_filename(filename: str) -> float:
     """Extract an epoch timestamp from display_YYYYMMDD_HHMMSS-style filenames."""
@@ -56,7 +62,7 @@ def _list_history_images(
             f
             for f in os.listdir(history_dir)
             if os.path.isfile(os.path.join(history_dir, f))
-            and f.lower().endswith(".png")
+            and f.lower().endswith(_EXT_PNG)
         ]
     except Exception:
         logger.exception("Failed to list history directory")
@@ -97,7 +103,7 @@ def _list_history_images(
         meta: dict = {}
         try:
             base, _ = os.path.splitext(f)
-            sidecar_path = os.path.join(history_dir, f"{base}.json")
+            sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
             if os.path.exists(sidecar_path):
                 with open(sidecar_path, encoding="utf-8") as fh:
                     meta = json.load(fh) or {}
@@ -106,7 +112,7 @@ def _list_history_images(
             meta = {}
         try:
             # Use device timezone for display
-            device_config = current_app.config.get("DEVICE_CONFIG")
+            device_config = current_app.config.get(_CONFIG_KEY)
             now = (
                 now_device_tz(device_config)
                 if device_config
@@ -135,8 +141,24 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
     base_dir = os.path.abspath(history_dir)
     candidate = os.path.abspath(os.path.join(base_dir, filename))
     if os.path.commonpath([base_dir, candidate]) != base_dir:
-        raise ValueError("invalid filename")
+        raise ValueError(_ERR_INVALID_FILENAME)
     return candidate
+
+
+def _validate_and_resolve_history_file(history_dir, filename):
+    """Validate and resolve a history filename to a safe absolute path.
+
+    Returns ``(safe_path, None)`` on success, or ``(None, error_response)`` when
+    the filename is invalid or the resolved file does not exist.  Callers should
+    check the second element before using the first.
+    """
+    try:
+        safe_path = _resolve_history_path(history_dir, filename)
+    except ValueError:
+        return None, json_error(_ERR_INVALID_FILENAME, status=400)
+    if not os.path.exists(safe_path):
+        return None, json_error("File not found", status=404)
+    return safe_path, None
 
 
 _DEFAULT_PER_PAGE = 24
@@ -144,7 +166,7 @@ _DEFAULT_PER_PAGE = 24
 
 @history_bp.route("/history")
 def history_page():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
 
     # Parse pagination parameters BEFORE listing so we can push them down
@@ -222,18 +244,18 @@ def history_page():
 
 @history_bp.route("/history/image/<path:filename>")
 def history_image(filename: str):
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
         _resolve_history_path(history_dir, filename)
     except ValueError:
-        return json_error("invalid filename", status=400)
+        return json_error(_ERR_INVALID_FILENAME, status=400)
     return send_from_directory(history_dir, filename)
 
 
 @history_bp.route("/history/redisplay", methods=["POST"])
 def history_redisplay():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     display_manager = current_app.config["DISPLAY_MANAGER"]
     history_dir = device_config.history_image_dir
 
@@ -248,13 +270,9 @@ def history_redisplay():
         if not isinstance(filename, str) or not filename.strip():
             return json_error("filename is required", status=400)
 
-        # Prevent path traversal; only allow files within the history dir
-        try:
-            safe_path = _resolve_history_path(history_dir, filename)
-        except ValueError:
-            return json_error("invalid filename", status=400)
-        if not os.path.exists(safe_path):
-            return json_error("file not found", status=404)
+        safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
+        if err is not None:
+            return err
 
         display_manager.display_preprocessed_image(safe_path)
         return json_success("Display updated")
@@ -268,7 +286,7 @@ def history_redisplay():
 
 @history_bp.route("/history/delete", methods=["POST"])
 def history_delete():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
         try:
@@ -280,22 +298,20 @@ def history_delete():
         filename = data.get("filename")
         if not isinstance(filename, str) or not filename.strip():
             return json_error("filename is required", status=400)
-        try:
-            safe_path = _resolve_history_path(history_dir, filename)
-        except ValueError:
-            return json_error("invalid filename", status=400)
-        if not os.path.exists(safe_path):
-            return json_error("File not found", status=404)
+
+        safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
+        if err is not None:
+            return err
 
         os.remove(safe_path)
         # Remove matching sidecar on png/json deletions.
         base, ext = os.path.splitext(safe_path)
-        if ext.lower() == ".png":
-            sidecar = f"{base}.json"
+        if ext.lower() == _EXT_PNG:
+            sidecar = f"{base}{_EXT_JSON}"
             if os.path.exists(sidecar):
                 os.remove(sidecar)
-        elif ext.lower() == ".json":
-            sidecar = f"{base}.png"
+        elif ext.lower() == _EXT_JSON:
+            sidecar = f"{base}{_EXT_PNG}"
             if os.path.exists(sidecar):
                 os.remove(sidecar)
         return json_success("Deleted")
@@ -311,13 +327,13 @@ def history_delete():
 
 @history_bp.route("/history/clear", methods=["POST"])
 def history_clear():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
         count = 0
         for f in os.listdir(history_dir):
             p = os.path.join(history_dir, f)
-            if os.path.isfile(p) and f.lower().endswith((".png", ".json")):
+            if os.path.isfile(p) and f.lower().endswith((_EXT_PNG, _EXT_JSON)):
                 os.remove(p)
                 count += 1
         return json_success(f"Cleared {count} images")
@@ -335,7 +351,7 @@ def history_storage():
 
     Values returned: free_gb, total_gb, used_gb, pct_free
     """
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
         usage = shutil.disk_usage(history_dir)

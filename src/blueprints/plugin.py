@@ -27,6 +27,12 @@ plugin_bp = Blueprint("plugin", __name__)
 
 PLUGINS_DIR = resolve_path("plugins")
 
+# Sonar S1192 — duplicate string constants
+_CONFIG_KEY = "DEVICE_CONFIG"
+_PLUGIN_ID = "plugin_id"
+_ERR_INTERNAL = "An internal error occurred"
+_ERR_NOT_FOUND = "Not Found"
+
 
 def _validate_required_fields(plugin, form_data):
     """Validate required fields from plugin schema against form data.
@@ -87,7 +93,7 @@ def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
 
 @plugin_bp.route("/plugin/<plugin_id>")
 def plugin_page(plugin_id: str):
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     plugin_config = device_config.get_plugin(plugin_id)
@@ -141,7 +147,7 @@ def plugin_page(plugin_id: str):
 
     except Exception as e:  # pragma: no cover - safety net
         logger.exception("EXCEPTION CAUGHT: %s", e)
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
     return render_template(
         "plugin.html",
@@ -177,11 +183,11 @@ def latest_plugin_image(plugin_id: str):
     JSON files are sorted by filename descending (newest first) so the first
     match is the most recent, giving O(1) reads in the common case.
     """
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     try:
         history_dir = str(device_config.history_image_dir)
         if not os.path.isdir(history_dir):
-            return ("Not Found", 404)
+            return (_ERR_NOT_FOUND, 404)
 
         # Pre-filter to .json files and sort newest-first by filename
         json_files = sorted(
@@ -194,22 +200,55 @@ def latest_plugin_image(plugin_id: str):
             try:
                 with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
-                if meta.get("plugin_id") == plugin_id:
+                if meta.get(_PLUGIN_ID) == plugin_id:
                     png_path = os.path.join(history_dir, name.replace(".json", ".png"))
                     if os.path.exists(png_path):
                         return _cacheable_send_file(png_path)
             except Exception:
                 continue
 
-        return ("Not Found", 404)
+        return (_ERR_NOT_FOUND, 404)
 
     except Exception:
-        return ("Not Found", 404)
+        return (_ERR_NOT_FOUND, 404)
+
+
+def _cleanup_plugin_resources(device_config, plugin_id, plugin_instance) -> None:
+    """Clean up cached image and run plugin-specific teardown after instance deletion.
+
+    Both cleanup steps are best-effort: failures are logged as warnings but do not
+    propagate so the caller's success response is unaffected.
+    """
+    # Clean up cached plugin instance image
+    try:
+        image_path = device_config.get_plugin_image_path(plugin_id, plugin_instance)
+        if image_path and os.path.isfile(image_path):
+            os.remove(image_path)
+            logger.info("Removed cached image: %s", image_path)
+    except Exception:
+        logger.warning(
+            "Could not clean up image for %s/%s",
+            _sanitize_log(plugin_id),
+            _sanitize_log(str(plugin_instance)),
+            exc_info=True,
+        )
+
+    # Run plugin-specific cleanup (e.g., image_upload deletes uploaded files)
+    try:
+        plugin_config = device_config.get_plugin(plugin_id)
+        if plugin_config:
+            plugin_obj = get_plugin_instance(plugin_config)
+            if plugin_obj and hasattr(plugin_obj, "cleanup"):
+                plugin_obj.cleanup({})
+    except Exception:
+        logger.warning(
+            "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
+        )
 
 
 @plugin_bp.route("/delete_plugin_instance", methods=["POST", "DELETE"])
 def delete_plugin_instance():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
@@ -217,7 +256,7 @@ def delete_plugin_instance():
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
-    plugin_id = data.get("plugin_id")
+    plugin_id = data.get(_PLUGIN_ID)
     plugin_instance = data.get("plugin_instance")
 
     if (
@@ -238,42 +277,17 @@ def delete_plugin_instance():
             return json_error("Plugin instance not found", status=400)
 
         device_config.write_config()
-
-        # Clean up cached plugin instance image
-        try:
-            image_path = device_config.get_plugin_image_path(plugin_id, plugin_instance)
-            if image_path and os.path.isfile(image_path):
-                os.remove(image_path)
-                logger.info("Removed cached image: %s", image_path)
-        except Exception:
-            logger.warning(
-                "Could not clean up image for %s/%s",
-                _sanitize_log(plugin_id),
-                _sanitize_log(str(plugin_instance)),
-                exc_info=True,
-            )
-
-        # Run plugin-specific cleanup (e.g., image_upload deletes uploaded files)
-        try:
-            plugin_config = device_config.get_plugin(plugin_id)
-            if plugin_config:
-                plugin_obj = get_plugin_instance(plugin_config)
-                if plugin_obj and hasattr(plugin_obj, "cleanup"):
-                    plugin_obj.cleanup({})
-        except Exception:
-            logger.warning(
-                "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
-            )
+        _cleanup_plugin_resources(device_config, plugin_id, plugin_instance)
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: %s", e)
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
     return jsonify({"success": True, "message": "Deleted plugin instance."})
 
 
 @plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
 def update_plugin_instance(instance_name: str):
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     try:
@@ -288,13 +302,13 @@ def update_plugin_instance(instance_name: str):
         plugin_settings = form_data
         plugin_settings.update(handle_request_files(request.files, request.form))
 
-        plugin_id = plugin_settings.pop("plugin_id", None)
+        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             raise APIError(
                 "plugin_id is required",
                 status=422,
                 code="validation_error",
-                details={"field": "plugin_id"},
+                details={"field": _PLUGIN_ID},
             )
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
@@ -319,7 +333,7 @@ def update_plugin_instance(instance_name: str):
     except APIError as e:
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception:
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
     return jsonify(
         {
@@ -331,7 +345,7 @@ def update_plugin_instance(instance_name: str):
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
 def display_plugin_instance():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
 
@@ -340,7 +354,7 @@ def display_plugin_instance():
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
-    plugin_id = data.get("plugin_id")
+    plugin_id = data.get(_PLUGIN_ID)
     plugin_instance_name = data.get("plugin_instance")
 
     try:
@@ -359,27 +373,27 @@ def display_plugin_instance():
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
     except Exception:
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
     return jsonify({"success": True, "message": "Display updated"}), 200
 
 
 @plugin_bp.route("/update_now", methods=["POST"])
 def update_now():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
 
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
-        plugin_id = plugin_settings.pop("plugin_id", None)
+        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             return json_error(
                 "plugin_id is required",
                 status=422,
                 code="validation_error",
-                details={"field": "plugin_id"},
+                details={"field": _PLUGIN_ID},
             )
 
         if refresh_task.running:
@@ -434,26 +448,24 @@ def update_now():
             )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
-        return json_error(
-            "An internal error occurred", status=500, code="internal_error"
-        )
+        return json_error(_ERR_INTERNAL, status=500, code="internal_error")
 
 
 @plugin_bp.route("/save_plugin_settings", methods=["POST"])
 def save_plugin_settings():
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
-        plugin_id = plugin_settings.pop("plugin_id", None)
+        plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             return json_error(
                 "plugin_id is required",
                 status=422,
                 code="validation_error",
-                details={"field": "plugin_id"},
+                details={"field": _PLUGIN_ID},
             )
         return _save_plugin_settings_common(
             plugin_id=plugin_id,
@@ -463,13 +475,13 @@ def save_plugin_settings():
         )
     except Exception as e:
         logger.exception("Error saving plugin settings: %s", e)
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
 
 @plugin_bp.route("/plugin/<string:plugin_id>/save", methods=["POST"])
 def save_plugin_settings_alias(plugin_id: str):
     """Backward-compatible route alias for plugin settings save."""
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     try:
@@ -483,7 +495,7 @@ def save_plugin_settings_alias(plugin_id: str):
         )
     except Exception:
         logger.exception("Error saving plugin settings (alias)")
-        return json_error("An internal error occurred", status=500)
+        return json_error(_ERR_INTERNAL, status=500)
 
 
 def _save_plugin_settings_common(
@@ -518,7 +530,7 @@ def _save_plugin_settings_common(
     else:
         playlist.add_plugin(
             {
-                "plugin_id": plugin_id,
+                _PLUGIN_ID: plugin_id,
                 "refresh": {"interval": 3600},
                 "plugin_settings": plugin_settings,
                 "name": instance_name,
@@ -562,7 +574,7 @@ def _find_history_image(
                 with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
                 if (
-                    meta.get("plugin_id") == plugin_id
+                    meta.get(_PLUGIN_ID) == plugin_id
                     and meta.get("plugin_instance") == instance_name
                 ):
                     png_path: str = os.path.join(
@@ -599,7 +611,7 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
             try:
                 with open(json_path, encoding="utf-8") as fh:
                     meta = json.load(fh)
-                if meta.get("plugin_id") == plugin_id:
+                if meta.get(_PLUGIN_ID) == plugin_id:
                     refresh_time = meta.get("refresh_time")
                     if refresh_time:
                         return refresh_time
@@ -616,7 +628,7 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
     endpoint="plugin_instance_image",
 )
 def instance_image(plugin_id: str, instance_name: str):
-    device_config = current_app.config["DEVICE_CONFIG"]
+    device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
     # Resolve expected image path
@@ -624,7 +636,7 @@ def instance_image(plugin_id: str, instance_name: str):
         path = device_config.get_plugin_image_path(plugin_id, instance_name)
         os.makedirs(os.path.dirname(path), exist_ok=True)
     except Exception:
-        return ("Not Found", 404)
+        return (_ERR_NOT_FOUND, 404)
 
     # Serve if already exists
     if os.path.exists(path):
@@ -634,10 +646,10 @@ def instance_image(plugin_id: str, instance_name: str):
     try:
         plugin_inst = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_inst:
-            return ("Not Found", 404)
+            return (_ERR_NOT_FOUND, 404)
         plugin_config = device_config.get_plugin(plugin_id)
         if not plugin_config:
-            return ("Not Found", 404)
+            return (_ERR_NOT_FOUND, 404)
         plugin = get_plugin_instance(plugin_config)
         image = plugin.generate_image(plugin_inst.settings, device_config)
         image.save(path)
@@ -647,4 +659,4 @@ def instance_image(plugin_id: str, instance_name: str):
         hist = _find_history_image(device_config, plugin_id, instance_name)
         if hist and os.path.exists(hist):
             return _cacheable_send_file(hist)
-        return ("Not Found", 404)
+        return (_ERR_NOT_FOUND, 404)
