@@ -660,7 +660,7 @@ if __name__ == "__main__":
             if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
 
-        serve(created_app, host="0.0.0.0", port=PORT, threads=1)
+        serve(created_app, host="0.0.0.0", port=PORT, threads=4)
     finally:
         refresh_task_obj = created_app.config.get("REFRESH_TASK")
         if refresh_task_obj is not None:
