@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.4.5 (2026-04-04)
+
+### Bug Fixes
+
+- Add server-side required field validation for plugin save (JTN-187, JTN-186)
+  ([`14879f0`](https://github.com/jtn0123/InkyPi/commit/14879f02f3c6867f11ee8cf46911f8c481fef727))
+
+JTN-187: _save_plugin_settings_common() and update_plugin_instance() now validate required fields
+  from the plugin schema before persisting settings. Missing required fields return 400 with a
+  descriptive error message.
+
+JTN-186: API keys page buttons verified working — listeners are correctly wired via optional
+  chaining and event delegation. Added defensive console.warn guards that log when expected DOM
+  elements are absent.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Playlist modal defaults and context-aware preview helper text (JTN-188, JTN-189)
+  ([`fdd231d`](https://github.com/jtn0123/InkyPi/commit/fdd231d79d7704de2a5155e24a4c1f40b9d41bff))
+
+- Change openCreateModal() defaults from 00:00-24:00 to 09:00-17:00 to avoid overlapping with the
+  Default playlist time range - Make plugin.html helper text conditional: show "Update Instance"
+  guidance on instance pages, "Add to Playlist" guidance on draft pages - Add tests for both fixes
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Strengthen test assertions per CodeRabbit review
+  ([`8973740`](https://github.com/jtn0123/InkyPi/commit/897374033d917f0d34bb666d54e5c2dfcfd5e7dd))
+
+Rewrite test_playlist_modal_defaults_to_non_overlapping_range to parse the openCreateModal function
+  body and verify exact default values. Rewrite test_preview_helper_text_is_conditional to scope
+  assertions to the workflow-help section rather than checking globally.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Use const instead of var in api_keys_page.js (SonarCloud S3504)
+  ([`941d1b5`](https://github.com/jtn0123/InkyPi/commit/941d1b590d1553581f62cb60beb04bad59eef2fd))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Split oversized test modules for maintainability (JTN-133)
+  ([`98c0456`](https://github.com/jtn0123/InkyPi/commit/98c0456c63c8773030f9eba6c5052158279b501a))
+
+Split test_settings_blueprint.py (~1163 lines) into four focused modules: - test_settings_update.py:
+  update/start-update operations - test_settings_save.py: save settings, validation, isolation, API
+  keys - test_settings_import.py: import/export operations - test_settings_blueprint.py: logs,
+  health, misc, helpers (remainder)
+
+Split test_weather.py (~1000 lines) into three focused modules: - test_weather_providers.py:
+  OpenWeatherMap/OpenMeteo API mocking - test_weather_validation.py: input validation (location,
+  units, API key) - test_weather.py: core rendering/integration tests (remainder)
+
+No test logic changed. Test count verified: 2045 before and after.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.4 (2026-04-04)
 
 ### Bug Fixes
