@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.4.9 (2026-04-04)
+
+### Bug Fixes
+
+- Add /playlists redirect and show plugin display names on dashboard
+  ([`b85f1c2`](https://github.com/jtn0123/InkyPi/commit/b85f1c28371bad120f4afba19f1c16f4efe2e3c3))
+
+JTN-198: Add redirect from /playlists (plural) to /playlist so users hitting the plural URL no
+  longer get a 404.
+
+JTN-193: Build a plugin_names lookup dict in the dashboard template and use display_name instead of
+  raw plugin_id (e.g. "AI Image" instead of "AI_IMAGE") in the status chip, now-showing, and next-up
+  sections.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.8 (2026-04-04)
 
 ### Bug Fixes
