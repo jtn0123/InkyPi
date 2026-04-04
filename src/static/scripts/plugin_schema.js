@@ -213,7 +213,7 @@
     urlInput.type = "text";
     urlInput.name = "calendarURLs[]";
     urlInput.className = "form-input";
-    urlInput.placeholder = "Calendar URL";
+    urlInput.placeholder = "https://calendar.google.com/…/basic.ics";
     urlInput.required = true;
     urlInput.value = url || "";
     const removeBtn = document.createElement("button");
@@ -262,16 +262,26 @@
     }
   }
 
+  function handleRemoveClick(button, list) {
+    if (list.querySelectorAll(".dynamic-list-item").length <= 1) {
+      const item = button.closest(".dynamic-list-item");
+      if (item) {
+        item.classList.add("shake");
+        item.addEventListener("animationend", () => item.classList.remove("shake"), { once: true });
+      }
+      return;
+    }
+    const item = button.closest(".dynamic-list-item");
+    const parentList = item?.parentElement;
+    item?.remove();
+    if (parentList) updateRepeaterEmptyState(parentList);
+  }
+
   function bindRemoveButtons(list) {
     list.querySelectorAll(".remove-btn").forEach((button) => {
       if (button.dataset.boundRemove === "true") return;
       button.dataset.boundRemove = "true";
-      button.addEventListener("click", () => {
-        const item = button.closest(".dynamic-list-item");
-        const parentList = item?.parentElement;
-        item?.remove();
-        if (parentList) updateRepeaterEmptyState(parentList);
-      });
+      button.addEventListener("click", () => handleRemoveClick(button, list));
     });
   }
 

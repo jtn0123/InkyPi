@@ -11,7 +11,7 @@
                 type="text"
                 name="calendarURLs[]"
                 class="form-input"
-                placeholder="Calendar URL"
+                placeholder="https://calendar.google.com/…/basic.ics"
                 value="{{ calendar_urls[idx] }}"
                 required
             >
@@ -27,3 +27,4 @@
     {% endfor %}
 </div>
 <button type="button" class="action-button compact is-secondary" data-repeater-add>Add Calendar</button>
+<small class="field-note">Paste an .ics feed URL from Google Calendar, Outlook, or any CalDAV provider.</small>

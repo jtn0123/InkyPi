@@ -3179,6 +3179,16 @@ textarea:focus-visible {
   font-weight: 600;
 }
 
+@keyframes shake-item {
+    0%, 100% { transform: translateX(0); }
+    25%, 75% { transform: translateX(-3px); }
+    50% { transform: translateX(3px); }
+}
+
+.dynamic-list-item.shake {
+    animation: shake-item 0.35s ease-in-out;
+}
+
 /* Mobile logs toggle */
 .settings-logs-toggle {
   display: none;

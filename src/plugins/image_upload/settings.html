@@ -8,7 +8,7 @@
             </div>
             <div class="toggle-container">
                 <input type="checkbox" id="padImage" name="padImage" class="toggle-checkbox" value="false">
-                <label for="padImage" class="toggle-label"></label>
+                <label for="padImage" class="toggle-label" aria-label="Toggle scale to fit"></label>
             </div>
             <input type="hidden" name="padImage" value="true">
         </div>
@@ -63,7 +63,7 @@
                 const fileElement = document.createElement("div");
                 fileElement.innerHTML = `
                     <span id="fileNameText">${fileName}</span>
-                    <button type="button" class="remove-btn" onclick="removeAddedFile('${fileName}')">X</button>
+                    <button type="button" class="remove-btn" aria-label="Remove ${fileName}" onclick="removeAddedFile('${fileName}')">X</button>
                 `;
                 fileElement.id = `added-${fileName}`;
                 fileElement.classList.add("file-name");
@@ -109,7 +109,7 @@
                 const fileElement = document.createElement("div");
                 fileElement.innerHTML = `
                     <span id="fileNameText">${fileName}</span>
-                    <button type="button" class="remove-btn" onclick="removeExistingFile('${fileName}')">X</button>
+                    <button type="button" class="remove-btn" aria-label="Remove ${fileName}" onclick="removeExistingFile('${fileName}')">X</button>
                 `;
                 fileElement.id = `existing-${fileName}`;
                 fileElement.classList.add("file-name");
