@@ -47,9 +47,9 @@ class TestRefreshSettingsBtnTemplate:
             html_text,
             re.DOTALL,
         )
-        assert btn_pattern, (
-            "playlist.html must contain a button with refresh-settings-btn class"
-        )
+        assert (
+            btn_pattern
+        ), "playlist.html must contain a button with refresh-settings-btn class"
         btn_match = btn_pattern.group(0)
         for attr in (
             "data-playlist",
@@ -57,9 +57,7 @@ class TestRefreshSettingsBtnTemplate:
             "data-instance",
             "data-refresh",
         ):
-            assert attr in btn_match, (
-                f"refresh-settings-btn must have {attr} attribute"
-            )
+            assert attr in btn_match, f"refresh-settings-btn must have {attr} attribute"
 
     def test_html_has_refresh_modal(self):
         html_text = PLAYLIST_HTML.read_text()
