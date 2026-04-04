@@ -1,22 +1,35 @@
 """Tests for playlist modal defaults and preview helper text (JTN-188, JTN-189)."""
 
+import re
 from pathlib import Path
 
 
-def test_playlist_modal_no_all_day_default():
-    """openCreateModal should not default to 00:00-24:00 (overlaps Default)."""
+def test_playlist_modal_defaults_to_non_overlapping_range():
+    """openCreateModal should default to 09:00-17:00, not 00:00-24:00."""
     js = Path("src/static/scripts/playlist.js").read_text()
-    # Find the openCreateModal function and verify it doesn't use 00:00/24:00
-    # The defaults should be something like 09:00-17:00
-    assert (
-        '"00:00"' not in js or "openCreateModal" not in js.split('"00:00"')[0][-200:]
-    ), "openCreateModal should not default start_time to 00:00"
+    # Find openCreateModal function body
+    match = re.search(
+        r"function\s+openCreateModal\s*\(\)\s*\{(.*?)\n\s*\}", js, re.DOTALL
+    )
+    assert match, "openCreateModal function not found"
+    body = match.group(1)
+    assert '"09:00"' in body, "start_time should default to 09:00"
+    assert '"17:00"' in body, "end_time should default to 17:00"
+    assert '"00:00"' not in body, "start_time should not default to 00:00"
+    assert '"24:00"' not in body, "end_time should not default to 24:00"
 
 
 def test_preview_helper_text_is_conditional():
-    """plugin.html helper text must be context-aware (draft vs instance)."""
+    """The workflow-help region must be context-aware (draft vs instance)."""
     html = Path("src/templates/plugin.html").read_text()
-    # The helper text should be wrapped in {% if plugin_instance %}
-    assert "{% if plugin_instance %}" in html
-    assert "Update Instance" in html
-    assert "Add to Playlist" in html
+    # Find the workflow-help section specifically
+    match = re.search(
+        r'class="form-help workflow-help">(.*?)</div>\s*</div>', html, re.DOTALL
+    )
+    assert match, "workflow-help section not found"
+    help_section = match.group(1)
+    assert (
+        "{% if plugin_instance %}" in help_section
+    ), "workflow-help must use conditional rendering for plugin_instance"
+    assert "Update Instance" in help_section
+    assert "Add to Playlist" in help_section
