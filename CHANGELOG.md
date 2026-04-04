@@ -1,6 +1,85 @@
 # CHANGELOG
 
 
+## v0.4.6 (2026-04-04)
+
+### Bug Fixes
+
+- Correct fallback path for benchmarks.db default location
+  ([`e466898`](https://github.com/jtn0123/InkyPi/commit/e4668981a0167666f5335be11491e3ba68111af7))
+
+The fallback when BASE_DIR is missing used __file__ (src/benchmarks/), making project_root resolve
+  to src/ instead of the actual project root. Now uses abspath to go up one level from
+  src/benchmarks/ to src/.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden falsy BASE_DIR handling and add coverage for runtime paths
+  ([`ded6017`](https://github.com/jtn0123/InkyPi/commit/ded60172e20a9611f18f950258dacd6897cd38d3))
+
+- Add `or fallback` guard for falsy BASE_DIR in benchmark_storage - Add test for mock_display
+  default output dir under runtime/ - Add test for benchmark_storage falsy BASE_DIR fallback
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Include benchmarks module in coverage collection
+  ([`61180f3`](https://github.com/jtn0123/InkyPi/commit/61180f342dac7f228e114af0e582ac7bd3570ff8))
+
+Remove src/benchmarks/* from .coveragerc omit list — the module now has 21 passing tests at 90%
+  coverage. This fixes SonarCloud quality gate which saw 0% coverage on new benchmark_storage.py
+  lines.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Rebalance settings layout and move runtime artifacts (JTN-150, JTN-132)
+  ([`91f93ce`](https://github.com/jtn0123/InkyPi/commit/91f93cee1babb7dc72ff0b629c6b819c55735e72))
+
+Settings page: collapse logs panel by default on all viewports — extends the proven mobile toggle
+  pattern to desktop. Settings form now gets full width; logs remain one click away via the floating
+  "Show Logs" button.
+
+Runtime artifacts: move benchmarks.db and mock_display_output defaults from src/ and project root
+  into runtime/ directory. Update CI, scripts, docs, and tests to match.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Strengthen test assertions per CodeRabbit review
+  ([`bc7db3a`](https://github.com/jtn0123/InkyPi/commit/bc7db3a70fe1fdf8dda6d1130a1c02677342b90f))
+
+- Force truly falsy BASE_DIR after MockDeviceConfig init normalization - Use exact path component
+  assertions instead of substring checks
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Apply CodeRabbit feedback — dynamic plugin discovery and helper extraction
+  ([`aa2a966`](https://github.com/jtn0123/InkyPi/commit/aa2a9664e7b154b19ba031065342fabb68f2aff5))
+
+- Replace hardcoded _ACTIVE_PLUGINS list with dynamic directory discovery - Extract duplicated
+  plugin class lookup into _get_plugin_class() helper - Add return type annotation to
+  _collect_fields()
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden regression tests per CodeRabbit review
+  ([`0f2741b`](https://github.com/jtn0123/InkyPi/commit/0f2741bbd1c8171142ed38d7ae87d062058ffc9f))
+
+- Add override assertion to catch plugins missing build_settings_schema() - Use pathlib for
+  OS-portable orphan detection - Add plugin_cls assertion guard in background fields test
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove 19 orphaned legacy settings.html templates (JTN-153)
+  ([`22aee5a`](https://github.com/jtn0123/InkyPi/commit/22aee5a2396aed65bf5d84c74d7ff71210e05480))
+
+All plugins now use the schema-driven form system exclusively. Delete 1,573 lines of dead HTML/JS, 1
+  orphaned widget template, and 7 tests that read deleted files. Add 3 regression-guard tests to
+  prevent drift back to legacy templates.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.5 (2026-04-04)
 
 ### Bug Fixes
