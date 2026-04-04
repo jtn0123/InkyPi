@@ -316,3 +316,32 @@ class TestSaveSettings:
     def test_save_settings_legacy_network_get(self, client):
         resp = client.get("/settings/network")
         assert resp.status_code == 200
+
+    def test_save_settings_missing_device_name(self, client):
+        form = {**self.VALID_FORM}
+        del form["deviceName"]
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "deviceName"
+
+    def test_save_settings_empty_device_name(self, client):
+        form = {**self.VALID_FORM, "deviceName": ""}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "deviceName"
+
+    def test_save_settings_whitespace_device_name(self, client):
+        form = {**self.VALID_FORM, "deviceName": "   "}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "deviceName"
+
+    def test_save_settings_zero_interval(self, client):
+        form = {**self.VALID_FORM, "interval": "0"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "interval"
