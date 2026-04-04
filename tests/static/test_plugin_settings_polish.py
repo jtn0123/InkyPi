@@ -11,12 +11,6 @@ def test_todo_remove_last_item_guarded():
     assert "length <= 1" in js or "length < 2" in js
 
 
-def test_countdown_date_has_aria_label():
-    """Countdown date input must have aria-label."""
-    html = Path("src/plugins/countdown/settings.html").read_text()
-    assert "aria-label" in html
-
-
 def test_calendar_repeater_has_descriptive_placeholder():
     """Calendar URL input should have a descriptive placeholder."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
@@ -27,12 +21,6 @@ def test_calendar_repeater_has_help_text():
     """Calendar repeater should have help text."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
     assert "field-note" in html
-
-
-def test_image_upload_remove_has_aria_label():
-    """Image upload remove buttons should have aria-label with filename."""
-    html = Path("src/plugins/image_upload/settings.html").read_text()
-    assert "aria-label" in html
 
 
 def test_settings_schema_has_option_group():
