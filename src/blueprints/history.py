@@ -161,6 +161,24 @@ def _validate_and_resolve_history_file(history_dir, filename):
     return safe_path, None
 
 
+def _parse_filename_from_request():
+    """Parse and validate a ``filename`` field from a JSON POST body.
+
+    Returns ``(filename, None)`` on success, or ``(None, error_response)``
+    when the payload is malformed or the filename is missing/empty.
+    """
+    try:
+        data = request.get_json(force=True)
+    except BadRequest:
+        return None, json_error("Invalid JSON payload", status=400)
+    if not isinstance(data, dict):
+        return None, json_error("Request body must be a JSON object", status=400)
+    filename = data.get("filename")
+    if not isinstance(filename, str) or not filename.strip():
+        return None, json_error("filename is required", status=400)
+    return filename, None
+
+
 _DEFAULT_PER_PAGE = 24
 
 
@@ -260,15 +278,9 @@ def history_redisplay():
     history_dir = device_config.history_image_dir
 
     try:
-        try:
-            data = request.get_json(force=True)
-        except BadRequest:
-            return json_error("Invalid JSON payload", status=400)
-        if not isinstance(data, dict):
-            return json_error("Request body must be a JSON object", status=400)
-        filename = data.get("filename")
-        if not isinstance(filename, str) or not filename.strip():
-            return json_error("filename is required", status=400)
+        filename, err = _parse_filename_from_request()
+        if err is not None:
+            return err
 
         safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
         if err is not None:
@@ -289,15 +301,9 @@ def history_delete():
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        try:
-            data = request.get_json(force=True)
-        except BadRequest:
-            return json_error("Invalid JSON payload", status=400)
-        if not isinstance(data, dict):
-            return json_error("Request body must be a JSON object", status=400)
-        filename = data.get("filename")
-        if not isinstance(filename, str) or not filename.strip():
-            return json_error("filename is required", status=400)
+        filename, err = _parse_filename_from_request()
+        if err is not None:
+            return err
 
         safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
         if err is not None:
