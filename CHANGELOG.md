@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.4.8 (2026-04-04)
+
+### Bug Fixes
+
+- Increase Waitress threads from 1 to 4 to prevent request blocking
+  ([`90c44c2`](https://github.com/jtn0123/InkyPi/commit/90c44c214bc55ea4f12fccbfc16453490cd8d4f4))
+
+Waitress was configured with threads=1, which meant Chrome's HTTP/1.1 keep-alive connections would
+  monopolize the single worker thread. This caused all subsequent AJAX requests (redisplay, clear
+  history, pagination) to hang indefinitely, appearing as silent no-ops to the user.
+
+Increasing to 4 threads matches the Raspberry Pi Zero 2 W's quad-core CPU and ensures concurrent
+  requests are handled properly.
+
+Fixes JTN-191, JTN-192, JTN-199, JTN-200
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.7 (2026-04-04)
 
 ### Bug Fixes
