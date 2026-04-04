@@ -1,6 +1,61 @@
 # CHANGELOG
 
 
+## v0.4.15 (2026-04-04)
+
+### Bug Fixes
+
+- Address CodeRabbit review — isfile check and plugin cleanup settings
+  ([`71d904e`](https://github.com/jtn0123/InkyPi/commit/71d904eebf287506569f5706099296f4c3190810))
+
+- history.py: use os.path.isfile() instead of os.path.exists() in _validate_and_resolve_history_file
+  to reject directories - plugin.py: capture instance settings before deletion and pass them to
+  _cleanup_plugin_resources so plugins like image_upload can clean up their own files
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract _parse_filename_from_request to eliminate duplicated blocks
+  ([`5362486`](https://github.com/jtn0123/InkyPi/commit/5362486b200a62123d8fdc26233557f35c4222ed))
+
+Sonar flagged lines 260-275 and 290-304 as near-identical (3.6% duplication exceeded the 3% gate).
+  Both history_redisplay and history_delete parsed JSON request bodies identically — now share a
+  single helper.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Validate deviceName and zero interval in settings save (JTN-218)
+  ([`f136a09`](https://github.com/jtn0123/InkyPi/commit/f136a09ef1c5b92115028ecfc180cc88e800432a))
+
+Backend now returns 422 with field-level details when deviceName is missing/empty/whitespace, or
+  when interval is zero, preventing silent no-op saves that left the UI without any error feedback.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **jtn-215**: Hide visibility toggle for unconfigured keys and clarify clear vs delete controls
+  ([`43b67a7`](https://github.com/jtn0123/InkyPi/commit/43b67a7113c1e24c546b14742563a1b513895d47))
+
+- Skip adding the show/hide toggle button for password inputs with no value (unconfigured providers
+  no longer show a meaningless "Show key" button) - Add distinct title tooltips to the clear (×) and
+  Delete buttons so users understand that clear only empties the field until saved, while delete
+  permanently removes the key from .env - Update delete button aria-label to include "permanently"
+  for screen-reader clarity - Add integration tests covering all three behaviours
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Refactoring
+
+- Reduce Sonar S1192/S3776 maintainability debt in blueprint files (JTN-212)
+  ([`1e32c37`](https://github.com/jtn0123/InkyPi/commit/1e32c3715c43f151fc81192c6341e053971c5426))
+
+Extract duplicate string constants (_CONFIG_KEY, _PLUGIN_ID, _ERR_INTERNAL, _ERR_NOT_FOUND,
+  _ERR_INVALID_FILENAME, _EXT_PNG, _EXT_JSON) and reduce cognitive complexity in plugin.py,
+  history.py, and apikeys.py by extracting helpers: _cleanup_plugin_resources(),
+  _validate_and_resolve_history_file(), _has_invalid_control_chars(), and _validate_api_key_entry().
+  No behaviour changes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.14 (2026-04-04)
 
 ### Bug Fixes
