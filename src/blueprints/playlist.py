@@ -497,6 +497,24 @@ def create_playlist():
         # save changes to device config file
         device_config.write_config()
 
+        # Check if the new playlist overlaps with the Default playlist and warn the user.
+        # Skip the warning when the playlist itself is named "Default".
+        warning = None
+        if playlist_name != "Default":
+            try:
+                for pl in playlist_manager.playlists:
+                    if getattr(pl, "name", "") == "Default":
+                        ps = _to_minutes(pl.start_time)
+                        pe = _to_minutes(pl.end_time)
+                        if _windows_overlap(start_min, end_min, ps, pe):
+                            warning = (
+                                "This playlist overlaps with Default. During its active hours, "
+                                "this playlist will take priority."
+                            )
+                        break
+            except Exception:
+                pass
+
     except Exception as e:
         logger.exception("EXCEPTION CAUGHT: " + str(e))
         return json_internal_error(
@@ -506,6 +524,8 @@ def create_playlist():
             },
         )
 
+    if warning:
+        return json_success("Created new Playlist!", warning=warning)
     return json_success("Created new Playlist!")
 
 
@@ -565,6 +585,26 @@ def update_playlist(playlist_name):
         pass
     device_config.write_config()
 
+    # Check if the updated playlist overlaps with the Default playlist and warn the user.
+    # Skip the warning when the playlist being updated is (or is being renamed to) "Default".
+    warning = None
+    if playlist_name != "Default" and new_name != "Default":
+        try:
+            for pl in playlist_manager.playlists:
+                if getattr(pl, "name", "") == "Default":
+                    ps = _to_minutes(pl.start_time)
+                    pe = _to_minutes(pl.end_time)
+                    if _windows_overlap(start_min, end_min, ps, pe):
+                        warning = (
+                            "This playlist overlaps with Default. During its active hours, "
+                            "this playlist will take priority."
+                        )
+                    break
+        except Exception:
+            pass
+
+    if warning:
+        return json_success(f"Updated playlist '{playlist_name}'!", warning=warning)
     return json_success(f"Updated playlist '{playlist_name}'!")
 
 

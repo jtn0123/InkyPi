@@ -122,3 +122,45 @@ def test_next_up_endpoint_and_ssr(client, device_config_dev):
     assert isinstance(data, dict)
     # One of the seeded plugin ids
     assert data.get("plugin_id") in ("weather", "clock")
+
+
+# JTN-213: Dashboard detail panel empty state when preview image exists
+
+
+def test_dashboard_shows_unavailable_message_when_preview_exists_but_no_plugin_id(
+    client, device_config_dev
+):
+    """When a preview image exists but refresh_info has no plugin_id, show 'Last display info unavailable.'"""
+    from PIL import Image
+
+    # Write a dummy processed image so has_preview=True
+    img = Image.new("RGB", (10, 10), "black")
+    img.save(device_config_dev.processed_image_file)
+
+    # Ensure refresh_info has no plugin_id (default state)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Last display info unavailable." in resp.data
+    assert b"Display a plugin to see details here." not in resp.data
+
+
+def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
+    client, device_config_dev
+):
+    """When no preview image and no plugin_id, show the generic 'Display a plugin' empty state."""
+    import os
+
+    # Remove any preview images so has_preview=False
+    for path in (
+        device_config_dev.processed_image_file,
+        device_config_dev.current_image_file,
+    ):
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Display a plugin to see details here." in resp.data
+    assert b"Last display info unavailable." not in resp.data

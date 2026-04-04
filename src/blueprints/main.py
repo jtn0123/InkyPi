@@ -67,12 +67,18 @@ def main_page():
     except Exception:
         next_up = {}
 
+    # Determine whether a preview image exists (processed preferred, then current)
+    has_preview = os.path.exists(device_config.processed_image_file) or os.path.exists(
+        device_config.current_image_file
+    )
+
     return render_template(
         "inky.html",
         config=device_config.get_config(),
         plugins=device_config.get_plugins(),
         refresh_info=device_config.get_refresh_info().to_dict(),
         next_up=next_up,
+        has_preview=has_preview,
     )
 
 
