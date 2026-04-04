@@ -1,5 +1,10 @@
 # InkyPi 
 
+[![CI](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml/badge.svg)](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jtn0123_InkyPi&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jtn0123_InkyPi)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green)](./LICENSE)
+
 <img src="./docs/images/inky_clock.jpg" />
 
 
@@ -7,25 +12,39 @@
 InkyPi is an open-source, customizable E-Ink display powered by a Raspberry Pi. Designed for simplicity and flexibility, it allows you to effortlessly display the content you care about, with a simple web interface that makes setup and configuration effortless.
 
 **Features**:
-- Natural paper-like aethetic: crisp, minimalist visuals that are easy on the eyes, with no glare or backlight
+- Natural paper-like aesthetic: crisp, minimalist visuals that are easy on the eyes, with no glare or backlight
 - Web Interface allows you to update and configure the display from any device on your network
-- Minimize distractions: no LEDS, noise, or notifications, just the content you care about
+- Minimal distractions: no LEDs, noise, or notifications — just the content you care about
 - Easy installation and configuration, perfect for beginners and makers alike
 - Open source project allowing you to modify, customize, and create your own plugins
 - Set up scheduled playlists to display different plugins at designated times
 
 **Plugins**:
 
-- Image Upload: Upload and display any image from your browser
-- Daily Newspaper/Comic: Show daily comics and front pages of major newspapers from around the world
-- Clock: Customizable clock faces for displaying time
-- AI Image/Text: Generate images and dynamic text from prompts using OpenAI's models
-- Weather: Display current weather conditions and multi-day forecasts with a customizable layout
-- Calendar: Visualize your calendar from Google, Outlook, or Apple Calendar with customizable layouts
+| Category | Plugin | Description |
+|----------|--------|-------------|
+| Display | Clock | Customizable clock faces |
+| | Countdown | Countdown timer to a target date |
+| | Year Progress | Visual progress bar for the current year |
+| | Todo List | Display a to-do list |
+| Images | Image Upload | Upload and display any image from your browser |
+| | Image Album | Cycle through an album of images |
+| | Image Folder | Display images from a local folder |
+| | Image URL | Display an image from a URL |
+| | Unsplash | Random curated photos from Unsplash |
+| | APOD | NASA Astronomy Picture of the Day |
+| | WPOTD | Wikipedia Picture of the Day |
+| News & Media | Newspaper | Front pages of major newspapers from around the world |
+| | Comic | Daily comics from popular syndicated strips |
+| | RSS | Display items from any RSS feed |
+| Information | Weather | Current conditions and multi-day forecasts |
+| | Calendar | Google, Outlook, or Apple Calendar integration |
+| | GitHub | Contribution graph, stars, and sponsor stats |
+| AI | AI Image | Generate images from prompts using OpenAI |
+| | AI Text | Generate dynamic text from prompts using OpenAI |
+| Utility | Screenshot | Capture and display a screenshot of any URL |
 
-And additional plugins coming soon! For documentation on building custom plugins, see [Building InkyPi Plugins](./docs/building_plugins.md).
-
-See [the wiki](https://github.com/fatihak/InkyPi/wiki) for a list of community-maintained third-party plugins.
+For documentation on building custom plugins, see [Building InkyPi Plugins](./docs/building_plugins.md).
 
 ## Hardware 
 - Raspberry Pi (4 | 3 | Zero 2 W)
@@ -53,7 +72,7 @@ To install InkyPi, follow these steps:
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/fatihak/InkyPi.git
+    git clone https://github.com/jtn0123/InkyPi.git
     ```
 2. Navigate to the project directory:
     ```bash
@@ -102,97 +121,35 @@ To update your InkyPi with the latest code changes, follow these steps:
     ```
 This process ensures that any new updates, including code changes and additional dependencies, are properly applied without requiring a full reinstallation.
 
-## Contributing Workflow
+## Development
 
-- Base new work from `origin/main`.
-- Keep PRs focused and feature-scoped; avoid long-lived branch drift.
-- For parent-fork sync work (`fatihak/InkyPi`), prefer cherry-pick by feature area and run plugin flow smoke tests after each batch.
-- Use the PR template checklist for base-branch, sync, and compatibility verification before merging.
+To run the web UI locally without e-ink hardware:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r install/requirements-dev.txt
+.venv/bin/python src/inkypi.py --dev --web-only
+```
+
+The dev server starts on port 8080. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full dev workflow and [docs/development.md](./docs/development.md) for platform-specific setup.
 
 ## Testing
 
-For local development, use the fast test runner:
-
 ```bash
-scripts/test.sh
-scripts/test.sh tests/unit/test_refresh_task_stress.py
-scripts/test_profile.sh
+scripts/test.sh                                        # fast local test runner (sharded)
+scripts/test.sh tests/unit/test_refresh_task_stress.py  # single file
+scripts/preflash_validate.sh                            # hardware-free pre-flash gate
 ```
 
-- `scripts/test.sh` is the recommended default local path.
-- It runs single-file debug targets serially and shards the broader default suite for faster local feedback.
-- Browser and accessibility suites stay explicit; see [docs/testing.md](./docs/testing.md) for serial debug, coverage, and Playwright-backed commands.
-
-### Pre-Flash Validation
-
-Use the hardware-free validation gate before flashing a Raspberry Pi:
-
-```bash
-scripts/preflash_validate.sh
-```
-
-This validates app boot, config resolution, mock-display rendering, targeted tests, and install-script syntax without the device connected.
-
-To also run the import-only install smoke phase:
-
-```bash
-INKYPI_VALIDATE_INSTALL=1 scripts/preflash_validate.sh
-```
-
-The import-only smoke phase runs in a clean temporary environment on both macOS and Linux. On Linux it also validates the Inky and systemd-related imports. This still does not prove EEPROM detection, SPI/GPIO access, or actual panel refresh on the target hardware. Those remain post-flash checks.
-
-Extended pre-install hardening lanes are available through env flags on `scripts/preflash_validate.sh`:
-
-```bash
-INKYPI_VALIDATE_PI_RUNTIME=1
-INKYPI_VALIDATE_STRESS=1
-INKYPI_VALIDATE_HEAVY_PLUGINS=1
-INKYPI_VALIDATE_BENCH_THRESHOLDS=1
-INKYPI_VALIDATE_COLD_BOOT=1
-INKYPI_VALIDATE_CACHE=1
-INKYPI_VALIDATE_ISOLATION=1
-INKYPI_VALIDATE_BROWSER_RENDER=1
-INKYPI_VALIDATE_INSTALL_IDEMPOTENCY=1
-INKYPI_VALIDATE_FAULTS=1
-INKYPI_VALIDATE_UPGRADE_COMPAT=1
-INKYPI_VALIDATE_COVERAGE=1
-INKYPI_VALIDATE_SECURITY=1
-INKYPI_VALIDATE_FLAKE=1
-INKYPI_VALIDATE_FS_PERMS=1
-INKYPI_VALIDATE_SOAK=1
-INKYPI_VALIDATE_RECOVERY=1
-INKYPI_VALIDATE_API_CONTRACT=1
-INKYPI_VALIDATE_MUTATION=1
-```
-
-Linux CI is the authoritative path for the Pi-like runtime, browser/render, install/update idempotency, security, flake-detection, soak, and mutation lanes. The new hardening lanes add fault injection, upgrade-compat checks, critical-file coverage thresholds, readonly filesystem checks, startup-recovery checks, API contract assertions, nightly soak, and a narrow mutation harness for refresh/cache/idempotency logic.
-
-## Runtime Feature Flags
-
-- `INKYPI_PLUGIN_RETRY_MAX` (default `1`)
-- `INKYPI_PLUGIN_RETRY_BACKOFF_MS` (default `500`)
-- `INKYPI_PLUGIN_TIMEOUT_S` (default `60`)
-- `INKYPI_BENCHMARK_API_ENABLED` (default `true`)
-- `INKYPI_PROGRESS_SSE_ENABLED` (default `true`)
-- `INKYPI_RENDER_CACHE_TTL_S` (default `300`)
-- `INKYPI_HEALTH_WINDOW_MIN` (default `1440`)
+See [docs/testing.md](./docs/testing.md) for coverage, browser/accessibility suites, pre-flash hardening lanes, and CI details.
 
 ## Uninstall
-To install InkyPi, simply run the following command:
+To uninstall InkyPi, simply run the following command:
 
 ```bash
 sudo bash install/uninstall.sh
 ```
-
-## Roadmap
-The InkyPi project is constantly evolving, with many exciting features and improvements planned for the future.
-
-- Plugins, plugins, plugins
-- Modular layouts to mix and match plugins
-- Support for buttons with customizable action bindings
-- Improved Web UI on mobile devices
-
-Check out the public [trello board](https://trello.com/b/SWJYWqe4/inkypi) to explore upcoming features and vote on what you'd like to see next!
 
 ## Waveshare Display Support
 
@@ -208,29 +165,20 @@ Distributed under the GPL 3.0 License, see [LICENSE](./LICENSE) for more informa
 
 This project includes fonts and icons with separate licensing and attribution requirements. See [Attribution](./docs/attribution.md) for details.
 
+## Documentation
+
+- [Development Setup](./docs/development.md) — Local dev environment on macOS, Linux, or Windows
+- [API Keys](./docs/api_keys.md) — Configuring API keys for plugins (OpenAI, Google, etc.)
+- [Testing](./docs/testing.md) — Test suite, sharding, browser tests, and coverage
+- [Building Plugins](./docs/building_plugins.md) — Guide for creating custom plugins
+- [Troubleshooting](./docs/troubleshooting.md) — Common issues and fixes
+
 ## Issues
 
-Check out the [troubleshooting guide](./docs/troubleshooting.md). If you're still having trouble, feel free to create an issue on the [GitHub Issues](https://github.com/fatihak/InkyPi/issues) page.
+Check out the [troubleshooting guide](./docs/troubleshooting.md). If you're still having trouble, feel free to create an issue on the [GitHub Issues](https://github.com/jtn0123/InkyPi/issues) page.
 
-If you're using a Pi Zero W, note that there are known issues during the installation process. See [Known Issues during Pi Zero W Installation](./docs/troubleshooting.md#known-issues-during-pi-zero-w-installation) section in the troubleshooting guide for additional details..
+If you're using a Pi Zero W, note that there are known issues during the installation process. See [Known Issues during Pi Zero W Installation](./docs/troubleshooting.md#known-issues-during-pi-zero-w-installation) section in the troubleshooting guide for additional details.
 
-## Sponsoring
+---
 
-InkyPi is maintained and developed with the help of sponsors. If you enjoy the project or find it useful, consider supporting its continued development.
-
-<p align="center">
-<a href="https://github.com/sponsors/fatihak" target="_blank"><img src="https://user-images.githubusercontent.com/345274/133218454-014a4101-b36a-48c6-a1f6-342881974938.png" alt="Become a Patreon" height="35" width="auto"></a>
-<a href="https://www.patreon.com/akzdev" target="_blank"><img src="https://c5.patreon.com/external/logo/become_a_patron_button.png" alt="Become a Patreon" height="35" width="auto"></a>
-<a href="https://www.buymeacoffee.com/akzdev" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="35" width="auto"></a>
-</p>
-
-
-## Acknowledgements
-
-Check out these similar projects:
-
-- [PaperPi](https://github.com/txoof/PaperPi) - awesome project that supports waveshare devices
-    - shoutout to @txoof for assisting with InkyPi's installation process
-- [InkyCal](https://github.com/aceinnolab/Inkycal) - has modular plugins for building custom dashboards
-- [PiInk](https://github.com/tlstommy/PiInk) - inspiration behind InkyPi's flask web ui
-- [rpi_weather_display](https://github.com/sjnims/rpi_weather_display) - alternative eink weather dashboard with advanced power efficiency
+Forked from [fatihak/InkyPi](https://github.com/fatihak/InkyPi).
