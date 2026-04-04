@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.4.3 (2026-04-04)
+
+### Bug Fixes
+
+- Hide desktop tab bar and deduplicate plugin page status (JTN-89, JTN-152)
+  ([`e0fd64b`](https://github.com/jtn0123/InkyPi/commit/e0fd64bddc73b149b0724484bd649a52ad6901ec))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Plugin settings UX polish — empty state, accessibility, affordances (JTN-184, JTN-174, JTN-157,
+  JTN-158, JTN-154)
+  ([`7f9100f`](https://github.com/jtn0123/InkyPi/commit/7f9100fd5c79727e6628669fade7f52e86096824))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Reduce function nesting and fix label association (SonarCloud)
+  ([`dcfe6ce`](https://github.com/jtn0123/InkyPi/commit/dcfe6cebf84d4f6c7e8ce223d6f785e3f4ca3220))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove orphaned grid property and harden test assertions
+  ([`ec6a228`](https://github.com/jtn0123/InkyPi/commit/ec6a2280c3a4e6d3913a2a0b9a65131ff7d7cba4))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.2 (2026-04-04)
 
 ### Performance Improvements
