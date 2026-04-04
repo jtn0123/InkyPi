@@ -248,9 +248,39 @@
     }
 
     function copyLogsToClipboard() {
-      const viewer = document.getElementById("logsViewer");
+      var viewer = document.getElementById("logsViewer");
+      var copyBtn = document.getElementById("logsCopyBtn");
       if (!viewer) return;
-      navigator.clipboard?.writeText(viewer.textContent || "").catch(() => {});
+      var text = viewer.textContent || "";
+
+      function showFeedback(success) {
+        if (!copyBtn) return;
+        var original = copyBtn.textContent;
+        copyBtn.textContent = success ? "Copied!" : "Copy failed";
+        setTimeout(function() { copyBtn.textContent = original; }, 1500);
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(
+          function() { showFeedback(true); },
+          function() { showFeedback(false); }
+        );
+      } else {
+        // Fallback for HTTP contexts
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          var ok = document.execCommand("copy");
+          showFeedback(ok);
+        } catch (e) {
+          showFeedback(false);
+        }
+        document.body.removeChild(ta);
+      }
     }
 
     function clearLogsView() {
