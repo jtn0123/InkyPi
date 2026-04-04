@@ -305,7 +305,11 @@ class Playlist:
         if plugin:
             plugin.update(updated_data)
             return True
-        logger.warning("Plugin %r with name %r not found.", plugin_id, instance_name)
+        logger.warning(
+            "Plugin '%s' with name '%s' not found.",
+            _sanitize_log_value(plugin_id),
+            _sanitize_log_value(instance_name),
+        )
         return False
 
     def delete_plugin(self, plugin_id, name):
@@ -316,7 +320,11 @@ class Playlist:
         ]
 
         if len(self.plugins) == initial_count:
-            logger.warning("Plugin %r with instance %r not found.", plugin_id, name)
+            logger.warning(
+                "Plugin '%s' with instance '%s' not found.",
+                _sanitize_log_value(plugin_id),
+                _sanitize_log_value(name),
+            )
             return False
         return True
 
@@ -542,8 +550,8 @@ class PluginInstance:
             except (ValueError, TypeError):
                 logger.warning(
                     "Malformed scheduled time '%s' for plugin '%s'; skipping scheduled check",
-                    scheduled_time_str,
-                    self.name,
+                    _sanitize_log_value(scheduled_time_str),
+                    _sanitize_log_value(self.name),
                 )
                 return False
 
@@ -587,8 +595,8 @@ class PluginInstance:
                 except (ValueError, TypeError):
                     logger.warning(
                         "Malformed snooze_until value '%s' for plugin '%s'; treating as eligible",
-                        self.snooze_until,
-                        self.name,
+                        _sanitize_log_value(self.snooze_until),
+                        _sanitize_log_value(self.name),
                     )
 
             return not (
