@@ -33,17 +33,15 @@ def test_workflow_mode_bar_hidden_on_desktop():
 def test_workflow_mode_bar_visible_on_mobile():
     """Inside a @media query in _responsive.css, .workflow-mode-bar must be display: flex."""
     css = _read_partial("_responsive.css")
-    # Find all @media blocks, then check for .workflow-mode-bar with display: flex
-    media_blocks = re.findall(r"@media[^{]*\{(.*?)(?=\n@|\Z)", css, re.DOTALL)
-    found = False
-    for block in media_blocks:
-        if ".workflow-mode-bar" in block and "display: flex" in block:
-            found = True
-            break
-    # Fallback: simpler check in case regex grouping misses nested braces
-    if not found:
-        found = "display: flex" in css and ".workflow-mode-bar" in css
-    assert found, ".workflow-mode-bar should have display: flex in a mobile media query"
+    # Find .workflow-mode-bar rule and check it has display: flex
+    assert (
+        ".workflow-mode-bar" in css
+    ), ".workflow-mode-bar must exist in _responsive.css"
+    # Find the specific rule block
+    pattern = r"\.workflow-mode-bar\s*\{[^}]*display:\s*flex"
+    assert re.search(
+        pattern, css
+    ), ".workflow-mode-bar should have display: flex in responsive CSS"
 
 
 # --- JTN-152: duplicate API status chips removed -----------------------------
@@ -55,20 +53,14 @@ def test_status_row_has_no_api_chips(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    # The status-row section should not contain API status text
-    # Extract the status-row div content
-    match = re.search(
-        r'class="status-row[^"]*"[^>]*>(.*?)</div>',
-        html,
-        re.DOTALL,
-    )
-    assert match, "status-row element not found in plugin page"
-    status_row_content = match.group(1)
+    # Find the status-row section
+    start = html.find('class="status-row')
+    assert start != -1, "status-row element not found in plugin page"
+    # Extract a reasonable chunk after the status-row opening tag
+    section = html[start : start + 500]
+    assert "API ready" not in section, "status-row should not contain 'API ready' chip"
     assert (
-        "API ready" not in status_row_content
-    ), "status-row should not contain 'API ready' chip"
-    assert (
-        "API key missing" not in status_row_content
+        "API key missing" not in section
     ), "status-row should not contain 'API key missing' chip"
 
 
