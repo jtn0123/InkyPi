@@ -2463,7 +2463,7 @@ textarea:focus-visible {
 }
 
 .workflow-mode-bar {
-  display: inline-flex;
+  display: none;
   gap: 8px;
   padding: 6px;
   border-radius: 999px;
@@ -6084,8 +6084,7 @@ body.modal-open {
         position: sticky;
         top: 8px;
         z-index: 6;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        display: flex;
         width: 100%;
     }
 
@@ -6459,3 +6458,4 @@ body.modal-open {
     color: var(--muted, #555);
   }
 }
+

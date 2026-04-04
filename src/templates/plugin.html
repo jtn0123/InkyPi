@@ -80,13 +80,6 @@
             {% else %}
             <span class="status-chip warning">Draft</span>
             {% endif %}
-            {% if api_key and api_key.required %}
-                {% if api_key.present %}
-                <span class="status-chip success">API ready</span>
-                {% else %}
-                <span class="status-chip error">API key missing</span>
-                {% endif %}
-            {% endif %}
         </div>
 
         <div class="workflow-mode-bar" role="tablist" aria-label="Plugin workflow">

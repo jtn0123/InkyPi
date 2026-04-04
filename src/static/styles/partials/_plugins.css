@@ -244,7 +244,7 @@
 }
 
 .workflow-mode-bar {
-  display: inline-flex;
+  display: none;
   gap: 8px;
   padding: 6px;
   border-radius: 999px;
