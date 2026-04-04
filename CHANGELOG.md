@@ -1,6 +1,73 @@
 # CHANGELOG
 
 
+## v0.4.11 (2026-04-04)
+
+### Bug Fixes
+
+- Apply log sanitization consistently across all model.py warning paths
+  ([`97f07fe`](https://github.com/jtn0123/InkyPi/commit/97f07fe0d1f9848681f9686330eda251e8e69405))
+
+Address CodeRabbit review: extend _sanitize_log_value() usage to all remaining user-controlled log
+  parameters (update_plugin, delete_plugin, scheduled time, snooze_until) for complete log-injection
+  mitigation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove unused pytest import flagged by ruff
+  ([`2c030b9`](https://github.com/jtn0123/InkyPi/commit/2c030b9ddf75d450a1c420d05fd319441f84f87b))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Resolve Sonar S2583 and S5145 in display_manager.py and model.py
+  ([`01d07f5`](https://github.com/jtn0123/InkyPi/commit/01d07f5d264f1bd866fe6817646581a1db1a1b9d))
+
+Initialize InkyDisplay and WaveshareDisplay to None before try/except import blocks so Sonar flow
+  analysis correctly recognizes the variables may remain None (S2583). Add _sanitize_log_value
+  helper in model.py to strip control characters from user-controlled data before logging (S5145).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Sanitize remaining user-controlled log values in model.py
+  ([`0b3bb30`](https://github.com/jtn0123/InkyPi/commit/0b3bb3022042414312716e0b2dce5278132b5b11))
+
+Address second CodeRabbit review: apply _sanitize_log_value() to add_plugin_to_playlist
+  playlist_name and is_show_eligible self.name for complete log-injection coverage.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add coverage for _sanitize_log_value helper to meet Sonar gate
+  ([`0e991e5`](https://github.com/jtn0123/InkyPi/commit/0e991e5ac3f41736faa8038a44e95b9380a4b672))
+
+Add 8 tests covering control char stripping, clean passthrough, non-string conversion, and empty
+  input to bring new code coverage above the 80% quality gate threshold.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Assert sanitized log content per CodeRabbit review
+  ([`7f182df`](https://github.com/jtn0123/InkyPi/commit/7f182dfe83437485442e95991e764576e0fbf8d7))
+
+Use caplog to verify warning messages are emitted with control characters stripped, not just that
+  the return value is False.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Cover add_plugin_to_nonexistent_playlist warning path
+  ([`6ce9878`](https://github.com/jtn0123/InkyPi/commit/6ce987855d20b6bda82d5c63853dc4471abda94b))
+
+Exercises the sanitized log line at model.py:190 to bring new code coverage above the 80% Sonar
+  quality gate.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Cover update_playlist warning path for Sonar 80% gate
+  ([`457ecc9`](https://github.com/jtn0123/InkyPi/commit/457ecc992493f9573594080ea4149c611e67f818))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.10 (2026-04-04)
 
 ### Bug Fixes
