@@ -1,7 +1,5 @@
 from datetime import UTC, datetime, timedelta
 
-import pytest
-
 import model
 from model import Playlist, PlaylistManager, PluginInstance, _sanitize_log_value
 
