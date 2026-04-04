@@ -332,6 +332,7 @@
       }
       // Add show/hide toggle buttons next to password inputs
       document.querySelectorAll('input[type="password"].form-input').forEach((input) => {
+        if (!input.value) return; // Skip unconfigured providers (empty input has no key to reveal)
         const toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "toggle-password-btn";
