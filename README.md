@@ -46,6 +46,28 @@ InkyPi is an open-source, customizable E-Ink display powered by a Raspberry Pi. 
 
 For documentation on building custom plugins, see [Building InkyPi Plugins](./docs/building_plugins.md).
 
+## What's New in This Fork
+
+This fork is under active development with a focus on stability, security, and UX polish.
+
+| Feature | This Fork | Upstream |
+|---------|:---------:|:--------:|
+| API Keys Management UI | :white_check_mark: | :x: |
+| Server-Side Settings Validation | :white_check_mark: | :x: |
+| SSRF & Path Traversal Protection | :white_check_mark: | :x: |
+| Image History Page with Pagination | :white_check_mark: | :x: |
+| HTTP Caching | :white_check_mark: | :x: |
+| Playlist UX (smart defaults, edit refresh) | :white_check_mark: | :x: |
+| Accessibility (ARIA, dialog semantics) | :white_check_mark: | :x: |
+| Fetch Timeouts & Error Feedback | :white_check_mark: | :x: |
+| 20 Built-in Plugins | :white_check_mark: | 14 |
+| Multi-threaded Server | :white_check_mark: | :x: |
+| Hourly Weather Display | :soon: | :white_check_mark: |
+| Display Saturation Setting | :soon: | :white_check_mark: |
+| Bi-color Display Support | :soon: | :white_check_mark: |
+
+:soon: = planned, tracking in [Linear backlog](https://linear.app/jtn0123/project/inkypi)
+
 ## Hardware 
 - Raspberry Pi (4 | 3 | Zero 2 W)
     - Recommended to get 40 pin Pre Soldered Header
