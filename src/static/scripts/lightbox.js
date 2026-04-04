@@ -180,6 +180,11 @@
     modal.classList.add('is-open');
     syncModalOpen();
 
+    // Make background inert for accessibility
+    Array.from(document.body.children).forEach(function(el) {
+      if (el !== modal && el.nodeType === 1) el.inert = true;
+    });
+
     // If already cached, trigger load immediately
     if (img.complete && img.naturalWidth > 0) {
       if (loader) loader.style.display = 'none';
@@ -198,6 +203,10 @@
       modal.setAttribute('hidden', '');
       modal.classList.remove('is-open');
     }
+    // Remove inert from background
+    Array.from(document.body.children).forEach(function(el) {
+      if (el.nodeType === 1) el.inert = false;
+    });
     syncModalOpen();
     // Restore focus to the element that opened the lightbox
     if (triggerElement && typeof triggerElement.focus === 'function') {
