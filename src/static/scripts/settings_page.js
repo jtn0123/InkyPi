@@ -1,4 +1,30 @@
 (function () {
+  function getFormSnapshot(form) {
+    const target = form || document.querySelector(".settings-form");
+    if (!target) return {};
+    const snap = {};
+    target.querySelectorAll("input, select, textarea").forEach(function (el) {
+      const key = el.name || el.id;
+      if (!key) return;
+      snap[key] = el.type === "checkbox" ? el.checked : el.value;
+    });
+    return snap;
+  }
+
+  function restoreFormFromSnapshot(form, snapshot) {
+    if (!form || !snapshot) return;
+    form.querySelectorAll("input, select, textarea").forEach(function (el) {
+      const key = el.name || el.id;
+      if (!key || !(key in snapshot)) return;
+      if (el.type === "checkbox") {
+        el.checked = snapshot[key];
+      } else {
+        el.value = snapshot[key];
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
   function createSettingsPage(config) {
     const ui = window.InkyPiUI || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -29,32 +55,6 @@
 
     // Dirty-state tracking for the Save button
     let _formSnapshot = null;
-
-    function getFormSnapshot(form) {
-      const target = form || document.querySelector(".settings-form");
-      if (!target) return {};
-      const snap = {};
-      target.querySelectorAll("input, select, textarea").forEach(function (el) {
-        const key = el.name || el.id;
-        if (!key) return;
-        snap[key] = el.type === "checkbox" ? el.checked : el.value;
-      });
-      return snap;
-    }
-
-    function restoreFormFromSnapshot(form, snapshot) {
-      if (!form || !snapshot) return;
-      form.querySelectorAll("input, select, textarea").forEach(function (el) {
-        const key = el.name || el.id;
-        if (!key || !(key in snapshot)) return;
-        if (el.type === "checkbox") {
-          el.checked = snapshot[key];
-        } else {
-          el.value = snapshot[key];
-        }
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-    }
 
     function checkDirty() {
       const saveBtn = document.getElementById("saveSettingsBtn");
@@ -112,7 +112,8 @@
           showResponseModal("failure", `Error! ${result.error}`);
           restoreFormFromSnapshot(form, _formSnapshot);
         }
-      } catch (_error) {
+      } catch (error) {
+        console.error("Settings save failed:", error);
         showResponseModal(
           "failure",
           "An error occurred while processing your request. Please try again."
