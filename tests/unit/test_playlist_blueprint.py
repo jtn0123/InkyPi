@@ -798,3 +798,44 @@ class TestEtaCacheThreadSafety:
 
         assert hasattr(pl_mod, "_eta_cache_lock")
         assert isinstance(pl_mod._eta_cache_lock, type(threading.Lock()))
+
+
+# ---------------------------------------------------------------------------
+# _default_overlap_warning helper tests
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultOverlapWarning:
+    def test_returns_warning_when_overlapping_default(self):
+        from blueprints.playlist import _default_overlap_warning
+        from model import Playlist
+
+        playlists = [Playlist("Default", "00:00", "24:00")]
+        from blueprints.playlist import _to_minutes
+
+        result = _default_overlap_warning(
+            _to_minutes("09:00"), _to_minutes("17:00"), playlists
+        )
+        assert result is not None
+        assert "Default" in result
+        assert "priority" in result
+
+    def test_returns_none_when_no_default(self):
+        from blueprints.playlist import _default_overlap_warning, _to_minutes
+        from model import Playlist
+
+        playlists = [Playlist("Work", "09:00", "17:00")]
+        result = _default_overlap_warning(
+            _to_minutes("06:00"), _to_minutes("08:00"), playlists
+        )
+        assert result is None
+
+    def test_returns_none_when_no_overlap(self):
+        from blueprints.playlist import _default_overlap_warning, _to_minutes
+        from model import Playlist
+
+        playlists = [Playlist("Default", "09:00", "17:00")]
+        result = _default_overlap_warning(
+            _to_minutes("18:00"), _to_minutes("20:00"), playlists
+        )
+        assert result is None
