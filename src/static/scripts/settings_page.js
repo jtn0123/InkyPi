@@ -27,31 +27,43 @@
     const target = form || document.querySelector(".settings-form");
     if (!target) return {};
     const snap = {};
-    target.querySelectorAll("input, select, textarea").forEach(function (el) {
+    for (const el of target.querySelectorAll("input, select, textarea")) {
       const key = el.name || el.id;
-      if (!key) return;
+      if (!key) continue;
       snap[key] = el.type === "checkbox" ? el.checked : el.value;
-    });
+    }
     return snap;
   }
 
   function restoreFormFromSnapshot(form, snapshot) {
     if (!form || !snapshot) return;
-    form.querySelectorAll("input, select, textarea").forEach(function (el) {
+    for (const el of form.querySelectorAll("input, select, textarea")) {
       const key = el.name || el.id;
-      if (!key || !(key in snapshot)) return;
+      if (!key || !(key in snapshot)) continue;
       if (el.type === "checkbox") {
         el.checked = snapshot[key];
       } else {
         el.value = snapshot[key];
       }
       el.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    }
+  }
+
+  function isErrorLine(line) {
+    return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
+  }
+
+  function isWarnLine(line) {
+    return /\bWARNING\b/i.test(line);
+  }
+
+  function prefKey(key) {
+    return `logs_${key}`;
   }
 
   function createSettingsPage(config) {
-    const ui = window.InkyPiUI || {};
-    const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
+    const ui = globalThis.InkyPiUI || {};
+    const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
     const state = {
       logsAutoScroll: true,
       logsWrap: true,
@@ -166,19 +178,7 @@
     }
 
     function toggleUseDeviceLocation(cb) {
-      state.attachGeo = !!(cb && cb.checked);
-    }
-
-    function prefKey(key) {
-      return `logs_${key}`;
-    }
-
-    function isErrorLine(line) {
-      return /\b(ERROR|CRITICAL|Exception|Traceback)\b/i.test(line);
-    }
-
-    function isWarnLine(line) {
-      return /\bWARNING\b/i.test(line);
+      state.attachGeo = !!(cb?.checked);
     }
 
     function updateLastUpdated() {
@@ -202,11 +202,11 @@
       const levelSelect = document.getElementById("logsLevel");
       const maxLinesInput = document.getElementById("logsMaxLines");
 
-      const filterText = (filterInput && filterInput.value || "").toLowerCase();
-      const level = (levelSelect && levelSelect.value) || "all";
+      const filterText = (filterInput?.value || "").toLowerCase();
+      const level = levelSelect?.value || "all";
       const maxLines = Math.max(
         50,
-        parseInt((maxLinesInput && maxLinesInput.value) || "500", 10)
+        parseInt(maxLinesInput?.value || "500", 10)
       );
       const atBottom = isViewerAtBottom(viewer);
 
@@ -251,7 +251,7 @@
         const params = new URLSearchParams();
         params.set("hours", String(hoursSelect ? hoursSelect.value : "2"));
         if (levelSelect) params.set("level", levelSelect.value || "all");
-        if (filterInput && filterInput.value) {
+        if (filterInput?.value) {
           params.set("contains", filterInput.value);
         }
         if (maxLinesInput) {
@@ -282,7 +282,7 @@
           ? "Auto-Scroll: On"
           : "Auto-Scroll: Off";
       }
-      ui.savePref && ui.savePref("", prefKey("autoScroll"), state.logsAutoScroll);
+      ui.savePref?.("", prefKey("autoScroll"), state.logsAutoScroll);
     }
 
     function onLogsControlsChanged() {
@@ -394,7 +394,7 @@
       const btn = document.getElementById("logsWrapBtn");
       if (viewer) viewer.style.whiteSpace = state.logsWrap ? "pre-wrap" : "pre";
       if (btn) btn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
-      ui.savePref && ui.savePref("", prefKey("wrap"), state.logsWrap);
+      ui.savePref?.("", prefKey("wrap"), state.logsWrap);
     }
 
     async function checkForUpdates() {
@@ -428,6 +428,7 @@
           notesContainer.hidden = true;
         }
       } catch (e) {
+        console.warn("Version check failed:", e);
         if (badge) { badge.textContent = "Check failed"; badge.className = "status-chip"; }
       }
     }
@@ -435,9 +436,9 @@
     async function startUpdate() {
       const btns = document.querySelectorAll(".header-actions .header-button");
       try {
-        btns.forEach((btn) => {
+        for (const btn of btns) {
           btn.disabled = true;
-        });
+        }
         const resp = await fetch(config.startUpdateUrl, { method: "POST" });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
@@ -451,23 +452,25 @@
             await fetchAndRenderLogs();
             const sresp = await fetch(config.updateStatusUrl);
             const sdata = await sresp.json();
-            if (!sdata || !sdata.running) {
+            if (!sdata?.running) {
               clearInterval(state.updateTimer);
               state.updateTimer = null;
               setTimeout(fetchAndRenderLogs, 500);
               checkForUpdates();
             }
           } catch (e) {
+            console.warn("Update status poll failed:", e);
             clearInterval(state.updateTimer);
             state.updateTimer = null;
           }
         }, 2000);
       } catch (e) {
+        console.warn("Failed to start update:", e);
         showResponseModal("failure", "Failed to start update");
       } finally {
-        btns.forEach((btn) => {
+        for (const btn of btns) {
           btn.disabled = false;
-        });
+        }
       }
     }
 
@@ -543,7 +546,7 @@
     }
 
     async function refreshBenchmarks() {
-      ui.setPanelLoading && ui.setPanelLoading("benchSummary", true);
+      ui.setPanelLoading?.("benchSummary", true);
       try {
         const [summaryResp, pluginsResp] = await Promise.all([
           fetch("/api/benchmarks/summary?window=24h", { cache: "no-store" }),
@@ -560,15 +563,16 @@
         ];
         document.getElementById("benchSummary").textContent = output.join("\n");
       } catch (e) {
+        console.warn("Failed to load benchmark summary:", e);
         document.getElementById("benchSummary").textContent =
           "Failed to load benchmark summary";
       } finally {
-        ui.setPanelLoading && ui.setPanelLoading("benchSummary", false);
+        ui.setPanelLoading?.("benchSummary", false);
       }
     }
 
     async function refreshHealth() {
-      ui.setPanelLoading && ui.setPanelLoading("healthSummary", true);
+      ui.setPanelLoading?.("healthSummary", true);
       try {
         const [pluginsResp, systemResp] = await Promise.all([
           fetch("/api/health/plugins", { cache: "no-store" }),
@@ -585,15 +589,16 @@
         ];
         document.getElementById("healthSummary").textContent = output.join("\n");
       } catch (e) {
+        console.warn("Failed to load health data:", e);
         document.getElementById("healthSummary").textContent =
           "Failed to load health data";
       } finally {
-        ui.setPanelLoading && ui.setPanelLoading("healthSummary", false);
+        ui.setPanelLoading?.("healthSummary", false);
       }
     }
 
     async function refreshIsolation() {
-      ui.setPanelLoading && ui.setPanelLoading("isolationSummary", true);
+      ui.setPanelLoading?.("isolationSummary", true);
       try {
         const resp = await fetch("/settings/isolation", { cache: "no-store" });
         const data = await resp.json();
@@ -603,10 +608,11 @@
           2
         );
       } catch (e) {
+        console.warn("Failed to load isolation list:", e);
         document.getElementById("isolationSummary").textContent =
           "Failed to load isolation list";
       } finally {
-        ui.setPanelLoading && ui.setPanelLoading("isolationSummary", false);
+        ui.setPanelLoading?.("isolationSummary", false);
       }
     }
 
@@ -645,6 +651,7 @@
           showResponseModal("failure", data.error || "Safe reset failed");
         }
       } catch (e) {
+        console.warn("Safe reset failed:", e);
         showResponseModal("failure", "Safe reset failed");
       }
     }
@@ -653,7 +660,7 @@
 
     function initProgressSSE() {
       try {
-        if (!window.EventSource) return;
+        if (!globalThis.EventSource) return;
         _progressES = new EventSource("/api/progress/stream");
         const refresh = () => refreshHealth();
         _progressES.addEventListener("done", refresh);
@@ -689,10 +696,9 @@
       }
 
       state.logsAutoScroll =
-        (ui.loadPref && ui.loadPref("", prefKey("autoScroll"), "true")) ===
-        "true";
+        (ui.loadPref?.("", prefKey("autoScroll"), "true")) === "true";
       state.logsWrap =
-        (ui.loadPref && ui.loadPref("", prefKey("wrap"), "true")) === "true";
+        (ui.loadPref?.("", prefKey("wrap"), "true")) === "true";
       if (autoBtn) {
         autoBtn.textContent = state.logsAutoScroll
           ? "Auto-Scroll: On"
@@ -733,25 +739,25 @@
 
     function setActiveTab(tab) {
       state.activeTab = tab;
-      document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+      for (const button of document.querySelectorAll("[data-settings-tab]")) {
         const isActive = button.dataset.settingsTab === tab;
         button.classList.toggle("active", isActive);
         if (isActive && mobileQuery.matches) {
           button.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
         }
-      });
-      document.querySelectorAll("[data-settings-panel]").forEach((panel) => {
+      }
+      for (const panel of document.querySelectorAll("[data-settings-panel]")) {
         const isActive = panel.dataset.settingsPanel === tab;
         panel.classList.toggle("active", isActive);
         panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-      });
+      }
       initializeMobilePanelState();
     }
 
     function initializeTabs() {
-      document.querySelectorAll("[data-settings-tab]").forEach((button) => {
+      for (const button of document.querySelectorAll("[data-settings-tab]")) {
         button.addEventListener("click", () => setActiveTab(button.dataset.settingsTab));
-      });
+      }
       setActiveTab("device");
     }
 
@@ -799,9 +805,9 @@
     }
 
     function bindButtons() {
-      document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
-        button.addEventListener("click", () => ui.toggleCollapsible && ui.toggleCollapsible(button));
-      });
+      for (const button of document.querySelectorAll("[data-collapsible-toggle]")) {
+        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
+      }
 
       // Dirty-state: snapshot initial form values and disable Save until something changes
       const saveBtn = document.getElementById("saveSettingsBtn");
@@ -835,12 +841,12 @@
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);
       });
-      document.querySelectorAll(".settings-slider").forEach((slider) => {
+      for (const slider of document.querySelectorAll(".settings-slider")) {
         slider.addEventListener("input", () => {
           const valueDisplay = document.getElementById(`${slider.id}-value`);
           if (valueDisplay) valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
         });
-      });
+      }
     }
 
     function init() {
@@ -858,7 +864,7 @@
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setActiveTab(state.activeTab));
       }
-      window.addEventListener("beforeunload", () => {
+      globalThis.addEventListener("beforeunload", () => {
         if (state.updateTimer) {
           clearInterval(state.updateTimer);
           state.updateTimer = null;
@@ -870,7 +876,7 @@
       });
     }
 
-    Object.assign(window, {
+    Object.assign(globalThis, {
       checkForUpdates,
       exportConfig,
       handleAction,
@@ -897,5 +903,5 @@
     return { init };
   }
 
-  window.InkyPiSettingsPage = { create: createSettingsPage };
+  globalThis.InkyPiSettingsPage = { create: createSettingsPage };
 })();
