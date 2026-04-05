@@ -17,33 +17,44 @@
     return true;
   }
 
+  function syncModalOpenState(ui) {
+    if (ui?.syncModalOpenState) return ui.syncModalOpenState();
+    const open = document.querySelector(".modal.is-open");
+    document.body.classList.toggle("modal-open", !!open);
+  }
+
+  function setHidden(node, hidden) {
+    if (!node) return;
+    node.hidden = hidden;
+    node.classList.toggle("is-hidden", hidden);
+  }
+
+  function buildProgressKey(ctx, config) {
+    if (ctx && ctx.page === "plugin") {
+      const pid = ctx.pluginId || config.pluginId;
+      const inst = ctx.instance || "";
+      return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || "_"}`;
+    }
+    return "INKYPI_LAST_PROGRESS";
+  }
+
+  function fadeSkeleton(skel) {
+    if (!skel) return;
+    skel.classList.add('is-hidden');
+    skel.addEventListener('transitionend', () => { skel.style.display = 'none'; }, { once: true });
+  }
+
+  function updateCombinedColorPreview(combined, bgPicker, textPicker) {
+    combined.style.background = bgPicker.value;
+    combined.style.color = textPicker.value;
+  }
+
   function createPluginPage(config) {
-    const ui = window.InkyPiUI || {};
-    const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
-    const uploadedFiles = (window.uploadedFiles = window.uploadedFiles || {});
+    const ui = globalThis.InkyPiUI || {};
+    const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
+    const uploadedFiles = (globalThis.uploadedFiles = globalThis.uploadedFiles || {});
     let actionInFlight = false;
     let workflowMode = "configure";
-
-    function syncModalOpenState() {
-      if (ui.syncModalOpenState) return ui.syncModalOpenState();
-      const open = document.querySelector(".modal.is-open");
-      document.body.classList.toggle("modal-open", !!open);
-    }
-
-    function setHidden(node, hidden) {
-      if (!node) return;
-      node.hidden = hidden;
-      node.classList.toggle("is-hidden", hidden);
-    }
-
-    function buildProgressKey(ctx) {
-      if (ctx && ctx.page === "plugin") {
-        const pid = ctx.pluginId || config.pluginId;
-        const inst = ctx.instance || "";
-        return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || "_"}`;
-      }
-      return "INKYPI_LAST_PROGRESS";
-    }
 
     function saveLastProgressSnapshot(context) {
       try {
@@ -65,7 +76,7 @@
           lines,
           ctx: context || config.progressContext,
         };
-        localStorage.setItem(buildProgressKey(data.ctx), JSON.stringify(data));
+        localStorage.setItem(buildProgressKey(data.ctx, config), JSON.stringify(data));
         localStorage.setItem("INKYPI_LAST_PROGRESS", JSON.stringify(data));
       } catch (e) { console.warn("Failed to save progress snapshot:", e); }
     }
@@ -73,7 +84,7 @@
     function showLastProgress() {
       try {
         const keys = [
-          buildProgressKey(config.progressContext),
+          buildProgressKey(config.progressContext, config),
           `INKYPI_LAST_PROGRESS:plugin:${config.pluginId}:_`,
           "INKYPI_LAST_PROGRESS",
         ];
@@ -212,8 +223,8 @@
 
       // Validate settingsForm required fields (catches empty calendar URLs, etc.)
       const settingsForm = document.getElementById("settingsForm");
-      if (settingsForm && window.FormValidator) {
-        const errorCount = window.FormValidator.validateAllInputs(settingsForm);
+      if (settingsForm && globalThis.FormValidator) {
+        const errorCount = globalThis.FormValidator.validateAllInputs(settingsForm);
         if (errorCount > 0) {
           showResponseModal("failure",
             errorCount + (errorCount === 1 ? " field needs" : " fields need") + " fixing before saving.");
@@ -225,8 +236,8 @@
 
       if (action === "add_to_playlist") {
         const scheduleForm = document.getElementById("scheduleForm");
-        if (scheduleForm && window.FormValidator) {
-          const scheduleErrors = window.FormValidator.validateAllInputs(scheduleForm);
+        if (scheduleForm && globalThis.FormValidator) {
+          const scheduleErrors = globalThis.FormValidator.validateAllInputs(scheduleForm);
           if (scheduleErrors > 0) {
             showResponseModal("failure",
               scheduleErrors + (scheduleErrors === 1 ? " field needs" : " fields need") + " fixing before saving.");
@@ -273,13 +284,13 @@
       try {
         const res = await fetch(config.refreshInfoUrl);
         const info = await res.json();
-        const ts = info && info.refresh_time ? new Date(info.refresh_time) : null;
+        const ts = info?.refresh_time ? new Date(info.refresh_time) : null;
         const currTime = document.getElementById("currentDisplayTime");
         if (currTime) currTime.textContent = ts ? ts.toLocaleString() : "—";
         const metaDiv = document.getElementById("pluginMeta");
         const metaContent = document.getElementById("pluginMetaContent");
         renderMetaBlock(metaDiv, metaContent, info);
-      } catch (e) {}
+      } catch (e) { console.warn("Failed to refresh preview info:", e); }
     }
 
     function openModal(modalId) {
@@ -288,7 +299,7 @@
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
-      syncModalOpenState();
+      syncModalOpenState(ui);
     }
 
     function closeModal(modalId) {
@@ -297,7 +308,7 @@
       modal.hidden = true;
       modal.style.display = "none";
       modal.classList.remove("is-open");
-      syncModalOpenState();
+      syncModalOpenState(ui);
     }
 
     function selectedFrame(element) {
@@ -314,7 +325,7 @@
       const fileNameText = document.getElementById("fileNameText");
       const uploadButtonLabel = document.getElementById("uploadButtonLabel");
       const removeFileButton = document.getElementById("removeFileButton");
-      const file = fileInput && fileInput.files && fileInput.files[0];
+      const file = fileInput?.files?.[0];
       if (!fileNameDisplay || !fileNameText || !uploadButtonLabel || !removeFileButton) {
         return;
       }
@@ -362,7 +373,7 @@
           cache: "no-store",
         });
         if (response.ok) return url;
-      } catch (error) {}
+      } catch (error) { console.warn("Failed to probe image URL:", probeUrl, error); }
       return null;
     }
 
@@ -451,12 +462,6 @@
       refreshInstancePreview();
     }
 
-    function fadeSkeleton(skel) {
-      if (!skel) return;
-      skel.classList.add('is-hidden');
-      skel.addEventListener('transitionend', () => { skel.style.display = 'none'; }, { once: true });
-    }
-
     function initPreviewInteractions() {
       const previewImg = document.getElementById("previewImage");
       const instanceImg = document.getElementById("instancePreviewImage");
@@ -468,8 +473,8 @@
         const nativeWidth = previewImg.dataset.nativeWidth || config.resolution[0];
         const nativeHeight = previewImg.dataset.nativeHeight || config.resolution[1];
         previewImg.addEventListener("click", () => {
-          if (previewImg.src && window.Lightbox) {
-            window.Lightbox.open(previewImg.src, previewImg.alt);
+          if (previewImg.src && globalThis.Lightbox) {
+            globalThis.Lightbox.open(previewImg.src, previewImg.alt);
           }
         });
         if (!container.closest(".status-card.compact")) {
@@ -493,17 +498,17 @@
           if (
             instanceImg.src &&
             !instanceImg.hidden &&
-            window.Lightbox
+            globalThis.Lightbox
           ) {
-            window.Lightbox.open(instanceImg.src, instanceImg.alt);
+            globalThis.Lightbox.open(instanceImg.src, instanceImg.alt);
           }
         });
       }
       document.addEventListener("click", (event) => {
         const img = event.target.closest("img.lightboxable");
-        if (!img || !window.Lightbox || !img.src) return;
+        if (!img || !globalThis.Lightbox || !img.src) return;
         event.preventDefault();
-        window.Lightbox.open(img.src, img.alt || "Preview");
+        globalThis.Lightbox.open(img.src, img.alt || "Preview");
       });
       const toggle = document.getElementById("toggleDeviceFrame");
       const overlay = document.getElementById("deviceFrameOverlay");
@@ -530,7 +535,7 @@
     }
 
     function bindModalClose() {
-      window.addEventListener("click", (event) => {
+      globalThis.addEventListener("click", (event) => {
         if (actionInFlight) return;
         const modal = document.getElementById("scheduleModal");
         if (event.target === modal) {
@@ -608,7 +613,7 @@
       document.querySelector("[data-background-upload]")?.addEventListener("change", showFileName);
       document.getElementById("removeFileButton")?.addEventListener("click", removeFile);
       document.querySelectorAll("[data-lightbox-close]").forEach((button) => {
-        button.addEventListener("click", () => window.Lightbox && window.Lightbox.close());
+        button.addEventListener("click", () => globalThis.Lightbox?.close());
       });
     }
 
@@ -637,13 +642,9 @@
           const textGroup = textPicker.closest(".form-group");
           if (textGroup) textGroup.appendChild(combined);
         }
-        function updateCombined() {
-          combined.style.background = bgPicker.value;
-          combined.style.color = textPicker.value;
-        }
-        updateCombined();
-        bgPicker.addEventListener("input", updateCombined);
-        textPicker.addEventListener("input", updateCombined);
+        updateCombinedColorPreview(combined, bgPicker, textPicker);
+        bgPicker.addEventListener("input", () => updateCombinedColorPreview(combined, bgPicker, textPicker));
+        textPicker.addEventListener("input", () => updateCombinedColorPreview(combined, bgPicker, textPicker));
       }
     }
 
@@ -651,8 +652,8 @@
       populateStyleSettings();
       bindControls();
       const scheduleForm = document.getElementById("scheduleForm");
-      if (scheduleForm && window.FormValidator && window.FormValidator.initFormValidation) {
-        window.FormValidator.initFormValidation(scheduleForm);
+      if (scheduleForm && globalThis.FormValidator?.initFormValidation) {
+        globalThis.FormValidator.initFormValidation(scheduleForm);
       }
       bindWorkflowMode();
       initStatusBar();
@@ -665,7 +666,7 @@
       }
     }
 
-    Object.assign(window, {
+    Object.assign(globalThis, {
       closeModal,
       displayInstanceNow,
       handleAction,
@@ -682,5 +683,5 @@
     return { init };
   }
 
-  window.InkyPiPluginPage = { create: createPluginPage };
+  globalThis.InkyPiPluginPage = { create: createPluginPage };
 })();
