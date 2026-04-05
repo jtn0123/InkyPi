@@ -137,7 +137,14 @@ def test_dashboard_shows_unavailable_message_when_preview_exists_but_no_plugin_i
     img = Image.new("RGB", (10, 10), "black")
     img.save(device_config_dev.processed_image_file)
 
-    # Ensure refresh_info has no plugin_id (default state)
+    # Explicitly ensure refresh_info has no plugin_id
+    import model
+
+    ri = device_config_dev.get_refresh_info()
+    ri.plugin_id = None
+    device_config_dev.config["refresh_info"] = ri.to_dict()
+    device_config_dev.write_config()
+
     resp = client.get("/")
     assert resp.status_code == 200
     assert b"Last display info unavailable." in resp.data
@@ -159,6 +166,12 @@ def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
             os.remove(path)
         except FileNotFoundError:
             pass
+
+    # Explicitly ensure refresh_info has no plugin_id
+    ri = device_config_dev.get_refresh_info()
+    ri.plugin_id = None
+    device_config_dev.config["refresh_info"] = ri.to_dict()
+    device_config_dev.write_config()
 
     resp = client.get("/")
     assert resp.status_code == 200

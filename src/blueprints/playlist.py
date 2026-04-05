@@ -100,7 +100,7 @@ def _default_overlap_warning(start_min, end_min, playlists):
                     )
                 break
     except Exception:
-        pass
+        logger.debug("Could not compute Default overlap warning", exc_info=True)
     return None
 
 

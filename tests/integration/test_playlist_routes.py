@@ -153,6 +153,10 @@ def test_update_playlist_overlapping_default_returns_warning(client, device_conf
 
 def test_update_default_playlist_does_not_warn_about_itself(client, device_config_dev):
     """Updating the Default playlist itself should not emit a warning about overlapping Default."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+        device_config_dev.write_config()
     upd = {
         "new_name": "Default",
         "start_time": "00:00",
