@@ -62,11 +62,9 @@ This fork is under active development with a focus on stability, security, and U
 | Fetch Timeouts & Error Feedback | :white_check_mark: | :x: |
 | 20 Built-in Plugins | :white_check_mark: | 14 |
 | Multi-threaded Server | :white_check_mark: | :x: |
-| Hourly Weather Display | :soon: | :white_check_mark: |
-| Display Saturation Setting | :soon: | :white_check_mark: |
-| Bi-color Display Support | :soon: | :white_check_mark: |
-
-:soon: = planned, tracking in [Linear backlog](https://linear.app/jtn0123/project/inkypi)
+| Hourly Weather Display | :white_check_mark: | :white_check_mark: |
+| Display Saturation Setting | :white_check_mark: | :white_check_mark: |
+| Bi-color Display Support | :white_check_mark: | :white_check_mark: |
 
 ## Hardware 
 - Raspberry Pi (4 | 3 | Zero 2 W)
