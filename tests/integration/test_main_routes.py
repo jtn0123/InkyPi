@@ -138,8 +138,6 @@ def test_dashboard_shows_unavailable_message_when_preview_exists_but_no_plugin_i
     img.save(device_config_dev.processed_image_file)
 
     # Explicitly ensure refresh_info has no plugin_id
-    import model
-
     ri = device_config_dev.get_refresh_info()
     ri.plugin_id = None
     device_config_dev.config["refresh_info"] = ri.to_dict()
