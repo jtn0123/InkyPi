@@ -98,25 +98,35 @@ def test_toggle_only_fresh_and_snooze(client, device_config_dev):
 # JTN-217: Overlap-with-Default warning
 
 
+def _ensure_default_playlist(device_config_dev):
+    """Ensure a Default (00:00-24:00) playlist exists in the config."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+        device_config_dev.write_config()
+
+
+def _assert_overlap_warning(data):
+    """Assert the response includes a Default-overlap warning."""
+    assert "warning" in data
+    assert "Default" in data["warning"]
+    assert "priority" in data["warning"]
+
+
 def test_create_playlist_overlapping_default_returns_warning(client, device_config_dev):
     """Creating a playlist whose hours overlap Default should succeed and return a warning."""
-    pm = device_config_dev.get_playlist_manager()
-    pm.add_playlist("Default", "00:00", "24:00")
-    device_config_dev.write_config()
+    _ensure_default_playlist(device_config_dev)
 
     payload = {"playlist_name": "Morning", "start_time": "06:00", "end_time": "09:00"}
     resp = client.post("/create_playlist", json=payload)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("success") is True
-    assert "warning" in data
-    assert "Default" in data["warning"]
-    assert "priority" in data["warning"]
+    _assert_overlap_warning(data)
 
 
 def test_create_default_playlist_does_not_warn_about_itself(client, device_config_dev):
     """Creating a playlist named 'Default' should not emit a warning about overlapping Default."""
-    # The config auto-creates a Default (00:00-24:00); delete it first so we can re-create it
     pm = device_config_dev.get_playlist_manager()
     pm.delete_playlist("Default")
     device_config_dev.write_config()
@@ -126,16 +136,16 @@ def test_create_default_playlist_does_not_warn_about_itself(client, device_confi
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("success") is True
-    # The Default playlist should not warn about overlapping with itself
     assert "warning" not in data or data.get("warning") is None
 
 
 def test_update_playlist_overlapping_default_returns_warning(client, device_config_dev):
     """Updating a playlist so its hours overlap Default should succeed and return a warning."""
+    _ensure_default_playlist(device_config_dev)
     pm = device_config_dev.get_playlist_manager()
-    pm.add_playlist("Default", "00:00", "24:00")
-    pm.add_playlist("Morning", "06:00", "09:00")
-    device_config_dev.write_config()
+    if not pm.get_playlist("Morning"):
+        pm.add_playlist("Morning", "06:00", "09:00")
+        device_config_dev.write_config()
 
     upd = {
         "new_name": "Morning",
@@ -146,17 +156,12 @@ def test_update_playlist_overlapping_default_returns_warning(client, device_conf
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("success") is True
-    assert "warning" in data
-    assert "Default" in data["warning"]
-    assert "priority" in data["warning"]
+    _assert_overlap_warning(data)
 
 
 def test_update_default_playlist_does_not_warn_about_itself(client, device_config_dev):
     """Updating the Default playlist itself should not emit a warning about overlapping Default."""
-    pm = device_config_dev.get_playlist_manager()
-    if not pm.get_playlist("Default"):
-        pm.add_playlist("Default", "00:00", "24:00")
-        device_config_dev.write_config()
+    _ensure_default_playlist(device_config_dev)
     upd = {
         "new_name": "Default",
         "start_time": "00:00",
@@ -166,5 +171,4 @@ def test_update_default_playlist_does_not_warn_about_itself(client, device_confi
     assert resp.status_code == 200
     data = resp.get_json()
     assert data.get("success") is True
-    # Updating Default should not warn about overlapping with itself
     assert "warning" not in data or data.get("warning") is None
