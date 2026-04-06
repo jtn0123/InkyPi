@@ -86,6 +86,32 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
     assert b'data-page-shell="dashboard"' in resp.data
 
 
+def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):
+    """JTN-214: Plugin cards must render with valid href attributes."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # Each plugin should have a link to its plugin page
+    # The test client's config should have at least one plugin registered
+    assert b'class="plugin-item"' in resp.data
+    assert b'href="/plugin/' in resp.data
+
+
+def test_plugin_page_accessible_from_dashboard_links(client, device_config_dev):
+    """JTN-214: Links from dashboard plugin cards should serve plugin pages."""
+    import re
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # Extract plugin hrefs from the response
+    hrefs = re.findall(rb'href="(/plugin/[^"]+)"', resp.data)
+    assert len(hrefs) > 0, "Dashboard should have at least one plugin link"
+    for href in hrefs:
+        plugin_resp = client.get(href.decode())
+        assert (
+            plugin_resp.status_code == 200
+        ), f"Plugin page {href.decode()} should be accessible"
+
+
 def test_next_up_endpoint_and_ssr(client, device_config_dev):
     # Seed playlist with two items so peek returns the second when index is None (first is candidate)
     pm = device_config_dev.get_playlist_manager()
