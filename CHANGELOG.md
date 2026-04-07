@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.4.22 (2026-04-07)
+
+### Bug Fixes
+
+- Eliminate TOCTOU race in start_update (JTN-249)
+  ([#166](https://github.com/jtn0123/InkyPi/pull/166),
+  [`465e7b7`](https://github.com/jtn0123/InkyPi/commit/465e7b72f5d94f601a88161af0154ab961a7b38f))
+
+* fix: eliminate TOCTOU race in start_update by atomically checking and setting running state
+
+The update guard previously released _update_lock after the running check but before flipping state,
+  allowing two concurrent requests to both pass the guard. The check and state mutation are now
+  inlined inside the same lock acquisition. Added TestStartUpdateTOCTOURace with an atomicity
+  assertion and a concurrent-request test verifying exactly one 200 and one 409.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: add TOCTOU race guard tests for start_update (JTN-249)
+
+Verify that concurrent POST /settings/update requests cannot both succeed (one must get 409), and
+  that the running-flag flip happens while the lock is still held — proving check-and-set atomicity.
+
+* fix: release lock if accidentally acquired in TOCTOU test
+
+In _SpyDict.__setitem__, if acquire(blocking=False) unexpectedly succeeds, the lock is now released
+  immediately to prevent deadlock/leak.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Enforce min cycle interval and validate new_name in update_playlist
+  ([#163](https://github.com/jtn0123/InkyPi/pull/163),
+  [`e33219c`](https://github.com/jtn0123/InkyPi/commit/e33219ced4f18cedd2c90e96398e0ce034e9dda9))
+
+JTN-232: Change max(0, cm) to max(1, cm) in _apply_cycle_override so cycle_minutes=0 produces 60
+  seconds instead of 0, preventing an infinite loop in the refresh scheduler.
+
+JTN-256: Call _validate_playlist_name() on new_name in update_playlist, matching the validation
+  already present in create_playlist. Rejects names with special characters or over 64 chars with a
+  400 error.
+
+Adds three regression tests covering both fixes.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Escape HTML in innerHTML interpolations to prevent XSS (JTN-242, JTN-243)
+  ([#165](https://github.com/jtn0123/InkyPi/pull/165),
+  [`74aa692`](https://github.com/jtn0123/InkyPi/commit/74aa692bb72b39776dff1e4867d3e298e377d234))
+
+Add escapeHtml helpers in progressive_disclosure.js, enhanced_progress.js, and skeleton_loader.js;
+  apply them wherever user-controlled or server-supplied strings are interpolated into innerHTML
+  template literals. Add structural tests verifying the escape pattern is present in each file.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.21 (2026-04-07)
 
 ### Bug Fixes
