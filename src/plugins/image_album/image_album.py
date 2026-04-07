@@ -7,6 +7,7 @@ from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.http_client import get_http_session
 from utils.image_utils import pad_image_blur
+from utils.security_utils import validate_url
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +216,11 @@ class ImageAlbum(BasePlugin):
                 if not url:
                     logger.error("Immich URL not provided")
                     raise RuntimeError("Immich URL is required.")
+
+                try:
+                    validate_url(url)
+                except ValueError as e:
+                    raise RuntimeError(f"Invalid URL: {e}") from e
 
                 album = settings.get("album")
                 if not album:

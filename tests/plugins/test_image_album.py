@@ -1,10 +1,14 @@
 # pyright: reportMissingImports=false
+import socket
 from contextlib import ExitStack, contextmanager
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+
+# A fake public DNS response used by tests that need validate_url to pass.
+_PUBLIC_DNS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
 
 
 def _png_bytes(size=(100, 80), color="blue"):
@@ -66,6 +70,7 @@ def test_image_album_generate_success(monkeypatch, plugin_config, device_config_
 
     monkeypatch.setenv("IMMICH_KEY", "test-key")
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
 
     albums = [{"albumName": "Vacation", "id": "album-1"}]
     assets = [{"id": "asset-1"}]
@@ -77,7 +82,7 @@ def test_image_album_generate_success(monkeypatch, plugin_config, device_config_
         result = p.generate_image(
             {
                 "albumProvider": "Immich",
-                "url": "http://immich.local",
+                "url": "http://immich.example.com",
                 "album": "Vacation",
             },
             device_config_dev,
@@ -96,7 +101,7 @@ def test_image_album_missing_key(monkeypatch, plugin_config, device_config_dev):
         p.generate_image(
             {
                 "albumProvider": "Immich",
-                "url": "http://immich.local",
+                "url": "http://immich.example.com",
                 "album": "Vacation",
             },
             device_config_dev,
@@ -120,11 +125,16 @@ def test_image_album_missing_album(monkeypatch, plugin_config, device_config_dev
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
 
     p = ImageAlbum(plugin_config)
     with pytest.raises(RuntimeError, match="Album name"):
         p.generate_image(
-            {"albumProvider": "Immich", "url": "http://immich.local", "album": ""},
+            {
+                "albumProvider": "Immich",
+                "url": "http://immich.example.com",
+                "album": "",
+            },
             device_config_dev,
         )
 
@@ -146,6 +156,7 @@ def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev)
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
 
     albums = [{"albumName": "Empty", "id": "album-2"}]
     session = _make_mock_session(albums, [], _png_bytes())
@@ -155,7 +166,7 @@ def test_image_album_empty_assets(monkeypatch, plugin_config, device_config_dev)
             p.generate_image(
                 {
                     "albumProvider": "Immich",
-                    "url": "http://immich.local",
+                    "url": "http://immich.example.com",
                     "album": "Empty",
                 },
                 device_config_dev,
@@ -166,6 +177,7 @@ def test_image_album_padding_blur(monkeypatch, plugin_config, device_config_dev)
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
 
     albums = [{"albumName": "Photos", "id": "album-3"}]
     assets = [{"id": "asset-2"}]
@@ -177,7 +189,7 @@ def test_image_album_padding_blur(monkeypatch, plugin_config, device_config_dev)
         result = p.generate_image(
             {
                 "albumProvider": "Immich",
-                "url": "http://immich.local",
+                "url": "http://immich.example.com",
                 "album": "Photos",
                 "padImage": "true",
                 "backgroundOption": "blur",
@@ -191,6 +203,7 @@ def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
 
     albums = [{"albumName": "Photos", "id": "album-3"}]
     assets = [{"id": "asset-2"}]
@@ -202,7 +215,7 @@ def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev
         result = p.generate_image(
             {
                 "albumProvider": "Immich",
-                "url": "http://immich.local",
+                "url": "http://immich.example.com",
                 "album": "Photos",
                 "padImage": "true",
                 "backgroundOption": "color",
@@ -213,10 +226,85 @@ def test_image_album_padding_color(monkeypatch, plugin_config, device_config_dev
     assert isinstance(result, Image.Image)
 
 
+def test_image_album_rejects_localhost_url(
+    monkeypatch, plugin_config, device_config_dev
+):
+    """ImageAlbum plugin must reject localhost Immich base URLs."""
+    from plugins.image_album.image_album import ImageAlbum
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+
+    p = ImageAlbum(plugin_config)
+    with pytest.raises(RuntimeError, match="Invalid URL"):
+        p.generate_image(
+            {
+                "albumProvider": "Immich",
+                "url": "http://localhost:2283",
+                "album": "Vacation",
+            },
+            device_config_dev,
+        )
+
+
+def test_image_album_rejects_private_ip_url(
+    monkeypatch, plugin_config, device_config_dev
+):
+    """ImageAlbum plugin must reject private IP Immich base URLs."""
+    from plugins.image_album.image_album import ImageAlbum
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.100", 0))
+        ],
+    )
+
+    p = ImageAlbum(plugin_config)
+    with pytest.raises(RuntimeError, match="Invalid URL"):
+        p.generate_image(
+            {
+                "albumProvider": "Immich",
+                "url": "http://internal.corp.example.com:2283",
+                "album": "Vacation",
+            },
+            device_config_dev,
+        )
+
+
+def test_image_album_rejects_metadata_endpoint_url(
+    monkeypatch, plugin_config, device_config_dev
+):
+    """ImageAlbum plugin must reject cloud metadata endpoint Immich base URLs."""
+    from plugins.image_album.image_album import ImageAlbum
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("169.254.169.254", 0))
+        ],
+    )
+
+    p = ImageAlbum(plugin_config)
+    with pytest.raises(RuntimeError, match="Invalid URL"):
+        p.generate_image(
+            {
+                "albumProvider": "Immich",
+                "url": "http://169.254.169.254",
+                "album": "Vacation",
+            },
+            device_config_dev,
+        )
+
+
 def test_image_album_vertical(monkeypatch, plugin_config, device_config_dev):
     from plugins.image_album.image_album import ImageAlbum
 
     monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "test-key")
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **kw: _PUBLIC_DNS)
     device_config_dev.update_value("orientation", "vertical")
 
     albums = [{"albumName": "Vacation", "id": "album-1"}]
@@ -229,7 +317,7 @@ def test_image_album_vertical(monkeypatch, plugin_config, device_config_dev):
         result = p.generate_image(
             {
                 "albumProvider": "Immich",
-                "url": "http://immich.local",
+                "url": "http://immich.example.com",
                 "album": "Vacation",
             },
             device_config_dev,
