@@ -507,7 +507,11 @@
         try {
             const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
             const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){ closeModal(); location.reload(); }
+            if (response.ok && result && result.success){
+                closeModal();
+                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                location.reload();
+            }
         } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 
@@ -521,7 +525,11 @@
         try {
             const response = await fetch(C.update_playlist_base_url + oldName, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
             const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){ closeModal(); location.reload(); }
+            if (response.ok && result && result.success){
+                closeModal();
+                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                location.reload();
+            }
         } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
     }
 

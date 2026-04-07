@@ -110,7 +110,11 @@
 
                     <div id="overviewEmpty" class="dashboard-overview-empty" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
                         {{ icon('monitor', 'empty-state-icon') | safe }}
+                        {% if has_preview %}
+                        <p>Last display info unavailable.</p>
+                        {% else %}
                         <p>Display a plugin to see details here.</p>
+                        {% endif %}
                     </div>
                 </aside>
             </div>
