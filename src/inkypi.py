@@ -378,11 +378,20 @@ def _setup_csrf_protection(app: Flask) -> None:
         token = session.get("_csrf_token")
         if not token:
             _generate_csrf_token()
-            return
-        request_token = request.headers.get("X-CSRFToken") or (
-            request.form.get("csrf_token")
-            if request.content_type and "form" in request.content_type
+            return json_error("CSRF token missing or invalid", status=403)
+        json_body = (
+            request.get_json(silent=True)
+            if request.content_type and "json" in request.content_type
             else None
+        )
+        request_token = (
+            request.headers.get("X-CSRFToken")
+            or (
+                request.form.get("csrf_token")
+                if request.content_type and "form" in request.content_type
+                else None
+            )
+            or (json_body.get("_csrf_token") if isinstance(json_body, dict) else None)
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)

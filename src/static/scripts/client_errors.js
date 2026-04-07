@@ -16,23 +16,35 @@
     return "Unhandled promise rejection";
   }
 
+  function getCsrfToken() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute("content") : "";
+  }
+
   function report(message, extra) {
     const now = Date.now();
     if (now - lastReport < THROTTLE_MS) return;
     lastReport = now;
     try {
+      const csrfToken = getCsrfToken();
       const body = JSON.stringify({
         level: "error",
         message,
         extra,
+        _csrf_token: csrfToken,
       });
-      // Use navigator.sendBeacon if available (works during page unload)
+      // Use navigator.sendBeacon if available (works during page unload).
+      // CSRF token is embedded in the JSON body because sendBeacon does not
+      // support custom request headers.
       if (navigator.sendBeacon) {
         navigator.sendBeacon(ENDPOINT, new Blob([body], { type: "application/json" }));
       } else {
         fetch(ENDPOINT, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrfToken,
+          },
           body: body,
         }).catch(function () {});
       }

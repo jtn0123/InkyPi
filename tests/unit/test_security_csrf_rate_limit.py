@@ -41,10 +41,19 @@ def csrf_app():
         if not token:
             _generate_csrf_token()
             return json_error("CSRF token missing or invalid", status=403)
-        request_token = request.headers.get("X-CSRFToken") or (
-            request.form.get("csrf_token")
-            if request.content_type and "form" in request.content_type
+        json_body = (
+            request.get_json(silent=True)
+            if request.content_type and "json" in request.content_type
             else None
+        )
+        request_token = (
+            request.headers.get("X-CSRFToken")
+            or (
+                request.form.get("csrf_token")
+                if request.content_type and "form" in request.content_type
+                else None
+            )
+            or (json_body.get("_csrf_token") if isinstance(json_body, dict) else None)
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
@@ -135,6 +144,119 @@ class TestCSRFProtection:
         assert resp.status_code == 403
         data = resp.get_json()
         assert "CSRF" in data.get("error", "")
+
+    # --- JTN-224: CSRF bypass on first POST in new session ---
+
+    def test_jtn224_new_session_post_rejected_not_allowed_through(self, csrf_app):
+        """JTN-224: A POST with no existing session token must be rejected, not passed through."""
+        client = csrf_app.test_client()
+        # Fresh client — no session cookie, no token
+        resp = client.post("/test-post", content_type="application/json", data="{}")
+        assert resp.status_code == 403
+        data = resp.get_json()
+        assert data is not None
+        assert "CSRF" in data.get("error", "")
+
+    def test_jtn224_get_then_post_with_token_succeeds(self, csrf_app):
+        """JTN-224: After a GET establishes the session token, POST with that token succeeds."""
+        # Simulate: manually set session token (as a GET would), then POST with it
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "session-established-token"
+        resp = client.post(
+            "/test-post", headers={"X-CSRFToken": "session-established-token"}
+        )
+        assert resp.status_code == 200
+
+    # --- JTN-257: sendBeacon CSRF token in JSON body ---
+
+    def test_jtn257_json_body_csrf_token_accepted(self, csrf_app):
+        """JTN-257: CSRF token included in JSON body (_csrf_token) must be accepted."""
+        import json
+
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "json-body-token-abc"
+        resp = client.post(
+            "/test-post",
+            content_type="application/json",
+            data=json.dumps({"_csrf_token": "json-body-token-abc", "level": "error"}),
+        )
+        assert resp.status_code == 200
+
+    def test_jtn257_json_body_wrong_csrf_token_rejected(self, csrf_app):
+        """JTN-257: Wrong _csrf_token in JSON body must return 403."""
+        import json
+
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "correct-json-token"
+        resp = client.post(
+            "/test-post",
+            content_type="application/json",
+            data=json.dumps({"_csrf_token": "wrong-json-token"}),
+        )
+        assert resp.status_code == 403
+
+    def test_jtn257_json_body_missing_csrf_token_rejected(self, csrf_app):
+        """JTN-257: JSON body without _csrf_token and no header must return 403."""
+        import json
+
+        client = csrf_app.test_client()
+        with client.session_transaction() as sess:
+            sess["_csrf_token"] = "some-token"
+        resp = client.post(
+            "/test-post",
+            content_type="application/json",
+            data=json.dumps({"level": "error", "message": "test"}),
+        )
+        assert resp.status_code == 403
+
+
+class TestClientErrorsJsCSRF:
+    """JTN-257: Structural tests verifying client_errors.js includes CSRF token support."""
+
+    def test_client_errors_js_reads_csrf_meta_tag(self):
+        """client_errors.js must include getCsrfToken() reading the csrf-token meta tag."""
+        import os
+
+        js_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "src",
+            "static",
+            "scripts",
+            "client_errors.js",
+        )
+        with open(os.path.abspath(js_path)) as fh:
+            source = fh.read()
+        assert (
+            'meta[name="csrf-token"]' in source
+        ), "client_errors.js must query the csrf-token meta tag"
+        assert (
+            "_csrf_token" in source
+        ), "client_errors.js must include _csrf_token in the request body"
+        assert (
+            "getCsrfToken" in source
+        ), "client_errors.js must define a getCsrfToken helper"
+
+    def test_client_errors_js_fetch_sends_x_csrftoken_header(self):
+        """fetch() fallback in client_errors.js must send X-CSRFToken header."""
+        import os
+
+        js_path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "src",
+            "static",
+            "scripts",
+            "client_errors.js",
+        )
+        with open(os.path.abspath(js_path)) as fh:
+            source = fh.read()
+        assert "X-CSRFToken" in source, "fetch() fallback must send X-CSRFToken header"
 
 
 class TestRateLimiting:
