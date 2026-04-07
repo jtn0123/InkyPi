@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.4.24 (2026-04-07)
+
+### Bug Fixes
+
+- Add default for get_resolution to prevent TypeError (JTN-239)
+  ([#168](https://github.com/jtn0123/InkyPi/pull/168),
+  [`3a7666c`](https://github.com/jtn0123/InkyPi/commit/3a7666c21203b70f6e95da067ccee3502c3a809f))
+
+get_resolution() now falls back to [800, 480] when the "resolution" key is absent from config,
+  preventing a TypeError on unpack of None. Also updated mock_get_config helpers in two plugin tests
+  to accept the new default keyword argument.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Correct word clock hour at minute 33 (JTN-253)
+  ([#167](https://github.com/jtn0123/InkyPi/pull/167),
+  [`038454c`](https://github.com/jtn0123/InkyPi/commit/038454c159f8a7a479c210dcc7a2c6821e42d121))
+
+At minute 33, the boundary condition `minute > 33` was False so the word clock displayed "TO
+  [current hour]" instead of "TO [next hour]". Changed to `minute >= 33` so the TO range starts
+  correctly at 33. Added a regression test asserting minute 33 shows the next hour.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Reset image hash on display failure to allow retry (JTN-255)
+  ([#169](https://github.com/jtn0123/InkyPi/pull/169),
+  [`5f31db4`](https://github.com/jtn0123/InkyPi/commit/5f31db4371ae1e0dd9f1422a905b34d3daea2569))
+
+_last_image_hash was set before display_image() ran, so any transient failure permanently prevented
+  retry of the same image. Now saves the previous hash and restores it in an except block if display
+  fails, ensuring the next refresh cycle will attempt the image again.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.23 (2026-04-07)
 
 ### Bug Fixes
