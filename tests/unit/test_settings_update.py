@@ -1,8 +1,9 @@
 # pyright: reportMissingImports=false
 """Tests for settings update/start-update operations."""
 
+import threading
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # /settings/update (POST) - start update
@@ -77,6 +78,91 @@ class TestStartUpdate:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["success"] is True
+        mod._set_update_state(False, None)
+
+    def test_start_update_toctou_race_prevented(self, client, monkeypatch):
+        """Concurrent requests to /settings/update must not both succeed.
+
+        This verifies the TOCTOU fix: the running-flag check and the state
+        flip both occur inside the same lock acquisition, so a second request
+        racing in between cannot slip through the guard.
+        """
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
+        mod._set_update_state(False, None)
+
+        results: list[int] = []
+        barrier = threading.Barrier(2)
+
+        def fire():
+            barrier.wait()  # both threads hit the endpoint simultaneously
+            resp = client.post("/settings/update")
+            results.append(resp.status_code)
+
+        t1 = threading.Thread(target=fire)
+        t2 = threading.Thread(target=fire)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        # Exactly one request must succeed (200) and one must be rejected (409).
+        results.sort()
+        assert results == [200, 409], (
+            f"Expected one 200 and one 409 but got {results}; "
+            "TOCTOU race may still be present."
+        )
+
+        mod._set_update_state(False, None)
+
+    def test_state_flip_inside_lock(self, client, monkeypatch):
+        """The running flag is set to True while _update_lock is still held.
+
+        We verify atomicity by intercepting the lock's __exit__ and checking
+        that _UPDATE_STATE["running"] was already True before the lock released.
+        """
+        import blueprints.settings as mod
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
+        mod._set_update_state(False, None)
+
+        state_at_exit: list[bool] = []
+        real_lock = mod._update_lock
+
+        class _CapturingLock:
+            """Thin wrapper that records _UPDATE_STATE["running"] on __exit__."""
+
+            def __enter__(self):
+                real_lock.acquire()
+                return self
+
+            def __exit__(self, *args):
+                # Capture the state while still inside the critical section
+                state_at_exit.append(bool(mod._UPDATE_STATE.get("running")))
+                real_lock.release()
+
+        capturing_lock = _CapturingLock()
+        with patch.object(mod, "_update_lock", capturing_lock):
+            resp = client.post("/settings/update")
+
+        assert resp.status_code == 200
+        # The first __exit__ call (from start_update's `with` block) must see
+        # running == True, proving the flip happened inside the lock.
+        assert state_at_exit, "Lock __exit__ was never called"
+        assert state_at_exit[0] is True, (
+            "running flag was not True when the lock was released; "
+            "the state flip may have happened outside the lock."
+        )
+
         mod._set_update_state(False, None)
 
 
