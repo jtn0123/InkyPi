@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.4.21 (2026-04-07)
+
+### Bug Fixes
+
+- Add coverage for form and header-priority CSRF token extraction paths
+  ([`cfc3ec0`](https://github.com/jtn0123/InkyPi/commit/cfc3ec07943372df1d6aee4563e0db0deccef14a))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add integration tests exercising production CSRF middleware per CodeRabbit
+  ([`5845b6a`](https://github.com/jtn0123/InkyPi/commit/5845b6a388d4567def3a3a7b881df7d764641a76))
+
+Wire tests through the real _setup_csrf_protection middleware instead of a duplicated fixture,
+  validating JTN-224 and JTN-257 end-to-end.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract _extract_csrf_token_from_request to reduce complexity (Sonar S3776)
+  ([`686c0d4`](https://github.com/jtn0123/InkyPi/commit/686c0d497c8ba43e4b9398c9553c66624a3965b4))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Harden CSRF protection for new sessions and sendBeacon requests
+  ([`12124c8`](https://github.com/jtn0123/InkyPi/commit/12124c8a795710be74c772aa108b5c7aff13d320))
+
+JTN-224: New sessions making their first POST were silently allowed through because the
+  missing-token branch returned None instead of a 403 response. Now correctly calls json_error to
+  reject the request.
+
+JTN-257: sendBeacon in client_errors.js bypassed CSRF because it cannot send custom headers. Fix
+  embeds the CSRF token (from the csrf-token meta tag) in the JSON body as _csrf_token, and updates
+  the server-side check to also read it from the JSON body. The fetch() fallback also sends
+  X-CSRFToken header.
+
+Adds targeted unit tests for both fixes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Update CI smoke tests to include CSRF tokens in POST requests
+  ([`759df80`](https://github.com/jtn0123/InkyPi/commit/759df80302babaf81eedb94ddef6b72c373d1553))
+
+The JTN-224 fix rejects POST requests without CSRF tokens. Update smoke tests to establish a session
+  cookie and extract the token from the HTML meta tag before issuing POST requests.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.20 (2026-04-07)
 
 ### Bug Fixes
