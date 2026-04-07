@@ -18,21 +18,8 @@ def start_update():
     panel via /api/logs.
     """
     try:
-        with _mod._update_lock:
-            if _mod._UPDATE_STATE.get("running"):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Update already in progress.",
-                            "running": True,
-                            "unit": _mod._UPDATE_STATE.get("unit"),
-                        }
-                    ),
-                    409,
-                )
-
-        # Accept optional target tag from JSON body
+        # Accept optional target tag from JSON body before acquiring the lock so
+        # we can validate it without holding the lock longer than necessary.
         target_tag: str | None = None
         raw_body = request.get_data(cache=True)
         if request.is_json and raw_body.strip():
@@ -57,9 +44,37 @@ def start_update():
 
         script_path = _mod._get_update_script_path()
         unit = f"inkypi-update-{int(time.time())}"
+        use_systemd = _mod._systemd_available()
 
-        if _mod._systemd_available():
-            _mod._set_update_state(True, f"{unit}.service")
+        # Atomically check-and-set the running flag so concurrent requests
+        # cannot both pass the guard (TOCTOU fix: the check and the state flip
+        # happen inside the same lock acquisition).
+        #
+        # NOTE: _set_update_state() also acquires _update_lock, so we inline
+        # the state mutation here to avoid re-entering the non-reentrant lock.
+        with _mod._update_lock:
+            if _mod._UPDATE_STATE.get("running"):
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Update already in progress.",
+                            "running": True,
+                            "unit": _mod._UPDATE_STATE.get("unit"),
+                        }
+                    ),
+                    409,
+                )
+            # Flip the state while still holding the lock (inlined to avoid
+            # re-acquiring the non-reentrant lock inside _set_update_state).
+            new_unit = f"{unit}.service" if use_systemd else None
+            _mod._UPDATE_STATE["running"] = True
+            _mod._UPDATE_STATE["unit"] = new_unit
+            _mod._UPDATE_STATE["started_at"] = float(time.time())
+
+        # Start the actual update process outside the lock (I/O-heavy, must not
+        # block other threads that only need a brief lock).
+        if use_systemd:
             try:
                 _mod._start_update_via_systemd(
                     unit,
@@ -73,7 +88,6 @@ def start_update():
                 )
                 _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
         else:
-            _mod._set_update_state(True, None)
             _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
 
         return jsonify(
