@@ -3,6 +3,18 @@
  * Provides Basic/Advanced mode switching and enhanced form organization
  */
 
+/**
+ * Escape HTML special characters to prevent XSS when interpolating
+ * user-controlled values into innerHTML.
+ * @param {string} str - Raw string to escape
+ * @returns {string} HTML-escaped string
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 class ProgressiveDisclosure {
     constructor() {
         this.currentMode = 'basic';
@@ -552,7 +564,7 @@ class ProgressiveDisclosure {
         }
 
         const changesHtml = changesSummary.changedSettings
-            .map(change => `<div class="change-item">• ${change}</div>`)
+            .map(change => `<div class="change-item">• ${escapeHtml(change)}</div>`)
             .join('');
 
         container.innerHTML = `

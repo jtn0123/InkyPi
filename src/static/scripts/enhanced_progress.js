@@ -37,6 +37,18 @@ function getErrorMessage(statusCode, fallbackMessage = 'An error occurred. Pleas
 window.getErrorMessage = getErrorMessage;
 window.HTTP_ERROR_MESSAGES = HTTP_ERROR_MESSAGES;
 
+/**
+ * Escape HTML special characters to prevent XSS when interpolating
+ * user-controlled values into innerHTML.
+ * @param {string} str - Raw string to escape
+ * @returns {string} HTML-escaped string
+ */
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 class EnhancedProgressDisplay {
     constructor(progressElement, options = {}) {
         this.progressElement = progressElement;
@@ -296,7 +308,7 @@ class EnhancedProgressDisplay {
                     <div class="step-number">${index + 1}</div>
                 </div>
                 <div class="step-content">
-                    <div class="step-name">${step}</div>
+                    <div class="step-name">${escapeHtml(step)}</div>
                     <div class="step-timing" style="display: none;"></div>
                 </div>
             </div>

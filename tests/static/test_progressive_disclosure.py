@@ -278,3 +278,23 @@ def test_progressive_disclosure_form_field_detection(client):
     assert ".form-input" in script_content
     assert ".form-field" in script_content
     assert "settings-container" in script_content
+
+
+def test_progressive_disclosure_escapes_change_items_in_innerHTML(client):
+    """Verify that change-item values are HTML-escaped before being set as innerHTML.
+
+    JTN-243: form field values are user-controlled and must be escaped to prevent XSS.
+    The escapeHtml helper must exist at module level and be applied to each change item.
+    """
+    resp = client.get("/static/scripts/progressive_disclosure.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # escapeHtml helper must be defined as a standalone function
+    assert "function escapeHtml(" in js
+
+    # The change-item template must use escapeHtml, not bare interpolation
+    assert "escapeHtml(change)" in js
+
+    # Bare unescaped interpolation must NOT appear in the change-item template
+    assert '`<div class="change-item">• ${change}</div>`' not in js
