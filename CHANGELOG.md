@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.4.19 (2026-04-07)
+
+### Bug Fixes
+
+- Edited API key values no longer silently discarded on save
+  ([`df75dfc`](https://github.com/jtn0123/InkyPi/commit/df75dfc9761befe0fc744580f9fc571ea87b187e))
+
+In saveGenericKeys(), existing rows with a new value entered by the user now send { key, value }
+  instead of always sending keepExisting:true. Adds two regression tests covering both the update
+  and preserve paths.
+
+Fixes JTN-250.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Include value: null in keepExisting test payload per CodeRabbit review
+  ([`8b7273b`](https://github.com/jtn0123/InkyPi/commit/8b7273b9d2be0d12beaeeae471f1544b2907dd51))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.18 (2026-04-07)
 
 ### Bug Fixes
