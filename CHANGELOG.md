@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.4.18 (2026-04-07)
+
+### Bug Fixes
+
+- Block SSRF in ImageURL and ImageAlbum plugins (JTN-226, JTN-229)
+  ([`649cd1c`](https://github.com/jtn0123/InkyPi/commit/649cd1c6eb02d2247324dc8a3534550e3cc332bb))
+
+Call validate_url() before fetching user-supplied URLs in both the ImageURL plugin and the Immich
+  provider in ImageAlbum, preventing requests to localhost, private IP ranges, and cloud metadata
+  endpoints. Add SSRF-specific tests for both plugins; update existing ImageAlbum tests to mock DNS
+  so validate_url passes for public hostnames.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Extract _fetch_immich_image to reduce cognitive complexity (Sonar S3776)
+  ([`eabea38`](https://github.com/jtn0123/InkyPi/commit/eabea38768caada9a571fcc7ff330759b0e5eccc))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.17 (2026-04-07)
 
 ### Bug Fixes
