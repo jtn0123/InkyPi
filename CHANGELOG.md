@@ -1,6 +1,52 @@
 # CHANGELOG
 
 
+## v0.4.17 (2026-04-07)
+
+### Bug Fixes
+
+- Add defensive href checks and integration tests for dashboard plugin cards (JTN-214)
+  ([`64e6366`](https://github.com/jtn0123/InkyPi/commit/64e6366f7fbdb31a5367080c0cdbb7627934071b))
+
+Adds a console.warn in dashboard_page.js init() to surface plugin cards missing href attributes, and
+  adds two integration tests asserting that all plugin card links render with valid hrefs and that
+  each linked plugin page returns HTTP 200.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Documentation
+
+- Mark hourly weather, saturation, and bi-color as implemented (JTN-219)
+  ([`cd97f8f`](https://github.com/jtn0123/InkyPi/commit/cd97f8fe022d99793ecdeb0d3313900ea81513e1))
+
+All three features previously marked :soon: are already present in the codebase — remove the
+  placeholder footnote and flip each row to ✅.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Refactoring
+
+- Reduce Sonar maintainability debt in settings_page.js (JTN-206)
+  ([`0935376`](https://github.com/jtn0123/InkyPi/commit/0935376a21293f9fe5202ecdad384795b5027a4e))
+
+Address 50 Sonar findings across 6 rules: optional chaining (S6582, 18 fixes), logged catch blocks
+  (S2486, 9 fixes), window→globalThis (S7764, 6 fixes), for...of over forEach (S7773, 10 fixes), and
+  move pure helpers isErrorLine/isWarnLine/prefKey to IIFE scope (S7721). No behaviour changes.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Sonar maintainability cleanup for plugin_page.js (JTN-205)
+  ([`acbc9b6`](https://github.com/jtn0123/InkyPi/commit/acbc9b6fe52f8f000cfc85c0a3d38689f8f951b9))
+
+- Replace all window.* references with globalThis.* (S7764, 23 findings) - Extract
+  syncModalOpenState, setHidden, buildProgressKey, fadeSkeleton, updateCombinedColorPreview to IIFE
+  scope instead of inner functions (S7721, 8 findings) - Apply optional chaining for foo && foo.bar
+  patterns (S6582, 7 findings) - Add console.warn to previously empty catch blocks (S2486, 3
+  findings)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.16 (2026-04-04)
 
 ### Bug Fixes
