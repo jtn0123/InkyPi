@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.4.23 (2026-04-07)
+
+### Bug Fixes
+
+- Url-encode playlist names and plugin instance in fetch URLs (JTN-234, JTN-240)
+  ([#164](https://github.com/jtn0123/InkyPi/pull/164),
+  [`cc66d76`](https://github.com/jtn0123/InkyPi/commit/cc66d7691bd1900988759d0440fce66181d53a61))
+
+Wrap playlist names with encodeURIComponent() at all three fetch call sites in playlist.js so names
+  containing spaces or special chars reach the server correctly. Replace Jinja string concatenation
+  for update_instance URL in plugin.html with url_for() accepting the real instance name, which lets
+  Flask percent-encode it properly. Add static-JS and integration tests for both fixes.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.22 (2026-04-07)
 
 ### Bug Fixes
