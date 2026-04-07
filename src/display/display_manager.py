@@ -198,35 +198,48 @@ class DisplayManager:
                     "display_ms": 0,
                     "display_driver": self.display.__class__.__name__,
                 }
+            previous_hash = self._last_image_hash
             self._last_image_hash = image_hash
 
-        preprocess_t0 = perf_counter()
-        # Save the raw image
-        logger.info(f"Saving image to {self.device_config.current_image_file}")
         try:
-            image.save(self.device_config.current_image_file, optimize=True)
-        except (OSError, ValueError, RuntimeError):
-            logger.exception("Failed to save current image preview")
+            preprocess_t0 = perf_counter()
+            # Save the raw image
+            logger.info(f"Saving image to {self.device_config.current_image_file}")
+            try:
+                image.save(self.device_config.current_image_file, optimize=True)
+            except (OSError, ValueError, RuntimeError):
+                logger.exception("Failed to save current image preview")
 
-        # Resize and adjust orientation
-        image = change_orientation(image, self.device_config.get_config("orientation"))
-        image = resize_image(image, self.device_config.get_resolution(), image_settings)
-        if self.device_config.get_config("inverted_image"):
-            image = image.rotate(180)
-        image = apply_image_enhancement(
-            image, self.device_config.get_config("image_settings")
-        )
-        try:
-            image.save(self.device_config.processed_image_file, optimize=True)
-        except (OSError, ValueError, RuntimeError):
-            logger.exception("Failed to save processed image preview")
-        self._save_history_entry(image, history_meta=history_meta)
-        preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
+            # Resize and adjust orientation
+            image = change_orientation(
+                image, self.device_config.get_config("orientation")
+            )
+            image = resize_image(
+                image, self.device_config.get_resolution(), image_settings
+            )
+            if self.device_config.get_config("inverted_image"):
+                image = image.rotate(180)
+            image = apply_image_enhancement(
+                image, self.device_config.get_config("image_settings")
+            )
+            try:
+                image.save(self.device_config.processed_image_file, optimize=True)
+            except (OSError, ValueError, RuntimeError):
+                logger.exception("Failed to save processed image preview")
+            self._save_history_entry(image, history_meta=history_meta)
+            preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
 
-        # Pass to the concrete instance to render to the device.
-        display_t0 = perf_counter()
-        self.display.display_image(image, image_settings)
-        display_ms = int((perf_counter() - display_t0) * 1000)
+            # Pass to the concrete instance to render to the device.
+            display_t0 = perf_counter()
+            self.display.display_image(image, image_settings)
+            display_ms = int((perf_counter() - display_t0) * 1000)
+        except Exception:
+            # Restore the previous hash so the same image can be retried on the
+            # next refresh cycle rather than being permanently skipped.
+            with self._hash_lock:
+                self._last_image_hash = previous_hash
+            raise
+
         return {
             "preprocess_ms": preprocess_ms,
             "display_ms": display_ms,

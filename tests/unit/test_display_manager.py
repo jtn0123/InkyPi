@@ -210,6 +210,46 @@ def test_display_manager_history_collision_adds_suffix(device_config_dev, monkey
     assert "display_20260331_224512_001" in pngs
 
 
+def test_display_manager_hash_reset_on_failure_allows_retry(
+    device_config_dev, monkeypatch
+):
+    """If display_image raises, _last_image_hash must be restored so the same
+    image can be retried on the next refresh cycle (JTN-255)."""
+    device_config_dev.update_value("display_type", "mock")
+
+    from display.display_manager import DisplayManager
+
+    dm = DisplayManager(device_config_dev)
+
+    # Patch the underlying display to raise on the first call only
+    call_count = {"n": 0}
+    original_display = dm.display.display_image
+
+    def failing_then_ok(img, image_settings=None):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise RuntimeError("simulated display failure")
+        return original_display(img, image_settings)
+
+    monkeypatch.setattr(dm.display, "display_image", failing_then_ok)
+
+    img = make_image(100, 50)
+
+    # First call should raise
+    with pytest.raises(RuntimeError, match="simulated display failure"):
+        dm.display_image(img)
+
+    # Hash must be restored to None (previous value) so retry is not skipped
+    assert (
+        dm._last_image_hash is None
+    ), "Hash was not reset after failure — retry would be permanently skipped"
+
+    # Second call with the same image must succeed (no "Image unchanged" skip)
+    result = dm.display_image(img)
+    assert call_count["n"] == 2, "display_image was not called on retry"
+    assert "display_ms" in result
+
+
 def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path):
     device_config_dev.update_value("display_type", "mock")
     from pathlib import Path
