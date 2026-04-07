@@ -210,18 +210,21 @@ jobs:
 
           echo "Using server URL: $SERVER_URL"
 
-          # Test all routes
-          curl -fsS ${SERVER_URL}/ >/dev/null
-          curl -fsS ${SERVER_URL}/settings >/dev/null
-          curl -fsS ${SERVER_URL}/playlist >/dev/null
-          curl -sS -o /dev/null -w "%{http_code}\n" ${SERVER_URL}/preview | tee preview_code.txt
+          # Test all routes — use a cookie jar so CSRF session is preserved
+          COOKIES=$(mktemp)
+          curl -fsS -c "$COOKIES" ${SERVER_URL}/ -o /tmp/home.html
+          CSRF_TOKEN=$(sed -n 's/.*csrf-token.*content="\([^"]*\)".*/\1/p' /tmp/home.html | head -1)
+          curl -fsS -b "$COOKIES" ${SERVER_URL}/settings >/dev/null
+          curl -fsS -b "$COOKIES" ${SERVER_URL}/playlist >/dev/null
+          curl -sS -b "$COOKIES" -o /dev/null -w "%{http_code}\n" ${SERVER_URL}/preview | tee preview_code.txt
           grep -q '^200$' preview_code.txt || { echo "Preview route did not return 200" >&2; kill $SERVER_PID 2>/dev/null || true; exit 1; }
-          curl -fsS ${SERVER_URL}/plugin/clock >/dev/null
-          curl -fsS ${SERVER_URL}/images/clock/faces/digital.png >/dev/null
-          curl -fsS "${SERVER_URL}/download-logs?hours=2" >/dev/null
-          curl -fsS "${SERVER_URL}/api/logs?hours=2&limit=200" >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/save_plugin_settings >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' ${SERVER_URL}/update_now >/dev/null
+          curl -fsS -b "$COOKIES" ${SERVER_URL}/plugin/clock >/dev/null
+          curl -fsS -b "$COOKIES" ${SERVER_URL}/images/clock/faces/digital.png >/dev/null
+          curl -fsS -b "$COOKIES" "${SERVER_URL}/download-logs?hours=2" >/dev/null
+          curl -fsS -b "$COOKIES" "${SERVER_URL}/api/logs?hours=2&limit=200" >/dev/null
+          curl -fsS -b "$COOKIES" -X POST -H "X-CSRFToken: $CSRF_TOKEN" -d 'plugin_id=clock' ${SERVER_URL}/save_plugin_settings >/dev/null
+          curl -fsS -b "$COOKIES" -X POST -H "X-CSRFToken: $CSRF_TOKEN" -d 'plugin_id=clock' ${SERVER_URL}/update_now >/dev/null
+          rm -f "$COOKIES"
           if [ ! -f src/static/images/processed_image.png ] && [ ! -f runtime/mock_display_output/latest.png ]; then
             echo "Expected preview image not found" >&2
             kill $SERVER_PID 2>/dev/null || true
@@ -278,7 +281,12 @@ jobs:
           curl -fsS http://127.0.0.1:8080/api/health/system >/dev/null
           curl -fsS http://127.0.0.1:8080/api/health/plugins >/dev/null
           curl -fsS http://127.0.0.1:8080/api/benchmarks/summary >/dev/null
-          curl -fsS -X POST -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
+          # POST with CSRF token
+          COOKIES=$(mktemp)
+          curl -fsS -c "$COOKIES" http://127.0.0.1:8080/ -o /tmp/home.html
+          CSRF_TOKEN=$(sed -n 's/.*csrf-token.*content="\([^"]*\)".*/\1/p' /tmp/home.html | head -1)
+          curl -fsS -b "$COOKIES" -X POST -H "X-CSRFToken: $CSRF_TOKEN" -d 'plugin_id=clock' http://127.0.0.1:8080/save_plugin_settings >/dev/null
+          rm -f "$COOKIES"
           kill $PID 2>/dev/null || true
 
   preflash-validate:
