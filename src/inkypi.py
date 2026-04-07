@@ -364,6 +364,23 @@ def _generate_csrf_token() -> str:
     return session["_csrf_token"]
 
 
+def _extract_csrf_token_from_request() -> str | None:
+    """Extract the CSRF token from the request header, form data, or JSON body."""
+    header_token = request.headers.get("X-CSRFToken")
+    if header_token:
+        return header_token
+    content_type = request.content_type or ""
+    if "form" in content_type:
+        form_token = request.form.get("csrf_token")
+        if form_token:
+            return form_token
+    if "json" in content_type:
+        json_body = request.get_json(silent=True)
+        if isinstance(json_body, dict):
+            return json_body.get("_csrf_token")
+    return None
+
+
 def _setup_csrf_protection(app: Flask) -> None:
     @app.context_processor
     def _inject_csrf_token():
@@ -379,20 +396,7 @@ def _setup_csrf_protection(app: Flask) -> None:
         if not token:
             _generate_csrf_token()
             return json_error("CSRF token missing or invalid", status=403)
-        json_body = (
-            request.get_json(silent=True)
-            if request.content_type and "json" in request.content_type
-            else None
-        )
-        request_token = (
-            request.headers.get("X-CSRFToken")
-            or (
-                request.form.get("csrf_token")
-                if request.content_type and "form" in request.content_type
-                else None
-            )
-            or (json_body.get("_csrf_token") if isinstance(json_body, dict) else None)
-        )
+        request_token = _extract_csrf_token_from_request()
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
 
