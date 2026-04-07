@@ -376,13 +376,14 @@ class TestStartUpdateTOCTOURace:
         real_dict = mod._UPDATE_STATE
 
         class _SpyDict(dict):
-            def __setitem__(self, key, value):
+            def __setitem__(self, key, value) -> None:
                 if key == "running" and value is True:
                     # Record whether the lock is already held (cannot acquire
                     # means this thread already owns it).
-                    lock_held_when_running_flipped.append(
-                        not mod._update_lock.acquire(blocking=False)
-                    )
+                    acquired = mod._update_lock.acquire(blocking=False)
+                    if acquired:
+                        mod._update_lock.release()
+                    lock_held_when_running_flipped.append(not acquired)
                 super().__setitem__(key, value)
 
         spy_state = _SpyDict(real_dict)
