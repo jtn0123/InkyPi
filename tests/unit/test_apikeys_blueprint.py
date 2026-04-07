@@ -220,7 +220,7 @@ def test_save_apikeys_preserves_existing_key_when_no_new_value(
     # when the user left the field blank.
     resp = client.post(
         "/api-keys/save",
-        json={"entries": [{"key": "MY_SECRET", "keepExisting": True}]},
+        json={"entries": [{"key": "MY_SECRET", "value": None, "keepExisting": True}]},
     )
     assert resp.status_code == 200
     content = Path(env_path).read_text()
