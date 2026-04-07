@@ -1,6 +1,72 @@
 # CHANGELOG
 
 
+## v0.4.20 (2026-04-07)
+
+### Bug Fixes
+
+- Address CodeRabbit nitpicks — log overlap warning failure, harden test preconditions
+  ([`81a3cd8`](https://github.com/jtn0123/InkyPi/commit/81a3cd8fc5875d5af556de2593c68e120f711849))
+
+- Log debug message on overlap warning failure instead of bare pass - Explicitly set
+  refresh_info.plugin_id=None in dashboard tests - Ensure Default playlist exists in update test
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Extract _default_overlap_warning helper and add coverage tests
+  ([`52d12be`](https://github.com/jtn0123/InkyPi/commit/52d12bef70c3dc942774e22852afa4786aa2b821))
+
+- Extract duplicated Default-overlap warning logic from create_playlist and update_playlist into
+  _default_overlap_warning() helper (Sonar S3776) - Merge main to pick up PRs 155+157 - Add 3 unit
+  tests for the helper to satisfy 80% new code coverage gate
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Jtn-217 playlist-Default overlap warning, JTN-213 dashboard empty state
+  ([`024beb6`](https://github.com/jtn0123/InkyPi/commit/024beb62969f47043df1c9ce244e012ed4bfe68c))
+
+JTN-217: create_playlist and update_playlist now check if the saved
+
+playlist overlaps the built-in Default playlist (which is the 00:00-24:00 catch-all). When an
+  overlap is found, the success response includes a `warning` field explaining that the new playlist
+  takes priority during its active hours. The playlist.js frontend stores the warning in
+  sessionStorage and shows it as a warning toast after reload. The warning is suppressed when the
+  playlist being created/updated is itself named "Default".
+
+JTN-213: main.py now computes `has_preview` (processed or current image file exists) and passes it
+  to the inky.html template. The overviewEmpty panel shows "Last display info unavailable." instead
+  of "Display a plugin to see details here." when a preview image exists but refresh_info has no
+  plugin_id — avoiding the misleading empty state on first page load after a display has run.
+
+Tests added for both fixes covering positive and negative cases.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Reduce playlist route complexity and add type annotations (Sonar S3776 + CodeRabbit)
+  ([`6b2692e`](https://github.com/jtn0123/InkyPi/commit/6b2692e69d91b5b51cca1ec37591f1c0209de9eb))
+
+Extract _parse_playlist_request_data, _validate_playlist_times, and _apply_cycle_override helpers to
+  bring create_playlist and update_playlist under the cognitive complexity limit. Add return type
+  annotations to test helpers per CodeRabbit review.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove unused model import flagged by ruff F401
+  ([`9ed2a4a`](https://github.com/jtn0123/InkyPi/commit/9ed2a4aec9a45e2ddcd25ec5a26df405f4d634af))
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract shared test helpers per CodeRabbit nitpick
+  ([`07011bd`](https://github.com/jtn0123/InkyPi/commit/07011bdc5e000c38e8a6d185cd61acf6126a3101))
+
+Extract _ensure_default_playlist and _assert_overlap_warning helpers to reduce duplication across
+  playlist overlap warning tests.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.19 (2026-04-07)
 
 ### Bug Fixes
