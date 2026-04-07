@@ -186,3 +186,42 @@ def test_save_apikeys_control_chars(client, tmp_path, monkeypatch):
         json={"entries": [{"key": "KEY", "value": "bad\nvalue"}]},
     )
     assert resp.status_code == 400
+
+
+def test_save_apikeys_updates_existing_key_when_new_value_provided(
+    client, tmp_path, monkeypatch
+):
+    """JTN-250: Sending a new value for an existing key must update it, not discard it."""
+    env_path = str(tmp_path / ".env")
+    Path(env_path).write_text("MY_SECRET=old_value\n")
+    monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: env_path)
+
+    # Simulate what the fixed JS sends: { key, value } (no keepExisting) for an
+    # existing row where the user typed a new value.
+    resp = client.post(
+        "/api-keys/save",
+        json={"entries": [{"key": "MY_SECRET", "value": "new_value"}]},
+    )
+    assert resp.status_code == 200
+    content = Path(env_path).read_text()
+    assert "new_value" in content
+    assert "old_value" not in content
+
+
+def test_save_apikeys_preserves_existing_key_when_no_new_value(
+    client, tmp_path, monkeypatch
+):
+    """JTN-250: Sending keepExisting=True for an existing key must preserve the stored value."""
+    env_path = str(tmp_path / ".env")
+    Path(env_path).write_text("MY_SECRET=original_value\n")
+    monkeypatch.setattr("blueprints.apikeys.get_env_path", lambda: env_path)
+
+    # Simulate what the fixed JS sends: { key, value: null, keepExisting: true }
+    # when the user left the field blank.
+    resp = client.post(
+        "/api-keys/save",
+        json={"entries": [{"key": "MY_SECRET", "keepExisting": True}]},
+    )
+    assert resp.status_code == 200
+    content = Path(env_path).read_text()
+    assert "original_value" in content
