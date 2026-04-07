@@ -283,6 +283,12 @@
           img.parentNode.insertBefore(fallback, img.nextSibling);
         });
       });
+      // JTN-214: Defensive check — log broken plugin card links
+      document.querySelectorAll('.plugins-container .plugin-item').forEach(function(el) {
+        if (!el.getAttribute('href')) {
+          console.warn('Plugin card missing href:', el.textContent.trim());
+        }
+      });
       document.getElementById("displayNextBtn")?.addEventListener("click", displayNextNow);
       initPreviewInteractions();
       initRealtime();
