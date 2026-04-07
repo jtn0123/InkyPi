@@ -103,6 +103,39 @@ def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
     assert os.path.isfile(os.path.join(str(tmp_src), "config", "device.json"))
 
 
+def test_get_resolution_returns_default_when_key_missing(monkeypatch, tmp_path):
+    import config as config_mod
+
+    # Arrange – config without a "resolution" key
+    cfg_data = {
+        "name": "NoResolution",
+        "display_type": "mock",
+        "orientation": "horizontal",
+        "playlist_config": {"playlists": [], "active_playlist": ""},
+        "refresh_info": {
+            "refresh_time": None,
+            "image_hash": None,
+            "refresh_type": "Manual Update",
+            "plugin_id": "",
+        },
+    }
+    cfg_path = tmp_path / "device_no_res.json"
+    with open(cfg_path, "w") as f:
+        json.dump(cfg_data, f)
+
+    monkeypatch.delenv("INKYPI_CONFIG_FILE", raising=False)
+    monkeypatch.delenv("INKYPI_ENV", raising=False)
+    monkeypatch.setattr(config_mod.Config, "config_file", str(cfg_path))
+
+    # Act
+    cfg = config_mod.Config()
+    width, height = cfg.get_resolution()
+
+    # Assert – default 800x480 is returned instead of crashing
+    assert width == 800
+    assert height == 480
+
+
 def test_runtime_dir_overrides_output_paths(monkeypatch, tmp_path):
     import config as config_mod
 

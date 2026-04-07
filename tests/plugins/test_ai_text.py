@@ -116,12 +116,12 @@ def test_ai_text_generate_image_orientation(
 
     mock_openai.return_value = FakeOpenAI()
 
-    def mock_get_config(key):
+    def mock_get_config(key, default=None):
         if key == "orientation":
             return orientation
         elif key == "resolution":
             return resolution
-        return None
+        return default
 
     monkeypatch.setattr(
         flask_app.config["DEVICE_CONFIG"], "get_config", mock_get_config
