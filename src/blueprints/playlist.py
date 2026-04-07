@@ -568,7 +568,7 @@ def _apply_cycle_override(playlist_manager, new_name, cycle_minutes):
         cm = int(cycle_minutes)
         playlist = playlist_manager.get_playlist(new_name)
         if playlist:
-            playlist.cycle_interval_seconds = max(0, cm) * 60
+            playlist.cycle_interval_seconds = max(1, cm) * 60
     except Exception:
         pass
 
@@ -582,10 +582,13 @@ def update_playlist(playlist_name):
     if not isinstance(data, dict):
         return json_error("Invalid JSON data", status=400)
 
-    new_name = data.get("new_name")
+    new_name_raw = data.get("new_name")
+    new_name, name_err = _validate_playlist_name(new_name_raw)
+    if name_err:
+        return name_err
     start_time = data.get("start_time")
     end_time = data.get("end_time")
-    if not new_name or not start_time or not end_time:
+    if not start_time or not end_time:
         return json_error("Missing required fields", status=400)
     start_min, end_min, time_err = _validate_playlist_times(start_time, end_time)
     if time_err:
