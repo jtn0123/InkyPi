@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Tests for settings update and version endpoints (_updates.py)."""
 
+import threading
 import time
 from unittest.mock import MagicMock
 
@@ -345,3 +346,90 @@ class TestUpdateRunnerHelpers:
         assert thread_args["name"] == "update-fallback"
         assert thread_args["daemon"] is True
         assert thread_args["started"] is True
+
+
+class TestStartUpdateTOCTOURace:
+    """Verify that the TOCTOU race in start_update is fixed.
+
+    The check (_UPDATE_STATE["running"]) and the state flip
+    (_set_update_state(True, ...)) must happen atomically inside the same
+    lock acquisition so two concurrent callers cannot both pass the guard.
+    """
+
+    def test_running_state_set_atomically(self, client, monkeypatch):
+        """_UPDATE_STATE['running'] is flipped to True while _update_lock is held.
+
+        We intercept the dict __setitem__ to observe whether the lock is held
+        at the exact moment the state flip occurs.  This proves the check-and-
+        set is atomic and not vulnerable to the TOCTOU window.
+        """
+        import blueprints.settings as mod
+
+        mod._set_update_state(False, None)
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
+
+        lock_held_when_running_flipped: list[bool] = []
+        real_dict = mod._UPDATE_STATE
+
+        class _SpyDict(dict):
+            def __setitem__(self, key, value):
+                if key == "running" and value is True:
+                    # Record whether the lock is already held (cannot acquire
+                    # means this thread already owns it).
+                    lock_held_when_running_flipped.append(
+                        not mod._update_lock.acquire(blocking=False)
+                    )
+                super().__setitem__(key, value)
+
+        spy_state = _SpyDict(real_dict)
+        monkeypatch.setattr(mod, "_UPDATE_STATE", spy_state)
+
+        try:
+            resp = client.post("/settings/update")
+            assert resp.status_code == 200
+            assert (
+                lock_held_when_running_flipped
+            ), "_UPDATE_STATE['running'] was never set to True"
+            assert (
+                lock_held_when_running_flipped[0] is True
+            ), "_UPDATE_STATE['running'] was flipped without holding _update_lock"
+        finally:
+            mod._set_update_state(False, None)
+
+    def test_concurrent_requests_one_409(self, client, monkeypatch):
+        """Two simultaneous start_update calls: exactly one succeeds, one gets 409."""
+        import blueprints.settings as mod
+
+        mod._set_update_state(False, None)
+        monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+        monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+        monkeypatch.setattr(
+            mod, "_start_update_fallback_thread", lambda sp, target_tag=None: None
+        )
+
+        results: list[int] = []
+        barrier = threading.Barrier(2)
+
+        def make_request():
+            barrier.wait()  # both threads hit the endpoint simultaneously
+            resp = client.post("/settings/update")
+            results.append(resp.status_code)
+
+        try:
+            t1 = threading.Thread(target=make_request)
+            t2 = threading.Thread(target=make_request)
+            t1.start()
+            t2.start()
+            t1.join(timeout=5)
+            t2.join(timeout=5)
+
+            assert sorted(results) == [
+                200,
+                409,
+            ], f"Expected one 200 and one 409, got: {results}"
+        finally:
+            mod._set_update_state(False, None)
