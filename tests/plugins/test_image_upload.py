@@ -289,12 +289,12 @@ def test_image_upload_generate_image_vertical_orientation(
     plugin = ImageUpload({"id": "image_upload"})
 
     # Mock vertical orientation and resolution
-    def mock_get_config(key):
+    def mock_get_config(key, default=None):
         if key == "orientation":
             return "vertical"
         elif key == "resolution":
             return (400, 300)  # width, height
-        return None
+        return default
 
     monkeypatch.setattr(device_config_dev, "get_config", mock_get_config)
 

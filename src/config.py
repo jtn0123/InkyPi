@@ -322,7 +322,7 @@ class Config:
 
     def get_resolution(self):
         """Returns the display resolution as a tuple (width, height) from the configuration."""
-        resolution = self.get_config("resolution")
+        resolution = self.get_config("resolution", default=[800, 480])
         width, height = resolution
         return (int(width), int(height))
 
