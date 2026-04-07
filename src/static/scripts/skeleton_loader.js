@@ -319,7 +319,7 @@ class SkeletonLoader {
                 ${stepList.map((step, index) => `
                     <div class="skeleton-progress-step ${index === 0 ? 'active' : ''}">
                         <div class="skeleton-step-indicator"></div>
-                        <div class="skeleton-step-text">${step}</div>
+                        <div class="skeleton-step-text">${SkeletonLoader.escapeHtml(step)}</div>
                     </div>
                 `).join('')}
             </div>
@@ -353,6 +353,18 @@ class SkeletonLoader {
             step.classList.toggle('active', index === currentStep);
             step.classList.toggle('completed', index < currentStep);
         });
+    }
+
+    /**
+     * Escape HTML special characters to prevent XSS when interpolating
+     * user-controlled values into innerHTML.
+     * @param {string} str - Raw string to escape
+     * @returns {string} HTML-escaped string
+     */
+    static escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 }
 

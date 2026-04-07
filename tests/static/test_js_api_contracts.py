@@ -213,3 +213,46 @@ def test_plugin_page_script_uses_globalthis_for_plugin_hooks(client):
     assert "function validateAddToPlaylistAction(action)" in js
     assert 'typeof globalThis.validatePluginSettings === "function"' in js
     assert "globalThis.PluginForm" in js
+
+
+# --- XSS / innerHTML safety ---
+
+
+def test_enhanced_progress_escapes_step_names_in_innerhtml(client):
+    """Verify step names from SSE events are HTML-escaped before innerHTML injection.
+
+    JTN-242: step names are server-supplied strings and must be escaped to prevent XSS.
+    The escapeHtml helper must exist at module level and be applied in renderSteps.
+    """
+    resp = client.get("/static/scripts/enhanced_progress.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # escapeHtml helper must be defined as a standalone function
+    assert "function escapeHtml(" in js
+
+    # renderSteps must use escapeHtml on the step value
+    assert "escapeHtml(step)" in js
+
+    # Bare unescaped interpolation must NOT appear for step-name rendering
+    assert '"step-name">${step}<' not in js
+
+
+def test_skeleton_loader_escapes_step_names_in_innerhtml(client):
+    """Verify step names passed to createProgressSkeleton are HTML-escaped.
+
+    JTN-242: step names are caller-supplied strings and must be escaped to prevent XSS.
+    The static escapeHtml helper must exist on SkeletonLoader and be applied in the template.
+    """
+    resp = client.get("/static/scripts/skeleton_loader.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # escapeHtml must be defined as a static method on SkeletonLoader
+    assert "static escapeHtml(" in js
+
+    # The progress-step template must use SkeletonLoader.escapeHtml
+    assert "SkeletonLoader.escapeHtml(step)" in js
+
+    # Bare unescaped interpolation must NOT appear for skeleton-step-text rendering
+    assert '"skeleton-step-text">${step}<' not in js
