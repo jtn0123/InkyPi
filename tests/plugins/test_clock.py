@@ -198,6 +198,32 @@ def test_static_translate_word_grid_positions_edges():
     assert [9, 5] in letters_59
 
 
+def test_translate_word_grid_positions_minute_33_uses_next_hour():
+    """At minute 33 the display should say TO [next hour], not TO [current hour].
+
+    3:33 -> "TO FOUR" (hour index 3 in the hours list = FOUR)
+    Before fix: minute > 33 was False so hours[hour-1]=THREE was used (wrong).
+    After fix:  minute >= 33 is True so hours[hour]=FOUR is used (correct).
+    """
+    from plugins.clock.clock import Clock
+
+    # hour=3 (3 o'clock), minute=33
+    letters = Clock.translate_word_grid_positions(3, 33)
+
+    # "TO" grid positions
+    assert [3, 9] in letters
+    assert [3, 10] in letters
+
+    # FOUR grid positions (hours[3] = FOUR = [[6,0],[6,1],[6,2],[6,3]])
+    assert [6, 0] in letters
+    assert [6, 1] in letters
+    assert [6, 2] in letters
+    assert [6, 3] in letters
+
+    # THREE grid positions must NOT appear (hours[2] = THREE = [[5,6]...[5,10]])
+    assert [5, 6] not in letters
+
+
 def test_draw_gradient_image_mode_and_size():
     from plugins.clock.clock import Clock
 
