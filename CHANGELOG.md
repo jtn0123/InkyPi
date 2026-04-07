@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.4.25 (2026-04-07)
+
+### Bug Fixes
+
+- Swap collapsible section arrow icon direction (JTN-244)
+  ([#170](https://github.com/jtn0123/InkyPi/pull/170),
+  [`0c70874`](https://github.com/jtn0123/InkyPi/commit/0c70874d95524b6c975feae28f941a64efed6362))
+
+The icon ternary in toggleCollapsible used isOpen (pre-toggle state) so the arrow pointed the wrong
+  way after every click. Swapping to `isOpen ? "▼" : "▲"` makes the icon reflect the post-toggle
+  (current) state. Added a regression test.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.24 (2026-04-07)
 
 ### Bug Fixes
