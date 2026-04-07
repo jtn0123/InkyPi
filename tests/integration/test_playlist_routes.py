@@ -98,7 +98,7 @@ def test_toggle_only_fresh_and_snooze(client, device_config_dev):
 # JTN-217: Overlap-with-Default warning
 
 
-def _ensure_default_playlist(device_config_dev):
+def _ensure_default_playlist(device_config_dev) -> None:
     """Ensure a Default (00:00-24:00) playlist exists in the config."""
     pm = device_config_dev.get_playlist_manager()
     if not pm.get_playlist("Default"):
@@ -106,7 +106,7 @@ def _ensure_default_playlist(device_config_dev):
         device_config_dev.write_config()
 
 
-def _assert_overlap_warning(data):
+def _assert_overlap_warning(data) -> None:
     """Assert the response includes a Default-overlap warning."""
     assert "warning" in data
     assert "Default" in data["warning"]

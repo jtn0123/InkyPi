@@ -458,37 +458,61 @@ def playlists():
     )
 
 
+def _parse_playlist_request_data():
+    """Parse and validate playlist create/update request data.
+
+    Returns (data_dict, error_response). If error_response is not None, return it.
+    """
+    data = request.get_json(silent=True)
+    if data is None:
+        form_data = request.form.to_dict()
+        if any(k in form_data for k in ("playlist_name", "start_time", "end_time")):
+            data = form_data
+        else:
+            return None, json_error("Unsupported media type", status=415)
+    if not isinstance(data, dict):
+        return None, json_error("Invalid JSON data", status=400)
+    return data, None
+
+
+def _validate_playlist_times(start_time, end_time):
+    """Validate and convert time strings to minutes.
+
+    Returns (start_min, end_min, error_response).
+    """
+    if not start_time or not end_time:
+        return (
+            None,
+            None,
+            json_error("Start time and End time are required", status=400),
+        )
+    try:
+        start_min = _to_minutes(start_time)
+        end_min = _to_minutes(end_time)
+    except Exception:
+        return None, None, json_error(_MSG_INVALID_TIME_FORMAT, status=400)
+    if start_min == end_min:
+        return None, None, json_error(_MSG_SAME_TIME, status=400)
+    return start_min, end_min, None
+
+
 @playlist_bp.route("/create_playlist", methods=["POST"])
 def create_playlist():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    data = request.get_json(silent=True)
-    if data is None:
-        form_data = request.form.to_dict()
-        # Keep form compatibility for UI submits, but reject arbitrary non-JSON payloads.
-        if any(k in form_data for k in ("playlist_name", "start_time", "end_time")):
-            data = form_data
-        else:
-            return json_error("Unsupported media type", status=415)
-    if not isinstance(data, dict):
-        return json_error("Invalid JSON data", status=400)
-    raw_name = data.get("playlist_name")
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
+    data, err = _parse_playlist_request_data()
+    if err:
+        return err
 
-    playlist_name, name_err = _validate_playlist_name(raw_name)
+    playlist_name, name_err = _validate_playlist_name(data.get("playlist_name"))
     if name_err:
         return name_err
-    if not start_time or not end_time:
-        return json_error("Start time and End time are required", status=400)
-    try:
-        start_min = _to_minutes(start_time)
-        end_min = _to_minutes(end_time)
-    except Exception:
-        return json_error(_MSG_INVALID_TIME_FORMAT, status=400)
-    if start_min == end_min:
-        return json_error(_MSG_SAME_TIME, status=400)
+    start_min, end_min, time_err = _validate_playlist_times(
+        data.get("start_time"), data.get("end_time")
+    )
+    if time_err:
+        return time_err
 
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
@@ -508,14 +532,14 @@ def create_playlist():
             # best-effort, fallback to allow
             pass
 
-        result = playlist_manager.add_playlist(playlist_name, start_time, end_time)
+        result = playlist_manager.add_playlist(
+            playlist_name, data.get("start_time"), data.get("end_time")
+        )
         if not result:
             return json_error("Failed to create playlist", status=500)
 
-        # save changes to device config file
         device_config.write_config()
 
-        # Warn if the new playlist overlaps with Default.
         warning = None
         if playlist_name != "Default":
             warning = _default_overlap_warning(
@@ -536,6 +560,19 @@ def create_playlist():
     return json_success("Created new Playlist!")
 
 
+def _apply_cycle_override(playlist_manager, new_name, cycle_minutes):
+    """Apply optional cycle interval override to a playlist."""
+    if cycle_minutes is None:
+        return
+    try:
+        cm = int(cycle_minutes)
+        playlist = playlist_manager.get_playlist(new_name)
+        if playlist:
+            playlist.cycle_interval_seconds = max(0, cm) * 60
+    except Exception:
+        pass
+
+
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
 def update_playlist(playlist_name):
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -548,16 +585,11 @@ def update_playlist(playlist_name):
     new_name = data.get("new_name")
     start_time = data.get("start_time")
     end_time = data.get("end_time")
-    cycle_minutes = data.get("cycle_minutes")  # optional override
     if not new_name or not start_time or not end_time:
         return json_error("Missing required fields", status=400)
-    try:
-        start_min = _to_minutes(start_time)
-        end_min = _to_minutes(end_time)
-    except Exception:
-        return json_error(_MSG_INVALID_TIME_FORMAT, status=400)
-    if start_min == end_min:
-        return json_error(_MSG_SAME_TIME, status=400)
+    start_min, end_min, time_err = _validate_playlist_times(start_time, end_time)
+    if time_err:
+        return time_err
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -578,18 +610,7 @@ def update_playlist(playlist_name):
     )
     if not result:
         return json_error("Failed to update playlist", status=500)
-    # Apply cycle override if provided
-    try:
-        if cycle_minutes is not None:
-            try:
-                cm = int(cycle_minutes)
-                playlist = playlist_manager.get_playlist(new_name)
-                if playlist:
-                    playlist.cycle_interval_seconds = max(0, cm) * 60
-            except Exception:
-                pass
-    except Exception:
-        pass
+    _apply_cycle_override(playlist_manager, new_name, data.get("cycle_minutes"))
     device_config.write_config()
 
     # Warn if the updated playlist overlaps with Default.
