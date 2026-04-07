@@ -189,6 +189,39 @@ class ImageAlbum(BasePlugin):
         }
         return template_params
 
+    def _fetch_immich_image(self, settings, device_config, dimensions, use_padding):
+        """Validate Immich settings and fetch an image from the provider."""
+        key = device_config.load_env_key("IMMICH_KEY")
+        if not key:
+            logger.error("Immich API Key not configured")
+            raise RuntimeError("Immich API Key not configured.")
+
+        url = settings.get("url")
+        if not url:
+            logger.error("Immich URL not provided")
+            raise RuntimeError("Immich URL is required.")
+
+        try:
+            validate_url(url)
+        except ValueError as e:
+            raise RuntimeError(f"Invalid URL: {e}") from e
+
+        album = settings.get("album")
+        if not album:
+            logger.error("Album name not provided")
+            raise RuntimeError("Album name is required.")
+
+        logger.info(f"Immich URL: {url}")
+        logger.info(f"Album: {album}")
+
+        provider = ImmichProvider(url, key, self.image_loader)
+        img = provider.get_image(album, dimensions, resize=not use_padding)
+
+        if not img:
+            logger.error("Failed to retrieve image from Immich")
+            raise RuntimeError("Failed to load image, please check logs.")
+        return img
+
     def generate_image(self, settings, device_config):
         logger.info("=== Image Album Plugin: Starting image generation ===")
 
@@ -207,36 +240,9 @@ class ImageAlbum(BasePlugin):
 
         match album_provider:
             case "Immich":
-                key = device_config.load_env_key("IMMICH_KEY")
-                if not key:
-                    logger.error("Immich API Key not configured")
-                    raise RuntimeError("Immich API Key not configured.")
-
-                url = settings.get("url")
-                if not url:
-                    logger.error("Immich URL not provided")
-                    raise RuntimeError("Immich URL is required.")
-
-                try:
-                    validate_url(url)
-                except ValueError as e:
-                    raise RuntimeError(f"Invalid URL: {e}") from e
-
-                album = settings.get("album")
-                if not album:
-                    logger.error("Album name not provided")
-                    raise RuntimeError("Album name is required.")
-
-                logger.info(f"Immich URL: {url}")
-                logger.info(f"Album: {album}")
-
-                provider = ImmichProvider(url, key, self.image_loader)
-                # Let loader resize when no padding needed, otherwise load full-size for padding
-                img = provider.get_image(album, dimensions, resize=not use_padding)
-
-                if not img:
-                    logger.error("Failed to retrieve image from Immich")
-                    raise RuntimeError("Failed to load image, please check logs.")
+                img = self._fetch_immich_image(
+                    settings, device_config, dimensions, use_padding
+                )
             case _:
                 logger.error(f"Unknown album provider: {album_provider}")
                 raise RuntimeError(f"Unsupported album provider: {album_provider}")
