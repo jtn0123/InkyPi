@@ -377,7 +377,7 @@
             urls: {
                 add_to_playlist: {{ url_for('playlist.add_plugin') | tojson }},
                 save_settings: {{ url_for("plugin.save_plugin_settings") | tojson }},
-                update_instance: {{ (url_for('plugin.update_plugin_instance', instance_name='') ~ (plugin_instance or '')) | tojson }},
+                update_instance: {{ url_for('plugin.update_plugin_instance', instance_name=(plugin_instance or '')) | tojson }},
                 update_now: {{ url_for("plugin.update_now") | tojson }},
             },
         };

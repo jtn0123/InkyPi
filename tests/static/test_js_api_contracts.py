@@ -256,3 +256,23 @@ def test_skeleton_loader_escapes_step_names_in_innerhtml(client):
 
     # Bare unescaped interpolation must NOT appear for skeleton-step-text rendering
     assert '"skeleton-step-text">${step}<' not in js
+
+
+# --- URL encoding ---
+
+
+def test_playlist_script_url_encodes_playlist_names_in_fetch_calls(client):
+    """JTN-234: Playlist names must be URL-encoded before appending to fetch URLs.
+
+    Playlist names can contain spaces and special characters.  Without encoding
+    the URL becomes malformed and the server receives a garbled path segment.
+    """
+    resp = client.get("/static/scripts/playlist.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # update_playlist_base_url must use encodeURIComponent, not raw concatenation
+    assert "update_playlist_base_url + encodeURIComponent(oldName)" in js
+
+    # Both delete_playlist fetch sites must use encodeURIComponent
+    assert js.count("delete_playlist_base_url + encodeURIComponent(") >= 2

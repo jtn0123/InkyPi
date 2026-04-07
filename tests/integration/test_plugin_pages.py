@@ -359,3 +359,38 @@ def test_plugin_latest_refresh_time_populated(client, device_config_dev):
     # The template should render the refresh time
     # It's rendered via JavaScript, so we check that the variable is set
     assert "plugin_latest_refresh" in body or "2025-01-15" in body
+
+
+def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(client):
+    """JTN-240: update_instance URL must use url_for() with the actual instance name.
+
+    When plugin_instance contains spaces or special characters the old string
+    concatenation approach (url_for(..., instance_name='') ~ instance_name)
+    produced an un-encoded URL like '/update_plugin_instance/My Instance'.
+    Flask's url_for() with the real name percent-encodes it correctly:
+    '/update_plugin_instance/My%20Instance'.
+    """
+    # Create a plugin instance whose name contains a space
+    resp = client.post(
+        "/add_plugin",
+        data={
+            "plugin_id": "ai_text",
+            "title": "My Title",
+            "textModel": "gpt-4o",
+            "textPrompt": "Hello",
+            "refresh_settings": (
+                '{"playlist":"Default","instance_name":"My Instance",'
+                '"refreshType":"interval","interval":"60","unit":"minute"}'
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+
+    page = client.get("/plugin/ai_text?instance=My Instance")
+    assert page.status_code == 200
+    body = page.data.decode("utf-8")
+
+    # url_for() encodes spaces as %20; the raw string must NOT appear in the URL
+    assert "update_plugin_instance/My%20Instance" in body
+    assert "update_plugin_instance/My Instance" not in body

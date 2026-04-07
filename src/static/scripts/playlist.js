@@ -523,7 +523,7 @@
         let endTime = document.getElementById("end_time").value;
         let cycleMinutes = document.getElementById('cycle_minutes').value;
         try {
-            const response = await fetch(C.update_playlist_base_url + oldName, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
+            const response = await fetch(C.update_playlist_base_url + encodeURIComponent(oldName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){
                 closeModal();
@@ -536,7 +536,7 @@
     async function deletePlaylist() {
         let name = document.getElementById("editingPlaylistName").value;
         try {
-            const response = await fetch(C.delete_playlist_base_url + name, { method: "DELETE" });
+            const response = await fetch(C.delete_playlist_base_url + encodeURIComponent(name), { method: "DELETE" });
             const result = await handleJsonResponse(response);
             if (response.ok && result && result.success){ closeModal(); location.reload(); }
         } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
@@ -894,7 +894,7 @@
         setModalOpen('deletePlaylistModal', true);
         btn.onclick = async function(){
             try{
-                const resp = await fetch(C.delete_playlist_base_url + name, { method:'DELETE' });
+                const resp = await fetch(C.delete_playlist_base_url + encodeURIComponent(name), { method:'DELETE' });
                 const j = await handleJsonResponse(resp);
                 if (resp.ok && j && j.success){ location.reload(); }
             } catch(e){ showResponseModal('failure', 'Failed to delete playlist'); }
