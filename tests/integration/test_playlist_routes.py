@@ -77,6 +77,63 @@ def test_reorder_plugins_endpoint(client, device_config_dev):
     assert pl2.plugins[0].name == "B"
 
 
+def test_cycle_override_zero_enforces_minimum_60_seconds(client, device_config_dev):
+    """JTN-232: cycle_minutes=0 must not produce cycle_interval_seconds of 0 (infinite loop)."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("CycleTest", "10:00", "11:00")
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "CycleTest",
+        "start_time": "10:00",
+        "end_time": "11:00",
+        "cycle_minutes": 0,
+    }
+    resp = client.put("/update_playlist/CycleTest", json=upd)
+    assert resp.status_code == 200
+
+    pl = pm.get_playlist("CycleTest")
+    assert pl is not None
+    assert (
+        pl.cycle_interval_seconds >= 60
+    ), f"cycle_interval_seconds should be at least 60, got {pl.cycle_interval_seconds}"
+
+
+def test_update_playlist_rejects_special_char_name(client, device_config_dev):
+    """JTN-256: update_playlist must validate new_name and reject XSS-style names."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("SafeName", "12:00", "13:00")
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "<script>alert(1)</script>",
+        "start_time": "12:00",
+        "end_time": "13:00",
+    }
+    resp = client.put("/update_playlist/SafeName", json=upd)
+    assert resp.status_code == 400
+    j = resp.get_json()
+    assert j.get("success") is False
+
+
+def test_update_playlist_rejects_name_over_64_chars(client, device_config_dev):
+    """JTN-256: update_playlist must reject names longer than 64 characters."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("LongNameTest", "14:00", "15:00")
+    device_config_dev.write_config()
+
+    long_name = "A" * 65
+    upd = {
+        "new_name": long_name,
+        "start_time": "14:00",
+        "end_time": "15:00",
+    }
+    resp = client.put("/update_playlist/LongNameTest", json=upd)
+    assert resp.status_code == 400
+    j = resp.get_json()
+    assert j.get("success") is False
+
+
 def test_toggle_only_fresh_and_snooze(client, device_config_dev):
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("Default", "00:00", "24:00")
