@@ -84,3 +84,37 @@ def test_json_body_csrf_token_accepted_by_production_middleware(csrf_client):
         data=json.dumps({"level": "error", "message": "test", "_csrf_token": token}),
     )
     assert resp.status_code == 200
+
+
+def test_form_csrf_token_accepted_by_production_middleware(csrf_client):
+    """CSRF token in form data (csrf_token field) must be accepted."""
+    csrf_client.get("/")
+    with csrf_client.session_transaction() as sess:
+        token = sess.get("_csrf_token")
+    assert token
+
+    resp = csrf_client.post(
+        "/settings/client_log",
+        data={"csrf_token": token, "level": "info", "message": "test"},
+        content_type="application/x-www-form-urlencoded",
+    )
+    # client_log expects JSON, so form data may error — but CSRF itself passes (not 403)
+    assert resp.status_code != 403
+
+
+def test_extract_csrf_token_prefers_header(csrf_client):
+    """When both header and JSON body have tokens, header takes precedence."""
+    csrf_client.get("/")
+    with csrf_client.session_transaction() as sess:
+        token = sess.get("_csrf_token")
+    assert token
+
+    resp = csrf_client.post(
+        "/settings/client_log",
+        content_type="application/json",
+        data=json.dumps(
+            {"level": "error", "message": "test", "_csrf_token": "wrong-body-token"}
+        ),
+        headers={"X-CSRFToken": token},
+    )
+    assert resp.status_code == 200
