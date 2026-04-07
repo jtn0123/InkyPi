@@ -8,7 +8,7 @@
     button.setAttribute("aria-expanded", String(!isOpen));
     content.classList.toggle("is-open", !isOpen);
     content.removeAttribute("hidden");
-    if (icon) icon.textContent = isOpen ? "▲" : "▼";
+    if (icon) icon.textContent = isOpen ? "▼" : "▲";
     const sectionId = button.closest('.collapsible')?.id;
     if (sectionId) {
       savePref('collapsible_', sectionId, !isOpen);
