@@ -274,7 +274,11 @@
         const isExisting = row.dataset.existing === "true";
         if (!key) return;
         if (isExisting) {
-          entries.push({ key, value: null, keepExisting: true });
+          if (value) {
+            entries.push({ key, value });
+          } else {
+            entries.push({ key, value: null, keepExisting: true });
+          }
         } else if (!value) {
           missingValue = true;
         } else {
