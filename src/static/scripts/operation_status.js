@@ -436,8 +436,6 @@ window.startOperation = function(id, description, options = {}) {
 // Integration with existing progress systems
 document.addEventListener('DOMContentLoaded', () => {
     // Auto-detect when form submissions start
-    const nativeFetch = window.fetch.bind(window);
-
     document.addEventListener('submit', (e) => {
         const form = e.target;
         const formId = form.id || 'form-' + Date.now();

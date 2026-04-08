@@ -108,11 +108,3 @@ def test_finish_operation_restores_previous_fetch(client):
     # The restore must be guarded so only the active wrapper is removed
     assert "if (window.fetch === wrappedFetch)" in js
 
-
-def test_native_fetch_still_bound_once(client):
-    """nativeFetch is still bound once at DOMContentLoaded to avoid rebinding."""
-    resp = client.get("/static/scripts/operation_status.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
-
-    assert "const nativeFetch = window.fetch.bind(window);" in js
