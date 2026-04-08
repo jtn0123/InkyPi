@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.16.0 (2026-04-08)
+
+### Features
+
+- Per-ip rate limiting for login and refresh (JTN-447)
+  ([#257](https://github.com/jtn0123/InkyPi/pull/257),
+  [`d43f676`](https://github.com/jtn0123/InkyPi/commit/d43f676887e46cea442893052ec2e658ca684688))
+
+Adds a stdlib-only TokenBucket rate limiter keyed on client IP address to defend /login and
+  /display-next (/refresh alias) against brute-force and refresh-storming attacks. Complements the
+  session-level PIN lockout introduced in JTN-286. Limits are configurable via
+  INKYPI_RATE_LIMIT_AUTH and INKYPI_RATE_LIMIT_REFRESH env vars (format: N/Sseconds).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Sse stream for live dashboard updates ([#256](https://github.com/jtn0123/InkyPi/pull/256),
+  [`65a02d8`](https://github.com/jtn0123/InkyPi/commit/65a02d8edabb2f5c30fdac024f39a4a8c0fd1a65))
+
+Add /api/events SSE endpoint backed by a new thread-safe EventBus (src/utils/event_bus.py) with
+  per-subscriber queues, 50-subscriber cap, 15 s heartbeat, and clean disconnect handling. Hook
+  publish() into RefreshTask._perform_refresh for refresh_started, refresh_complete, and
+  plugin_failed events. Wire pushUrl in the dashboard template so the existing EventSource fallback
+  logic activates automatically. Add 18 tests covering bus unit behaviour, stream formatting,
+  endpoint contract, and refresh-task hook integration.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.15.0 (2026-04-08)
 
 ### Features
