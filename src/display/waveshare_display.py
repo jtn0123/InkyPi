@@ -128,7 +128,7 @@ class WaveshareDisplay(AbstractDisplay):
         """
 
         logger.info("Displaying image to Waveshare display.")
-        if not image:
+        if image is None:
             raise ValueError("No image provided.")
 
         # Assume device was in sleep mode.
