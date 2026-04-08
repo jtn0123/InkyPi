@@ -256,6 +256,10 @@ def create_app():
 
     setup_secret_key(app, device_config)
 
+    from app_setup.auth import init_auth
+
+    init_auth(app, device_config)
+
     app.config["MAX_FORM_PARTS"] = 10_000
     try:
         _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
