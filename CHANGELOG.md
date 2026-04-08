@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.14.0 (2026-04-08)
+
+### Features
+
+- Add optional PIN authentication (JTN-286) ([#241](https://github.com/jtn0123/InkyPi/pull/241),
+  [`ced305d`](https://github.com/jtn0123/InkyPi/commit/ced305da90ec7de72636c230bb819e4026893460))
+
+* feat: add optional PIN authentication (JTN-286)
+
+Adds opt-in PIN auth via INKYPI_AUTH_PIN env var or device_config auth.pin. When unset (default)
+  behaviour is unchanged. When set, all routes except /login, /logout, /sw.js, /static/*,
+  /api/health, /healthz, /readyz redirect unauthenticated requests to a login form. PIN is
+  scrypt-hashed in memory, never persisted. Rate-limits 5 failures then 60s lockout. 16 new tests,
+  all 2445 passing.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: validate next URL and extract login template constant (Sonar S5146/S1192)
+
+- _safe_next_url() rejects absolute and protocol-relative URLs to prevent open-redirect via the
+  ?next= parameter - _LOGIN_TEMPLATE constant deduplicates the 'login.html' literal
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.13.0 (2026-04-08)
 
 ### Features
