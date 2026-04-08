@@ -1,9 +1,9 @@
 import logging
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
+from utils.time_utils import get_timezone
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class Countdown(BasePlugin):
         dimensions = self.get_oriented_dimensions(device_config)
 
         tz_name = device_config.get_config("timezone", default="America/New_York")
-        tz = ZoneInfo(tz_name)
+        tz = get_timezone(tz_name)
         current_time = datetime.now(tz)
 
         countdown_date = datetime.strptime(countdown_date_str, "%Y-%m-%d")

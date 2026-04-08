@@ -365,3 +365,72 @@ def test_weather_generate_settings_template():
     assert "api_key" in template
     assert template["api_key"]["service"] == "OpenWeatherMap"
     assert template["style_settings"] is True
+
+
+def test_weather_invalid_timezone_falls_back_to_utc(device_config_dev, monkeypatch):
+    """Invalid device timezone must not crash weather; get_timezone() falls back to UTC."""
+    from unittest.mock import patch
+
+    from plugins.weather.weather import Weather
+
+    device_config_dev.update_value("timezone", "Not/A_Valid_Timezone")
+
+    weather = Weather({"id": "weather"})
+
+    open_meteo_response = {
+        "latitude": 40.7,
+        "longitude": -74.0,
+        "timezone": "UTC",
+        "current": {
+            "time": "2025-06-01T12:00",
+            "temperature_2m": 20.0,
+            "apparent_temperature": 18.0,
+            "relative_humidity_2m": 60,
+            "precipitation": 0.0,
+            "rain": 0.0,
+            "wind_speed_10m": 5.0,
+            "wind_direction_10m": 180,
+            "weather_code": 0,
+            "is_day": 1,
+            "surface_pressure": 1013.0,
+            "uv_index": 2.0,
+            "visibility": 10000.0,
+        },
+        "daily": {
+            "time": ["2025-06-01"],
+            "temperature_2m_max": [22.0],
+            "temperature_2m_min": [15.0],
+            "weather_code": [0],
+            "precipitation_sum": [0.0],
+            "moon_phase": [0.1],
+            "sunrise": ["2025-06-01T05:30"],
+            "sunset": ["2025-06-01T20:00"],
+            "is_day": [1],
+        },
+        "hourly": {
+            "time": ["2025-06-01T12:00"],
+            "temperature_2m": [20.0],
+            "precipitation": [0.0],
+            "rain": [0.0],
+            "weather_code": [0],
+            "is_day": [1],
+        },
+    }
+    empty_aqi = {}
+
+    with patch.object(weather, "get_open_meteo_data", return_value=open_meteo_response):
+        with patch.object(
+            weather, "get_open_meteo_air_quality", return_value=empty_aqi
+        ):
+            # Should not raise ZoneInfoNotFoundError
+            settings = {
+                "latitude": "40.7128",
+                "longitude": "-74.0060",
+                "units": "metric",
+                "weatherProvider": "OpenMeteo",
+            }
+            result = weather.generate_image(settings, device_config_dev)
+
+    from PIL import Image as PILImage
+
+    assert isinstance(result, PILImage.Image)

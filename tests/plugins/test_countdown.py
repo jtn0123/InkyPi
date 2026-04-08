@@ -75,3 +75,20 @@ def test_countdown_vertical(plugin_config, device_config_dev):
             device_config_dev,
         )
     assert isinstance(result, Image.Image)
+
+
+def test_countdown_invalid_timezone_falls_back_to_utc(plugin_config, device_config_dev):
+    """Invalid timezone must not crash countdown; get_timezone() falls back to UTC."""
+    from plugins.countdown.countdown import Countdown
+
+    device_config_dev.update_value("timezone", "Not/A_Valid_Timezone")
+
+    with patch("plugins.countdown.countdown.datetime", wraps=datetime) as mock_dt:
+        mock_dt.now.return_value = _frozen_now(2025, 6, 1)
+        p = Countdown(plugin_config)
+        # Should not raise ZoneInfoNotFoundError
+        result = p.generate_image(
+            {"title": "Fallback Test", "date": "2025-12-25"},
+            device_config_dev,
+        )
+    assert isinstance(result, Image.Image)
