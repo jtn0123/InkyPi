@@ -103,7 +103,7 @@
                                      data-thumbnail-instance="{{ plugin_instance.name }}">
                                     <div class="img-skeleton" aria-hidden="true"></div>
                                     <img
-                                        src="{{ url_for('plugin.plugin_instance_image', playlist_name=playlist.name, plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
+                                        src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
                                         alt="{{ plugin_instance.name }} preview"
                                         class="plugin-thumbnail"
                                         title="Click to view full size"

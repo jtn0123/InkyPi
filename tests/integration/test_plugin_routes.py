@@ -477,3 +477,32 @@ def test_delete_plugin_instance_calls_plugin_cleanup(
     assert resp.status_code == 200
     assert "settings" in cleanup_called
     assert cleanup_called["settings"] == {}
+
+
+def test_playlist_page_instance_image_url_has_no_playlist_name_query_param(
+    client, device_config_dev
+):
+    """Regression test for JTN-265.
+
+    playlist.html used to pass playlist_name=... to url_for('plugin.plugin_instance_image'),
+    which Flask silently appended as a query string the route ignores.  Verify that
+    rendered image src URLs do NOT contain playlist_name as a query parameter.
+    """
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("MyPlaylist", "00:00", "24:00")
+    pl = pm.get_playlist("MyPlaylist")
+    pl.add_plugin(
+        {
+            "plugin_id": "ai_text",
+            "name": "My Instance",
+            "plugin_settings": {},
+            "refresh": {"interval": 300},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.data.decode()
+    # The image src should not carry playlist_name as a query param
+    assert "playlist_name=" not in body
