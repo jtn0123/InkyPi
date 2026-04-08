@@ -507,6 +507,20 @@ class PluginInstance:
         latest_refresh (str): ISO-formatted string representing the last refresh time.
     """
 
+    # Only these attributes may be modified via update().  plugin_id is
+    # intentionally excluded — it is an immutable identity field and must not
+    # be overwritten by user-supplied data.
+    _UPDATABLE: frozenset = frozenset(
+        {
+            "name",
+            "settings",
+            "refresh",
+            "latest_refresh_time",
+            "only_show_when_fresh",
+            "snooze_until",
+        }
+    )
+
     def __init__(
         self,
         plugin_id,
@@ -526,9 +540,20 @@ class PluginInstance:
         self.snooze_until = snooze_until
 
     def update(self, updated_data):
-        """Update attributes of the class with the dictionary values."""
+        """Update attributes of the class with the dictionary values.
+
+        Only keys present in ``_UPDATABLE`` are applied; unknown keys are
+        silently ignored to avoid breaking callers that pass extra data and to
+        prevent arbitrary attribute injection.
+        """
         for key, value in updated_data.items():
-            setattr(self, key, value)
+            if key in self._UPDATABLE:
+                setattr(self, key, value)
+            else:
+                logger.debug(
+                    "PluginInstance.update: ignoring non-updatable field %r",
+                    key,
+                )
 
     def should_refresh(self, current_time: datetime) -> bool:
         """Checks whether the plugin should be refreshed based on its refresh settings and the current time."""

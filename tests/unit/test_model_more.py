@@ -59,3 +59,128 @@ def test_add_default_playlist_returns_true_and_grows_list():
     result = pm.add_default_playlist()
     assert result is True
     assert len(pm.playlists) == before + 1
+
+
+# ---------------------------------------------------------------------------
+# Tests for PluginInstance.update() allowlist (JTN-230)
+# ---------------------------------------------------------------------------
+
+
+class TestPluginInstanceUpdateAllowlist:
+    """PluginInstance.update() should only apply fields in _UPDATABLE."""
+
+    def _make_pi(self):
+        return PluginInstance(
+            plugin_id="weather",
+            name="main",
+            settings={"city": "London"},
+            refresh={"interval": 300},
+            latest_refresh_time=None,
+            only_show_when_fresh=False,
+            snooze_until=None,
+        )
+
+    def test_update_settings_allowed(self):
+        pi = self._make_pi()
+        pi.update({"settings": {"city": "Paris"}})
+        assert pi.settings == {"city": "Paris"}
+
+    def test_update_refresh_allowed(self):
+        pi = self._make_pi()
+        pi.update({"refresh": {"interval": 600}})
+        assert pi.refresh == {"interval": 600}
+
+    def test_update_latest_refresh_time_allowed(self):
+        pi = self._make_pi()
+        ts = "2024-01-01T12:00:00"
+        pi.update({"latest_refresh_time": ts})
+        assert pi.latest_refresh_time == ts
+
+    def test_update_only_show_when_fresh_allowed(self):
+        pi = self._make_pi()
+        pi.update({"only_show_when_fresh": True})
+        assert pi.only_show_when_fresh is True
+
+    def test_update_snooze_until_allowed(self):
+        pi = self._make_pi()
+        ts = "2024-06-01T08:00:00"
+        pi.update({"snooze_until": ts})
+        assert pi.snooze_until == ts
+
+    def test_update_name_allowed(self):
+        pi = self._make_pi()
+        pi.update({"name": "Renamed"})
+        assert pi.name == "Renamed"
+
+    def test_update_unknown_key_silently_ignored(self):
+        """Unknown keys must not raise and must not be applied."""
+        pi = self._make_pi()
+        pi.update({"evil_key": "evil_value"})
+        assert not hasattr(pi, "evil_key")
+
+    def test_update_plugin_id_injection_blocked(self):
+        """plugin_id is not in _UPDATABLE and must not be overwritten."""
+        pi = self._make_pi()
+        pi.update({"plugin_id": "injected"})
+        assert pi.plugin_id == "weather"
+
+    def test_update_mixed_allowed_and_unknown(self):
+        """Allowed fields are applied; unknown fields are ignored."""
+        pi = self._make_pi()
+        pi.update(
+            {
+                "settings": {"city": "Tokyo"},
+                "plugin_id": "evil",
+                "__class__": "hacked",
+            }
+        )
+        assert pi.settings == {"city": "Tokyo"}
+        assert pi.plugin_id == "weather"
+        assert not hasattr(pi, "__class__") or pi.__class__ is PluginInstance
+
+    def test_playlist_update_plugin_end_to_end(self):
+        """Playlist.update_plugin() still applies legitimate settings correctly."""
+        pl = Playlist(
+            "Default",
+            "00:00",
+            "24:00",
+            plugins=[
+                {
+                    "plugin_id": "clock",
+                    "name": "desk",
+                    "plugin_settings": {"format": "12h"},
+                    "refresh": {"interval": 60},
+                }
+            ],
+        )
+        result = pl.update_plugin(
+            "clock",
+            "desk",
+            {"settings": {"format": "24h"}, "refresh": {"interval": 120}},
+        )
+        assert result is True
+        plugin = pl.find_plugin("clock", "desk")
+        assert plugin is not None
+        assert plugin.settings == {"format": "24h"}
+        assert plugin.refresh == {"interval": 120}
+
+    def test_playlist_update_plugin_blocks_id_injection(self):
+        """Passing plugin_id in updated_data must not overwrite the stored id."""
+        pl = Playlist(
+            "Default",
+            "00:00",
+            "24:00",
+            plugins=[
+                {
+                    "plugin_id": "clock",
+                    "name": "desk",
+                    "plugin_settings": {},
+                    "refresh": {},
+                }
+            ],
+        )
+        pl.update_plugin("clock", "desk", {"plugin_id": "evil", "settings": {"x": 1}})
+        plugin = pl.find_plugin("clock", "desk")
+        assert plugin is not None
+        assert plugin.plugin_id == "clock"
+        assert plugin.settings == {"x": 1}
