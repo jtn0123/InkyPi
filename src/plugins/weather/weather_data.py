@@ -436,7 +436,7 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
 
     data_points.append(
         {
-            "label": "UV Index",
+            "label": _LABEL_UV_INDEX,
             "measurement": current.get("uvi"),
             "unit": "",
             "icon": os.path.join(plugin_dir, "icons/uvi.png"),
@@ -469,6 +469,8 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
 
 
 _OPEN_METEO_AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor", "Ext Poor"]
+
+_LABEL_UV_INDEX = "UV Index"
 
 
 def _format_open_meteo_visibility(raw_visibility, units):
@@ -596,11 +598,11 @@ def parse_open_meteo_data_points(
         aqi_data.get("hourly", {}).get("uv_index", []),
         tz,
         current_time,
-        "UV Index",
+        _LABEL_UV_INDEX,
     )
     data_points.append(
         {
-            "label": "UV Index",
+            "label": _LABEL_UV_INDEX,
             "measurement": current_uv_index,
             "unit": "",
             "icon": os.path.join(plugin_dir, "icons/uvi.png"),

@@ -32,6 +32,8 @@ _CONFIG_KEY = "DEVICE_CONFIG"
 _PLUGIN_ID = "plugin_id"
 _ERR_INTERNAL = "An internal error occurred"
 _ERR_NOT_FOUND = "Not Found"
+_MSG_DISPLAY_UPDATED = "Display updated"
+_ERR_PLUGIN_ID_REQUIRED = "plugin_id is required"
 
 
 def _validate_required_fields(plugin, form_data):
@@ -320,7 +322,7 @@ def update_plugin_instance(instance_name: str):
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             raise APIError(
-                "plugin_id is required",
+                _ERR_PLUGIN_ID_REQUIRED,
                 status=422,
                 code="validation_error",
                 details={"field": _PLUGIN_ID},
@@ -390,7 +392,7 @@ def display_plugin_instance():
     except Exception:
         return json_error(_ERR_INTERNAL, status=500)
 
-    return jsonify({"success": True, "message": "Display updated"}), 200
+    return jsonify({"success": True, "message": _MSG_DISPLAY_UPDATED}), 200
 
 
 @plugin_bp.route("/update_now", methods=["POST"])
@@ -405,7 +407,7 @@ def update_now():
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             return json_error(
-                "plugin_id is required",
+                _ERR_PLUGIN_ID_REQUIRED,
                 status=422,
                 code="validation_error",
                 details={"field": _PLUGIN_ID},
@@ -417,7 +419,11 @@ def update_now():
             )
             return (
                 jsonify(
-                    {"success": True, "message": "Display updated", "metrics": metrics}
+                    {
+                        "success": True,
+                        "message": _MSG_DISPLAY_UPDATED,
+                        "metrics": metrics,
+                    }
                 ),
                 200,
             )
@@ -457,7 +463,11 @@ def update_now():
                 }
             return (
                 jsonify(
-                    {"success": True, "message": "Display updated", "metrics": metrics}
+                    {
+                        "success": True,
+                        "message": _MSG_DISPLAY_UPDATED,
+                        "metrics": metrics,
+                    }
                 ),
                 200,
             )
@@ -477,7 +487,7 @@ def save_plugin_settings():
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
             return json_error(
-                "plugin_id is required",
+                _ERR_PLUGIN_ID_REQUIRED,
                 status=422,
                 code="validation_error",
                 details={"field": _PLUGIN_ID},

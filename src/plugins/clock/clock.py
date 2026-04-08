@@ -93,7 +93,7 @@ class Clock(BasePlugin):
 
         img = None
         try:
-            if clock_face == "Gradient Clock":
+            if clock_face == DEFAULT_CLOCK_FACE:
                 img = self.draw_conic_clock(
                     dimensions, current_time, primary_color, secondary_color
                 )
