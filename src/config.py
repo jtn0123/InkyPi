@@ -140,9 +140,19 @@ class Config:
             )
             return env_file
 
-        # 2) Respect class attribute override (possibly set by CLI)
+        # 2) Respect class attribute override (e.g. set by CLI or a subclass), but only
+        # when it differs from the built-in default.  The base Config class always has
+        # config_file set to the production device.json path; if that value is still the
+        # default it means nobody has explicitly overridden it, so we must fall through to
+        # the INKYPI_ENV check (step 3).  Only treat config_file as an explicit override
+        # when it has been changed from the original default (e.g. by CLI or a subclass).
+        _base_default = os.path.join(base_dir, "config", "device.json")
         class_override = getattr(type(self), "config_file", None)
-        if class_override and os.path.isfile(class_override):
+        if (
+            class_override is not None
+            and class_override != _base_default
+            and os.path.isfile(class_override)
+        ):
             logger.info(
                 "config_loaded: Using config from class override",
                 extra={"source": "class_override", "path": class_override},
