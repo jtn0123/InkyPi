@@ -3,6 +3,7 @@ import math
 import os
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from pathlib import Path
 from uuid import uuid4
 
 from flask import (
@@ -16,6 +17,7 @@ from flask import (
 )
 
 from utils.http_utils import json_error
+from utils.image_serving import maybe_serve_webp
 from utils.rate_limiter import CooldownLimiter
 
 logger = logging.getLogger(__name__)
@@ -92,7 +94,7 @@ def preview_image():
         path = device_config.current_image_file
     if not os.path.exists(path):
         return ("Preview not available", 404)
-    return send_file(path, mimetype="image/png", conditional=True)
+    return maybe_serve_webp(Path(path), request.headers.get("Accept"))
 
 
 @main_bp.route("/api/current_image", methods=["GET"])
