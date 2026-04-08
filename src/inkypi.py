@@ -137,6 +137,39 @@ args = None  # Populated by main()
 app: Flask | None = None
 
 
+def _resolve_port(cli_port, dev_mode):
+    """Determine the port to listen on from CLI arg then env vars then default."""
+    if cli_port is not None:
+        return cli_port
+    env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
+    if env_port:
+        try:
+            return int(env_port)
+        except ValueError:
+            pass
+    return 8080 if dev_mode else 80
+
+
+def _apply_dev_env(args):
+    """Persist dev-mode flags to the environment for downstream consumers."""
+    os.environ["INKYPI_ENV"] = "dev"
+    if args.web_only:
+        os.environ["INKYPI_NO_REFRESH"] = "1"
+
+
+def _install_dev_log_handler():
+    """Attach the in-memory log handler used in development mode."""
+    try:
+        from blueprints.settings import DevModeLogHandler
+
+        dev_handler = DevModeLogHandler()
+        dev_handler.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(dev_handler)
+        logger.info("Dev mode log handler enabled (in-memory buffer)")
+    except Exception as e:
+        logger.warning(f"Could not enable dev mode log handler: {e}")
+
+
 def main(argv: list[str] | None = None):
     """Parse CLI arguments and initialise the application."""
 
@@ -173,49 +206,23 @@ def main(argv: list[str] | None = None):
 
     # If --dev explicitly passed, set env var for downstream logic and logs
     if args.dev:
-        os.environ["INKYPI_ENV"] = "dev"
-        # If explicitly opting for web-only via CLI, mirror it in the environment for downstream logic
-        if args.web_only:
-            os.environ["INKYPI_NO_REFRESH"] = "1"
+        _apply_dev_env(args)
 
     # Config file selection via CLI has highest priority; otherwise resolver will decide
     if args.config:
         Config.config_file = args.config
 
-    # Determine port
-    if args.port is not None:
-        PORT = args.port
-    else:
-        # Prefer env INKYPI_PORT then PORT; default by mode
-        env_port = os.getenv("INKYPI_PORT") or os.getenv("PORT")
-        if env_port:
-            try:
-                PORT = int(env_port)
-            except ValueError:
-                PORT = 8080 if DEV_MODE else 80
-        else:
-            PORT = 8080 if DEV_MODE else 80
+    PORT = _resolve_port(args.port, DEV_MODE)
 
-    if DEV_MODE:
-        logger.info(f"Starting InkyPi in DEVELOPMENT mode on port {PORT}")
-    else:
-        logger.info(f"Starting InkyPi in PRODUCTION mode on port {PORT}")
+    mode_label = "DEVELOPMENT" if DEV_MODE else "PRODUCTION"
+    logger.info(f"Starting InkyPi in {mode_label} mode on port {PORT}")
     logging.getLogger("waitress.queue").setLevel(logging.ERROR)
     FAST_DEV = bool(args.fast_dev or _env_bool("INKYPI_FAST_DEV"))
 
     app = create_app()
 
-    # Enable dev mode logging handler for in-memory log capture
     if DEV_MODE:
-        try:
-            from blueprints.settings import DevModeLogHandler
-
-            dev_handler = DevModeLogHandler()
-            dev_handler.setLevel(logging.DEBUG)
-            logging.getLogger().addHandler(dev_handler)
-            logger.info("Dev mode log handler enabled (in-memory buffer)")
-        except Exception as e:
-            logger.warning(f"Could not enable dev mode log handler: {e}")
+        _install_dev_log_handler()
 
     return app
 

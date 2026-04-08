@@ -150,39 +150,21 @@ class BasePlugin:
         template_params["frame_styles"] = FRAME_STYLES
         return template_params
 
-    def render_image(self, dimensions, html_file, css_file=None, template_params=None):
-        if template_params is None:
-            template_params = {}
-        # load the base plugin and current plugin css files
+    def _build_css_files(self, css_file, extra_css_files):
+        """Return the ordered list of CSS file paths for this render."""
         css_files = [os.path.join(BASE_PLUGIN_RENDER_DIR, "plugin.css")]
         if css_file:
-            plugin_css = os.path.join(self.render_dir, css_file)
-            css_files.append(plugin_css)
-        # Allow passing a list of extra CSS file names
-        extra_css_files = template_params.get("extra_css_files") or []
+            css_files.append(os.path.join(self.render_dir, css_file))
         if isinstance(extra_css_files, list):
             for fname in extra_css_files:
                 try:
                     css_files.append(os.path.join(self.render_dir, fname))
                 except Exception as e:
                     logger.warning("Failed to add extra CSS file %s: %s", fname, e)
+        return css_files
 
-        # Convert to file:// URLs so the headless browser can load local assets.
-        style_sheet_urls = [self.to_file_url(path) for path in css_files]
-        template_params["style_sheets"] = style_sheet_urls
-        template_params["width"] = dimensions[0]
-        template_params["height"] = dimensions[1]
-        # Convert font file paths to file URLs
-        fonts = get_fonts()
-        for f in fonts:
-            try:
-                f["url"] = self.to_file_url(f.get("url", ""))
-            except Exception as e:
-                logger.warning("Failed to convert font URL %s: %s", f.get("url", ""), e)
-        template_params["font_faces"] = fonts
-
-        # Optionally inline CSS when running in headless screenshot mode to avoid any
-        # possible file:// loading issues on some platforms
+    def _build_inline_css(self, css_files, template_params):
+        """Read CSS files and optional extra_css from settings into an inline list."""
         inline_css: list[str] = []
         for css_path in css_files:
             try:
@@ -191,7 +173,6 @@ class BasePlugin:
             except Exception as e:
                 logger.warning("Failed to read CSS file %s: %s", css_path, e)
                 raise RuntimeError(f"Unable to read CSS file {css_path}") from e
-        # Allow per-render extra CSS injection via plugin_settings.extra_css
         try:
             extra_css = (template_params.get("plugin_settings", {}) or {}).get(
                 "extra_css"
@@ -201,10 +182,10 @@ class BasePlugin:
         except Exception as e:
             logger.warning("Failed to process extra CSS string %r: %s", extra_css, e)
             raise RuntimeError("Unable to process extra CSS string") from e
-        if inline_css:
-            template_params["inline_styles"] = inline_css
+        return inline_css
 
-        # load and render the given html template
+    def _render_template(self, html_file, template_params):
+        """Render the Jinja2 template and return HTML string."""
         try:
             start_step("template", f"Loading and rendering template: {html_file}")
             template = self.env.get_template(html_file)
@@ -221,6 +202,7 @@ class BasePlugin:
                 html_file,
                 elapsed_ms,
             )
+            return rendered_html
         except Exception as e:
             fail_step(f"Template rendering failed: {str(e)}")
             logger.error(
@@ -231,42 +213,20 @@ class BasePlugin:
             )
             raise
 
-        # Screenshot with optional timeout from environment
+    def _capture_screenshot(self, rendered_html, dimensions):
+        """Take a screenshot of the rendered HTML and return a PIL Image."""
         try:
             start_step("screenshot", "Preparing screenshot capture")
-            timeout_ms = None
-            try:
-                raw = os.getenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "").strip()
-                if raw:
-                    timeout_ms = int(raw)
-            except (ValueError, TypeError):
-                timeout_ms = None
-
+            timeout_ms = self._get_screenshot_timeout()
             timeout_desc = f" (timeout: {timeout_ms}ms)" if timeout_ms else ""
             update_step(f"Taking screenshot of rendered HTML{timeout_desc}")
-
             t1 = perf_counter()
             image = take_screenshot_html(
                 rendered_html, dimensions, timeout_ms=timeout_ms
             )
             elapsed_ms = int((perf_counter() - t1) * 1000)
-
             if image is None:
-                fail_step("Screenshot capture returned None - check screenshot backend")
-                logger.error(
-                    "Rendering HTML to image returned None. Check screenshot backend."
-                )
-                try:
-                    image = Image.new(
-                        "RGB", (int(dimensions[0]), int(dimensions[1])), "white"
-                    )
-                    update_step("Created fallback white image")
-                    complete_step(f"Fallback image created ({elapsed_ms}ms)")
-                except Exception:
-                    fail_step("Failed to create fallback image")
-                    raise RuntimeError(
-                        "Failed to render plugin image. See logs for details."
-                    ) from None
+                image = self._screenshot_fallback(dimensions, elapsed_ms)
             else:
                 complete_step(f"Screenshot captured successfully ({elapsed_ms}ms)")
                 logger.info(
@@ -275,10 +235,61 @@ class BasePlugin:
                     timeout_ms,
                     elapsed_ms,
                 )
+            return image
         except Exception as e:
             fail_step(f"Screenshot capture failed: {str(e)}")
             logger.error(
                 "Screenshot failed | plugin=%s error=%s", self.get_plugin_id(), str(e)
             )
             raise
-        return image
+
+    @staticmethod
+    def _get_screenshot_timeout():
+        """Read INKYPI_SCREENSHOT_TIMEOUT_MS env var; return int ms or None."""
+        try:
+            raw = os.getenv("INKYPI_SCREENSHOT_TIMEOUT_MS", "").strip()
+            return int(raw) if raw else None
+        except (ValueError, TypeError):
+            return None
+
+    def _screenshot_fallback(self, dimensions, elapsed_ms):
+        """Create a white fallback image when the screenshot backend returns None."""
+        fail_step("Screenshot capture returned None - check screenshot backend")
+        logger.error("Rendering HTML to image returned None. Check screenshot backend.")
+        try:
+            image = Image.new("RGB", (int(dimensions[0]), int(dimensions[1])), "white")
+            update_step("Created fallback white image")
+            complete_step(f"Fallback image created ({elapsed_ms}ms)")
+            return image
+        except Exception:
+            fail_step("Failed to create fallback image")
+            raise RuntimeError(
+                "Failed to render plugin image. See logs for details."
+            ) from None
+
+    def render_image(self, dimensions, html_file, css_file=None, template_params=None):
+        if template_params is None:
+            template_params = {}
+
+        # Build CSS file list and inject stylesheet/dimension/font params
+        css_files = self._build_css_files(
+            css_file, template_params.get("extra_css_files") or []
+        )
+        template_params["style_sheets"] = [self.to_file_url(path) for path in css_files]
+        template_params["width"] = dimensions[0]
+        template_params["height"] = dimensions[1]
+
+        fonts = get_fonts()
+        for f in fonts:
+            try:
+                f["url"] = self.to_file_url(f.get("url", ""))
+            except Exception as e:
+                logger.warning("Failed to convert font URL %s: %s", f.get("url", ""), e)
+        template_params["font_faces"] = fonts
+
+        inline_css = self._build_inline_css(css_files, template_params)
+        if inline_css:
+            template_params["inline_styles"] = inline_css
+
+        rendered_html = self._render_template(html_file, template_params)
+        return self._capture_screenshot(rendered_html, dimensions)
