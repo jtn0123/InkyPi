@@ -235,6 +235,9 @@
         const srcId = e.dataTransfer.getData('text/plain');
         const srcEl = document.getElementById(srcId);
         if (srcEl && srcEl !== this){
+            const srcPlaylist = srcEl.closest('.playlist-item');
+            const dstPlaylist = this.closest('.playlist-item');
+            if (srcPlaylist !== dstPlaylist) return false;  // prevent cross-playlist drops
             this.parentNode.insertBefore(srcEl, this.nextSibling);
             const container = this.closest('.playlist-item');
             const playlistName = container?.getAttribute('data-playlist-name');
