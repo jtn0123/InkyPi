@@ -35,6 +35,17 @@ jobs:
         env:
           CI: true
         run: scripts/lint.sh
+      - name: Check dependency licenses
+        run: |
+          pip install --quiet pip-licenses
+          # Block GPL-3/AGPL-3 specifically (not LGPL or GPL-2). Partial-match
+          # is intentionally OFF to avoid catching LGPL or GPL-2-or-later.
+          # Known GPL-3 exemptions tracked separately for replacement.
+          # Do NOT add more — see JTN-298 follow-up.
+          pip-licenses \
+            --fail-on='GPL-3.0;AGPL-3.0;GPL-3.0-or-later;AGPL-3.0-or-later;GPL v3;AGPL v3;GPL-3.0-only;AGPL-3.0-only' \
+            --format=plain \
+            --ignore-packages recurring-ical-events rfc3987
 
   shellcheck:
     name: Shell script validation
@@ -63,6 +74,7 @@ jobs:
           bash -n scripts/test_profile.sh
           bash -n scripts/venv.sh
           bash -n scripts/web_only.sh
+          bash -n scripts/check_licenses.sh
       - name: Run shellcheck
         run: |
           # Run shellcheck linting on all shell scripts
