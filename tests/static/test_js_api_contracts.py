@@ -257,6 +257,31 @@ def test_plugin_page_script_uses_globalthis_for_plugin_hooks(client):
     assert "globalThis.PluginForm" in js
 
 
+def test_show_last_progress_does_not_use_global_fallback_key(client):
+    """Verify showLastProgress does not fall back to the bare global key.
+
+    JTN-246: the global 'INKYPI_LAST_PROGRESS' key is shared across all plugins,
+    so using it as a fallback in showLastProgress can surface progress data from
+    a completely different plugin. Only plugin-scoped keys must be in the chain.
+    """
+    resp = client.get("/static/scripts/plugin_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # The plugin-specific key prefix must still be present
+    assert "INKYPI_LAST_PROGRESS:plugin:" in js
+
+    # Extract the showLastProgress function body to check its keys array
+    fn_start = js.find("function showLastProgress()")
+    assert fn_start != -1, "showLastProgress function not found"
+    fn_body = js[fn_start : fn_start + 600]
+
+    # The bare global key must NOT appear in the showLastProgress keys array
+    assert (
+        '"INKYPI_LAST_PROGRESS"' not in fn_body
+    ), "showLastProgress must not include the bare global fallback key"
+
+
 # --- XSS / innerHTML safety ---
 
 
