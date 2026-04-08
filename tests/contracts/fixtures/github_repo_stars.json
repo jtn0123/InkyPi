@@ -1,0 +1,29 @@
+{
+  "id": 1296269,
+  "node_id": "MDEwOlJlcG9zaXRvcnkxMjk2MjY5",
+  "name": "Hello-World",
+  "full_name": "octocat/Hello-World",
+  "owner": {
+    "login": "octocat",
+    "id": 1,
+    "type": "User"
+  },
+  "private": false,
+  "html_url": "https://github.com/octocat/Hello-World",
+  "description": "This your first repo!",
+  "fork": false,
+  "url": "https://api.github.com/repos/octocat/Hello-World",
+  "default_branch": "main",
+  "stargazers_count": 1729,
+  "watchers_count": 80,
+  "language": "Python",
+  "forks_count": 9,
+  "open_issues_count": 0,
+  "topics": ["octocat", "atom", "electron", "api"],
+  "visibility": "public",
+  "license": {
+    "key": "mit",
+    "name": "MIT License",
+    "spdx_id": "MIT"
+  }
+}

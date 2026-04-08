@@ -1,0 +1,9 @@
+{
+  "copyright": "Test Producer",
+  "date": "2026-04-06",
+  "explanation": "A video APOD — the parser should reject this with media_type != image.",
+  "media_type": "video",
+  "service_version": "v1",
+  "title": "Example Time-Lapse",
+  "url": "https://www.youtube.com/embed/example"
+}
