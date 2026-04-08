@@ -130,12 +130,12 @@
                                 <label class="form-label">Frame:</label>
                                 <div id="frame-selection" class="image-grid">
                                     {% for frame in frame_styles %}
-                                    <div class="image-option" data-face-name="{{ frame.name }}" data-frame-option tabindex="0" role="button">
+                                    <button type="button" class="image-option" data-face-name="{{ frame.name }}" data-frame-option aria-label="Select {{ frame.name }}">
                                         <img
                                             src="{{ url_for('plugin.image', plugin_id='base_plugin', filename=frame.icon) }}"
                                             alt="{{ frame.name }}"
                                         />
-                                    </div>
+                                    </button>
                                     {% endfor %}
                                 </div>
                                 <input type="hidden" id="selected-frame" name="selectedFrame" value="{{ frame_styles[0].name }}" />
