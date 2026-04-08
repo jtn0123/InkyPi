@@ -56,15 +56,16 @@
         newspaper: "Newspaper",
       };
       const rows = [];
+      let titleIndex = -1;
       const date = meta.date ? new Date(meta.date).toISOString().slice(0, 10) : "";
       if (date || labels[info.plugin_id]) rows.push(`${labels[info.plugin_id] || info.plugin_id} ${date}`.trim());
-      if (meta.title) rows.push(meta.title);
+      if (meta.title) { titleIndex = rows.length; rows.push(meta.title); }
       if (meta.caption) rows.push(meta.caption);
       if (meta.explanation) rows.push(meta.explanation);
       rows.forEach((text, index) => {
         const row = document.createElement("div");
         row.className = "workflow-meta-row";
-        if (index === 1 && meta.title) {
+        if (index === titleIndex) {
           const em = document.createElement("em");
           em.textContent = text;
           row.appendChild(em);
