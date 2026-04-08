@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Error scenario tests for the Weather plugin."""
+
 from unittest.mock import MagicMock
 
 import pytest

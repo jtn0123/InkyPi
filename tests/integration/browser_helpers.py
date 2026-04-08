@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Shared helpers for Playwright-based browser tests."""
+
 from __future__ import annotations
 
 from pathlib import Path

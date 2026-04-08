@@ -5,6 +5,7 @@ UI Interaction Tests for playlist page.
 Tests verify dynamic JavaScript behavior: keyboard reordering,
 delete modals, and drag-and-drop in the playlist interface.
 """
+
 from __future__ import annotations
 
 import os

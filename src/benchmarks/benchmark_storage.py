@@ -75,8 +75,7 @@ def _should_record_event(device_config, refresh_event: dict[str, Any]) -> bool:
 
 def _ensure_schema(conn: sqlite3.Connection) -> None:
     cur = conn.cursor()
-    cur.execute(
-        """
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS refresh_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refresh_id TEXT NOT NULL,
@@ -93,10 +92,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             memory_percent REAL,
             notes TEXT
         )
-        """
-    )
-    cur.execute(
-        """
+        """)
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS stage_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refresh_id TEXT NOT NULL,
@@ -105,8 +102,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             duration_ms INTEGER,
             extra_json TEXT
         )
-        """
-    )
+        """)
     _ensure_optional_columns(
         conn,
         "refresh_events",

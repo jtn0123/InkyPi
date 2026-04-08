@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Shared fixtures with realistic API response shapes for plugin tests."""
+
 from io import BytesIO
 from unittest.mock import MagicMock
 

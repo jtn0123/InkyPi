@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for plugins/comic/comic.py — additional coverage for error paths."""
+
 from unittest.mock import MagicMock
 
 import pytest

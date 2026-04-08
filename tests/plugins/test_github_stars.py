@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for the GitHub stars plugin repository path resolution (JTN-264)."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest

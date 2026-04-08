@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Property-based API tests using Hypothesis."""
+
 from hypothesis import HealthCheck, given, settings, strategies as st
 
 

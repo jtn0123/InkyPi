@@ -50,8 +50,7 @@ def discover_plugin_ids(repo_root: Path) -> list[str]:
 
 
 def fill_form_and_extract(page):
-    return page.evaluate(
-        """
+    return page.evaluate("""
         () => {
           const form = document.querySelector('#settingsForm, #pluginForm');
           if (!form) return null;
@@ -85,8 +84,7 @@ def fill_form_and_extract(page):
           }
           return data;
         }
-        """
-    )
+        """)
 
 
 def stub_external_assets(page):

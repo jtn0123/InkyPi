@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Structural validation of install/setup scripts — no shell execution."""
+
 from pathlib import Path
 
 import pytest

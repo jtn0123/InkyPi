@@ -27,8 +27,7 @@ def test_plugin_add_to_playlist_flow(client):
         with open("src/static/scripts/response_modal.js", encoding="utf-8") as f:
             js_modal = f.read()
         page.add_script_tag(content=js_modal)
-        page.evaluate(
-            """
+        page.evaluate("""
             window.__requests__ = [];
             const ok = (body) => new Response(JSON.stringify(Object.assign({success:true,message:"Added"}, body||{})), {status:200, headers:{'Content-Type':'application/json'}});
             window.fetch = (url, opts) => {
@@ -65,8 +64,7 @@ def test_plugin_add_to_playlist_flow(client):
                     fetch("/add_plugin", { method: "POST", body: formData });
                 });
             });
-        """
-        )
+        """)
 
         # Open Add to Playlist modal and fill fields (scope to the modal)
         page.click("text=Add to Playlist")

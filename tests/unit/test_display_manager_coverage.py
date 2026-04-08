@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for display/display_manager.py — additional coverage."""
+
 import os
 
 from PIL import Image

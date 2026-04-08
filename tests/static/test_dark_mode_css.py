@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Dark mode CSS verification tests."""
+
 import re
 from pathlib import Path
 

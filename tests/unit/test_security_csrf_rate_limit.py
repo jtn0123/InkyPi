@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for CSRF protection, rate limiting, and XSS prevention."""
+
 import secrets
 
 import pytest

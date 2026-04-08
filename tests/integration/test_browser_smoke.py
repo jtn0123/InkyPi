@@ -203,29 +203,25 @@ def _new_page(browser, viewport: dict, theme: str):
     page = browser.new_page(
         viewport={"width": viewport["width"], "height": viewport["height"]}
     )
-    page.add_init_script(
-        script=f"""
+    page.add_init_script(script=f"""
         (() => {{
             try {{
                 localStorage.setItem("theme", {theme!r});
                 localStorage.setItem("inkypi-theme", {theme!r});
             }} catch (e) {{}}
         }})();
-        """
-    )
+        """)
     return page
 
 
 def _assert_no_horizontal_overflow(page):
-    widths = page.evaluate(
-        """
+    widths = page.evaluate("""
         () => ({
             innerWidth: window.innerWidth,
             clientWidth: document.documentElement.clientWidth,
             scrollWidth: document.documentElement.scrollWidth,
         })
-        """
-    )
+        """)
     assert widths["scrollWidth"] <= widths["clientWidth"] + 2, widths
 
 

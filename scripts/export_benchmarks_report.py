@@ -27,16 +27,14 @@ def main():
     cur = conn.cursor()
 
     # Recent 50 refreshes summary
-    cur.execute(
-        """
+    cur.execute("""
         SELECT refresh_id, ts, plugin_id, instance, playlist, used_cached,
                request_ms, generate_ms, preprocess_ms, display_ms,
                cpu_percent, memory_percent
         FROM refresh_events
         ORDER BY ts DESC
         LIMIT 50
-        """
-    )
+        """)
     rows = cur.fetchall()
 
     report_path = os.path.join(base_dir, "docs", "benchmarks_report.md")
@@ -49,7 +47,7 @@ def main():
         )
         fh.write("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|\n")
         for r in rows:
-            (_rid, ts, plugin, inst, pl, cached, req, gen, pre, disp, cpu, mem) = r
+            _rid, ts, plugin, inst, pl, cached, req, gen, pre, disp, cpu, mem = r
             iso = datetime.utcfromtimestamp(ts).isoformat() + "Z"
             fh.write(
                 f"| {iso} | {plugin or ''} | {inst or ''} | {pl or ''} | {cached or 0} | {req or ''} | {gen or ''} | {pre or ''} | {disp or ''} | {cpu or ''} | {mem or ''} |\n"
@@ -58,14 +56,12 @@ def main():
         fh.write("\n### Stage samples (latest 50)\n\n")
         fh.write("| ts | refresh_id | stage | duration(ms) | extra |\n")
         fh.write("|---|---|---|---:|---|\n")
-        cur.execute(
-            """
+        cur.execute("""
             SELECT ts, refresh_id, stage, duration_ms, COALESCE(extra_json, '')
             FROM stage_events
             ORDER BY ts DESC
             LIMIT 50
-            """
-        )
+            """)
         for ts, rid, stage, dur, extra in cur.fetchall():
             iso = datetime.utcfromtimestamp(ts).isoformat() + "Z"
             fh.write(f"| {iso} | {rid} | {stage} | {dur or ''} | {extra or ''} |\n")

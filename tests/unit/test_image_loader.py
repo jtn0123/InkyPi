@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for utils/image_loader.py — AdaptiveImageLoader."""
+
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 

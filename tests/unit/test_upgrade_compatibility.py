@@ -44,26 +44,22 @@ def test_benchmark_schema_upgrades_legacy_columns(tmp_path):
 
     db_path = tmp_path / "legacy.db"
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE refresh_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refresh_id TEXT NOT NULL,
             ts REAL NOT NULL,
             plugin_id TEXT
         )
-        """
-    )
-    conn.execute(
-        """
+        """)
+    conn.execute("""
         CREATE TABLE stage_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refresh_id TEXT NOT NULL,
             ts REAL NOT NULL,
             stage TEXT NOT NULL
         )
-        """
-    )
+        """)
     _ensure_schema(conn)
     refresh_columns = {
         row[1] for row in conn.execute("PRAGMA table_info(refresh_events)").fetchall()
@@ -82,16 +78,14 @@ def test_benchmark_schema_upgrades_legacy_columns(tmp_path):
 def test_benchmarks_api_handles_legacy_schema(client, device_config_dev, tmp_path):
     db_path = tmp_path / "legacy_api.db"
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE refresh_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             refresh_id TEXT NOT NULL,
             ts REAL NOT NULL,
             plugin_id TEXT
         )
-        """
-    )
+        """)
     conn.execute(
         "INSERT INTO refresh_events (refresh_id, ts, plugin_id) VALUES (?, ?, ?)",
         ("legacy-1", 1_700_000_000.0, "clock"),

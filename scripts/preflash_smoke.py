@@ -372,14 +372,12 @@ def run_benchmark_smoke() -> None:
             refresh_task.stop()
 
         with sqlite3.connect(db_path) as conn:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT request_ms, generate_ms, preprocess_ms, display_ms
                 FROM refresh_events
                 WHERE plugin_id = 'ai_text'
                 ORDER BY id
-                """
-            ).fetchall()
+                """).fetchall()
         if len(rows) < 5:
             raise RuntimeError("Benchmark smoke did not record enough refresh rows")
 

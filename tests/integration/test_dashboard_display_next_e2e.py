@@ -38,8 +38,7 @@ def test_display_next_sends_request(
     rc = navigate_and_wait(page, live_server, "/")
 
     # Mock fetch AFTER navigation so JS context is live
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
         const origFetch = window.fetch;
         window.__fetchCalls = [];
         window.fetch = function(...args) {
@@ -55,8 +54,7 @@ def test_display_next_sends_request(
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }"""
-    )
+    }""")
 
     display_next = page.locator("#displayNextBtn, button:has-text('Display Next')")
     display_next.first.wait_for(state="visible", timeout=5000)
@@ -83,8 +81,7 @@ def test_display_next_no_js_errors(
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/")
 
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
         const origFetch = window.fetch;
         window.fetch = function(...args) {
             const url = typeof args[0] === 'string' ? args[0] : args[0].url;
@@ -97,8 +94,7 @@ def test_display_next_no_js_errors(
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }"""
-    )
+    }""")
 
     display_next = page.locator("#displayNextBtn, button:has-text('Display Next')")
     display_next.first.wait_for(state="visible", timeout=5000)

@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """End-to-end form workflow tests using Playwright."""
+
 from __future__ import annotations
 
 import os

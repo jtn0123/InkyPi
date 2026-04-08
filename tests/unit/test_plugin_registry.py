@@ -52,7 +52,7 @@ def _base_env() -> dict[str, str]:
 
 
 def _read_pythonpath_from_shell(
-    env: dict[str, str]
+    env: dict[str, str],
 ) -> subprocess.CompletedProcess[str]:
     command = (
         "source scripts/venv.sh >/dev/null 2>&1 && "

@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Error scenario tests for the RSS plugin."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest

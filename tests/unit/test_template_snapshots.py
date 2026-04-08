@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Template structure snapshot tests."""
+
 import pytest
 
 

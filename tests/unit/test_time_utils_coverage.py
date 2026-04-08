@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Tests for utils/time_utils.py — additional coverage."""
+
 from datetime import UTC
 
 from utils.time_utils import (

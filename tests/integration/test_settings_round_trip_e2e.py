@@ -63,14 +63,12 @@ def test_image_slider_values_persist(live_server, browser_page):
     navigate_and_wait(page, live_server, "/settings")
 
     page.locator("#saturation").wait_for(state="attached", timeout=5000)
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
         const slider = document.getElementById('saturation');
         slider.value = '1.5';
         slider.dispatchEvent(new Event('input', { bubbles: true }));
         slider.dispatchEvent(new Event('change', { bubbles: true }));
-    }"""
-    )
+    }""")
 
     save_btn = page.locator("#saveSettingsBtn")
     save_btn.scroll_into_view_if_needed()

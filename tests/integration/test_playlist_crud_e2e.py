@@ -24,8 +24,7 @@ def test_create_playlist_via_form(
     rc = navigate_and_wait(page, live_server, "/playlist")
 
     # Stub reload so the page stays testable after form submit
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
         const origFetch = window.fetch;
         window.__fetchCalls = [];
         window.fetch = function(...args) {
@@ -33,8 +32,7 @@ def test_create_playlist_via_form(
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }"""
-    )
+    }""")
 
     # Click New Playlist button
     new_btn = page.locator("#newPlaylistBtn")
@@ -82,8 +80,7 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
     rc = navigate_and_wait(page, live_server, "/playlist")
 
     # Stub fetch and reload AFTER navigation so JS context is live
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
         const origFetch = window.fetch;
         window.__deleteCalls = [];
         window.fetch = function(...args) {
@@ -94,8 +91,7 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
             return origFetch.apply(this, args);
         };
         window.location.reload = function() {};
-    }"""
-    )
+    }""")
 
     # Click delete button on a playlist
     delete_btn = page.locator(".delete-playlist-btn").first

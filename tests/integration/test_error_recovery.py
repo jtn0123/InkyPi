@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Error recovery tests for graceful failure handling."""
+
 import pytest
 
 

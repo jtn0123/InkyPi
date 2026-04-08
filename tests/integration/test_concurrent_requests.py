@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 """Concurrent request tests to verify thread safety."""
+
 import threading
 
 

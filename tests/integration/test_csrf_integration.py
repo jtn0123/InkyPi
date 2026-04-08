@@ -6,6 +6,7 @@ that other integration tests are not burdened with token bookkeeping.  These
 tests register the **real** ``_setup_csrf_protection`` middleware on a
 dedicated app instance to verify it end-to-end.
 """
+
 import json
 
 import pytest
