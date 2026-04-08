@@ -14,6 +14,7 @@
                 placeholder="https://calendar.google.com/…/basic.ics"
                 value="{{ calendar_urls[idx] }}"
                 required
+                aria-label="Calendar URL"
             >
             <button type="button" class="remove-btn icon-button" aria-label="Remove calendar">
                 {{ icon('trash', 'action-icon') | safe }}
