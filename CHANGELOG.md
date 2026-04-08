@@ -1,6 +1,156 @@
 # CHANGELOG
 
 
+## v0.9.0 (2026-04-08)
+
+### Bug Fixes
+
+- Scope wizard nav ids per step to remove duplicates (JTN-314)
+  ([#237](https://github.com/jtn0123/InkyPi/pull/237),
+  [`32c6716`](https://github.com/jtn0123/InkyPi/commit/32c671639181200478f758095dc8c01e7cec2ffa))
+
+Replace id="wizardPrev"/id="wizardNext" with data-wizard-prev/data-wizard-next attributes in
+  initializeWizard() so multiple wizard containers on the same page never produce duplicate DOM ids.
+  Also adds an early-return guard that prevents navigation from being injected into an empty
+  .setup-wizard placeholder (the root cause of 136 duplicate-id findings in the 2026-04-06 dogfood
+  audit). Updates querySelector calls to use the new attribute selectors. Adds 5 regression tests
+  covering both the JS source and rendered plugin page HTML.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- Add OpenAPI spec and Swagger UI docs (JTN-285)
+  ([#236](https://github.com/jtn0123/InkyPi/pull/236),
+  [`698d24d`](https://github.com/jtn0123/InkyPi/commit/698d24d612973d4c81b917fda246895f93f68f4a))
+
+Adds hand-written OpenAPI 3.0 spec at src/static/openapi.json covering 12 documented paths across
+  Health, System, Display, Playlist, History, and Docs tag groups. Exposes GET /api/docs (Swagger UI
+  via CDN) and GET /api/openapi.json via a new api_docs blueprint. Includes a drift guard test that
+  asserts every spec path exists in the Flask url_map.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Refactoring
+
+- Hoist nested JS functions and reduce deep nesting (JTN-281)
+  ([#232](https://github.com/jtn0123/InkyPi/pull/232),
+  [`951d27f`](https://github.com/jtn0123/InkyPi/commit/951d27f309cc572d7a4b08c9800d81bd06ba1276))
+
+Addresses a subset of the SonarCloud S2004 (deep nesting) and S7721 (inner functions could be at
+  module scope) findings across the frontend JavaScript modules.
+
+Files modified:
+
+- history_page.js: hoists setHidden, setModalOpen, showStoredMessage, and hideHistoryImageSkeleton
+  out of createHistoryPage to module scope (4 hoists). - dashboard_page.js: hoists setHidden and
+  hidePreviewSkeletonNode out of createDashboardPage to module scope (2 hoists). - settings_page.js:
+  replaces inline anonymous function expressions in copyLogsToClipboard with named arrow callbacks;
+  tightens showCopyFeedback's setTimeout callback (2 cleanups). - plugin_page.js: extracts
+  showInstanceFallback helper to flatten a triple-nested onerror handler in refreshInstancePreview,
+  and extracts collapseApiIndicator from initApiIndicator (2 fixes). - plugin_schema.js: extracts
+  initLeafletMap from openModal in initWeatherMap to flatten a deeply nested setTimeout callback (1
+  fix).
+
+Pure refactor — behavior is unchanged. No global API surface (window.X = X assignments) was renamed.
+  All event handler wiring preserved. Static and integration test suites still pass.
+
+The remaining S2004/S7721 findings are either in tightly-coupled closures (api_keys_page) or
+  describe code structures whose line numbers no longer match the live source after recent unrelated
+  refactors. Those will be addressed in a follow-up if SonarCloud re-flags them after this lands.
+
+Refs JTN-281
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Split inkypi.py into middleware/error modules (JTN-289)
+  ([#230](https://github.com/jtn0123/InkyPi/pull/230),
+  [`cc301ac`](https://github.com/jtn0123/InkyPi/commit/cc301acedeb7c1f765dce4f6b743188ce8658330))
+
+* refactor: split inkypi.py into focused middleware/error/logging modules (JTN-289)
+
+Reduces inkypi.py from 687 lines to ~340 by extracting middleware, error handlers, health endpoints,
+  blueprint registration, signal handling, and logging setup into a new src/app_setup/ package:
+
+- app_setup/logging_setup.py — 67 lines (logging config + dev handler) - app_setup/error_handlers.py
+  — 54 lines (Flask error handlers) - app_setup/security_middleware.py — 261 lines (CSRF, rate
+  limit, headers, secrets) - app_setup/health.py — 26 lines (/healthz, /readyz) -
+  app_setup/blueprints_registry.py — 22 lines (blueprint registration) - app_setup/signals.py — 34
+  lines (SIGTERM/SIGINT handlers)
+
+Behavior is unchanged. The public API of inkypi.py is preserved via re-exports — every symbol that
+  tests/unit/test_inkypi.py monkey-patches is still available as a module attribute
+  (pop_hot_reload_info, the _setup_* helpers, _generate_csrf_token,
+  _extract_csrf_token_from_request, etc.).
+
+The two security middleware functions that emit log lines or call pop_hot_reload_info now resolve
+  those targets through sys.modules['inkypi'] so existing monkey-patches in test_inkypi.py keep
+  working without modification.
+
+Closes JTN-289
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: extract security-header helper functions to reduce complexity (S3776)
+
+SonarCloud flagged setup_security_headers as having cognitive complexity 40 (max 15) — the entire
+  after_request handler lived inside one function with multiple nested try/except blocks.
+
+Splits the handler into focused helpers per concern: - _emit_request_timing_log -
+  _apply_static_cache_headers - _apply_baseline_security_headers - _apply_hsts_header -
+  _apply_csp_header - _apply_hot_reload_header
+
+The handler now just iterates over them with shared exception isolation. Behavior is unchanged.
+
+* fix: mark http:// literal in HTTPS redirect as NOSONAR (S5332)
+
+The http:// string in setup_https_redirect is the SOURCE of the http→https upgrade, not a hardcoded
+  insecure URL. Adds a NOSONAR comment to suppress the false-positive S5332 hotspot.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add API contract tests for APOD, GitHub, and Open-Meteo (JTN-292)
+  ([#231](https://github.com/jtn0123/InkyPi/pull/231),
+  [`f562dee`](https://github.com/jtn0123/InkyPi/commit/f562dee0d6e5dcb515d682095a0c07c40ff63c42))
+
+Adds tests/contracts/ with 4 hand-constructed JSON fixtures and 11 contract tests covering the top
+  external API integrations:
+
+- NASA APOD (image and video media types) - GitHub repos endpoint (used by the github_stars plugin)
+  - Open-Meteo forecast API (used by the weather plugin)
+
+Each test loads a fixture, validates a minimal schema, and exercises the plugin parsing code via
+  requests-mock — no live API calls happen in CI. If an upstream API changes its response shape, the
+  relevant test will break loudly here instead of silently in production.
+
+Coverage in this PR is intentionally narrow (3 plugins). Follow-ups will extend to OpenWeatherMap,
+  Unsplash, RSS, and Google Calendar.
+
+Refs JTN-292
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add integration tests for full refresh cycle (JTN-291)
+  ([#234](https://github.com/jtn0123/InkyPi/pull/234),
+  [`21b078f`](https://github.com/jtn0123/InkyPi/commit/21b078f1c1b915b433faf136f9dd0cbc5f44d4ac))
+
+Adds three deterministic, fast (<1s total) integration tests that exercise the path from playlist
+  resolution through plugin image generation to the mock display without using sleep() or thread
+  timing:
+
+- test_refresh_cycle_runs_plugin_to_display: year_progress plugin renders to MockDisplay; asserts
+  image dimensions, plugin_health green, metrics set - test_refresh_cycle_handles_plugin_failure:
+  stubbed crashing plugin leaves display uncalled and plugin_health red with error recorded -
+  test_refresh_cycle_advances_playlist: two plugins in playlist each render once and receive a
+  refresh timestamp after their respective ticks
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.8.0 (2026-04-08)
 
 ### Documentation
