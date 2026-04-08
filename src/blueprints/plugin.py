@@ -91,7 +91,7 @@ def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
     return resp
 
 
-@plugin_bp.route("/plugin/<plugin_id>")
+@plugin_bp.route("/plugin/<plugin_id>", methods=["GET"])
 def plugin_page(plugin_id: str):
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
@@ -158,7 +158,7 @@ def plugin_page(plugin_id: str):
     )
 
 
-@plugin_bp.route("/images/<plugin_id>/<path:filename>")
+@plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
 def image(plugin_id: str, filename: str):
     # send_from_directory handles path traversal protection internally
     plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
@@ -172,7 +172,9 @@ def image(plugin_id: str, filename: str):
 
 
 @plugin_bp.route(
-    "/plugin_latest_image/<string:plugin_id>", endpoint="plugin_latest_image"
+    "/plugin_latest_image/<string:plugin_id>",
+    endpoint="plugin_latest_image",
+    methods=["GET"],
 )
 def latest_plugin_image(plugin_id: str):
     """Serve the most recent history image for a given plugin_id.
@@ -639,6 +641,7 @@ def _find_latest_plugin_refresh_time(device_config, plugin_id: str) -> str | Non
 @plugin_bp.route(
     "/instance_image/<string:plugin_id>/<string:instance_name>",
     endpoint="plugin_instance_image",
+    methods=["GET"],
 )
 def instance_image(plugin_id: str, instance_name: str):
     device_config = current_app.config[_CONFIG_KEY]

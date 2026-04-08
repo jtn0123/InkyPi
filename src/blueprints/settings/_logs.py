@@ -10,7 +10,7 @@ from utils.http_utils import json_error
 from utils.time_utils import now_device_tz
 
 
-@_mod.settings_bp.route("/download-logs")
+@_mod.settings_bp.route("/download-logs", methods=["GET"])
 def download_logs():
     try:
         # Guardrail hours clamp
@@ -80,7 +80,7 @@ def _filter_log_lines(lines, contains, level):
     return lines
 
 
-@_mod.settings_bp.route("/api/logs")
+@_mod.settings_bp.route("/api/logs", methods=["GET"])
 def api_logs():
     """JSON logs API with server-side filter, level selection and limits."""
     try:

@@ -103,7 +103,7 @@ def start_update():
         return json_internal_error("start update", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/settings/update_status")
+@_mod.settings_bp.route("/settings/update_status", methods=["GET"])
 def update_status():
     try:
         import subprocess
@@ -156,7 +156,7 @@ def update_status():
         return json_internal_error("update status", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/version")
+@_mod.settings_bp.route("/api/version", methods=["GET"])
 def api_version():
     """Return current and latest version info."""
     try:

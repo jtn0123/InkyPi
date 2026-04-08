@@ -80,7 +80,7 @@ def safe_reset():
         return json_internal_error("safe reset", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/settings")
+@_mod.settings_bp.route("/settings", methods=["GET"])
 def settings_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
@@ -89,7 +89,7 @@ def settings_page():
     )
 
 
-@_mod.settings_bp.route("/settings/backup")
+@_mod.settings_bp.route("/settings/backup", methods=["GET"])
 def backup_restore_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     # For now, reuse the main settings page and anchor to a section; separate template can be added later
@@ -216,7 +216,7 @@ def import_settings():
         )
 
 
-@_mod.settings_bp.route("/settings/api-keys")
+@_mod.settings_bp.route("/settings/api-keys", methods=["GET"])
 def api_keys_page():
     device_config = current_app.config["DEVICE_CONFIG"]
 
