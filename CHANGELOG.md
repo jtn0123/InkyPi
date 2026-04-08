@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.4.28 (2026-04-08)
+
+### Bug Fixes
+
+- Cache response data instead of full Response objects (JTN-267)
+  ([#179](https://github.com/jtn0123/InkyPi/pull/179),
+  [`481113b`](https://github.com/jtn0123/InkyPi/commit/481113b7ea96387c064f695e11f12e7947297e52))
+
+Store only status_code, headers, and content bytes in HTTPCache entries, reconstructing a
+  lightweight Response on hit to prevent socket connections from being held open and exhausting the
+  connection pool.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Handle owner/repo format in GitHub stars plugin (JTN-264)
+  ([#180](https://github.com/jtn0123/InkyPi/pull/180),
+  [`df9a6ed`](https://github.com/jtn0123/InkyPi/commit/df9a6ede3d9d2c654490d402cfc18e589c474e68))
+
+Placeholder suggested "owner/repo" but code prepended username, producing invalid API paths like
+  "username/owner/repo". Now detects "/" in the repository field and uses it directly; updated
+  placeholder to "repository-name" to clarify expected input.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.27 (2026-04-08)
 
 ### Bug Fixes
