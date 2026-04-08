@@ -15,6 +15,16 @@ apikeys_bp = Blueprint("apikeys", __name__)
 _BACKSLASH = "\\"
 _DOUBLE_QUOTE = '"'
 
+# Internal app secrets that must never appear in the user-facing API Keys UI (JTN-309).
+# These are application-level secrets, not provider API credentials.
+_INTERNAL_KEYS: frozenset[str] = frozenset(
+    {
+        "SECRET_KEY",
+        "TEST_KEY",
+        "WTF_CSRF_SECRET_KEY",
+    }
+)
+
 
 # Path to .env file
 def get_env_path():
@@ -146,9 +156,12 @@ def apikeys_page():
     env_path = get_env_path()
     entries = parse_env_file(env_path)
 
-    # Prepare entries for template: only key and masked value (no real values for security)
+    # Prepare entries for template: only key and masked value (no real values for security).
+    # Skip internal app secrets so they are never exposed in the UI (JTN-309).
     template_entries = [
-        {"key": key, "masked": mask_value(value)} for key, value in entries
+        {"key": key, "masked": mask_value(value)}
+        for key, value in entries
+        if key not in _INTERNAL_KEYS
     ]
 
     api_key_plugins = {
