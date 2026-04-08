@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.10.0 (2026-04-08)
+
+### Features
+
+- Add service worker for offline shell caching (JTN-303)
+  ([#233](https://github.com/jtn0123/InkyPi/pull/233),
+  [`66eb6da`](https://github.com/jtn0123/InkyPi/commit/66eb6dad95bb0bd2726ea4a053d5e882cb51e116))
+
+* feat: add service worker for offline shell caching (JTN-303)
+
+Adds sw.js with cache-first strategy for /static/* assets, a /sw.js route at origin root with
+  Service-Worker-Allowed header, and SW registration in the base template (https/localhost only).
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: exclude sw.js from SonarCloud coverage gate
+
+sw.js is a browser service worker — it cannot be instrumented by Python's pytest/coverage. Exclude
+  it from SonarCloud's coverage requirement the same way existing static JS files under scripts/ are
+  already excluded.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.9.0 (2026-04-08)
 
 ### Bug Fixes
