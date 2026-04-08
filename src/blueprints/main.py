@@ -16,6 +16,7 @@ from flask import (
 )
 
 from utils.http_utils import json_error
+from utils.image_serving import maybe_serve_webp
 from utils.rate_limiter import CooldownLimiter
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,11 @@ def preview_image():
         path = device_config.current_image_file
     if not os.path.exists(path):
         return ("Preview not available", 404)
-    return send_file(path, mimetype="image/png", conditional=True)
+    # Both candidate paths come from device_config (trusted JSON).
+    abs_path = os.path.abspath(path)
+    safe_root = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
 
 
 @main_bp.route("/api/current_image", methods=["GET"])
