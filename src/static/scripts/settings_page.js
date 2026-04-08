@@ -170,11 +170,15 @@
           : "The system is shutting down. The UI will remain unavailable until it is manually restarted."
       );
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      await fetch(config.shutdownUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reboot }),
-      });
+      try {
+        await fetch(config.shutdownUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reboot }),
+        });
+      } catch (e) {
+        // Expected — device is shutting down, connection will be severed
+      }
     }
 
     function toggleUseDeviceLocation(cb) {
