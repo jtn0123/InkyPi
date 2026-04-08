@@ -142,6 +142,20 @@ python scripts/plugin_validator.py clock   # validate a single plugin
    - Jinja environment is initialized even if a plugin lacks its own `render/` directory. Base templates under `plugins/base_plugin/render/` are always available.
    - If a plugin does not provide `settings.html`, the UI will include `base_plugin/settings.html` by default.
 
+## Docker (development)
+
+For contributors who don't have a Pi, you can run InkyPi in a container:
+
+```bash
+docker compose up --build
+```
+
+The web UI will be available at http://localhost:8080. Source changes
+in `src/` are reflected immediately via volume mount. The display is
+automatically mocked — no hardware required.
+
+To stop the container, press `Ctrl+C` or run `docker compose down`.
+
 ## Other Requirements
 
 InkyPi relies on system packages for some features, which are normally installed via the `install.sh` script. **(Skip if using devbox method)**
