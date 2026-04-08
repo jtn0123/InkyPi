@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import logging
 import os
@@ -6,6 +8,7 @@ from datetime import UTC, datetime
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     jsonify,
     render_template,
@@ -364,6 +367,118 @@ def history_clear():
             "clear history",
             details={"hint": "Check history directory permissions."},
         )
+
+
+_CSV_HEADERS = [
+    "timestamp",
+    "plugin_id",
+    "instance_name",
+    "status",
+    "duration_ms",
+    "error_message",
+]
+
+
+def _iter_history_csv(history_dir: str):
+    """Yield CSV rows (as bytes) for every history entry, newest first.
+
+    Each PNG in *history_dir* produces one row.  The sidecar JSON is read for
+    metadata; missing fields default to an empty string.
+    """
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(_CSV_HEADERS)
+    buf.seek(0)
+    yield buf.getvalue().encode("utf-8")
+
+    try:
+        files = [
+            f
+            for f in os.listdir(history_dir)
+            if os.path.isfile(os.path.join(history_dir, f))
+            and f.lower().endswith(_EXT_PNG)
+        ]
+    except Exception:
+        logger.exception("CSV export: failed to list history directory")
+        return
+
+    # Sort newest first (mirrors _list_history_images ordering)
+    def _safe_mtime(path: str) -> float:
+        try:
+            return os.path.getmtime(path)
+        except Exception:
+            return 0.0
+
+    files.sort(
+        key=lambda f: (
+            _safe_mtime(os.path.join(history_dir, f)),
+            _timestamp_from_history_filename(f),
+            f,
+        ),
+        reverse=True,
+    )
+
+    for f in files:
+        full_path = os.path.join(history_dir, f)
+        try:
+            mtime = os.path.getmtime(full_path)
+        except Exception:
+            continue
+
+        meta: dict = {}
+        try:
+            base, _ = os.path.splitext(f)
+            sidecar_path = os.path.join(history_dir, f"{base}{_EXT_JSON}")
+            if os.path.exists(sidecar_path):
+                with open(sidecar_path, encoding="utf-8") as fh:
+                    meta = json.load(fh) or {}
+        except Exception:
+            meta = {}
+
+        # Prefer the ISO timestamp stored in the sidecar; fall back to mtime.
+        timestamp = (
+            meta.get("refresh_time")
+            or datetime.fromtimestamp(mtime, tz=UTC).isoformat()
+        )
+
+        row = [
+            timestamp,
+            meta.get("plugin_id", ""),
+            meta.get("plugin_instance", ""),
+            meta.get("status", ""),
+            meta.get("duration_ms", ""),
+            meta.get("error_message", ""),
+        ]
+
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(row)
+        buf.seek(0)
+        yield buf.getvalue().encode("utf-8")
+
+
+@history_bp.route("/history/export.csv", methods=["GET"])
+def history_export_csv():
+    """Return all history entries as a downloadable CSV file.
+
+    Columns: timestamp, plugin_id, instance_name, status, duration_ms,
+    error_message.
+    """
+    device_config = current_app.config[_CONFIG_KEY]
+    history_dir = device_config.history_image_dir
+
+    date_str = datetime.now(tz=UTC).strftime("%Y%m%d")
+    filename = f"inkypi-history-{date_str}.csv"
+
+    return Response(
+        _iter_history_csv(history_dir),
+        status=200,
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @history_bp.route("/history/storage", methods=["GET"])
