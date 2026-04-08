@@ -436,10 +436,6 @@ window.startOperation = function(id, description, options = {}) {
 // Integration with existing progress systems
 document.addEventListener('DOMContentLoaded', () => {
     // Auto-detect when form submissions start
-    const nativeFetch = window.fetch.bind(window);
-    let fetchWrapped = false;
-    let fetchTimeoutId = null;
-
     document.addEventListener('submit', (e) => {
         const form = e.target;
         const formId = form.id || 'form-' + Date.now();
@@ -448,51 +444,53 @@ document.addEventListener('DOMContentLoaded', () => {
         // Start operation tracking
         const operation = window.operationStatus.startOperation(formId, description);
 
+        // Per-operation closure state — not shared across concurrent submissions
         let operationCompleted = false;
+        let localTimeoutId = null;
+        const previousFetch = window.fetch;
 
-        function restoreFetch() {
-            if (fetchWrapped) {
-                window.fetch = nativeFetch;
-                fetchWrapped = false;
+        function finishOperation() {
+            if (localTimeoutId) {
+                clearTimeout(localTimeoutId);
+                localTimeoutId = null;
             }
-            if (fetchTimeoutId) {
-                clearTimeout(fetchTimeoutId);
-                fetchTimeoutId = null;
+            // Restore the fetch that was in place when this operation started,
+            // but only if our wrapper is still the active one.
+            if (window.fetch === wrappedFetch) {
+                window.fetch = previousFetch;
             }
         }
 
-        // Only wrap fetch if not already wrapped
-        if (!fetchWrapped) {
-            fetchWrapped = true;
-            window.fetch = function(...args) {
-                return nativeFetch(...args).then(response => {
-                    if (!operationCompleted) {
-                        operationCompleted = true;
-                        restoreFetch();
-                        if (response.ok) {
-                            operation.complete('Form submitted successfully');
-                        } else {
-                            operation.fail(`Request failed: ${response.status} ${response.statusText}`);
-                        }
+        function wrappedFetch(...args) {
+            return previousFetch(...args).then(response => {
+                if (!operationCompleted) {
+                    operationCompleted = true;
+                    finishOperation();
+                    if (response.ok) {
+                        operation.complete('Form submitted successfully');
+                    } else {
+                        operation.fail(`Request failed: ${response.status} ${response.statusText}`);
                     }
-                    return response;
-                }).catch(error => {
-                    if (!operationCompleted) {
-                        operationCompleted = true;
-                        restoreFetch();
-                        operation.fail(`Network error: ${error.message}`);
-                    }
-                    throw error;
-                });
-            };
+                }
+                return response;
+            }).catch(error => {
+                if (!operationCompleted) {
+                    operationCompleted = true;
+                    finishOperation();
+                    operation.fail(`Network error: ${error.message}`);
+                }
+                throw error;
+            });
         }
 
-        // Restore original fetch after a timeout
-        if (fetchTimeoutId) clearTimeout(fetchTimeoutId);
-        fetchTimeoutId = setTimeout(() => {
-            restoreFetch();
+        // Install this operation's wrapper on top of whatever fetch is current
+        window.fetch = wrappedFetch;
+
+        // Fail the operation if no fetch response arrives within the timeout
+        localTimeoutId = setTimeout(() => {
             if (!operationCompleted) {
                 operationCompleted = true;
+                finishOperation();
                 operation.fail('Request timeout');
             }
         }, 30000);
