@@ -1,7 +1,7 @@
 (function () {
   function toggleCollapsible(button) {
-    const content = button && button.nextElementSibling;
-    const icon = button && button.querySelector(".collapsible-icon");
+    const content = button?.nextElementSibling;
+    const icon = button?.querySelector(".collapsible-icon");
     if (!button || !content) return;
     const isOpen = content.classList.contains("is-open");
     button.classList.toggle("active", !isOpen);
@@ -26,7 +26,7 @@
       const shouldBeOpen = saved === 'true';
       const content = button.nextElementSibling;
       const icon = button.querySelector(".collapsible-icon");
-      const isOpen = content && content.classList.contains("is-open");
+      const isOpen = content?.classList.contains("is-open");
       if (shouldBeOpen !== isOpen) {
         button.classList.toggle("active", shouldBeOpen);
         button.setAttribute("aria-expanded", String(shouldBeOpen));
@@ -103,7 +103,7 @@
     };
   }
 
-  window.InkyPiUI = {
+  globalThis.InkyPiUI = {
     debounce,
     jumpToSection,
     loadPref,

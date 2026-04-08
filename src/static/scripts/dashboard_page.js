@@ -10,8 +10,8 @@
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
     let lastImageHash = config.imageHash;
     const desktopPreviewQuery =
-      window.matchMedia &&
-      window.matchMedia("(hover: hover) and (pointer: fine)");
+      globalThis.matchMedia &&
+      globalThis.matchMedia("(hover: hover) and (pointer: fine)");
 
     function setHidden(node, hidden) {
       if (!node) return;
@@ -19,7 +19,7 @@
     }
 
     function canUseNativePreview() {
-      return !!(desktopPreviewQuery && desktopPreviewQuery.matches);
+      return !!(desktopPreviewQuery?.matches);
     }
 
     function syncPreviewMode(container, previewImg) {
@@ -45,7 +45,7 @@
       const metaContent = document.getElementById("imageMetaContent");
       if (!metaDiv || !metaContent) return;
       metaContent.innerHTML = "";
-      if (!(info && info.plugin_meta)) {
+      if (!info?.plugin_meta) {
         setHidden(metaDiv, true);
         return;
       }
@@ -141,7 +141,7 @@
         if (connWarn) setHidden(connWarn, true);
       }
 
-      if (info && info.image_hash && info.image_hash !== lastImageHash && previewImg) {
+      if (info?.image_hash && info.image_hash !== lastImageHash && previewImg) {
         lastImageHash = info.image_hash;
         if (previewSkel) { previewSkel.style.display = ''; previewSkel.classList.remove('is-hidden'); }
         setHidden(previewSkel, false);
@@ -152,9 +152,9 @@
       setStatusBlock("nowShowing", info);
       setStatusBlock("nextUp", up);
       const row = document.getElementById("statusRow");
-      setHidden(row, !(info && info.plugin_id) && !(up && up.plugin_id));
+      setHidden(row, !info?.plugin_id && !up?.plugin_id);
       const overviewEmpty = document.getElementById("overviewEmpty");
-      const hasData = (info && info.plugin_id) || (up && up.plugin_id);
+      const hasData = info?.plugin_id || up?.plugin_id;
       setHidden(overviewEmpty, hasData);
     }
 
@@ -187,7 +187,7 @@
     function initPreviewInteractions() {
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
-      const container = previewImg && previewImg.parentElement;
+      const container = previewImg?.parentElement;
       const hidePreviewSkeleton = () => {
         if (!previewSkel) return;
         previewSkel.classList.add('is-hidden');
@@ -200,7 +200,7 @@
           hidePreviewSkeleton();
         }
         previewImg.addEventListener("click", () => {
-          if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt);
+          if (previewImg.src && globalThis.Lightbox) globalThis.Lightbox.open(previewImg.src, previewImg.alt);
         });
         previewImg.style.cursor = "pointer";
         previewImg.setAttribute("role", "button");
@@ -208,7 +208,7 @@
         previewImg.addEventListener("keydown", (e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            if (previewImg.src && window.Lightbox) window.Lightbox.open(previewImg.src, previewImg.alt);
+            if (previewImg.src && globalThis.Lightbox) globalThis.Lightbox.open(previewImg.src, previewImg.alt);
           }
         });
       }
@@ -231,7 +231,7 @@
         if (desktopPreviewQuery && typeof desktopPreviewQuery.addEventListener === "function") {
           desktopPreviewQuery.addEventListener("change", () => syncPreviewMode(container, previewImg));
         }
-        window.addEventListener("resize", () => syncPreviewMode(container, previewImg));
+        globalThis.addEventListener("resize", () => syncPreviewMode(container, previewImg));
       }
     }
 
@@ -249,11 +249,11 @@
         if (pollTimerId) { clearInterval(pollTimerId); pollTimerId = null; }
       }
 
-      window.addEventListener("beforeunload", cleanup);
-      window.addEventListener("pagehide", cleanup);
+      globalThis.addEventListener("beforeunload", cleanup);
+      globalThis.addEventListener("pagehide", cleanup);
 
       const pushUrl = config.pushUrl;
-      if (pushUrl && window.EventSource) {
+      if (pushUrl && globalThis.EventSource) {
         try {
           sseSource = new EventSource(pushUrl);
           sseSource.onmessage = () => refreshPreview();
@@ -298,5 +298,5 @@
     return { init };
   }
 
-  window.InkyPiDashboardPage = { create: createDashboardPage };
+  globalThis.InkyPiDashboardPage = { create: createDashboardPage };
 })();

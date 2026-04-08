@@ -375,7 +375,7 @@
     const hiddenContainer = widget.querySelector("#hiddenFileInputs");
     if (!fileInput || !fileNames || !hiddenContainer) return;
 
-    const uploadedFiles = window.__INKYPI_UPLOADED_FILES__ || (window.__INKYPI_UPLOADED_FILES__ = {});
+    const uploadedFiles = globalThis.__INKYPI_UPLOADED_FILES__ || (globalThis.__INKYPI_UPLOADED_FILES__ = {});
     if (!uploadedFiles["imageFiles[]"]) uploadedFiles["imageFiles[]"] = [];
 
     const renderFile = (id, fileName, removeHandler) => {
@@ -440,12 +440,12 @@
     const openModal = () => {
       modal.style.display = "block";
       setTimeout(() => {
-        if (!window.L || map) return;
-        const lat = parseFloat(latInput.value) || 40.7128;
-        const lon = parseFloat(lonInput.value) || -74.0060;
-        map = window.L.map(mapRoot).setView([lat, lon], 4.5);
-        window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-        marker = window.L.marker([lat, lon], { draggable: true }).addTo(map);
+        if (!globalThis.L || map) return;
+        const lat = Number.parseFloat(latInput.value) || 40.7128;
+        const lon = Number.parseFloat(lonInput.value) || -74.0060;
+        map = globalThis.L.map(mapRoot).setView([lat, lon], 4.5);
+        globalThis.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        marker = globalThis.L.marker([lat, lon], { draggable: true }).addTo(map);
         map.on("click", (event) => marker.setLatLng(event.latlng));
       }, 100);
     };
@@ -486,7 +486,7 @@
   function init() {
     const root = document.querySelector("[data-settings-schema]");
     if (!root) return;
-    const boot = window.__INKYPI_PLUGIN_BOOT__ || {};
+    const boot = globalThis.__INKYPI_PLUGIN_BOOT__ || {};
     syncCheckboxState(root);
     initializeWidgets(root, boot.pluginSettings || {});
     applyDependentOptions(root);
@@ -494,6 +494,6 @@
     bindStandardEvents(root);
   }
 
-  window.InkyPiPluginSchema = { init };
+  globalThis.InkyPiPluginSchema = { init };
   document.addEventListener("DOMContentLoaded", init);
 })();

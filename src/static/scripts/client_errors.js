@@ -55,7 +55,7 @@
     }
   }
 
-  window.addEventListener("error", function (event) {
+  globalThis.addEventListener("error", function (event) {
     report("Uncaught error: " + (event.message || "unknown"), {
       filename: event.filename || "",
       lineno: event.lineno || 0,
@@ -64,7 +64,7 @@
     });
   });
 
-  window.addEventListener("unhandledrejection", function (event) {
+  globalThis.addEventListener("unhandledrejection", function (event) {
     const reason = event.reason;
     const message = getRejectionMessage(reason);
     report(message, {

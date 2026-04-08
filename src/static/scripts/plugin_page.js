@@ -30,7 +30,7 @@
   }
 
   function buildProgressKey(ctx, config) {
-    if (ctx && ctx.page === "plugin") {
+    if (ctx?.page === "plugin") {
       const pid = ctx.pluginId || config.pluginId;
       const inst = ctx.instance || "";
       return `INKYPI_LAST_PROGRESS:plugin:${pid}:${inst || "_"}`;
@@ -138,7 +138,7 @@
     function renderMetaBlock(metaDiv, metaContent, info) {
       if (!metaDiv || !metaContent) return;
       metaContent.innerHTML = "";
-      if (!(info && info.plugin_meta)) {
+      if (!info?.plugin_meta) {
         setHidden(metaDiv, true);
         return;
       }
@@ -593,7 +593,7 @@
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });
       document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
-        button.addEventListener("click", () => ui.toggleCollapsible && ui.toggleCollapsible(button));
+        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
       });
       document.querySelectorAll("[data-frame-option]").forEach((option) => {
         option.addEventListener("click", () => selectedFrame(option));

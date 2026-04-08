@@ -210,7 +210,7 @@
       const level = levelSelect?.value || "all";
       const maxLines = Math.max(
         50,
-        parseInt(maxLinesInput?.value || "500", 10)
+        Number.parseInt(maxLinesInput?.value || "500", 10)
       );
       const atBottom = isViewerAtBottom(viewer);
 
@@ -261,7 +261,7 @@
         if (maxLinesInput) {
           params.set(
             "limit",
-            String(Math.max(50, parseInt(maxLinesInput.value || "500", 10)))
+            String(Math.max(50, Number.parseInt(maxLinesInput.value || "500", 10)))
           );
         }
         const resp = await fetch(`${config.logsUrl}?${params.toString()}`, {
@@ -848,7 +848,7 @@
       for (const slider of document.querySelectorAll(".settings-slider")) {
         slider.addEventListener("input", () => {
           const valueDisplay = document.getElementById(`${slider.id}-value`);
-          if (valueDisplay) valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
+          if (valueDisplay) valueDisplay.textContent = Number.parseFloat(slider.value).toFixed(1);
         });
       }
     }
@@ -899,7 +899,7 @@
       updateSliderValue(slider) {
         const valueDisplay = document.getElementById(`${slider.id}-value`);
         if (valueDisplay) {
-          valueDisplay.textContent = parseFloat(slider.value).toFixed(1);
+          valueDisplay.textContent = Number.parseFloat(slider.value).toFixed(1);
         }
       },
     });

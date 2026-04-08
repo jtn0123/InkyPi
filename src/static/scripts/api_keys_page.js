@@ -300,7 +300,7 @@
         const result = await response.json();
         if (response.ok) {
           showResponseModal("success", result.message);
-          setTimeout(() => window.location.reload(), 1000);
+          setTimeout(() => globalThis.location.reload(), 1000);
         } else {
           showResponseModal("failure", result.error);
         }
@@ -377,7 +377,7 @@
       });
     }
 
-    Object.assign(window, {
+    Object.assign(globalThis, {
       addPreset,
       addRow,
       clearField,
@@ -389,5 +389,5 @@
     return { init };
   }
 
-  window.InkyPiApiKeysPage = { create: createApiKeysPage };
+  globalThis.InkyPiApiKeysPage = { create: createApiKeysPage };
 })();
