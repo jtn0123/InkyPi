@@ -1,6 +1,11 @@
 # Building InkyPi Plugins
 
-This guide walks you through the process of creating a new plugin for InkyPi. 
+This guide walks you through the process of creating a new plugin for InkyPi.
+
+> **In a hurry?** Jump to the [Hello World walkthrough](#hello-world-walkthrough) at the bottom for a 7-step example you can copy.
+
+> **New to the codebase?** Start with the [architecture overview](architecture.md) to see how plugins fit into the request and refresh flows.
+
 
 ### 1. Create a Directory for Your Plugin
 
@@ -185,3 +190,117 @@ Your repository must include:
 See [InkyPi-Plugin-Template](https://github.com/fatihak/InkyPi-Plugin-Template) for a sample template of a third-party plugin.
 
 Once you're done, feel free to add your plugin to the [3rd Party Plugin List](https://github.com/fatihak/InkyPi/wiki/3rd-Party-Plugins) and share it in the [🙌 Show and Tell Discussion Board](https://github.com/fatihak/InkyPi/discussions/categories/show-and-tell).
+
+---
+
+## Hello World walkthrough
+
+The fastest way to understand the plugin system is to build the smallest possible plugin and watch it appear in the web UI. This walkthrough creates a plugin that draws "Hello, World!" on the display in seven steps.
+
+### 1. Create the plugin directory
+
+```bash
+mkdir src/plugins/hello
+```
+
+The directory name (`hello`) becomes the plugin's `id` — lowercase, no spaces.
+
+### 2. Add the plugin metadata
+
+Create `src/plugins/hello/plugin-info.json`:
+
+```json
+{
+  "display_name": "Hello World",
+  "id": "hello",
+  "class": "Hello",
+  "api_version": "1.0",
+  "version": "1.0.0"
+}
+```
+
+`api_version` and `version` are checked at load time — see [JTN-300](https://linear.app/jtn0123/issue/JTN-300).
+
+### 3. Implement the plugin class
+
+Create `src/plugins/hello/hello.py`:
+
+```python
+import logging
+
+from PIL import Image, ImageDraw
+
+from plugins.base_plugin.base_plugin import BasePlugin
+from utils.app_utils import get_font
+
+logger = logging.getLogger(__name__)
+
+
+class Hello(BasePlugin):
+    def generate_image(self, settings, device_config):
+        dimensions = self.get_oriented_dimensions(device_config)
+        width, height = dimensions
+
+        image = Image.new("RGB", dimensions, (255, 255, 255))
+        draw = ImageDraw.Draw(image)
+
+        message = settings.get("message", "Hello, World!")
+        font = get_font("Jost", font_size=int(width * 0.08))
+
+        draw.text(
+            (width / 2, height / 2),
+            message,
+            anchor="mm",
+            fill=(0, 0, 0),
+            font=font,
+        )
+        return image
+```
+
+The class name (`Hello`) must match the `class` field in `plugin-info.json`.
+
+### 4. Add a settings template
+
+Create `src/plugins/hello/settings.html`:
+
+```html
+<div class="form-group">
+  <label for="message">Message</label>
+  <input
+    type="text"
+    id="message"
+    name="message"
+    value="{{ plugin_settings.message or 'Hello, World!' }}"
+    placeholder="Hello, World!"
+  />
+</div>
+```
+
+The `name` attribute (`message`) becomes the key in the `settings` dict passed to `generate_image()`.
+
+### 5. Add an icon
+
+Drop any 256x256 PNG into `src/plugins/hello/icon.png`. The web UI shows it in the plugin picker.
+
+### 6. Run the dev server
+
+```bash
+INKYPI_ENV=dev .venv/bin/python src/inkypi.py --dev --web-only
+```
+
+Or use the [Docker setup](development.md#docker-development) added in JTN-297:
+
+```bash
+docker compose up --build
+```
+
+### 7. Verify in the web UI
+
+1. Open http://localhost:8080
+2. Click **Add Plugin** on the dashboard or playlist page
+3. Find **Hello World** in the list
+4. Save it to a playlist with any message
+5. The next refresh tick will show the message on the (mock) display
+
+That's it — you've built and shipped a plugin. From here, look at the [`year_progress`](../src/plugins/year_progress/) plugin for a slightly richer example using `render_image()` with HTML/CSS templates, or [`weather`](../src/plugins/weather/) for a plugin that calls an external API.
+

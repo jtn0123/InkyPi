@@ -187,10 +187,11 @@ This project includes fonts and icons with separate licensing and attribution re
 
 ## Documentation
 
+- [Architecture](./docs/architecture.md) — High-level component map and request/refresh flow
 - [Development Setup](./docs/development.md) — Local dev environment on macOS, Linux, or Windows
 - [API Keys](./docs/api_keys.md) — Configuring API keys for plugins (OpenAI, Google, etc.)
 - [Testing](./docs/testing.md) — Test suite, sharding, browser tests, and coverage
-- [Building Plugins](./docs/building_plugins.md) — Guide for creating custom plugins
+- [Building Plugins](./docs/building_plugins.md) — Guide for creating custom plugins (includes a hello-world walkthrough)
 - [Troubleshooting](./docs/troubleshooting.md) — Common issues and fixes
 
 ## Issues
