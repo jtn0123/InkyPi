@@ -27,7 +27,7 @@
       if (!stored) return;
       try {
         const message = JSON.parse(stored);
-        if (message && message.type && message.text) {
+        if (message?.type && message.text) {
           showResponseModal(message.type, message.text);
         }
       } catch (e) {
@@ -127,7 +127,7 @@
           "storedMessage",
           JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
-        window.location.reload();
+        globalThis.location.reload();
       } catch (e) {
         console.error(e);
         closeDeleteModal();
@@ -163,7 +163,7 @@
           "storedMessage",
           JSON.stringify({ type: "success", text: "Success! " + result.message })
         );
-        window.location.reload();
+        globalThis.location.reload();
       } catch (e) {
         console.error(e);
         closeClearModal();
@@ -199,9 +199,9 @@
         event.preventDefault();
         const img = thumb.querySelector("img");
         const alt =
-          thumb.getAttribute("aria-label") || (img && img.alt) || "Preview";
-        if (window.Lightbox) {
-          window.Lightbox.open(thumb.href, alt);
+          thumb.getAttribute("aria-label") || img?.alt || "Preview";
+        if (globalThis.Lightbox) {
+          globalThis.Lightbox.open(thumb.href, alt);
         }
       });
     }
@@ -209,7 +209,7 @@
     function bindActions() {
       document
         .getElementById("historyRefreshBtn")
-        ?.addEventListener("click", () => window.location.reload());
+        ?.addEventListener("click", () => globalThis.location.reload());
       document
         .getElementById("historyClearBtn")
         ?.addEventListener("click", openClearModal);
@@ -272,11 +272,11 @@
       bindImages();
       bindThumbLightbox();
       bindActions();
-      window.updateHistoryStorage = updateStorage;
+      globalThis.updateHistoryStorage = updateStorage;
     }
 
     return { init };
   }
 
-  window.InkyPiHistoryPage = { create: createHistoryPage };
+  globalThis.InkyPiHistoryPage = { create: createHistoryPage };
 })();
