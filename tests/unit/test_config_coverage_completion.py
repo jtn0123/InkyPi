@@ -123,7 +123,7 @@ def test_flask_env_development_fallback(tmp_path, monkeypatch):
 
 
 def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
-    """Test that _validate_device_config is invoked when reading config (line 151)."""
+    """Test that validate_device_config is invoked when reading config."""
     # Create a valid config
     config_dir = tmp_path / "config"
     config_dir.mkdir()
@@ -152,6 +152,7 @@ def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
     config_file.write_text(json.dumps(cfg_data))
 
     import config as config_mod
+    import utils.config_schema as schema_mod
 
     monkeypatch.setattr(config_mod.Config, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(
@@ -167,21 +168,21 @@ def test_validate_device_config_called_on_read(tmp_path, monkeypatch):
         config_mod.Config, "history_image_dir", str(tmp_path / "history")
     )
 
-    # Track if _validate_device_config was called
+    # Track if validate_device_config was called
     validate_called = {"count": 0}
-    original_validate = config_mod.Config._validate_device_config
+    original_validate = schema_mod.validate_device_config
 
-    def track_validate(self, config_dict):
+    def track_validate(config_dict):
         validate_called["count"] += 1
-        return original_validate(self, config_dict)
+        return original_validate(config_dict)
 
-    monkeypatch.setattr(config_mod.Config, "_validate_device_config", track_validate)
+    monkeypatch.setattr(config_mod, "validate_device_config", track_validate)
 
     # Create Config - should call validate during read_config
     config_mod.Config()
 
     # Verify validation was called
-    assert validate_called["count"] > 0, "_validate_device_config should be called"
+    assert validate_called["count"] > 0, "validate_device_config should be called"
 
 
 def test_validation_with_jsonschema_available(tmp_path, monkeypatch):
@@ -282,6 +283,7 @@ def test_validation_without_jsonschema(tmp_path, monkeypatch):
     config_file.write_text(json.dumps(cfg_data))
 
     import config as config_mod
+    import utils.config_schema as schema_mod
 
     monkeypatch.setattr(config_mod.Config, "BASE_DIR", str(tmp_path))
     monkeypatch.setattr(
@@ -297,16 +299,12 @@ def test_validation_without_jsonschema(tmp_path, monkeypatch):
         config_mod.Config, "history_image_dir", str(tmp_path / "history")
     )
 
-    # Temporarily disable jsonschema
-    original_jsonschema = config_mod.jsonschema
-    monkeypatch.setattr(config_mod, "jsonschema", None)
+    # Temporarily disable jsonschema in the schema validation module
+    monkeypatch.setattr(schema_mod, "jsonschema", None)
 
-    # Should still load without validation
+    # Should still load without validation (valid orientation so fallback passes)
     cfg = config_mod.Config()
     assert cfg.get_config("name") == "InkyPi No Schema"
-
-    # Restore
-    monkeypatch.setattr(config_mod, "jsonschema", original_jsonschema)
 
 
 def test_env_mode_with_whitespace(tmp_path, monkeypatch):
