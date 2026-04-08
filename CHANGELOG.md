@@ -1,6 +1,43 @@
 # CHANGELOG
 
 
+## v0.17.0 (2026-04-08)
+
+### Features
+
+- Add display calibration patterns CLI ([#260](https://github.com/jtn0123/InkyPi/pull/260),
+  [`cdb5b38`](https://github.com/jtn0123/InkyPi/commit/cdb5b38bc8b286e3b93981f1e4e6cf962b2b6753))
+
+scripts/calibration_pattern.py generates 6 PNG test images (pure colors, grayscale ramp, dithering
+  grid, font resolution, edge sharpness, full-refresh ghosting) for tuning e-ink display rendering
+  pipelines and color profiles. Supports --profile color/grayscale/mono; tests cover all patterns
+  and profiles.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Aggregated refresh stats endpoint ([#258](https://github.com/jtn0123/InkyPi/pull/258),
+  [`ba31444`](https://github.com/jtn0123/InkyPi/commit/ba3144412ab1396d22341f388f6fd8c943728c02))
+
+Add GET /api/stats returning rolling refresh aggregates (total, success_rate, P50/P95 duration, top
+  failing plugins) for 1h, 24h, and 7d windows, computed from history sidecar files with a 60s
+  in-process cache.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Seed test data CLI for dev environments ([#262](https://github.com/jtn0123/InkyPi/pull/262),
+  [`dfdabed`](https://github.com/jtn0123/InkyPi/commit/dfdabedea90649aaebbdb8fd5f54008a95de4312))
+
+Adds scripts/seed_test_data.py which populates a dev target directory with 3 sample plugin instances
+  (year_progress, weather, calendar), a sample playlist, and N synthetic history PNG+sidecar pairs.
+  Idempotent by default; --reset wipes and reseeds. Refuses to run against src/config or any
+  directory whose device.json has display_type != mock.
+
+Adds 22 tests in tests/test_seed_test_data.py covering basic seeding, sidecar JSON validity, safety
+  guards, idempotency, and --reset behaviour.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.16.0 (2026-04-08)
 
 ### Features
