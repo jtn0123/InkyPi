@@ -751,6 +751,12 @@ class RefreshTask:
             raise last_exc
         raise RuntimeError(f"Plugin '{plugin_id}' failed with unknown error")
 
+    # Class-level counter tracking threads that timed out but could not be stopped.
+    # Python threads cannot be force-killed; cooperative plugins should check the
+    # cancel_event passed via result_holder["cancel_event"] and exit early.
+    _zombie_thread_count: int = 0
+    _zombie_thread_lock: threading.Lock = threading.Lock()
+
     def _execute_inprocess(self, refresh_action, plugin_config, current_dt: datetime):
         """Run a plugin directly in the current process (no subprocess isolation).
 
@@ -759,6 +765,13 @@ class RefreshTask:
 
         Supports retries and timeouts via a worker thread so the behaviour
         mirrors the subprocess path as closely as possible.
+
+        On timeout a ``threading.Event`` (``cancel_event``) is set so that
+        cooperative plugins can detect cancellation and exit early.  Because
+        Python threads cannot be force-killed, a timed-out thread becomes a
+        "zombie" daemon thread.  The class-level ``_zombie_thread_count``
+        counter is incremented for each such thread and decremented when the
+        thread eventually finishes, enabling monitoring.
         """
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
@@ -769,8 +782,10 @@ class RefreshTask:
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
             result_holder: dict = {}
+            cancel_event = threading.Event()
+            result_holder["cancel_event"] = cancel_event
 
-            def _worker(holder=result_holder):
+            def _worker(holder=result_holder, _cancel=cancel_event):
                 try:
                     plugin = get_plugin_instance(plugin_config)
                     image = refresh_action.execute(
@@ -783,12 +798,37 @@ class RefreshTask:
                     holder["meta"] = meta
                 except Exception as exc:
                     holder["error"] = exc
+                finally:
+                    if _cancel.is_set():
+                        # Decrement zombie count now that this thread is finishing.
+                        with RefreshTask._zombie_thread_lock:
+                            RefreshTask._zombie_thread_count = max(
+                                0, RefreshTask._zombie_thread_count - 1
+                            )
+                        logging.getLogger(__name__).info(
+                            "Zombie thread for plugin '%s' has finished. "
+                            "Active zombie threads: %d",
+                            plugin_id,
+                            RefreshTask._zombie_thread_count,
+                        )
 
             worker_thread = threading.Thread(target=_worker, daemon=True)
             worker_thread.start()
             worker_thread.join(timeout=timeout_s)
 
             if worker_thread.is_alive():
+                cancel_event.set()
+                with RefreshTask._zombie_thread_lock:
+                    RefreshTask._zombie_thread_count += 1
+                    zombie_count = RefreshTask._zombie_thread_count
+                logging.getLogger(__name__).warning(
+                    "Plugin '%s' timed out after %ds — cancellation event set. "
+                    "Thread cannot be force-killed; it will run until completion. "
+                    "Active zombie threads: %d",
+                    plugin_id,
+                    int(timeout_s),
+                    zombie_count,
+                )
                 last_exc = TimeoutError(
                     f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
                 )
