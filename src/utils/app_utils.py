@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Google's public DNS server — used only to determine the local IP address
 # via a UDP connect (no data is sent). Not a security-sensitive endpoint.
-_DNS_CHECK_HOST = "8.8.8.8"
+_DNS_CHECK_HOST = "8.8.8.8"  # NOSONAR — connectivity check, not security-sensitive
 
 FONT_FAMILIES = {
     "Dogica": [
