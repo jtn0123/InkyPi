@@ -87,7 +87,9 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
             or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
         ):
             return None
-        url = request.url.replace("http://", "https://", 1)
+        # NOSONAR — the http:// literal is intentional: we are upgrading the
+        # request to https. SonarCloud rule S5332 is a false positive here.
+        url = request.url.replace("http://", "https://", 1)  # NOSONAR
         return redirect(url, code=301)
 
 
