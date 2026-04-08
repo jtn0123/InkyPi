@@ -28,20 +28,49 @@
     };
     let playlistRefreshManager = null;
 
+    // Track the element that triggered the most-recently opened modal so focus
+    // can be restored when the modal closes.
+    let _lastModalTrigger = null;
+
     function syncModalOpenState(){
         var ui = window.InkyPiUI;
         if (ui && ui.syncModalOpenState) return ui.syncModalOpenState();
         var open = document.querySelector('.modal.is-open, .thumbnail-preview-modal.is-open');
         document.body.classList.toggle('modal-open', !!open);
+        // Block the page content from receiving pointer/keyboard events while any
+        // modal is open.  The modal elements live outside #playlist-page-content
+        // so they remain interactive.
+        const pageContent = document.getElementById('playlist-page-content');
+        if (pageContent) {
+            if (open) {
+                pageContent.setAttribute('inert', '');
+            } else {
+                pageContent.removeAttribute('inert');
+            }
+        }
     }
 
-    function setModalOpen(modalId, open){
+    function setModalOpen(modalId, open, triggerEl){
         const modal = document.getElementById(modalId);
         if (!modal) return;
+        if (open && triggerEl) _lastModalTrigger = triggerEl;
         modal.hidden = !open;
         modal.style.display = open ? 'flex' : 'none';
         modal.classList.toggle('is-open', open);
         syncModalOpenState();
+        if (open) {
+            // Move focus to the first focusable element inside the modal
+            const focusable = modal.querySelector(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusable) setTimeout(() => focusable.focus(), 0);
+        } else {
+            // Restore focus to the element that opened the modal
+            if (_lastModalTrigger) {
+                try { _lastModalTrigger.focus(); } catch(_) {}
+                _lastModalTrigger = null;
+            }
+        }
     }
 
     function getOpenModalId(){
@@ -161,10 +190,11 @@
         setModalOpen('thumbnailPreviewModal', false);
     }
 
-    function openRefreshModal(playlistName, pluginId, instanceName, refreshSettings) {
+    function openRefreshModal(playlistName, pluginId, instanceName, refreshSettings, triggerEl) {
         state.currentEditPlaylist = playlistName;
         state.currentEditPluginId = pluginId;
         state.currentEditInstance = instanceName;
+        if (triggerEl) _lastModalTrigger = triggerEl;
         if (!playlistRefreshManager && typeof window.createRefreshSettingsManager === 'function') {
             playlistRefreshManager = window.createRefreshSettingsManager('refreshSettingsModal', 'modal');
         }
@@ -175,6 +205,11 @@
                 modal.hidden = false;
                 modal.classList.add('is-open');
                 syncModalOpenState();
+                // Move focus into the modal
+                const focusable = modal.querySelector(
+                    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                );
+                if (focusable) setTimeout(() => focusable.focus(), 0);
             }
         } else {
             setModalOpen('refreshSettingsModal', true);
@@ -192,6 +227,11 @@
             }
         } else {
             setModalOpen('refreshSettingsModal', false);
+        }
+        // Restore focus to the trigger element
+        if (_lastModalTrigger) {
+            try { _lastModalTrigger.focus(); } catch(_) {}
+            _lastModalTrigger = null;
         }
     }
 
@@ -428,7 +468,7 @@
         }
     }
 
-    function openCreateModal() {
+    function openCreateModal(triggerEl) {
         const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "New Playlist";
         document.getElementById("playlist_name").value = "";
@@ -439,10 +479,10 @@
         if (cycleInput) cycleInput.value = "";
         if (modal) modal.dataset.mode = "create";
         document.getElementById("deleteButton").classList.add("hidden");
-        setModalOpen("playlistModal", true);
+        setModalOpen("playlistModal", true, triggerEl);
     }
 
-    function openEditModal(playlistName, startTime, endTime, cycleMinutes) {
+    function openEditModal(playlistName, startTime, endTime, cycleMinutes, triggerEl) {
         const modal = document.getElementById("playlistModal");
         document.getElementById("modalTitle").textContent = "Update Playlist";
         document.getElementById("playlist_name").value = playlistName;
@@ -453,7 +493,7 @@
         if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
         if (modal) modal.dataset.mode = "edit";
         document.getElementById("deleteButton").classList.remove("hidden");
-        setModalOpen("playlistModal", true);
+        setModalOpen("playlistModal", true, triggerEl);
     }
 
     function openModal() { setModalOpen('playlistModal', true); }
@@ -618,7 +658,7 @@
         document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
-        if (newBtn){ newBtn.addEventListener('click', () => openCreateModal()); }
+        if (newBtn){ newBtn.addEventListener('click', (e) => openCreateModal(e.currentTarget)); }
         document.querySelectorAll('[data-playlist-toggle]').forEach((button) => {
             button.addEventListener('click', () => togglePlaylistCard(button));
         });
@@ -641,7 +681,7 @@
                 const st = el.getAttribute('data-start-time');
                 const et = el.getAttribute('data-end-time');
                 const cm = el.getAttribute('data-cycle-minutes');
-                openEditModal(name, st, et, cm);
+                openEditModal(name, st, et, cm, el);
             });
         });
         document.querySelectorAll('.run-next-btn').forEach(btn => {
@@ -652,14 +692,14 @@
         });
         document.querySelectorAll('.delete-playlist-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const name = e.currentTarget.getAttribute('data-playlist');
-                openDeletePlaylistModal(name);
+                const el = e.currentTarget;
+                openDeletePlaylistModal(el.getAttribute('data-playlist'), el);
             });
         });
         document.querySelectorAll('.delete-instance-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const t = e.currentTarget;
-                openDeleteInstanceModal(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'));
+                openDeleteInstanceModal(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
             });
         });
         document.querySelectorAll('.refresh-settings-btn').forEach(btn => {
@@ -675,7 +715,8 @@
                     t.getAttribute('data-playlist'),
                     t.getAttribute('data-plugin-id'),
                     t.getAttribute('data-instance'),
-                    refreshSettings
+                    refreshSettings,
+                    t
                 );
             });
         });
@@ -888,13 +929,13 @@
     // Use shared Lightbox API instead of local implementations
 
     // --- Delete confirm flows ---
-    function openDeletePlaylistModal(name){
+    function openDeletePlaylistModal(name, triggerEl){
         const el = document.getElementById('deletePlaylistModal');
         const txt = document.getElementById('deletePlaylistText');
         const btn = document.getElementById('confirmDeletePlaylistBtn');
         if (!el || !txt || !btn) return;
         txt.textContent = `Delete playlist '${name}'?`;
-        setModalOpen('deletePlaylistModal', true);
+        setModalOpen('deletePlaylistModal', true, triggerEl);
         btn.onclick = async function(){
             try{
                 const resp = await fetch(C.delete_playlist_base_url + encodeURIComponent(name), { method:'DELETE' });
@@ -906,13 +947,13 @@
     }
     function closeDeletePlaylistModal(){ setModalOpen('deletePlaylistModal', false); }
 
-    function openDeleteInstanceModal(playlistName, pluginId, instanceName){
+    function openDeleteInstanceModal(playlistName, pluginId, instanceName, triggerEl){
         const el = document.getElementById('deleteInstanceModal');
         const txt = document.getElementById('deleteInstanceText');
         const btn = document.getElementById('confirmDeleteInstanceBtn');
         if (!el || !txt || !btn) return;
         txt.textContent = `Delete instance '${instanceName}'?`;
-        setModalOpen('deleteInstanceModal', true);
+        setModalOpen('deleteInstanceModal', true, triggerEl);
         btn.onclick = async function(){
             try{
                 const resp = await fetch(C.delete_plugin_instance_url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: playlistName, plugin_id: pluginId, plugin_instance: instanceName }) });
