@@ -35,7 +35,7 @@ def test_webp_returned_when_header_present(tmp_path):
     png = _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/webp,*/*;q=0.8")
+        resp = maybe_serve_webp(png, "image/webp,*/*;q=0.8", safe_root=tmp_path)
 
     assert resp.content_type == "image/webp"
     # Verify the bytes are valid WebP (RIFF….WEBP header)
@@ -53,7 +53,7 @@ def test_png_returned_when_header_absent(tmp_path):
     png = _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, None)
+        resp = maybe_serve_webp(png, None, safe_root=tmp_path)
 
     assert resp.content_type == "image/png"
 
@@ -67,7 +67,7 @@ def test_png_returned_when_header_no_webp(tmp_path):
     png = _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/png,*/*")
+        resp = maybe_serve_webp(png, "image/png,*/*", safe_root=tmp_path)
 
     assert resp.content_type == "image/png"
 
@@ -81,7 +81,7 @@ def test_etag_present_for_webp_response(tmp_path):
     png = _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/webp")
+        resp = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
 
     assert "ETag" in resp.headers
     assert resp.headers["ETag"]  # non-empty
@@ -98,7 +98,7 @@ def test_etag_changes_when_mtime_changes(tmp_path):
 
     # First response
     with app.test_request_context("/"):
-        resp1 = maybe_serve_webp(png, "image/webp")
+        resp1 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
     etag1 = resp1.headers["ETag"]
 
     # Overwrite the file with a new image (different mtime)
@@ -113,7 +113,7 @@ def test_etag_changes_when_mtime_changes(tmp_path):
     _encode_webp.cache_clear()
 
     with app.test_request_context("/"):
-        resp2 = maybe_serve_webp(png, "image/webp")
+        resp2 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
     etag2 = resp2.headers["ETag"]
 
     assert etag1 != etag2
@@ -131,9 +131,9 @@ def test_cache_returns_same_bytes_on_repeated_call(tmp_path):
     _encode_webp.cache_clear()
 
     with app.test_request_context("/"):
-        resp1 = maybe_serve_webp(png, "image/webp")
+        resp1 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
     with app.test_request_context("/"):
-        resp2 = maybe_serve_webp(png, "image/webp")
+        resp2 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
 
     assert resp1.get_data() == resp2.get_data()
     # Cache should have exactly 1 entry (second call was a hit)

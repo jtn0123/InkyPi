@@ -47,7 +47,12 @@ def _encode_webp(
 # ---------------------------------------------------------------------------
 
 
-def maybe_serve_webp(image_path: Path, accept_header: str | None) -> Response:
+def maybe_serve_webp(
+    image_path: Path,
+    accept_header: str | None,
+    *,
+    safe_root: Path | str,
+) -> Response:
     """Return a WebP response if the client accepts it, otherwise the original PNG.
 
     Parameters
@@ -56,29 +61,53 @@ def maybe_serve_webp(image_path: Path, accept_header: str | None) -> Response:
         Absolute path to the PNG file on disk.
     accept_header:
         Value of the ``Accept`` request header (may be *None*).
+    safe_root:
+        Trusted directory the resolved *image_path* must live within. The
+        function re-validates containment using ``realpath`` and raises
+        :class:`ValueError` if the path escapes — defense in depth on top of
+        any caller-side validation.
 
     Returns
     -------
     flask.Response
         Either a WebP response (``Content-Type: image/webp``) with an ETag, or
         the result of ``flask.send_file`` for the original PNG.
+
+    Raises
+    ------
+    ValueError
+        If *image_path* is not contained within *safe_root* after symlink
+        resolution.
     """
-    path_str = str(image_path)
+    safe_path = _validate_under_root(image_path, safe_root)
 
     if not _client_accepts_webp(accept_header):
-        return send_file(path_str, mimetype="image/png", conditional=True)
+        return send_file(safe_path, mimetype="image/png", conditional=True)
 
-    stat = os.stat(path_str)
+    stat = os.stat(safe_path)
     mtime = int(stat.st_mtime)
     size = stat.st_size
 
-    webp_bytes = _encode_webp(path_str, mtime, size)
+    webp_bytes = _encode_webp(safe_path, mtime, size)
 
-    etag = _make_etag(path_str, mtime)
+    etag = _make_etag(safe_path, mtime)
     response = Response(webp_bytes, mimetype="image/webp")
     response.headers["ETag"] = etag
     response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+def _validate_under_root(image_path: Path, safe_root: Path | str) -> str:
+    """Resolve *image_path* and assert it lives under *safe_root*.
+
+    Returns the resolved absolute path string. This is the sanitization
+    boundary that downstream filesystem calls rely on.
+    """
+    root = os.path.realpath(str(safe_root))
+    candidate = os.path.realpath(str(image_path))
+    if os.path.commonpath([root, candidate]) != root:
+        raise ValueError("image_path escapes safe_root")
+    return candidate
 
 
 # ---------------------------------------------------------------------------

@@ -94,7 +94,12 @@ def preview_image():
         path = device_config.current_image_file
     if not os.path.exists(path):
         return ("Preview not available", 404)
-    return maybe_serve_webp(Path(path), request.headers.get("Accept"))
+    # Both candidate paths come from device_config (trusted JSON), so the
+    # parent directory of whichever one we picked is a safe containment root.
+    safe_root = os.path.dirname(os.path.abspath(path))
+    return maybe_serve_webp(
+        Path(path), request.headers.get("Accept"), safe_root=safe_root
+    )
 
 
 @main_bp.route("/api/current_image", methods=["GET"])

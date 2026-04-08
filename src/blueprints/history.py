@@ -271,7 +271,11 @@ def history_image(filename: str):
     except ValueError:
         return json_error(_ERR_INVALID_FILENAME, status=400)
     if filename.lower().endswith(".png"):
-        return maybe_serve_webp(Path(resolved), request.headers.get("Accept"))
+        return maybe_serve_webp(
+            Path(resolved),
+            request.headers.get("Accept"),
+            safe_root=history_dir,
+        )
     return send_from_directory(history_dir, filename)
 
 
