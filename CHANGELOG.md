@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.4.42 (2026-04-08)
+
+### Bug Fixes
+
+- Disable API Keys Save until form is dirty (JTN-225)
+  ([#215](https://github.com/jtn0123/InkyPi/pull/215),
+  [`e1624d3`](https://github.com/jtn0123/InkyPi/commit/e1624d3963424cdc9c30c12ae5942050bed8bdab))
+
+The Save button on /settings/api-keys was enabled by default and produced no feedback when clicked
+  with no edits. Now Save starts disabled, enables on input changes, and disables again after a
+  successful save. A no-op click (keyboard shortcut) shows a "No changes to save" toast.
+
+Closes JTN-225
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.41 (2026-04-08)
 
 ### Bug Fixes
