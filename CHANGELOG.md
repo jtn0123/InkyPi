@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.7.0 (2026-04-08)
+
+### Features
+
+- Add ARIA landmarks and skip-to-content link (JTN-296 partial)
+  ([#227](https://github.com/jtn0123/InkyPi/pull/227),
+  [`edc3b9d`](https://github.com/jtn0123/InkyPi/commit/edc3b9dba8936117eba99a09bbe49ef977be10ad))
+
+Adds role=main/nav/banner/contentinfo to the base layout and a visually-hidden skip-to-content link
+  that becomes visible on focus. This is the first slice of the broader accessibility audit; the
+  full audit (focus management, aria-live regions, contrast checks) will follow in additional PRs.
+
+- Convert app-header div to <header role="banner"> on all shared layout pages - Add <nav
+  role="navigation"> for site-level nav links on the dashboard - Fix api_keys.html missing
+  id="main-content" on its <main> element - Skip-to-content link and .skip-link CSS were already
+  present in base.html/_layout.css - Add 20 unit tests verifying landmark presence and skip-link CSS
+  off-screen positioning
+
+Refs JTN-296
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add Dockerfile and docker-compose for dev/test (JTN-297)
+  ([#223](https://github.com/jtn0123/InkyPi/pull/223),
+  [`9fc200b`](https://github.com/jtn0123/InkyPi/commit/9fc200bf20481e9cb086991cd0bb6a99119287ba))
+
+Lets contributors run the full InkyPi web UI in a container with mocked display, no Pi hardware
+  required. Live reload via src/ volume mount. Documented as alternative dev setup.
+
+Closes JTN-297
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.6.4 (2026-04-08)
 
 ### Bug Fixes
