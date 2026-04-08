@@ -249,6 +249,7 @@ def flask_app(device_config_dev, monkeypatch):
     from blueprints.metrics import metrics_bp
     from blueprints.playlist import playlist_bp
     from blueprints.plugin import plugin_bp
+    from blueprints.plugin_io import plugin_io_bp
     from blueprints.settings import settings_bp
     from blueprints.version_info import version_info_bp
     from display.display_manager import DisplayManager
@@ -306,6 +307,7 @@ def flask_app(device_config_dev, monkeypatch):
     app.register_blueprint(apikeys_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
+    app.register_blueprint(plugin_io_bp)
     app.register_blueprint(playlist_bp)
     app.register_blueprint(history_bp)
     app.register_blueprint(api_docs_bp)
