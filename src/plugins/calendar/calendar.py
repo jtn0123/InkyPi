@@ -283,7 +283,8 @@ class Calendar(BasePlugin):
         return parsed_events
 
     def get_view_range(self, view, current_dt, settings):
-        start = datetime(current_dt.year, current_dt.month, current_dt.day)
+        tz = current_dt.tzinfo
+        start = datetime(current_dt.year, current_dt.month, current_dt.day, tzinfo=tz)
         if view == "timeGridDay":
             end = start + timedelta(days=1)
         elif view == "timeGridWeek":
@@ -292,14 +293,18 @@ class Calendar(BasePlugin):
                 python_week_start = (week_start_day - 1) % 7
                 offset = (current_dt.weekday() - python_week_start) % 7
                 start = current_dt - timedelta(days=offset)
-                start = datetime(start.year, start.month, start.day)
+                start = datetime(start.year, start.month, start.day, tzinfo=tz)
             end = start + timedelta(days=7)
         elif view == "dayGrid":
             start = current_dt - timedelta(weeks=1)
             end = current_dt + timedelta(weeks=int(settings.get("displayWeeks") or 4))
         elif view == "dayGridMonth":
-            start = datetime(current_dt.year, current_dt.month, 1) - timedelta(weeks=1)
-            end = datetime(current_dt.year, current_dt.month, 1) + timedelta(weeks=6)
+            start = datetime(
+                current_dt.year, current_dt.month, 1, tzinfo=tz
+            ) - timedelta(weeks=1)
+            end = datetime(current_dt.year, current_dt.month, 1, tzinfo=tz) + timedelta(
+                weeks=6
+            )
         elif view == "listMonth":
             end = start + timedelta(weeks=5)
         return start, end
