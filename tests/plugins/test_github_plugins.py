@@ -378,3 +378,88 @@ def test_sponsors_api_error(monkeypatch, plugin_config, device_config_dev):
                 {"githubType": "sponsors", "githubUsername": "octocat"},
                 device_config_dev,
             )
+
+
+def test_sponsors_null_tier_does_not_crash(
+    monkeypatch, plugin_config, device_config_dev
+):
+    """JTN-254: null tier in sponsorship data should not raise TypeError."""
+    from plugins.github.github import GitHub
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda k: "ghp_fake")
+
+    data_with_null_tier = {
+        "data": {
+            "user": {
+                "sponsorshipsAsMaintainer": {
+                    "totalCount": 2,
+                    "nodes": [
+                        {
+                            "createdAt": "2024-01-01T00:00:00Z",
+                            "sponsorEntity": {"login": "alice", "name": "Alice"},
+                            "tier": {"name": "Gold", "monthlyPriceInCents": 1000},
+                        },
+                        {
+                            "createdAt": "2024-06-01T00:00:00Z",
+                            "sponsorEntity": {"login": "bob", "name": "Bob"},
+                            "tier": None,
+                        },
+                    ],
+                },
+                "estimatedNextSponsorsPayoutInCents": 1000,
+            }
+        }
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.raise_for_status = MagicMock()
+    mock_resp.json.return_value = data_with_null_tier
+
+    with patch("plugins.github.github_sponsors.get_http_session") as mock_session_fn:
+        mock_session_fn.return_value.post.return_value = mock_resp
+        p = GitHub(plugin_config)
+        result = p.generate_image(
+            {"githubType": "sponsors", "githubUsername": "octocat"},
+            device_config_dev,
+        )
+    assert isinstance(result, Image.Image)
+
+
+def test_calculate_monthly_total_null_tier():
+    """JTN-254: null tier entries contribute 0 cents; rounding is correct."""
+    from plugins.github.github_sponsors import calculate_monthly_total
+
+    data = {
+        "data": {
+            "user": {
+                "sponsorshipsAsMaintainer": {
+                    "nodes": [
+                        {"tier": {"monthlyPriceInCents": 999}},
+                        {"tier": None},
+                        {"tier": {"monthlyPriceInCents": 1}},
+                    ]
+                }
+            }
+        }
+    }
+    # 999 + 0 + 1 = 1000 cents => $10 (exact)
+    assert calculate_monthly_total(data) == 10
+
+
+def test_calculate_monthly_total_rounding():
+    """JTN-254: round() is used instead of int() for correct rounding."""
+    from plugins.github.github_sponsors import calculate_monthly_total
+
+    data = {
+        "data": {
+            "user": {
+                "sponsorshipsAsMaintainer": {
+                    "nodes": [
+                        {"tier": {"monthlyPriceInCents": 150}},
+                    ]
+                }
+            }
+        }
+    }
+    # 150 cents = $1.50 => round() gives 2, int() would give 1
+    assert calculate_monthly_total(data) == 2
