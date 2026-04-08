@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.4.38 (2026-04-08)
+
+### Bug Fixes
+
+- Add labels to unlabeled form controls in playlist and calendar (JTN-222)
+  ([#201](https://github.com/jtn0123/InkyPi/pull/201),
+  [`488ff38`](https://github.com/jtn0123/InkyPi/commit/488ff3856fc50a3ac9d20a116eaca7156294622d))
+
+Add aria-label attributes to the interval, unit, and refreshTime inputs in
+  refresh_settings_form.html, and to the calendarURLs[] input in calendar_repeater.html, so all form
+  controls have accessible labels. Adds four regression tests verifying each control has an
+  aria-label.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Clear image hash after preprocessed display to prevent skip (JTN-236)
+  ([#199](https://github.com/jtn0123/InkyPi/pull/199),
+  [`25f8551`](https://github.com/jtn0123/InkyPi/commit/25f85517cec3e2b0b9b9fed4b372a03f623a2641))
+
+display_preprocessed_image (used by history redisplay) now clears _last_image_hash after a
+  successful display so the next regular refresh always renders rather than being silently skipped
+  due to a stale hash match.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.37 (2026-04-08)
 
 ### Bug Fixes
