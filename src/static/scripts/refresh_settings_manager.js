@@ -61,6 +61,7 @@ class RefreshSettingsManager {
     setupInteractiveHandlers() {
         const activateGroup = (radio, input) => {
             radio.checked = true;
+            this.syncScheduledDefaults();
             setTimeout(() => input.focus(), 0);
         };
 
@@ -85,10 +86,41 @@ class RefreshSettingsManager {
         this.radioScheduled.addEventListener('click', () => activateGroup(this.radioScheduled, this.inputScheduled));
 
         // Focusing inputs → auto-select their radio
-        this.inputInterval.addEventListener('focus', () => (this.radioInterval.checked = true));
-        this.inputScheduled.addEventListener('focus', () => (this.radioScheduled.checked = true));
+        this.inputInterval.addEventListener('focus', () => {
+            this.radioInterval.checked = true;
+            this.syncScheduledDefaults();
+        });
+        this.inputScheduled.addEventListener('focus', () => {
+            this.radioScheduled.checked = true;
+            this.syncScheduledDefaults();
+        });
         if (this.selectUnit) {
-            this.selectUnit.addEventListener('focus', () => (this.radioInterval.checked = true));
+            this.selectUnit.addEventListener('focus', () => {
+                this.radioInterval.checked = true;
+                this.syncScheduledDefaults();
+            });
+        }
+    }
+
+    /**
+     * Apply defaults and show/hide help text based on current radio selection.
+     * Option A: prefill 09:00 when switching to Daily at with no value.
+     * Option B: show inline guidance text when Daily at is active.
+     */
+    syncScheduledDefaults() {
+        const scheduledActive = this.radioScheduled && this.radioScheduled.checked;
+
+        // Option A: default time
+        if (scheduledActive && this.inputScheduled && !this.inputScheduled.value) {
+            this.inputScheduled.value = '09:00';
+        }
+
+        // Option B: inline help text
+        const helpEl = this.modal
+            ? this.modal.querySelector(`#${this.prefix}-scheduled-help`)
+            : null;
+        if (helpEl) {
+            helpEl.style.display = scheduledActive ? 'block' : 'none';
         }
     }
 
