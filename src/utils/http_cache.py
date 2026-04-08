@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class CacheEntry:
     """Represents a cached HTTP response with metadata."""
 
-    response: requests.Response
+    cached_data: dict[str, Any]
     cached_at: float
     ttl_seconds: float
     url: str
@@ -36,6 +36,19 @@ class CacheEntry:
     def age_seconds(self) -> float:
         """Return the age of this cache entry in seconds."""
         return time.time() - self.cached_at
+
+    def build_response(self) -> requests.Response:
+        """Reconstruct a lightweight Response from cached data.
+
+        Returns a new Response object with status_code, headers, and content
+        populated from the stored data. No socket or connection references are
+        held by the returned object.
+        """
+        resp = requests.models.Response()
+        resp.status_code = self.cached_data["status_code"]
+        resp.headers.update(self.cached_data["headers"])
+        resp._content = self.cached_data["content"]  # type: ignore[attr-defined]
+        return resp
 
 
 @dataclass
@@ -217,7 +230,7 @@ class HTTPCache:
                     "hit_count": entry.hit_count,
                 },
             )
-            return entry.response
+            return entry.build_response()
 
     def put(
         self,
@@ -255,13 +268,22 @@ class HTTPCache:
             logger.debug("Cache skip | url=%s (no-cache directive)", url)
             return
 
+        # Extract only the essential data from the response.
+        # Reading response.content also closes the underlying connection,
+        # returning the socket to the pool.
+        cached_data = {
+            "status_code": response.status_code,
+            "headers": dict(response.headers),
+            "content": response.content,
+        }
+
         with self._lock:
             # Evict if at capacity
             if len(self._cache) >= self.max_size and cache_key not in self._cache:
                 self._evict_lru()
 
             self._cache[cache_key] = CacheEntry(
-                response=response,
+                cached_data=cached_data,
                 cached_at=time.time(),
                 ttl_seconds=effective_ttl,
                 url=url,
