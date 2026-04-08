@@ -1,0 +1,10 @@
+{
+  "copyright": "Test Astronomer",
+  "date": "2026-04-07",
+  "explanation": "A representative APOD response. Hand-constructed from the documented schema at https://github.com/nasa/apod-api so we can validate parser code without hitting the live API.",
+  "hdurl": "https://apod.nasa.gov/apod/image/2604/example_hd.jpg",
+  "media_type": "image",
+  "service_version": "v1",
+  "title": "Example Galaxy",
+  "url": "https://apod.nasa.gov/apod/image/2604/example.jpg"
+}
