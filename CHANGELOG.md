@@ -1,6 +1,58 @@
 # CHANGELOG
 
 
+## v0.4.29 (2026-04-08)
+
+### Bug Fixes
+
+- Remove User-Agent header to prevent CORS preflight (JTN-261)
+  ([#177](https://github.com/jtn0123/InkyPi/pull/177),
+  [`597ca1f`](https://github.com/jtn0123/InkyPi/commit/597ca1f2914bf207324f693cd9777d0b0edbdb32))
+
+* fix: remove User-Agent header to prevent CORS preflight (JTN-261)
+
+Custom User-Agent header in api_validator.js triggered CORS preflight requests, causing false
+  "endpoint unreachable" errors on external APIs. Removed the header since browsers set their own
+  and it's forbidden in the Fetch spec. Added test asserting no custom User-Agent is set.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: make User-Agent header check case-insensitive in test
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Scope fetch wrapper state per operation (JTN-260)
+  ([#176](https://github.com/jtn0123/InkyPi/pull/176),
+  [`3fe36ae`](https://github.com/jtn0123/InkyPi/commit/3fe36ae72732b0b6c414ef55df1f94904b656d15))
+
+* fix: scope fetch wrapper state per operation to prevent stuck submissions (JTN-260)
+
+Concurrent form submissions shared mutable module-level state (fetchWrapped, fetchTimeoutId), so if
+  form B submitted before form A's fetch returned, B's operation was silently skipped and
+  permanently stuck.
+
+Fix: move all per-operation state (operationCompleted, localTimeoutId, previousFetch) into the
+  submit handler's closure. Each submission installs its own wrappedFetch that delegates to the
+  fetch that was current at submission time, forming a safe chain. finishOperation restores
+  previousFetch only when the active wrapper belongs to this operation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: remove dead nativeFetch binding and associated test
+
+nativeFetch was declared but never referenced after the JTN-260 concurrent fetch-wrapper refactor;
+  replaced entirely by per-operation previousFetch. Remove the unused binding and the test that
+  asserted its presence.
+
+* style: fix black formatting
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.28 (2026-04-08)
 
 ### Bug Fixes
