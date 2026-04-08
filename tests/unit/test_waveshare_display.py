@@ -169,3 +169,37 @@ def test_waveshare_init_missing_display_type(device_config_dev):
         match="Waveshare driver but 'display_type' not specified in configuration",
     ):
         WaveshareDisplay(device_config_dev)
+
+
+def test_waveshare_display_image_none_raises(monkeypatch, device_config_dev):
+    """Test that display_image raises ValueError on None (not truthy check on PIL Image)."""
+    device_config_dev.update_value("display_type", "epd7in3e")
+    install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+
+    with pytest.raises(ValueError, match="No image provided"):
+        driver.display_image(None)
+
+
+def test_waveshare_display_image_valid_pil_image_not_rejected(
+    monkeypatch, device_config_dev
+):
+    """Test that a valid PIL Image is not incorrectly rejected by the None check.
+
+    Pillow 10.x raises a TypeError if you use `if not image:` on a PIL Image object.
+    Ensure the explicit `if image is None:` check accepts a real image without error.
+    """
+    device_config_dev.update_value("display_type", "epd7in3e")
+    install_fake_epd_module(monkeypatch, "epd7in3e", FakeMonoEPD)
+
+    from display.waveshare_display import WaveshareDisplay
+
+    driver = WaveshareDisplay(device_config_dev)
+
+    # A 1x1 image would raise TypeError on `if not image:` in modern Pillow
+    img = Image.new("RGB", (1, 1), (0, 0, 0))
+    # Should not raise
+    driver.display_image(img)

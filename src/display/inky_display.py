@@ -57,7 +57,7 @@ class InkyDisplay(AbstractDisplay):
         """
 
         logger.info("Displaying image to Inky display.")
-        if not image:
+        if image is None:
             raise ValueError("No image provided.")
 
         # Display the image on the Inky display
