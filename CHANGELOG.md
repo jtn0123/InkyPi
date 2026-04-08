@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.6.2 (2026-04-08)
+
+### Bug Fixes
+
+- Filter internal secrets and fix Add Key button on API Keys page (JTN-309, JTN-310)
+  ([#222](https://github.com/jtn0123/InkyPi/pull/222),
+  [`97352d3`](https://github.com/jtn0123/InkyPi/commit/97352d38c98161ba428785e968fa0b5e2c0ddc26))
+
+- JTN-309: skip SECRET_KEY/TEST_KEY/WTF_CSRF_SECRET_KEY in the API Keys blueprint so internal
+  secrets are not exposed in the UI. Added _INTERNAL_KEYS frozenset constant; filtered in
+  apikeys_page(). - JTN-310: guard addRow() against missing #apikeys-list element and guard
+  addPreset() against buttons with no data-key attribute so the Add API Key button and preset chips
+  fail gracefully instead of throwing a silent TypeError.
+
+Closes JTN-309 Closes JTN-310
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.6.1 (2026-04-08)
 
 ### Bug Fixes
