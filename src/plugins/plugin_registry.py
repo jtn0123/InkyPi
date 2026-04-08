@@ -1,6 +1,7 @@
 # app_registry.py
 
 import importlib
+import json
 import logging
 import os
 import sys
@@ -59,6 +60,62 @@ def _load_single_plugin_instance(plugin_config):
         raise
 
 
+def _check_plugin_version(
+    plugin_id: str, plugin_dir: Path
+) -> tuple[str | None, str | None]:
+    """Read api_version and version from a plugin's plugin-info.json.
+
+    Returns (api_version, version). Missing fields are returned as None and
+    logged at DEBUG level for backward compatibility.
+    """
+    from plugins.base_plugin.base_plugin import PLUGIN_API_VERSION
+
+    info_path = plugin_dir / "plugin-info.json"
+    api_version = None
+    version = None
+    if info_path.is_file():
+        try:
+            with open(info_path, encoding="utf-8") as f:
+                info = json.load(f)
+            api_version = info.get("api_version")
+            version = info.get("version")
+        except Exception as e:
+            logger.debug("Could not read plugin-info.json for '%s': %s", plugin_id, e)
+
+    if api_version is None:
+        logger.debug(
+            "Plugin '%s' has no api_version in plugin-info.json (backward compatible).",
+            plugin_id,
+        )
+    else:
+        try:
+            declared_major = int(str(api_version).split(".")[0])
+            current_major = int(str(PLUGIN_API_VERSION).split(".")[0])
+            if declared_major != current_major:
+                logger.warning(
+                    "Plugin '%s' declares api_version '%s' but loader expects '%s'. "
+                    "Major version mismatch — plugin will still be loaded.",
+                    plugin_id,
+                    api_version,
+                    PLUGIN_API_VERSION,
+                )
+        except (ValueError, IndexError) as e:
+            logger.warning(
+                "Plugin '%s' has unparseable api_version '%s': %s",
+                plugin_id,
+                api_version,
+                e,
+            )
+
+    if version is None:
+        logger.debug(
+            "Plugin '%s' has no version in plugin-info.json (backward compatible).",
+            plugin_id,
+        )
+
+    return api_version, version
+
+
 def load_plugins(plugins_config):
     """Validate plugin directories and register configs for lazy loading.
 
@@ -89,6 +146,14 @@ def load_plugins(plugins_config):
                 plugin_id,
             )
             continue
+
+        # Read version metadata from plugin-info.json and expose on config
+        api_version, version = _check_plugin_version(plugin_id, plugin_dir)
+        plugin = dict(plugin)
+        if api_version is not None:
+            plugin.setdefault("api_version", api_version)
+        if version is not None:
+            plugin.setdefault("version", version)
 
         # Store config for lazy loading; actual import deferred to get_plugin_instance()
         _PLUGIN_CONFIGS[plugin_id] = plugin

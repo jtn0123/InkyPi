@@ -2,5 +2,7 @@
     "display_name": "Today's Newspaper",
     "id": "newspaper",
     "class": "Newspaper",
-    "image_settings": ["keep-width"]
+    "image_settings": ["keep-width"],
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

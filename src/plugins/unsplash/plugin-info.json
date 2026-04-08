@@ -1,5 +1,7 @@
 {
     "display_name": "Unsplash",
     "id": "unsplash",
-    "class": "Unsplash"
+    "class": "Unsplash",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

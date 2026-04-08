@@ -1,5 +1,7 @@
 {
     "display_name": "Image Album",
     "id": "image_album",
-    "class": "ImageAlbum"
+    "class": "ImageAlbum",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

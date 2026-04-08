@@ -1,5 +1,7 @@
 {
     "display_name": "Image Upload",
     "id": "image_upload",
-    "class": "ImageUpload"
+    "class": "ImageUpload",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }
