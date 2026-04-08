@@ -343,3 +343,50 @@ def test_playlist_script_url_encodes_playlist_names_in_fetch_calls(client):
 
     # Both delete_playlist fetch sites must use encodeURIComponent
     assert js.count("delete_playlist_base_url + encodeURIComponent(") >= 2
+
+
+# --- API Keys dirty tracking (JTN-225) ---
+
+
+def test_api_keys_page_js_dirty_tracking_present(client):
+    """JTN-225: api_keys_page.js must implement dirty tracking so Save starts disabled."""
+    resp = client.get("/static/scripts/api_keys_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # Dirty-state variables and helpers must be present
+    assert "let _isDirty = false" in js
+    assert "function markDirty()" in js
+    assert "function markClean()" in js
+
+    # markDirty enables Save; markClean disables it
+    assert "saveBtn.disabled = false" in js
+    assert "saveBtn.disabled = true" in js
+
+    # Save button must be disabled at init
+    assert "saveBtn.disabled = true" in js
+
+    # saveKeys must guard against no-op clicks
+    assert "No changes to save" in js
+
+    # Structural mutations (addRow, deleteRow, clearField) must call markDirty
+    assert js.count("markDirty()") >= 4
+
+    # After a successful save, markClean must be called
+    assert js.count("markClean()") >= 2
+
+
+def test_api_keys_template_save_button_starts_disabled(client):
+    """JTN-225: The rendered /settings/api-keys page must have Save disabled by default."""
+    resp = client.get("/settings/api-keys")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # The Save button element must carry the disabled attribute in the raw HTML
+    assert 'id="saveApiKeysBtn"' in body
+    # Confirm the disabled attribute is present on that button in the HTML
+    save_btn_idx = body.index('id="saveApiKeysBtn"')
+    surrounding = body[max(0, save_btn_idx - 20) : save_btn_idx + 120]
+    assert (
+        "disabled" in surrounding
+    ), "Save button on /settings/api-keys must have disabled attribute in rendered HTML"
