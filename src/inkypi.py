@@ -49,6 +49,7 @@ from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image, get_ip_address
+from utils.config_schema import ConfigValidationError
 
 # Re-exported for tests/unit/test_inkypi.py monkey-patches.
 __all__ = [
@@ -234,7 +235,11 @@ def create_app():
 
         return {"app_version": version, "url_for": versioned_url_for}
 
-    device_config = Config()
+    try:
+        device_config = Config()
+    except ConfigValidationError as exc:
+        logger.error("Config invalid: %s", exc)
+        raise SystemExit(1) from exc
     display_manager = DisplayManager(device_config)
     refresh_task = RefreshTask(device_config, display_manager)
 

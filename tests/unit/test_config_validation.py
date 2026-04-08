@@ -131,12 +131,13 @@ def test_invalid_orientation_raises_value_error(tmp_path, monkeypatch):
 
     # Point Config to this file
     import config as config_mod
+    import utils.config_schema as schema_mod
 
     monkeypatch.setattr(config_mod.Config, "config_file", str(cfg_path), raising=True)
 
-    # When jsonschema is missing, fallback validation should catch orientation
-    # Force jsonschema to None
-    monkeypatch.setattr(config_mod, "jsonschema", None, raising=True)
+    # When jsonschema is missing, fallback validation should catch orientation.
+    # Patch the module-level binding in config_schema (the validation now lives there).
+    monkeypatch.setattr(schema_mod, "jsonschema", None, raising=True)
 
     # Attempt to construct Config should raise due to validation
     try:

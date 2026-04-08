@@ -1,24 +1,16 @@
-import functools
 import hashlib
-import importlib
 import json
 import logging
 import os
 import shutil
 import tempfile
 import threading
-from typing import Any, cast
+from typing import Any
 
 from dotenv import load_dotenv, set_key, unset_key
 
 from model import PlaylistManager, RefreshInfo
-
-# Optional dependency: jsonschema for validating device.json (loaded dynamically to avoid typing issues)
-jsonschema: Any = None
-try:
-    jsonschema = importlib.import_module("jsonschema")
-except Exception:  # pragma: no cover
-    jsonschema = None
+from utils.config_schema import validate_device_config
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +64,6 @@ def _summarize_playlist(pl: Any) -> dict:
         }
     except Exception:
         return {"name": "<unknown>", "num_plugins": 0}
-
-
-@functools.lru_cache(maxsize=4)
-def _load_json_schema(schema_path: str) -> dict[str, Any]:
-    """Load and cache a JSON Schema from disk.
-
-    Cached by absolute schema path to avoid repeated disk I/O and parsing.
-    """
-    with open(schema_path) as f:
-        return cast(dict[str, Any], json.load(f))
 
 
 class Config:
@@ -266,8 +248,8 @@ class Config:
         with open(self.config_file) as f:
             config = json.load(f)
 
-        # Validate against JSON Schema if available
-        self._validate_device_config(config)
+        # Validate against JSON Schema — raises ConfigValidationError on failure
+        validate_device_config(config)
 
         # Log a sanitized summary instead of full config to avoid leaking secrets
         try:
@@ -501,78 +483,6 @@ class Config:
         # Create a temporary plugin instance to get the image path
         plugin_instance = PluginInstance(plugin_id, instance_name, {}, {})
         return os.path.join(self.plugin_image_dir, plugin_instance.get_image_path())
-
-    def _schema_dir(self):
-        """Return absolute path to the config schemas directory."""
-        return os.path.join(self.BASE_DIR, "config", "schemas")
-
-    @staticmethod
-    def _format_validation_message(ve) -> str:
-        """Build a user-friendly error message from a jsonschema ValidationError.
-
-        Prepends the failing field path (if any) and appends a (safely truncated)
-        representation of the invalid value.
-        """
-        msg = getattr(ve, "message", str(ve))
-        try:
-            if hasattr(ve, "path") and ve.path:
-                path = ".".join(str(p) for p in ve.path)
-                msg = f"{path}: {msg}"
-            bad = getattr(ve, "instance", None)
-            bad_repr = repr(bad)
-            if len(bad_repr) > 200:
-                bad_repr = bad_repr[:197] + "..."
-            msg = f"{msg} (got: {bad_repr})"
-        except (AttributeError, TypeError, IndexError):
-            pass
-        return msg
-
-    def _validate_device_config(self, config: dict):
-        """Validate device.json against the bundled JSON Schema.
-
-        Uses draft 2020-12. On schema violations, raises ValueError with a concise
-        message including the failing path and (safely) the invalid value when helpful.
-        If the validator or schema is unavailable, validation is skipped.
-        """
-        # First: fallback validation when jsonschema isn't available
-        if jsonschema is None:
-            # Only validate orientation if provided; schema does not require it
-            if "orientation" in config:
-                orientation = config.get("orientation")
-                if orientation not in ("horizontal", "vertical"):
-                    raise ValueError(
-                        f"device.json failed schema validation: orientation: invalid value (got: {repr(orientation)})"
-                    )
-            # No further schema checks available; exit early
-            return
-
-        # jsonschema is available, proceed with full validation inside a try/except
-        try:
-            schema_path = os.path.join(self._schema_dir(), "device_config.schema.json")
-            if not os.path.isfile(schema_path):
-                logger.warning(
-                    "Device config schema not found at %s; skipping validation",
-                    schema_path,
-                )
-                return
-            schema = _load_json_schema(schema_path)
-            jsonschema.Draft202012Validator(schema).validate(config)
-        except Exception as ex:
-            # If this is a jsonschema ValidationError, wrap with user-friendly ValueError; else warn
-            try:
-                is_validation_error = (
-                    jsonschema is not None
-                    and hasattr(jsonschema, "exceptions")
-                    and isinstance(ex, jsonschema.exceptions.ValidationError)
-                )
-            except (AttributeError, TypeError):
-                is_validation_error = False
-            if is_validation_error:
-                msg = self._format_validation_message(ex)
-                raise ValueError(f"device.json failed schema validation: {msg}") from ex
-            logger.warning(
-                "device.json validation encountered a non-fatal error: %s", ex
-            )
 
     @staticmethod
     def _sanitize_config_for_log(config_dict):
