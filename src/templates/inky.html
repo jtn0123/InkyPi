@@ -154,7 +154,7 @@
         imageHash: {{ refresh_info.get('image_hash')|tojson }},
         nextUpUrl: {{ url_for('main.next_up') | tojson }},
         previewUrl: {{ url_for('main.preview_image') | tojson }},
-        pushUrl: {{ (INKYPI_PUSH_URL if INKYPI_PUSH_URL is defined else None) | tojson }},
+        pushUrl: {{ (INKYPI_PUSH_URL if INKYPI_PUSH_URL is defined else url_for('events.sse_events')) | tojson }},
         refreshInfoUrl: {{ url_for('main.refresh_info') | tojson }},
         resolution: {{ config.resolution | tojson }},
     };

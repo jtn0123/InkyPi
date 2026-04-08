@@ -18,6 +18,7 @@ from refresh_task.worker import (
     _get_mp_context,
     _remote_exception,
 )
+from utils.event_bus import get_event_bus
 from utils.history_cleanup import cleanup_history
 from utils.image_utils import compute_image_hash
 from utils.metrics import (
@@ -62,6 +63,7 @@ class RefreshTask:
         self.running = False
         self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
         self.progress_bus = get_progress_bus()
+        self.event_bus = get_event_bus()
         self.plugin_health: dict[str, dict] = {}
         self._tick_count: int = 0
 
@@ -294,6 +296,14 @@ class RefreshTask:
                     "request_id": request_id,
                 }
             )
+            self.event_bus.publish(
+                "refresh_started",
+                {
+                    "plugin": instance_name or plugin_id,
+                    "plugin_id": plugin_id,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
             try:
                 image, plugin_meta = self._execute_with_policy(
                     refresh_action,
@@ -327,6 +337,14 @@ class RefreshTask:
                         "error": str(exc),
                         "retained_display": bool(retain_path),
                     }
+                )
+                self.event_bus.publish(
+                    "plugin_failed",
+                    {
+                        "plugin": instance_name or plugin_id,
+                        "plugin_id": plugin_id,
+                        "error": str(exc),
+                    },
                 )
                 raise
             try:
@@ -407,6 +425,14 @@ class RefreshTask:
                 "request_id": request_id,
                 "metrics": metrics,
             }
+        )
+        self.event_bus.publish(
+            "refresh_complete",
+            {
+                "plugin": instance_name or plugin_id,
+                "plugin_id": plugin_id,
+                "duration_ms": request_ms,
+            },
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
