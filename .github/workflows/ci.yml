@@ -6,6 +6,7 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 9 * * *'
+    - cron: '0 3 * * 0'
 
 permissions:
   contents: read
@@ -504,7 +505,7 @@ jobs:
     name: Mutation nightly
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -514,15 +515,36 @@ jobs:
           cache-dependency-path: |
             install/requirements.txt
             install/requirements-dev.txt
+      - name: Install OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libopenjp2-7 \
+            libopenblas-dev \
+            libfreetype6-dev \
+            fonts-noto-color-emoji
       - name: Install dependencies
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
-      - name: Run mutation validation
+      - name: Run mutmut
         env:
-          INKYPI_VALIDATE_MUTATION: '1'
+          INKYPI_ENV: dev
+          INKYPI_NO_REFRESH: '1'
+          PYTHONPATH: src
         run: |
-          scripts/preflash_validate.sh
+          mutmut run --CI
+      - name: Show mutation results
+        if: always()
+        run: |
+          mutmut results || true
+      - name: Upload mutmut cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutmut-cache
+          path: .mutmut-cache
+          if-no-files-found: ignore
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)
