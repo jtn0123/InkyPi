@@ -20,10 +20,10 @@
                 {{ icon('trash', 'action-icon') | safe }}
             </button>
         </div>
-        <label class="dynamic-list-color-group">
+        <span class="dynamic-list-color-group">
             <span>Color</span>
-            <input type="color" name="calendarColors[]" class="color-picker" value="{{ calendar_colors[idx] if idx < (calendar_colors | length) else '#007BFF' }}">
-        </label>
+            <input type="color" name="calendarColors[]" class="color-picker" aria-label="Calendar color" value="{{ calendar_colors[idx] if idx < (calendar_colors | length) else '#007BFF' }}">
+        </span>
     </div>
     {% endfor %}
 </div>

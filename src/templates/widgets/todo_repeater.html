@@ -13,6 +13,7 @@
                 name="list-title[]"
                 class="form-input"
                 placeholder="List title"
+                aria-label="List title"
                 value="{{ list_titles[idx] if idx < (list_titles | length) else '' }}"
             >
             <button type="button" class="remove-btn icon-button" aria-label="Remove list">
@@ -24,6 +25,7 @@
             class="form-input dynamic-list-textarea"
             rows="5"
             placeholder="Enter tasks, one per line"
+            aria-label="Todo list items"
         >{{ list_items[idx] if idx < (list_items | length) else '' }}</textarea>
     </div>
     {% endfor %}

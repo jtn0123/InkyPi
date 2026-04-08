@@ -75,7 +75,7 @@
                 <label class="toggle-item-label" for="{{ field.id | default(field.name) }}">{{ field.label }}</label>
                 {% if field.hint %}<span class="toggle-item-hint">{{ field.hint }}</span>{% endif %}
             </div>
-            <label class="toggle-container">
+            <span class="toggle-container">
                 <input
                     type="checkbox"
                     id="{{ field.id | default(field.name) }}"
@@ -87,7 +87,7 @@
                     {% if is_checked(field, plugin_settings) == 'True' %}checked{% endif %}
                 >
                 <span class="toggle-label"></span>
-            </label>
+            </span>
             {% if field.submit_unchecked %}
             <input type="hidden" name="{{ field.name }}" value="{{ field.unchecked_value | default('false') }}">
             {% endif %}

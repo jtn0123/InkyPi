@@ -38,7 +38,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
@@ -65,7 +65,7 @@
                         {% endif %}
                     {% endif %}
 
-                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Show last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
                     <div id="loadingIndicator" class="loading-indicator"></div>
                 </div>
             </div>
@@ -127,8 +127,8 @@
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
                             <div class="form-group nowrap">
-                                <label class="form-label">Frame:</label>
-                                <div id="frame-selection" class="image-grid">
+                                <span id="frame-label" class="form-label">Frame:</span>
+                                <div id="frame-selection" class="image-grid" role="group" aria-labelledby="frame-label">
                                     {% for frame in frame_styles %}
                                     <button type="button" class="image-option" data-face-name="{{ frame.name }}" data-frame-option aria-label="Select {{ frame.name }}">
                                         <img
@@ -142,7 +142,7 @@
                             </div>
 
                             <div class="form-group">
-                                <label class="form-label">Margins:</label>
+                                <span class="form-label">Margins:</span>
                                 <div class="form-group nowrap">
                                     <label for="topMargin" class="form-label">Top</label>
                                     <input type="number" class="form-input" id="topMargin" name="topMargin" min="0" max="100" step="5">px
@@ -163,8 +163,8 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label">Background:</label>
-                            <div class="form-group nowrap">
+                            <span id="background-label" class="form-label">Background:</span>
+                            <div class="form-group nowrap" role="group" aria-labelledby="background-label">
                                 <label>
                                     <input type="radio" name="backgroundOption" value="color" checked>
                                     Color
@@ -217,7 +217,7 @@
                 <div class="status-body">
                     <div class="image-container" id="currentPreviewContainer">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
-                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current Image" width="{{ resolution[0] }}" height="{{ resolution[1] }}" data-native-width="{{ resolution[0] }}" data-native-height="{{ resolution[1] }}">
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display" width="{{ resolution[0] }}" height="{{ resolution[1] }}" data-native-width="{{ resolution[0] }}" data-native-height="{{ resolution[1] }}">
                         <div id="deviceFrameOverlay" class="device-frame-overlay" aria-hidden="true"></div>
                     </div>
                     <div class="status-meta compact">
@@ -236,7 +236,7 @@
                         {% if plugin_instance %}
                         No saved image found for this instance yet.
                         {% if plugin_instance_playlist %}
-                        <div class="status-placeholder-actions"><button type="button" id="displayInstanceBtn" class="action-button compact" aria-label="Display this instance now">Display Instance</button></div>
+                        <div class="status-placeholder-actions"><button type="button" id="displayInstanceBtn" class="action-button compact">Display Instance</button></div>
                         {% endif %}
                         {% else %}
                         No images generated yet. Use "Update Preview" to create one.
@@ -307,7 +307,7 @@
                     <span id="instance-error" class="validation-message" role="alert"></span>
                 </div>
                 <div class="form-group">
-                    <label>Refresh</label>
+                    <span class="form-label">Refresh</span>
                     <span class="help-icon" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
                 </div>
                 <div class="form-group nowrap">
