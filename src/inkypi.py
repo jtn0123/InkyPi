@@ -324,11 +324,11 @@ def _register_blueprints(app: Flask) -> None:
 
 
 def _register_health_endpoints(app: Flask) -> None:
-    @app.route("/healthz")
+    @app.route("/healthz", methods=["GET"])
     def healthz():
         return ("OK", 200)
 
-    @app.route("/readyz")
+    @app.route("/readyz", methods=["GET"])
     def readyz():
         try:
             rt = app.config.get("REFRESH_TASK")

@@ -182,7 +182,7 @@ def _parse_filename_from_request():
 _DEFAULT_PER_PAGE = 24
 
 
-@history_bp.route("/history")
+@history_bp.route("/history", methods=["GET"])
 def history_page():
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -260,7 +260,7 @@ def history_page():
     )
 
 
-@history_bp.route("/history/image/<path:filename>")
+@history_bp.route("/history/image/<path:filename>", methods=["GET"])
 def history_image(filename: str):
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
@@ -351,7 +351,7 @@ def history_clear():
         )
 
 
-@history_bp.route("/history/storage")
+@history_bp.route("/history/storage", methods=["GET"])
 def history_storage():
     """Return storage stats for the filesystem containing the history directory.
 

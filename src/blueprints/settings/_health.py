@@ -34,7 +34,7 @@ def _filter_health_by_window(health, window_min):
     return filtered
 
 
-@_mod.settings_bp.route("/api/health/plugins")
+@_mod.settings_bp.route("/api/health/plugins", methods=["GET"])
 def health_plugins():
     try:
         rt = current_app.config["REFRESH_TASK"]
@@ -49,7 +49,7 @@ def health_plugins():
         return json_internal_error("health plugins", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/health/system")
+@_mod.settings_bp.route("/api/health/system", methods=["GET"])
 def health_system():
     try:
         data: dict[str, Any] = {"success": True}
@@ -70,7 +70,7 @@ def health_system():
         return json_internal_error("health system", details={"error": str(e)})
 
 
-@_mod.settings_bp.route("/api/progress/stream")
+@_mod.settings_bp.route("/api/progress/stream", methods=["GET"])
 def progress_stream():
     if os.getenv("INKYPI_PROGRESS_SSE_ENABLED", "true").strip().lower() not in (
         "1",

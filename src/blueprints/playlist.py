@@ -349,12 +349,12 @@ def add_plugin():
     return json_success("Scheduled refresh configured.")
 
 
-@playlist_bp.route("/playlists")
+@playlist_bp.route("/playlists", methods=["GET"])
 def playlists_redirect():
     return redirect(url_for("playlist.playlists"))
 
 
-@playlist_bp.route("/playlist")
+@playlist_bp.route("/playlist", methods=["GET"])
 def playlists():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -749,7 +749,7 @@ def display_next_in_playlist():
         return json_internal_error("display next in playlist")
 
 
-@playlist_bp.route("/playlist/eta/<string:playlist_name>")
+@playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])
 def playlist_eta(playlist_name: str):
     """Return per-instance ETA for the named playlist.
 

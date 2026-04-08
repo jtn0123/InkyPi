@@ -43,7 +43,7 @@ def _current_dt(device_config):
         return datetime.now(UTC)
 
 
-@main_bp.route("/")
+@main_bp.route("/", methods=["GET"])
 def main_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     # Compute a non-mutating next-up preview for SSR convenience
@@ -83,7 +83,7 @@ def main_page():
     )
 
 
-@main_bp.route("/preview")
+@main_bp.route("/preview", methods=["GET"])
 def preview_image():
     device_config = current_app.config["DEVICE_CONFIG"]
     # Prefer processed image; fall back to current raw image if missing
@@ -95,7 +95,7 @@ def preview_image():
     return send_file(path, mimetype="image/png", conditional=True)
 
 
-@main_bp.route("/api/current_image")
+@main_bp.route("/api/current_image", methods=["GET"])
 def get_current_image():
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -132,7 +132,7 @@ def get_current_image():
     return response
 
 
-@main_bp.route("/refresh-info")
+@main_bp.route("/refresh-info", methods=["GET"])
 def refresh_info():
     device_config = current_app.config["DEVICE_CONFIG"]
     try:
@@ -142,7 +142,7 @@ def refresh_info():
     return jsonify(info)
 
 
-@main_bp.route("/next-up")
+@main_bp.route("/next-up", methods=["GET"])
 def next_up():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
@@ -199,7 +199,7 @@ def save_plugin_order():
 
 
 # Serve static assets from src/static for test and dev environments
-@main_bp.route("/static/<path:filename>")
+@main_bp.route("/static/<path:filename>", methods=["GET"])
 def static_files(filename: str):
     try:
         static_dir = os.path.abspath(

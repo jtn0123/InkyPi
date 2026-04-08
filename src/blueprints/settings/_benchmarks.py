@@ -9,7 +9,7 @@ from utils.http_utils import json_error, json_internal_error
 from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 
-@_mod.settings_bp.route("/api/benchmarks/summary")
+@_mod.settings_bp.route("/api/benchmarks/summary", methods=["GET"])
 def benchmarks_summary():
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
@@ -63,7 +63,7 @@ def benchmarks_summary():
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/refreshes")
+@_mod.settings_bp.route("/api/benchmarks/refreshes", methods=["GET"])
 def benchmarks_refreshes():
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
@@ -114,7 +114,7 @@ def benchmarks_refreshes():
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/plugins")
+@_mod.settings_bp.route("/api/benchmarks/plugins", methods=["GET"])
 def benchmarks_plugins():
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)
@@ -168,7 +168,7 @@ def benchmarks_plugins():
             conn.close()
 
 
-@_mod.settings_bp.route("/api/benchmarks/stages")
+@_mod.settings_bp.route("/api/benchmarks/stages", methods=["GET"])
 def benchmarks_stages():
     if not _mod._benchmarks_enabled():
         return json_error(BENCHMARKS_API_DISABLED_ERROR, status=404)

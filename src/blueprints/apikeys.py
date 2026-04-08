@@ -140,7 +140,7 @@ def mask_value(value):
     return "●" * min(len(value), 20)
 
 
-@apikeys_bp.route("/api-keys")
+@apikeys_bp.route("/api-keys", methods=["GET"])
 def apikeys_page():
     """Render API keys management page."""
     env_path = get_env_path()
