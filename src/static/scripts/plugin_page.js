@@ -86,7 +86,6 @@
         const keys = [
           buildProgressKey(config.progressContext, config),
           `INKYPI_LAST_PROGRESS:plugin:${config.pluginId}:_`,
-          "INKYPI_LAST_PROGRESS",
         ];
         let data = null;
         for (const key of keys) {
