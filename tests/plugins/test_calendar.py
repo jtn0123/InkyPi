@@ -474,3 +474,33 @@ def test_get_contrast_color_edge_cases():
 
     # Test exact threshold
     assert p.get_contrast_color("#969696") == "#000000"  # yiq = 150
+
+
+def test_get_view_range_returns_tz_aware_datetimes():
+    """Verify get_view_range preserves timezone info from current_dt (JTN-233)."""
+    from plugins.calendar.calendar import Calendar
+
+    p = Calendar({"id": "calendar"})
+    tz = ZoneInfo("America/New_York")
+    now = datetime(2025, 1, 15, 10, 30, tzinfo=tz)
+
+    for view in ("timeGridDay", "timeGridWeek", "dayGridMonth", "listMonth"):
+        start, end = p.get_view_range(view, now, {})
+        assert start.tzinfo is not None, f"{view}: start is naive"
+        assert end.tzinfo is not None, f"{view}: end is naive"
+
+
+def test_get_view_range_tz_aware_timeGridWeek_display_previous_days():
+    """Verify displayPreviousDays path also yields tz-aware datetimes (JTN-233)."""
+    from plugins.calendar.calendar import Calendar
+
+    p = Calendar({"id": "calendar"})
+    tz = ZoneInfo("America/New_York")
+    now = datetime(2025, 1, 15, 10, 30, tzinfo=tz)  # Wednesday
+
+    start, end = p.get_view_range("timeGridWeek", now, {"displayPreviousDays": "true"})
+    assert start.tzinfo is not None, "start (displayPreviousDays) is naive"
+    assert end.tzinfo is not None, "end (displayPreviousDays) is naive"
+    # Should be Monday of that week
+    assert start.day == 13
+    assert start.month == 1
