@@ -25,6 +25,7 @@ from app_setup.health import (
     register_health_endpoints,
     register_health_endpoints as _register_health_endpoints,
 )
+from app_setup.http_metrics import setup_http_metrics
 from app_setup.logging_setup import install_dev_log_handler, setup_logging
 from app_setup.security_middleware import (
     _extract_csrf_token_from_request,
@@ -306,6 +307,7 @@ def create_app():
     setup_rate_limiting(app)
     register_error_handlers(app)
     setup_security_headers(app, dev_mode=DEV_MODE)
+    setup_http_metrics(app)
     setup_signal_handlers(app)
 
     return app
