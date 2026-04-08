@@ -52,7 +52,7 @@ def test_api_validator_no_custom_user_agent(client):
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 
-    assert "User-Agent" not in js, (
+    assert "user-agent" not in js.lower(), (
         "Custom User-Agent header must not be set in fetch calls — "
         "it triggers CORS preflight and is forbidden by the Fetch spec."
     )
