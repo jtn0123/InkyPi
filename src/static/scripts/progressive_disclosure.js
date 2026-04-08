@@ -249,16 +249,20 @@ class ProgressiveDisclosure {
         const steps = container.querySelectorAll('.wizard-step');
         let currentStep = 0;
 
-        // Show first step
-        if (steps.length > 0) {
-            steps[0].classList.add('active');
-        }
+        // Do not inject navigation into an empty wizard container — this would
+        // produce orphaned wizardPrev/wizardNext elements (duplicate-id risk).
+        if (steps.length === 0) return;
 
-        // Create navigation
+        // Show first step
+        steps[0].classList.add('active');
+
+        // Create navigation — use data attributes instead of ids so multiple
+        // wizards on one page (or a hidden placeholder alongside a real one)
+        // never produce duplicate id attributes in the document.
         const navigation = document.createElement('div');
         navigation.className = 'wizard-navigation';
         navigation.innerHTML = `
-            <button type="button" class="action-button is-secondary" id="wizardPrev" disabled>
+            <button type="button" class="action-button is-secondary" data-wizard-prev disabled>
                 Previous
             </button>
             <div class="wizard-progress">
@@ -269,7 +273,7 @@ class ProgressiveDisclosure {
                     ).join('')}
                 </div>
             </div>
-            <button type="button" class="action-button" id="wizardNext">
+            <button type="button" class="action-button" data-wizard-next>
                 Next
             </button>
         `;
@@ -277,8 +281,8 @@ class ProgressiveDisclosure {
         container.appendChild(navigation);
 
         // Navigation event handlers
-        const prevBtn = navigation.querySelector('#wizardPrev');
-        const nextBtn = navigation.querySelector('#wizardNext');
+        const prevBtn = navigation.querySelector('[data-wizard-prev]');
+        const nextBtn = navigation.querySelector('[data-wizard-next]');
         const stepText = navigation.querySelector('.wizard-step-text');
         const stepDots = navigation.querySelectorAll('.wizard-step-dot');
 
