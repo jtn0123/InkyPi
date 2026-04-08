@@ -9,7 +9,7 @@ def test_playlist_modal_defaults_to_non_overlapping_range():
     js = Path("src/static/scripts/playlist.js").read_text()
     # Find openCreateModal function body
     match = re.search(
-        r"function\s+openCreateModal\s*\(\)\s*\{(.*?)\n\s*\}", js, re.DOTALL
+        r"function\s+openCreateModal\s*\([^)]*\)\s*\{(.*?)\n\s*\}", js, re.DOTALL
     )
     assert match, "openCreateModal function not found"
     body = match.group(1)
