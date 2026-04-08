@@ -8,7 +8,7 @@
     <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
-        <div class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
@@ -22,7 +22,7 @@
                     <button id="historyRefreshBtn" class="header-button" type="button">Refresh</button>
                 </div>
             </div>
-        </div>
+        </header>
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'History'}]) }}
         <div class="page-intro">

@@ -10,7 +10,7 @@
     <div class="frame settings-panel">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
         <!-- Settings Header -->
-        <div class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
@@ -25,7 +25,7 @@
                     <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
                 </div>
             </div>
-        </div>
+        </header>
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings'}]) }}
         <div class="page-intro">
