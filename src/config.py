@@ -292,7 +292,7 @@ class Config:
         """
         if key is not None:
             return self.config.get(key, default)
-        return self.config
+        return self.config.copy()
 
     def get_plugins(self):
         """Returns the list of plugin configurations, sorted by custom order if set."""

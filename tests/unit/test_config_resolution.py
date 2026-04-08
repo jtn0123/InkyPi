@@ -165,6 +165,36 @@ def test_get_resolution_returns_default_when_key_missing(monkeypatch, tmp_path):
     assert height == 480
 
 
+def test_get_config_without_key_returns_copy(monkeypatch, tmp_path):
+    """get_config() with no key must return a copy, not the internal dict (JTN-241)."""
+    import config as config_mod
+
+    cfg_path = tmp_path / "device.json"
+    _write_min_config(str(cfg_path), name="CopyTest")
+    monkeypatch.delenv("INKYPI_CONFIG_FILE", raising=False)
+    monkeypatch.delenv("INKYPI_ENV", raising=False)
+    monkeypatch.setattr(config_mod.Config, "config_file", str(cfg_path))
+
+    cfg = config_mod.Config()
+
+    result = cfg.get_config()
+
+    # Must be a dict with expected content
+    assert result["name"] == "CopyTest"
+
+    # Mutating the returned dict must NOT affect internal state
+    result["name"] = "MutatedName"
+    assert cfg.get_config("name") == "CopyTest", (
+        "get_config() returned a mutable reference to the internal config dict; "
+        "it should return a copy instead"
+    )
+
+    # The returned dict must be a different object each call
+    assert (
+        cfg.get_config() is not cfg.get_config() or cfg.get_config() is not cfg.config
+    )
+
+
 def test_runtime_dir_overrides_output_paths(monkeypatch, tmp_path):
     import config as config_mod
 
