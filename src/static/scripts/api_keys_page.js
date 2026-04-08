@@ -194,6 +194,10 @@
       const emptyState = document.getElementById("empty-state");
       if (emptyState) emptyState.remove();
       const list = document.getElementById("apikeys-list");
+      if (!list) {
+        console.warn("api_keys_page: #apikeys-list not found in DOM");
+        return;
+      }
       const row = document.createElement("div");
       row.className = "apikey-row";
       row.dataset.existing = "false";
@@ -223,6 +227,7 @@
 
     function addPreset(button) {
       const key = button.dataset.key;
+      if (!key) return;
       addRow(key, "");
       button.style.display = "none";
     }
