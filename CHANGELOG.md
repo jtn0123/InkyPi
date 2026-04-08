@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v0.4.34 (2026-04-08)
+
+### Bug Fixes
+
+- Repair broken YAML in ci.yml — literal newline in curl -w format string
+  ([`36d06a8`](https://github.com/jtn0123/InkyPi/commit/36d06a896fedccaa65beac8deafc343fa0c8d972))
+
+The `-w "%{http_code}\n"` had an actual newline instead of `\n`, causing GitHub Actions to fail with
+  "workflow file issue" on all PRs.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.33 (2026-04-08)
 
 ### Bug Fixes
