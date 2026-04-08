@@ -42,12 +42,12 @@ def reset_global_cache():
 
 def test_cache_entry_expiration():
     """Test CacheEntry expiration logic."""
-    resp = Mock(spec=requests.Response)
+    cached_data = {"status_code": 200, "headers": {}, "content": b"body"}
 
     with patch("utils.http_cache.time") as mock_time:
         mock_time.time.return_value = 1000.0
         entry = CacheEntry(
-            response=resp,
+            cached_data=cached_data,
             cached_at=mock_time.time(),
             ttl_seconds=0.1,
             url="https://example.com",
@@ -63,12 +63,12 @@ def test_cache_entry_expiration():
 
 def test_cache_entry_age():
     """Test CacheEntry age calculation."""
-    resp = Mock(spec=requests.Response)
+    cached_data = {"status_code": 200, "headers": {}, "content": b"body"}
 
     with patch("utils.http_cache.time") as mock_time:
         mock_time.time.return_value = 1000.0
         entry = CacheEntry(
-            response=resp,
+            cached_data=cached_data,
             cached_at=mock_time.time(),
             ttl_seconds=10.0,
             url="https://example.com",
@@ -411,3 +411,33 @@ def test_cache_custom_ttl_override(cache, mock_response):
     # Check the actual TTL
     entry = cache._cache[cache._make_cache_key(url)]
     assert entry.ttl_seconds == 0.2
+
+
+def test_cached_response_holds_no_raw_connection(cache, mock_response):
+    """Cached responses must not hold raw socket or urllib3 connection references.
+
+    Storing full Response objects prevents connections from returning to the
+    pool. The cache must store only serialisable data and reconstruct a
+    lightweight Response on hit.
+    """
+    url = "https://example.com/connection_test"
+
+    cache.put(url, mock_response)
+
+    # The internal cache entry must store plain data, not a Response object.
+    entry = cache._cache[cache._make_cache_key(url)]
+    assert not isinstance(
+        entry.cached_data, requests.Response
+    ), "cache entry must not hold a Response object"
+    assert isinstance(entry.cached_data, dict)
+    assert set(entry.cached_data.keys()) == {"status_code", "headers", "content"}
+
+    # The reconstructed response on cache hit must be a plain Response with no
+    # raw attribute pointing to a live connection.
+    cached = cache.get(url)
+    assert cached is not None
+    assert isinstance(cached, requests.Response)
+    # raw should be None (unset) on a freshly constructed Response object
+    assert cached.raw is None, "cached response must not hold a raw urllib3 connection"
+    assert cached.status_code == 200
+    assert cached.content == b"test response body"
