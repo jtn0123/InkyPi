@@ -6,35 +6,49 @@
     ].find((modal) => modal && !modal.hidden);
   }
 
+  // Module-scope helpers — hoisted from createHistoryPage (JTN-281).
+  function setHidden(node, hidden) {
+    if (!node) return;
+    node.hidden = hidden;
+  }
+
+  function setModalOpen(node, open) {
+    if (!node) return;
+    node.hidden = !open;
+    node.style.display = open ? "block" : "none";
+  }
+
+  function showStoredMessage() {
+    const stored = sessionStorage.getItem("storedMessage");
+    if (!stored) return;
+    try {
+      const message = JSON.parse(stored);
+      if (message?.type && message.text) {
+        showResponseModal(message.type, message.text);
+      }
+    } catch (e) {
+      // Intentionally ignored — malformed session data; item is removed below regardless
+    }
+    sessionStorage.removeItem("storedMessage");
+  }
+
+  function hideHistoryImageSkeleton(img) {
+    const skeleton = img.previousElementSibling;
+    if (!skeleton) return;
+    skeleton.classList.add("is-hidden");
+    skeleton.addEventListener(
+      "transitionend",
+      () => {
+        skeleton.style.display = "none";
+      },
+      { once: true }
+    );
+  }
+
   function createHistoryPage(config) {
     const state = {
       pendingDelete: "",
     };
-
-    function setHidden(node, hidden) {
-      if (!node) return;
-      node.hidden = hidden;
-    }
-
-    function setModalOpen(node, open) {
-      if (!node) return;
-      node.hidden = !open;
-      node.style.display = open ? "block" : "none";
-    }
-
-    function showStoredMessage() {
-      const stored = sessionStorage.getItem("storedMessage");
-      if (!stored) return;
-      try {
-        const message = JSON.parse(stored);
-        if (message?.type && message.text) {
-          showResponseModal(message.type, message.text);
-        }
-      } catch (e) {
-        // Intentionally ignored — malformed session data; item is removed below regardless
-      }
-      sessionStorage.removeItem("storedMessage");
-    }
 
     async function updateStorage() {
       try {
@@ -180,14 +194,9 @@
 
     function bindImages() {
       document.querySelectorAll(".history-image").forEach((img) => {
-        function hideSkeleton() {
-          const skeleton = img.previousElementSibling;
-          if (!skeleton) return;
-          skeleton.classList.add('is-hidden');
-          skeleton.addEventListener('transitionend', () => { skeleton.style.display = 'none'; }, { once: true });
-        }
-        img.addEventListener("load", hideSkeleton);
-        img.addEventListener("error", hideSkeleton);
+        const handler = () => hideHistoryImageSkeleton(img);
+        img.addEventListener("load", handler);
+        img.addEventListener("error", handler);
       });
     }
 

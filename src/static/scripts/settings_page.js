@@ -3,7 +3,9 @@
     if (!btn) return;
     const original = btn.textContent;
     btn.textContent = success ? "Copied!" : "Copy failed";
-    setTimeout(function() { btn.textContent = original; }, 1500);
+    setTimeout(() => {
+      btn.textContent = original;
+    }, 1500);
   }
 
   function copyViaExecCommand(text) {
@@ -336,10 +338,9 @@
       const text = viewer.textContent || "";
 
       if (navigator.clipboard && globalThis.isSecureContext) {
-        navigator.clipboard.writeText(text).then(
-          function() { showCopyFeedback(copyBtn, true); },
-          function() { showCopyFeedback(copyBtn, false); }
-        );
+        const onSuccess = () => showCopyFeedback(copyBtn, true);
+        const onFailure = () => showCopyFeedback(copyBtn, false);
+        navigator.clipboard.writeText(text).then(onSuccess, onFailure);
       } else {
         showCopyFeedback(copyBtn, copyViaExecCommand(text));
       }

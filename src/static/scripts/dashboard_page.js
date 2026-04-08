@@ -5,6 +5,24 @@
     refreshDelayMs: 300,
   };
 
+  // Module-scope helpers — hoisted from createDashboardPage (JTN-281).
+  function setHidden(node, hidden) {
+    if (!node) return;
+    node.hidden = hidden;
+  }
+
+  function hidePreviewSkeletonNode(previewSkel) {
+    if (!previewSkel) return;
+    previewSkel.classList.add("is-hidden");
+    previewSkel.addEventListener(
+      "transitionend",
+      () => {
+        previewSkel.style.display = "none";
+      },
+      { once: true }
+    );
+  }
+
   function createDashboardPage(config) {
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
@@ -12,11 +30,6 @@
     const desktopPreviewQuery =
       globalThis.matchMedia &&
       globalThis.matchMedia("(hover: hover) and (pointer: fine)");
-
-    function setHidden(node, hidden) {
-      if (!node) return;
-      node.hidden = hidden;
-    }
 
     function canUseNativePreview() {
       return !!(desktopPreviewQuery?.matches);
@@ -188,11 +201,7 @@
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
       const container = previewImg?.parentElement;
-      const hidePreviewSkeleton = () => {
-        if (!previewSkel) return;
-        previewSkel.classList.add('is-hidden');
-        previewSkel.addEventListener('transitionend', () => { previewSkel.style.display = 'none'; }, { once: true });
-      };
+      const hidePreviewSkeleton = () => hidePreviewSkeletonNode(previewSkel);
       if (previewImg) {
         previewImg.addEventListener("load", hidePreviewSkeleton);
         previewImg.addEventListener("error", hidePreviewSkeleton);

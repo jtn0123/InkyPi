@@ -449,25 +449,30 @@
     latInput.value = config.latitude || latInput.value || "40.7128";
     lonInput.value = config.longitude || lonInput.value || "-74.0060";
 
-    let map;
-    let marker;
+    const mapState = { map: null, marker: null };
+
+    const initLeafletMap = () => {
+      if (!globalThis.L || mapState.map) return;
+      const lat = Number.parseFloat(latInput.value) || 40.7128;
+      const lon = Number.parseFloat(lonInput.value) || -74.006;
+      mapState.map = globalThis.L.map(mapRoot).setView([lat, lon], 4.5);
+      globalThis.L
+        .tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+        .addTo(mapState.map);
+      mapState.marker = globalThis.L
+        .marker([lat, lon], { draggable: true })
+        .addTo(mapState.map);
+      mapState.map.on("click", (event) => mapState.marker.setLatLng(event.latlng));
+    };
 
     const openModal = () => {
       modal.style.display = "block";
-      setTimeout(() => {
-        if (!globalThis.L || map) return;
-        const lat = Number.parseFloat(latInput.value) || 40.7128;
-        const lon = Number.parseFloat(lonInput.value) || -74.0060;
-        map = globalThis.L.map(mapRoot).setView([lat, lon], 4.5);
-        globalThis.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-        marker = globalThis.L.marker([lat, lon], { draggable: true }).addTo(map);
-        map.on("click", (event) => marker.setLatLng(event.latlng));
-      }, 100);
+      setTimeout(initLeafletMap, 100);
     };
 
     const closeModal = () => {
-      if (marker) {
-        const position = marker.getLatLng().wrap();
+      if (mapState.marker) {
+        const position = mapState.marker.getLatLng().wrap();
         latInput.value = position.lat;
         lonInput.value = position.lng;
       }

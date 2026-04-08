@@ -44,6 +44,12 @@
     skel.addEventListener('transitionend', () => { skel.style.display = 'none'; }, { once: true });
   }
 
+  function showInstanceFallback(imgEl, skeleton, fallback) {
+    setHidden(imgEl, true);
+    setHidden(skeleton, true);
+    setHidden(fallback, false);
+  }
+
   function updateCombinedColorPreview(combined, bgPicker, textPicker) {
     combined.style.background = bgPicker.value;
     combined.style.color = textPicker.value;
@@ -410,24 +416,23 @@
         return;
       }
 
-      instImgEl.src = `${imageUrl}?t=${Date.now()}`;
-      instImgEl.onload = function () {
-        setHidden(skeleton, true);
-      };
-      instImgEl.onerror = function () {
-        if (primaryUrl && imageUrl === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl) {
+      const onPrimaryError = function () {
+        const canFallback =
+          primaryUrl && imageUrl === primaryUrl && fallbackUrl && fallbackUrl !== primaryUrl;
+        if (canFallback) {
           this.src = `${fallbackUrl}?t=${Date.now()}`;
-          this.onerror = function () {
-            setHidden(this, true);
-            setHidden(skeleton, true);
-            setHidden(fallback, false);
-          };
+          this.onerror = onFallbackError;
           return;
         }
-        setHidden(this, true);
-        setHidden(skeleton, true);
-        setHidden(fallback, false);
+        showInstanceFallback(this, skeleton, fallback);
       };
+      const onFallbackError = function () {
+        showInstanceFallback(this, skeleton, fallback);
+      };
+
+      instImgEl.src = `${imageUrl}?t=${Date.now()}`;
+      instImgEl.onload = () => setHidden(skeleton, true);
+      instImgEl.onerror = onPrimaryError;
     }
 
     async function displayInstanceNow() {
@@ -523,15 +528,17 @@
       }
     }
 
+    function collapseApiIndicator(apiIndicator) {
+      apiIndicator.classList.remove("auto-collapse");
+      apiIndicator.classList.add("collapsed");
+    }
+
     function initApiIndicator() {
       const apiIndicator = document.getElementById("apiKeyIndicator");
       if (!apiIndicator) return;
       setTimeout(() => {
         apiIndicator.classList.add("auto-collapse");
-        setTimeout(() => {
-          apiIndicator.classList.remove("auto-collapse");
-          apiIndicator.classList.add("collapsed");
-        }, 3000);
+        setTimeout(() => collapseApiIndicator(apiIndicator), 3000);
       }, 100);
     }
 
