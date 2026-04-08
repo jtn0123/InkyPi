@@ -9,6 +9,7 @@
     try {
       return JSON.parse(value);
     } catch (error) {
+      // Intentionally ignored — invalid JSON returns the provided fallback value
       return fallback;
     }
   }

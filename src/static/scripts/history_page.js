@@ -30,7 +30,9 @@
         if (message && message.type && message.text) {
           showResponseModal(message.type, message.text);
         }
-      } catch (e) {}
+      } catch (e) {
+        // Intentionally ignored — malformed session data; item is removed below regardless
+      }
       sessionStorage.removeItem("storedMessage");
     }
 

@@ -67,7 +67,10 @@
   function savePref(prefix, key, value) {
     try {
       localStorage.setItem(prefix + key, String(value));
-    } catch (e) {}
+    } catch (e) {
+      // Intentionally ignored — localStorage may be unavailable (private browsing / storage full)
+      console.warn("savePref: localStorage unavailable", e);
+    }
   }
 
   function loadPref(prefix, key, defaultValue) {
@@ -75,6 +78,7 @@
       const value = localStorage.getItem(prefix + key);
       return value === null ? defaultValue : value;
     } catch (e) {
+      // Intentionally ignored — localStorage may be unavailable; return the default value
       return defaultValue;
     }
   }

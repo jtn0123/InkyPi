@@ -46,7 +46,9 @@
             "X-CSRFToken": csrfToken,
           },
           body: body,
-        }).catch(function () {});
+        }).catch(function (err) {
+          console.warn("client_errors: failed to send error report", err);
+        });
       }
     } catch (e) {
       // Swallow — never let error reporting itself throw
