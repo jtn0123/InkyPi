@@ -28,6 +28,7 @@ from utils.metrics import (
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
+from utils.webhooks import send_failure_webhook
 
 try:
     # Optional import; code must continue if unavailable
@@ -992,6 +993,27 @@ class RefreshTask:
                 plugin_id,
                 instance,
                 plugin_instance.consecutive_failure_count,
+            )
+
+        # Best-effort webhook notification — never raises.
+        try:
+            webhook_urls = self.device_config.get_config("webhook_urls", default=[])
+            if webhook_urls:
+                now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
+                error_msg = (
+                    self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
+                )
+                payload = {
+                    "event": "plugin_failure",
+                    "plugin_id": plugin_id,
+                    "instance_name": instance,
+                    "error": error_msg,
+                    "ts": now_iso,
+                }
+                send_failure_webhook(webhook_urls, payload)
+        except Exception:
+            logger.warning(
+                "webhook: unexpected error building webhook payload", exc_info=True
             )
 
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
