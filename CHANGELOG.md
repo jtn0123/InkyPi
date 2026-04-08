@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.18.0 (2026-04-08)
+
+### Features
+
+- Plugin dry-run CLI for offline rendering ([#261](https://github.com/jtn0123/InkyPi/pull/261),
+  [`fe216d0`](https://github.com/jtn0123/InkyPi/commit/fe216d0bcca0d8205c1a1b667d3a550a346d8520))
+
+* feat: plugin dry-run CLI for offline rendering
+
+Add scripts/dry_run_plugin.py — loads any plugin by ID, calls generate_image() via a
+  _MockDeviceConfig stub, and saves the PNG locally. No Flask, no display driver, no refresh task
+  needed. Supports --plugin, --output, --width, --height, --orientation, --timezone, and --config
+  (JSON settings override).
+
+Add tests/test_dry_run_plugin.py with 17 tests covering unit helpers (_MockDeviceConfig,
+  _discover_plugin_config, _load_settings) and end-to-end integration against year_progress
+  including dimension verification and --config override.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: remove unused mypy type-ignore comment in dry_run test
+
+* style: reformat test_plugin_routes.py with black (merge artifact)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.17.0 (2026-04-08)
 
 ### Features
