@@ -970,11 +970,14 @@ class RefreshTask:
             return False
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
-        # Use %r to escape control characters in user-controlled values (S5145)
+        # Sanitize user-controlled values for the audit log (S5145):
+        # strip CR/LF (log injection) and truncate to a sane length.
+        safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]
+        safe_inst = str(instance).replace("\r", "").replace("\n", "")[:64]
         logger.info(
-            "plugin circuit_breaker: manual_reset | plugin_id=%r instance=%r",
-            plugin_id,
-            instance,
+            "plugin circuit_breaker: manual_reset | plugin_id=%s instance=%s",
+            safe_pid,
+            safe_inst,
         )
         return True
 
