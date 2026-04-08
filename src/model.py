@@ -516,6 +516,8 @@ class PluginInstance:
         latest_refresh_time=None,
         only_show_when_fresh=False,
         snooze_until=None,
+        consecutive_failure_count=0,
+        paused=False,
     ):
         self.plugin_id = plugin_id
         self.name = name
@@ -524,6 +526,8 @@ class PluginInstance:
         self.latest_refresh_time = latest_refresh_time
         self.only_show_when_fresh = only_show_when_fresh
         self.snooze_until = snooze_until
+        self.consecutive_failure_count = consecutive_failure_count
+        self.paused = paused
 
     def update(self, updated_data):
         """Update attributes of the class with the dictionary values."""
@@ -634,6 +638,8 @@ class PluginInstance:
             "latest_refresh_time": self.latest_refresh_time,
             "only_show_when_fresh": self.only_show_when_fresh,
             "snooze_until": self.snooze_until,
+            "consecutive_failure_count": self.consecutive_failure_count,
+            "paused": self.paused,
         }
 
     @classmethod
@@ -646,4 +652,6 @@ class PluginInstance:
             latest_refresh_time=data.get("latest_refresh_time"),
             only_show_when_fresh=data.get("only_show_when_fresh", False),
             snooze_until=data.get("snooze_until"),
+            consecutive_failure_count=data.get("consecutive_failure_count", 0),
+            paused=data.get("paused", False),
         )
