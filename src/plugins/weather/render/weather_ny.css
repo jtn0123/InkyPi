@@ -20,23 +20,24 @@
   bottom: 4px;
 }
 
-.alerts { 
-  display: flex; 
-  gap: 4px; 
-  flex-wrap: wrap; 
-  margin: 0 0 4px; 
+.alerts {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin: 0 0 4px;
+  align-items: center;
 }
 .alert-pill {
   font-size: 12px;
   font-weight: 500;
-  padding: 2px 8px;
+  padding: 3px 10px;
   background: rgba(255, 165, 0, 0.1);
   border: 1px solid rgba(255, 165, 0, 0.4);
   border-radius: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+  max-width: 240px;
 }
 
 .alert-pill.alert-overflow {
@@ -228,7 +229,7 @@
 .weather-dashboard.ny.variant-a .main-grid { gap: 8px; }
 .weather-dashboard.ny.variant-a .current-weather .current-temp { font-size: 42px; }
 .weather-dashboard.ny.variant-a .metrics-grid { gap: 2px 6px; }
-.weather-dashboard.ny.variant-a .forecast.ny { margin-top: 4px; padding: 4px 2px; }
+.weather-dashboard.ny.variant-a .forecast.ny { margin-top: 4px; gap: 8px; padding: 10px 8px; }
 .weather-dashboard.ny.variant-a .chart-container.ny { height: 65%; }
 
 /* Variant B: Bolder, more newspaper-like */
@@ -245,6 +246,8 @@
 .weather-dashboard.ny.variant-b .forecast.ny {
   background: rgba(0,0,0,0.04);
   border: 2px solid rgba(0,0,0,0.1);
+  gap: 10px;
+  padding: 12px 10px;
 }
 .weather-dashboard.ny.variant-b .alert-pill {
   font-weight: 700;
@@ -256,23 +259,17 @@
 /* Subtle shift of header to the right within the right column */
 .right-col > .header { padding-left: 12px; }
 
-/* Ensure alert pills never clip last digit */
-.alerts { align-items: center; }
-.alert-pill { max-width: 240px; padding: 3px 10px; }
-
 /* Borderless and expanded regions for C1 */
 .weather-dashboard.ny.variant-c1 .forecast.ny { background: transparent; border: none; padding: 16px 12px; }
 .weather-dashboard.ny.variant-c1 .chart-container.ny { border: none; }
 .weather-dashboard.ny.variant-c1 .right-col { gap: 10px; }
 
 /* Variant-specific forecast spacing/typography adjustments */
-.weather-dashboard.ny.variant-a .forecast.ny { gap: 8px; padding: 10px 8px; }
 .weather-dashboard.ny.variant-a .forecast-day-name { font-size: 11px; }
 .weather-dashboard.ny.variant-a .forecast-icon { width: 34px; height: 34px; }
 .weather-dashboard.ny.variant-a .forecast-temps { font-size: 12px; }
 .weather-dashboard.ny.variant-a .moon-phase-container { font-size: 10px; }
 
-.weather-dashboard.ny.variant-b .forecast.ny { gap: 10px; padding: 12px 10px; }
 .weather-dashboard.ny.variant-b .forecast-day-name { font-size: 12px; }
 .weather-dashboard.ny.variant-b .forecast-icon { width: 36px; height: 36px; }
 .weather-dashboard.ny.variant-b .forecast-temps { font-size: 13px; }
