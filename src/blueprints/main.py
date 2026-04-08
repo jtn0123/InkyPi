@@ -198,6 +198,24 @@ def save_plugin_order():
     return jsonify({"success": True})
 
 
+@main_bp.route("/sw.js", methods=["GET"])
+def service_worker():
+    """Serve the service worker from the origin root.
+
+    Service workers must be registered from the origin root to control all
+    paths beneath it.  Flask's built-in /static/<filename> route would serve
+    the file under /static/sw.js, which would limit its scope to /static/*.
+    """
+    static_dir = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "static")
+    )
+    response = send_from_directory(
+        static_dir, "sw.js", mimetype="application/javascript"
+    )
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response
+
+
 # Serve static assets from src/static for test and dev environments
 @main_bp.route("/static/<path:filename>", methods=["GET"])
 def static_files(filename: str):

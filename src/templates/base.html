@@ -13,6 +13,11 @@
     <script src="{{ url_for('static', filename='scripts/form_validator.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/response_modal.js') }}" defer></script>
     {% block head %}{% endblock %}
+    <script>
+      if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+        window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+      }
+    </script>
 </head>
 <body>
     <a href="#main-content" class="skip-link">Skip to main content</a>
