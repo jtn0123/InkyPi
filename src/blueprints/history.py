@@ -309,9 +309,16 @@ def history_delete():
         if err is not None:
             return err
 
+        base, ext = os.path.splitext(safe_path)
+        if not ext.lower().endswith((_EXT_PNG, _EXT_JSON)):
+            return json_error(
+                "unsupported file type",
+                status=400,
+                details={"hint": "Only .png and .json history files may be deleted."},
+            )
+
         os.remove(safe_path)
         # Remove matching sidecar on png/json deletions.
-        base, ext = os.path.splitext(safe_path)
         if ext.lower() == _EXT_PNG:
             sidecar = f"{base}{_EXT_JSON}"
             if os.path.exists(sidecar):
