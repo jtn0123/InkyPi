@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.6.4 (2026-04-08)
+
+### Bug Fixes
+
+- Enforce 36px minimum touch targets on mobile (JTN-223)
+  ([#224](https://github.com/jtn0123/InkyPi/pull/224),
+  [`3f3bdff`](https://github.com/jtn0123/InkyPi/commit/3f3bdff9d56bab55a7d7d0e31aff03872120f310))
+
+Adds mobile media query rules ensuring all interactive controls meet the 36px tap target threshold.
+  Affects buttons, checkboxes, radios, selects, and chip controls on /settings, /settings/api-keys,
+  and all plugin config pages. Desktop styles unchanged.
+
+Closes JTN-223
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- Remove orphan GPL-3 dependency rfc3987 (JTN-313 partial)
+  ([#225](https://github.com/jtn0123/InkyPi/pull/225),
+  [`57a71cf`](https://github.com/jtn0123/InkyPi/commit/57a71cf43c43e7bda75e083eeb11d422b359a6ab))
+
+rfc3987 is GPL-3.0-or-later licensed. Investigation showed it is a true orphan: pip show rfc3987
+  reports Required-by: (empty), nothing in src/, tests/, or scripts/ imports it, and it is absent
+  from install/requirements*.txt. Removed from the --ignore-packages exemption list in both
+  scripts/check_licenses.sh and .github/workflows/ci.yml. The recurring-ical-events replacement (the
+  harder half of JTN-313) will be handled in a separate PR.
+
+Refs JTN-313
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.6.3 (2026-04-08)
 
 ### Bug Fixes
