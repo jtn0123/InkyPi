@@ -11,6 +11,7 @@ import logging
 import os
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Any
 
@@ -80,6 +81,9 @@ class CacheStats:
         }
 
 
+_DEFAULT_MAX_ENTRIES = 256
+
+
 class HTTPCache:
     """Thread-safe HTTP response cache with TTL and LRU eviction."""
 
@@ -88,27 +92,42 @@ class HTTPCache:
         default_ttl: float = 300.0,  # 5 minutes
         max_size: int = 100,
         enabled: bool = True,
+        max_entries: int | None = None,
     ):
         """Initialize the HTTP cache.
 
         Args:
             default_ttl: Default time-to-live in seconds
-            max_size: Maximum number of entries before LRU eviction
+            max_size: Maximum number of entries before LRU eviction (legacy param)
             enabled: Whether caching is enabled
+            max_entries: Maximum number of entries cap with LRU eviction.
+                Defaults to HTTP_CACHE_MAX_ENTRIES env var or 256.
         """
         self.default_ttl = default_ttl
         self.max_size = max_size
         self.enabled = enabled
 
-        self._cache: dict[str, CacheEntry] = {}
+        # Resolve max_entries: explicit arg > env var > default
+        if max_entries is not None:
+            self.max_entries = max_entries
+        else:
+            try:
+                self.max_entries = int(
+                    os.getenv("HTTP_CACHE_MAX_ENTRIES", str(_DEFAULT_MAX_ENTRIES))
+                )
+            except ValueError:
+                self.max_entries = _DEFAULT_MAX_ENTRIES
+
+        self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lock = threading.RLock()
         self._stats = CacheStats()
 
         logger.info(
-            "HTTP cache initialized | enabled=%s ttl=%.0fs max_size=%d",
+            "HTTP cache initialized | enabled=%s ttl=%.0fs max_size=%d max_entries=%d",
             enabled,
             default_ttl,
             max_size,
+            self.max_entries,
         )
 
     def _make_cache_key(self, url: str, params: dict[str, Any] | None = None) -> str:
@@ -149,21 +168,15 @@ class HTTPCache:
     def _evict_lru(self) -> None:
         """Evict least recently used entry when cache is full.
 
-        Eviction score = cached_at + (hit_count * 100)
-        Lower scores get evicted first.
+        The OrderedDict keeps insertion/access order: the front (last=False)
+        is the least-recently-used entry, which is removed here.
 
         Must be called with lock held.
         """
         if not self._cache:
             return
 
-        # Find entry with lowest score (oldest + least accessed)
-        # Higher hit_count adds to the score, making it less likely to be evicted
-        lru_key = min(
-            self._cache.keys(),
-            key=lambda k: (self._cache[k].cached_at + (self._cache[k].hit_count * 100)),
-        )
-        del self._cache[lru_key]
+        self._cache.popitem(last=False)
         self._stats.evictions += 1
 
     def get(
@@ -216,9 +229,10 @@ class HTTPCache:
                 )
                 return None
 
-            # Cache hit
+            # Cache hit — move to most-recently-used position (end of OrderedDict)
             entry.hit_count += 1
             self._stats.hits += 1
+            self._cache.move_to_end(cache_key)
             ttl_remaining = entry.ttl_seconds - entry.age_seconds()
             logger.debug(
                 "cache_lookup: hit",
@@ -278,8 +292,9 @@ class HTTPCache:
         }
 
         with self._lock:
-            # Evict if at capacity
-            if len(self._cache) >= self.max_size and cache_key not in self._cache:
+            # Evict if at capacity (enforce both max_size and max_entries)
+            effective_cap = min(self.max_size, self.max_entries)
+            while len(self._cache) >= effective_cap and cache_key not in self._cache:
                 self._evict_lru()
 
             self._cache[cache_key] = CacheEntry(
@@ -308,6 +323,21 @@ class HTTPCache:
             logger.info("Cache cleared | removed=%d", count)
             return count
 
+    def stats(self) -> dict[str, Any]:
+        """Return a snapshot of cache statistics.
+
+        Returns:
+            Dictionary with hits, misses, evictions, hit_rate, size,
+            max_entries, and enabled flag.
+        """
+        with self._lock:
+            result = self._stats.to_dict()
+            result["size"] = len(self._cache)
+            result["max_entries"] = self.max_entries
+            result["max_size"] = self.max_size
+            result["enabled"] = self.enabled
+            return result
+
     def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
@@ -315,11 +345,12 @@ class HTTPCache:
             Dictionary with cache stats including hits, misses, hit rate, etc.
         """
         with self._lock:
-            stats = self._stats.to_dict()
-            stats["size"] = len(self._cache)
-            stats["max_size"] = self.max_size
-            stats["enabled"] = self.enabled
-            return stats
+            result = self._stats.to_dict()
+            result["size"] = len(self._cache)
+            result["max_size"] = self.max_size
+            result["max_entries"] = self.max_entries
+            result["enabled"] = self.enabled
+            return result
 
     def remove_expired(self) -> int:
         """Remove all expired entries from cache.
@@ -348,6 +379,7 @@ def get_cache() -> HTTPCache:
     - INKYPI_HTTP_CACHE_ENABLED: Enable/disable caching (default: true)
     - INKYPI_HTTP_CACHE_TTL_S: Default TTL in seconds (default: 300)
     - INKYPI_HTTP_CACHE_MAX_SIZE: Max cache entries (default: 100)
+    - HTTP_CACHE_MAX_ENTRIES: Hard cap with LRU eviction (default: 256)
     """
     global _global_cache
 
@@ -372,8 +404,19 @@ def get_cache() -> HTTPCache:
             max_size = int(os.getenv("INKYPI_HTTP_CACHE_MAX_SIZE", "100"))
         except ValueError:
             max_size = 100
+        try:
+            max_entries = int(
+                os.getenv("HTTP_CACHE_MAX_ENTRIES", str(_DEFAULT_MAX_ENTRIES))
+            )
+        except ValueError:
+            max_entries = _DEFAULT_MAX_ENTRIES
 
-        _global_cache = HTTPCache(default_ttl=ttl, max_size=max_size, enabled=enabled)
+        _global_cache = HTTPCache(
+            default_ttl=ttl,
+            max_size=max_size,
+            enabled=enabled,
+            max_entries=max_entries,
+        )
         return _global_cache
 
 
