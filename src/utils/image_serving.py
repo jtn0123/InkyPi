@@ -18,6 +18,7 @@ from pathlib import Path
 from flask import Response, send_from_directory
 from PIL import Image
 from werkzeug.exceptions import NotFound
+from werkzeug.utils import safe_join
 
 # ---------------------------------------------------------------------------
 # Internal cache
@@ -109,17 +110,14 @@ def maybe_serve_webp(
 def _safe_join(root: str, filename: str) -> str:
     """Resolve *filename* under *root* with path-traversal protection.
 
-    Returns an absolute filesystem path. Raises :class:`NotFound` if the
-    resolved path escapes *root* or does not exist — mirroring the behavior of
-    ``send_from_directory`` so callers see consistent error semantics.
+    Wraps :func:`werkzeug.utils.safe_join`, which is the Flask-recommended
+    sanitizer for joining a trusted base directory with an untrusted filename.
+    Raises :class:`NotFound` if traversal is attempted or the file is missing.
     """
-    base = os.path.realpath(root)
-    candidate = os.path.realpath(os.path.join(base, filename))
-    if os.path.commonpath([base, candidate]) != base:
+    joined = safe_join(root, filename)
+    if joined is None or not os.path.isfile(joined):
         raise NotFound()
-    if not os.path.isfile(candidate):
-        raise NotFound()
-    return candidate
+    return joined
 
 
 # ---------------------------------------------------------------------------
