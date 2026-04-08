@@ -1,6 +1,99 @@
 # CHANGELOG
 
 
+## v0.4.32 (2026-04-08)
+
+### Bug Fixes
+
+- Prevent cross-playlist drag-and-drop corruption (JTN-235)
+  ([#184](https://github.com/jtn0123/InkyPi/pull/184),
+  [`05df62e`](https://github.com/jtn0123/InkyPi/commit/05df62e3be640a0f39d5b6b1e9bcab7b9fd21620))
+
+* fix: prevent cross-playlist drag-and-drop corruption (JTN-235)
+
+Added a same-playlist guard in handleDrop that compares the source element's .playlist-item ancestor
+  with the drop target's ancestor. When they differ the handler returns early, preventing DOM
+  mutation, a stale reorder API call, and silent item loss from the source playlist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+* test: scope drag guard assertions to handleDrop function block
+
+Add _handle_drop_block() helper that extracts only the handleDrop function body (between "function
+  handleDrop(e){" and "function handleDragEnd()") so all test assertions are scoped to that function
+  and cannot produce false positives from other parts of playlist.js.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Track title index dynamically in dashboard renderMeta (JTN-248)
+  ([#185](https://github.com/jtn0123/InkyPi/pull/185),
+  [`cb193d0`](https://github.com/jtn0123/InkyPi/commit/cb193d05a27bd90ec761d8f0aa03c78ae5108fe8))
+
+* fix: track title index dynamically in dashboard renderMeta (JTN-248)
+
+Dashboard renderMeta hardcoded title at index 1, causing the wrong row to be italicised when no
+  date/label row was present. Now uses a titleIndex variable set to the row's actual position when
+  the title is pushed.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Treat Open-Meteo dates as local instead of UTC (JTN-251)
+  ([#188](https://github.com/jtn0123/InkyPi/pull/188),
+  [`f60f044`](https://github.com/jtn0123/InkyPi/commit/f60f044e78f7195a1f395c688ef4bcf04661ee9e))
+
+Open-Meteo returns forecast dates in the coordinate's local timezone as naive datetimes. The
+  previous code forced UTC via `.replace(tzinfo=UTC)` then converted to local time, shifting day
+  labels back by one for western timezones. Now naive datetimes from Open-Meteo are treated as local
+  (matching the API's coordinate-based timezone) with no conversion needed.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Use click timer to enable lightbox double-click native sizing (JTN-262)
+  ([#187](https://github.com/jtn0123/InkyPi/pull/187),
+  [`268fbb9`](https://github.com/jtn0123/InkyPi/commit/268fbb9da9ddf063c4ffe708e4bfb3694a8c538b))
+
+* fix: use click timer to enable lightbox double-click native sizing (JTN-262)
+
+Single click closed the lightbox before dblclick could fire, making the native-sizing toggle
+  unreachable. Replace the separate click/dblclick handlers with a 300 ms click timer that
+  distinguishes single vs double click.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Use explicit None check for PIL Image in WaveshareDisplay (JTN-263)
+  ([#186](https://github.com/jtn0123/InkyPi/pull/186),
+  [`4f67866`](https://github.com/jtn0123/InkyPi/commit/4f6786610867306e1c19b52c2f531202e46e0a31))
+
+* fix: use explicit None check for PIL Image in WaveshareDisplay (JTN-263)
+
+Replace deprecated `if not image:` with `if image is None:` in both WaveshareDisplay and InkyDisplay
+  to avoid TypeError on modern Pillow versions.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.31 (2026-04-08)
 
 ### Bug Fixes
