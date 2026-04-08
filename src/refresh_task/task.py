@@ -19,6 +19,11 @@ from refresh_task.worker import (
     _remote_exception,
 )
 from utils.image_utils import compute_image_hash
+from utils.metrics import (
+    record_refresh_failure,
+    record_refresh_success,
+    set_circuit_breaker_open,
+)
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
@@ -896,6 +901,7 @@ class RefreshTask:
             entry["retained_display"] = False
             if metrics:
                 entry["last_metrics"] = metrics
+            record_refresh_success()
             self._cb_on_success(plugin_instance, plugin_id, instance)
         else:
             msg = error or "unknown error"
@@ -909,6 +915,7 @@ class RefreshTask:
             entry["retained_display"] = bool((metrics or {}).get("retained_display"))
             if metrics:
                 entry["last_metrics"] = metrics
+            record_refresh_failure(plugin_id)
             self._cb_on_failure(plugin_instance, plugin_id, instance)
         self.plugin_health[plugin_id] = entry
 
@@ -929,6 +936,7 @@ class RefreshTask:
             )
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
+        set_circuit_breaker_open(plugin_id, False)
 
     def _cb_on_failure(
         self,
@@ -950,6 +958,7 @@ class RefreshTask:
         )
         if plugin_instance.consecutive_failure_count >= threshold:
             plugin_instance.paused = True
+            set_circuit_breaker_open(plugin_id, True)
             logger.error(
                 "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
                 " paused after %d consecutive failures",
