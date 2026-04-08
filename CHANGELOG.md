@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.4.37 (2026-04-08)
+
+### Bug Fixes
+
+- Add keyboard accessibility to plugin.html clickable element (JTN-279)
+  ([#195](https://github.com/jtn0123/InkyPi/pull/195),
+  [`76a6b8f`](https://github.com/jtn0123/InkyPi/commit/76a6b8fe0b06d2e0aca85f8a3db62ca55b9d927c))
+
+* fix: add keyboard accessibility to plugin.html clickable element (JTN-279)
+
+Convert the frame-option <div> to a semantic <button> element for native keyboard support
+  (Enter/Space), add aria-label, and reset button background in CSS so it renders identically to the
+  previous div.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.36 (2026-04-08)
 
 ### Bug Fixes
