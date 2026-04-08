@@ -1,0 +1,783 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "InkyPi API",
+    "description": "HTTP API for the InkyPi e-ink display controller. Manage playlists, plugins, display refresh, settings, and system health.",
+    "version": "0.4.25",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local InkyPi device (default dev port)"
+    },
+    {
+      "url": "http://inkypi.local",
+      "description": "InkyPi device on LAN via mDNS"
+    }
+  ],
+  "paths": {
+    "/api/health/system": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "System health metrics",
+        "description": "Returns CPU, memory, and disk usage percentages plus uptime in seconds. Fields are null when psutil is not installed.",
+        "operationId": "healthSystem",
+        "responses": {
+          "200": {
+            "description": "System metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHealth"
+                },
+                "example": {
+                  "success": true,
+                  "cpu_percent": 12.4,
+                  "memory_percent": 48.2,
+                  "disk_percent": 31.0,
+                  "uptime_seconds": 86400
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/health/plugins": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Plugin health snapshot",
+        "description": "Returns the last-known health status for each plugin instance, filtered to a configurable time window (default 24 hours).",
+        "operationId": "healthPlugins",
+        "responses": {
+          "200": {
+            "description": "Plugin health map keyed by plugin ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginHealthResponse"
+                },
+                "example": {
+                  "success": true,
+                  "items": {
+                    "clock": {
+                      "status": "ok",
+                      "last_seen": "2024-01-15T10:30:00+00:00"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Current and latest version info",
+        "description": "Returns the running application version and the latest available release from GitHub. Use update_available to decide whether to trigger an update.",
+        "operationId": "getVersion",
+        "responses": {
+          "200": {
+            "description": "Version information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
+                },
+                "example": {
+                  "current": "0.4.25",
+                  "latest": "0.4.25",
+                  "update_available": false,
+                  "update_running": false,
+                  "release_notes": null
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/logs": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Fetch application logs",
+        "description": "Returns recent log lines from the inkypi.service journal (or log file fallback). Rate-limited to prevent abuse.",
+        "operationId": "getLogs",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "Look-back window in hours (default 24, capped at 168)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 168,
+              "default": 24
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of log lines to return (default 500, capped at 5000)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5000,
+              "default": 500
+            }
+          },
+          {
+            "name": "contains",
+            "in": "query",
+            "description": "Case-insensitive substring filter applied to each log line",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "level",
+            "in": "query",
+            "description": "Minimum log level filter (DEBUG, INFO, WARNING, ERROR, CRITICAL)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Log lines and metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogsResponse"
+                },
+                "example": {
+                  "lines": ["2024-01-15 10:30:00 INFO Refresh complete"],
+                  "truncated": false,
+                  "count": 1
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/api/current_image": {
+      "get": {
+        "tags": ["Display"],
+        "summary": "Current display image",
+        "description": "Returns the most recently rendered image as PNG. Supports conditional GET via If-Modified-Since for efficient polling.",
+        "operationId": "getCurrentImage",
+        "parameters": [
+          {
+            "name": "If-Modified-Since",
+            "in": "header",
+            "description": "Return 304 Not Modified if image has not changed since this timestamp",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PNG image of the current display",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not Modified — image unchanged since If-Modified-Since"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/display-next": {
+      "post": {
+        "tags": ["Display"],
+        "summary": "Advance to next plugin in playlist",
+        "description": "Triggers an immediate display refresh, advancing to the next eligible plugin in the active playlist. Rate-limited to prevent rapid successive calls.",
+        "operationId": "displayNext",
+        "responses": {
+          "200": {
+            "description": "Refresh triggered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayNextResponse"
+                },
+                "example": {
+                  "success": true,
+                  "plugin_id": "clock",
+                  "plugin_instance": "My Clock"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/refresh-info": {
+      "get": {
+        "tags": ["Display"],
+        "summary": "Last refresh metadata",
+        "description": "Returns timing and context information about the most recent display refresh.",
+        "operationId": "getRefreshInfo",
+        "responses": {
+          "200": {
+            "description": "Refresh info object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshInfo"
+                },
+                "example": {
+                  "plugin_id": "clock",
+                  "plugin_instance": "My Clock",
+                  "playlist": "Default",
+                  "request_ms": 120,
+                  "generate_ms": 450,
+                  "display_ms": 800
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/playlist": {
+      "get": {
+        "tags": ["Playlist"],
+        "summary": "Playlist management page",
+        "description": "Returns the HTML playlist management interface.",
+        "operationId": "getPlaylistPage",
+        "responses": {
+          "200": {
+            "description": "HTML page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/create_playlist": {
+      "post": {
+        "tags": ["Playlist"],
+        "summary": "Create a new playlist",
+        "description": "Creates a new named playlist with optional time window and cycle interval.",
+        "operationId": "createPlaylist",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlaylistRequest"
+              },
+              "example": {
+                "name": "Daytime",
+                "start_time": "08:00",
+                "end_time": "20:00",
+                "cycle_minutes": 30
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Playlist created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/delete_playlist/{playlist_name}": {
+      "delete": {
+        "tags": ["Playlist"],
+        "summary": "Delete a playlist",
+        "description": "Permanently removes a playlist and its associated plugin assignments.",
+        "operationId": "deletePlaylist",
+        "parameters": [
+          {
+            "name": "playlist_name",
+            "in": "path",
+            "required": true,
+            "description": "Name of the playlist to delete",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Playlist deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "tags": ["History"],
+        "summary": "Display history page",
+        "description": "Returns the HTML history browser showing previously rendered images.",
+        "operationId": "getHistoryPage",
+        "responses": {
+          "200": {
+            "description": "HTML page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history/storage": {
+      "get": {
+        "tags": ["History"],
+        "summary": "History storage usage",
+        "description": "Returns storage statistics for the display history directory.",
+        "operationId": "historyStorage",
+        "responses": {
+          "200": {
+            "description": "Storage usage information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryStorageResponse"
+                },
+                "example": {
+                  "count": 42,
+                  "total_size": "128.5 MB",
+                  "oldest": "2024-01-01T00:00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "tags": ["Docs"],
+        "summary": "Swagger UI interactive documentation",
+        "description": "Returns an HTML page with the Swagger UI explorer, loaded from CDN and pointing at /api/openapi.json.",
+        "operationId": "getDocs",
+        "responses": {
+          "200": {
+            "description": "Swagger UI HTML page",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "tags": ["Docs"],
+        "summary": "OpenAPI specification",
+        "description": "Returns this OpenAPI 3.0 specification as JSON.",
+        "operationId": "getOpenApiSpec",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0 JSON document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Operation completed"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "An error occurred"
+          }
+        }
+      },
+      "SystemHealth": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "cpu_percent": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "description": "CPU usage percentage (null when psutil unavailable)"
+          },
+          "memory_percent": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "description": "Memory usage percentage"
+          },
+          "disk_percent": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "description": "Disk usage percentage for root filesystem"
+          },
+          "uptime_seconds": {
+            "type": "integer",
+            "nullable": true,
+            "description": "System uptime in seconds since last boot"
+          }
+        }
+      },
+      "PluginHealthResponse": {
+        "type": "object",
+        "required": ["success", "items"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "object",
+            "description": "Map of plugin_id to health info",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["ok", "error", "unknown"]
+                },
+                "last_seen": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "VersionResponse": {
+        "type": "object",
+        "required": ["current", "update_available", "update_running"],
+        "properties": {
+          "current": {
+            "type": "string",
+            "description": "Currently installed version",
+            "example": "0.4.25"
+          },
+          "latest": {
+            "type": "string",
+            "nullable": true,
+            "description": "Latest available release tag (null if GitHub unavailable)",
+            "example": "0.4.25"
+          },
+          "update_available": {
+            "type": "boolean",
+            "description": "True if latest > current"
+          },
+          "update_running": {
+            "type": "boolean",
+            "description": "True if an update process is currently running"
+          },
+          "release_notes": {
+            "type": "string",
+            "nullable": true,
+            "description": "Release notes from the latest GitHub release"
+          }
+        }
+      },
+      "LogsResponse": {
+        "type": "object",
+        "required": ["lines", "truncated", "count"],
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Log lines, newest last"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True if results were capped by limit or response size guardrail"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Number of lines returned"
+          }
+        }
+      },
+      "DisplayNextResponse": {
+        "type": "object",
+        "required": ["success"],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "plugin_id": {
+            "type": "string",
+            "description": "Plugin type that was rendered",
+            "example": "clock"
+          },
+          "plugin_instance": {
+            "type": "string",
+            "description": "Plugin instance name that was rendered",
+            "example": "My Clock"
+          }
+        }
+      },
+      "RefreshInfo": {
+        "type": "object",
+        "properties": {
+          "plugin_id": {
+            "type": "string",
+            "nullable": true,
+            "example": "clock"
+          },
+          "plugin_instance": {
+            "type": "string",
+            "nullable": true,
+            "example": "My Clock"
+          },
+          "playlist": {
+            "type": "string",
+            "nullable": true,
+            "example": "Default"
+          },
+          "request_ms": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Time spent on the plugin data request in ms"
+          },
+          "generate_ms": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Time spent on image generation in ms"
+          },
+          "preprocess_ms": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Time spent on image preprocessing in ms"
+          },
+          "display_ms": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Time spent pushing image to the e-ink display in ms"
+          }
+        }
+      },
+      "CreatePlaylistRequest": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique playlist name",
+            "example": "Daytime"
+          },
+          "start_time": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "Active window start time in HH:MM format",
+            "example": "08:00"
+          },
+          "end_time": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "description": "Active window end time in HH:MM format",
+            "example": "20:00"
+          },
+          "cycle_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Override cycle interval in minutes for this playlist"
+          }
+        }
+      },
+      "HistoryStorageResponse": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "description": "Number of images in history"
+          },
+          "total_size": {
+            "type": "string",
+            "description": "Human-readable total disk usage",
+            "example": "128.5 MB"
+          },
+          "oldest": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the oldest history image"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request — invalid parameters or missing required fields",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded — try again after a short delay",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "System and plugin health monitoring"
+    },
+    {
+      "name": "System",
+      "description": "Version information and log access"
+    },
+    {
+      "name": "Display",
+      "description": "Display refresh and image retrieval"
+    },
+    {
+      "name": "Playlist",
+      "description": "Playlist creation and management"
+    },
+    {
+      "name": "History",
+      "description": "Previously rendered image history"
+    },
+    {
+      "name": "Docs",
+      "description": "API documentation endpoints"
+    }
+  ]
+}
