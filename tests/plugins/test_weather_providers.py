@@ -4,6 +4,7 @@
 from datetime import UTC
 from typing import cast
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -469,3 +470,35 @@ def test_weather_parse_data_points_openmeteo():
 
     result = p.parse_data_points(weather_data, aqi_data, tz, "metric", "12h")
     assert len(result) > 0
+
+
+def test_open_meteo_forecast_dates_not_shifted_for_western_tz():
+    """JTN-251: Open-Meteo returns local dates; parsing them as UTC shifts day labels
+    back by one for western timezones.  The fix treats naive datetimes as local."""
+    import os
+
+    from plugins.weather.weather_data import parse_open_meteo_forecast
+
+    # US/Eastern is UTC-5 in winter.  If "2025-01-15" were wrongly treated as UTC
+    # midnight, astimezone(ET) would give 2025-01-14 19:00 — the previous day.
+    tz = ZoneInfo("America/New_York")
+    daily_data = {
+        "time": ["2025-01-15"],
+        "temperature_2m_max": [5.0],
+        "temperature_2m_min": [-3.0],
+        "weathercode": [1],
+    }
+
+    # plugin_dir just needs a valid path; icon look-ups are best-effort
+    plugin_dir = os.path.dirname(__file__)
+
+    forecast = parse_open_meteo_forecast(
+        daily_data, tz, is_day=True, lat=40.7, plugin_dir=plugin_dir
+    )
+
+    assert len(forecast) == 1
+    # "2025-01-15" is a Wednesday — confirm no day-shift occurred
+    assert forecast[0]["day"] == "Wed", (
+        f"Expected 'Wed' but got '{forecast[0]['day']}'; "
+        "dates may still be shifted (UTC interpretation bug)"
+    )
