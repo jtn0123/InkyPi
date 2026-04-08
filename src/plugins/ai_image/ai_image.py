@@ -66,7 +66,8 @@ class AIImage(BasePlugin):
                         options_by_value={
                             "openai": [
                                 option(
-                                    "gpt-image-1.5", "GPT Image 1.5 \u00b7 ~$0.07/img"
+                                    DEFAULT_IMAGE_MODEL,
+                                    "GPT Image 1.5 \u00b7 ~$0.07/img",
                                 ),
                             ],
                             "google": [
@@ -87,7 +88,7 @@ class AIImage(BasePlugin):
                         options_source="imageModel",
                         options_source_default=DEFAULT_IMAGE_MODEL,
                         options_by_value={
-                            "gpt-image-1.5": [
+                            DEFAULT_IMAGE_MODEL: [
                                 option("high", "High (~$0.20)"),
                                 option("medium", "Medium (~$0.07)"),
                                 option("low", "Low (~$0.01)"),
@@ -198,7 +199,7 @@ class AIImage(BasePlugin):
         self,
         ai_client,
         prompt,
-        model="gpt-image-1.5",
+        model=DEFAULT_IMAGE_MODEL,
         quality="medium",
         orientation="horizontal",
     ):

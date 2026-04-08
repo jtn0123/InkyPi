@@ -22,6 +22,8 @@ except Exception:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+_DEVICE_JSON = "device.json"
+
 
 @functools.lru_cache(maxsize=4)
 def _load_json_schema(schema_path: str) -> dict[str, Any]:
@@ -38,7 +40,7 @@ class Config:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
     # File paths relative to the script's directory (default; can be overridden)
-    config_file = os.path.join(BASE_DIR, "config", "device.json")
+    config_file = os.path.join(BASE_DIR, "config", _DEVICE_JSON)
 
     # File path for storing the current image being displayed
     current_image_file = os.path.join(BASE_DIR, "static", "images", "current_image.png")
@@ -128,7 +130,7 @@ class Config:
         """
         base_dir = self.BASE_DIR
         config_dir = os.path.join(base_dir, "config")
-        prod_path = os.path.join(config_dir, "device.json")
+        prod_path = os.path.join(config_dir, _DEVICE_JSON)
         dev_path = os.path.join(config_dir, "device_dev.json")
 
         # 1) Explicit file from environment
@@ -146,7 +148,7 @@ class Config:
         # default it means nobody has explicitly overridden it, so we must fall through to
         # the INKYPI_ENV check (step 3).  Only treat config_file as an explicit override
         # when it has been changed from the original default (e.g. by CLI or a subclass).
-        _base_default = os.path.join(base_dir, "config", "device.json")
+        _base_default = os.path.join(base_dir, "config", _DEVICE_JSON)
         class_override = getattr(type(self), "config_file", None)
         if (
             class_override is not None
@@ -188,7 +190,7 @@ class Config:
 
         # 6) Bootstrap from template if neither exists
         template_path = os.path.abspath(
-            os.path.join(base_dir, "..", "install", "config_base", "device.json")
+            os.path.join(base_dir, "..", "install", "config_base", _DEVICE_JSON)
         )
         try:
             os.makedirs(config_dir, exist_ok=True)
