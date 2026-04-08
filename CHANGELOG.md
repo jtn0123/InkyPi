@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.30 (2026-04-08)
+
+### Bug Fixes
+
+- Bump SonarSource/sonarqube-scan-action v5 → v7 (CVE fix)
+  ([`90a4580`](https://github.com/jtn0123/InkyPi/commit/90a45809ffba3178dda6cbf42b05cf6cae28ada7))
+
+
 ## v0.4.29 (2026-04-08)
 
 ### Bug Fixes
