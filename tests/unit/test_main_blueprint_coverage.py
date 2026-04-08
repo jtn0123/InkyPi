@@ -81,6 +81,27 @@ def test_current_image_if_modified_since_malformed(client, device_config_dev):
     assert resp.status_code == 200
 
 
+def test_current_image_if_modified_since_utc_returns_304(client, device_config_dev):
+    """Verify parsedate_to_datetime correctly handles UTC timestamps for 304 responses.
+
+    This guards against the bug where strptime with %Z would treat parsed time
+    as local time instead of UTC, causing incorrect cache validation.
+    """
+    _save_png(device_config_dev.current_image_file)
+    image_path = device_config_dev.current_image_file
+    file_mtime = int(os.path.getmtime(image_path))
+    # Build an HTTP date string one second after the file's actual mtime (UTC)
+    from datetime import UTC, datetime
+
+    future_dt = datetime.fromtimestamp(file_mtime + 1, tz=UTC)
+    header_value = future_dt.strftime("%a, %d %b %Y %H:%M:%S GMT")
+    resp = client.get(
+        "/api/current_image",
+        headers={"If-Modified-Since": header_value},
+    )
+    assert resp.status_code == 304
+
+
 # ---- /display-next ----
 
 

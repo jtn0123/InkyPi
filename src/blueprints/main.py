@@ -2,6 +2,7 @@ import logging
 import math
 import os
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from uuid import uuid4
 
 from flask import (
@@ -111,10 +112,8 @@ def get_current_image():
     if_modified_since = request.headers.get("If-Modified-Since")
     if if_modified_since:
         try:
-            # Parse the If-Modified-Since header
-            client_mtime = datetime.strptime(
-                if_modified_since, "%a, %d %b %Y %H:%M:%S %Z"
-            )
+            # Parse the If-Modified-Since header (always returns timezone-aware datetime)
+            client_mtime = parsedate_to_datetime(if_modified_since)
             client_mtime_seconds = int(client_mtime.timestamp())
 
             # Compare (both now in seconds, no sub-second precision)
