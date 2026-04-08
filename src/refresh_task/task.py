@@ -58,6 +58,17 @@ class RefreshTask:
         self.progress_bus = get_progress_bus()
         self.plugin_health: dict[str, dict] = {}
 
+    @staticmethod
+    def _get_circuit_breaker_threshold() -> int:
+        """Return the consecutive-failure threshold before a plugin is paused.
+
+        Reads ``PLUGIN_FAILURE_THRESHOLD`` from the environment (default 5).
+        """
+        try:
+            return max(1, int(os.getenv("PLUGIN_FAILURE_THRESHOLD", "5") or "5"))
+        except (ValueError, TypeError):
+            return 5
+
     def start(self):
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
@@ -868,6 +879,14 @@ class RefreshTask:
         entry.setdefault("timeout_count", 0)
         entry["instance"] = instance
         entry["last_seen"] = now_iso
+
+        # Resolve the PluginInstance so we can mutate its circuit-breaker fields
+        plugin_instance = None
+        if instance:
+            plugin_instance = self.device_config.get_playlist_manager().find_plugin(
+                plugin_id, instance
+            )
+
         if ok:
             entry["status"] = "green"
             entry["last_success_at"] = now_iso
@@ -877,6 +896,7 @@ class RefreshTask:
             entry["retained_display"] = False
             if metrics:
                 entry["last_metrics"] = metrics
+            self._cb_on_success(plugin_instance, plugin_id, instance)
         else:
             msg = error or "unknown error"
             entry["status"] = "red"
@@ -889,7 +909,77 @@ class RefreshTask:
             entry["retained_display"] = bool((metrics or {}).get("retained_display"))
             if metrics:
                 entry["last_metrics"] = metrics
+            self._cb_on_failure(plugin_instance, plugin_id, instance)
         self.plugin_health[plugin_id] = entry
+
+    def _cb_on_success(
+        self,
+        plugin_instance,
+        plugin_id: str,
+        instance: str | None,
+    ) -> None:
+        """Reset the circuit breaker on a successful refresh."""
+        if plugin_instance is None:
+            return
+        if plugin_instance.paused or plugin_instance.consecutive_failure_count > 0:
+            logger.info(
+                "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
+                plugin_id,
+                instance,
+            )
+        plugin_instance.consecutive_failure_count = 0
+        plugin_instance.paused = False
+
+    def _cb_on_failure(
+        self,
+        plugin_instance,
+        plugin_id: str,
+        instance: str | None,
+    ) -> None:
+        """Increment the failure counter and pause the plugin if threshold exceeded."""
+        if plugin_instance is None or plugin_instance.paused:
+            return
+        threshold = self._get_circuit_breaker_threshold()
+        plugin_instance.consecutive_failure_count += 1
+        logger.warning(
+            "plugin circuit_breaker: failure | plugin_id=%s instance=%s count=%d/%d",
+            plugin_id,
+            instance,
+            plugin_instance.consecutive_failure_count,
+            threshold,
+        )
+        if plugin_instance.consecutive_failure_count >= threshold:
+            plugin_instance.paused = True
+            logger.error(
+                "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
+                " paused after %d consecutive failures",
+                plugin_id,
+                instance,
+                plugin_instance.consecutive_failure_count,
+            )
+
+    def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
+        """Clear the paused state and failure counter for a plugin instance.
+
+        Returns True if the instance was found and reset, False otherwise.
+        """
+        plugin_instance = self.device_config.get_playlist_manager().find_plugin(
+            plugin_id, instance
+        )
+        if plugin_instance is None:
+            return False
+        plugin_instance.consecutive_failure_count = 0
+        plugin_instance.paused = False
+        # Sanitize user-controlled values for the audit log (S5145):
+        # strip CR/LF (log injection) and truncate to a sane length.
+        safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]
+        safe_inst = str(instance).replace("\r", "").replace("\n", "")[:64]
+        logger.info(
+            "plugin circuit_breaker: manual_reset | plugin_id=%s instance=%s",
+            safe_pid,
+            safe_inst,
+        )
+        return True
 
     def get_health_snapshot(self) -> dict:
         return dict(self.plugin_health)
@@ -937,9 +1027,20 @@ class RefreshTask:
             )
             return None, None
 
-        # Use eligibility-aware selection
-        plugin = playlist.get_next_eligible_plugin(current_dt)
-        if plugin:
+        # Use eligibility-aware selection; skip circuit-breaker paused plugins
+        attempts_left = len(playlist.plugins)
+        while attempts_left > 0:
+            plugin = playlist.get_next_eligible_plugin(current_dt)
+            if plugin is None:
+                break
+            if getattr(plugin, "paused", False):
+                logger.info(
+                    "plugin circuit_breaker: skipping paused plugin | plugin_id=%s instance=%s",
+                    plugin.plugin_id,
+                    plugin.name,
+                )
+                attempts_left -= 1
+                continue
             logger.info(
                 f"Determined next plugin. | active_playlist: {playlist.name} | plugin_instance: {plugin.name}"
             )

@@ -395,6 +395,35 @@ def display_plugin_instance():
     return jsonify({"success": True, "message": _MSG_DISPLAY_UPDATED}), 200
 
 
+@plugin_bp.route(
+    "/plugin_instance/<string:plugin_id>/<string:instance_name>/force_retry",
+    methods=["POST"],
+)
+def force_retry_plugin_instance(plugin_id: str, instance_name: str):
+    """Clear the circuit-breaker paused state for a plugin instance.
+
+    Allows a paused plugin to be retried on the next scheduler cycle without
+    waiting for a successful refresh to reset it automatically.
+    """
+    refresh_task = current_app.config.get("REFRESH_TASK")
+    if refresh_task is None:
+        return json_error("Refresh task not available", status=503)
+    if not hasattr(refresh_task, "reset_circuit_breaker"):
+        return json_error("Circuit-breaker reset not supported", status=501)
+    found = refresh_task.reset_circuit_breaker(plugin_id, instance_name)
+    if not found:
+        return json_error(
+            f"Plugin instance '{_sanitize_response_value(instance_name)}' not found",
+            status=404,
+        )
+    return jsonify(
+        {
+            "success": True,
+            "message": f"Circuit-breaker reset for '{_sanitize_response_value(instance_name)}'.",
+        }
+    )
+
+
 @plugin_bp.route("/update_now", methods=["POST"])
 def update_now():
     device_config = current_app.config[_CONFIG_KEY]
