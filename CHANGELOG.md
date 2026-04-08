@@ -1,6 +1,50 @@
 # CHANGELOG
 
 
+## v0.11.0 (2026-04-08)
+
+### Features
+
+- Serve WebP-encoded images for accepting clients (JTN-302)
+  ([#235](https://github.com/jtn0123/InkyPi/pull/235),
+  [`7923b91`](https://github.com/jtn0123/InkyPi/commit/7923b91675988fc1b6ed5c718da9c144e0a9f932))
+
+* feat: serve WebP-encoded images when client accepts (JTN-302)
+
+Add utils/image_serving.py with maybe_serve_webp() helper that returns a WebP-encoded response
+  (quality=85, method=4) via lru_cache when the client's Accept header includes image/webp, and
+  falls back to the original PNG otherwise. Wire into /preview and /history/image routes with ETag
+  support. Add 6 tests covering all branches.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: use sha256 for ETag fingerprint to satisfy Sonar S4790
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: validate image_path containment in maybe_serve_webp (Sonar S2083/S6549)
+
+Adds a required safe_root parameter and re-validates that the resolved image path lives under it.
+  Pre-existing caller-side validation in history.py is now backed by an explicit sanitization
+  boundary that satisfies SonarCloud's path-traversal taint analysis.
+
+* fix: rewrite maybe_serve_webp to use send_from_directory (Sonar S2083)
+
+Sonar's pythonsecurity taint analyzer doesn't recognize manual commonpath checks as a sanitizer.
+  Switch the helper signature to (safe_root, filename, accept_header) and delegate the PNG branch to
+  flask.send_from_directory which IS a recognized sink. The WebP branch uses a private _safe_join
+  helper that mirrors send_from_directory's validation semantics.
+
+* fix: use werkzeug.utils.safe_join for Sonar-recognized sanitization
+
+S6549 still flagged the manual realpath/commonpath check. werkzeug's safe_join is the canonical path
+  sanitizer that Sonar's taint analyzer recognizes, so use it directly.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.10.0 (2026-04-08)
 
 ### Features
