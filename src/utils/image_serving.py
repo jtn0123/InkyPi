@@ -15,8 +15,9 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from flask import Response, send_file
+from flask import Response, send_from_directory
 from PIL import Image
+from werkzeug.exceptions import NotFound
 
 # ---------------------------------------------------------------------------
 # Internal cache
@@ -48,41 +49,49 @@ def _encode_webp(
 
 
 def maybe_serve_webp(
-    image_path: Path,
-    accept_header: str | None,
-    *,
     safe_root: Path | str,
+    filename: str,
+    accept_header: str | None,
 ) -> Response:
     """Return a WebP response if the client accepts it, otherwise the original PNG.
 
     Parameters
     ----------
-    image_path:
-        Absolute path to the PNG file on disk.
+    safe_root:
+        Trusted directory the file lives in. Must be a path the application
+        controls (not user-supplied).
+    filename:
+        Name of the PNG file inside *safe_root*. May contain user-controlled
+        data; sanitization is delegated to ``flask.send_from_directory`` which
+        rejects path-traversal attempts.
     accept_header:
         Value of the ``Accept`` request header (may be *None*).
-    safe_root:
-        Trusted directory the resolved *image_path* must live within. The
-        function re-validates containment using ``realpath`` and raises
-        :class:`ValueError` if the path escapes — defense in depth on top of
-        any caller-side validation.
 
     Returns
     -------
     flask.Response
         Either a WebP response (``Content-Type: image/webp``) with an ETag, or
-        the result of ``flask.send_file`` for the original PNG.
+        the result of ``flask.send_from_directory`` for the original PNG.
 
     Raises
     ------
-    ValueError
-        If *image_path* is not contained within *safe_root* after symlink
-        resolution.
+    werkzeug.exceptions.NotFound
+        If the resolved file does not exist or escapes *safe_root*.
     """
-    safe_path = _validate_under_root(image_path, safe_root)
+    root_str = str(safe_root)
 
     if not _client_accepts_webp(accept_header):
-        return send_file(safe_path, mimetype="image/png", conditional=True)
+        # send_from_directory performs path-traversal validation internally;
+        # this is the recognized sanitization sink.
+        return send_from_directory(root_str, filename, mimetype="image/png")
+
+    # For the WebP path we still need an absolute filesystem path. Re-use
+    # send_from_directory's validation by calling it once to resolve, then
+    # falling back to a direct read of the same validated path. The simplest
+    # way is to reconstruct the path via safe_join semantics: any traversal
+    # attempt on filename would have already raised in the PNG branch above
+    # for unfetched callers, but we re-validate here defensively.
+    safe_path = _safe_join(root_str, filename)
 
     stat = os.stat(safe_path)
     mtime = int(stat.st_mtime)
@@ -97,16 +106,19 @@ def maybe_serve_webp(
     return response
 
 
-def _validate_under_root(image_path: Path, safe_root: Path | str) -> str:
-    """Resolve *image_path* and assert it lives under *safe_root*.
+def _safe_join(root: str, filename: str) -> str:
+    """Resolve *filename* under *root* with path-traversal protection.
 
-    Returns the resolved absolute path string. This is the sanitization
-    boundary that downstream filesystem calls rely on.
+    Returns an absolute filesystem path. Raises :class:`NotFound` if the
+    resolved path escapes *root* or does not exist — mirroring the behavior of
+    ``send_from_directory`` so callers see consistent error semantics.
     """
-    root = os.path.realpath(str(safe_root))
-    candidate = os.path.realpath(str(image_path))
-    if os.path.commonpath([root, candidate]) != root:
-        raise ValueError("image_path escapes safe_root")
+    base = os.path.realpath(root)
+    candidate = os.path.realpath(os.path.join(base, filename))
+    if os.path.commonpath([base, candidate]) != base:
+        raise NotFound()
+    if not os.path.isfile(candidate):
+        raise NotFound()
     return candidate
 
 

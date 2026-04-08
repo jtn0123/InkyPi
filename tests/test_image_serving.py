@@ -32,10 +32,10 @@ def test_webp_returned_when_header_present(tmp_path):
 
     from utils.image_serving import maybe_serve_webp
 
-    png = _make_png(tmp_path)
+    _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/webp,*/*;q=0.8", safe_root=tmp_path)
+        resp = maybe_serve_webp(tmp_path, "test.png", "image/webp,*/*;q=0.8")
 
     assert resp.content_type == "image/webp"
     # Verify the bytes are valid WebP (RIFF….WEBP header)
@@ -50,12 +50,12 @@ def test_png_returned_when_header_absent(tmp_path):
 
     from utils.image_serving import maybe_serve_webp
 
-    png = _make_png(tmp_path)
+    _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, None, safe_root=tmp_path)
+        resp = maybe_serve_webp(tmp_path, "test.png", None)
 
-    assert resp.content_type == "image/png"
+    assert resp.mimetype == "image/png"
 
 
 def test_png_returned_when_header_no_webp(tmp_path):
@@ -64,12 +64,12 @@ def test_png_returned_when_header_no_webp(tmp_path):
 
     from utils.image_serving import maybe_serve_webp
 
-    png = _make_png(tmp_path)
+    _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/png,*/*", safe_root=tmp_path)
+        resp = maybe_serve_webp(tmp_path, "test.png", "image/png,*/*")
 
-    assert resp.content_type == "image/png"
+    assert resp.mimetype == "image/png"
 
 
 def test_etag_present_for_webp_response(tmp_path):
@@ -78,10 +78,10 @@ def test_etag_present_for_webp_response(tmp_path):
 
     from utils.image_serving import maybe_serve_webp
 
-    png = _make_png(tmp_path)
+    _make_png(tmp_path)
     app = Flask(__name__)
     with app.test_request_context("/"):
-        resp = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
+        resp = maybe_serve_webp(tmp_path, "test.png", "image/webp")
 
     assert "ETag" in resp.headers
     assert resp.headers["ETag"]  # non-empty
@@ -98,7 +98,7 @@ def test_etag_changes_when_mtime_changes(tmp_path):
 
     # First response
     with app.test_request_context("/"):
-        resp1 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
+        resp1 = maybe_serve_webp(tmp_path, "test.png", "image/webp")
     etag1 = resp1.headers["ETag"]
 
     # Overwrite the file with a new image (different mtime)
@@ -113,7 +113,7 @@ def test_etag_changes_when_mtime_changes(tmp_path):
     _encode_webp.cache_clear()
 
     with app.test_request_context("/"):
-        resp2 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
+        resp2 = maybe_serve_webp(tmp_path, "test.png", "image/webp")
     etag2 = resp2.headers["ETag"]
 
     assert etag1 != etag2
@@ -125,18 +125,46 @@ def test_cache_returns_same_bytes_on_repeated_call(tmp_path):
 
     from utils.image_serving import _encode_webp, maybe_serve_webp
 
-    png = _make_png(tmp_path)
+    _make_png(tmp_path)
     app = Flask(__name__)
 
     _encode_webp.cache_clear()
 
     with app.test_request_context("/"):
-        resp1 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
+        resp1 = maybe_serve_webp(tmp_path, "test.png", "image/webp")
     with app.test_request_context("/"):
-        resp2 = maybe_serve_webp(png, "image/webp", safe_root=tmp_path)
+        resp2 = maybe_serve_webp(tmp_path, "test.png", "image/webp")
 
     assert resp1.get_data() == resp2.get_data()
     # Cache should have exactly 1 entry (second call was a hit)
     info = _encode_webp.cache_info()
     assert info.currsize == 1
     assert info.hits >= 1
+
+
+def test_path_traversal_rejected(tmp_path):
+    """Filename containing '..' must not escape safe_root."""
+    from flask import Flask
+    from werkzeug.exceptions import NotFound
+
+    from utils.image_serving import maybe_serve_webp
+
+    # Create a file outside the safe_root
+    outside = tmp_path.parent / "outside.png"
+    img = Image.new("RGB", (4, 4), color=(0, 0, 0))
+    img.save(outside, format="PNG")
+    try:
+        nested = tmp_path / "nested"
+        nested.mkdir()
+        app = Flask(__name__)
+        with app.test_request_context("/"):
+            try:
+                maybe_serve_webp(nested, "../../outside.png", "image/webp")
+            except NotFound:
+                return
+            raise AssertionError("Expected NotFound for path traversal attempt")
+    finally:
+        try:
+            outside.unlink()
+        except FileNotFoundError:
+            pass

@@ -3,7 +3,6 @@ import logging
 import os
 import shutil
 from datetime import UTC, datetime
-from pathlib import Path
 
 from flask import (
     Blueprint,
@@ -267,15 +266,11 @@ def history_image(filename: str):
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        resolved = _resolve_history_path(history_dir, filename)
+        _resolve_history_path(history_dir, filename)
     except ValueError:
         return json_error(_ERR_INVALID_FILENAME, status=400)
     if filename.lower().endswith(".png"):
-        return maybe_serve_webp(
-            Path(resolved),
-            request.headers.get("Accept"),
-            safe_root=history_dir,
-        )
+        return maybe_serve_webp(history_dir, filename, request.headers.get("Accept"))
     return send_from_directory(history_dir, filename)
 
 

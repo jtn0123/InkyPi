@@ -3,7 +3,6 @@ import math
 import os
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
-from pathlib import Path
 from uuid import uuid4
 
 from flask import (
@@ -94,12 +93,11 @@ def preview_image():
         path = device_config.current_image_file
     if not os.path.exists(path):
         return ("Preview not available", 404)
-    # Both candidate paths come from device_config (trusted JSON), so the
-    # parent directory of whichever one we picked is a safe containment root.
-    safe_root = os.path.dirname(os.path.abspath(path))
-    return maybe_serve_webp(
-        Path(path), request.headers.get("Accept"), safe_root=safe_root
-    )
+    # Both candidate paths come from device_config (trusted JSON).
+    abs_path = os.path.abspath(path)
+    safe_root = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
 
 
 @main_bp.route("/api/current_image", methods=["GET"])
