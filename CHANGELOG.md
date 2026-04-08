@@ -1,6 +1,69 @@
 # CHANGELOG
 
 
+## v0.16.0 (2026-04-08)
+
+### Features
+
+- Per-ip rate limiting for login and refresh (JTN-447)
+  ([#257](https://github.com/jtn0123/InkyPi/pull/257),
+  [`d43f676`](https://github.com/jtn0123/InkyPi/commit/d43f676887e46cea442893052ec2e658ca684688))
+
+Adds a stdlib-only TokenBucket rate limiter keyed on client IP address to defend /login and
+  /display-next (/refresh alias) against brute-force and refresh-storming attacks. Complements the
+  session-level PIN lockout introduced in JTN-286. Limits are configurable via
+  INKYPI_RATE_LIMIT_AUTH and INKYPI_RATE_LIMIT_REFRESH env vars (format: N/Sseconds).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Sse stream for live dashboard updates ([#256](https://github.com/jtn0123/InkyPi/pull/256),
+  [`65a02d8`](https://github.com/jtn0123/InkyPi/commit/65a02d8edabb2f5c30fdac024f39a4a8c0fd1a65))
+
+Add /api/events SSE endpoint backed by a new thread-safe EventBus (src/utils/event_bus.py) with
+  per-subscriber queues, 50-subscriber cap, 15 s heartbeat, and clean disconnect handling. Hook
+  publish() into RefreshTask._perform_refresh for refresh_started, refresh_complete, and
+  plugin_failed events. Wire pushUrl in the dashboard template so the existing EventSource fallback
+  logic activates automatically. Add 18 tests covering bus unit behaviour, stream formatting,
+  endpoint contract, and refresh-task hook integration.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
+## v0.15.0 (2026-04-08)
+
+### Features
+
+- Csv export of refresh history ([#254](https://github.com/jtn0123/InkyPi/pull/254),
+  [`2cc123f`](https://github.com/jtn0123/InkyPi/commit/2cc123f9bbbb08878fe1f764e148ca1d56792078))
+
+Add GET /history/export.csv route that streams all history entries as a downloadable CSV (timestamp,
+  plugin_id, instance_name, status, duration_ms, error_message) using stdlib csv + io.StringIO. Adds
+  an Export CSV button to the history page header. Includes 13 tests covering headers, empty state,
+  row values, escaping (commas, quotes, newlines), missing sidecar fallback, and page link presence.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Plugin instance export/import via JSON (JTN-448)
+  ([#255](https://github.com/jtn0123/InkyPi/pull/255),
+  [`3a6c12e`](https://github.com/jtn0123/InkyPi/commit/3a6c12e8725cfd2eafbcd3e6b27768f8b5da5180))
+
+Add GET /api/plugins/export (single or all instances) and POST /api/plugins/import endpoints. Import
+  validates shape, rejects unknown plugin_ids, handles name collisions, and does not auto-add to
+  playlist.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Webhook notifications on plugin failures (JTN-449)
+  ([#253](https://github.com/jtn0123/InkyPi/pull/253),
+  [`7a63469`](https://github.com/jtn0123/InkyPi/commit/7a6346989ae055116dd98addf87a59892155da20))
+
+POST to configured webhook_urls on plugin failure or circuit-breaker open. Best-effort: 1 s timeout,
+  no retries, exceptions swallowed. Adds send_failure_webhook helper, hooks into _cb_on_failure, and
+  documents the feature in docs/webhooks.md.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.14.0 (2026-04-08)
 
 ### Features

@@ -18,6 +18,7 @@ from refresh_task.worker import (
     _get_mp_context,
     _remote_exception,
 )
+from utils.event_bus import get_event_bus
 from utils.history_cleanup import cleanup_history
 from utils.image_utils import compute_image_hash
 from utils.metrics import (
@@ -28,6 +29,7 @@ from utils.metrics import (
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
+from utils.webhooks import send_failure_webhook
 
 try:
     # Optional import; code must continue if unavailable
@@ -62,6 +64,7 @@ class RefreshTask:
         self.running = False
         self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
         self.progress_bus = get_progress_bus()
+        self.event_bus = get_event_bus()
         self.plugin_health: dict[str, dict] = {}
         self._tick_count: int = 0
 
@@ -294,6 +297,14 @@ class RefreshTask:
                     "request_id": request_id,
                 }
             )
+            self.event_bus.publish(
+                "refresh_started",
+                {
+                    "plugin": instance_name or plugin_id,
+                    "plugin_id": plugin_id,
+                    "ts": datetime.now(UTC).isoformat(),
+                },
+            )
             try:
                 image, plugin_meta = self._execute_with_policy(
                     refresh_action,
@@ -327,6 +338,14 @@ class RefreshTask:
                         "error": str(exc),
                         "retained_display": bool(retain_path),
                     }
+                )
+                self.event_bus.publish(
+                    "plugin_failed",
+                    {
+                        "plugin": instance_name or plugin_id,
+                        "plugin_id": plugin_id,
+                        "error": str(exc),
+                    },
                 )
                 raise
             try:
@@ -407,6 +426,14 @@ class RefreshTask:
                 "request_id": request_id,
                 "metrics": metrics,
             }
+        )
+        self.event_bus.publish(
+            "refresh_complete",
+            {
+                "plugin": instance_name or plugin_id,
+                "plugin_id": plugin_id,
+                "duration_ms": request_ms,
+            },
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
@@ -992,6 +1019,27 @@ class RefreshTask:
                 plugin_id,
                 instance,
                 plugin_instance.consecutive_failure_count,
+            )
+
+        # Best-effort webhook notification — never raises.
+        try:
+            webhook_urls = self.device_config.get_config("webhook_urls", default=[])
+            if webhook_urls:
+                now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
+                error_msg = (
+                    self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
+                )
+                payload = {
+                    "event": "plugin_failure",
+                    "plugin_id": plugin_id,
+                    "instance_name": instance,
+                    "error": error_msg,
+                    "ts": now_iso,
+                }
+                send_failure_webhook(webhook_urls, payload)
+        except Exception:
+            logger.warning(
+                "webhook: unexpected error building webhook payload", exc_info=True
             )
 
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:

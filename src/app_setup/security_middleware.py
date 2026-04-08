@@ -15,10 +15,11 @@ import os
 import secrets
 from time import perf_counter
 
-from flask import Flask, g, redirect, request, session
+from flask import Flask, g, make_response, redirect, request, session
 
 from config import Config
 from utils.http_utils import json_error
+from utils.rate_limit import make_auth_bucket, make_refresh_bucket
 from utils.rate_limiter import SlidingWindowLimiter
 
 logger = logging.getLogger(__name__)
@@ -148,12 +149,30 @@ def setup_csrf_protection(app: Flask) -> None:
 # Rate limiting
 # ---------------------------------------------------------------------------
 
+#: Paths that receive stricter per-IP token-bucket limiting (POST only).
+#: /display-next is the canonical refresh endpoint; /refresh is a backward-
+#: compatible alias; /login is the PIN-auth endpoint.
+_AUTH_RATE_PATHS = frozenset({"/login"})
+_REFRESH_RATE_PATHS = frozenset({"/display-next", "/refresh"})
 
 _mutation_limiter = SlidingWindowLimiter(_MUTATE_MAX, _MUTATE_WINDOW)
 
+# Endpoint-specific token-bucket limiters (lazy-initialised at first call to
+# setup_rate_limiting so env vars set after import are respected).
+_auth_bucket = None
+_refresh_bucket = None
+
 
 def setup_rate_limiting(app: Flask) -> None:
-    """Sliding-window per-IP rate limit on mutating requests."""
+    """Sliding-window per-IP rate limit on mutating requests.
+
+    Also applies stricter token-bucket limits to the /login and
+    /display-next (refresh) endpoints to prevent brute-force and
+    refresh-storming attacks (JTN-447).
+    """
+    global _auth_bucket, _refresh_bucket
+    _auth_bucket = make_auth_bucket()
+    _refresh_bucket = make_refresh_bucket()
 
     @app.before_request
     def _rate_limit_mutations():
@@ -162,6 +181,24 @@ def setup_rate_limiting(app: Flask) -> None:
         if request.path in _RATE_EXEMPT:
             return None
         addr = request.remote_addr or "unknown"
+
+        # --- Endpoint-specific token-bucket limits (stricter) ---
+        if request.path in _AUTH_RATE_PATHS and not _auth_bucket.try_acquire(addr):  # type: ignore[union-attr]
+            body, code = json_error(
+                "Too many login attempts — try again later", status=429
+            )
+            resp = make_response(body, code)
+            resp.headers["Retry-After"] = "30"
+            return resp
+        elif request.path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):  # type: ignore[union-attr]
+            body, code = json_error(
+                "Refresh rate limit exceeded — try again later", status=429
+            )
+            resp = make_response(body, code)
+            resp.headers["Retry-After"] = "6"
+            return resp
+
+        # --- General sliding-window limit (all other mutations) ---
         allowed, _ = _mutation_limiter.check(addr)
         if not allowed:
             return json_error("Rate limit exceeded — try again shortly", status=429)
