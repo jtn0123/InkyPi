@@ -20,7 +20,7 @@ def _import_dry_run():
     spec = importlib.util.spec_from_file_location("dry_run_plugin", script_path)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    spec.loader.exec_module(mod)
     return mod
 
 
