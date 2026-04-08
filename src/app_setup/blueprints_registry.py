@@ -15,6 +15,7 @@ def register_blueprints(app: Flask) -> None:
     from blueprints.playlist import playlist_bp
     from blueprints.plugin import plugin_bp
     from blueprints.settings import settings_bp
+    from blueprints.version_info import version_info_bp
 
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
@@ -24,3 +25,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(history_bp)
     app.register_blueprint(api_docs_bp)
     app.register_blueprint(metrics_bp)
+    app.register_blueprint(version_info_bp)
