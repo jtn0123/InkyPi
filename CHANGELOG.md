@@ -1,6 +1,54 @@
 # CHANGELOG
 
 
+## v0.6.0 (2026-04-08)
+
+### Documentation
+
+- Document systemd journal rotation for long-running Pi deployments (JTN-304)
+  ([#218](https://github.com/jtn0123/InkyPi/pull/218),
+  [`f8c9827`](https://github.com/jtn0123/InkyPi/commit/f8c982749a99f1175a219f34a3b5c16c9be5cc91))
+
+Adds a log rotation section to the troubleshooting docs explaining how to check journal disk usage,
+  set size limits in journald.conf, and vacuum old logs. Helps prevent disk-full issues on SD cards
+  over weeks/months of 24/7 uptime.
+
+Closes JTN-304
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Auto-pause failing plugins after threshold (JTN-301)
+  ([#217](https://github.com/jtn0123/InkyPi/pull/217),
+  [`e4f65db`](https://github.com/jtn0123/InkyPi/commit/e4f65db457430989b9d7c26a070b8470a97f21bf))
+
+* feat: auto-pause plugins after consecutive failures (JTN-301)
+
+Adds a circuit-breaker counter to the refresh path. After N consecutive failures (default 5, env:
+  PLUGIN_FAILURE_THRESHOLD), the plugin is marked paused and skipped by the scheduler until a
+  successful refresh resets it. Backend-only — UI surfacing comes in a follow-up.
+
+Closes JTN-301
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: address SonarCloud findings on circuit breaker (JTN-301)
+
+- Extract _cb_on_success and _cb_on_failure helpers from _update_plugin_health to reduce cognitive
+  complexity (S3776, was 24). - Use %r in reset_circuit_breaker log to escape user-controlled
+  plugin_id/instance values (S5145).
+
+* fix: explicit sanitization of user-controlled log values (S5145)
+
+SonarCloud's analyzer didn't recognize %r-formatted log values as sanitized. Switch to explicit
+  replace+truncate so the dataflow is visible to the analyzer.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.5.0 (2026-04-08)
 
 ### Bug Fixes
