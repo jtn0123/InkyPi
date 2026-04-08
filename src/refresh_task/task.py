@@ -658,6 +658,48 @@ class RefreshTask:
             str(payload.get("error_message") or "unknown error"),
         )
 
+    def _run_subprocess_attempt(
+        self, refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
+    ):
+        """Spawn a subprocess for one plugin execution attempt.
+
+        Returns ``(image, exc_or_meta)`` on success, or raises/returns an exception
+        as the second element when the attempt fails.
+        """
+        ctx = _get_mp_context()
+        result_queue = ctx.Queue(maxsize=1)
+        proc = ctx.Process(
+            target=_execute_refresh_attempt_worker,
+            args=(
+                result_queue,
+                plugin_config,
+                refresh_action,
+                self.device_config,
+                current_dt,
+            ),
+            daemon=True,
+        )
+        try:
+            proc.start()
+            proc.join(timeout=timeout_s)
+            if proc.is_alive():
+                self._cleanup_subprocess(proc, plugin_id)
+                return None, TimeoutError(self._timeout_msg(plugin_id, timeout_s))
+            return self._handle_process_result(result_queue, proc, plugin_id, attempt)
+        except TimeoutError:
+            return None, TimeoutError(self._timeout_msg(plugin_id, timeout_s))
+        except Exception as exc:
+            return None, exc
+        finally:
+            try:
+                result_queue.close()
+            except OSError:
+                pass
+            try:
+                result_queue.join_thread()
+            except OSError:
+                pass
+
     def _execute_with_policy(
         self, refresh_action, plugin_config, current_dt: datetime, request_id=None
     ):
@@ -684,47 +726,13 @@ class RefreshTask:
                 attempts,
                 timeout_s,
             )
-            ctx = _get_mp_context()
-            result_queue = ctx.Queue(maxsize=1)
-            proc = ctx.Process(
-                target=_execute_refresh_attempt_worker,
-                args=(
-                    result_queue,
-                    plugin_config,
-                    refresh_action,
-                    self.device_config,
-                    current_dt,
-                ),
-                daemon=True,
+            image, exc_or_meta = self._run_subprocess_attempt(
+                refresh_action, plugin_config, current_dt, plugin_id, timeout_s, attempt
             )
-            try:
-                proc.start()
-                proc.join(timeout=timeout_s)
-                if proc.is_alive():
-                    self._cleanup_subprocess(proc, plugin_id)
-                    last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
-                else:
-                    result = self._handle_process_result(
-                        result_queue, proc, plugin_id, attempt
-                    )
-                    image, exc_or_meta = result
-                    if image is not None:
-                        return image, exc_or_meta
-                    last_exc = exc_or_meta
-            except TimeoutError:
-                last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
-            except Exception as exc:
-                last_exc = exc
-            finally:
-                try:
-                    result_queue.close()
-                except OSError:
-                    pass
-                try:
-                    result_queue.join_thread()
-                except OSError:
-                    pass
+            if image is not None:
+                return image, exc_or_meta
 
+            last_exc = exc_or_meta
             if isinstance(last_exc, TimeoutError):
                 last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
 

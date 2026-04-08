@@ -24,6 +24,55 @@ logger = logging.getLogger(__name__)
 
 _DEVICE_JSON = "device.json"
 
+_SENSITIVE_TERMS = ("secret", "token", "api", "key", "password")
+
+
+def _looks_sensitive(key_name: str) -> bool:
+    """Return True if the key name suggests it may hold a secret value."""
+    lowered = key_name.lower()
+    return any(s in lowered for s in _SENSITIVE_TERMS)
+
+
+def _mask_config_value(value: Any) -> Any:
+    """Recursively mask sensitive values for safe logging."""
+    if isinstance(value, dict):
+        return {
+            k: ("***" if _looks_sensitive(k) else _mask_config_value(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_config_value(v) for v in value]
+    if isinstance(value, int | float | bool) or value is None:
+        return value
+    if isinstance(value, str):
+        # Keep short benign strings; mask long or multi-line ones
+        return (
+            value
+            if len(value) <= 64 and not any(c in value for c in ("\n", "\r"))
+            else "***"
+        )
+    return "<omitted>"
+
+
+def _summarize_playlist(pl: Any) -> dict:
+    """Summarize a single playlist entry, stripping per-plugin settings."""
+    try:
+        plugins = pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
+        return {
+            "name": pl.get("name"),
+            "num_plugins": len(plugins),
+            "plugins": [
+                {
+                    "plugin_id": p.get("plugin_id"),
+                    "name": p.get("name"),
+                    "has_settings": bool(p.get("plugin_settings")),
+                }
+                for p in plugins
+            ],
+        }
+    except Exception:
+        return {"name": "<unknown>", "num_plugins": 0}
+
 
 @functools.lru_cache(maxsize=4)
 def _load_json_schema(schema_path: str) -> dict[str, Any]:
@@ -535,56 +584,6 @@ class Config:
           credentials saved in settings.
         - Keeps non-sensitive high-level fields as-is for debuggability.
         """
-
-        def _looks_sensitive(key_name: str) -> bool:
-            lowered = key_name.lower()
-            return any(
-                s in lowered for s in ("secret", "token", "api", "key", "password")
-            )
-
-        def _mask(value):
-            if isinstance(value, dict):
-                return {
-                    k: ("***" if _looks_sensitive(k) else _mask(v))
-                    for k, v in value.items()
-                }
-            if isinstance(value, list):
-                return [_mask(v) for v in value]
-            # Do not attempt to log raw bytes or large strings; keep small scalars
-            if isinstance(value, int | float | bool) or value is None:
-                return value
-            if isinstance(value, str):
-                # Keep short benign strings; mask long ones
-                return (
-                    value
-                    if len(value) <= 64 and not any(c in value for c in ("\n", "\r"))
-                    else "***"
-                )
-            return "<omitted>"
-
-        def _sanitize_playlist(pl) -> dict:
-            """Summarize a single playlist entry, stripping per-plugin settings."""
-            try:
-                pl_name = pl.get("name")
-                plugins = (
-                    pl.get("plugins", []) if isinstance(pl.get("plugins"), list) else []
-                )
-                return {
-                    "name": pl_name,
-                    "num_plugins": len(plugins),
-                    # Do not expose per-plugin settings; only summarize ids/names
-                    "plugins": [
-                        {
-                            "plugin_id": p.get("plugin_id"),
-                            "name": p.get("name"),
-                            "has_settings": bool(p.get("plugin_settings")),
-                        }
-                        for p in plugins
-                    ],
-                }
-            except Exception:
-                return {"name": "<unknown>", "num_plugins": 0}
-
         sanitized: dict[str, Any] = {}
         for key, value in (config_dict or {}).items():
             if key == "playlist_config" and isinstance(value, dict):
@@ -595,11 +594,10 @@ class Config:
                 )
                 sanitized[key] = {
                     "active_playlist": value.get("active_playlist"),
-                    "playlists": [_sanitize_playlist(pl) for pl in playlists],
+                    "playlists": [_summarize_playlist(pl) for pl in playlists],
                 }
             elif _looks_sensitive(key):
                 sanitized[key] = "***"
             else:
-                sanitized[key] = _mask(value)
-
+                sanitized[key] = _mask_config_value(value)
         return sanitized

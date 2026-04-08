@@ -209,84 +209,113 @@ def _process_uploaded_file(extension: str, file_path: str, content: bytes) -> No
             out.write(content)
 
 
+_ALLOWED_FILE_EXTENSIONS = {
+    "pdf",
+    "png",
+    "avif",
+    "jpg",
+    "jpeg",
+    "gif",
+    "webp",
+    "heif",
+    "heic",
+}
+
+
+def _get_existing_file_location(key, form_data):
+    """Return the existing file location(s) from form_data for the given key.
+
+    Returns the stored value for scalar keys, or a list for list keys (``key[]``).
+    Returns None if the key is not present in form_data.
+    """
+    if key not in form_data:
+        return None, False
+    is_list = key.endswith("[]")
+    if not is_list:
+        return form_data.get(key), True
+    if hasattr(form_data, "getlist"):
+        return form_data.getlist(key), True
+    existing = form_data.get(key)
+    return (existing if isinstance(existing, list) else [existing]), True
+
+
+def _validate_and_read_file(file, file_name):
+    """Read and validate file content. Returns (content, extension) or raises RuntimeError."""
+    extension = os.path.splitext(file_name)[1].replace(".", "")
+    if not extension or extension.lower() not in _ALLOWED_FILE_EXTENSIONS:
+        return None, None
+
+    content = file.read()
+    if content is None:
+        raise RuntimeError("Empty upload content")
+
+    max_upload_bytes_env = os.getenv("MAX_UPLOAD_BYTES")
+    max_upload_bytes = (
+        int(max_upload_bytes_env) if max_upload_bytes_env else 10 * 1024 * 1024
+    )
+    if len(content) > max_upload_bytes:
+        raise RuntimeError(
+            f"Uploaded file exceeds size limit of {max_upload_bytes} bytes"
+        )
+    return content, extension.lower()
+
+
+def _rewind_file_stream(file):
+    """Rewind file stream so callers can re-read from the beginning."""
+    try:
+        if hasattr(file, "stream"):
+            file.stream.seek(0)
+        elif hasattr(file, "seek"):
+            file.seek(0)
+    except (OSError, AttributeError):
+        logger.debug("Failed to rewind file stream", exc_info=True)
+
+
+def _save_uploaded_file(file, file_name, extension, content):
+    """Persist the uploaded file and return its path on disk."""
+    safe_name = os.path.basename(file_name)
+    file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
+    os.makedirs(file_save_dir, exist_ok=True)
+    # Prefix with timestamp to avoid silent overwrites from duplicate filenames
+    unique_name = f"{int(time.time())}_{safe_name}"
+    file_path = os.path.join(file_save_dir, unique_name)
+    _rewind_file_stream(file)
+    _process_uploaded_file(extension, file_path, content)
+    return file_path
+
+
+def _collect_existing_locations(request_keys, form_data):
+    """Seed the file-location map with any pre-existing paths from form_data."""
+    file_location_map = {}
+    for key in request_keys:
+        value, found = _get_existing_file_location(key, form_data)
+        if found:
+            file_location_map[key] = value
+    return file_location_map
+
+
 def handle_request_files(request_files, form_data=None):
     if form_data is None:
         form_data = {}
-    allowed_file_extensions = {
-        "pdf",
-        "png",
-        "avif",
-        "jpg",
-        "jpeg",
-        "gif",
-        "webp",
-        "heif",
-        "heic",
-    }
-    file_location_map = {}
     request_keys = (
         set(request_files.keys()) if hasattr(request_files, "keys") else set()
     )
-    # handle existing file locations being provided as part of the form data
-    for key in request_keys:
-        is_list = key.endswith("[]")
-        if key in form_data:
-            if is_list:
-                if hasattr(form_data, "getlist"):
-                    file_location_map[key] = form_data.getlist(key)
-                else:
-                    existing = form_data.get(key)
-                    file_location_map[key] = (
-                        existing if isinstance(existing, list) else [existing]
-                    )
-            else:
-                file_location_map[key] = form_data.get(key)
-    # add new files in the request
+    # Seed map with existing file locations from form data
+    file_location_map = _collect_existing_locations(request_keys, form_data)
+
+    # Add new files from the request
     for key, file in request_files.items(multi=True):
-        is_list = key.endswith("[]")
         file_name = file.filename
         if not file_name:
             continue
 
-        extension = os.path.splitext(file_name)[1].replace(".", "")
-        if not extension or extension.lower() not in allowed_file_extensions:
+        content, extension = _validate_and_read_file(file, file_name)
+        if content is None:
             continue
 
-        file_name = os.path.basename(file_name)
+        file_path = _save_uploaded_file(file, file_name, extension, content)
 
-        file_save_dir = resolve_path(os.path.join("static", "images", "saved"))
-        os.makedirs(file_save_dir, exist_ok=True)
-        # Prefix with timestamp to avoid silent overwrites from duplicate filenames
-        unique_name = f"{int(time.time())}_{file_name}"
-        file_path = os.path.join(file_save_dir, unique_name)
-
-        # Read raw bytes once so this works with both FileStorage and test fakes.
-        content = file.read()
-        if content is None:
-            raise RuntimeError("Empty upload content")
-
-        max_upload_bytes_env = os.getenv("MAX_UPLOAD_BYTES")
-        max_upload_bytes = (
-            int(max_upload_bytes_env) if max_upload_bytes_env else 10 * 1024 * 1024
-        )
-        if len(content) > max_upload_bytes:
-            raise RuntimeError(
-                f"Uploaded file exceeds size limit of {max_upload_bytes} bytes"
-            )
-
-        # Rewind file objects for callers that expect stream position to remain usable.
-        try:
-            if hasattr(file, "stream"):
-                file.stream.seek(0)
-            elif hasattr(file, "seek"):
-                file.seek(0)
-        except (OSError, AttributeError):
-            logger.debug("Failed to rewind file stream", exc_info=True)
-
-        # Save PDFs as-is. Validate and save images.
-        _process_uploaded_file(extension, file_path, content)
-
-        if is_list:
+        if key.endswith("[]"):
             file_location_map.setdefault(key, [])
             file_location_map[key].append(file_path)
         else:
