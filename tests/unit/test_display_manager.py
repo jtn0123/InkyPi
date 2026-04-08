@@ -264,3 +264,28 @@ def test_display_manager_display_preprocessed_image(device_config_dev, tmp_path)
 
     assert Path(device_config_dev.current_image_file).exists()
     assert Path(device_config_dev.processed_image_file).exists()
+
+
+def test_display_preprocessed_image_clears_hash(device_config_dev, tmp_path):
+    """display_preprocessed_image must clear _last_image_hash so the next
+    regular refresh is not skipped due to a stale hash match (JTN-236)."""
+    device_config_dev.update_value("display_type", "mock")
+
+    from display.display_manager import DisplayManager
+
+    img_path = tmp_path / "preprocessed.png"
+    make_image(100, 50).save(img_path)
+
+    dm = DisplayManager(device_config_dev)
+
+    # Simulate a prior regular display that sets a non-None hash
+    dm.display_image(make_image(100, 50, color="red"))
+    assert dm._last_image_hash is not None, "Hash should be set after display_image"
+
+    # Redisplay via history path
+    dm.display_preprocessed_image(str(img_path))
+
+    # Hash must be cleared so the next regular refresh is not skipped
+    assert (
+        dm._last_image_hash is None
+    ), "Hash was not cleared after display_preprocessed_image — next refresh would be skipped"

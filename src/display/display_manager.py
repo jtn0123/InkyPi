@@ -258,8 +258,13 @@ class DisplayManager:
         preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
         display_t0 = perf_counter()
         self.display.display_image(image, [])
+        display_ms = int((perf_counter() - display_t0) * 1000)
+        # Clear the dedup hash so the next regular refresh is not skipped
+        # because it still matches the pre-history image hash (JTN-236).
+        with self._hash_lock:
+            self._last_image_hash = None
         return {
             "preprocess_ms": preprocess_ms,
-            "display_ms": int((perf_counter() - display_t0) * 1000),
+            "display_ms": display_ms,
             "display_driver": self.display.__class__.__name__,
         }
