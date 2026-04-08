@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.6.1 (2026-04-08)
+
+### Bug Fixes
+
+- Wire up Calendar plugin Remove and Last progress buttons (JTN-311, JTN-312)
+  ([#221](https://github.com/jtn0123/InkyPi/pull/221),
+  [`8d8f010`](https://github.com/jtn0123/InkyPi/commit/8d8f01069aa56836188e3279ebda2eb39671c203))
+
+- JTN-311: Remove calendar button now disables when only one row remains, with a tooltip explaining
+  why. Added syncRemoveButtonStates() called on init, add, and remove. Removed the silent shake-only
+  UX. - JTN-312: Last progress button now correctly reveals the progress panel by calling
+  setHidden(progress, false) instead of progress.style.display which was overridden by the HTML
+  hidden attribute (a silent no-op).
+
+Closes JTN-311 Closes JTN-312
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- Add dependency license audit CI step (JTN-298)
+  ([#219](https://github.com/jtn0123/InkyPi/pull/219),
+  [`573cd69`](https://github.com/jtn0123/InkyPi/commit/573cd69c288a089d263f7c2276e3fe8611ffa373))
+
+* chore: add dependency license audit to CI (JTN-298)
+
+Adds a pip-licenses check that fails CI if a GPL/AGPL license is detected in the dependency tree.
+  Also adds scripts/check_licenses.sh for local pre-PR runs. NOTE: the current dependency tree FAILS
+  the audit — recurring-ical-events 3.8.0 carries GPL-3.0-or-later and rfc3987 1.3.8 carries GPLv3+;
+  these require follow-up remediation.
+
+Closes JTN-298
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: tighten license check to GPL-3/AGPL-3 only with exemptions
+
+The initial broad GPL/AGPL partial-match also caught LGPL packages (like astroid, CairoSVG,
+  zeroconf) which are fine for libraries used by an MIT project. Switch to exact-match against GPL-3
+  / AGPL-3 strings only and exempt the two known runtime offenders (recurring-ical-events, rfc3987)
+  for separate replacement work.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.6.0 (2026-04-08)
 
 ### Documentation
