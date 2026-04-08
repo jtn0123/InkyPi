@@ -1,0 +1,14 @@
+# Gitleaks configuration for InkyPi
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "InkyPi gitleaks config"
+
+[extend]
+# Extend the default ruleset
+useDefault = true
+
+[[allowlists]]
+description = "Intentional fake secrets used in log-redaction unit tests"
+paths = [
+    "tests/test_log_redaction\\.py",
+]
