@@ -1,6 +1,107 @@
 # CHANGELOG
 
 
+## v0.4.33 (2026-04-08)
+
+### Bug Fixes
+
+- Catch expected network error in shutdown fetch (JTN-247)
+  ([#189](https://github.com/jtn0123/InkyPi/pull/189),
+  [`b7d7a6a`](https://github.com/jtn0123/InkyPi/commit/b7d7a6a38b037a648aee1a09357541cc0f785d52))
+
+* fix: catch expected network error in shutdown fetch (JTN-247)
+
+Wrap the shutdown/reboot fetch call in a try/catch so that the inevitable connection-severed
+  TypeError is silenced rather than surfacing a confusing error modal after the success message.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove global progress fallback to prevent cross-plugin data (JTN-246)
+  ([#193](https://github.com/jtn0123/InkyPi/pull/193),
+  [`522feea`](https://github.com/jtn0123/InkyPi/commit/522feea12cb06ff045040b99037a0fc1b50f0e25))
+
+* fix: remove global progress fallback to prevent cross-plugin data (JTN-246)
+
+showLastProgress fell back to a bare global localStorage key shared across all plugins, which could
+  surface progress data from an unrelated plugin. Removed the global fallback, keeping only
+  plugin+instance-specific and plugin-only scoped keys. Added test verifying the global key is
+  absent from the fallback chain.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Remove unused playlist_name from instance image URL (JTN-265)
+  ([#192](https://github.com/jtn0123/InkyPi/pull/192),
+  [`848ae50`](https://github.com/jtn0123/InkyPi/commit/848ae500d6bc51d1005d612db239afb8d656a64b))
+
+* fix: remove unused playlist_name from instance image URL (JTN-265)
+
+playlist.html was passing playlist_name=playlist.name to url_for for the plugin_instance_image
+  route, which Flask silently appended as a query string. The route only accepts plugin_id and
+  instance_name, so the extra param was ignored — causing wrong images for duplicate instances.
+  Removed the unused argument and added a regression test.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Return shallow copy from get_config() to prevent mutation (JTN-241)
+  ([#190](https://github.com/jtn0123/InkyPi/pull/190),
+  [`7984ae4`](https://github.com/jtn0123/InkyPi/commit/7984ae453469aaa2dd511bd296eba1e467a73435))
+
+* fix: return shallow copy from get_config() to prevent mutation (JTN-241)
+
+get_config() without a key returned a direct reference to the internal config dict, allowing callers
+  to mutate shared state outside the lock. Now returns self.config.copy() to prevent accidental
+  mutation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Use get_timezone() for safe timezone handling in plugins (JTN-238)
+  ([#191](https://github.com/jtn0123/InkyPi/pull/191),
+  [`74c8e57`](https://github.com/jtn0123/InkyPi/commit/74c8e57ed3bc86be85cdcb18c029b4da40cd5054))
+
+* fix: use get_timezone() to handle invalid timezones in countdown and weather (JTN-238)
+
+Replace raw ZoneInfo() calls in countdown and weather plugins with the shared get_timezone() utility
+  that catches ZoneInfoNotFoundError and falls back to UTC. Remove now-unused ZoneInfo imports. Add
+  tests verifying invalid timezone strings do not crash either plugin.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Add CodeQL code scanning workflow
+  ([`3d70264`](https://github.com/jtn0123/InkyPi/commit/3d70264dbf1e5786e7db14c439758d9d6420b1c3))
+
+
 ## v0.4.32 (2026-04-08)
 
 ### Bug Fixes
