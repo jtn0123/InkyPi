@@ -22,6 +22,7 @@
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     <main id="main-content" role="main" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+    <div id="playlist-page-content">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
         <div class="app-header">
@@ -156,6 +157,7 @@
             {% endfor %}
         </div>
     </div>
+    </div><!-- /#playlist-page-content -->
 
     <!-- Schedule Configuration Modal -->
     <div id="playlistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
