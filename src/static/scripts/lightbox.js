@@ -12,6 +12,20 @@
   const IMG_ID = 'imagePreviewImg';
   const VISIBLE_CLASS = 'lightbox-img-visible';
   let triggerElement = null;
+  let clickTimer = null;
+
+  function imgClickHandler(e) {
+    if (clickTimer) {
+      clearTimeout(clickTimer);
+      clickTimer = null;
+      toggleNativeSizing(e);
+    } else {
+      clickTimer = setTimeout(function() {
+        clickTimer = null;
+        closeLightbox();
+      }, 300);
+    }
+  }
 
   function showImage(img) {
     img.classList.add(VISIBLE_CLASS);
@@ -88,9 +102,10 @@
       img.className = 'lightbox-preview-image';
       img.alt = 'Large preview';
       img.style.cursor = 'zoom-out';
-      // Single click closes lightbox, double-click toggles native sizing
-      img.addEventListener('click', closeLightbox);
-      img.addEventListener('dblclick', toggleNativeSizing);
+      // Single click closes lightbox; double-click toggles native sizing.
+      // A click timer distinguishes the two so the first click of a
+      // double-click does not close the lightbox before dblclick fires.
+      img.addEventListener('click', imgClickHandler);
 
       bindImageLoadHandlers(img, content);
 
@@ -107,8 +122,7 @@
       const img = document.getElementById(IMG_ID);
       if (img && !img._lbInit) {
         img.style.cursor = 'zoom-out';
-        img.addEventListener('click', closeLightbox);
-        img.addEventListener('dblclick', toggleNativeSizing);
+        img.addEventListener('click', imgClickHandler);
 
         // Inject loading/error elements if missing
         if (!content.querySelector('.lightbox-loading')) {
