@@ -1,0 +1,17 @@
+# Gitleaks configuration for InkyPi
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "InkyPi gitleaks config"
+
+[extend]
+# Extend the default ruleset
+useDefault = true
+
+# Allowlist intentional fake secrets in the log-redaction test file.
+# These strings are test fixtures that verify the filter pattern works;
+# they are not real credentials.
+[allowlist]
+description = "Intentional fake secrets in log-redaction unit tests"
+paths = [
+    '''tests/test_log_redaction\.py''',
+]
