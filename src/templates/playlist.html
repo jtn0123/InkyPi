@@ -27,7 +27,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}
@@ -78,8 +78,8 @@
                             {% if playlist.plugins %}
                             <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
                             {% endif %}
-                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
-                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" title="Delete playlist" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
+                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
+                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
                             <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
                         </div>
                     </div>
@@ -127,11 +127,10 @@
                                     </span>
                                 {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit plugin" aria-label="Edit plugin {{ plugin_instance.name }}">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" aria-label="Edit plugin {{ plugin_instance.name }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                 </a>
                                 <button class="edit-button refresh-settings-btn" type="button"
-                                        title="Edit Refresh Settings"
                                         aria-label="Edit refresh settings for {{ plugin_instance.name }}"
                                         data-playlist="{{ playlist.name }}"
                                         data-plugin-id="{{ plugin_instance.plugin_id }}"
@@ -139,10 +138,10 @@
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
                                 </button>
-                                <button class="edit-button plugin-display-btn" type="button" title="Display Now" aria-label="Display {{ plugin_instance.name }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
+                                <button class="edit-button plugin-display-btn" type="button" aria-label="Display {{ plugin_instance.name }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                 </button>
-                                <button class="delete-button delete-instance-btn" type="button" title="Delete Plugin Instance" aria-label="Delete plugin instance {{ plugin_instance.name }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
+                                <button class="delete-button delete-instance-btn" type="button" aria-label="Delete plugin instance {{ plugin_instance.name }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
                                     {{ icon('trash', 'action-icon') | safe }}
                                 </button>
                             </div>

@@ -13,7 +13,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('gear-six', 'app-icon') | safe }}
@@ -76,10 +76,10 @@
                         </div>
                         <div class="form-group nowrap">
                             <label class="form-label" for="invertImage">Invert Image</label>
-                            <label class="toggle-container">
+                            <span class="toggle-container">
                                 <input type="checkbox" id="invertImage" name="invertImage" class="toggle-checkbox" {% if device_settings.inverted_image %}checked{% endif %}>
                                 <span class="toggle-label"></span>
-                            </label>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -101,10 +101,10 @@
                         </div>
                         <div class="form-group nowrap">
                             <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
-                            <label class="toggle-container">
+                            <span class="toggle-container">
                                 <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox">
                                 <span class="toggle-label"></span>
-                            </label>
+                            </span>
                         </div>
                         <div class="form-group nowrap">
                             <label for="timeFormat" class="form-label">Time Format</label>
@@ -138,10 +138,10 @@
 
                         <div class="form-group nowrap">
                             <label class="form-label" for="logSystemStats">Log System Stats</label>
-                            <label class="toggle-container">
+                            <span class="toggle-container">
                                 <input type="checkbox" id="logSystemStats" name="logSystemStats" class="toggle-checkbox" {% if device_settings.log_system_stats %}checked{% endif %}>
                                 <span class="toggle-label"></span>
-                            </label>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -189,10 +189,10 @@
                         </div>
                         <div class="form-group nowrap">
                             <label class="form-label" for="includeKeys">Include API keys</label>
-                            <label class="toggle-container">
+                            <span class="toggle-container">
                                 <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
                                 <span class="toggle-label"></span>
-                            </label>
+                            </span>
                         </div>
                         <div class="form-group">
                             <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
@@ -222,17 +222,17 @@
                         </div>
                         <div class="sections-grid two-col">
                             <div class="form-group">
-                                <label class="form-label">Benchmark Summary</label>
-                                <div id="benchSummary" class="logs-viewer loading-panel diagnostics-panel" aria-busy="true">Benchmark summary loading...</div>
+                                <span class="form-label">Benchmark Summary</span>
+                                <div id="benchSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Benchmark Summary" aria-busy="true">Benchmark summary loading...</div>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">Health Summary</label>
-                                <div id="healthSummary" class="logs-viewer loading-panel diagnostics-panel" aria-busy="true">Health summary loading...</div>
+                                <span class="form-label">Health Summary</span>
+                                <div id="healthSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Health Summary" aria-busy="true">Health summary loading...</div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Isolation Summary</label>
-                            <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-busy="true">Isolation list loading...</div>
+                            <span class="form-label">Isolation Summary</span>
+                            <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-label="Isolation Summary" aria-busy="true">Isolation list loading...</div>
                         </div>
                     </div>
                 </div>

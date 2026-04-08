@@ -1,6 +1,6 @@
 <div class="form-group">
-    <label class="form-label">Clock Face</label>
-    <div id="clock-face-selection" class="image-grid">
+    <span id="clock-face-label" class="form-label">Clock Face</span>
+    <div id="clock-face-selection" class="image-grid" role="group" aria-labelledby="clock-face-label">
         {% for face in clock_faces %}
         <button
             type="button"

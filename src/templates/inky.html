@@ -13,7 +13,7 @@
         <div class="app-header">
             <div class="header-content">
                 <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon current-page" title="Home" aria-label="Home" aria-current="page">{{ icon('house', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon current-page" aria-label="Home" aria-current="page">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         {{ icon('squares-four', 'app-icon') | safe }}
@@ -21,9 +21,9 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" title="History" aria-label="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" title="Playlists" aria-label="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" title="Settings" aria-label="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" aria-label="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" aria-label="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" aria-label="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
                     </div>
                     <div class="image-container">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
-                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display image for {{ config.name }}"
+                        <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display for {{ config.name }}"
                              width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
                              data-native-width="{{ config.resolution[0] }}" data-native-height="{{ config.resolution[1] }}">
                     </div>
@@ -128,7 +128,6 @@
             <div class="plugins-container dashboard-grid">
                 {% for plugin in plugins %}
                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="plugin-item"
-                   title="{{ plugin.display_name }}"
                    aria-label="Open {{ plugin.display_name }} plugin settings">
                     {% set ph = icon_map.get(plugin.id) %}
                     {% if ph %}
