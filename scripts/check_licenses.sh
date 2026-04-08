@@ -10,4 +10,4 @@ pip install --quiet pip-licenses
 pip-licenses \
   --fail-on='GPL-3.0;AGPL-3.0;GPL-3.0-or-later;AGPL-3.0-or-later;GPL v3;AGPL v3;GPL-3.0-only;AGPL-3.0-only' \
   --format=plain \
-  --ignore-packages recurring-ical-events rfc3987
+  --ignore-packages recurring-ical-events
