@@ -1,6 +1,114 @@
 # CHANGELOG
 
 
+## v0.12.0 (2026-04-08)
+
+### Bug Fixes
+
+- Add accessible labels to form controls (JTN-315)
+  ([#242](https://github.com/jtn0123/InkyPi/pull/242),
+  [`12543ef`](https://github.com/jtn0123/InkyPi/commit/12543efda0f90178a4148ab56b6884920fe92073))
+
+All form controls on /playlist and /plugin/calendar already have proper labels in the current
+  templates (aria-label on interval/unit/ time inputs in refresh_settings_form.html, for=
+  associations on selects in playlist modal). This commit adds a regression test that asserts every
+  named input/select/textarea has an accessible label, and removes label/select-name from the axe
+  known-violations allowlists in test_playlist_a11y.py and test_more_a11y.py since those rules now
+  pass.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Lazy-load history images to fix Playwright timeout (JTN-316)
+  ([#238](https://github.com/jtn0123/InkyPi/pull/238),
+  [`776f777`](https://github.com/jtn0123/InkyPi/commit/776f7779cd4a7f62c9c29ef3501d3c6fb67ddc0b))
+
+Add decoding="async" to history grid images and defer lightbox.js / history_page.js so they no
+  longer block HTML parsing, preventing the networkidle / load-event timeout Playwright recorded on
+  /history.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- Add backup/restore CLI for device config (JTN-336)
+  ([#246](https://github.com/jtn0123/InkyPi/pull/246),
+  [`f3c9b0f`](https://github.com/jtn0123/InkyPi/commit/f3c9b0ff058607e28b505b163693f8313e1c4407))
+
+scripts/backup_config.py creates a timestamped tar.gz of device.json + plugin instance images with a
+  manifest including SHA-256 checksum. scripts/restore_config.py reverses the operation: shows what
+  will be restored, requires confirmation (or --yes), creates a .pre-restore-<timestamp>.tar.gz
+  safety backup first, then verifies checksum. Both scripts are stdlib-only and independent of the
+  Flask app. 12 tests in tests/test_backup_restore.py cover all key scenarios.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add HTMX MVP for history pagination (JTN-288) ([#243](https://github.com/jtn0123/InkyPi/pull/243),
+  [`9c5f26b`](https://github.com/jtn0123/InkyPi/commit/9c5f26bd8030c4011941f9f142aa70b4b673ec63))
+
+Vendor htmx.min.js 2.0.4 (~50 KB) and include it in base.html with defer. Convert the history page
+  grid/pagination to use hx-get / hx-target / hx-swap so page navigation swaps only the
+  history-grid-container partial in place. The /history route serves the partial template when the
+  HX-Request header is present and the full page otherwise (progressive enhancement — no-JS users
+  follow normal <a href> links unchanged). Five tests in tests/test_htmx.py cover partial vs full
+  response, htmx script presence, hx-* attribute presence, and the no-JS fallback.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add JS/CSS asset bundling for production (JTN-287)
+  ([#240](https://github.com/jtn0123/InkyPi/pull/240),
+  [`c2eec87`](https://github.com/jtn0123/InkyPi/commit/c2eec87d19678436df4319b9be2499f4977c3eb0))
+
+Bundle and minify 7 common JS files and the built CSS into versioned dist files with SHA-256
+  cache-busting hashes via scripts/build_assets.py. Adds Jinja2 bundled_asset() helper with graceful
+  degradation when manifest is absent, and a {% if bundled_assets_enabled %} guard in base.html so
+  dev mode continues using individual script tags.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add mutmut config and nightly mutation testing job (JTN-290)
+  ([#239](https://github.com/jtn0123/InkyPi/pull/239),
+  [`3fb4eb3`](https://github.com/jtn0123/InkyPi/commit/3fb4eb30ebd9635f981416a94fab56b90bfb61e7))
+
+Adds mutmut 2.5.1 to dev deps, configures [tool.mutmut] in pyproject.toml scoped to 3 high-value
+  files, wires the existing mutation-nightly CI job to run mutmut on Sunday 03:00 UTC schedule only,
+  adds a config guard test, and adds docs/mutation_testing.md with local-run and expansion
+  instructions.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add Prometheus /metrics endpoint (JTN-334) ([#245](https://github.com/jtn0123/InkyPi/pull/245),
+  [`5b4f73b`](https://github.com/jtn0123/InkyPi/commit/5b4f73be07ce72f35fec1ff7dca24afbf92eb569))
+
+Expose GET /metrics with five Prometheus gauges/counters: refresh totals (success/failure),
+  last-successful-refresh timestamp, per-plugin failure counts, circuit-breaker open state, and
+  process uptime. Uses a custom CollectorRegistry for test isolation; endpoint requires no
+  authentication.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Optional JSON structured logging via INKYPI_LOG_FORMAT (JTN-337)
+  ([#244](https://github.com/jtn0123/InkyPi/pull/244),
+  [`6be6683`](https://github.com/jtn0123/InkyPi/commit/6be668387a807d7554c243c4c5b1d53d7610246d))
+
+Add JsonFormatter emitting one JSON object per line with ts, level, logger, msg, module, func, line,
+  pid fields. Exception records include exc_type, exc_message, exc_traceback. Extras nested under
+  extra key. Non-serialisable values stringified safely. Enabled via INKYPI_LOG_FORMAT=json; default
+  plain-text format unchanged. Adds 17 tests (100% pass) and docs/logging.md.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Validate device.json schema on startup (JTN-335)
+  ([#247](https://github.com/jtn0123/InkyPi/pull/247),
+  [`86f9cfc`](https://github.com/jtn0123/InkyPi/commit/86f9cfced637d8938ea0b85702b6a713fe368df9))
+
+Extract schema validation into src/utils/config_schema.py with a dedicated ConfigValidationError
+  class. Wire validate_device_config() into Config.read_config() and add clean exit(1) handling in
+  create_app(). Adds 13 new tests covering valid, invalid, fallback (no jsonschema), permissive
+  unknown keys, and regression against the real device_dev.json.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.11.0 (2026-04-08)
 
 ### Features
