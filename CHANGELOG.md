@@ -1,6 +1,98 @@
 # CHANGELOG
 
 
+## v0.4.39 (2026-04-08)
+
+### Bug Fixes
+
+- Add cancellation event and tracking for timed-out plugin threads (JTN-237)
+  ([#205](https://github.com/jtn0123/InkyPi/pull/205),
+  [`d19b8ad`](https://github.com/jtn0123/InkyPi/commit/d19b8adc81d7a8f46f5768b39fb82323d988b468))
+
+On timeout in _execute_inprocess, set a threading.Event (cancel_event) so cooperative plugins can
+  detect cancellation. Track zombie daemon threads with a class-level counter (_zombie_thread_count)
+  that increments on timeout and decrements when the thread eventually finishes. Log clear warnings
+  about zombie threads for monitoring.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Html accessibility — labels, aria attributes, and alt text (JTN-278)
+  ([#207](https://github.com/jtn0123/InkyPi/pull/207),
+  [`6010237`](https://github.com/jtn0123/InkyPi/commit/6010237a5167ddf2748187c4a906f0d3d2f65503))
+
+Address 42 SonarCloud accessibility issues across 12 templates:
+
+- S7927: Remove redundant title attributes where aria-label is present (home links, action buttons
+  in playlist/inky/history/settings/api_keys) - S7927: Align aria-label with visible button text or
+  remove when redundant (plugin.html progress button, display instance button) - S6853: Replace
+  unassociated <label> with <span> for toggle containers that wrap checkboxes implicitly (settings,
+  settings_schema) - S6853: Add aria-label to inputs lacking label association (todo_repeater
+  inputs, calendar color picker) - S6853: Replace unassociated section labels with <span> +
+  aria-label on target div for non-labelable elements (settings diagnostics panels) - S6853: Convert
+  Frame/Background/Clock-Face labels to span + role=group with aria-labelledby for image-grid button
+  groups - S6853: Replace bare <label>Refresh</label> with <span> in refresh_settings_form.html and
+  plugin.html schedule modal - S6851: Remove redundant "image" from alt text in plugin.html,
+  inky.html (Current display), and rss.html (Related)
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract duplicated string literals into constants (JTN-282)
+  ([#203](https://github.com/jtn0123/InkyPi/pull/203),
+  [`59323e7`](https://github.com/jtn0123/InkyPi/commit/59323e713d3351e42d8ec1408e52e9fe0ed36371))
+
+Extract repeated string literals into named module-level constants across six files to address
+  SonarCloud S1192 warnings: _STATE_NEW_YORK/_STATE_NEW_JERSEY in newspaper/constants.py,
+  DEFAULT_IMAGE_MODEL reuse in ai_image.py, _MSG_DISPLAY_UPDATED/_ERR_PLUGIN_ID_REQUIRED in
+  blueprints/plugin.py, _LABEL_UV_INDEX in weather_data.py, _DEVICE_JSON in config.py, and
+  DEFAULT_CLOCK_FACE reuse in clock.py.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Merge duplicate CSS selectors (JTN-284) ([#200](https://github.com/jtn0123/InkyPi/pull/200),
+  [`a69e05a`](https://github.com/jtn0123/InkyPi/commit/a69e05a6380794628f5e8747d6df99adb4e2d853))
+
+Merged 9 duplicate CSS selectors flagged by SonarCloud S4666 across _dashboard.css, _layout.css,
+  weather_ny.css, and weather.css. Cascade order and specificity preserved; later-defined override
+  values kept.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Modernize JS with globalThis, optional chaining, Number.parseInt (JTN-280)
+  ([#202](https://github.com/jtn0123/InkyPi/pull/202),
+  [`f042c15`](https://github.com/jtn0123/InkyPi/commit/f042c15411ab69ba82f2fef8b285aedeae1bde60))
+
+Address ~62 SonarCloud modernization flags (S7764, S6582, S7773): - Replace window with globalThis
+  in dashboard_page, history_page, plugin_schema, client_errors, api_keys_page, ui_helpers,
+  plugin_page (skipping csrf.js monkey-patch) - Replace a && a.b patterns with a?.b optional
+  chaining across dashboard_page, history_page, plugin_page, ui_helpers - Replace
+  parseInt/parseFloat with Number.parseInt/Number.parseFloat in settings_page and plugin_schema
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Reduce cognitive complexity in top 5 worst functions (JTN-276)
+  ([#206](https://github.com/jtn0123/InkyPi/pull/206),
+  [`b5f260f`](https://github.com/jtn0123/InkyPi/commit/b5f260f7c0e8506f812828a03b3e5aeb8459ce66))
+
+Extract helper functions and apply early returns to bring the following SonarCloud S3776 violations
+  under control:
+
+- app_utils.handle_request_files (was 39): split into _get_existing_file_location,
+  _validate_and_read_file, _rewind_file_stream, _save_uploaded_file, and _collect_existing_locations
+  helpers - config._sanitize_config_for_log (was 30): promote inner closures (_looks_sensitive,
+  _mask, _sanitize_playlist) to module-level functions _looks_sensitive, _mask_config_value, and
+  _summarize_playlist - base_plugin.render_image (was 29): extract _build_css_files,
+  _build_inline_css, _render_template, _capture_screenshot, _get_screenshot_timeout, and
+  _screenshot_fallback methods - inkypi.main (was 29): extract _resolve_port, _apply_dev_env, and
+  _install_dev_log_handler helpers - task._execute_with_policy (was 25): extract
+  _run_subprocess_attempt method
+
+Behavior is unchanged; all 2217 tests pass.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.38 (2026-04-08)
 
 ### Bug Fixes
