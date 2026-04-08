@@ -111,3 +111,46 @@ def test_all_pages_include_navigation(client, path):
     html = resp.get_data(as_text=True)
     # All pages should have header navigation or back button
     assert "header" in html.lower()
+
+
+# ---------------------------------------------------------------------------
+# JTN-222: Unlabeled form controls — accessibility labels
+# ---------------------------------------------------------------------------
+
+
+def test_playlist_refresh_interval_has_aria_label(client):
+    """The interval number input in the refresh settings form has an aria-label."""
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    # The refresh_settings_form.html is included inside the Refresh Settings modal.
+    # It renders with prefix="modal", so the input id is "modal-interval".
+    assert 'name="interval"' in html
+    assert 'aria-label="Refresh interval"' in html
+
+
+def test_playlist_refresh_unit_has_aria_label(client):
+    """The unit select in the refresh settings form has an aria-label."""
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'name="unit"' in html
+    assert 'aria-label="Refresh interval unit"' in html
+
+
+def test_playlist_refresh_time_has_aria_label(client):
+    """The refreshTime time input in the refresh settings form has an aria-label."""
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'name="refreshTime"' in html
+    assert 'aria-label="Daily refresh time"' in html
+
+
+def test_calendar_url_input_has_aria_label(client):
+    """The calendarURLs[] input in the calendar plugin page has an aria-label."""
+    resp = client.get("/plugin/calendar")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'name="calendarURLs[]"' in html
+    assert 'aria-label="Calendar URL"' in html
