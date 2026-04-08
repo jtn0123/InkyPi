@@ -347,10 +347,15 @@ def parse_open_meteo_hourly(hourly_data, tz, time_format):
 _AQI_SCALE = ["Good", "Fair", "Moderate", "Poor", "Very Poor"]
 
 
-def _format_owm_visibility(visibility_raw):
+def _format_owm_visibility(visibility_raw, units):
     if visibility_raw is not None:
-        visibility = visibility_raw / 1000
-        return f">{visibility}" if visibility >= 10 else visibility
+        if units == "imperial":
+            visibility = round(visibility_raw / 1609.34, 1)
+            threshold = 6.2
+        else:
+            visibility = round(visibility_raw / 1000, 1)
+            threshold = 10
+        return f">{visibility}" if visibility >= threshold else visibility
     return "N/A"
 
 
@@ -436,12 +441,13 @@ def parse_data_points(weather, air_quality, tz, units, time_format, plugin_dir):
         }
     )
 
-    visibility_str = _format_owm_visibility(current.get("visibility"))
+    visibility_unit = "mi" if units == "imperial" else "km"
+    visibility_str = _format_owm_visibility(current.get("visibility"), units)
     data_points.append(
         {
             "label": "Visibility",
             "measurement": visibility_str,
-            "unit": "km",
+            "unit": visibility_unit,
             "icon": os.path.join(plugin_dir, "icons/visibility.png"),
         }
     )
