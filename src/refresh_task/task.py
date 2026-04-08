@@ -887,8 +887,6 @@ class RefreshTask:
                 plugin_id, instance
             )
 
-        threshold = self._get_circuit_breaker_threshold()
-
         if ok:
             entry["status"] = "green"
             entry["last_success_at"] = now_iso
@@ -898,19 +896,7 @@ class RefreshTask:
             entry["retained_display"] = False
             if metrics:
                 entry["last_metrics"] = metrics
-            # Reset circuit-breaker on success
-            if plugin_instance is not None:
-                if (
-                    plugin_instance.paused
-                    or plugin_instance.consecutive_failure_count > 0
-                ):
-                    logger.info(
-                        "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
-                        plugin_id,
-                        instance,
-                    )
-                plugin_instance.consecutive_failure_count = 0
-                plugin_instance.paused = False
+            self._cb_on_success(plugin_instance, plugin_id, instance)
         else:
             msg = error or "unknown error"
             entry["status"] = "red"
@@ -923,26 +909,54 @@ class RefreshTask:
             entry["retained_display"] = bool((metrics or {}).get("retained_display"))
             if metrics:
                 entry["last_metrics"] = metrics
-            # Increment circuit-breaker counter
-            if plugin_instance is not None and not plugin_instance.paused:
-                plugin_instance.consecutive_failure_count += 1
-                logger.warning(
-                    "plugin circuit_breaker: failure | plugin_id=%s instance=%s count=%d/%d",
-                    plugin_id,
-                    instance,
-                    plugin_instance.consecutive_failure_count,
-                    threshold,
-                )
-                if plugin_instance.consecutive_failure_count >= threshold:
-                    plugin_instance.paused = True
-                    logger.error(
-                        "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
-                        " paused after %d consecutive failures",
-                        plugin_id,
-                        instance,
-                        plugin_instance.consecutive_failure_count,
-                    )
+            self._cb_on_failure(plugin_instance, plugin_id, instance)
         self.plugin_health[plugin_id] = entry
+
+    def _cb_on_success(
+        self,
+        plugin_instance,
+        plugin_id: str,
+        instance: str | None,
+    ) -> None:
+        """Reset the circuit breaker on a successful refresh."""
+        if plugin_instance is None:
+            return
+        if plugin_instance.paused or plugin_instance.consecutive_failure_count > 0:
+            logger.info(
+                "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
+                plugin_id,
+                instance,
+            )
+        plugin_instance.consecutive_failure_count = 0
+        plugin_instance.paused = False
+
+    def _cb_on_failure(
+        self,
+        plugin_instance,
+        plugin_id: str,
+        instance: str | None,
+    ) -> None:
+        """Increment the failure counter and pause the plugin if threshold exceeded."""
+        if plugin_instance is None or plugin_instance.paused:
+            return
+        threshold = self._get_circuit_breaker_threshold()
+        plugin_instance.consecutive_failure_count += 1
+        logger.warning(
+            "plugin circuit_breaker: failure | plugin_id=%s instance=%s count=%d/%d",
+            plugin_id,
+            instance,
+            plugin_instance.consecutive_failure_count,
+            threshold,
+        )
+        if plugin_instance.consecutive_failure_count >= threshold:
+            plugin_instance.paused = True
+            logger.error(
+                "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
+                " paused after %d consecutive failures",
+                plugin_id,
+                instance,
+                plugin_instance.consecutive_failure_count,
+            )
 
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
         """Clear the paused state and failure counter for a plugin instance.
@@ -956,8 +970,9 @@ class RefreshTask:
             return False
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
+        # Use %r to escape control characters in user-controlled values (S5145)
         logger.info(
-            "plugin circuit_breaker: manual_reset | plugin_id=%s instance=%s",
+            "plugin circuit_breaker: manual_reset | plugin_id=%r instance=%r",
             plugin_id,
             instance,
         )
