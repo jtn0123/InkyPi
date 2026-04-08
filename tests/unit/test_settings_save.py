@@ -345,3 +345,29 @@ class TestSaveSettings:
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "interval"
+
+    def test_save_settings_checkbox_on_stores_true(self, client, device_config_dev):
+        """Checkbox fields submitted as 'on' should be stored as boolean True."""
+        form = {**self.VALID_FORM, "invertImage": "on", "logSystemStats": "on"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 200
+        assert device_config_dev.get_config("inverted_image") is True
+        assert device_config_dev.get_config("log_system_stats") is True
+
+    def test_save_settings_checkbox_absent_stores_false(
+        self, client, device_config_dev
+    ):
+        """Checkboxes not present in form (unchecked) should be stored as boolean False."""
+        form = {**self.VALID_FORM}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 200
+        assert device_config_dev.get_config("inverted_image") is False
+        assert device_config_dev.get_config("log_system_stats") is False
+
+    def test_save_settings_checkbox_not_string_on(self, client, device_config_dev):
+        """Checkbox value other than 'on' should be stored as boolean False."""
+        form = {**self.VALID_FORM, "invertImage": "yes", "logSystemStats": "true"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 200
+        assert device_config_dev.get_config("inverted_image") is False
+        assert device_config_dev.get_config("log_system_stats") is False
