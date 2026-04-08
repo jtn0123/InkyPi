@@ -394,3 +394,22 @@ def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(clien
     # url_for() encodes spaces as %20; the raw string must NOT appear in the URL
     assert "update_plugin_instance/My%20Instance" in body
     assert "update_plugin_instance/My Instance" not in body
+
+
+def test_wizard_ids_not_duplicated_in_static_html(client):
+    """JTN-220: wizardPrev and wizardNext must each appear at most once in rendered HTML.
+
+    The wizard navigation is injected by progressive_disclosure.js; the template
+    must not also render a static copy, or every plugin settings page will have
+    duplicate id attributes which break querySelector-based selectors.
+    """
+    resp = client.get("/plugin/calendar")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert (
+        body.count('id="wizardPrev"') <= 1
+    ), "Duplicate id='wizardPrev' found in rendered HTML for /plugin/calendar"
+    assert (
+        body.count('id="wizardNext"') <= 1
+    ), "Duplicate id='wizardNext' found in rendered HTML for /plugin/calendar"
