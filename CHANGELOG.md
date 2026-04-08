@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.4.27 (2026-04-08)
+
+### Bug Fixes
+
+- Respect unit preference for OWM visibility display (JTN-252)
+  ([#178](https://github.com/jtn0123/InkyPi/pull/178),
+  [`3a0efee`](https://github.com/jtn0123/InkyPi/commit/3a0efee7e2bed5c02da28df6bceaebdd06eebbdc))
+
+OWM visibility always showed "km" regardless of the user's unit preference. Now converts metres to
+  miles for imperial users and labels with "mi" accordingly.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.26 (2026-04-08)
 
 ### Bug Fixes
