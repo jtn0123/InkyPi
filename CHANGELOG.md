@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.4.40 (2026-04-08)
+
+### Bug Fixes
+
+- Resolve security hotspots — sha256, constants, HTTPS (JTN-283)
+  ([#204](https://github.com/jtn0123/InkyPi/pull/204),
+  [`8a14921`](https://github.com/jtn0123/InkyPi/commit/8a14921b2ed5e0bd51f923dcd3e4f969aa54cdcc))
+
+* fix: resolve security hotspots — sha256, constants, HTTPS (JTN-283)
+
+- Replace hashlib.md5 with hashlib.sha256 in config write deduplication (S4790) - Extract hardcoded
+  "8.8.8.8" to _DNS_CHECK_HOST constant with explanatory comment (S1313) - Upgrade SMBC and
+  Questionable Content RSS feed URLs from HTTP to HTTPS (S5332)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: add NOSONAR to DNS check host constant
+
+The hardcoded IP is Google's public DNS used for connectivity checks, not a security-sensitive
+  endpoint.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: update DNS check host comment to reflect both UDP and TCP usage
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.39 (2026-04-08)
 
 ### Bug Fixes
