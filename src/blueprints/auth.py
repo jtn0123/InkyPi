@@ -23,6 +23,21 @@ auth_bp = Blueprint("auth", __name__)
 
 _MAX_FAILED_ATTEMPTS = 5
 _LOCKOUT_SECONDS = 60
+_LOGIN_TEMPLATE = "login.html"
+
+
+def _safe_next_url(raw: str | None) -> str:
+    """Return *raw* only when it's a same-origin relative path; otherwise '/'.
+
+    Open-redirect guard: rejects schemes, network-location URLs, protocol-relative
+    URLs, and anything that does not start with a single '/'. Empty/None → '/'.
+    """
+    if not raw:
+        return "/"
+    # Reject protocol-relative ('//evil.com') and absolute ('http://evil.com')
+    if not raw.startswith("/") or raw.startswith("//"):
+        return "/"
+    return raw
 
 
 def _is_locked_out() -> bool:
@@ -49,9 +64,10 @@ def _record_failed_attempt() -> None:
 
 @auth_bp.route("/login", methods=["GET"])
 def login_get():
+    next_url = _safe_next_url(request.args.get("next"))
     if session.get("authed") is True:
-        return redirect(request.args.get("next") or "/")
-    return render_template("login.html", error=None, next=request.args.get("next", "/"))
+        return redirect(next_url)
+    return render_template(_LOGIN_TEMPLATE, error=None, next=next_url)
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -63,11 +79,11 @@ def login_post():
         # Auth not enabled — redirect home
         return redirect("/")
 
-    next_url = request.form.get("next") or "/"
+    next_url = _safe_next_url(request.form.get("next"))
 
     if _is_locked_out():
         return render_template(
-            "login.html",
+            _LOGIN_TEMPLATE,
             error="Too many failed attempts. Please wait 60 seconds and try again.",
             next=next_url,
         )
@@ -77,11 +93,11 @@ def login_post():
         session["authed"] = True
         session.pop("login_failed_count", None)
         session.pop("login_lockout_until", None)
-        return redirect(next_url if next_url.startswith("/") else "/")
+        return redirect(next_url)
 
     _record_failed_attempt()
     return render_template(
-        "login.html", error="Incorrect PIN. Please try again.", next=next_url
+        _LOGIN_TEMPLATE, error="Incorrect PIN. Please try again.", next=next_url
     )
 
 
