@@ -249,16 +249,21 @@ def history_page():
         "used_gb": round(used_bytes / gb, 2) if used_bytes is not None else None,
     }
 
-    return render_template(
-        "history.html",
-        images=images,
-        storage=storage_ctx,
-        metrics=metrics,
-        page=page,
-        total_pages=total_pages,
-        total=total,
-        per_page=per_page,
-    )
+    template_ctx = {
+        "images": images,
+        "storage": storage_ctx,
+        "metrics": metrics,
+        "page": page,
+        "total_pages": total_pages,
+        "total": total,
+        "per_page": per_page,
+    }
+
+    # HTMX partial: return only the grid fragment when requested via hx-get
+    if request.headers.get("HX-Request") == "true":
+        return render_template("partials/history_grid.html", **template_ctx)
+
+    return render_template("history.html", **template_ctx)
 
 
 @history_bp.route("/history/image/<path:filename>", methods=["GET"])
