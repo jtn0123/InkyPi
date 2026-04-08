@@ -300,3 +300,41 @@ class TestGetCurrentHourlyValue:
         times = ["2025-06-15T10:00+00:00"]
         values = []  # times has entry but values is empty
         assert _get_current_hourly_value(times, values, tz, current, "test") == "N/A"
+
+
+class TestFormatOwmVisibility:
+    """Tests for JTN-252: OWM visibility respects unit preference."""
+
+    def test_metric_returns_km_value(self):
+        from plugins.weather.weather_data import _format_owm_visibility
+
+        # 5000 metres → 5.0 km, below 10 km threshold
+        result = _format_owm_visibility(5000, "metric")
+        assert result == 5.0
+
+    def test_metric_above_threshold_prefixes_gt(self):
+        from plugins.weather.weather_data import _format_owm_visibility
+
+        # 10000 metres → 10.0 km, at threshold → ">10.0"
+        result = _format_owm_visibility(10000, "metric")
+        assert result == ">10.0"
+
+    def test_imperial_converts_to_miles(self):
+        from plugins.weather.weather_data import _format_owm_visibility
+
+        # 8046.72 metres ≈ 5.0 miles
+        result = _format_owm_visibility(8046.72, "imperial")
+        assert result == 5.0
+
+    def test_imperial_above_threshold_prefixes_gt(self):
+        from plugins.weather.weather_data import _format_owm_visibility
+
+        # 10000 metres ≈ 6.2 miles, at threshold → ">6.2"
+        result = _format_owm_visibility(10000, "imperial")
+        assert result == ">6.2"
+
+    def test_none_visibility_returns_na(self):
+        from plugins.weather.weather_data import _format_owm_visibility
+
+        assert _format_owm_visibility(None, "imperial") == "N/A"
+        assert _format_owm_visibility(None, "metric") == "N/A"
