@@ -1,6 +1,43 @@
 # CHANGELOG
 
 
+## v0.8.0 (2026-04-08)
+
+### Documentation
+
+- Add architecture diagram and plugin hello-world tutorial (JTN-295)
+  ([#228](https://github.com/jtn0123/InkyPi/pull/228),
+  [`240ea97`](https://github.com/jtn0123/InkyPi/commit/240ea970d7343a5c3e9f7cdc3a8f5823fd8c32e0))
+
+Adds docs/architecture.md with a Mermaid flowchart of the request and refresh paths, plus a 7-step
+  hello-world walkthrough at the bottom of the plugin building guide. Both linked from the README's
+  Documentation section so new contributors can orient quickly.
+
+Closes JTN-295
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add pytest-benchmark perf baseline tests and CI step (JTN-293)
+  ([#229](https://github.com/jtn0123/InkyPi/pull/229),
+  [`9806aa6`](https://github.com/jtn0123/InkyPi/commit/9806aa621d06616eca3be1490690a9b845a81080))
+
+Adds 5 deterministic benchmarks for the InkyPi hot paths:
+
+- HTTP cache hit lookup - PIL image resize + convert (e-ink prep) - PIL image PNG encode (/preview
+  hot path) - Config read (JSON parse + validate) - Plugin registry list scan (startup walk of
+  src/plugins/)
+
+A new CI step in the lint job runs them on every PR via `pytest tests/benchmarks/ --benchmark-only`.
+  For now CI only prints the timings — auto-comparison against a stored baseline (and a regression
+  gate) is a follow-up PR.
+
+Refs JTN-293
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.7.1 (2026-04-08)
 
 ### Bug Fixes
