@@ -6301,6 +6301,43 @@ body.modal-open {
     .modal {
         align-items: flex-end;
     }
+
+    /* ── 36 px minimum touch targets (JTN-223) ── */
+    button,
+    .btn,
+    .action-button,
+    .header-button,
+    .icon-button,
+    .chip,
+    a.btn,
+    select,
+    select.form-input,
+    .button-group button,
+    .collapsible-header {
+        min-height: 36px;
+        min-width: 36px;
+    }
+
+    /* Checkboxes and radios: enlarge the hit area without distorting
+       the visual indicator. Width/height controls the drawn box;
+       the parent label provides the extra tap space. */
+    input[type="checkbox"],
+    input[type="radio"] {
+        width: 20px;
+        height: 20px;
+        min-width: 20px;
+        min-height: 20px;
+    }
+
+    /* Labels that wrap a checkbox/radio get a comfortable tap zone */
+    label:has(> input[type="checkbox"]),
+    label:has(> input[type="radio"]) {
+        min-height: 36px;
+        display: inline-flex;
+        align-items: center;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
 }
 
 /* ── Narrowest screens ── */
