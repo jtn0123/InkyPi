@@ -1,5 +1,20 @@
 (function () {
   function createApiKeysPage(config) {
+    // Dirty-tracking state: true when any field has changed since last save/load.
+    let _isDirty = false;
+
+    function markDirty() {
+      _isDirty = true;
+      const saveBtn = document.getElementById("saveApiKeysBtn");
+      if (saveBtn) saveBtn.disabled = false;
+    }
+
+    function markClean() {
+      _isDirty = false;
+      const saveBtn = document.getElementById("saveApiKeysBtn");
+      if (saveBtn) saveBtn.disabled = true;
+    }
+
     function updateManagedSummary() {
       const configured = Array.from(document.querySelectorAll(".api-key-status")).filter(
         (node) => !/not configured/i.test(node.textContent || "")
@@ -14,6 +29,7 @@
       const input = document.getElementById(inputId);
       if (!input) return;
       input.value = "";
+      markDirty();
       input.focus();
     }
 
@@ -93,6 +109,7 @@
       const saveBtn = document.getElementById("saveApiKeysBtn");
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
       const data = new FormData(form);
+      let savedOk = false;
       try {
         const resp = await fetch(config.saveManagedUrl, {
           method: "POST",
@@ -100,6 +117,7 @@
         });
         const result = await resp.json();
         if (resp.ok) {
+          savedOk = true;
           showResponseModal("success", `Success! ${result.message}`);
           if (result.updated && result.updated.length > 0) {
             updateConfiguredStatus(result.updated);
@@ -110,7 +128,13 @@
       } catch (e) {
         showResponseModal("failure", "Failed to save keys. Please try again.");
       } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+        if (saveBtn) { saveBtn.textContent = "Save"; }
+        if (savedOk) {
+          markClean();
+        } else {
+          // Re-enable so user can retry
+          if (saveBtn) saveBtn.disabled = false;
+        }
       }
     }
 
@@ -166,6 +190,7 @@
     }
 
     function addRow(key = "", value = "") {
+      markDirty();
       const emptyState = document.getElementById("empty-state");
       if (emptyState) emptyState.remove();
       const list = document.getElementById("apikeys-list");
@@ -222,6 +247,7 @@
       if (row?.dataset.existing === "true" && deletedKey) {
         if (!confirm(`Remove ${deletedKey}? Save to apply.`)) return;
       }
+      markDirty();
       row?.remove();
       if (deletedKey) {
         const presetBtn = document.querySelector(
@@ -291,6 +317,7 @@
       }
       const saveBtn = document.getElementById("saveApiKeysBtn");
       if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+      let savedOk = false;
       try {
         const response = await fetch(config.saveGenericUrl, {
           method: "POST",
@@ -299,6 +326,7 @@
         });
         const result = await response.json();
         if (response.ok) {
+          savedOk = true;
           showResponseModal("success", result.message);
           setTimeout(() => globalThis.location.reload(), 1000);
         } else {
@@ -307,11 +335,20 @@
       } catch (error) {
         showResponseModal("failure", "Failed to save API keys");
       } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save"; }
+        if (saveBtn) { saveBtn.textContent = "Save"; }
+        if (savedOk) {
+          markClean();
+        } else {
+          if (saveBtn) saveBtn.disabled = false;
+        }
       }
     }
 
     function saveKeys() {
+      if (!_isDirty) {
+        showResponseModal("info", "No changes to save.");
+        return;
+      }
       if (config.mode === "managed") {
         return saveManagedKeys();
       }
@@ -349,6 +386,8 @@
       });
       const addBtn = document.getElementById("addApiKeyBtn");
       const saveBtn = document.getElementById("saveApiKeysBtn");
+      // Save starts disabled until the user makes a change
+      if (saveBtn) saveBtn.disabled = true;
       if (addBtn) {
         addBtn.addEventListener("click", () => addRow());
       } else if (config.mode === "generic") {
@@ -359,6 +398,15 @@
       } else {
         console.warn("api_keys_page: #saveApiKeysBtn not found in DOM");
       }
+      // Mark dirty on any input change within the page
+      document.addEventListener("input", (event) => {
+        if (
+          event.target.closest(".api-keys-frame") &&
+          (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA")
+        ) {
+          markDirty();
+        }
+      });
       document.addEventListener("click", (event) => {
         const actionEl = event.target.closest("[data-api-action]");
         if (!actionEl) return;
