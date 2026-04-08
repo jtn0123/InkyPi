@@ -171,112 +171,146 @@ def setup_rate_limiting(app: Flask) -> None:
 # ---------------------------------------------------------------------------
 
 
+_STATIC_ASSET_EXTS = (
+    ".css",
+    ".js",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+)
+_DEFAULT_CSP = (
+    "default-src 'self'; img-src 'self' data: https:; "
+    "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "script-src 'self'; font-src 'self' data: https:"
+)
+
+
+def _emit_request_timing_log(response) -> None:
+    """Emit a timing log line if INKYPI_REQUEST_TIMING is set."""
+    if not _env_bool("INKYPI_REQUEST_TIMING"):
+        return
+    t0 = getattr(g, "_t0", None)
+    if t0 is None:
+        return
+    elapsed_ms = int((perf_counter() - t0) * 1000)
+    # Emit on the "inkypi" logger so existing monkey-patches in
+    # tests/unit/test_inkypi.py catch it without modification.
+    import sys
+
+    inkypi_mod = sys.modules.get("inkypi")
+    timing_logger = (
+        getattr(inkypi_mod, "logger", None) if inkypi_mod is not None else None
+    ) or logging.getLogger("inkypi")
+    timing_logger.info(
+        "HTTP %s %s -> %s in %sms",
+        request.method,
+        request.path,
+        response.status_code,
+        elapsed_ms,
+    )
+
+
+def _apply_static_cache_headers(response) -> None:
+    """Set long-lived Cache-Control on hashed static assets."""
+    if not request.path.startswith("/static/"):
+        return
+    if any(request.path.endswith(ext) for ext in _STATIC_ASSET_EXTS):
+        response.headers.setdefault(
+            "Cache-Control",
+            f"public, max-age={_CACHE_1_YEAR}, immutable",
+        )
+    else:
+        response.headers.setdefault("Cache-Control", f"public, max-age={_CACHE_1_DAY}")
+
+
+def _apply_baseline_security_headers(response) -> None:
+    """Set the always-on baseline security headers."""
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault(
+        "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+    )
+
+
+def _apply_hsts_header(response) -> None:
+    """Set HSTS when the request arrived over HTTPS (or via a TLS proxy)."""
+    is_https = (
+        request.is_secure
+        or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
+    )
+    if is_https:
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+
+
+def _apply_csp_header(response, *, dev_mode: bool) -> None:
+    """Set the Content-Security-Policy header (report-only in dev mode)."""
+    csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP
+    report_only = dev_mode or _env_bool("INKYPI_CSP_REPORT_ONLY")
+    header_name = (
+        "Content-Security-Policy-Report-Only"
+        if report_only
+        else "Content-Security-Policy"
+    )
+    if header_name not in response.headers:
+        response.headers[header_name] = csp_value
+
+
+def _apply_hot_reload_header(response, *, dev_mode: bool) -> None:
+    """Surface the dev-mode plugin hot-reload status as a response header."""
+    # Resolve the symbol from the inkypi module so monkey-patches in
+    # tests/unit/test_inkypi.py affect the call here too.
+    import sys
+
+    inkypi_mod = sys.modules.get("inkypi")
+    pop_fn = (
+        getattr(inkypi_mod, "pop_hot_reload_info", None)
+        if inkypi_mod is not None
+        else None
+    )
+    if pop_fn is None:
+        from plugins.plugin_registry import pop_hot_reload_info as pop_fn
+    info = pop_fn()
+    if info and dev_mode:
+        response.headers.setdefault(
+            "X-InkyPi-Hot-Reload",
+            f"{info['plugin_id']}:{int(info['reloaded'])}",
+        )
+
+
 def setup_security_headers(app: Flask, *, dev_mode: bool) -> None:
-    """Attach an after_request hook that sets security + caching headers."""
+    """Attach an after_request hook that sets security + caching headers.
+
+    The hook delegates to small helper functions per concern so the
+    cognitive complexity stays low (SonarCloud S3776).
+    """
 
     @app.after_request
     def _set_security_headers(response):
+        for step in (
+            _emit_request_timing_log,
+            _apply_static_cache_headers,
+            _apply_baseline_security_headers,
+            _apply_hsts_header,
+        ):
+            try:
+                step(response)
+            except Exception:
+                pass
         try:
-            if _env_bool("INKYPI_REQUEST_TIMING"):
-                t0 = getattr(g, "_t0", None)
-                if t0 is not None:
-                    elapsed_ms = int((perf_counter() - t0) * 1000)
-                    # Emit on the "inkypi" logger so existing monkey-patches in
-                    # tests/unit/test_inkypi.py catch it without modification.
-                    import sys
-
-                    inkypi_mod = sys.modules.get("inkypi")
-                    timing_logger = (
-                        getattr(inkypi_mod, "logger", None)
-                        if inkypi_mod is not None
-                        else None
-                    ) or logging.getLogger("inkypi")
-                    timing_logger.info(
-                        "HTTP %s %s -> %s in %sms",
-                        request.method,
-                        request.path,
-                        response.status_code,
-                        elapsed_ms,
-                    )
-        except Exception:
-            pass
-
-        if request.path.startswith("/static/"):
-            if any(
-                request.path.endswith(ext)
-                for ext in [
-                    ".css",
-                    ".js",
-                    ".png",
-                    ".jpg",
-                    ".jpeg",
-                    ".gif",
-                    ".svg",
-                    ".woff",
-                    ".woff2",
-                    ".ttf",
-                ]
-            ):
-                response.headers.setdefault(
-                    "Cache-Control",
-                    f"public, max-age={_CACHE_1_YEAR}, immutable",
-                )
-            else:
-                response.headers.setdefault(
-                    "Cache-Control", f"public, max-age={_CACHE_1_DAY}"
-                )
-
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault(
-            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
-        )
-        try:
-            if (
-                request.is_secure
-                or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-            ):
-                response.headers.setdefault(
-                    "Strict-Transport-Security",
-                    "max-age=31536000; includeSubDomains",
-                )
+            _apply_csp_header(response, dev_mode=dev_mode)
         except Exception:
             pass
         try:
-            csp_value = (
-                os.getenv("INKYPI_CSP")
-                or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:"
-            )
-            report_only = dev_mode or _env_bool("INKYPI_CSP_REPORT_ONLY")
-            header_name = (
-                "Content-Security-Policy-Report-Only"
-                if report_only
-                else "Content-Security-Policy"
-            )
-            if header_name not in response.headers:
-                response.headers[header_name] = csp_value
-        except Exception:
-            pass
-        try:
-            # Resolve the symbol from the inkypi module so monkey-patches in
-            # tests/unit/test_inkypi.py affect the call here too.
-            import sys
-
-            inkypi_mod = sys.modules.get("inkypi")
-            pop_fn = (
-                getattr(inkypi_mod, "pop_hot_reload_info", None)
-                if inkypi_mod is not None
-                else None
-            )
-            if pop_fn is None:
-                from plugins.plugin_registry import pop_hot_reload_info as pop_fn
-            info = pop_fn()
-            if info and dev_mode:
-                response.headers.setdefault(
-                    "X-InkyPi-Hot-Reload",
-                    f"{info['plugin_id']}:{int(info['reloaded'])}",
-                )
+            _apply_hot_reload_header(response, dev_mode=dev_mode)
         except Exception:
             pass
         return response
