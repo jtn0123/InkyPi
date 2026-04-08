@@ -7,8 +7,11 @@ title = "InkyPi gitleaks config"
 # Extend the default ruleset
 useDefault = true
 
-[[allowlists]]
-description = "Intentional fake secrets used in log-redaction unit tests"
+# Allowlist intentional fake secrets in the log-redaction test file.
+# These strings are test fixtures that verify the filter pattern works;
+# they are not real credentials.
+[allowlist]
+description = "Intentional fake secrets in log-redaction unit tests"
 paths = [
-    "tests/test_log_redaction\\.py",
+    '''tests/test_log_redaction\.py''',
 ]
