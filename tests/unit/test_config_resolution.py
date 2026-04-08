@@ -103,6 +103,35 @@ def test_bootstrap_when_no_config_found(monkeypatch, tmp_path):
     assert os.path.isfile(os.path.join(str(tmp_src), "config", "device.json"))
 
 
+def test_env_mode_dev_wins_over_prod_when_both_exist(monkeypatch, tmp_path):
+    """Regression test for JTN-259: INKYPI_ENV=dev must select device_dev.json
+    even when device.json also exists (the class default always points to device.json,
+    which previously caused step 2 to always match and INKYPI_ENV to be unreachable).
+    """
+    import config as config_mod
+
+    # Create both prod and dev config files in a temp directory
+    prod_path = tmp_path / "config" / "device.json"
+    dev_path = tmp_path / "config" / "device_dev.json"
+    _write_min_config(str(prod_path), name="ProdConfig")
+    _write_min_config(str(dev_path), name="DevConfig")
+
+    # Point BASE_DIR and config_file to the temp directory so the class default
+    # resolves to the temp prod path (simulating the bug scenario where device.json exists)
+    monkeypatch.setattr(config_mod.Config, "BASE_DIR", str(tmp_path))
+    monkeypatch.delenv("INKYPI_CONFIG_FILE", raising=False)
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+
+    # Act — INKYPI_ENV=dev should select device_dev.json, not device.json
+    cfg = config_mod.Config()
+
+    # Assert — dev config wins even though prod config exists
+    assert cfg.get_config("name") == "DevConfig", (
+        "INKYPI_ENV=dev should select device_dev.json even when device.json exists; "
+        "this fails if the class-default config_file check blocks env-based selection"
+    )
+
+
 def test_get_resolution_returns_default_when_key_missing(monkeypatch, tmp_path):
     import config as config_mod
 
