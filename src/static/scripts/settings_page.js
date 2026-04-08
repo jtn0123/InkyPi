@@ -84,7 +84,7 @@
         intervalInput.value = String(intervalInHours);
         unitSelect.value = "hour";
       } else {
-        intervalInput.value = String(intervalInMinutes);
+        intervalInput.value = String(Math.max(1, intervalInMinutes));
         unitSelect.value = "minute";
       }
     }
