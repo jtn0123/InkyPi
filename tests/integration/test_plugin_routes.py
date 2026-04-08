@@ -518,9 +518,7 @@ def test_plugin_page_instance_url_plus_encoding_decoded_correctly(
     assert resp.status_code == 200
 
 
-def test_plugin_page_instance_nonexistent_returns_friendly_404(
-    client, device_config_dev
-):
+def test_plugin_page_instance_nonexistent_returns_friendly_404(client, device_config_dev):
     """GET /plugin/<id>?instance=<missing> returns 404 with a descriptive message (JTN-221)."""
     resp = client.get("/plugin/weather?instance=nonexistent instance")
     assert resp.status_code == 404
