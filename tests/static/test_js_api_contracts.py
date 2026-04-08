@@ -126,6 +126,32 @@ def test_lightbox_script_exists(client):
     assert "modal.id" in js and "imagePreviewModal" in js
 
 
+def test_lightbox_click_timer_disambiguates_single_double_click(client):
+    """JTN-262: Single click should close, double-click should toggle native sizing.
+
+    The fix uses a click timer so the first click of a double-click does not
+    close the lightbox before the second click arrives.  Verify the timer
+    pattern is present and the separate dblclick listener is gone.
+    """
+    resp = client.get("/static/scripts/lightbox.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # Timer variable must exist at module scope
+    assert "let clickTimer = null" in js
+
+    # The unified handler that checks / clears the timer
+    assert "imgClickHandler" in js
+    assert "clearTimeout(clickTimer)" in js
+    assert "clickTimer = setTimeout" in js
+
+    # The handler must be registered as a click listener on the img
+    assert "img.addEventListener('click', imgClickHandler)" in js
+
+    # The old separate dblclick listener must not be present
+    assert "addEventListener('dblclick'" not in js
+
+
 # --- Response Modal ---
 
 
