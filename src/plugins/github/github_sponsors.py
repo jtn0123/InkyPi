@@ -91,5 +91,7 @@ def fetch_sponsorships(username, api_key):
 
 def calculate_monthly_total(data) -> int:
     sponsorships = data["data"]["user"]["sponsorshipsAsMaintainer"]["nodes"]
-    total_per_month = sum(s["tier"]["monthlyPriceInCents"] / 100 for s in sponsorships)
-    return int(total_per_month)
+    total_cents = sum(
+        (s.get("tier") or {}).get("monthlyPriceInCents", 0) for s in sponsorships
+    )
+    return round(total_cents / 100)
