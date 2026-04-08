@@ -34,6 +34,34 @@ Tail the logs:
 journalctl -u inkypi -f
 ```
 
+## Log Rotation
+
+On a long-running Pi (weeks or months of 24/7 uptime), the systemd journal can quietly grow large enough to fill an SD card. A few commands help you keep it in check.
+
+**Check current journal disk usage:**
+```bash
+journalctl --disk-usage
+```
+
+**Set a persistent size cap** by adding these lines to `/etc/systemd/journald.conf`:
+```ini
+SystemMaxUse=50M
+RuntimeMaxUse=50M
+```
+Then restart the journal daemon to apply:
+```bash
+sudo systemctl restart systemd-journald
+```
+
+**Vacuum old logs immediately** (one-off cleanup):
+```bash
+sudo journalctl --vacuum-size=50M
+```
+
+> **Note:** The in-memory log buffer used in dev mode (`--dev`) holds at most 1,000 entries and is never written to disk, so it has no impact on journal size.
+
+The InkyPi install script (`install/install.sh`) automatically applies a 50M journal cap during a fresh install if no `SystemMaxUse` limit is already configured.
+
 ## Restart the InkyPi Service
 
 ```bash
