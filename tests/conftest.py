@@ -298,6 +298,8 @@ def flask_app(device_config_dev, monkeypatch):
     def _inject_csrf_token():
         return {"csrf_token": _generate_csrf_token}
 
+    from app_setup.http_metrics import setup_http_metrics
+
     # Register routes
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
@@ -307,6 +309,8 @@ def flask_app(device_config_dev, monkeypatch):
     app.register_blueprint(history_bp)
     app.register_blueprint(api_docs_bp)
     app.register_blueprint(metrics_bp)
+
+    setup_http_metrics(app)
 
     # Lightweight health endpoints for probes/CI
     @app.route("/healthz")
