@@ -25,7 +25,7 @@
     <div id="playlist-page-content">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
-        <div class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
@@ -39,7 +39,7 @@
                     <button id="newPlaylistBtn" class="header-button" type="button">New Playlist</button>
                 </div>
             </div>
-        </div>
+        </header>
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Playlists'}]) }}
         <div class="page-intro">
