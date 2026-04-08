@@ -42,7 +42,7 @@ COMICS = {
         "caption": lambda element: "",
     },
     "Saturday Morning Breakfast Cereal": {
-        "feed": "http://www.smbc-comics.com/comic/rss",
+        "feed": "https://www.smbc-comics.com/comic/rss",
         "element": lambda feed: feed.entries[0].description,
         "url": lambda element: _img_src(element),
         "title": lambda feed: _split_safe(feed.entries[0].title, "-", 1),
@@ -56,7 +56,7 @@ COMICS = {
         "caption": lambda element: _img_alt(element),
     },
     "Questionable Content": {
-        "feed": "http://www.questionablecontent.net/QCRSS.xml",
+        "feed": "https://www.questionablecontent.net/QCRSS.xml",
         "element": lambda feed: feed.entries[0].description,
         "url": lambda element: _img_src(element),
         "title": lambda feed: feed.entries[0].title,
