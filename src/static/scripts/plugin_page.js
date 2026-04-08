@@ -131,7 +131,9 @@
         }
         if (elapsedEl) elapsedEl.textContent = "—";
         if (bar) { bar.style.width = "100%"; bar.setAttribute("aria-valuenow", 100); }
-        if (progress) progress.style.display = "block";
+        // JTN-312: clear the HTML `hidden` attribute so the block is visible;
+        // setting style.display alone does not override the `hidden` attribute.
+        if (progress) setHidden(progress, false);
       } catch (e) { console.warn("Failed to show last progress:", e); }
     }
 

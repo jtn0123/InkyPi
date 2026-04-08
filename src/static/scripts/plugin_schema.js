@@ -227,8 +227,7 @@
     removeBtn.appendChild(icon);
     removeBtn.addEventListener("click", () => {
       const list = entry.parentElement;
-      entry.remove();
-      updateRepeaterEmptyState(list);
+      if (list) handleRemoveClick(removeBtn, list);
     });
     toolbar.appendChild(urlInput);
     toolbar.appendChild(removeBtn);
@@ -263,19 +262,32 @@
     }
   }
 
+  // JTN-311: Disable remove buttons when only one calendar row remains so the
+  // button is never a silent no-op. The tooltip explains why removal is blocked.
+  function syncRemoveButtonStates(list) {
+    const count = list.querySelectorAll(".dynamic-list-item").length;
+    const onlyOne = count <= 1;
+    list.querySelectorAll(".remove-btn").forEach((btn) => {
+      btn.disabled = onlyOne;
+      if (onlyOne) {
+        btn.title = "Add another calendar before removing this one";
+      } else {
+        btn.title = "";
+      }
+    });
+  }
+
   function handleRemoveClick(button, list) {
     if (list.querySelectorAll(".dynamic-list-item").length <= 1) {
-      const item = button.closest(".dynamic-list-item");
-      if (item) {
-        item.classList.add("shake");
-        item.addEventListener("animationend", () => item.classList.remove("shake"), { once: true });
-      }
       return;
     }
     const item = button.closest(".dynamic-list-item");
     const parentList = item?.parentElement;
     item?.remove();
-    if (parentList) updateRepeaterEmptyState(parentList);
+    if (parentList) {
+      updateRepeaterEmptyState(parentList);
+      syncRemoveButtonStates(parentList);
+    }
   }
 
   function bindRemoveButtons(list) {
@@ -298,9 +310,12 @@
       if (!urls.length) list.appendChild(createCalendarEntry("", "#007BFF"));
     }
     updateRepeaterEmptyState(list);
+    syncRemoveButtonStates(list);
     addButton.addEventListener("click", () => {
       list.appendChild(createCalendarEntry("", "#007BFF"));
       updateRepeaterEmptyState(list);
+      syncRemoveButtonStates(list);
+      bindRemoveButtons(list);
     });
   }
 
