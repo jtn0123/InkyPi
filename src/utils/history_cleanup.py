@@ -72,7 +72,9 @@ def _remove_pair(base_dir: str, png_path: str, result: CleanupResult) -> None:
         result.freed_bytes += sidecar_freed
 
 
-def _collect_png_files(history_dir: str, result: CleanupResult) -> list[tuple[float, str]]:
+def _collect_png_files(
+    history_dir: str, result: CleanupResult
+) -> list[tuple[float, str]]:
     """Return a list of ``(mtime, abs_path)`` for every non-symlink PNG in *history_dir*.
 
     Symlinks are skipped and counted in *result.skipped_symlinks*.

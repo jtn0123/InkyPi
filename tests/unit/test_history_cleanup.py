@@ -58,9 +58,11 @@ def test_nonexistent_dir_returns_empty_result(tmp_path):
 def test_max_age_deletes_old_files(tmp_path):
     """Files older than max_age_days should be removed."""
     _make_png(tmp_path, "old.png", age_seconds=31 * 86400)  # 31 days old
-    _make_png(tmp_path, "new.png", age_seconds=1 * 86400)   # 1 day old
+    _make_png(tmp_path, "new.png", age_seconds=1 * 86400)  # 1 day old
 
-    result = cleanup_history(str(tmp_path), max_age_days=30, max_count=0, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=30, max_count=0, min_free_bytes=0
+    )
 
     assert result.deleted_count == 1
     assert not (tmp_path / "old.png").exists()
@@ -70,9 +72,13 @@ def test_max_age_deletes_old_files(tmp_path):
 
 def test_max_age_deletes_sidecar_too(tmp_path):
     """When an old PNG is deleted its JSON sidecar must go too."""
-    png, sidecar = _make_pair(tmp_path, "display_20200101_000000", age_seconds=40 * 86400)
+    png, sidecar = _make_pair(
+        tmp_path, "display_20200101_000000", age_seconds=40 * 86400
+    )
 
-    result = cleanup_history(str(tmp_path), max_age_days=30, max_count=0, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=30, max_count=0, min_free_bytes=0
+    )
 
     assert result.deleted_count == 1
     assert not png.exists()
@@ -83,7 +89,9 @@ def test_max_age_zero_disables_age_check(tmp_path):
     """max_age_days=0 should leave all files untouched."""
     _make_png(tmp_path, "ancient.png", age_seconds=365 * 86400)
 
-    result = cleanup_history(str(tmp_path), max_age_days=0, max_count=0, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=0, max_count=0, min_free_bytes=0
+    )
 
     assert result.deleted_count == 0
     assert (tmp_path / "ancient.png").exists()
@@ -100,7 +108,9 @@ def test_max_count_keeps_newest(tmp_path):
         _make_png(tmp_path, f"img_{i:02d}.png", age_seconds=(5 - i) * 3600)
 
     # Keep only the 3 newest
-    result = cleanup_history(str(tmp_path), max_age_days=0, max_count=3, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=0, max_count=3, min_free_bytes=0
+    )
 
     assert result.deleted_count == 2
     assert result.remaining_count == 3
@@ -118,7 +128,9 @@ def test_max_count_zero_disables_count_check(tmp_path):
     for i in range(10):
         _make_png(tmp_path, f"img_{i}.png")
 
-    result = cleanup_history(str(tmp_path), max_age_days=0, max_count=0, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=0, max_count=0, min_free_bytes=0
+    )
 
     assert result.deleted_count == 0
     assert result.remaining_count == 10
@@ -129,7 +141,9 @@ def test_max_count_under_limit_is_noop(tmp_path):
     for i in range(3):
         _make_png(tmp_path, f"img_{i}.png")
 
-    result = cleanup_history(str(tmp_path), max_age_days=0, max_count=10, min_free_bytes=0)
+    result = cleanup_history(
+        str(tmp_path), max_age_days=0, max_count=10, min_free_bytes=0
+    )
 
     assert result.deleted_count == 0
     assert result.remaining_count == 3
@@ -238,7 +252,9 @@ def test_no_files_outside_history_dir_deleted(tmp_path):
     external = other_dir / "external.png"
     external.write_bytes(b"\x00" * 1024)
 
-    result = cleanup_history(str(history_dir), max_age_days=30, max_count=0, min_free_bytes=0)
+    result = cleanup_history(
+        str(history_dir), max_age_days=30, max_count=0, min_free_bytes=0
+    )
 
     assert result.deleted_count == 1
     assert external.exists(), "External file must not be deleted"
