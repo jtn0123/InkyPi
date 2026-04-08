@@ -107,4 +107,3 @@ def test_finish_operation_restores_previous_fetch(client):
     assert "window.fetch = previousFetch;" in js
     # The restore must be guarded so only the active wrapper is removed
     assert "if (window.fetch === wrappedFetch)" in js
-
