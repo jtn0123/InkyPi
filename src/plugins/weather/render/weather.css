@@ -14,6 +14,7 @@
   width: 100%;
   height: 100%;
   font-family: "Jost", sans-serif;
+  position: relative;
 }
 
 .header {
@@ -33,10 +34,6 @@
   text-align: right;
   font-weight: bold;
   padding: 0.3dvh 0.5dvw;
-}
-
-.weather-dashboard {
-  position: relative;
 }
 
 .title {

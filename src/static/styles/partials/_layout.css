@@ -27,6 +27,7 @@
     width: 300px;
     margin: 0 auto;
     padding: var(--spacing-xs);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .image-container img {
@@ -41,11 +42,6 @@
 
 /* Any image marked lightboxable gets the zoom-in cursor */
 .lightboxable { cursor: zoom-in; }
-
-/* Hover feedback on clickable image containers */
-.image-container {
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
 
 /* Enhanced meta information hierarchy */
 .image-meta {
@@ -209,7 +205,6 @@ main[data-page-shell="workflow"] .frame {
 }
 
 /* Device frame overlay for large preview */
-.image-container { position: relative; }
 .device-frame-overlay {
   position: absolute;
   inset: 0;
@@ -319,7 +314,7 @@ main[data-page-shell="workflow"] .frame {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin: 4px 0 10px 0;
+    margin: 4px 0 16px 0;
 }
 
 .section-focus {
@@ -410,13 +405,6 @@ main[data-page-shell="workflow"] .frame {
 .lightbox-preview-image.lightbox-img-visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.section-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
 }
 
 .section-nav .status-chip {
