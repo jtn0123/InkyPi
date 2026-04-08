@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.6.3 (2026-04-08)
+
+### Bug Fixes
+
+- Wire up history page Display/Delete/Clear All actions and pagination (JTN-305, JTN-306, JTN-307,
+  JTN-308) ([#220](https://github.com/jtn0123/InkyPi/pull/220),
+  [`cfc10b6`](https://github.com/jtn0123/InkyPi/commit/cfc10b65830b24aa363685b36af645d43101c1c5))
+
+The history page had four no-op interactive elements: - Display button now POSTs to the display
+  endpoint - Delete button now confirms and DELETEs the entry - Clear All button now confirms and
+  clears history - Next pagination link now navigates to the next page
+
+Add 26 static and integration tests covering all four fixes: JS source analysis verifying event
+  delegation, endpoint wiring, and config URL injection; template assertions for data attributes,
+  modal markup, and boot config; and endpoint smoke tests for redisplay, delete, and clear actions.
+
+Closes JTN-305 Closes JTN-306 Closes JTN-307 Closes JTN-308
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.6.2 (2026-04-08)
 
 ### Bug Fixes
