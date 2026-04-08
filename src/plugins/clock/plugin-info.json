@@ -1,5 +1,7 @@
 {
     "display_name": "Clock",
     "id": "clock",
-    "class": "Clock"
+    "class": "Clock",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

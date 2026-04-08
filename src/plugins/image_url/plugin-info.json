@@ -1,5 +1,7 @@
 {
     "display_name": "Image URL",
     "id": "image_url",
-    "class": "ImageURL"
+    "class": "ImageURL",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

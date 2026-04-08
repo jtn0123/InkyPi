@@ -1,5 +1,7 @@
 {
   "display_name": "Countdown",
   "id": "countdown",
-  "class": "Countdown"
+  "class": "Countdown",
+  "api_version": "1.0",
+  "version": "1.0.0"
 }

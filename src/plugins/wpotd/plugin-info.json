@@ -1,5 +1,7 @@
 {
   "display_name": "Wikipedia:Picture of the day",
   "id": "wpotd",
-  "class": "Wpotd"
+  "class": "Wpotd",
+  "api_version": "1.0",
+  "version": "1.0.0"
 }

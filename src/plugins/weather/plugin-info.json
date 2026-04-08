@@ -1,5 +1,7 @@
 {
     "display_name": "Weather",
     "id": "weather",
-    "class": "Weather"
+    "class": "Weather",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

@@ -1,5 +1,7 @@
 {
     "display_name": "AI Text",
     "id": "ai_text",
-    "class": "AIText"
+    "class": "AIText",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

@@ -1,5 +1,7 @@
 {
     "display_name": "RSS Feed",
     "id": "rss",
-    "class": "Rss"
+    "class": "Rss",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

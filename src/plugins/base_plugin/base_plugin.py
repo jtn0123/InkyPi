@@ -19,6 +19,8 @@ from utils.progress import (
 
 logger = logging.getLogger(__name__)
 
+PLUGIN_API_VERSION = "1.0"
+
 PLUGINS_DIR = resolve_path("plugins")
 BASE_PLUGIN_DIR = os.path.join(PLUGINS_DIR, "base_plugin")
 BASE_PLUGIN_RENDER_DIR = os.path.join(BASE_PLUGIN_DIR, "render")
@@ -36,6 +38,8 @@ class BasePlugin:
 
     def __init__(self, config, **dependencies):
         self.config = config
+        self.version: str | None = config.get("version")
+        self.api_version: str | None = config.get("api_version")
 
         # Initialize adaptive image loader for device-aware image processing
         self.image_loader = AdaptiveImageLoader()

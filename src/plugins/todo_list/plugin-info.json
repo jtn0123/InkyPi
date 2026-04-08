@@ -1,5 +1,7 @@
 {
   "display_name": "To-Do List",
   "id": "todo_list",
-  "class": "TodoList"
+  "class": "TodoList",
+  "api_version": "1.0",
+  "version": "1.0.0"
 }

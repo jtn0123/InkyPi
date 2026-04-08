@@ -1,5 +1,7 @@
 {
     "display_name": "Image Folder",
     "id": "image_folder",
-    "class": "ImageFolder"
+    "class": "ImageFolder",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }

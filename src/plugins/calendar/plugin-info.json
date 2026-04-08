@@ -1,5 +1,7 @@
 {
     "display_name": "Calendar",
     "id": "calendar",
-    "class": "Calendar"
+    "class": "Calendar",
+    "api_version": "1.0",
+    "version": "1.0.0"
 }
