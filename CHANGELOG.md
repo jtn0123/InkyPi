@@ -1,6 +1,63 @@
 # CHANGELOG
 
 
+## v0.5.0 (2026-04-08)
+
+### Bug Fixes
+
+- Make Refresh Settings modal a true modal (JTN-228)
+  ([#213](https://github.com/jtn0123/InkyPi/pull/213),
+  [`47dcc0e`](https://github.com/jtn0123/InkyPi/commit/47dcc0ed217cfa9bc13116eebbce5bbbcec4b017))
+
+* fix: make playlist Refresh Settings modal block background (JTN-228)
+
+The Refresh Settings dialog left the underlying playlist page interactive. Adds a
+  #playlist-page-content wrapper div in playlist.html and toggles the inert attribute on it whenever
+  any modal opens, blocking all pointer, keyboard, and touch events from reaching background
+  controls. Focus is moved into the modal on open and restored to the trigger element on close. All
+  playlist modals (Refresh Settings, Schedule, Delete playlist/instance) use the same centralised
+  syncModalOpenState path.
+
+Closes JTN-228
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: update openCreateModal regex for triggerEl parameter
+
+The JTN-228 modal backdrop fix added a triggerEl parameter to openCreateModal for focus restoration.
+  Loosens the test regex to accept any signature so the assertion still validates the body.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Prefill default time when switching to Daily-at scheduling (JTN-227)
+  ([#214](https://github.com/jtn0123/InkyPi/pull/214),
+  [`8f96d8e`](https://github.com/jtn0123/InkyPi/commit/8f96d8e187adeb14a3c43a278f3635e9b5d59ae1))
+
+The Daily-at refresh option used to start with an empty time input, leaving users to discover the
+  requirement via an error toast on save. Now defaults to 09:00 on switch and shows inline guidance
+  text.
+
+Closes JTN-227
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add plugin api_version and version metadata (JTN-300)
+  ([#216](https://github.com/jtn0123/InkyPi/pull/216),
+  [`0fb809f`](https://github.com/jtn0123/InkyPi/commit/0fb809fe30b82af7fb2198f3537f5fc49cc00a4a))
+
+Adds PLUGIN_API_VERSION constant in base_plugin and api_version/version fields to all built-in
+  plugin metadata. Plugin loader logs a warning on major version mismatch but still loads (backward
+  compatible). Lays the groundwork for safe plugin API evolution.
+
+Closes JTN-300
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.42 (2026-04-08)
 
 ### Bug Fixes
