@@ -11,6 +11,8 @@ import logging
 import logging.config
 import os
 
+from utils.logging_utils import SecretRedactionFilter
+
 
 def use_json_logging() -> bool:
     """Return True when INKYPI_LOG_FORMAT=json is set."""
@@ -51,6 +53,10 @@ def setup_logging() -> None:
             ),
             disable_existing_loggers=False,
         )
+
+    # Attach the secret-redaction filter to the root logger so it applies to
+    # ALL handlers (console, file, dev-mode buffer) and both log formats.
+    logging.getLogger().addFilter(SecretRedactionFilter())
 
 
 def install_dev_log_handler() -> None:
