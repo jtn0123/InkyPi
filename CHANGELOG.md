@@ -1,6 +1,62 @@
 # CHANGELOG
 
 
+## v0.4.26 (2026-04-08)
+
+### Bug Fixes
+
+- Allow INKYPI_ENV to override default config path (JTN-259)
+  ([#175](https://github.com/jtn0123/InkyPi/pull/175),
+  [`fea64a1`](https://github.com/jtn0123/InkyPi/commit/fea64a1105c9fa64a72c3b9c379eed49ee51edf1))
+
+Config._determine_config_path step 2 previously used getattr(type(self), "config_file") which always
+  matches the base Config default (device.json path), making INKYPI_ENV=dev unreachable when
+  device.json exists.
+
+Fix: compare the class attribute against the computed base default (_base_default =
+  base_dir/config/device.json). Only treat it as an explicit override when the value has been
+  changed from that default (e.g. by CLI mutation or test monkeypatching). Adds a regression test
+  that verifies INKYPI_ENV=dev selects device_dev.json even when device.json also exists.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Convert checkbox values to boolean in settings (JTN-231)
+  ([#171](https://github.com/jtn0123/InkyPi/pull/171),
+  [`1238f55`](https://github.com/jtn0123/InkyPi/commit/1238f55eef8ab19748fff5561319ec3a91967a3c))
+
+Settings checkboxes stored raw HTML "on"/None instead of proper booleans. Convert inverted_image and
+  log_system_stats fields with == "on" comparison.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Handle null tier in GitHub sponsors plugin (JTN-254)
+  ([#173](https://github.com/jtn0123/InkyPi/pull/173),
+  [`47cf3e1`](https://github.com/jtn0123/InkyPi/commit/47cf3e14ef82d54ee409d63be80bc08189c97f13))
+
+Safely handle null tier entries from GitHub GraphQL API using (s.get("tier") or {}).get(..., 0) and
+  use round() instead of int() for correct rounding of monthly totals.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Make calendar view range datetimes timezone-aware (JTN-233)
+  ([#174](https://github.com/jtn0123/InkyPi/pull/174),
+  [`31231f2`](https://github.com/jtn0123/InkyPi/commit/31231f29c3dfd900c9c067f41cb371270b270650))
+
+get_view_range created naive datetimes that crashed when compared with tz-aware iCal events. Now
+  passes tzinfo from current_dt to all datetime constructors in the method.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Use parsedate_to_datetime for correct UTC handling (JTN-258)
+  ([#172](https://github.com/jtn0123/InkyPi/pull/172),
+  [`e07c9b1`](https://github.com/jtn0123/InkyPi/commit/e07c9b15c4407e0b79e1fd60e3bd53bf9ed7c02d))
+
+Replace strptime with %Z (unreliable timezone handling) with email.utils.parsedate_to_datetime which
+  always returns timezone-aware datetimes, ensuring correct UTC comparison against file mtime.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.25 (2026-04-07)
 
 ### Bug Fixes
