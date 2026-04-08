@@ -1,5 +1,6 @@
 """Tests for HTTP response caching functionality."""
 
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -441,3 +442,122 @@ def test_cached_response_holds_no_raw_connection(cache, mock_response):
     assert cached.raw is None, "cached response must not hold a raw urllib3 connection"
     assert cached.status_code == 200
     assert cached.content == b"test response body"
+
+
+# ---------------------------------------------------------------------------
+# JTN-299: LRU eviction via max_entries, stats(), and env var override
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def small_cache(mock_response):
+    """Cache with max_entries=3 for eviction tests."""
+    return HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=3)
+
+
+def test_max_entries_evicts_oldest(small_cache, mock_response):
+    """Cache evicts the oldest (LRU) entry when max_entries is exceeded."""
+    small_cache.put("https://example.com/a", mock_response)
+    small_cache.put("https://example.com/b", mock_response)
+    small_cache.put("https://example.com/c", mock_response)
+
+    assert len(small_cache._cache) == 3
+
+    # Adding a 4th entry should evict the oldest ("a")
+    small_cache.put("https://example.com/d", mock_response)
+
+    assert len(small_cache._cache) == 3
+    assert small_cache.get("https://example.com/a") is None
+    assert small_cache.get("https://example.com/b") is not None
+    assert small_cache.get("https://example.com/d") is not None
+
+
+def test_lru_access_moves_entry_to_most_recent(small_cache, mock_response):
+    """Accessing a cache entry promotes it so it is not evicted first."""
+    small_cache.put("https://example.com/a", mock_response)
+    small_cache.put("https://example.com/b", mock_response)
+    small_cache.put("https://example.com/c", mock_response)
+
+    # Access "a" so it becomes most-recently-used
+    small_cache.get("https://example.com/a")
+
+    # Adding a 4th entry should evict "b" (now the least recently used)
+    small_cache.put("https://example.com/d", mock_response)
+
+    assert len(small_cache._cache) == 3
+    assert small_cache.get("https://example.com/a") is not None, "a should survive"
+    assert small_cache.get("https://example.com/b") is None, "b should be evicted"
+
+
+def test_stats_method_returns_counters(small_cache, mock_response):
+    """stats() returns hits, misses, and evictions counters."""
+    url_a = "https://example.com/s1"
+    url_b = "https://example.com/s2"
+
+    # Miss
+    small_cache.get(url_a)
+
+    # Store and hit
+    small_cache.put(url_a, mock_response)
+    small_cache.get(url_a)
+
+    # Fill to capacity and trigger one eviction
+    small_cache.put("https://example.com/x1", mock_response)
+    small_cache.put("https://example.com/x2", mock_response)
+    small_cache.put(url_b, mock_response)  # 4th entry → eviction
+
+    result = small_cache.stats()
+    assert result["hits"] >= 1
+    assert result["misses"] >= 1
+    assert result["evictions"] >= 1
+    assert "hit_rate" in result
+    assert result["max_entries"] == 3
+
+
+def test_eviction_counter_increments(small_cache, mock_response):
+    """Eviction counter increments with each evicted entry."""
+    for i in range(6):
+        small_cache.put(f"https://example.com/ev{i}", mock_response)
+
+    result = small_cache.stats()
+    assert result["evictions"] == 3  # 6 inserts into cap-3 cache = 3 evictions
+
+
+def test_env_var_max_entries_override(mock_response):
+    """HTTP_CACHE_MAX_ENTRIES env var is respected when constructing a cache."""
+    with patch.dict(os.environ, {"HTTP_CACHE_MAX_ENTRIES": "2"}):
+        env_cache = HTTPCache(default_ttl=60.0, max_size=100, enabled=True)
+
+    assert env_cache.max_entries == 2
+
+    env_cache.put("https://example.com/e1", mock_response)
+    env_cache.put("https://example.com/e2", mock_response)
+    assert len(env_cache._cache) == 2
+
+    env_cache.put("https://example.com/e3", mock_response)
+    assert len(env_cache._cache) == 2
+    assert env_cache.stats()["evictions"] == 1
+
+
+def test_under_limit_no_eviction(mock_response):
+    """No evictions occur when cache stays under max_entries."""
+    c = HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=10)
+    for i in range(5):
+        c.put(f"https://example.com/under{i}", mock_response)
+
+    assert c.stats()["evictions"] == 0
+    assert len(c._cache) == 5
+
+
+def test_existing_ttl_behavior_preserved(mock_response):
+    """Existing TTL expiry behavior is unaffected by the LRU cap."""
+    c = HTTPCache(default_ttl=60.0, max_size=100, enabled=True, max_entries=256)
+    url = "https://example.com/ttl_preserved"
+
+    with patch("utils.http_cache.time") as mock_time:
+        mock_time.time.return_value = 2000.0
+        c.put(url, mock_response, ttl=0.5)
+        assert c.get(url) is not None
+
+        mock_time.time.return_value = 2001.0
+        assert c.get(url) is None
