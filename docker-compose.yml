@@ -1,0 +1,19 @@
+services:
+  inkypi:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      # Live reload: source changes are reflected immediately
+      - ./src:/app/src:ro
+      # Persistent config and mock display output
+      - inkypi-config:/app/src/config
+      - inkypi-runtime:/app/runtime
+    environment:
+      INKYPI_ENV: dev
+      INKYPI_NO_REFRESH: "1"
+      PYTHONPATH: src
+
+volumes:
+  inkypi-config:
+  inkypi-runtime:
