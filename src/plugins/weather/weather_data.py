@@ -245,7 +245,9 @@ def parse_open_meteo_forecast(daily_data, tz, is_day, lat, plugin_dir):
     forecast = []
 
     for i in range(0, len(times)):
-        dt = datetime.fromisoformat(times[i]).replace(tzinfo=UTC).astimezone(tz)
+        dt = datetime.fromisoformat(times[i])
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tz)
         day_label = dt.strftime("%a")
 
         code = weather_codes[i] if i < len(weather_codes) else 0
