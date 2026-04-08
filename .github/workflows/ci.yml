@@ -216,8 +216,7 @@ jobs:
           CSRF_TOKEN=$(sed -n 's/.*csrf-token.*content="\([^"]*\)".*/\1/p' /tmp/home.html | head -1)
           curl -fsS -b "$COOKIES" ${SERVER_URL}/settings >/dev/null
           curl -fsS -b "$COOKIES" ${SERVER_URL}/playlist >/dev/null
-          curl -sS -b "$COOKIES" -o /dev/null -w "%{http_code}
-" ${SERVER_URL}/preview | tee preview_code.txt
+          curl -sS -b "$COOKIES" -o /dev/null -w '%{http_code}\n' ${SERVER_URL}/preview | tee preview_code.txt
           grep -q '^200$' preview_code.txt || { echo "Preview route did not return 200" >&2; kill $SERVER_PID 2>/dev/null || true; exit 1; }
           curl -fsS -b "$COOKIES" ${SERVER_URL}/plugin/clock >/dev/null
           curl -fsS -b "$COOKIES" ${SERVER_URL}/images/clock/faces/digital.png >/dev/null
