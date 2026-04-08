@@ -1,6 +1,125 @@
 # CHANGELOG
 
 
+## v0.13.0 (2026-04-08)
+
+### Features
+
+- Add /api/version/info and /api/uptime JSON endpoints (JTN-360)
+  ([#249](https://github.com/jtn0123/InkyPi/pull/249),
+  [`9f2c876`](https://github.com/jtn0123/InkyPi/commit/9f2c8764472e47d5fc0f76a2108299e917d68076))
+
+* feat: add /api/version/info and /api/uptime endpoints (JTN-360)
+
+Adds a new version_info blueprint with two unauthenticated JSON endpoints: - GET /api/version/info —
+  version, git_sha, git_branch, build_time, python_version (all cached at module import, never
+  per-request) - GET /api/uptime — process_uptime_seconds, system_uptime_seconds (/proc/uptime on
+  Linux, null elsewhere), process_started_at ISO timestamp
+
+Registers blueprint in blueprints_registry.py and conftest.py; adds 13 tests covering both routes.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: add unit tests for version_info helper functions to meet coverage gate (JTN-360)
+
+SonarCloud Quality Gate requires ≥80% coverage on new code; previous commit was at 78.9%. Added
+  targeted unit tests for exception fallback paths in _read_app_version, _run_git, _read_build_time,
+  and the Linux /proc/uptime path in _system_uptime_seconds. Coverage is now at 98%.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add diagnostic snapshot CLI for support workflows (JTN-363)
+  ([#252](https://github.com/jtn0123/InkyPi/pull/252),
+  [`6e5d568`](https://github.com/jtn0123/InkyPi/commit/6e5d568fc5afc3f750e4fad8819e45a89005602a))
+
+scripts/diagnostic_snapshot.py collects system info, redacted device.json (API
+  keys/tokens/passwords/secrets/pins masked), log tail, and best-effort journal entries into a
+  support tarball. 17 tests cover redaction, log handling, manifest structure, and graceful
+  fallbacks.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add HTTP request timing histogram to /metrics (JTN-362)
+  ([#251](https://github.com/jtn0123/InkyPi/pull/251),
+  [`fab9033`](https://github.com/jtn0123/InkyPi/commit/fab90338099354805db705eb772f9c3b1cd33b3b))
+
+* feat: add HTTP request timing histogram to metrics (JTN-362)
+
+Extends the Prometheus /metrics endpoint with per-endpoint latency histograms
+  (inkypi_http_request_duration_seconds) and request counters (inkypi_http_requests_total), labelled
+  by method, url_rule endpoint, and status code. Excludes /metrics scrapes and /static/* to avoid
+  noise.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: black formatting for JTN-361
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* Revert "fix: black formatting for JTN-361"
+
+This reverts commit c3c04d3e124138fcfb24d886225b09cb2bf2cee6.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add log filter to redact secret-like patterns (JTN-364)
+  ([#250](https://github.com/jtn0123/InkyPi/pull/250),
+  [`acf9880`](https://github.com/jtn0123/InkyPi/commit/acf98801fc21f701ffeb0795a1b206a7e89043da))
+
+* feat: add log filter to redact secret-like patterns (JTN-364)
+
+Introduces SecretRedactionFilter — a logging.Filter that masks API keys, Bearer tokens, passwords,
+  PINs, and 32+ hex strings in every log record before it reaches any handler. Applied globally via
+  the root logger in setup_logging() so both plain-text and JSON log formats are covered.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: add gitleaks:allow annotations to test secrets (JTN-364)
+
+Gitleaks CI was flagging intentional fake secrets used in the redaction filter tests. Added inline #
+  gitleaks:allow comments so the scanner recognises these as test fixtures, not real credentials.
+
+* fix: add gitleaks config to allowlist test-fixture secrets (JTN-364)
+
+Tests for the secret-redaction filter intentionally contain fake api_key= strings to verify the
+  filter pattern works. Add a .gitleaks.toml that allowlists tests/test_log_redaction.py so the
+  scanner does not flag these well-known test fixtures as real credentials.
+
+* fix: switch to top-level [allowlist] syntax in .gitleaks.toml (JTN-364)
+
+Gitleaks v8 path allowlisting requires the top-level [allowlist] table rather than the
+  [[allowlists]] array form when no condition is specified.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Auto-cleanup of old history images (JTN-361) ([#248](https://github.com/jtn0123/InkyPi/pull/248),
+  [`0993412`](https://github.com/jtn0123/InkyPi/commit/0993412cefcddb4f8fb8e45af196d7c82c2aa5a8))
+
+* feat: auto-cleanup of old history images (JTN-361)
+
+Add history_cleanup.py with retention policy (max_age_days, max_count, min_free_bytes). Wire into
+  RefreshTask to run every 10 ticks. Read policy from device_config history_cleanup section with
+  safe defaults.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: black formatting on history_cleanup files (JTN-361)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: remove leaked pre-restore tarball from JTN-361 branch
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.12.0 (2026-04-08)
 
 ### Bug Fixes
