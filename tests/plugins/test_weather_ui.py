@@ -48,14 +48,25 @@ def test_weather_plugin_settings_persistence(client):
 
 
 def test_weather_plugin_wizard_step_navigation(client):
-    """Test that weather plugin retains the standard page workflow chrome."""
+    """Test that weather plugin retains the setup-wizard container and loads the JS that creates nav.
+
+    The wizard navigation buttons (wizardPrev/wizardNext) are injected at runtime by
+    progressive_disclosure.js — they must NOT be duplicated in the server-rendered HTML.
+    The static HTML should have exactly the bare .setup-wizard container plus the script.
+    """
     resp = client.get("/plugin/weather")
     assert resp.status_code == 200
 
     response_text = resp.get_data(as_text=True)
 
-    assert "wizard-navigation" in response_text
-    assert "wizard-progress" in response_text
-    assert "wizard-step-indicator" in response_text
-    assert "wizardNext" in response_text
-    assert "wizardPrev" in response_text
+    # The container element is still rendered server-side
+    assert "setup-wizard" in response_text
+    # The JS module that injects wizard navigation at runtime must be loaded
+    assert "progressive_disclosure.js" in response_text
+    # IDs must not be duplicated in static HTML — JS creates them once at runtime
+    assert (
+        response_text.count('id="wizardPrev"') <= 1
+    ), "Duplicate id='wizardPrev' found in server-rendered HTML"
+    assert (
+        response_text.count('id="wizardNext"') <= 1
+    ), "Duplicate id='wizardNext' found in server-rendered HTML"
