@@ -15,7 +15,7 @@ def stars_generate_image(plugin_instance, settings, device_config):
 
     dimensions = plugin_instance.get_oriented_dimensions(device_config)
 
-    github_repository = username + "/" + repository
+    github_repository = repository if "/" in repository else username + "/" + repository
 
     try:
         stars = fetch_stars(github_repository)

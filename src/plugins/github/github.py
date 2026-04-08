@@ -35,7 +35,7 @@ class GitHub(BasePlugin):
                     field(
                         "githubRepository",
                         label="Repository",
-                        placeholder="owner/repo",
+                        placeholder="repository-name",
                         wrapper_id="repositoryGroup",
                         visible_if={"field": "githubType", "equals": "stars"},
                     ),
