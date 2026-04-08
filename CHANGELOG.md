@@ -1,6 +1,73 @@
 # CHANGELOG
 
 
+## v0.4.35 (2026-04-08)
+
+### Bug Fixes
+
+- Add error handling to empty JS catch blocks (JTN-277)
+  ([#194](https://github.com/jtn0123/InkyPi/pull/194),
+  [`25dbd90`](https://github.com/jtn0123/InkyPi/commit/25dbd90015bceac415257468840ca32a2305a1c2))
+
+* fix: add error handling to empty JS catch blocks (JTN-277)
+
+Resolves SonarCloud S2486 — replace empty catch blocks with either console.warn/error calls or
+  explanatory intent comments, so errors are never silently swallowed without a documented reason.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Handle DST transitions in scheduled refresh (JTN-268)
+  ([#196](https://github.com/jtn0123/InkyPi/pull/196),
+  [`12f4874`](https://github.com/jtn0123/InkyPi/commit/12f4874c1e4f6eced20a7b689a81dbfd32f57c68))
+
+* fix: handle DST transitions in scheduled refresh (JTN-268)
+
+Replace current_time.replace(hour=h, minute=m) with a timedelta-from-midnight approach to avoid
+  ValueError on spring-forward non-existent times and incorrect fold selection on fall-back
+  ambiguous times. Add DST-specific tests covering spring-forward and fall-back scenarios.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Handle sub-minute intervals in settings display (JTN-245)
+  ([#197](https://github.com/jtn0123/InkyPi/pull/197),
+  [`c9055b3`](https://github.com/jtn0123/InkyPi/commit/c9055b35a127a90381c46fdccfea3c17ac721b13))
+
+* fix: handle sub-minute intervals in settings display (JTN-245)
+
+Math.max(1, intervalInMinutes) prevents sub-minute cycle intervals from displaying as "0 minutes",
+  which failed the min="1" validation on the interval input field. Also fixes a pre-existing black
+  formatting violation in scripts/export_benchmarks_report.py.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Code Style
+
+- Auto-format all Python files with Black
+  ([`e707553`](https://github.com/jtn0123/InkyPi/commit/e707553b7c2b352f625fd4f500669e707045f11a))
+
+34 files had pre-existing formatting issues that caused CI lint failures on every PR branch.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.34 (2026-04-08)
 
 ### Bug Fixes
