@@ -55,7 +55,7 @@ def _apply(record: logging.LogRecord) -> logging.LogRecord:
 
 class TestRedactHelper:
     def test_api_key_equals(self):
-        result = _redact("api_key=abc123def456")
+        result = _redact("api_key=abc123def456")  # gitleaks:allow
         assert "abc123def456" not in result
         assert "***REDACTED***" in result
         assert "api_key" in result
@@ -99,7 +99,7 @@ class TestRedactHelper:
         assert _redact(clean) == clean
 
     def test_mixed_sentence_only_secret_redacted(self):
-        text = "User logged in successfully; api_key=TOPSECRETKEY123 from 192.168.1.1"
+        text = "User logged in successfully; api_key=TOPSECRETKEY123 from 192.168.1.1"  # gitleaks:allow
         result = _redact(text)
         assert "User logged in successfully" in result
         assert "192.168.1.1" in result
@@ -113,7 +113,7 @@ class TestRedactHelper:
 
 class TestSecretRedactionFilter:
     def test_msg_redacted(self):
-        record = _apply(_make_record("api_key=abc123def456"))
+        record = _apply(_make_record("api_key=abc123def456"))  # gitleaks:allow
         assert "abc123def456" not in record.msg
         assert "***REDACTED***" in record.msg
 
@@ -138,9 +138,8 @@ class TestSecretRedactionFilter:
 
     def test_extra_string_attribute_with_secret_redacted(self):
         # Extra attribute contains a key=value pair — the value is redacted.
-        record = _apply(
-            _make_record("check extras", auth_info="api_key=SECRETKEYVALUE")
-        )
+        auth = "api_key=SECRETKEYVALUE"  # gitleaks:allow
+        record = _apply(_make_record("check extras", auth_info=auth))
         assert record.auth_info == "api_key=***REDACTED***"  # type: ignore[attr-defined]
 
     def test_extra_non_string_attribute_untouched(self):
@@ -149,7 +148,8 @@ class TestSecretRedactionFilter:
 
     def test_filter_always_returns_true(self):
         """Filter must never drop records."""
-        result = SecretRedactionFilter().filter(_make_record("api_key=xyz"))
+        msg = "api_key=xyz"  # gitleaks:allow
+        result = SecretRedactionFilter().filter(_make_record(msg))
         assert result is True
 
     def test_authorization_header_redacted(self):
@@ -172,7 +172,7 @@ class TestSecretRedactionFilter:
 class TestPlainTextOutput:
     def test_formatted_message_redacted_via_msg(self):
         # Secret is in the msg template itself (already fully interpolated).
-        record = _make_record("api_key=MYSECRETAPIKEY123")
+        record = _make_record("api_key=MYSECRETAPIKEY123")  # gitleaks:allow
         SecretRedactionFilter().filter(record)
         formatted = record.getMessage()
         assert "MYSECRETAPIKEY123" not in formatted
@@ -199,7 +199,7 @@ class TestPlainTextOutput:
 
 class TestJsonFormatterOutput:
     def test_secret_in_msg_redacted_in_json(self):
-        record = _make_record("api_key=SUPERSECRET")
+        record = _make_record("api_key=SUPERSECRET")  # gitleaks:allow
         SecretRedactionFilter().filter(record)
         data = json.loads(JsonFormatter().format(record))
         assert "SUPERSECRET" not in data["msg"]
