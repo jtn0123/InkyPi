@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.4.36 (2026-04-08)
+
+### Bug Fixes
+
+- Add explicit HTTP methods to all Flask routes (JTN-275)
+  ([#198](https://github.com/jtn0123/InkyPi/pull/198),
+  [`ccab65a`](https://github.com/jtn0123/InkyPi/commit/ccab65a682a290983c19edce4a74cbd69bb3f985))
+
+* fix: add explicit HTTP methods to all Flask routes (JTN-275)
+
+Resolves SonarCloud S6965 by adding explicit methods= to every @*.route() decorator across all
+  blueprints and the main app, replacing implicit method acceptance with correct GET-only or
+  appropriate method lists.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: retrigger workflow
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.4.35 (2026-04-08)
 
 ### Bug Fixes
