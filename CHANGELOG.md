@@ -1,6 +1,80 @@
 # CHANGELOG
 
 
+## v0.4.41 (2026-04-08)
+
+### Bug Fixes
+
+- Add LRU eviction to HTTP cache to prevent memory growth (JTN-299)
+  ([#208](https://github.com/jtn0123/InkyPi/pull/208),
+  [`6bc5ce7`](https://github.com/jtn0123/InkyPi/commit/6bc5ce76cb8257ad0daad4e804c57bfe9026c146))
+
+Adds a configurable max_entries cap (default 256, env: HTTP_CACHE_MAX_ENTRIES) with LRU eviction via
+  OrderedDict. Tracks hit/miss/eviction counters for benchmark visibility. Existing TTL behavior
+  unchanged.
+
+Closes JTN-299
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Eliminate duplicate wizardPrev/wizardNext DOM IDs (JTN-220)
+  ([#212](https://github.com/jtn0123/InkyPi/pull/212),
+  [`38db1fb`](https://github.com/jtn0123/InkyPi/commit/38db1fbf215deee5c4f7d7cb084f7b893fca9575))
+
+Plugin settings pages were rendering the wizard navigation twice — once statically in plugin.html
+  (wizardPrev/wizardNext buttons inside .wizard-navigation) and once injected at runtime by
+  progressive_disclosure.js's initializeWizard() which appends a second .wizard-navigation to the
+  same .setup-wizard container.
+
+Removes the static wizard nav from the template so IDs are unique and DOM selectors are
+  deterministic. The .setup-wizard container remains for JS to populate. Updates tests to reflect
+  that navigation is JS-injected, not static.
+
+Closes JTN-220
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Restrict history_delete to .png and .json files (JTN-266)
+  ([#211](https://github.com/jtn0123/InkyPi/pull/211),
+  [`9a8db5b`](https://github.com/jtn0123/InkyPi/commit/9a8db5b053770cb2d8a281cb73374c0ffcaedc0d))
+
+Aligns history_delete with history_clear by adding the same extension allowlist. Prevents deletion
+  of arbitrary non-history files that might exist in the history directory. Returns 400 for
+  unsupported extensions.
+
+Closes JTN-266
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Restrict PluginInstance.update() to allowlisted fields (JTN-230)
+  ([#209](https://github.com/jtn0123/InkyPi/pull/209),
+  [`98cd869`](https://github.com/jtn0123/InkyPi/commit/98cd8691d8139fd7b56b3ae1e3ecf955249a3104))
+
+Replaces blanket setattr loop with an explicit allowlist of updatable fields (settings, refresh,
+  latest_refresh_time, etc.). Unknown keys are silently ignored to avoid breaking callers. Prevents
+  arbitrary attribute injection if user-controlled data ever reaches this code path.
+
+Closes JTN-230
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- Cache pip dependencies in CI for faster builds (JTN-294)
+  ([#210](https://github.com/jtn0123/InkyPi/pull/210),
+  [`01125b2`](https://github.com/jtn0123/InkyPi/commit/01125b206ce8703867fef204d026bb96d0c193c9))
+
+Adds cache: pip to all actions/setup-python steps in ci.yml. Cache key is derived from
+  install/requirements*.txt so it invalidates automatically when dependencies change. Should cut
+  30-60s per Python job.
+
+Also adds pip cache to the release.yml workflow which was missing it.
+
+Closes JTN-294
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.4.40 (2026-04-08)
 
 ### Bug Fixes
