@@ -479,6 +479,62 @@ def test_delete_plugin_instance_calls_plugin_cleanup(
     assert cleanup_called["settings"] == {}
 
 
+def _add_named_plugin_instance(device_config_dev, plugin_id, instance_name):
+    """Helper: add a named plugin instance to the Default playlist."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    if not pl.find_plugin(plugin_id, instance_name):
+        pl.add_plugin(
+            {
+                "plugin_id": plugin_id,
+                "name": instance_name,
+                "plugin_settings": {"city": "London"},
+                "refresh": {"interval": 300},
+            }
+        )
+    device_config_dev.write_config()
+
+
+def test_plugin_page_instance_query_param_returns_200(client, device_config_dev):
+    """GET /plugin/<id>?instance=<name> returns 200 when the instance exists (JTN-221)."""
+    _add_named_plugin_instance(device_config_dev, "weather", "Audit weather")
+
+    resp = client.get("/plugin/weather?instance=Audit weather")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "Audit weather" in body or "London" in body
+
+
+def test_plugin_page_instance_url_plus_encoding_decoded_correctly(
+    client, device_config_dev
+):
+    """GET /plugin/<id>?instance=Name+With+Spaces decodes '+' to space (JTN-221)."""
+    _add_named_plugin_instance(device_config_dev, "weather", "Audit weather")
+
+    # Simulate a browser URL with + for spaces
+    resp = client.get("/plugin/weather?instance=Audit+weather")
+    assert resp.status_code == 200
+
+
+def test_plugin_page_instance_nonexistent_returns_friendly_404(
+    client, device_config_dev
+):
+    """GET /plugin/<id>?instance=<missing> returns 404 with a descriptive message (JTN-221)."""
+    resp = client.get("/plugin/weather?instance=nonexistent instance")
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body is not None
+    assert "nonexistent instance" in body.get("error", "")
+
+
+def test_plugin_page_without_instance_param_still_works(client):
+    """GET /plugin/<id> (no ?instance=) continues to work after JTN-221 fix."""
+    resp = client.get("/plugin/weather")
+    assert resp.status_code == 200
+
+
 def test_playlist_page_instance_image_url_has_no_playlist_name_query_param(
     client, device_config_dev
 ):
