@@ -72,9 +72,9 @@ def test_plugin_settings_accessibility(client):
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations from upstream merge (HTML template issues)
-    # These should be fixed separately - see upstream issue tracker
-    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    # Filter out known violations that are pre-existing upstream issues
+    # "label" and "select-name" have been fixed by JTN-315
+    known_violations = {"landmark-one-main", "region"}
     violations = [
         v
         for v in (result.get("violations") or [])
@@ -108,8 +108,9 @@ def test_settings_page_accessibility(client):
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    # Filter out known violations that are pre-existing upstream issues
+    # "label" and "select-name" have been fixed by JTN-315
+    known_violations = {"landmark-one-main", "region"}
     violations = [
         v
         for v in (result.get("violations") or [])
@@ -143,8 +144,9 @@ def test_history_page_accessibility(client):
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    # Filter out known violations that are pre-existing upstream issues
+    # "label" and "select-name" have been fixed by JTN-315
+    known_violations = {"landmark-one-main", "region"}
     violations = [
         v
         for v in (result.get("violations") or [])

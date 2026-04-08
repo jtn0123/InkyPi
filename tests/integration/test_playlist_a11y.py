@@ -61,8 +61,9 @@ def test_playlist_accessibility_with_axe(client, device_config_dev, monkeypatch)
         result = page.evaluate("() => axe.run(document)")
         browser.close()
 
-    # Filter out known violations from upstream merge (HTML template issues)
-    known_violations = {"label", "landmark-one-main", "region", "select-name"}
+    # Filter out known violations that are pre-existing upstream issues
+    # "label" and "select-name" have been fixed by JTN-315
+    known_violations = {"landmark-one-main", "region"}
     all_violations = result.get("violations") or []
     violations = [v for v in all_violations if v.get("id") not in known_violations]
     assert not violations, f"New A11y violations: {[v.get('id') for v in violations]}"
