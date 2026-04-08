@@ -35,6 +35,10 @@ jobs:
         env:
           CI: true
         run: scripts/lint.sh
+      - name: Check dependency licenses
+        run: |
+          pip install --quiet pip-licenses
+          pip-licenses --fail-on='GPL;AGPL' --partial-match --format=plain
 
   shellcheck:
     name: Shell script validation
@@ -63,6 +67,7 @@ jobs:
           bash -n scripts/test_profile.sh
           bash -n scripts/venv.sh
           bash -n scripts/web_only.sh
+          bash -n scripts/check_licenses.sh
       - name: Run shellcheck
         run: |
           # Run shellcheck linting on all shell scripts
