@@ -557,11 +557,13 @@ class PluginInstance:
                 )
                 return False
 
-            scheduled_dt = current_time.replace(
-                hour=scheduled_time.hour,
-                minute=scheduled_time.minute,
-                second=0,
-                microsecond=0,
+            # Build scheduled_dt using timedelta from midnight to avoid DST
+            # pitfalls. current_time.replace(hour=h, minute=m) can raise
+            # ValueError for non-existent spring-forward times and silently
+            # picks the wrong fold for ambiguous fall-back times.
+            midnight = current_time.replace(hour=0, minute=0, second=0, microsecond=0)
+            scheduled_dt = midnight + timedelta(
+                hours=scheduled_time.hour, minutes=scheduled_time.minute
             )
 
             # Align timezone awareness for comparison
