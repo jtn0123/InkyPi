@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## v0.4.31 (2026-04-08)
+
+### Bug Fixes
+
+- Bump requests 2.33.0 + black 26.3.1 (CVE fixes)
+  ([`ed86b66`](https://github.com/jtn0123/InkyPi/commit/ed86b66816fb4ee086b0ceadccad3c76a8a10907))
+
+- Bump requests to 2.33.0 (CVE fix for insecure temp file reuse)
+  ([`5511f89`](https://github.com/jtn0123/InkyPi/commit/5511f899074fe10e124a8869e5fa89b61aca8fd7))
+
+
 ## v0.4.30 (2026-04-08)
 
 ### Bug Fixes
