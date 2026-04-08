@@ -81,8 +81,7 @@ class APIValidator {
                 const response = await fetch(url, {
                     method: options.method,
                     headers: {
-                        ...options.headers,
-                        'User-Agent': 'InkyPi-Validator/1.0'
+                        ...options.headers
                     },
                     signal: controller.signal,
                     mode: 'cors',

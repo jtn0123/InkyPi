@@ -42,6 +42,22 @@ def test_api_validator_script_exists(client):
         assert token in js
 
 
+def test_api_validator_no_custom_user_agent(client):
+    """JTN-261: Custom User-Agent header triggers CORS preflight, failing external API checks.
+
+    User-Agent is not CORS-safelisted and is a forbidden header in the Fetch spec.
+    The validator must not set it in fetch calls.
+    """
+    resp = client.get("/static/scripts/api_validator.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "User-Agent" not in js, (
+        "Custom User-Agent header must not be set in fetch calls — "
+        "it triggers CORS preflight and is forbidden by the Fetch spec."
+    )
+
+
 # --- Enhanced Progress ---
 
 
