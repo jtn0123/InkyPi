@@ -11,6 +11,7 @@ from jinja2 import ChoiceLoader, FileSystemLoader
 from waitress import serve  # type: ignore
 from werkzeug.serving import is_running_from_reloader
 
+from app_setup.asset_helpers import setup_asset_helpers
 from app_setup.blueprints_registry import register_blueprints
 
 # Re-exports for backwards compatibility — some tests and external code
@@ -265,6 +266,7 @@ def create_app():
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
     register_blueprints(app)
+    setup_asset_helpers(app)
     register_health_endpoints(app)
 
     @app.before_request
