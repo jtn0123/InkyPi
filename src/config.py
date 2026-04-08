@@ -311,7 +311,7 @@ class Config:
             self.config["playlist_config"] = self.playlist_manager.to_dict()
             self.config["refresh_info"] = self.refresh_info.to_dict()
             serialized = json.dumps(self.config, indent=4)
-            content_hash = hashlib.md5(serialized.encode()).hexdigest()
+            content_hash = hashlib.sha256(serialized.encode()).hexdigest()
             if content_hash == self._last_written_hash:
                 logger.debug("Config unchanged, skipping write")
                 return

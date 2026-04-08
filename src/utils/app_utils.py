@@ -11,6 +11,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 logger = logging.getLogger(__name__)
 
+# Google's public DNS server — used for local IP detection (UDP connect,
+# no data sent) and TCP connectivity checks. Not a security-sensitive endpoint.
+_DNS_CHECK_HOST = "8.8.8.8"  # NOSONAR — connectivity check, not security-sensitive
+
 FONT_FAMILIES = {
     "Dogica": [
         {"font-weight": "normal", "file": "dogicapixel.ttf"},
@@ -47,7 +51,7 @@ def resolve_path(file_path):
 def get_ip_address():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
+            s.connect((_DNS_CHECK_HOST, 80))
             return s.getsockname()[0]
     except OSError:
         return None
@@ -68,8 +72,7 @@ def is_connected():
     """Check if the Raspberry Pi has an internet connection."""
     sock = None
     try:
-        # Try to connect to Google's public DNS server
-        sock = socket.create_connection(("8.8.8.8", 53), timeout=2)
+        sock = socket.create_connection((_DNS_CHECK_HOST, 53), timeout=2)
         return True
     except OSError:
         return False
