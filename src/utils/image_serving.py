@@ -96,4 +96,6 @@ def _client_accepts_webp(accept_header: str | None) -> bool:
 def _make_etag(path: str, mtime: int) -> str:
     """Produce a stable ETag string from *path*, *mtime*, and the literal ``"webp"``."""
     raw = f"{path}:{mtime}:webp"
-    return hashlib.sha1(raw.encode()).hexdigest()  # noqa: S324 — not security-sensitive
+    # sha256 used purely for cache-key fingerprinting (not security-sensitive),
+    # but we use it instead of sha1 to keep SonarCloud quiet (rule S4790).
+    return hashlib.sha256(raw.encode()).hexdigest()[:40]
