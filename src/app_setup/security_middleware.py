@@ -256,6 +256,8 @@ def _apply_hsts_header(response) -> None:
 def _apply_csp_header(response, *, dev_mode: bool) -> None:
     """Set the Content-Security-Policy header (report-only in dev mode)."""
     csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP
+    if "report-uri" not in csp_value:
+        csp_value = csp_value.rstrip("; ") + "; report-uri /api/csp-report"
     report_only = dev_mode or _env_bool("INKYPI_CSP_REPORT_ONLY")
     header_name = (
         "Content-Security-Policy-Report-Only"
