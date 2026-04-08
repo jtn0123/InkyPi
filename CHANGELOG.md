@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.7.1 (2026-04-08)
+
+### Bug Fixes
+
+- Plugin edit routes support ?instance= param (JTN-221)
+  ([#226](https://github.com/jtn0123/InkyPi/pull/226),
+  [`acd92c0`](https://github.com/jtn0123/InkyPi/commit/acd92c06385c0056e8294777312e79a4bde42f9c))
+
+* fix: support ?instance= query param on plugin edit routes (JTN-221)
+
+Plugin edit routes returned 404 when given an instance query parameter, breaking saved-instance
+  editing flows from the playlist page. Now looks up the instance via playlist manager (with URL
+  decoding) and renders the editor with its settings prefilled. Returns a friendly 404 if the
+  instance name doesn't exist.
+
+Adds tests for: existing instance returns 200, URL-encoded '+' spaces decode correctly, nonexistent
+  instance returns descriptive 404, and the baseline no-instance route continues to work.
+
+Closes JTN-221
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting to JTN-221 test file
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.7.0 (2026-04-08)
 
 ### Features
