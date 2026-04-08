@@ -18,6 +18,7 @@ from refresh_task.worker import (
     _get_mp_context,
     _remote_exception,
 )
+from utils.history_cleanup import cleanup_history
 from utils.image_utils import compute_image_hash
 from utils.metrics import (
     record_refresh_failure,
@@ -62,6 +63,7 @@ class RefreshTask:
         self.manual_update_requests: deque[ManualUpdateRequest] = deque(maxlen=50)
         self.progress_bus = get_progress_bus()
         self.plugin_health: dict[str, dict] = {}
+        self._tick_count: int = 0
 
     @staticmethod
     def _get_circuit_breaker_threshold() -> int:
@@ -145,10 +147,35 @@ class RefreshTask:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
                     self._complete_manual_request(manual_request, metrics=metrics)
 
+                self._tick_count += 1
+                self._maybe_run_history_cleanup()
+
             except Exception as e:
                 logger.exception("Exception during refresh")
                 if result is not None:
                     self._complete_manual_request(result[-1], exception=e)
+
+    # ------------------------------------------------------------------
+    # History cleanup
+    # ------------------------------------------------------------------
+
+    _CLEANUP_INTERVAL_TICKS = 10
+
+    def _maybe_run_history_cleanup(self) -> None:
+        """Run history cleanup every N ticks (non-blocking; errors are logged only)."""
+        if self._tick_count % self._CLEANUP_INTERVAL_TICKS != 0:
+            return
+        try:
+            cfg = self.device_config.get_config("history_cleanup") or {}
+            history_dir = self.device_config.history_image_dir
+            cleanup_history(
+                history_dir,
+                max_age_days=int(cfg.get("max_age_days", 30)),
+                max_count=int(cfg.get("max_count", 500)),
+                min_free_bytes=int(cfg.get("min_free_bytes", 500_000_000)),
+            )
+        except Exception:
+            logger.exception("history_cleanup: unexpected error during cleanup")
 
     def _wait_for_trigger(self):
         """Wait for the next refresh trigger while holding the condition lock.
