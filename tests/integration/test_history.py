@@ -657,6 +657,58 @@ def test_history_action_buttons_have_aria_labels(client, device_config_dev):
     assert f'aria-label="Delete {fname}"' in body
 
 
+# ---------------------------------------------------------------------------
+# Extension allowlist tests for history_delete (JTN-266)
+# ---------------------------------------------------------------------------
+
+
+def test_history_delete_rejects_non_history_extension(client, device_config_dev):
+    """history_delete must refuse to delete files with unsupported extensions."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    txt_path = os.path.join(d, "notes.txt")
+    with open(txt_path, "w", encoding="utf-8") as fh:
+        fh.write("secret")
+
+    resp = client.post("/history/delete", json={"filename": "notes.txt"})
+
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data is not None
+    assert "unsupported file type" in data.get("error", "").lower()
+    # File must still exist
+    assert os.path.exists(txt_path)
+
+
+def test_history_delete_allows_png(client, device_config_dev):
+    """history_delete must successfully delete .png files."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    from PIL import Image
+
+    fname = "display_jtn266_png.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+
+    resp = client.post("/history/delete", json={"filename": fname})
+
+    assert resp.status_code == 200
+    assert not os.path.exists(os.path.join(d, fname))
+
+
+def test_history_delete_allows_json(client, device_config_dev):
+    """history_delete must successfully delete .json sidecar files."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_jtn266_meta.json"
+    with open(os.path.join(d, fname), "w", encoding="utf-8") as fh:
+        fh.write("{}")
+
+    resp = client.post("/history/delete", json={"filename": fname})
+
+    assert resp.status_code == 200
+    assert not os.path.exists(os.path.join(d, fname))
+
+
 def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkeypatch):
     """Only `limit` number of sidecar JSON files are read, not all."""
     import json as _json
