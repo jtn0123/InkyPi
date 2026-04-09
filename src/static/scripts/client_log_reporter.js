@@ -10,19 +10,19 @@
   "use strict";
 
   // Opt-in guard — do nothing unless the page explicitly enables this shim.
-  var metaTag = document.querySelector('meta[name="client-log-enabled"]');
-  if (!metaTag || metaTag.getAttribute("content") !== "1") {
+  const metaTag = document.querySelector('meta[name="client-log-enabled"]');
+  if (metaTag?.getAttribute("content") !== "1") {
     return;
   }
 
-  var ENDPOINT = "/api/client-log";
-  var SAMPLE_RATE = 0.5; // report 50% of console messages
-  var MAX_FAILURES = 5;
-  var failures = 0;
-  var disabled = false;
+  const ENDPOINT = "/api/client-log";
+  const SAMPLE_RATE = 0.5; // report 50% of console messages
+  const MAX_FAILURES = 5;
+  let failures = 0;
+  let disabled = false;
 
-  var originalWarn = console.warn.bind(console);
-  var originalError = console.error.bind(console);
+  const originalWarn = console.warn.bind(console);
+  const originalError = console.error.bind(console);
 
   function shouldSample() {
     // NOSONAR — Math.random is intentional: this is non-security log sampling.
@@ -31,7 +31,7 @@
   }
 
   function getCsrfToken() {
-    var meta = document.querySelector('meta[name="csrf-token"]');
+    const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute("content") : "";
   }
 
@@ -57,24 +57,24 @@
     if (disabled) return;
     if (!shouldSample()) return;
     try {
-      var payload = {
+      const payload = {
         level: level,
         message: (args[0] !== undefined ? String(args[0]) : "").slice(0, 2048),
         args: argsToString(args),
         url: location.pathname.slice(0, 2048),
         ts: new Date().toISOString(),
       };
-      var body = JSON.stringify(payload);
+      const body = JSON.stringify(payload);
       if (navigator.sendBeacon) {
         // sendBeacon works during page unload; CSRF token embedded in body
         // because sendBeacon does not support custom headers.
-        var blob = new Blob([body], { type: "application/json" });
-        var ok = navigator.sendBeacon(ENDPOINT, blob);
-        if (!ok) {
+        const blob = new Blob([body], { type: "application/json" });
+        const ok = navigator.sendBeacon(ENDPOINT, blob);
+        if (ok === false) {
           onSendFailure();
         }
       } else {
-        var csrfToken = getCsrfToken();
+        const csrfToken = getCsrfToken();
         fetch(ENDPOINT, {
           method: "POST",
           headers: {
