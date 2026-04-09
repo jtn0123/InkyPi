@@ -76,10 +76,16 @@
       modal.className = 'modal image-modal';
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
-      modal.setAttribute('aria-label', 'Image preview');
+      modal.setAttribute('aria-labelledby', 'imagePreviewTitle');
       modal.style.display = 'none';
       const content = document.createElement('div');
       content.className = 'modal-content';
+
+      const heading = document.createElement('h2');
+      heading.id = 'imagePreviewTitle';
+      heading.className = 'sr-only';
+      heading.textContent = 'Image preview';
+      content.appendChild(heading);
 
       const close = document.createElement('button');
       close.className = 'close-button';
