@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.25.1 (2026-04-09)
+
+### Bug Fixes
+
+- Add aria-pressed to logs panel toggle buttons (JTN-472)
+  ([#273](https://github.com/jtn0123/InkyPi/pull/273),
+  [`14359e7`](https://github.com/jtn0123/InkyPi/commit/14359e76555f74ad903e1a25d819abfa6d9e29cd))
+
+Add aria-pressed="true" initial state to Auto-Scroll and Wrap toggle buttons in the settings logs
+  panel, and update the JS click handlers (toggleLogsAutoScroll, toggleLogsWrap,
+  initializeLogsControls) to keep aria-pressed in sync with the toggle state so screen readers can
+  announce the pressed state without relying on text-label alone.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.25.0 (2026-04-09)
 
 ### Features
