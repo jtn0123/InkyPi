@@ -125,3 +125,23 @@ def test_plugin_registry_list_scan(benchmark, device_config_dev):
     assert isinstance(result, list)
     # The repo ships ~20+ plugins; just sanity check that we got several
     assert len(result) >= 5
+
+
+# ---------------------------------------------------------------------------
+# 6. Config read — cached (mtime unchanged)   JTN-519
+# ---------------------------------------------------------------------------
+
+
+def test_config_read_cached(benchmark, device_config_dev):
+    """Measure read_config() when the file is unchanged (cache hit path).
+
+    After the first read (which populates the mtime cache), subsequent calls
+    should take only an os.stat() + dict copy — no JSON parse or schema
+    validation.  This is the hot path hit on every RefreshTask tick.
+    """
+    # Warm the cache
+    device_config_dev.read_config()
+
+    result = benchmark(device_config_dev.read_config)
+    assert isinstance(result, dict)
+    assert "name" in result

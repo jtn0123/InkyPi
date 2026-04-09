@@ -106,6 +106,10 @@ class Config:
     def __init__(self):
         self._config_lock = threading.RLock()
         self._last_written_hash = None
+        # mtime-based read cache: skip JSON parse + schema validation when the
+        # file has not changed.  Stored as (mtime_ns: int, data: dict).
+        self._config_cache_mtime: int | None = None
+        self._config_cache_data: dict | None = None
         self._resolve_runtime_paths()
         # Resolve which config file to use (env/CLI overrides with safe fallbacks)
         self.config_file = self._determine_config_path()
@@ -242,26 +246,72 @@ class Config:
                 f"Also attempted bootstrap from {template_path} and failed: {ex}"
             ) from ex
 
-    def read_config(self):
-        """Reads the device config JSON file and returns it as a dictionary."""
-        logger.debug(f"Reading device config from {self.config_file}")
-        with open(self.config_file) as f:
-            config = json.load(f)
+    def invalidate_config_cache(self) -> None:
+        """Invalidate the in-memory config read cache.
 
-        # Validate against JSON Schema — raises ConfigValidationError on failure
-        validate_device_config(config)
+        The next call to :meth:`read_config` will re-stat the file and, if the
+        mtime has changed, re-parse and re-validate the JSON.  Call this after
+        any external write to the config file that bypasses :meth:`write_config`.
+        """
+        with self._config_lock:
+            self._config_cache_mtime = None
+            self._config_cache_data = None
 
-        # Log a sanitized summary instead of full config to avoid leaking secrets
-        try:
-            logger.debug(
-                "Loaded config (sanitized):\n%s",
-                json.dumps(self._sanitize_config_for_log(config), indent=3),
-            )
-        except Exception:
-            # Never break startup due to logging
-            logger.debug("Loaded config (sanitized): <unavailable>")
+    def read_config(self) -> dict:
+        """Reads the device config JSON file and returns it as a dictionary.
 
-        return config
+        Uses an mtime-based in-memory cache so that repeated calls skip the
+        JSON parse and jsonschema validation when the file has not changed on
+        disk.  The stat call (to read mtime) is always performed, but it is
+        ~100x cheaper than a full parse+validate cycle.
+
+        Thread safety: the cache is protected by ``_config_lock``.
+        """
+        with self._config_lock:
+            try:
+                stat = os.stat(self.config_file)
+                current_mtime_ns = stat.st_mtime_ns
+            except OSError:
+                # File is gone or unreadable — clear cache and let the open()
+                # below raise a clear error.
+                self._config_cache_mtime = None
+                self._config_cache_data = None
+                current_mtime_ns = None
+
+            if (
+                current_mtime_ns is not None
+                and self._config_cache_mtime is not None
+                and current_mtime_ns == self._config_cache_mtime
+                and self._config_cache_data is not None
+            ):
+                logger.debug(
+                    "Config cache hit (mtime_ns=%s): skipping parse+validate",
+                    current_mtime_ns,
+                )
+                return self._config_cache_data.copy()
+
+            logger.debug("Reading device config from %s", self.config_file)
+            with open(self.config_file) as f:
+                config = json.load(f)
+
+            # Validate against JSON Schema — raises ConfigValidationError on failure
+            validate_device_config(config)
+
+            # Log a sanitized summary instead of full config to avoid leaking secrets
+            try:
+                logger.debug(
+                    "Loaded config (sanitized):\n%s",
+                    json.dumps(self._sanitize_config_for_log(config), indent=3),
+                )
+            except Exception:
+                # Never break startup due to logging
+                logger.debug("Loaded config (sanitized): <unavailable>")
+
+            # Update cache after successful parse+validate
+            self._config_cache_mtime = current_mtime_ns
+            self._config_cache_data = config
+
+            return config
 
     def read_plugins_list(self):
         """Reads the plugin-info.json config JSON from each plugin folder. Excludes the base plugin."""
@@ -311,6 +361,17 @@ class Config:
                     os.fsync(outfile.fileno())
                 os.replace(tmp_path, self.config_file)
                 self._last_written_hash = content_hash
+                # Refresh the read cache so the next read_config() call sees the
+                # newly written content without re-parsing.  We stat() after the
+                # replace so the recorded mtime is the actual on-disk mtime.
+                try:
+                    new_mtime_ns = os.stat(self.config_file).st_mtime_ns
+                    self._config_cache_mtime = new_mtime_ns
+                    self._config_cache_data = self.config.copy()
+                except OSError:
+                    # Non-fatal: cache will be rebuilt on the next read_config().
+                    self._config_cache_mtime = None
+                    self._config_cache_data = None
             finally:
                 try:
                     if os.path.exists(tmp_path):
