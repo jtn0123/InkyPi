@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.25.5 (2026-04-09)
+
+### Bug Fixes
+
+- Allow underscores/hyphens in playlist instance names (JTN-471)
+  ([#275](https://github.com/jtn0123/InkyPi/pull/275),
+  [`b457914`](https://github.com/jtn0123/InkyPi/commit/b457914341bbd2abec1f181121a207da0d5c9210))
+
+* fix: allow underscores and hyphens in playlist instance names (JTN-471)
+
+Instance name validation now accepts [A-Za-z0-9 _-] instead of alphanumeric+spaces-only, matching
+  the naming convention the system itself uses for auto-generated instances (e.g.
+  weather_saved_settings). Slashes, dots, and other path-unsafe characters remain rejected. Frontend
+  JS and the HTML pattern attribute are updated to give immediate feedback, and the error message
+  now accurately describes the allowed character set.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: update test_instance_name_invalid_chars to match new error message
+
+The assertion was checking for "alphanumeric" which no longer appears in the updated validation
+  error message. Updated to check for the full accurate wording.
+
+* style: black format test_playlist_blueprint.py
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.25.4 (2026-04-09)
 
 ### Bug Fixes
