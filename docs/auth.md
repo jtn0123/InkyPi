@@ -52,3 +52,65 @@ Add an `auth` section to your device config:
   need to invalidate all existing sessions.
 - For remote access, combine with HTTPS (see `INKYPI_FORCE_HTTPS`) so the PIN
   is not transmitted in the clear.
+
+---
+
+# Read-only API Token (JTN-477)
+
+InkyPi supports an optional read-only bearer token for monitoring scripts and
+automation tools that need to poll status endpoints without requiring an
+interactive PIN session. This feature is **independent** from PIN auth and can
+be used whether or not a PIN is configured.
+
+## Enabling the read-only token
+
+Set the `INKYPI_READONLY_TOKEN` environment variable before starting InkyPi:
+
+```bash
+export INKYPI_READONLY_TOKEN="your-long-random-token-here"
+```
+
+Use a cryptographically strong random value, for example:
+
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+The token is hashed with `hashlib.sha256` immediately on startup; the
+plaintext is never stored or logged.
+
+## Using the token
+
+Pass the token in the `Authorization` header of your HTTP request:
+
+```bash
+curl -H "Authorization: Bearer <your-token>" http://inkypi.local:5000/api/uptime
+```
+
+## Allowed endpoints and methods
+
+The token grants **read-only** access (GET / HEAD / OPTIONS only) to the
+following paths:
+
+| Path               | Description                  |
+|--------------------|------------------------------|
+| `/api/health`      | Service health check         |
+| `/api/version/info`| Firmware / app version       |
+| `/api/uptime`      | Device uptime                |
+| `/api/screenshot`  | Current display screenshot   |
+| `/metrics`         | Prometheus-style metrics     |
+| `/api/stats`       | Refresh statistics           |
+
+Requests to any other path, or any mutating method (POST, PUT, DELETE, PATCH)
+on the above paths, are **not** authorised by the token — a PIN session is
+required.
+
+## Security notes
+
+- The raw token is never stored; only its SHA-256 hex digest is kept in
+  application memory.
+- Comparison uses `hmac.compare_digest` to prevent timing attacks.
+- Combine with HTTPS so the token is not transmitted in the clear.
+- To rotate the token, restart InkyPi with a new `INKYPI_READONLY_TOKEN` value.
+- PIN auth and bearer-token auth are independent: having a valid token does
+  **not** grant access to admin or mutating routes.
