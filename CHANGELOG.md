@@ -1,6 +1,43 @@
 # CHANGELOG
 
 
+## v0.27.2 (2026-04-09)
+
+### Performance Improvements
+
+- Cache device.json reads with mtime invalidation (JTN-519)
+  ([#282](https://github.com/jtn0123/InkyPi/pull/282),
+  [`cdbbc81`](https://github.com/jtn0123/InkyPi/commit/cdbbc81e0c764862ecdc88556c7a17d4958b7024))
+
+* perf: cache device.json reads with mtime invalidation (JTN-519)
+
+Add an mtime-based in-memory cache to Config.read_config() so repeated calls skip the JSON parse +
+  jsonschema validation when the file has not changed on disk. The stat() call is still performed on
+  every read but is ~100x cheaper than a full parse+validate cycle on slow microSD (Pi Zero).
+
+- Track (mtime_ns, parsed_dict) on the Config instance, protected by the existing _config_lock
+  (threading.RLock). - write_config() refreshes the cache after a successful file replace so the
+  next read_config() is a cache hit with zero re-parse cost. - invalidate_config_cache() allows
+  explicit invalidation for callers that write to the file outside of write_config(). - 11 new unit
+  tests: cache hit, copy-not-reference, mtime invalidation, explicit invalidation, write cycle
+  correctness, thread safety (concurrent reads + concurrent read/write), OSError fallback. - New
+  benchmark test_config_read_cached added to test_perf_baseline.py.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: include test_config_mtime_cache in coverage gate suite (JTN-519)
+
+Add tests/unit/test_config_mtime_cache.py to the coverage_suite() in preflash_validate.sh so the new
+  mtime-cache code paths in config.py are exercised during the CI coverage gate, pushing config.py
+  line-rate above the 72% threshold.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.27.1 (2026-04-09)
 
 ### Bug Fixes
