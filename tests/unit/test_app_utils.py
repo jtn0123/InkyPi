@@ -391,7 +391,7 @@ def test_handle_request_files_empty_content(monkeypatch, tmp_path):
     f = FakeFile("empty.png", b"")
     files = FakeFiles([("file", f)])
 
-    with pytest.raises(RuntimeError, match="Invalid image upload"):
+    with pytest.raises(RuntimeError, match="not a valid image"):
         app_utils.handle_request_files(files)
 
 
@@ -477,5 +477,5 @@ def test_handle_request_files_invalid_jpeg_raises(monkeypatch, tmp_path):
     f = FakeFile("bad.jpg", b"not a real jpeg")
     files = FakeFiles([("file", f)])
 
-    with pytest.raises(RuntimeError, match="Invalid image upload"):
+    with pytest.raises(RuntimeError, match="not a valid image"):
         app_utils.handle_request_files(files)
