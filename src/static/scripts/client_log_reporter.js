@@ -59,7 +59,7 @@
     try {
       const payload = {
         level: level,
-        message: (args[0] !== undefined ? String(args[0]) : "").slice(0, 2048),
+        message: (args[0] === undefined ? "" : String(args[0])).slice(0, 2048),
         args: argsToString(args),
         url: location.pathname.slice(0, 2048),
         ts: new Date().toISOString(),
