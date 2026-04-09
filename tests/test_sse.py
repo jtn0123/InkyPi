@@ -253,7 +253,7 @@ class TestRefreshTaskHooks:
         # Provide a minimal plugin config and stub _execute_with_policy to return an image
         from PIL import Image
 
-        img = Image.new("RGB", (100, 100), "white")
+        img = Image.new("RGB", device_config_dev.get_resolution(), "white")
 
         monkeypatch.setattr(task, "_execute_with_policy", lambda *a, **kw: (img, {}))
         monkeypatch.setattr(task, "_push_to_display", lambda *a, **kw: (10, 5))
