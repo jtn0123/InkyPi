@@ -1,6 +1,90 @@
 # CHANGELOG
 
 
+## v0.25.0 (2026-04-09)
+
+### Features
+
+- Optional browser console message forwarder (JTN-481)
+  ([#268](https://github.com/jtn0123/InkyPi/pull/268),
+  [`091d92f`](https://github.com/jtn0123/InkyPi/commit/091d92f22fad6fb5559f21eca04c26417ac64f8f))
+
+* feat: optional browser console message forwarder (JTN-481)
+
+Add POST /api/client-log endpoint and client_log_reporter.js shim that forwards console.warn/error
+  to the server. Opt-in via <meta name="client-log-enabled" content="1">; 50% sampling;
+  self-disables after 5 failures; per-IP rate limit (cap=10, refill=1/s); CR/LF stripped (Sonar
+  S5145); logs at WARNING so SecretRedactionFilter (JTN-364) applies.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: black formatting for client_log files
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: remove leaked tarball files
+
+* fix: modernize client_log_reporter JS for Sonar S3504/S6582/S7735
+
+- var -> const/let - Use optional chaining for meta tag check - Compare sendBeacon result with ===
+  false (avoid negated condition)
+
+* fix: invert undefined check to clear Sonar S7735
+
+* fix: exclude reporter scripts from Sonar CPD duplication check
+
+The client_error and client_log reporters share intentional boilerplate (rate limiter, sendBeacon,
+  CSRF helper) that is too small to refactor into a shared helper without adding more complexity
+  than it removes.
+
+* refactor: extract client report helper to reduce duplication
+
+Move the body-size + rate-limit + JSON parse boilerplate from client_log.py into
+  utils.client_endpoint.parse_client_report so the new endpoint does not duplicate the existing
+  client_error.py code (Sonar new-code duplication gate <= 3%).
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Plugin instance config history and diff endpoint (JTN-479)
+  ([#271](https://github.com/jtn0123/InkyPi/pull/271),
+  [`bf566d6`](https://github.com/jtn0123/InkyPi/commit/bf566d61b417dc9442c3d72a3d5a53d7fa7cfd89))
+
+* feat: plugin instance config history and diff endpoint (JTN-479)
+
+Track per-instance settings changes in a JSONL log (capped at 100 entries). Expose GET
+  /api/plugins/instance/<name>/history and GET /api/plugins/instance/<name>/diff for debugging
+  config regressions. Hook record_change into update_plugin_instance and save_plugin_settings flows;
+  fail-safe (logs, never blocks save). 24 tests added.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: sanitize instance_name in log messages (Sonar S5145)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: harden plugin history against CodeQL path injection + reflective XSS
+
+- _safe_filename now strict-validates and raises on invalid input (CodeQL recognises full-match
+  regex as a path-injection sanitizer) - _safe_instance_name in the blueprint returns the validated
+  name; all downstream paths use the safe variant - Error messages no longer echo user input back
+  (clears reflective XSS)
+
+* fix: hash-based history filenames to clear CodeQL py/path-injection
+
+CodeQL's taint analysis didn't recognise the regex full-match validator as a sanitizer. Replaced the
+  user-name-derived filename with a sha256-hex digest that contains only [0-9a-f] characters and is
+  recognised as opaque/safe by the analyser.
+
+The original instance name is still preserved inside each JSONL record so 'history' and 'diff'
+  endpoints continue to return human-readable data.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.24.0 (2026-04-09)
 
 ### Features
