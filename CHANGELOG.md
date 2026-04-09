@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v0.22.0 (2026-04-09)
+
+### Features
+
+- I18n scaffolding with gettext stubs and extractor (JTN-459)
+  ([#267](https://github.com/jtn0123/InkyPi/pull/267),
+  [`94e9937`](https://github.com/jtn0123/InkyPi/commit/94e99375a5c596a0f8eb166d75c3b12eaa484181))
+
+* feat: i18n scaffolding with gettext stubs and extractor (JTN-459)
+
+Add stdlib-only i18n foundation: src/utils/i18n.py with identity _() helper and init_i18n() Jinja2
+  wiring, translations/en/messages.json with 26 English baseline strings, scripts/extract_strings.py
+  to scan templates/Python for _() calls (with --check CI mode), and 12 tests covering all scaffold
+  behaviours. No templates modified; no third-party deps added.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: increase i18n coverage to clear Sonar 80% gate
+
+Adds 9 more tests covering _load_locale error paths, init_i18n translation loading,
+  extract_strings.main() output messages, and _scan_file OSError handling.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Validate plugin output dimensions before display (JTN-455)
+  ([#266](https://github.com/jtn0123/InkyPi/pull/266),
+  [`a8f94f7`](https://github.com/jtn0123/InkyPi/commit/a8f94f78208138c33ac593ab13550c98569d4e5f))
+
+Add OutputDimensionMismatch exception and validate_image_dimensions helper in
+  src/utils/output_validator.py. Wire validation in RefreshTask._perform_refresh between generate()
+  and display push — mismatched dims log a clear error with plugin_id/expected/actual, mark plugin
+  health red, and skip the display push for that tick without crashing the refresh loop. Auto-rotate
+  by 90° when dims are transposed. Fix test_sse.py to use device resolution instead of 100x100.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.21.0 (2026-04-09)
 
 ### Features
