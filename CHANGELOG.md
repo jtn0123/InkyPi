@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.25.3 (2026-04-09)
+
+### Bug Fixes
+
+- Reject non-http(s) URL schemes in screenshot plugin (JTN-456)
+  ([`3a98514`](https://github.com/jtn0123/InkyPi/commit/3a98514bfd99dde844d9cef5bf9e998972d59d5c))
+
+fix: reject non-http(s) URL schemes in screenshot plugin (JTN-456)
+
+- Reject non-http(s) URL schemes in screenshot plugin at save time (JTN-456)
+  ([`61efb22`](https://github.com/jtn0123/InkyPi/commit/61efb2283945b8335ec65de593f6e50796ee719c))
+
+- Add `validate_settings` hook to `BasePlugin` (returns None by default) - Override in `Screenshot`
+  plugin to call `validate_url` before settings persist - Wire hook into
+  `_save_plugin_settings_common` and `update_plugin_instance` so both save routes enforce scheme
+  validation (http/https only) - Add `pattern="https?://.*"` and `type="url"` to screenshot URL
+  field for client-side feedback via `settings_schema.html` pattern attribute support - Sanitize URL
+  in log message to prevent log injection (S5145) - Add 12 integration tests covering javascript:,
+  file://, data:, ftp: rejection and http/https acceptance across all three save routes
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.25.2 (2026-04-09)
 
 ### Bug Fixes
