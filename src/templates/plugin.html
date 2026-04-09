@@ -296,7 +296,7 @@
                 </div>
                 <div class="form-group">
                     <label for="instance" class="form-label">Instance Name:</label>
-                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error">
+                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required pattern="[A-Za-z0-9 _-]+" title="Letters, numbers, spaces, underscores, and hyphens only" class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error">
                     <span id="instance-error" class="validation-message" role="alert"></span>
                 </div>
                 <div class="form-group">

@@ -31,7 +31,7 @@ def test_add_plugin_validation_errors(client):
         "refresh_settings": json.dumps(
             {
                 "playlist": "Default",
-                "instance_name": "Bad-Name",  # hyphen not allowed
+                "instance_name": "bad/name",  # slash not allowed
                 "refreshType": "interval",
                 "unit": "minute",
                 "interval": 5,
@@ -40,7 +40,9 @@ def test_add_plugin_validation_errors(client):
     }
     r1 = client.post("/add_plugin", data=bad_name)
     assert r1.status_code == 422
-    assert "alphanumeric characters and spaces" in r1.get_json().get("error", "")
+    assert "letters, numbers, spaces, underscores, and hyphens" in r1.get_json().get(
+        "error", ""
+    )
 
     missing_type = {
         "plugin_id": "clock",
@@ -55,6 +57,69 @@ def test_add_plugin_validation_errors(client):
     r2 = client.post("/add_plugin", data=missing_type)
     assert r2.status_code == 422
     assert "Refresh type is required" in r2.get_json().get("error", "")
+
+
+def _add_plugin_with_instance(client, instance_name):
+    """Helper: attempt to add a clock plugin with the given instance name."""
+    payload = {
+        "plugin_id": "clock",
+        "refresh_settings": json.dumps(
+            {
+                "playlist": "Default",
+                "instance_name": instance_name,
+                "refreshType": "interval",
+                "unit": "minute",
+                "interval": 10,
+            }
+        ),
+    }
+    return client.post("/add_plugin", data=payload)
+
+
+def test_instance_name_allows_underscore(client):
+    """JTN-471: underscore should be accepted in instance names."""
+    resp = _add_plugin_with_instance(client, "weather_home")
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+
+def test_instance_name_allows_hyphen(client):
+    """JTN-471: hyphen should be accepted in instance names."""
+    resp = _add_plugin_with_instance(client, "my-plugin")
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+
+def test_instance_name_allows_plain(client):
+    """JTN-471: plain alphanumeric name should be accepted."""
+    resp = _add_plugin_with_instance(client, "plain")
+    assert resp.status_code == 200
+    assert resp.get_json().get("success") is True
+
+
+def test_instance_name_rejects_slash(client):
+    """JTN-471: slash must be rejected to prevent path traversal."""
+    resp = _add_plugin_with_instance(client, "foo/bar")
+    assert resp.status_code == 422
+    assert "letters, numbers, spaces, underscores, and hyphens" in resp.get_json().get(
+        "error", ""
+    )
+
+
+def test_instance_name_rejects_dotdot(client):
+    """JTN-471: ../etc traversal attempt must be rejected."""
+    resp = _add_plugin_with_instance(client, "../etc")
+    assert resp.status_code == 422
+    assert "letters, numbers, spaces, underscores, and hyphens" in resp.get_json().get(
+        "error", ""
+    )
+
+
+def test_instance_name_rejects_empty(client):
+    """JTN-471: empty instance name must be rejected."""
+    resp = _add_plugin_with_instance(client, "")
+    assert resp.status_code == 422
+    assert "required" in resp.get_json().get("error", "").lower()
 
 
 def test_create_playlist_error_paths(client):

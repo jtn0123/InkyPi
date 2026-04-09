@@ -26,6 +26,7 @@ playlist_bp = Blueprint("playlist", __name__)
 
 _PLAYLIST_NAME_MAX_LEN = 64
 _PLAYLIST_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
+_INSTANCE_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
 
 # Shared string constants to avoid duplication
 _CODE_VALIDATION = "validation_error"
@@ -304,12 +305,9 @@ def add_plugin():
                 code=_CODE_VALIDATION,
                 details={"field": "instance_name"},
             )
-        if not all(
-            char.isalpha() or char.isspace() or char.isnumeric()
-            for char in instance_name
-        ):
+        if not _INSTANCE_NAME_RE.match(instance_name):
             return json_error(
-                "Instance name can only contain alphanumeric characters and spaces",
+                "Instance name can only contain letters, numbers, spaces, underscores, and hyphens",
                 status=422,
                 code=_CODE_VALIDATION,
                 details={"field": "instance_name"},

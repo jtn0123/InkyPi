@@ -451,7 +451,10 @@ class TestAddPlugin:
             data={"plugin_id": "weather", "refresh_settings": refresh_settings},
         )
         assert resp.status_code == 422
-        assert "alphanumeric" in resp.get_json()["error"]
+        assert (
+            "letters, numbers, spaces, underscores, and hyphens"
+            in resp.get_json()["error"]
+        )
 
     def test_missing_refresh_type(self, client, device_config_dev):
         _create_playlist(client, "NoRefType", "08:00", "12:00")
