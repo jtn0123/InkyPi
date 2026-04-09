@@ -1,6 +1,49 @@
 # CHANGELOG
 
 
+## v0.24.0 (2026-04-09)
+
+### Features
+
+- Api key validator CLI for plugin credentials (JTN-480)
+  ([#270](https://github.com/jtn0123/InkyPi/pull/270),
+  [`ffa1b78`](https://github.com/jtn0123/InkyPi/commit/ffa1b78096a93ef5890bd8b44d8d1173bb1c1694))
+
+Add scripts/validate_api_keys.py that reads .env and device.json, probes 6 plugin APIs
+  (OpenWeatherMap, OpenAI, Google AI, Unsplash, NASA APOD, GitHub) with minimal read-only requests,
+  and reports OK/Invalid/Quota/NetworkError status per plugin. Includes 37 tests with requests_mock
+  covering all status classifications and exit codes.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Read-only bearer token for monitoring endpoints (JTN-477)
+  ([#269](https://github.com/jtn0123/InkyPi/pull/269),
+  [`85e30a2`](https://github.com/jtn0123/InkyPi/commit/85e30a2d1f43abf2f4849089eacd43a4208e609f))
+
+Add INKYPI_READONLY_TOKEN env var to enable a second auth path independent of PIN auth.
+  GET/HEAD/OPTIONS requests to the allowlist (/api/health, /api/version/info, /api/uptime,
+  /api/screenshot, /metrics, /api/stats) are accepted with a valid Authorization: Bearer header.
+  Mutating methods and non-allowlist paths still require a PIN session. Token is stored as a SHA-256
+  digest; hmac.compare_digest prevents timing attacks.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Subresource Integrity for vendored and CDN assets (JTN-478)
+  ([#272](https://github.com/jtn0123/InkyPi/pull/272),
+  [`b43b227`](https://github.com/jtn0123/InkyPi/commit/b43b2279b8f958f0c38f13c4c1d64dc8460b0f1b))
+
+- Add src/utils/sri.py with compute_sri(), sri_for() (Jinja helper, cached), cdn_sri() (reads
+  cdn_manifest.json), and init_sri() Flask wiring - Add src/static/cdn_manifest.json with SHA-384
+  hashes for swagger-ui-css, swagger-ui-bundle, and chart-js CDN assets - Add
+  scripts/update_cdn_sri.py to refresh CDN hashes when versions bump - Wire init_sri(app) into
+  create_app() in src/inkypi.py - Register sri_for/cdn_sri on base_plugin Jinja env for plugin
+  templates - Add integrity + crossorigin attrs to htmx (vendor), swagger-ui, chart.js tags - Add 24
+  tests in tests/test_sri.py covering all helpers and the update script - Update conftest.py
+  flask_app fixture to call init_sri
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.23.0 (2026-04-09)
 
 ### Features
