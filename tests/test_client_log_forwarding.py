@@ -92,7 +92,9 @@ class TestPostValidJson:
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
             resp = _post(cl_client, payload)
         assert resp.status_code == 204
-        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        warning_msgs = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
         assert any("TypeError: x is undefined" in m for m in warning_msgs)
 
 
@@ -223,12 +225,16 @@ class TestLogLevelPrefix:
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
             resp = _post(cl_client, {"level": "warn", "message": "test warn"})
         assert resp.status_code == 204
-        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        warning_msgs = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
         assert any("client log [warn]" in m for m in warning_msgs)
 
     def test_error_logged_with_error_prefix(self, cl_client, caplog):
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
             resp = _post(cl_client, {"level": "error", "message": "test error"})
         assert resp.status_code == 204
-        warning_msgs = [r.message for r in caplog.records if r.levelno == logging.WARNING]
+        warning_msgs = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
         assert any("client log [error]" in m for m in warning_msgs)

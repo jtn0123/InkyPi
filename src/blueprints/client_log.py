@@ -32,9 +32,9 @@ _rate_limiter: TokenBucket = TokenBucket(capacity=10, refill_rate=1.0)
 # ---------------------------------------------------------------------------
 # Size limits
 # ---------------------------------------------------------------------------
-_MESSAGE_MAX = 2048   # bytes for message field
-_ARGS_MAX = 4096      # bytes for args field
-_BODY_MAX = 16_384    # 16 KB total body
+_MESSAGE_MAX = 2048  # bytes for message field
+_ARGS_MAX = 4096  # bytes for args field
+_BODY_MAX = 16_384  # 16 KB total body
 
 # Accepted levels — info/debug rejected to avoid noise
 _ACCEPTED_LEVELS = frozenset({"warn", "error"})
