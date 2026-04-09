@@ -60,7 +60,7 @@
           onSendFailure();
         });
       }
-    } catch (_e) {
+    } catch {
       // Never let the reporter itself throw — record a soft failure so the
       // self-disable counter still kicks in if something is fundamentally broken.
       onSendFailure();
