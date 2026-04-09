@@ -107,6 +107,9 @@ _DEFAULT_AUTH_REFILL = 1 / 30  # 1 token per 30 s
 _DEFAULT_REFRESH_CAPACITY = 10
 _DEFAULT_REFRESH_REFILL = 1 / 6  # 1 token per 6 s
 
+_DEFAULT_MUTATING_CAPACITY = 10
+_DEFAULT_MUTATING_REFILL = 10 / 60  # 10 tokens per minute
+
 
 def _parse_rate_env(name: str, capacity_default: int, rate_default: float):
     """Parse ``N/Sseconds`` from *name* env var.
@@ -139,5 +142,24 @@ def make_refresh_bucket() -> TokenBucket:
     """Return a TokenBucket configured for the /display-next endpoint."""
     cap, rate = _parse_rate_env(
         "INKYPI_RATE_LIMIT_REFRESH", _DEFAULT_REFRESH_CAPACITY, _DEFAULT_REFRESH_REFILL
+    )
+    return TokenBucket(capacity=cap, refill_rate=rate)
+
+
+def make_mutating_bucket() -> TokenBucket:
+    """Return a TokenBucket configured for high-cost mutating endpoints.
+
+    Applied to endpoints such as /save_plugin_settings and /update_now that
+    can saturate CPU or hardware resources if hammered.  Looser than the auth
+    bucket (3/min) but stricter than the global sliding-window (60/min).
+    Default: burst of 10, refill at 10/min per IP.
+
+    Override with env var ``INKYPI_RATE_LIMIT_MUTATING`` in ``N/Sseconds``
+    format (e.g. ``"10/60"``).
+    """
+    cap, rate = _parse_rate_env(
+        "INKYPI_RATE_LIMIT_MUTATING",
+        _DEFAULT_MUTATING_CAPACITY,
+        _DEFAULT_MUTATING_REFILL,
     )
     return TokenBucket(capacity=cap, refill_rate=rate)
