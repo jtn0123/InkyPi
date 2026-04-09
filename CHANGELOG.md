@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## v0.26.0 (2026-04-09)
+
+### Features
+
+- Validate uploaded image magic bytes (JTN-514) ([#281](https://github.com/jtn0123/InkyPi/pull/281),
+  [`4950a46`](https://github.com/jtn0123/InkyPi/commit/4950a4659fe23448257ffc472382b300bcf5204f))
+
+Add magic-byte verification and PIL.verify() to _validate_and_read_file so renamed binaries (e.g.
+  evil.exe → evil.png) are rejected before they reach downstream PIL parsing. Closes the
+  polyglot/type-confusion class.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.25.5 (2026-04-09)
 
 ### Bug Fixes
