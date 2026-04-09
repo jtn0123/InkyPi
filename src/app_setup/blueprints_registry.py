@@ -11,6 +11,7 @@ def register_blueprints(app: Flask) -> None:
     from blueprints.apikeys import apikeys_bp
     from blueprints.auth import auth_bp
     from blueprints.client_error import client_error_bp
+    from blueprints.client_log import client_log_bp
     from blueprints.csp_report import csp_report_bp
     from blueprints.events import events_bp
     from blueprints.history import history_bp
@@ -27,6 +28,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
     app.register_blueprint(client_error_bp)
+    app.register_blueprint(client_log_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(plugin_io_bp)
