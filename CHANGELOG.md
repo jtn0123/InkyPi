@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.20.0 (2026-04-09)
+
+### Features
+
+- Add GET /api/screenshot endpoint (JTN-450) ([#263](https://github.com/jtn0123/InkyPi/pull/263),
+  [`32ea818`](https://github.com/jtn0123/InkyPi/commit/32ea81800b2a670a0e8850dd28957b869a738c93))
+
+Returns the current display image (processed first, fallback to current) as PNG or WebP via content
+  negotiation. Supports conditional GET with If-Modified-Since/304, Cache-Control: no-cache
+  must-revalidate, and Last-Modified header. Reuses maybe_serve_webp from JTN-302. No auth required
+  so the endpoint is embeddable in dashboards and status pages.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.19.0 (2026-04-09)
 
 ### Features
