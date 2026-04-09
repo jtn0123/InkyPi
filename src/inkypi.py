@@ -51,6 +51,7 @@ from plugins.plugin_registry import load_plugins, pop_hot_reload_info
 from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image, get_ip_address
 from utils.config_schema import ConfigValidationError
+from utils.i18n import init_i18n
 
 # Re-exported for tests/unit/test_inkypi.py monkey-patches.
 __all__ = [
@@ -275,6 +276,7 @@ def create_app():
         _max_len = _DEFAULT_MAX_UPLOAD
     app.config["MAX_CONTENT_LENGTH"] = _max_len
 
+    init_i18n(app)
     register_blueprints(app)
     setup_asset_helpers(app)
     register_health_endpoints(app)

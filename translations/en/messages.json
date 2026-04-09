@@ -1,0 +1,38 @@
+{
+  "_meta": {
+    "locale": "en",
+    "description": "English baseline — keys and values are identical (identity mapping). Future language files should copy this structure and translate the values only.",
+    "format": "{ \"source string\": \"translated string\" }",
+    "extraction": "Run `python scripts/extract_strings.py` to regenerate translations/extracted.json from source."
+  },
+
+  "InkyPi": "InkyPi",
+  "Settings": "Settings",
+  "History": "History",
+  "Home": "Home",
+  "Sign In": "Sign In",
+  "Playlists": "Playlists",
+
+  "Current Display": "Current Display",
+  "Now showing:": "Now showing:",
+  "Sections": "Sections",
+  "Device": "Device",
+  "Scheduling": "Scheduling",
+  "Image Processing": "Image Processing",
+  "Updates": "Updates",
+
+  "Download Logs": "Download Logs",
+  "Manage API Keys": "Manage API Keys",
+  "Export CSV": "Export CSV",
+  "Refresh": "Refresh",
+  "Save": "Save",
+
+  "Enter your PIN to continue.": "Enter your PIN to continue.",
+  "Enter PIN": "Enter PIN",
+  "PIN": "PIN",
+
+  "Device Name": "Device Name",
+  "Orientation": "Orientation",
+  "Horizontal": "Horizontal",
+  "Vertical": "Vertical"
+}
