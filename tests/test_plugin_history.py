@@ -19,12 +19,19 @@ def config_dir(tmp_path):
     return str(tmp_path)
 
 
+def _hist_file_for(config_dir, instance_name):
+    """Helper that mirrors plugin_history._history_file for test assertions."""
+    from utils.plugin_history import _history_file
+
+    return _history_file(config_dir, instance_name)
+
+
 def test_record_change_creates_file(config_dir):
     from utils.plugin_history import record_change
 
     record_change(config_dir, "my_plugin", {"key": "old"}, {"key": "new"})
 
-    hist_file = os.path.join(config_dir, "plugin_history", "my_plugin.jsonl")
+    hist_file = _hist_file_for(config_dir, "my_plugin")
     assert os.path.isfile(hist_file)
     with open(hist_file) as fh:
         lines = [ln.strip() for ln in fh if ln.strip()]
@@ -42,7 +49,7 @@ def test_record_change_appends(config_dir):
     record_change(config_dir, "inst", {"a": 1}, {"a": 2})
     record_change(config_dir, "inst", {"a": 2}, {"a": 3})
 
-    hist_file = os.path.join(config_dir, "plugin_history", "inst.jsonl")
+    hist_file = _hist_file_for(config_dir, "inst")
     with open(hist_file) as fh:
         lines = [ln.strip() for ln in fh if ln.strip()]
     assert len(lines) == 2
@@ -89,7 +96,7 @@ def test_truncation_at_max_entries(config_dir):
         record_change(config_dir, "inst", {"v": i}, {"v": i + 1})
 
     # File should contain exactly MAX_ENTRIES lines
-    hist_file = os.path.join(config_dir, "plugin_history", "inst.jsonl")
+    hist_file = _hist_file_for(config_dir, "inst")
     with open(hist_file) as fh:
         lines = [ln.strip() for ln in fh if ln.strip()]
     assert len(lines) == MAX_ENTRIES

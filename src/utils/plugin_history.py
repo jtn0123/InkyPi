@@ -1,13 +1,16 @@
 """Plugin instance config history and diff utilities (JTN-479).
 
 Each plugin instance gets a small JSONL log file under:
-    <config_dir>/plugin_history/<safe_instance_name>.jsonl
+    <config_dir>/plugin_history/<sha256(instance_name)[:16]>.jsonl
 
-Records are appended on every settings change and capped at MAX_ENTRIES.
+The filename is a hash of the instance name (not the name itself) so that
+filesystem operations never depend on user-controlled string contents —
+this keeps CodeQL's path-injection analyzer happy.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -19,20 +22,23 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 MAX_ENTRIES = 100
-# Strict allowlist regex that CodeQL recognises as a path-injection sanitizer.
+# Strict allowlist regex used at the API boundary; defense in depth.
 _VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}\Z")
 
 
-def _safe_filename(instance_name: str) -> str:
-    """Return *instance_name* if it matches the allowlist; raise otherwise.
+def _hashed_filename(instance_name: str) -> str:
+    """Return an opaque hash-based filename for *instance_name*.
 
-    All callers must pass a name they have already validated against
-    ``_VALID_NAME_RE``. This function exists as a defense-in-depth boundary
-    that taint analyzers (CodeQL py/path-injection) can recognise.
+    The filename is derived purely from a hex digest, so the resulting
+    string consists only of [0-9a-f] characters and contains no path
+    separators. CodeQL recognises hash output as path-injection-safe.
     """
-    if not isinstance(instance_name, str) or not _VALID_NAME_RE.match(instance_name):
+    if not isinstance(instance_name, str):
+        raise TypeError("instance_name must be a string")
+    if not _VALID_NAME_RE.match(instance_name):
         raise ValueError("plugin_history: invalid instance name")
-    return instance_name
+    digest = hashlib.sha256(instance_name.encode("utf-8")).hexdigest()
+    return digest[:16] + ".jsonl"
 
 
 def _history_dir(config_dir: str) -> str:
@@ -40,9 +46,7 @@ def _history_dir(config_dir: str) -> str:
 
 
 def _history_file(config_dir: str, instance_name: str) -> str:
-    return os.path.join(
-        _history_dir(config_dir), f"{_safe_filename(instance_name)}.jsonl"
-    )
+    return os.path.join(_history_dir(config_dir), _hashed_filename(instance_name))
 
 
 def record_change(
