@@ -139,3 +139,41 @@ def test_skip_link_css_offscreen():
         ".skip-link must be positioned off-screen by default; "
         f"found block: {block!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# aria-pressed on logs panel toggle buttons (JTN-472)
+# ---------------------------------------------------------------------------
+
+
+def test_logs_panel_toggle_buttons_have_aria_pressed(client):
+    """Auto-Scroll and Wrap toggle buttons must expose aria-pressed (JTN-472)."""
+    html = _html(client, "/settings")
+    # logsAutoScrollBtn must have aria-pressed attribute
+    assert (
+        'id="logsAutoScrollBtn"' in html
+    ), "logsAutoScrollBtn not found in settings HTML"
+    assert 'id="logsWrapBtn"' in html, "logsWrapBtn not found in settings HTML"
+
+    # Both buttons must carry aria-pressed in the rendered HTML
+    import re
+
+    auto_scroll_match = re.search(
+        r'id="logsAutoScrollBtn"[^>]*aria-pressed="(true|false)"'
+        r'|aria-pressed="(true|false)"[^>]*id="logsAutoScrollBtn"',
+        html,
+    )
+    assert auto_scroll_match, (
+        "logsAutoScrollBtn is missing aria-pressed attribute; "
+        "toggle state must not be conveyed through text label alone (JTN-472)"
+    )
+
+    wrap_match = re.search(
+        r'id="logsWrapBtn"[^>]*aria-pressed="(true|false)"'
+        r'|aria-pressed="(true|false)"[^>]*id="logsWrapBtn"',
+        html,
+    )
+    assert wrap_match, (
+        "logsWrapBtn is missing aria-pressed attribute; "
+        "toggle state must not be conveyed through text label alone (JTN-472)"
+    )
