@@ -100,6 +100,46 @@ def preview_image():
     return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
 
 
+@main_bp.route("/api/screenshot", methods=["GET"])
+def screenshot():
+    """Return the current display image as PNG or WebP (JTN-450).
+
+    Prefer the processed image; fall back to current_image_file.  Supports
+    content negotiation via the Accept header (WebP when advertised), conditional
+    GET via If-Modified-Since / 304, and sets Cache-Control: no-cache so
+    monitoring dashboards always poll for fresh content.
+    """
+    device_config = current_app.config["DEVICE_CONFIG"]
+    path = device_config.processed_image_file
+    if not os.path.exists(path):
+        path = device_config.current_image_file
+    if not os.path.exists(path):
+        return json_error("No display image available yet", status=404)
+
+    abs_path = os.path.abspath(path)
+
+    # Conditional GET — If-Modified-Since
+    file_mtime = int(os.path.getmtime(abs_path))
+    last_modified = datetime.fromtimestamp(file_mtime, tz=UTC)
+    last_modified_str = last_modified.strftime("%a, %d %b %Y %H:%M:%S GMT")
+
+    if_modified_since = request.headers.get("If-Modified-Since")
+    if if_modified_since:
+        try:
+            client_mtime = parsedate_to_datetime(if_modified_since)
+            if int(client_mtime.timestamp()) >= file_mtime:
+                return "", 304
+        except (ValueError, OSError):
+            pass
+
+    safe_root = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    response = maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
+    response.headers["Last-Modified"] = last_modified_str
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
+
+
 @main_bp.route("/api/current_image", methods=["GET"])
 def get_current_image():
     """Serve current_image.png with conditional request support (If-Modified-Since) for polling."""
