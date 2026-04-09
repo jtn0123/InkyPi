@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.21.0 (2026-04-09)
+
+### Features
+
+- Image diff utility for history comparison (JTN-452)
+  ([#264](https://github.com/jtn0123/InkyPi/pull/264),
+  [`953746c`](https://github.com/jtn0123/InkyPi/commit/953746cdb0e0f1a94b233ffe446b05f255b5920b))
+
+scripts/image_diff.py compares two PNG files and reports pixel difference count, percentage changed,
+  max channel delta, and writes a visual diff PNG with changed pixels overlaid in red at 50% alpha.
+  Supports --threshold, --summary-only, and --json flags.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.20.0 (2026-04-09)
 
 ### Features
