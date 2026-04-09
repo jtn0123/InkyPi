@@ -209,8 +209,9 @@
     </div>
 
     <!-- Delete Playlist Confirm Modal -->
-    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete playlist" hidden>
+    <div id="deletePlaylistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deletePlaylistTitle" hidden>
         <div class="modal-content modal-sheet">
+            <h2 id="deletePlaylistTitle" class="sr-only">Confirm delete playlist</h2>
             <p id="deletePlaylistText"></p>
             <div class="buttons-container">
                 <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
@@ -220,8 +221,9 @@
     </div>
 
     <!-- Delete Instance Confirm Modal -->
-    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-label="Confirm delete instance" hidden>
+    <div id="deleteInstanceModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="deleteInstanceTitle" hidden>
         <div class="modal-content modal-sheet">
+            <h2 id="deleteInstanceTitle" class="sr-only">Confirm delete instance</h2>
             <p id="deleteInstanceText"></p>
             <div class="buttons-container">
                 <button type="button" class="action-button warn" id="confirmDeleteInstanceBtn">Delete</button>
