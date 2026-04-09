@@ -224,6 +224,71 @@ _ALLOWED_FILE_EXTENSIONS = {
     "heic",
 }
 
+# Magic-byte signatures for image formats.  Each entry maps a normalised
+# extension (or set of equivalent extensions) to a list of byte-prefix
+# tuples that are valid for that format.  Only image extensions are listed
+# here; PDF is validated separately by downstream code.
+_IMAGE_MAGIC_SIGNATURES: dict[str, list[bytes]] = {
+    "png": [b"\x89PNG\r\n\x1a\n"],
+    "jpg": [b"\xff\xd8\xff"],
+    "jpeg": [b"\xff\xd8\xff"],
+    "gif": [b"GIF87a", b"GIF89a"],
+    "webp": [b"RIFF"],  # Full check: bytes[8:12] == b"WEBP" – done in validator
+    "bmp": [b"BM"],
+    # HEIF/HEIC/AVIF use ISO Base Media File Format; magic is at offset 4.
+    # We allow any ftyp box (offset 4–8 == b"ftyp") rather than enumerating
+    # every brand, then rely on PIL.verify() for deeper validation.
+    "heif": [],  # checked via PIL only
+    "heic": [],  # checked via PIL only
+    "avif": [],  # checked via PIL only
+}
+
+# Image extensions that require PIL verification after the magic-byte check.
+_IMAGE_EXTENSIONS: frozenset[str] = frozenset(
+    ext for ext in _ALLOWED_FILE_EXTENSIONS if ext != "pdf"
+)
+
+
+def _check_magic_bytes(content: bytes, extension: str) -> bool:
+    """Return True if *content* starts with a recognised magic signature for *extension*.
+
+    For formats without a simple prefix (heif/heic/avif) we defer entirely to
+    PIL.verify() and return True here so the caller proceeds to that check.
+
+    For WebP we additionally verify the "WEBP" brand at offset 8.
+    """
+    sigs = _IMAGE_MAGIC_SIGNATURES.get(extension)
+    if sigs is None:
+        # Unknown image extension — allow PIL to decide.
+        return True
+    if not sigs:
+        # Formats delegated entirely to PIL (heif/heic/avif).
+        return True
+    if not any(content.startswith(sig) for sig in sigs):
+        return False
+    # Extra check for WebP: the 4-byte brand field at offset 8 must be b"WEBP".
+    if extension == "webp":
+        return content[8:12] == b"WEBP"
+    return True
+
+
+def _validate_image_content(content: bytes, extension: str) -> None:
+    """Validate image content using magic bytes and PIL verification.
+
+    Raises ``RuntimeError`` with a user-safe message when the file is not a
+    valid image.  The caller is responsible for ensuring *content* is non-empty
+    before calling this function.
+    """
+    if not _check_magic_bytes(content, extension):
+        raise RuntimeError("Uploaded file is not a valid image")
+
+    # PIL verification: catches malformed files that pass the magic-byte check.
+    try:
+        with Image.open(BytesIO(content)) as img:
+            img.verify()
+    except Exception as exc:
+        raise RuntimeError("Uploaded file is not a valid image") from exc
+
 
 def _get_existing_file_location(key, form_data):
     """Return the existing file location(s) from form_data for the given key.
@@ -248,9 +313,14 @@ def _validate_and_read_file(file, file_name):
     if not extension or extension.lower() not in _ALLOWED_FILE_EXTENSIONS:
         return None, None
 
+    ext = extension.lower()
+
     content = file.read()
     if content is None:
         raise RuntimeError("Empty upload content")
+
+    if len(content) == 0:
+        raise RuntimeError("Uploaded file is not a valid image")
 
     max_upload_bytes_env = os.getenv("MAX_UPLOAD_BYTES")
     max_upload_bytes = (
@@ -260,7 +330,13 @@ def _validate_and_read_file(file, file_name):
         raise RuntimeError(
             f"Uploaded file exceeds size limit of {max_upload_bytes} bytes"
         )
-    return content, extension.lower()
+
+    # Validate magic bytes and PIL integrity for image uploads.
+    # PDFs are handled by downstream code; skip magic-byte check for them.
+    if ext in _IMAGE_EXTENSIONS:
+        _validate_image_content(content, ext)
+
+    return content, ext
 
 
 def _rewind_file_stream(file):
