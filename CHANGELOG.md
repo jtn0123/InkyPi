@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.25.4 (2026-04-09)
+
+### Bug Fixes
+
+- Add aria-labelledby to image preview lightbox modal (JTN-467)
+  ([#274](https://github.com/jtn0123/InkyPi/pull/274),
+  [`c5e1a23`](https://github.com/jtn0123/InkyPi/commit/c5e1a2337033eaceb16e83c694fcdcf8f5cbd94a))
+
+The #imagePreviewModal was missing a proper accessible name on both the dashboard (dynamic modal via
+  lightbox.js used aria-label instead of aria-labelledby) and plugin pages (aria-labelledby pointed
+  to a non-existent id). Added <h2 id="imagePreviewTitle" class="sr-only"> inside the modal on
+  plugin.html, and updated lightbox.js to create the same heading element and use aria-labelledby
+  when dynamically creating the modal. Adds 5 regression tests.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.25.3 (2026-04-09)
 
 ### Bug Fixes
