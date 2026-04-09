@@ -19,6 +19,7 @@ def register_blueprints(app: Flask) -> None:
     from blueprints.metrics import metrics_bp
     from blueprints.playlist import playlist_bp
     from blueprints.plugin import plugin_bp
+    from blueprints.plugin_history_bp import plugin_history_bp
     from blueprints.plugin_io import plugin_io_bp
     from blueprints.settings import settings_bp
     from blueprints.stats import stats_bp
@@ -31,6 +32,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(client_log_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
+    app.register_blueprint(plugin_history_bp)
     app.register_blueprint(plugin_io_bp)
     app.register_blueprint(playlist_bp)
     app.register_blueprint(history_bp)

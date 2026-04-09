@@ -20,6 +20,7 @@ from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.http_utils import APIError, json_error
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
+from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
 
 logger = logging.getLogger(__name__)
@@ -345,8 +346,13 @@ def update_plugin_instance(instance_name: str):
             except Exception:
                 logger.debug("Could not validate plugin schema for %s", plugin_id)
 
+        before_settings = dict(plugin_instance.settings or {})
         plugin_instance.settings = plugin_settings
         device_config.write_config()
+        config_dir = os.path.dirname(device_config.config_file)
+        _record_plugin_change(
+            config_dir, instance_name, before_settings, plugin_settings
+        )
     except APIError as e:
         return json_error(e.message, status=e.status, code=e.code, details=e.details)
     except Exception:
@@ -579,7 +585,9 @@ def _save_plugin_settings_common(
 
     instance_name = f"{plugin_id}_saved_settings"
     existing_instance = playlist.find_plugin(plugin_id, instance_name)
+    before_settings: dict = {}
     if existing_instance:
+        before_settings = dict(existing_instance.settings or {})
         existing_instance.settings = plugin_settings
     else:
         playlist.add_plugin(
@@ -594,6 +602,8 @@ def _save_plugin_settings_common(
     # Preserve legacy failure surface for callers/tests that patch config mutation hooks.
     device_config.update_value("playlist_config", playlist_manager.to_dict())
     device_config.write_config()
+    config_dir = os.path.dirname(device_config.config_file)
+    _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
     return (
         jsonify(
             {
