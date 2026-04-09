@@ -287,6 +287,7 @@
         btn.textContent = state.logsAutoScroll
           ? "Auto-Scroll: On"
           : "Auto-Scroll: Off";
+        btn.setAttribute("aria-pressed", String(state.logsAutoScroll));
       }
       ui.savePref?.("", prefKey("autoScroll"), state.logsAutoScroll);
     }
@@ -398,7 +399,10 @@
       const viewer = document.getElementById("logsViewer");
       const btn = document.getElementById("logsWrapBtn");
       if (viewer) viewer.style.whiteSpace = state.logsWrap ? "pre-wrap" : "pre";
-      if (btn) btn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
+      if (btn) {
+        btn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
+        btn.setAttribute("aria-pressed", String(state.logsWrap));
+      }
       ui.savePref?.("", prefKey("wrap"), state.logsWrap);
     }
 
@@ -708,9 +712,11 @@
         autoBtn.textContent = state.logsAutoScroll
           ? "Auto-Scroll: On"
           : "Auto-Scroll: Off";
+        autoBtn.setAttribute("aria-pressed", String(state.logsAutoScroll));
       }
       if (wrapBtn) {
         wrapBtn.textContent = state.logsWrap ? "Wrap: On" : "Wrap: Off";
+        wrapBtn.setAttribute("aria-pressed", String(state.logsWrap));
       }
       if (viewer) {
         viewer.style.whiteSpace = state.logsWrap ? "pre-wrap" : "pre";
