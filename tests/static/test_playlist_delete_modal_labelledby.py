@@ -50,6 +50,14 @@ class TestDeletePlaylistModalLabelledBy:
         assert (
             'aria-labelledby="deletePlaylistTitle"' in html
         ), '#deletePlaylistModal must use aria-labelledby="deletePlaylistTitle"'
+        # Assert the modal tag itself does not contain a plain aria-label attribute
+        modal_tag_match = re.search(r'<div[^>]*id="deletePlaylistModal"[^>]*>', html)
+        assert modal_tag_match, "#deletePlaylistModal opening tag not found"
+        modal_tag = modal_tag_match.group(0)
+        assert "aria-label=" not in modal_tag or "aria-labelledby=" in modal_tag, (
+            "#deletePlaylistModal must not use aria-label without aria-labelledby; "
+            "use aria-labelledby exclusively"
+        )
 
 
 class TestDeleteInstanceModalLabelledBy:
@@ -84,6 +92,14 @@ class TestDeleteInstanceModalLabelledBy:
         assert (
             'aria-labelledby="deleteInstanceTitle"' in html
         ), '#deleteInstanceModal must use aria-labelledby="deleteInstanceTitle"'
+        # Assert the modal tag itself does not contain a plain aria-label attribute
+        modal_tag_match = re.search(r'<div[^>]*id="deleteInstanceModal"[^>]*>', html)
+        assert modal_tag_match, "#deleteInstanceModal opening tag not found"
+        modal_tag = modal_tag_match.group(0)
+        assert "aria-label=" not in modal_tag or "aria-labelledby=" in modal_tag, (
+            "#deleteInstanceModal must not use aria-label without aria-labelledby; "
+            "use aria-labelledby exclusively"
+        )
 
 
 class TestDeleteModalHeadingElements:
