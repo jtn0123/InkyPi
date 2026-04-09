@@ -6,7 +6,7 @@
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     {% from 'macros/api_key_card.html' import api_key_card %}
-    <main id="main-content" role="main" class="page-shell page-shell-management" data-page-shell="management">
+    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame">
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
         {% if api_keys_mode == 'managed' %}

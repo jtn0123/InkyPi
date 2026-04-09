@@ -73,6 +73,32 @@ def test_all_pages_have_main_landmark(client, path):
     ), f"No <main id='main-content'> or role='main' with id='main-content' on {path}"
 
 
+@pytest.mark.parametrize("path", MAIN_PAGES)
+def test_main_element_has_tabindex_minus_one(client, path):
+    """<main id='main-content'> must have tabindex='-1' so skip link can move focus.
+
+    Without tabindex='-1', activating the skip link scrolls the viewport but does
+    not move keyboard focus, leaving the next Tab at the top of the page (JTN-458).
+    """
+    html = _html(client, path)
+    # The main element must contain both id="main-content" and tabindex="-1"
+    # as attributes on the same opening tag.
+    has_tabindex = bool(
+        re.search(
+            r'<main\b[^>]*\bid=["\']main-content["\'][^>]*\btabindex=["\']?-1["\']?',
+            html,
+        )
+        or re.search(
+            r'<main\b[^>]*\btabindex=["\']?-1["\']?[^>]*\bid=["\']main-content["\']',
+            html,
+        )
+    )
+    assert has_tabindex, (
+        f"<main id='main-content'> on {path} is missing tabindex='-1'. "
+        'Add tabindex="-1" so the skip link moves keyboard focus into main (JTN-458).'
+    )
+
+
 # ---------------------------------------------------------------------------
 # role="banner" / <header>
 # Plugin pages are out of scope for this PR (JTN-296 partial).
