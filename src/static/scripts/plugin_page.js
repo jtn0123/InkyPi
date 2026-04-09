@@ -12,6 +12,14 @@
       if (instanceError) instanceError.textContent = "Instance name is required";
       return false;
     }
+    if (!/^[A-Za-z0-9 _-]+$/.test(name)) {
+      if (instanceInput) {
+        instanceInput.setAttribute("aria-invalid", "true");
+        instanceInput.focus();
+      }
+      if (instanceError) instanceError.textContent = "Instance name can only contain letters, numbers, spaces, underscores, and hyphens";
+      return false;
+    }
     if (instanceInput) instanceInput.setAttribute("aria-invalid", "false");
     if (instanceError) instanceError.textContent = "";
     return true;
