@@ -16,6 +16,7 @@ from utils.progress import (
     start_step,
     update_step,
 )
+from utils.sri import cdn_sri, sri_for
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,9 @@ class BasePlugin:
         self.env = Environment(
             loader=loader, autoescape=select_autoescape(["html", "xml"])
         )
+        # Register SRI helpers so plugin templates can use sri_for/cdn_sri
+        self.env.globals["sri_for"] = sri_for
+        self.env.globals["cdn_sri"] = cdn_sri
         # Enable template auto-reload for development convenience
         try:
             self.env.auto_reload = True
