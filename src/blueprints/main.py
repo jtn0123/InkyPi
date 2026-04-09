@@ -174,6 +174,9 @@ def get_current_image():
         "%a, %d %b %Y %H:%M:%S GMT"
     )
     response.headers["Cache-Control"] = "no-cache"
+    response.headers["Content-Disposition"] = (
+        f'inline; filename="{os.path.basename(image_path)}"'
+    )
     return response
 
 

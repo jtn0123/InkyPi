@@ -84,7 +84,9 @@ def maybe_serve_webp(
     if not _client_accepts_webp(accept_header):
         # send_from_directory performs path-traversal validation internally;
         # this is the recognized sanitization sink.
-        return send_from_directory(root_str, filename, mimetype="image/png")
+        resp = send_from_directory(root_str, filename, mimetype="image/png")
+        resp.headers["Content-Disposition"] = f'inline; filename="{filename}"'
+        return resp
 
     # For the WebP path we still need an absolute filesystem path. Re-use
     # send_from_directory's validation by calling it once to resolve, then
@@ -104,6 +106,7 @@ def maybe_serve_webp(
     response = Response(webp_bytes, mimetype="image/webp")
     response.headers["ETag"] = etag
     response.headers["Cache-Control"] = "no-cache"
+    response.headers["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
 
 
