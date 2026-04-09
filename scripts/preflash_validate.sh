@@ -131,7 +131,8 @@ coverage_suite() {
         tests/unit/test_refresh_task_resilience.py \
         tests/unit/test_plugin_isolation.py \
         tests/unit/test_upgrade_compatibility.py \
-        tests/unit/test_install_scripts.py
+        tests/unit/test_install_scripts.py \
+        tests/unit/test_config_mtime_cache.py
     python scripts/coverage_gate.py coverage.xml
 }
 
