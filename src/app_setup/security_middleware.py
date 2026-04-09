@@ -171,24 +171,35 @@ _refresh_bucket = None
 _mutating_bucket = None
 
 
-def _check_auth_rate(addr: str) -> bool:
-    """Return True if the request is allowed by the auth bucket."""
-    return _auth_bucket.try_acquire(addr)  # type: ignore[union-attr]
-
-
-def _check_refresh_rate(addr: str) -> bool:
-    """Return True if the request is allowed by the refresh bucket."""
-    return _refresh_bucket.try_acquire(addr)  # type: ignore[union-attr]
-
-
-def _check_mutating_rate(addr: str) -> bool:
-    """Return True if the request is allowed by the mutating bucket."""
-    return _mutating_bucket.try_acquire(addr)  # type: ignore[union-attr]
-
-
 def _is_mutating_path(path: str) -> bool:
     """Return True if *path* matches a high-cost mutating endpoint."""
     return path in _MUTATING_RATE_PATHS or path.startswith(_MUTATING_RATE_PREFIX)
+
+
+def _apply_token_bucket_limits(path: str, addr: str):
+    """Check per-endpoint token-bucket limits; return a 429 response or None.
+
+    Extracted to keep ``_rate_limit_mutations`` below SonarCloud's cognitive
+    complexity threshold (S3776).
+    """
+    if path in _AUTH_RATE_PATHS and not _auth_bucket.try_acquire(addr):  # type: ignore[union-attr]
+        body, code = json_error("Too many login attempts — try again later", status=429)
+        resp = make_response(body, code)
+        resp.headers["Retry-After"] = "30"
+        return resp
+    if path in _REFRESH_RATE_PATHS and not _refresh_bucket.try_acquire(addr):  # type: ignore[union-attr]
+        body, code = json_error(
+            "Refresh rate limit exceeded — try again later", status=429
+        )
+        resp = make_response(body, code)
+        resp.headers["Retry-After"] = "6"
+        return resp
+    if _is_mutating_path(path) and not _mutating_bucket.try_acquire(addr):  # type: ignore[union-attr]
+        body, code = json_error("Too many requests — try again later", status=429)
+        resp = make_response(body, code)
+        resp.headers["Retry-After"] = "6"
+        return resp
+    return None
 
 
 def setup_rate_limiting(app: Flask) -> None:
@@ -214,28 +225,9 @@ def setup_rate_limiting(app: Flask) -> None:
         if request.path in _RATE_EXEMPT:
             return None
         addr = request.remote_addr or "unknown"
-
-        # --- Endpoint-specific token-bucket limits (stricter) ---
-        if request.path in _AUTH_RATE_PATHS and not _check_auth_rate(addr):
-            body, code = json_error(
-                "Too many login attempts — try again later", status=429
-            )
-            resp = make_response(body, code)
-            resp.headers["Retry-After"] = "30"
-            return resp
-        if request.path in _REFRESH_RATE_PATHS and not _check_refresh_rate(addr):
-            body, code = json_error(
-                "Refresh rate limit exceeded — try again later", status=429
-            )
-            resp = make_response(body, code)
-            resp.headers["Retry-After"] = "6"
-            return resp
-        if _is_mutating_path(request.path) and not _check_mutating_rate(addr):
-            body, code = json_error("Too many requests — try again later", status=429)
-            resp = make_response(body, code)
-            resp.headers["Retry-After"] = "6"
-            return resp
-
+        bucket_resp = _apply_token_bucket_limits(request.path, addr)
+        if bucket_resp is not None:
+            return bucket_resp
         # --- General sliding-window limit (all other mutations) ---
         allowed, _ = _mutation_limiter.check(addr)
         if not allowed:
