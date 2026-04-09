@@ -44,7 +44,8 @@ def test_csp_enforcement_and_report_only(monkeypatch):
     monkeypatch.setenv("INKYPI_CSP", "default-src 'none'")
     r3 = client.get("/healthz")
     header_name = "Content-Security-Policy"
-    assert r3.headers.get(header_name) == "default-src 'none'"
+    # The middleware appends report-uri to the custom value
+    assert r3.headers.get(header_name, "").startswith("default-src 'none'")
 
 
 def test_hsts_only_under_https_or_forward_proto(monkeypatch):
