@@ -5,6 +5,13 @@ except the skip-list require a valid authenticated session.
 
 When neither is configured the module registers no handlers and the app
 behaves identically to today.
+
+Read-only bearer token (JTN-477)
+---------------------------------
+Set INKYPI_READONLY_TOKEN to enable a second auth path for monitoring scripts.
+GET/HEAD/OPTIONS requests to the allowlist paths below accept either a valid
+PIN session **or** an ``Authorization: Bearer <token>`` header that matches.
+Mutating endpoints always require a PIN session regardless of the token.
 """
 
 from __future__ import annotations
@@ -29,8 +36,23 @@ _AUTH_SKIP_EXACT = frozenset({"/login", "/logout", "/sw.js", "/api/health"})
 # Also skip Flask/Werkzeug internal health probes registered by health.py
 _AUTH_SKIP_HEALTH = frozenset({"/healthz", "/readyz"})
 
+# Read-only token allowlist — GET/HEAD/OPTIONS only (JTN-477)
+_READONLY_TOKEN_ALLOWLIST = frozenset(
+    {
+        "/api/health",
+        "/api/version/info",
+        "/api/uptime",
+        "/api/screenshot",
+        "/metrics",
+        "/api/stats",
+    }
+)
+
 _MAX_FAILED_ATTEMPTS = 5
 _LOCKOUT_SECONDS = 60
+
+# Safe HTTP methods eligible for read-only token access
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 # Per-process random salt — never persisted, never logged
 _SCRYPT_SALT = secrets.token_bytes(32)
@@ -58,6 +80,39 @@ def _verify_pin(candidate: str, stored_hash: bytes) -> bool:
     return hmac.compare_digest(candidate_hash, stored_hash)
 
 
+def _hash_token(token: str) -> str:
+    """Return a SHA-256 hex digest of *token*. Never stored in plaintext."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _verify_bearer_token(stored_hash: str) -> bool:
+    """Return True when the request carries a Bearer token matching *stored_hash*.
+
+    Performs a constant-time comparison to prevent timing attacks.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return False
+    candidate = auth_header[len("Bearer ") :]
+    candidate_hash = hashlib.sha256(candidate.encode()).hexdigest()
+    return hmac.compare_digest(candidate_hash, stored_hash)
+
+
+def _is_readonly_token_request(stored_hash: str) -> bool:
+    """Return True when this request may be satisfied by a valid read-only token.
+
+    Conditions (all must hold):
+    - HTTP method is safe (GET / HEAD / OPTIONS)
+    - Request path is in the token allowlist
+    - Bearer token in Authorization header matches stored hash
+    """
+    if request.method not in _SAFE_METHODS:
+        return False
+    if request.path not in _READONLY_TOKEN_ALLOWLIST:
+        return False
+    return _verify_bearer_token(stored_hash)
+
+
 def _should_skip_auth() -> bool:
     """Return True when the current request path is exempt from authentication."""
     path = request.path
@@ -69,7 +124,15 @@ def _should_skip_auth() -> bool:
 
 
 def init_auth(app: Flask, device_config: Config) -> None:
-    """Wire up PIN auth if a PIN is configured; otherwise log and return."""
+    """Wire up PIN auth and optional read-only bearer token."""
+    # --- Read-only token (JTN-477) -------------------------------------------
+    readonly_token = os.environ.get("INKYPI_READONLY_TOKEN")
+    if readonly_token and isinstance(readonly_token, str):
+        token_hash = _hash_token(readonly_token)
+        app.config["READONLY_TOKEN_HASH"] = token_hash
+        logger.info("Read-only API token enabled")
+
+    # --- PIN auth (JTN-286) --------------------------------------------------
     pin = os.environ.get("INKYPI_AUTH_PIN")
     if not pin:
         try:
@@ -97,6 +160,10 @@ def init_auth(app: Flask, device_config: Config) -> None:
         if _should_skip_auth():
             return None
         if session.get("authed") is True:
+            return None
+        # Allow valid read-only bearer token on the allowlist (safe methods only)
+        token_hash = app.config.get("READONLY_TOKEN_HASH")
+        if token_hash and _is_readonly_token_request(token_hash):
             return None
         next_url = request.url
         return redirect(url_for("auth.login_get", next=next_url))
