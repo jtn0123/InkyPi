@@ -28,7 +28,7 @@ def download_logs():
         return Response(
             buffer.read(),
             mimetype="text/plain",
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     except Exception:

@@ -91,6 +91,8 @@ def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
         ttl = 300
     ttl = max(0, ttl)
     resp.headers["Cache-Control"] = f"public, max-age={ttl}"
+    basename = os.path.basename(safe_path)
+    resp.headers["Content-Disposition"] = f'inline; filename="{basename}"'
     return resp
 
 
@@ -171,6 +173,8 @@ def image(plugin_id: str, filename: str):
     except Exception:
         ttl = 300
     resp.headers["Cache-Control"] = f"public, max-age={max(0, ttl)}"
+    basename = os.path.basename(filename)
+    resp.headers["Content-Disposition"] = f'inline; filename="{basename}"'
     return resp
 
 
