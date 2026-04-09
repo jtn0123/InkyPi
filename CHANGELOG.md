@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.25.2 (2026-04-09)
+
+### Bug Fixes
+
+- Make skip link actually move focus to main (JTN-458)
+  ([#276](https://github.com/jtn0123/InkyPi/pull/276),
+  [`a0b7f24`](https://github.com/jtn0123/InkyPi/commit/a0b7f2464facd50abfabf73cfd77b9557c7f6e05))
+
+Add tabindex="-1" to <main id="main-content"> in all page templates so activating the "Skip to main
+  content" link moves keyboard focus into main rather than leaving it on body. Also adds a
+  parametrized test asserting the attribute is present on every main page.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.25.1 (2026-04-09)
 
 ### Bug Fixes
