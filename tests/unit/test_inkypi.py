@@ -474,7 +474,8 @@ def test_csp_headers_default_and_overrides(monkeypatch):
         if "Content-Security-Policy" in r3.headers
         else "Content-Security-Policy-Report-Only"
     )
-    assert r3.headers[header_name] == "default-src 'none'"
+    # The middleware appends report-uri to the custom value
+    assert r3.headers[header_name].startswith("default-src 'none'")
 
 
 # --- Request ID and hot reload ---

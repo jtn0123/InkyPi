@@ -26,6 +26,7 @@ from utils.metrics import (
     record_refresh_success,
     set_circuit_breaker_open,
 )
+from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
@@ -374,6 +375,55 @@ class RefreshTask:
         )
         if image is None:
             raise RuntimeError("Plugin returned None image; cannot refresh display.")
+
+        # Validate dimensions before doing anything expensive (hash / display push).
+        expected_w, expected_h = self.device_config.get_resolution()
+        try:
+            image = validate_image_dimensions(
+                image,
+                expected_w,
+                expected_h,
+                plugin_id=plugin_id,
+            )
+        except OutputDimensionMismatch as exc:
+            logger.error(
+                "plugin_lifecycle: dimension_mismatch | plugin_id=%s instance=%s "
+                "expected=%dx%d actual=%dx%d — skipping display push",
+                plugin_id,
+                instance_name,
+                exc.expected[0],
+                exc.expected[1],
+                exc.actual[0],
+                exc.actual[1],
+            )
+            self._update_plugin_health(
+                plugin_id=plugin_id,
+                instance=instance_name,
+                ok=False,
+                metrics={"retained_display": bool(self._stale_display_path())},
+                error=str(exc),
+            )
+            self.progress_bus.publish(
+                {
+                    "state": "error",
+                    "plugin_id": plugin_id,
+                    "instance": instance_name,
+                    "refresh_id": benchmark_id,
+                    "request_id": request_id,
+                    "error": str(exc),
+                    "retained_display": bool(self._stale_display_path()),
+                }
+            )
+            self.event_bus.publish(
+                "plugin_failed",
+                {
+                    "plugin": instance_name or plugin_id,
+                    "plugin_id": plugin_id,
+                    "error": str(exc),
+                },
+            )
+            return None, False, {}
+
         image_hash = compute_image_hash(image)
 
         refresh_info = refresh_action.get_refresh_info()

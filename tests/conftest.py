@@ -244,6 +244,7 @@ def flask_app(device_config_dev, monkeypatch):
 
     from blueprints.api_docs import api_docs_bp
     from blueprints.apikeys import apikeys_bp
+    from blueprints.csp_report import csp_report_bp
     from blueprints.events import events_bp
     from blueprints.history import history_bp
     from blueprints.main import main_bp
@@ -316,6 +317,7 @@ def flask_app(device_config_dev, monkeypatch):
     app.register_blueprint(metrics_bp)
     app.register_blueprint(stats_bp)
     app.register_blueprint(version_info_bp)
+    app.register_blueprint(csp_report_bp)
     app.register_blueprint(events_bp)
 
     setup_http_metrics(app)
