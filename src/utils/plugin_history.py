@@ -84,9 +84,16 @@ def record_change(
                 pass
             raise
     except Exception as exc:
+        # Sanitize user-controlled instance_name to prevent log injection (S5145)
+        safe_name = str(instance_name).replace("\r", "").replace("\n", "")[:64]
         logger.warning(
-            "plugin_history: could not record change for %r: %s", instance_name, exc
+            "plugin_history: could not record change for %r: %s", safe_name, exc
         )
+
+
+def _safe_log_name(instance_name: str) -> str:
+    """Strip CR/LF and cap length to prevent log injection (Sonar S5145)."""
+    return str(instance_name).replace("\r", "").replace("\n", "")[:64]
 
 
 def get_history(config_dir: str, instance_name: str, limit: int = 20) -> list[dict]:
@@ -111,7 +118,9 @@ def get_history(config_dir: str, instance_name: str, limit: int = 20) -> list[di
                     continue
     except Exception as exc:
         logger.warning(
-            "plugin_history: could not read history for %r: %s", instance_name, exc
+            "plugin_history: could not read history for %r: %s",
+            _safe_log_name(instance_name),
+            exc,
         )
         return []
 
