@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.19.0 (2026-04-09)
+
+### Features
+
+- Csp violation report endpoint ([#259](https://github.com/jtn0123/InkyPi/pull/259),
+  [`8ff10fd`](https://github.com/jtn0123/InkyPi/commit/8ff10fd65f0fe5b71c807a7bc26626fc98594965))
+
+Add POST /api/csp-report blueprint that accepts legacy application/csp-report and modern
+  application/json payloads, logs violations as WARNING with redacted source URLs, and returns 204
+  No Content. Wire a report-uri directive into the existing CSP header (additive, no refactor). No
+  auth required so browsers can reach the endpoint unconditionally; per-IP rate limiting via
+  SlidingWindowLimiter. Includes 12 tests covering all content-types, caplog assertions, URL
+  redaction, 204 on empty/invalid body, 405 on GET, and deduplication of the report-uri directive.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.18.0 (2026-04-08)
 
 ### Features
