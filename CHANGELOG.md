@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.27.0 (2026-04-09)
+
+### Features
+
+- Set Content-Disposition headers on file download endpoints (JTN-515)
+  ([#280](https://github.com/jtn0123/InkyPi/pull/280),
+  [`e4343e3`](https://github.com/jtn0123/InkyPi/commit/e4343e3a52b88f8d48c188575844be31f05f01c9))
+
+Add explicit Content-Disposition headers to all file-serving routes to defeat browser MIME-sniffing
+  and make download intent unambiguous:
+
+- download_logs: fix unquoted filename → `attachment; filename="inkypi_*.log"` -
+  _cacheable_send_file (plugin images): add `inline; filename="..."` -
+  /images/<plugin_id>/<filename>: add `inline; filename="..."` - maybe_serve_webp (PNG + WebP
+  branches): add `inline; filename="..."` - get_current_image: add `inline;
+  filename="current_image.png"`
+
+X-Content-Type-Options: nosniff is already set globally by security middleware; no per-route change
+  needed.
+
+Add contract tests in tests/contracts/test_download_headers.py asserting attachment/inline
+  disposition, quoted filenames, safe characters, and nosniff header presence.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.26.0 (2026-04-09)
 
 ### Features
