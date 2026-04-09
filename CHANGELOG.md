@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v0.23.0 (2026-04-09)
+
+### Features
+
+- Client-side error forwarding endpoint /api/client-error (JTN-454)
+  ([#265](https://github.com/jtn0123/InkyPi/pull/265),
+  [`98db028`](https://github.com/jtn0123/InkyPi/commit/98db0282828e2e3d4aeaab8afb245c5918691f2b))
+
+* feat: client-side error forwarding endpoint (JTN-454)
+
+POST /api/client-error accepts JSON error reports from window.onerror and unhandledrejection
+  handlers, validates schema, caps field sizes at 2KB/16KB, logs as WARNING (SecretRedactionFilter
+  strips secrets), and rate-limits 5 tokens per IP at 0.5 refill/s. A new client_error_reporter.js
+  wires up the browser side with 25% sampling, sendBeacon support, and self-disabling after 5
+  failures.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: address Sonar findings on client error endpoint
+
+- Drop redundant UnicodeDecodeError catch (subclass of ValueError) (S5713) - Strip CR/LF from logged
+  report fields to prevent log injection (S5145) - JS: var -> const/let throughout (S3504) - JS:
+  empty catch now records a soft failure instead of swallowing (S2486) - JS: explain Math.random
+  sampling is non-security (S2245)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: re-trigger workflows after Sonar fix push
+
+* fix: drop unused catch parameter to clear Sonar S2486
+
+* fix: NOSONAR for Math.random sampling (S2245 false positive)
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.22.0 (2026-04-09)
 
 ### Features
