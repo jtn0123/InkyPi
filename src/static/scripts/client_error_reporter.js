@@ -6,18 +6,19 @@
 (function () {
   "use strict";
 
-  var ENDPOINT = "/api/client-error";
-  var SAMPLE_RATE = 0.25; // report 25% of errors
-  var MAX_FAILURES = 5;
-  var failures = 0;
-  var disabled = false;
+  const ENDPOINT = "/api/client-error";
+  const SAMPLE_RATE = 0.25; // report 25% of errors
+  const MAX_FAILURES = 5;
+  let failures = 0;
+  let disabled = false;
 
   function shouldSample() {
+    // Math.random is fine here — only used for non-security log sampling.
     return Math.random() < SAMPLE_RATE;
   }
 
   function getCsrfToken() {
-    var meta = document.querySelector('meta[name="csrf-token"]');
+    const meta = document.querySelector('meta[name="csrf-token"]');
     return meta ? meta.getAttribute("content") : "";
   }
 
@@ -32,17 +33,17 @@
     if (disabled) return;
     if (!shouldSample()) return;
     try {
-      var body = JSON.stringify(payload);
+      const body = JSON.stringify(payload);
       if (navigator.sendBeacon) {
         // sendBeacon works during page unload; CSRF token embedded in body
         // because sendBeacon does not support custom headers.
-        var blob = new Blob([body], { type: "application/json" });
-        var ok = navigator.sendBeacon(ENDPOINT, blob);
+        const blob = new Blob([body], { type: "application/json" });
+        const ok = navigator.sendBeacon(ENDPOINT, blob);
         if (!ok) {
           onSendFailure();
         }
       } else {
-        var csrfToken = getCsrfToken();
+        const csrfToken = getCsrfToken();
         fetch(ENDPOINT, {
           method: "POST",
           headers: {
@@ -60,7 +61,9 @@
         });
       }
     } catch (_e) {
-      // Never let the reporter itself throw — swallow silently.
+      // Never let the reporter itself throw — record a soft failure so the
+      // self-disable counter still kicks in if something is fundamentally broken.
+      onSendFailure();
     }
   }
 
@@ -75,8 +78,8 @@
   });
 
   globalThis.addEventListener("unhandledrejection", function (event) {
-    var reason = event.reason;
-    var message;
+    const reason = event.reason;
+    let message;
     if (reason instanceof Error) {
       message = reason.message || "Unhandled promise rejection";
     } else if (typeof reason === "string") {

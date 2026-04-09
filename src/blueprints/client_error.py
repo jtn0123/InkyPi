@@ -46,6 +46,11 @@ def _cap(value: object, max_len: int = _FIELD_MAX) -> str:
     return str(value)[:max_len]
 
 
+def _strip_newlines(value: str) -> str:
+    """Replace CR/LF with spaces to prevent log-injection (Sonar S5145)."""
+    return value.replace("\r", " ").replace("\n", " ")
+
+
 @client_error_bp.route("/api/client-error", methods=["POST"])
 def receive_client_error() -> tuple[Response, int] | Response:
     """Accept a browser JS error report and emit it as a WARNING log entry.
@@ -70,7 +75,7 @@ def receive_client_error() -> tuple[Response, int] | Response:
     # --- parse & validate -------------------------------------------------
     try:
         data = json.loads(raw_body)
-    except (ValueError, UnicodeDecodeError):
+    except ValueError:
         return json_error("Request body must be valid JSON", status=400)
 
     if not isinstance(data, dict):
@@ -83,12 +88,13 @@ def receive_client_error() -> tuple[Response, int] | Response:
         )
 
     # --- build sanitised report -------------------------------------------
+    # Strip CR/LF from each field to prevent log injection (Sonar S5145).
+    # SecretRedactionFilter (JTN-364) handles secret stripping downstream.
     report: dict[str, object] = {}
     for field in _ACCEPTED_FIELDS:
         if field in data:
-            report[field] = _cap(data[field])
+            report[field] = _strip_newlines(_cap(data[field]))
 
-    # --- log (SecretRedactionFilter will strip secrets) -------------------
     logger.warning("client error: %s", json.dumps(report))
 
     return Response(status=204)
