@@ -15,8 +15,9 @@ from __future__ import annotations
 import json
 import logging
 
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response
 
+from utils.client_endpoint import parse_client_report, strip_newlines
 from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
 
@@ -45,11 +46,6 @@ def _cap(value: object, max_len: int) -> str:
     return str(value)[:max_len]
 
 
-def _strip_newlines(value: str) -> str:
-    """Replace CR/LF with spaces to prevent log-injection (Sonar S5145)."""
-    return value.replace("\r", " ").replace("\n", " ")
-
-
 @client_log_bp.route("/api/client-log", methods=["POST"])
 def receive_client_log() -> tuple[Response, int] | Response:
     """Accept a browser console.warn/error report and emit it as a WARNING log entry.
@@ -57,28 +53,9 @@ def receive_client_log() -> tuple[Response, int] | Response:
     Returns 204 on success so the browser-side script has a cheap ack with
     no body to parse.
     """
-    # --- body size guard --------------------------------------------------
-    content_length = request.content_length
-    if content_length is not None and content_length > _BODY_MAX:
-        return json_error("Request body too large", status=413)
-
-    raw_body = request.get_data(as_text=False)
-    if len(raw_body) > _BODY_MAX:
-        return json_error("Request body too large", status=413)
-
-    # --- rate limiting ----------------------------------------------------
-    remote_ip = request.remote_addr or "unknown"
-    if not _rate_limiter.try_acquire(remote_ip):
-        return json_error("Rate limit exceeded", status=429)
-
-    # --- parse & validate -------------------------------------------------
-    try:
-        data = json.loads(raw_body)
-    except ValueError:
-        return json_error("Request body must be valid JSON", status=400)
-
-    if not isinstance(data, dict):
-        return json_error("Request body must be a JSON object", status=400)
+    data, error = parse_client_report(_rate_limiter, _BODY_MAX)
+    if error is not None:
+        return error
 
     level = data.get("level", "")
     if level not in _ACCEPTED_LEVELS:
@@ -87,20 +64,17 @@ def receive_client_log() -> tuple[Response, int] | Response:
             status=400,
         )
 
-    # --- build sanitised report -------------------------------------------
     # Strip CR/LF from each field to prevent log injection (Sonar S5145).
     # SecretRedactionFilter (JTN-364) handles secret stripping downstream.
-    report: dict[str, object] = {
-        "level": level,
-    }
+    report: dict[str, object] = {"level": level}
     if "message" in data:
-        report["message"] = _strip_newlines(_cap(data["message"], _MESSAGE_MAX))
+        report["message"] = strip_newlines(_cap(data["message"], _MESSAGE_MAX))
     if "args" in data:
-        report["args"] = _strip_newlines(_cap(data["args"], _ARGS_MAX))
+        report["args"] = strip_newlines(_cap(data["args"], _ARGS_MAX))
     if "url" in data:
-        report["url"] = _strip_newlines(_cap(data["url"], _MESSAGE_MAX))
+        report["url"] = strip_newlines(_cap(data["url"], _MESSAGE_MAX))
     if "ts" in data:
-        report["ts"] = _strip_newlines(_cap(data["ts"], 64))
+        report["ts"] = strip_newlines(_cap(data["ts"], 64))
 
     logger.warning("client log [%s]: %s", level, json.dumps(report))
 
