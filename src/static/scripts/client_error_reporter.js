@@ -13,8 +13,9 @@
   let disabled = false;
 
   function shouldSample() {
-    // Math.random is fine here — only used for non-security log sampling.
-    return Math.random() < SAMPLE_RATE;
+    // NOSONAR — Math.random is intentional: this is non-security log sampling.
+    // Sonar rule javascript:S2245 (insecure RNG) is a false positive here.
+    return Math.random() < SAMPLE_RATE; // NOSONAR
   }
 
   function getCsrfToken() {
