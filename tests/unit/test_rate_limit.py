@@ -1,4 +1,4 @@
-"""Tests for utils.rate_limit (TokenBucket) and per-endpoint middleware (JTN-447)."""
+"""Tests for utils.rate_limit (TokenBucket) and per-endpoint middleware (JTN-447, JTN-513)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from utils.rate_limit import (
     TokenBucket,
     _parse_rate_env,
     make_auth_bucket,
+    make_mutating_bucket,
     make_refresh_bucket,
 )
 
@@ -144,6 +145,18 @@ class TestParseRateEnv:
         b = make_auth_bucket()
         assert b._capacity == 7.0
         assert b._refill_rate == pytest.approx(1 / 45)
+
+    def test_make_mutating_bucket_uses_defaults(self, monkeypatch):
+        monkeypatch.delenv("INKYPI_RATE_LIMIT_MUTATING", raising=False)
+        b = make_mutating_bucket()
+        assert b._capacity == 10.0
+        assert b._refill_rate == pytest.approx(10 / 60)
+
+    def test_make_mutating_bucket_respects_env(self, monkeypatch):
+        monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "15/30")
+        b = make_mutating_bucket()
+        assert b._capacity == 15.0
+        assert b._refill_rate == pytest.approx(1 / 30)
 
 
 # ---------------------------------------------------------------------------
@@ -305,5 +318,183 @@ class TestNonRateLimitedEndpoints:
         client = rate_limit_app.test_client()
         # The other endpoint has no rate limit in this fixture
         for _ in range(15):
+            resp = client.post("/api/other")
+            assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# JTN-513: Mutating endpoint rate limits
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def mutating_rate_app():
+    """Minimal Flask app with mutating-endpoint token-bucket rate limiting (JTN-513)."""
+    from utils.http_utils import json_error
+    from utils.rate_limit import TokenBucket
+
+    app = Flask(__name__)
+    app.secret_key = "test-secret"
+    app.config["TESTING"] = True
+
+    # Tight bucket (capacity=10, no refill) for deterministic testing
+    mutating_b = TokenBucket(capacity=10, refill_rate=0)
+    auth_b = TokenBucket(capacity=5, refill_rate=0)
+
+    _AUTH_PATHS = frozenset({"/login"})
+    _MUTATING_PATHS = frozenset({"/save_plugin_settings", "/update_now"})
+    _MUTATING_PREFIX = "/api/refresh/"
+
+    def _is_mutating(path: str) -> bool:
+        return path in _MUTATING_PATHS or path.startswith(_MUTATING_PREFIX)
+
+    @app.before_request
+    def _rl():
+        from flask import make_response, request
+
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return None
+        addr = request.remote_addr or "unknown"
+        if request.path in _AUTH_PATHS and not auth_b.try_acquire(addr):
+            body, code = json_error(
+                "Too many login attempts — try again later", status=429
+            )
+            resp = make_response(body, code)
+            resp.headers["Retry-After"] = "30"
+            return resp
+        if _is_mutating(request.path) and not mutating_b.try_acquire(addr):
+            body, code = json_error("Too many requests — try again later", status=429)
+            resp = make_response(body, code)
+            resp.headers["Retry-After"] = "6"
+            return resp
+        return None
+
+    @app.route("/login", methods=["POST"])
+    def login():
+        return {"ok": True}
+
+    @app.route("/save_plugin_settings", methods=["POST"])
+    def save_plugin_settings():
+        return {"ok": True}
+
+    @app.route("/update_now", methods=["POST"])
+    def update_now():
+        return {"ok": True}
+
+    @app.route("/api/refresh/<path:sub>", methods=["POST"])
+    def api_refresh(sub):
+        return {"ok": True}
+
+    @app.route("/api/health", methods=["GET"])
+    def health():
+        return {"status": "ok"}
+
+    @app.route("/api/other", methods=["POST"])
+    def other():
+        return {"ok": True}
+
+    return app
+
+
+class TestMutatingEndpointRateLimit:
+    """JTN-513: /save_plugin_settings, /update_now, /api/refresh/* get strict token-bucket."""
+
+    def test_ten_update_now_calls_succeed(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            resp = client.post("/update_now")
+            assert resp.status_code == 200
+
+    def test_eleventh_update_now_returns_429(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            client.post("/update_now")
+        resp = client.post("/update_now")
+        assert resp.status_code == 429
+
+    def test_eleventh_update_now_has_retry_after_header(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            client.post("/update_now")
+        resp = client.post("/update_now")
+        assert resp.headers.get("Retry-After") == "6"
+
+    def test_eleventh_update_now_has_json_error_body(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            client.post("/update_now")
+        resp = client.post("/update_now")
+        data = resp.get_json()
+        assert data is not None
+        assert (
+            "rate" in data.get("error", "").lower()
+            or "request" in data.get("error", "").lower()
+        )
+
+    def test_ten_save_plugin_settings_calls_succeed(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            resp = client.post("/save_plugin_settings")
+            assert resp.status_code == 200
+
+    def test_eleventh_save_plugin_settings_returns_429(self, mutating_rate_app):
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            client.post("/save_plugin_settings")
+        resp = client.post("/save_plugin_settings")
+        assert resp.status_code == 429
+
+    def test_api_refresh_subpath_rate_limited(self, mutating_rate_app):
+        """POST /api/refresh/* is matched by prefix and rate-limited."""
+        client = mutating_rate_app.test_client()
+        for _ in range(10):
+            client.post("/api/refresh/all")
+        resp = client.post("/api/refresh/all")
+        assert resp.status_code == 429
+
+    def test_get_requests_not_rate_limited(self, mutating_rate_app):
+        """GET requests to /api/health are never subject to mutating rate limits."""
+        client = mutating_rate_app.test_client()
+        for _ in range(20):
+            resp = client.get("/api/health")
+            assert resp.status_code == 200
+
+    def test_login_uses_its_own_tighter_bucket(self, mutating_rate_app):
+        """Login still uses its own auth bucket; exhausting it doesn't affect mutating paths."""
+        client = mutating_rate_app.test_client()
+        # Exhaust the auth bucket (capacity=5)
+        for _ in range(5):
+            client.post("/login")
+        # Login should now be denied
+        resp = client.post("/login")
+        assert resp.status_code == 429
+        # But /update_now still works (has its own bucket, capacity=10)
+        resp2 = client.post("/update_now")
+        assert resp2 == resp2  # just check it doesn't crash
+        # The mutating bucket still has capacity
+        assert resp2.status_code == 200
+
+    def test_different_ips_get_independent_mutating_buckets(self, mutating_rate_app):
+        """Exhausting one IP's mutating bucket does not affect another IP."""
+        with mutating_rate_app.test_client() as client:
+            for _ in range(10):
+                client.post("/update_now", environ_base={"REMOTE_ADDR": "10.1.0.1"})
+            resp_a = client.post(
+                "/update_now", environ_base={"REMOTE_ADDR": "10.1.0.1"}
+            )
+            assert resp_a.status_code == 429
+            resp_b = client.post(
+                "/update_now", environ_base={"REMOTE_ADDR": "10.1.0.2"}
+            )
+            assert resp_b.status_code == 200
+
+    def test_non_mutating_post_not_blocked_by_mutating_bucket(self, mutating_rate_app):
+        """/api/other POST is not subject to the mutating token bucket."""
+        client = mutating_rate_app.test_client()
+        # Even after the mutating bucket is exhausted for this IP
+        for _ in range(10):
+            client.post("/update_now")
+        # /api/other has no rate limit in this fixture so should succeed
+        for _ in range(5):
             resp = client.post("/api/other")
             assert resp.status_code == 200
