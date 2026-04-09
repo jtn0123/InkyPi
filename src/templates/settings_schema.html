@@ -179,6 +179,7 @@
                 {% if field.step is defined %}step="{{ field.step }}"{% endif %}
                 {% if field.required %}required{% endif %}
                 {% if field.list %}list="{{ field.list.id }}"{% endif %}
+                {% if field.pattern %}pattern="{{ field.pattern }}"{% endif %}
             >
             {% if field.list %}
             <datalist id="{{ field.list.id }}">

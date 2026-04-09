@@ -9,14 +9,27 @@ logger = logging.getLogger(__name__)
 
 
 class Screenshot(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject non-http(s) URLs at save time to prevent unsafe values persisting."""
+        url = settings.get("url", "").strip()
+        if not url:
+            return "URL is required."
+        try:
+            validate_url(url)
+        except ValueError as e:
+            return f"Invalid URL: {e}"
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
                 "Capture",
                 field(
                     "url",
+                    "url",
                     label="URL",
                     placeholder="https://example.com",
+                    pattern="https?://.*",
                     required=True,
                 ),
                 callout(
@@ -39,7 +52,8 @@ class Screenshot(BasePlugin):
 
         dimensions = self.get_oriented_dimensions(device_config)
 
-        logger.info(f"Taking screenshot of url: {url}")
+        safe_url = url.replace("\n", "").replace("\r", "")
+        logger.info("Taking screenshot of url: %s", safe_url)
 
         image = take_screenshot(url, dimensions, timeout_ms=40000)
 

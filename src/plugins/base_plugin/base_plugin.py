@@ -132,6 +132,18 @@ class BasePlugin:
         except Exception:
             return self.to_file_url(path)
 
+    def validate_settings(self, settings: dict) -> str | None:
+        """Validate plugin-specific settings before they are persisted.
+
+        Plugins can override this to reject invalid settings at save time,
+        before ``generate_image`` is ever called.  Return a human-readable
+        error string to reject the save, or ``None`` to allow it.
+
+        The default implementation performs no validation and always returns
+        ``None``.
+        """
+        return None
+
     def build_settings_schema(self):
         """Return a declarative settings schema for shared rendering.
 

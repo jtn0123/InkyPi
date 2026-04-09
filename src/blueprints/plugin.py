@@ -335,7 +335,7 @@ def update_plugin_instance(instance_name: str):
                 status=404,
             )
 
-        # Validate required fields defined in the plugin schema
+        # Validate required fields and plugin-specific settings
         plugin_config = device_config.get_plugin(plugin_id)
         if plugin_config:
             try:
@@ -343,6 +343,9 @@ def update_plugin_instance(instance_name: str):
                 validation_error = _validate_required_fields(plugin, plugin_settings)
                 if validation_error:
                     return json_error(validation_error, status=400)
+                settings_error = plugin.validate_settings(plugin_settings)
+                if settings_error:
+                    return json_error(settings_error, status=400)
             except Exception:
                 logger.debug("Could not validate plugin schema for %s", plugin_id)
 
@@ -568,12 +571,15 @@ def _save_plugin_settings_common(
             status=404,
         )
 
-    # Validate required fields defined in the plugin schema
+    # Validate required fields and plugin-specific settings
     try:
         plugin = get_plugin_instance(plugin_config)
         validation_error = _validate_required_fields(plugin, plugin_settings)
         if validation_error:
             return json_error(validation_error, status=400)
+        settings_error = plugin.validate_settings(plugin_settings)
+        if settings_error:
+            return json_error(settings_error, status=400)
     except Exception:
         logger.debug("Could not validate plugin schema for %s", plugin_id)
 
