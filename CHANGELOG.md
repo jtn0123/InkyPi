@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v0.28.0 (2026-04-09)
+
+### Features
+
+- Strict rate limits on mutating endpoints (JTN-513)
+  ([#279](https://github.com/jtn0123/InkyPi/pull/279),
+  [`a6b676a`](https://github.com/jtn0123/InkyPi/commit/a6b676ae977498251e4c812c8a135f7fd1beb42b))
+
+* feat: strict rate limits on mutating endpoints (JTN-513)
+
+Add /save_plugin_settings, /update_now, and /api/refresh/* to an intermediate token-bucket rate
+  limit (10/min per IP) to prevent CPU saturation and e-ink panel abuse. This sits between the auth
+  bucket (~3/min) and the global sliding window (60/min). The bucket is configurable via
+  INKYPI_RATE_LIMIT_MUTATING env var. Also refactors the middleware to use small helper functions
+  per bucket check, keeping cognitive complexity low (SonarCloud S3776).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: reduce cognitive complexity in rate limiting middleware (S3776)
+
+Extract the three token-bucket checks into _apply_token_bucket_limits() so _rate_limit_mutations
+  stays below SonarCloud's complexity threshold.
+
+* fix: correct test fixtures for security_middleware rate-limit helpers (JTN-513)
+
+- Add Flask app context to _apply_token_bucket_limits direct calls (make_response requires it) - Use
+  _drained_bucket() helper that pre-drains the specific test IP key (TokenBucket.try_acquire always
+  returns True for a new key, even with capacity=0) - Fix integration test to drain bucket via two
+  sequential requests instead of relying on capacity=0 shortcut - Remove unused MagicMock/patch
+  imports (ruff I001 fix)
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.27.2 (2026-04-09)
 
 ### Performance Improvements
