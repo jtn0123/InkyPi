@@ -19,12 +19,20 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 MAX_ENTRIES = 100
-_SAFE_NAME_RE = re.compile(r"[^a-zA-Z0-9_\-]")
+# Strict allowlist regex that CodeQL recognises as a path-injection sanitizer.
+_VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}\Z")
 
 
 def _safe_filename(instance_name: str) -> str:
-    """Convert an instance name to a safe filename component (no slashes etc.)."""
-    return _SAFE_NAME_RE.sub("_", instance_name)
+    """Return *instance_name* if it matches the allowlist; raise otherwise.
+
+    All callers must pass a name they have already validated against
+    ``_VALID_NAME_RE``. This function exists as a defense-in-depth boundary
+    that taint analyzers (CodeQL py/path-injection) can recognise.
+    """
+    if not isinstance(instance_name, str) or not _VALID_NAME_RE.match(instance_name):
+        raise ValueError("plugin_history: invalid instance name")
+    return instance_name
 
 
 def _history_dir(config_dir: str) -> str:

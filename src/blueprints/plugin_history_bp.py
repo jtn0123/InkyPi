@@ -24,18 +24,26 @@ logger = logging.getLogger(__name__)
 plugin_history_bp = Blueprint("plugin_history", __name__)
 
 _CONFIG_KEY = "DEVICE_CONFIG"
-# Only allow instance names that are safe filesystem identifiers
-_VALID_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_\-]*$")
-_MAX_LIMIT = 100
+# Only allow instance names that are safe filesystem identifiers.
+# Strict allowlist regex makes this an explicit barrier for taint analyzers.
+_VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}\Z")
 
 
-def _validate_instance_name(name: str) -> str | None:
-    """Return an error string if *name* is invalid, else None."""
-    if not name or "/" in name or "\\" in name or ".." in name:
-        return "Invalid instance name"
+def _safe_instance_name(name: str) -> str | None:
+    """Return *name* if it matches the strict allowlist, else None.
+
+    This is the single point of validation for any user-controlled instance
+    name before it is used to build a filesystem path. CodeQL recognises
+    regex full-match as a sanitizer barrier (py/path-injection).
+    """
+    if not name or len(name) > 64:
+        return None
     if not _VALID_NAME_RE.match(name):
-        return "Invalid instance name: only letters, digits, hyphens and underscores allowed"
-    return None
+        return None
+    return name
+
+
+_MAX_LIMIT = 100
 
 
 def _config_dir(device_config) -> str:
@@ -62,27 +70,24 @@ def _instance_exists(device_config, instance_name: str) -> bool:
 )
 def plugin_instance_history(instance_name: str):
     """Return recent config-change history for a plugin instance."""
-    err = _validate_instance_name(instance_name)
-    if err:
-        return json_error(err, status=400)
+    safe_name = _safe_instance_name(instance_name)
+    if safe_name is None:
+        return json_error("Invalid instance name", status=400)
 
     device_config = current_app.config[_CONFIG_KEY]
 
-    if not _instance_exists(device_config, instance_name):
-        return json_error(f"Plugin instance '{instance_name}' not found", status=404)
+    if not _instance_exists(device_config, safe_name):
+        return json_error("Plugin instance not found", status=404)
 
     try:
         limit_raw = request.args.get("limit", "20")
         limit = int(limit_raw)
-        if limit < 1:
-            limit = 1
-        elif limit > _MAX_LIMIT:
-            limit = _MAX_LIMIT
+        limit = max(1, min(limit, _MAX_LIMIT))
     except ValueError:
         return json_error("'limit' must be an integer", status=400)
 
-    history = get_history(_config_dir(device_config), instance_name, limit=limit)
-    return jsonify({"instance": instance_name, "history": history})
+    history = get_history(_config_dir(device_config), safe_name, limit=limit)
+    return jsonify({"instance": safe_name, "history": history})
 
 
 @plugin_history_bp.route(
@@ -90,16 +95,16 @@ def plugin_instance_history(instance_name: str):
 )
 def plugin_instance_diff(instance_name: str):
     """Return the diff between the two most-recent history entries."""
-    err = _validate_instance_name(instance_name)
-    if err:
-        return json_error(err, status=400)
+    safe_name = _safe_instance_name(instance_name)
+    if safe_name is None:
+        return json_error("Invalid instance name", status=400)
 
     device_config = current_app.config[_CONFIG_KEY]
 
-    if not _instance_exists(device_config, instance_name):
-        return json_error(f"Plugin instance '{instance_name}' not found", status=404)
+    if not _instance_exists(device_config, safe_name):
+        return json_error("Plugin instance not found", status=404)
 
-    history = get_history(_config_dir(device_config), instance_name, limit=2)
+    history = get_history(_config_dir(device_config), safe_name, limit=2)
     if len(history) < 2:
         return json_error(
             "Not enough history to compute a diff (need at least 2 entries)",
@@ -112,7 +117,7 @@ def plugin_instance_diff(instance_name: str):
     diff = compute_diff(previous.get("after", {}), latest.get("after", {}))
     return jsonify(
         {
-            "instance": instance_name,
+            "instance": safe_name,
             "from_ts": previous.get("ts"),
             "to_ts": latest.get("ts"),
             "diff": diff,
