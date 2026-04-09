@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.27.1 (2026-04-09)
+
+### Bug Fixes
+
+- Add aria-labelledby to playlist delete modals (JTN-468)
+  ([#278](https://github.com/jtn0123/InkyPi/pull/278),
+  [`fec0032`](https://github.com/jtn0123/InkyPi/commit/fec00325f65dcfcf97c78c1a7f08c2f43a42492b))
+
+* fix: add aria-labelledby to playlist delete modals (JTN-468)
+
+Add sr-only h2 headings with ids (deletePlaylistTitle, deleteInstanceTitle) inside
+  deletePlaylistModal and deleteInstanceModal, and switch from aria-label to aria-labelledby to
+  match the pattern used by playlistModal and refreshSettingsModal. Adds 9 regression tests.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: strengthen aria-label absence assertions per CodeRabbit review
+
+Add negative assertions to both no_aria_label_fallback tests to verify the modal opening tags do not
+  contain aria-label= (only aria-labelledby=), preventing fallback regressions.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.27.0 (2026-04-09)
 
 ### Features
