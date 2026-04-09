@@ -52,6 +52,7 @@ from refresh_task import RefreshTask
 from utils.app_utils import generate_startup_image, get_ip_address
 from utils.config_schema import ConfigValidationError
 from utils.i18n import init_i18n
+from utils.sri import init_sri
 
 # Re-exported for tests/unit/test_inkypi.py monkey-patches.
 __all__ = [
@@ -279,6 +280,7 @@ def create_app():
     init_i18n(app)
     register_blueprints(app)
     setup_asset_helpers(app)
+    init_sri(app)
     register_health_endpoints(app)
 
     @app.before_request
