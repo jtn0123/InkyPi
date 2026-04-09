@@ -5,7 +5,7 @@
     <script src="{{ url_for('static', filename='scripts/settings_page.js') }}"></script>
 {% endblock %}
 {% block body %}
-    <main id="main-content" role="main" class="page-shell page-shell-management" data-page-shell="management">
+    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
