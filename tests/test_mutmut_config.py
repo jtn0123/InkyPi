@@ -10,9 +10,10 @@ from pathlib import Path
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 EXPECTED_FILES = [
-    "src/utils/http_utils.py",
-    "src/utils/image_serving.py",
-    "src/refresh_task/task.py",
+    "src/app_setup/",
+    "src/blueprints/",
+    "src/utils/",
+    "src/refresh_task/",
 ]
 
 
