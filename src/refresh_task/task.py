@@ -45,7 +45,18 @@ except Exception:  # pragma: no cover
 
 
 try:
-    from cysystemd.daemon import notify as _sd_notify
+    from cysystemd.daemon import (
+        Notification as _sd_Notification,
+        notify as _sd_notify_raw,
+    )
+
+    def _sd_notify(_kind: str) -> None:
+        # Adapter for the legacy string-based interface used elsewhere in this file.
+        if _kind == "WATCHDOG=1":
+            _sd_notify_raw(_sd_Notification.WATCHDOG)
+        elif _kind == "READY=1":
+            _sd_notify_raw(_sd_Notification.READY)
+
 except Exception:
     _sd_notify = None
 
@@ -113,7 +124,7 @@ class RefreshTask:
             try:
                 _sd_notify("WATCHDOG=1")
             except Exception:
-                pass
+                logger.exception("Failed to notify systemd watchdog")
 
     @staticmethod
     def _complete_manual_request(manual_request, metrics=None, exception=None):
