@@ -1,6 +1,92 @@
 # CHANGELOG
 
 
+## v0.29.0 (2026-04-10)
+
+### Continuous Integration
+
+- Enforce browser-smoke as required CI check via ci-gate job (JTN-510)
+  ([#292](https://github.com/jtn0123/InkyPi/pull/292),
+  [`2b2ed59`](https://github.com/jtn0123/InkyPi/commit/2b2ed597fd25c2d01cea4fe7da8b4b1ad6c13ee2))
+
+* ci: add ci-gate job and enforce browser-smoke as required check (JTN-510)
+
+- Add `ci-gate` summary job that needs lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix,
+  coverage-gate, security, and browser-smoke; the single gate name is what repo owner must mark as
+  required in GitHub branch protection (steps documented in docs/development.md) - Expand
+  CONTRIBUTING.md with a dedicated "Running Browser Tests Locally" section explaining SKIP_BROWSER
+  purpose, when it is and isn't acceptable, and the exact command required for frontend-touching PRs
+  - Update PR checklist (pull_request_template.md + CONTRIBUTING.md) with an explicit browser-test
+  checkbox for src/static/** and src/templates/** changes - Add scripts/precommit_browser_warning.sh
+  and wire it into .pre-commit-config.yaml as a warn-only local hook that fires when frontend files
+  are staged with SKIP_BROWSER=1 set - Add precommit_browser_warning.sh to CI shellcheck/bash-syntax
+  validation
+
+Closes JTN-510
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* docs: fix SKIP_BROWSER wording and repo path per CodeRabbit review
+
+- CONTRIBUTING.md: clarify that SKIP_BROWSER defaults to unset and browser tests will fail (not
+  skip) when Chromium is absent - docs/development.md: use fatihak/InkyPi (upstream) not fork path
+  in the ci-gate branch protection step instructions
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Documentation
+
+- Add Architecture Decision Records for 6 key design choices (JTN-522, Grade H1)
+  ([#300](https://github.com/jtn0123/InkyPi/pull/300),
+  [`85097f7`](https://github.com/jtn0123/InkyPi/commit/85097f7749ff1d5e4c3bcc8b792059d097c6952a))
+
+Creates docs/adr/ with a template, README index, and 6 grounded ADRs covering subprocess plugin
+  isolation, HTTP cache strategy, playlist scheduling, JSON config store, Waitress vs Gunicorn, and
+  WebP on-the-fly encoding. Links index from docs/architecture.md. All rationale traced to actual
+  src/ files and commit history.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add InkyPiStore reactive store and migrate page state (JTN-502)
+  ([#293](https://github.com/jtn0123/InkyPi/pull/293),
+  [`6cdae29`](https://github.com/jtn0123/InkyPi/commit/6cdae29c11afa0d1ceac9edb5dd87de273d01ee9))
+
+* feat: add InkyPiStore and migrate page state (JTN-502, Grade C1)
+
+Introduces a lightweight reactive store (`store.js`) that provides a centralized, observable place
+  for page-level state, eliminating scattered module-level variables and reducing polling/state race
+  risk.
+
+- `src/static/scripts/store.js`: new `createStore(initialState)` with `get`, `set` (object-merge or
+  function updater), and `subscribe` (key- level, shallow-compare, returns unsubscribe). Exposed as
+  `window.InkyPiStore` / `globalThis.InkyPiStore`. - `dashboard_page.js`: `lastImageHash` and
+  `consecutiveFailures` now read/written via store instance; plain-var fallback for environments
+  without store. - `plugin_form.js`: `initProgress` state (`t0`, `clockTimer`, `lastStepBase`)
+  backed by store instance. - `settings_page.js`: `state` object proxied through store so all
+  reads/writes flow through observable keys. - `tests/static/test_store_contract.py`: 12 new
+  contract tests covering public API presence and per-file store usage.
+
+No behavior change — pure refactor. `playlist.js` migration is deliberately deferred to the JTN-469
+  sibling PR.
+
+Closes JTN-502
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: replace var with let/const in store and migrated files (JTN-502)
+
+Addresses 2 SonarCloud S3504 issues: unexpected var declarations in dashboard_page.js and
+  plugin_form.js. Also proactively modernises the same pattern in store.js for consistency.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.28.5 (2026-04-10)
 
 ### Bug Fixes
