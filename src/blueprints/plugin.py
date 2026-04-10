@@ -18,6 +18,7 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
+from utils.fallback_image import render_error_image
 from utils.http_utils import APIError, json_error
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
@@ -481,9 +482,36 @@ def update_now():
                 _t_gen_start = perf_counter()
                 try:
                     image = plugin.generate_image(plugin_settings, device_config)
-                except RuntimeError as e:
+                except Exception as e:
                     logger.warning("Plugin error in update_now: %s", e)
-                    return json_error(str(e), status=400, code="plugin_error")
+                    # Push a fallback image so the display reflects the failure
+                    try:
+                        w, h = device_config.get_resolution()
+                        fallback = render_error_image(
+                            width=w,
+                            height=h,
+                            plugin_id=plugin_id,
+                            instance_name=None,
+                            error_class=type(e).__name__,
+                            error_message=str(e),
+                        )
+                        display_manager.display_image(
+                            fallback,
+                            image_settings=plugin_config.get("image_settings", []),
+                        )
+                    except Exception:
+                        logger.warning(
+                            "update_now: fallback display failed for %s",
+                            plugin_id,
+                            exc_info=True,
+                        )
+                    status = 400 if isinstance(e, RuntimeError) else 500
+                    code = (
+                        "plugin_error"
+                        if isinstance(e, RuntimeError)
+                        else "internal_error"
+                    )
+                    return json_error(str(e), status=status, code=code)
                 generate_ms = int((perf_counter() - _t_gen_start) * 1000)
                 display_manager.display_image(
                     image, image_settings=plugin_config.get("image_settings", [])

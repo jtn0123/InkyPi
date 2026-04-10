@@ -19,6 +19,7 @@ from refresh_task.worker import (
     _remote_exception,
 )
 from utils.event_bus import get_event_bus
+from utils.fallback_image import render_error_image
 from utils.history_cleanup import cleanup_history
 from utils.image_utils import compute_image_hash
 from utils.metrics import (
@@ -359,6 +360,13 @@ class RefreshTask:
                         "error": str(exc),
                     },
                 )
+                self._push_fallback_image(
+                    plugin_id=plugin_id,
+                    instance_name=instance_name,
+                    exc=exc,
+                    plugin_config=plugin_config,
+                    refresh_action=refresh_action,
+                )
                 raise
             try:
                 save_stage_event(
@@ -644,6 +652,54 @@ class RefreshTask:
             if path and os.path.exists(path):
                 return path
         return None
+
+    def _push_fallback_image(
+        self,
+        plugin_id: str,
+        instance_name: str | None,
+        exc: BaseException,
+        plugin_config: dict,
+        refresh_action,
+    ) -> None:
+        """Render and push an error-card fallback image to the display.
+
+        Called when ``generate_image()`` raises so the user sees *something*
+        changed rather than stale content.  Best-effort: any error here is
+        logged but never re-raised.
+        """
+        try:
+            width, height = self.device_config.get_resolution()
+            fallback = render_error_image(
+                width=width,
+                height=height,
+                plugin_id=plugin_id,
+                instance_name=instance_name,
+                error_class=type(exc).__name__,
+                error_message=str(exc),
+            )
+            history_meta = {
+                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
+                "plugin_id": plugin_id,
+                "playlist": refresh_action.get_refresh_info().get("playlist"),
+                "plugin_instance": instance_name,
+            }
+            self.display_manager.display_image(
+                fallback,
+                image_settings=plugin_config.get("image_settings", []),
+                history_meta=history_meta,
+            )
+            logger.info(
+                "plugin_lifecycle: fallback_displayed | plugin_id=%s instance=%s",
+                plugin_id,
+                instance_name,
+            )
+        except Exception:
+            logger.warning(
+                "plugin_lifecycle: fallback_display_failed | plugin_id=%s instance=%s",
+                plugin_id,
+                instance_name,
+                exc_info=True,
+            )
 
     def _update_refresh_info(self, refresh_info, metrics, used_cached):
         """Persist the latest refresh information to the device config.
@@ -1043,7 +1099,10 @@ class RefreshTask:
         """Reset the circuit breaker on a successful refresh."""
         if plugin_instance is None:
             return
-        if plugin_instance.paused or plugin_instance.consecutive_failure_count > 0:
+        changed = (
+            plugin_instance.paused or plugin_instance.consecutive_failure_count > 0
+        )
+        if changed:
             logger.info(
                 "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
                 plugin_id,
@@ -1051,7 +1110,18 @@ class RefreshTask:
             )
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
+        plugin_instance.disabled_reason = None
         set_circuit_breaker_open(plugin_id, False)
+        if changed:
+            try:
+                self.device_config.write_config()
+            except Exception:
+                logger.warning(
+                    "plugin circuit_breaker: failed to persist reset for %s/%s",
+                    plugin_id,
+                    instance,
+                    exc_info=True,
+                )
 
     def _cb_on_failure(
         self,
@@ -1071,8 +1141,18 @@ class RefreshTask:
             plugin_instance.consecutive_failure_count,
             threshold,
         )
+        newly_paused = False
         if plugin_instance.consecutive_failure_count >= threshold:
+            now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
+            error_msg = (
+                self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
+            )
             plugin_instance.paused = True
+            plugin_instance.disabled_reason = (
+                f"Paused after {plugin_instance.consecutive_failure_count} consecutive "
+                f"failures at {now_iso}. Last error: {error_msg[:120]}"
+            )
+            newly_paused = True
             set_circuit_breaker_open(plugin_id, True)
             logger.error(
                 "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
@@ -1081,6 +1161,18 @@ class RefreshTask:
                 instance,
                 plugin_instance.consecutive_failure_count,
             )
+        # Persist the updated counter (and paused state if newly paused) to disk
+        # so that a daemon restart preserves the circuit-breaker state.
+        if newly_paused or plugin_instance.consecutive_failure_count > 0:
+            try:
+                self.device_config.write_config()
+            except Exception:
+                logger.warning(
+                    "plugin circuit_breaker: failed to persist failure state for %s/%s",
+                    plugin_id,
+                    instance,
+                    exc_info=True,
+                )
 
         # Best-effort webhook notification — never raises.
         try:
@@ -1115,6 +1207,7 @@ class RefreshTask:
             return False
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
+        plugin_instance.disabled_reason = None
         # Sanitize user-controlled values for the audit log (S5145):
         # strip CR/LF (log injection) and truncate to a sane length.
         safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]

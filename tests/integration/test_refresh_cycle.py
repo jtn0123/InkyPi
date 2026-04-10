@@ -138,7 +138,7 @@ def test_refresh_cycle_runs_plugin_to_display(device_config_dev, monkeypatch):
 
 
 def test_refresh_cycle_handles_plugin_failure(device_config_dev, monkeypatch):
-    """When the plugin raises, the display is skipped and health records the error."""
+    """When the plugin raises, a fallback error-card is pushed and health records the error."""
     failing_cfg = {"id": "bad_plugin", "class": "BadPlugin"}
     monkeypatch.setattr(
         device_config_dev,
@@ -183,8 +183,20 @@ def test_refresh_cycle_handles_plugin_failure(device_config_dev, monkeypatch):
             current_dt,
         )
 
-    # Display must NOT have been called
-    assert display_calls == [], "Display should not be called when plugin fails"
+    # A fallback image must have been pushed so the display does not stay frozen.
+    # The fallback image is an RGBA PIL Image at the device resolution.
+    assert (
+        len(display_calls) == 1
+    ), "Display should be called exactly once with the fallback error-card image"
+    fallback_img = display_calls[0][0]
+    from PIL import Image as _PIL_Image
+
+    assert isinstance(fallback_img, _PIL_Image.Image), "Fallback must be a PIL Image"
+    expected_w, expected_h = device_config_dev.get_resolution()
+    assert fallback_img.size == (
+        expected_w,
+        expected_h,
+    ), f"Fallback image dimensions {fallback_img.size} do not match display {(expected_w, expected_h)}"
 
     # Plugin health must record the failure
     assert "bad_plugin" in task.plugin_health
