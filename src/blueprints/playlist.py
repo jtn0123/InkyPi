@@ -253,6 +253,36 @@ def _compute_playlist_rotation_eta(pl, next_index, until_next_min, cycle_min, no
     return eta_for_pl
 
 
+def _validate_instance_name(raw_name):
+    """Validate and normalise an instance name.
+
+    Returns ``(name, error_response)``.  Exactly one will be non-None.
+    """
+    name = raw_name.strip() if raw_name else ""
+    if not name:
+        return None, json_error(
+            "Instance name is required",
+            status=422,
+            code=_CODE_VALIDATION,
+            details={"field": "instance_name"},
+        )
+    if len(name) > 64:
+        return None, json_error(
+            "Instance name must be 64 characters or fewer",
+            status=422,
+            code=_CODE_VALIDATION,
+            details={"field": "instance_name"},
+        )
+    if not _INSTANCE_NAME_RE.match(name):
+        return None, json_error(
+            "Instance name can only contain letters, numbers, spaces, underscores, and hyphens",
+            status=422,
+            code=_CODE_VALIDATION,
+            details={"field": "instance_name"},
+        )
+    return name, None
+
+
 @playlist_bp.route("/add_plugin", methods=["POST"])
 def add_plugin():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -282,7 +312,6 @@ def add_plugin():
             )
 
         playlist = refresh_settings.get("playlist")
-        instance_name = refresh_settings.get("instance_name")
         if not playlist:
             return json_error(
                 PLAYLIST_NAME_REQUIRED_ERROR,
@@ -290,28 +319,11 @@ def add_plugin():
                 code=_CODE_VALIDATION,
                 details={"field": "playlist"},
             )
-        instance_name = instance_name.strip() if instance_name else ""
-        if not instance_name:
-            return json_error(
-                "Instance name is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "instance_name"},
-            )
-        if len(instance_name) > 64:
-            return json_error(
-                "Instance name must be 64 characters or fewer",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "instance_name"},
-            )
-        if not _INSTANCE_NAME_RE.match(instance_name):
-            return json_error(
-                "Instance name can only contain letters, numbers, spaces, underscores, and hyphens",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "instance_name"},
-            )
+        instance_name, name_err = _validate_instance_name(
+            refresh_settings.get("instance_name")
+        )
+        if name_err:
+            return name_err
 
         existing = playlist_manager.find_plugin(plugin_id, instance_name)
         if existing:
@@ -332,11 +344,16 @@ def add_plugin():
             "plugin_settings": plugin_settings,
             "name": instance_name,
         }
-        result = playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
-        if not result:
-            return json_error("Failed to add to playlist", status=500)
+        add_result: list[bool] = []
 
-        device_config.write_config()
+        def _do_add(cfg):
+            add_result.append(
+                playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
+            )
+
+        device_config.update_atomic(_do_add)
+        if not add_result or not add_result[0]:
+            return json_error("Failed to add to playlist", status=500)
     except Exception:
         return json_internal_error(
             "add plugin to playlist",
@@ -530,13 +547,18 @@ def create_playlist():
             # best-effort, fallback to allow
             pass
 
-        result = playlist_manager.add_playlist(
-            playlist_name, data.get("start_time"), data.get("end_time")
-        )
-        if not result:
-            return json_error("Failed to create playlist", status=500)
+        add_pl_result: list[bool] = []
 
-        device_config.write_config()
+        def _do_add_playlist(cfg):
+            add_pl_result.append(
+                playlist_manager.add_playlist(
+                    playlist_name, data.get("start_time"), data.get("end_time")
+                )
+            )
+
+        device_config.update_atomic(_do_add_playlist)
+        if not add_pl_result or not add_pl_result[0]:
+            return json_error("Failed to create playlist", status=500)
 
         warning = None
         if playlist_name != "Default":
@@ -633,13 +655,19 @@ def update_playlist(playlist_name):
     if cycle_err:
         return cycle_err
 
-    result = playlist_manager.update_playlist(
-        playlist_name, new_name, start_time, end_time
-    )
-    if not result:
+    upd_result: list[bool] = []
+
+    def _do_update_playlist(cfg):
+        upd_result.append(
+            playlist_manager.update_playlist(
+                playlist_name, new_name, start_time, end_time
+            )
+        )
+        _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int)
+
+    device_config.update_atomic(_do_update_playlist)
+    if not upd_result or not upd_result[0]:
         return json_error("Failed to update playlist", status=500)
-    _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int)
-    device_config.write_config()
 
     # Warn if the updated playlist overlaps with Default.
     warning = None
@@ -665,8 +693,9 @@ def delete_playlist(playlist_name):
     if not playlist:
         return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
 
-    playlist_manager.delete_playlist(playlist_name)
-    device_config.write_config()
+    device_config.update_atomic(
+        lambda cfg: playlist_manager.delete_playlist(playlist_name)
+    )
 
     return json_success(f"Deleted playlist '{playlist_name}'!")
 
@@ -714,10 +743,15 @@ def reorder_plugins():
         if not playlist:
             return json_error(f"Playlist '{playlist_name}' not found", status=400)
 
-        if not playlist.reorder_plugins(ordered):
+        reorder_result: list[bool] = []
+
+        def _do_reorder(cfg):
+            reorder_result.append(playlist.reorder_plugins(ordered))
+
+        device_config.update_atomic(_do_reorder)
+        if not reorder_result or not reorder_result[0]:
             return json_error("Invalid order payload", status=400)
 
-        device_config.write_config()
         return json_success("Reordered plugins")
     except Exception:
         return json_internal_error(

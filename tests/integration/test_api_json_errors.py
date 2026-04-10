@@ -29,10 +29,10 @@ def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):
     # Simulate a config write failure so endpoint returns JSON error
     dc = flask_app.config["DEVICE_CONFIG"]
 
-    def boom_update_value(*args, **kwargs):
+    def boom_update_atomic(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(dc, "update_value", boom_update_value, raising=True)
+    monkeypatch.setattr(dc, "update_atomic", boom_update_atomic, raising=True)
 
     resp = client.post(
         "/save_plugin_settings",

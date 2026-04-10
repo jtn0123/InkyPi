@@ -1,6 +1,7 @@
 // Enhanced toast notification system
 // Configurable timing defaults (ms).
 const TOAST_DURATION_MS = 5000;
+const TOAST_ERROR_DURATION_MS = 8000;
 const MODAL_AUTO_CLOSE_MS = 10000;
 const TOAST_FADE_MS = 300;
 
@@ -20,15 +21,32 @@ function ensureToastContainer() {
 
 const MAX_VISIBLE_TOASTS = 3;
 
+function dismissStaleErrors() {
+    const container = ensureToastContainer();
+    const existingErrors = Array.from(container.querySelectorAll('.toast.error'));
+    existingErrors.forEach(el => closeToast(el.id));
+}
+
 function showToast(status, message, duration = TOAST_DURATION_MS) {
     const container = ensureToastContainer();
     const toastId = `toast-${++toastCounter}`;
+
+    // When showing a new error, dismiss any previous error toasts first
+    // so stale validation messages don't stack up across save attempts.
+    if (status === 'error') {
+        dismissStaleErrors();
+    }
 
     // Enforce stack limit — remove oldest toasts beyond MAX_VISIBLE_TOASTS
     while (container.children.length >= MAX_VISIBLE_TOASTS) {
         const oldest = container.firstElementChild;
         if (oldest) oldest.remove();
     }
+
+    // Resolve effective duration: errors use TOAST_ERROR_DURATION_MS by default
+    const effectiveDuration = (status === 'error' && duration === TOAST_DURATION_MS)
+        ? TOAST_ERROR_DURATION_MS
+        : duration;
 
     const toast = document.createElement('div');
     toast.className = `toast ${status}`;
@@ -62,10 +80,10 @@ function showToast(status, message, duration = TOAST_DURATION_MS) {
     toast.appendChild(closeBtn);
 
     // Add countdown progress bar for auto-closing toasts
-    if (duration > 0 && status !== 'error') {
+    if (effectiveDuration > 0) {
         const progress = document.createElement('div');
         progress.className = 'toast-progress';
-        progress.style.animationDuration = `${duration}ms`;
+        progress.style.animationDuration = `${effectiveDuration}ms`;
         toast.appendChild(progress);
     }
 
@@ -76,9 +94,9 @@ function showToast(status, message, duration = TOAST_DURATION_MS) {
         toast.classList.add('show');
     });
 
-    // Auto-close after duration (skip for errors so users can read details)
-    if (duration > 0 && status !== 'error') {
-        setTimeout(() => closeToast(toastId), duration);
+    // Auto-close after effectiveDuration
+    if (effectiveDuration > 0) {
+        setTimeout(() => closeToast(toastId), effectiveDuration);
     }
 
     return toastId;

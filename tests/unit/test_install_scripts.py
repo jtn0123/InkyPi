@@ -1,6 +1,7 @@
 # pyright: reportMissingImports=false
 """Structural validation of install/setup scripts — no shell execution."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -108,6 +109,22 @@ class TestInstallScript:
     def test_install_builds_css(self):
         assert "build_css" in self.content
 
+    def test_install_skips_zramtools_when_zram_swap_already_active(self):
+        # JTN-569: Pi OS Trixie preinstalls zram-swap which configures /dev/zram0 at
+        # boot. Installing zram-tools on top fights over /dev/zram0 and makes
+        # `systemctl start zramswap` exit 1. The guard must run before apt-get.
+        guard = 'grep -q "^/dev/zram" /proc/swaps'
+        apt_install = "apt-get install -y zram-tools"
+        assert guard in self.content
+        assert "skipping zram-tools install" in self.content
+        assert "return 0" in self.content
+
+        fn_start = self.content.index("setup_zramswap_service() {")
+        guard_pos = self.content.index(guard, fn_start)
+        return_pos = self.content.index("return 0", fn_start)
+        apt_pos = self.content.index(apt_install, fn_start)
+        assert guard_pos < return_pos < apt_pos
+
     def test_install_enables_zramswap_on_bookworm_and_trixie(self):
         # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
         # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. The previous
@@ -125,6 +142,49 @@ class TestInstallScript:
         assert "12=Bookworm" in self.content
         assert "13=Trixie" in self.content
         assert "Trixe" not in self.content  # typo guard
+
+    def test_zramswap_regex_matches_codename_comment_parity(self):
+        # JTN-531: The codename comment near get_os_version() and the version
+        # regex in the zramswap branch must list the same integer keys.
+        # If someone adds 14=Forky to one without updating the other this test
+        # will catch it.
+
+        # Parse "# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie"
+        # Capture every "<digit(s)>=<Codename>" pair from the comment line
+        # immediately above the get_os_version() function definition.
+        comment_versions = set()
+        lines = self.content.splitlines()
+        for i, line in enumerate(lines):
+            if "get_os_version" in line and line.strip().startswith("get_os_version"):
+                # Search backwards for the nearest preceding comment line with
+                # version=Codename pairs (at most 5 lines back).
+                for j in range(max(0, i - 5), i):
+                    if "#" in lines[j]:
+                        for m in re.finditer(r"(\d+)\s*=\s*[A-Za-z]+", lines[j]):
+                            comment_versions.add(int(m.group(1)))
+
+        # Parse the regex alternation in the zramswap if-branch:
+        # [[ "$os_version" =~ ^(11|12|13)$ ]]
+        regex_versions = set()
+        for line in self.content.splitlines():
+            m = re.search(r"\^\(([0-9|]+)\)\$", line)
+            if m:
+                for part in m.group(1).split("|"):
+                    if part.strip().isdigit():
+                        regex_versions.add(int(part.strip()))
+
+        assert (
+            comment_versions
+        ), "Could not parse any version numbers from the get_os_version comment in install.sh"
+        assert (
+            regex_versions
+        ), "Could not parse any version numbers from the zramswap regex in install.sh"
+        assert comment_versions == regex_versions, (
+            f"Codename comment versions {sorted(comment_versions)} do not match "
+            f"zramswap regex versions {sorted(regex_versions)}. "
+            "Update both the comment near get_os_version() and the regex in the "
+            "zramswap branch when adding a new Debian release."
+        )
 
 
 # ---- update.sh ----

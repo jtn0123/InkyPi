@@ -1,6 +1,121 @@
 # CHANGELOG
 
 
+## v0.28.4 (2026-04-10)
+
+### Bug Fixes
+
+- Add shellcheck to lint.sh and OS codename parity test (JTN-531)
+  ([#286](https://github.com/jtn0123/InkyPi/pull/286),
+  [`b3fe54f`](https://github.com/jtn0123/InkyPi/commit/b3fe54f8bb5c01de5d132b0b8a4b38d3dc3951ec))
+
+* fix: add shellcheck to lint.sh and OS codename parity test (JTN-531)
+
+- Add shellcheck step (blocking, severity=warning) to scripts/lint.sh covering install/*.sh and
+  scripts/*.sh; gracefully skips locally when binary is absent, fails in CI if missing - Add
+  test_zramswap_regex_matches_codename_comment_parity to assert the get_os_version comment and
+  zramswap regex always share the same Debian version integers, so adding a new release to one
+  without the other causes immediate CI failure - Fix pre-existing ruff invalid-syntax errors in
+  scripts/compare_icons.py (escaped quotes inside f-strings, Python <3.12 incompatible)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor: use dynamic glob discovery for shellcheck file list
+
+Replace hardcoded SHELLCHECK_FILES array with nullglob glob expansion of install/*.sh and
+  scripts/*.sh so new scripts are automatically covered without manual list maintenance.
+
+Addresses CodeRabbit review comment.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Atomic config RMW — add Config.update_atomic (JTN-498)
+  ([#289](https://github.com/jtn0123/InkyPi/pull/289),
+  [`7991328`](https://github.com/jtn0123/InkyPi/commit/7991328d139a79f33dbd49d492d2b763b030c499))
+
+* fix: add Config.update_atomic to guard full RMW cycle under lock (JTN-498, Grade B2)
+
+Add `Config.update_atomic(update_fn)` that holds `_config_lock` across the entire read → mutate →
+  write cycle, preventing concurrent threads from clobbering each other's playlist edits.
+
+Migrate key RMW callsites in playlist.py and plugin.py to use `update_atomic` instead of bare
+  mutation + write_config(). Update the two integration tests that mocked `update_value` to mock
+  `update_atomic` instead. Add a 20-thread concurrent regression test that verifies all plugin
+  additions land in the final config without any being silently dropped.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* refactor: extract _validate_instance_name helper to reduce cognitive complexity (S3776)
+
+Reduces add_plugin() cognitive complexity from 16 to ≤15 per SonarCloud rule S3776.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Clear stale error toasts and auto-dismiss on new save attempt (JTN-464)
+  ([#287](https://github.com/jtn0123/InkyPi/pull/287),
+  [`de95a98`](https://github.com/jtn0123/InkyPi/commit/de95a98ec8bf04dab2f3304f4be1a879891957d5))
+
+- Dismiss existing error toasts before showing a new one, preventing stale validation messages from
+  stacking up across save attempts. - Add TOAST_ERROR_DURATION_MS (8 s) constant so error toasts
+  auto-dismiss instead of requiring a manual × click. - Keep the × close button and success-toast
+  behaviour unchanged.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Escape closes #scheduleModal and focus moves into it on open (JTN-461, JTN-463)
+  ([#288](https://github.com/jtn0123/InkyPi/pull/288),
+  [`3de2f5a`](https://github.com/jtn0123/InkyPi/commit/3de2f5ab6c93fd2cd547e42612fef11132e66ec1))
+
+* fix: Escape closes #scheduleModal and focus moves into it on open (JTN-461, JTN-463)
+
+- JTN-461: add keydown listener in bindModalClose so pressing Escape dismisses #scheduleModal when
+  it is visible, matching the pattern used by playlistModal and the history-page modals. - JTN-463:
+  extend openModal to focus the first focusable element inside the modal on open (matching
+  setModalOpen in playlist.js); track the trigger button in _lastModalTrigger and restore focus to
+  it on close (WAI-ARIA best practice). - Add two static regression tests in
+  test_modal_accessibility_guards.py to guard against future regressions.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: resolve Sonar S2486 and S2004 in plugin_page.js
+
+- S2486: remove empty catch block — .focus() on a DOM element does not throw in practice; the
+  try/catch was defensive but Sonar requires non-empty catch bodies. - S2004: replace per-element
+  forEach/addEventListener loop for [data-open-modal] with a single delegated document click
+  listener, reducing function nesting from 5 to 4 levels.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Skip zram-tools when OS already provides zram swap (JTN-569)
+  ([#285](https://github.com/jtn0123/InkyPi/pull/285),
+  [`b621d2b`](https://github.com/jtn0123/InkyPi/commit/b621d2bef6610e14ac761fbe7200b61761496e25))
+
+* fix: skip zram-tools install when OS already provides zram swap (JTN-569)
+
+On Pi OS Trixie, the preinstalled zram-swap package configures /dev/zram0 at boot. Installing
+  zram-tools on top causes mkswap to fail with "is mounted" and leaves zramswap.service in a failed
+  state. Add a /proc/swaps guard at the top of setup_zramswap_service() that exits early when zram
+  swap is already active, preventing the conflict.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: assert guard ordering in zram skip test (JTN-569)
+
+Strengthen the test to verify that the /proc/swaps guard appears before the apt-get install line,
+  not just that both strings are present. This prevents false positives if the guard were ever moved
+  below the install command.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.28.3 (2026-04-10)
 
 ### Bug Fixes
