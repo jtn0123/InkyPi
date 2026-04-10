@@ -14,6 +14,8 @@ from utils.http_cache import (
     clear_cache,
     get_cache,
     get_cache_stats,
+    get_http_cache,
+    reset_for_tests,
 )
 
 
@@ -561,3 +563,28 @@ def test_existing_ttl_behavior_preserved(mock_response):
 
         mock_time.time.return_value = 2001.0
         assert c.get(url) is None
+
+
+def test_get_http_cache_returns_http_cache_instance():
+    """get_http_cache() returns an HTTPCache singleton."""
+    cache = get_http_cache()
+    assert isinstance(cache, HTTPCache)
+
+
+def test_get_http_cache_is_same_as_get_cache():
+    """get_http_cache() returns the same object as get_cache()."""
+    assert get_http_cache() is get_cache()
+
+
+def test_reset_for_tests_clears_singleton():
+    """reset_for_tests() resets the global cache so the next call creates a fresh instance."""
+    cache1 = get_http_cache()
+    reset_for_tests()
+    cache2 = get_http_cache()
+    assert cache2 is not cache1
+
+
+def test_reset_for_tests_when_none():
+    """reset_for_tests() is safe to call when the global cache is already None."""
+    reset_for_tests()  # clear first
+    reset_for_tests()  # must not raise
