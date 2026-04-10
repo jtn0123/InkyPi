@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.31.0 (2026-04-10)
+
+### Features
+
+- Accessor + reset_for_tests() for utils singletons (JTN-493)
+  ([#298](https://github.com/jtn0123/InkyPi/pull/298),
+  [`56715b0`](https://github.com/jtn0123/InkyPi/commit/56715b00f89a95f90f18eaa4ba615e7b917cb5fa))
+
+* feat: add explicit accessors and reset_for_tests() to utils singletons (JTN-493)
+
+Add get_http_session()/reset_for_tests() to http_client, get_http_cache()/reset_for_tests() to
+  http_cache, and get_translations()/get_active_locale()/reset_for_tests() to i18n. Wire an autouse
+  pytest fixture in conftest.py to scrub all three singletons between tests, eliminating
+  order-dependent test pollution. src/inkypi.py and plugin_registry.py globals are intentionally out
+  of scope (follow-up). Grade A1.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: add coverage for accessor and reset_for_tests() functions (JTN-493)
+
+Cover the new get_http_cache(), reset_for_tests() (http_client/http_cache/i18n), get_translations(),
+  and get_active_locale() helpers so the SonarCloud new-code coverage gate reaches >= 80%.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.30.0 (2026-04-10)
 
 ### Features
