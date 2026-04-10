@@ -354,12 +354,12 @@ if __name__ == "__main__":
         threading.Thread(target=_show_startup, daemon=True, name="StartupImage").start()
 
     try:
-        from cysystemd.daemon import notify as sd_notify
+        from cysystemd.daemon import Notification, notify
 
-        sd_notify("READY=1")
+        notify(Notification.READY)
         logger.info("Notified systemd: READY=1")
     except Exception:
-        pass
+        logger.exception("Failed to notify systemd READY")
 
     try:
         if DEV_MODE:
