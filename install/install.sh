@@ -345,7 +345,7 @@ get_ip_address() {
   echo "$ip_address"
 }
 
-# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixe
+# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie
 get_os_version() {
   lsb_release -sr
 }
@@ -388,12 +388,15 @@ if [[ -n "$WS_TYPE" ]]; then
 fi
 enable_interfaces
 install_debian_dependencies
-# check OS version for Bookworm to setup zramswap
-if [[ $(get_os_version) = "12" ]] ; then
-  echo "OS version is Bookworm - setting up zramswap"
+# Setup zramswap on any modern Pi OS that ships zram-tools (Bullseye/Bookworm/Trixie).
+# This is critical on low-RAM boards like the Pi Zero 2 W (512 MB) — without
+# zramswap, pip install of numpy/Pillow/playwright will OOM during the install step.
+os_version=$(get_os_version)
+if [[ "$os_version" =~ ^(11|12|13)$ ]] ; then
+  echo "OS version is $os_version (Bullseye/Bookworm/Trixie) - setting up zramswap"
   setup_zramswap_service
 else
-  echo "OS version is not Bookworm - skipping zramswap setup."
+  echo "OS version is $os_version - skipping zramswap setup (zram-tools not available on this release)."
 fi
 setup_earlyoom_service
 configure_journal_size
