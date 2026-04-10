@@ -108,6 +108,24 @@ class TestInstallScript:
     def test_install_builds_css(self):
         assert "build_css" in self.content
 
+    def test_install_enables_zramswap_on_bookworm_and_trixie(self):
+        # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
+        # Pi Zero 2 W (512 MB RAM) doesn't OOM during pip install. The previous
+        # check only matched Bookworm (12) exactly, leaving Trixie users broken.
+        assert "os_version=$(get_os_version)" in self.content
+        assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
+        assert "setup_zramswap_service" in self.content
+        # The skip branch should still exist for unknown future releases.
+        assert "skipping zramswap setup" in self.content
+
+    def test_install_os_version_comment_lists_correct_codenames(self):
+        # The comment near get_os_version should list 11/12/13 with correct
+        # codenames — including the 'Trixie' typo fix from JTN-528.
+        assert "11=Bullseye" in self.content
+        assert "12=Bookworm" in self.content
+        assert "13=Trixie" in self.content
+        assert "Trixe" not in self.content  # typo guard
+
 
 # ---- update.sh ----
 
