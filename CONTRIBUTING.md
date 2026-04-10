@@ -64,7 +64,8 @@ Browser tests use Playwright with a headless Chromium instance. There are two gr
 
 ```bash
 SKIP_BROWSER=0 .venv/bin/python -m pytest tests/
-# Or simply omit SKIP_BROWSER (it defaults to off when Chromium is available):
+# Or simply omit SKIP_BROWSER — it defaults to unset (tests run); Chromium must
+# be installed or browser tests will fail (they are not auto-skipped on missing Chromium):
 .venv/bin/python -m pytest tests/
 ```
 

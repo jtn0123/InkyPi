@@ -164,7 +164,7 @@ status check in GitHub branch protection.
 
 ### Making `ci-gate` a required status check (repo owner steps)
 
-1. Go to **GitHub.com → jtn0123/InkyPi → Settings → Branches**.
+1. Go to **GitHub.com → fatihak/InkyPi → Settings → Branches**.
 2. Under "Branch protection rules", click **Edit** next to the `main` rule (or **Add rule**
    if none exists).
 3. Enable **"Require status checks to pass before merging"**.
