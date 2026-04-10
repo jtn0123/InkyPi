@@ -112,9 +112,17 @@ class TestInstallScript:
         # JTN-569: Pi OS Trixie preinstalls zram-swap which configures /dev/zram0 at
         # boot. Installing zram-tools on top fights over /dev/zram0 and makes
         # `systemctl start zramswap` exit 1. The guard must run before apt-get.
-        assert 'grep -q "^/dev/zram" /proc/swaps' in self.content
+        guard = 'grep -q "^/dev/zram" /proc/swaps'
+        apt_install = "apt-get install -y zram-tools"
+        assert guard in self.content
         assert "skipping zram-tools install" in self.content
         assert "return 0" in self.content
+
+        fn_start = self.content.index("setup_zramswap_service() {")
+        guard_pos = self.content.index(guard, fn_start)
+        return_pos = self.content.index("return 0", fn_start)
+        apt_pos = self.content.index(apt_install, fn_start)
+        assert guard_pos < return_pos < apt_pos
 
     def test_install_enables_zramswap_on_bookworm_and_trixie(self):
         # JTN-528: zramswap must be enabled on Bullseye/Bookworm/Trixie so the
