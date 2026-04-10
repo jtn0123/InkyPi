@@ -239,19 +239,22 @@ class TestSdNotifyAdapter:
 
     def test_sd_notify_is_none_when_cysystemd_unavailable(self):
         """When cysystemd is not importable, _sd_notify must be None (graceful degradation)."""
-        # Temporarily make cysystemd unimportable
         task_module_name = "refresh_task_jtn594_none_test"
 
-        for mod_name in [
-            "waveshare_epd",
-            "gpiozero",
-            "PIL",
-            "PIL.Image",
-            "PIL.ImageDraw",
-            "PIL.ImageFont",
-        ]:
-            if mod_name not in sys.modules:
-                sys.modules[mod_name] = types.ModuleType(mod_name)
+        stub_mods = {
+            "waveshare_epd": types.ModuleType("waveshare_epd"),
+            "gpiozero": types.ModuleType("gpiozero"),
+            "PIL": types.ModuleType("PIL"),
+            "PIL.Image": types.ModuleType("PIL.Image"),
+            "PIL.ImageDraw": types.ModuleType("PIL.ImageDraw"),
+            "PIL.ImageFont": types.ModuleType("PIL.ImageFont"),
+            # Set cysystemd entries to None so any 'from cysystemd…' raises ImportError
+            "cysystemd": None,
+            "cysystemd.daemon": None,
+        }
+
+        if str(SRC_DIR) not in sys.path:
+            sys.path.insert(0, str(SRC_DIR))
 
         spec = importlib.util.spec_from_file_location(
             task_module_name,
@@ -259,31 +262,8 @@ class TestSdNotifyAdapter:
         )
         module = importlib.util.module_from_spec(spec)
 
-        class _RaisesImport:
-            """Fake module finder that makes cysystemd unimportable."""
-
-            def find_module(self, name, path=None):
-                if name.startswith("cysystemd"):
-                    return self
-
-            def load_module(self, name):
-                raise ImportError(f"Simulated missing: {name}")
-
-        raiser = _RaisesImport()
-        sys.meta_path.insert(0, raiser)
-        try:
-            if str(SRC_DIR) not in sys.path:
-                sys.path.insert(0, str(SRC_DIR))
-            # Remove any cached cysystemd modules
-            for key in list(sys.modules.keys()):
-                if key.startswith("cysystemd"):
-                    del sys.modules[key]
+        with patch.dict(sys.modules, stub_mods):
             spec.loader.exec_module(module)
-        finally:
-            sys.meta_path.remove(raiser)
-            # Clean up after ourselves
-            if task_module_name in sys.modules:
-                del sys.modules[task_module_name]
 
         assert module._sd_notify is None, (
             "_sd_notify should be None when cysystemd is unavailable, "
