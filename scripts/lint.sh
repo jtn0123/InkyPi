@@ -44,30 +44,11 @@ else
     echo "✅ mypy type check passed"
 fi
 
-# Shell scripts that run on user devices — must pass shellcheck.
-SHELLCHECK_FILES=(
-    install/install.sh
-    install/uninstall.sh
-    install/update.sh
-    install/do_update.sh
-    scripts/dev.sh
-    scripts/dev_update.sh
-    scripts/format.sh
-    scripts/lint.sh
-    scripts/logs.sh
-    scripts/test.sh
-    scripts/test_profile.sh
-    scripts/venv.sh
-    scripts/web_only.sh
-    scripts/check_licenses.sh
-    scripts/preflash_validate.sh
-)
-
-# Filter to files that actually exist (guard against future renames).
-EXISTING_SHELLCHECK_FILES=()
-for f in "${SHELLCHECK_FILES[@]}"; do
-    [[ -f "$f" ]] && EXISTING_SHELLCHECK_FILES+=("$f")
-done
+# Shell scripts under install/ and scripts/ — must pass shellcheck.
+# Dynamic discovery ensures new scripts are covered automatically.
+shopt -s nullglob
+EXISTING_SHELLCHECK_FILES=(install/*.sh scripts/*.sh)
+shopt -u nullglob
 
 echo "Running shellcheck..."
 if command -v shellcheck > /dev/null 2>&1; then
