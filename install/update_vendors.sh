@@ -21,10 +21,15 @@ declare -a VENDORS=(
 for vendor in "${VENDORS[@]}"; do
   IFS='|' read -r name url output <<< "$vendor"
   echo "Updating $name..."
-  if curl -fsSL --retry 3 --connect-timeout 10 --max-time 60 "$url" -o "$output"; then
+  # JTN-534: --retry-all-errors retries write errors too (curl exit 23) which
+  # bit us during the JTN-528 sim run. --retry-delay 2 spaces retries to avoid
+  # hammering the CDN under flaky connectivity.
+  if curl -fsSL --retry 5 --retry-all-errors --retry-delay 2 \
+      --connect-timeout 10 --max-time 120 "$url" -o "$output"; then
     echo "  ✓ Downloaded to $output"
   else
-    echo "  ✗ Failed to download $name" >&2
+    rc=$?
+    echo "  ✗ Failed to download $name (curl exit $rc)" >&2
     exit 1
   fi
 done

@@ -52,8 +52,16 @@ def _read_manifest(tar: tarfile.TarFile) -> dict:
     return json.loads(fobj.read().decode("utf-8"))
 
 
-def _pre_restore_backup(config_dir: str, instances_dir: str) -> str:
-    """Create a safety backup of current state before overwriting."""
+def _pre_restore_backup(
+    config_dir: str, instances_dir: str, output_dir: str | None = None
+) -> str:
+    """Create a safety backup of current state before overwriting.
+
+    The backup is written into *output_dir* (or the parent of *config_dir* if
+    not given) so it stays alongside the data it's protecting and never leaks
+    into a random working directory. Tests can pass a tmp_path here to keep
+    artifacts contained (JTN-538).
+    """
     # Import inline so the module stays self-contained
     scripts_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, scripts_dir)
@@ -63,7 +71,9 @@ def _pre_restore_backup(config_dir: str, instances_dir: str) -> str:
         sys.path.pop(0)
 
     ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    output = os.path.abspath(f".pre-restore-{ts}.tar.gz")
+    target_dir = output_dir or os.path.dirname(os.path.abspath(config_dir))
+    os.makedirs(target_dir, exist_ok=True)
+    output = os.path.join(target_dir, f".pre-restore-{ts}.tar.gz")
     history_dir = os.path.join(os.path.dirname(instances_dir), "history")
     backup_config.run_backup(
         output=output,

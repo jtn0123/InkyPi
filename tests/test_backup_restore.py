@@ -286,7 +286,7 @@ class TestRestoreConfig:
     def test_restore_creates_pre_restore_safety_backup(
         self, backup_mod, restore_mod, tmp_path, monkeypatch
     ):
-        """restore --yes should create a .pre-restore-*.tar.gz in cwd."""
+        """restore --yes should create a .pre-restore-*.tar.gz next to the config."""
         src = tmp_path / "src"
         src.mkdir()
         config_dir = _make_config_dir(src)
@@ -303,8 +303,12 @@ class TestRestoreConfig:
         safety_outputs: list[str] = []
         original_pre_restore = restore_mod._pre_restore_backup
 
-        def capture_pre_restore(config_dir, instances_dir):
-            result = original_pre_restore(config_dir, instances_dir)
+        # JTN-538: pin the safety backup output dir to tmp_path so the
+        # .pre-restore-*.tar.gz never leaks into the repo working tree.
+        def capture_pre_restore(config_dir, instances_dir, output_dir=None):
+            result = original_pre_restore(
+                config_dir, instances_dir, output_dir=str(tmp_path)
+            )
             safety_outputs.append(result)
             return result
 
