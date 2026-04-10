@@ -226,14 +226,16 @@ configure_journal_size() {
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
-  "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel > /dev/null
-  "$VENV_PATH/bin/python" -m pip install -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
+  # JTN-534: pass --retries 5 --timeout 60 to survive flaky Wi-Fi on a Pi Zero 2 W.
+  # pip's default retries=5 already; explicit so a future change to pip default doesn't bite us.
+  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --upgrade pip setuptools wheel > /dev/null
+  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
   show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
   if [[ -n "$WS_TYPE" ]]; then
     echo "Adding additional dependencies for waveshare to the python virtual environment. "
-    "$VENV_PATH/bin/python" -m pip install -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
+    "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 -r "$WS_REQUIREMENTS_FILE" > ws_pip_install.log &
     show_loader "\tInstalling additional Waveshare python dependencies. "
   fi
 
@@ -412,7 +414,13 @@ fi
 install_app_service
 
 echo "Update JS and CSS files"
-bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
+# JTN-534: previously the exit code from update_vendors.sh was discarded — a
+# transient curl write error during vendor download silently produced a
+# half-installed CSS/JS bundle. Fail loudly instead so the user knows.
+if ! bash "$SCRIPT_DIR/update_vendors.sh"; then
+  echo_error "ERROR: Vendor JS/CSS download failed. Check network connectivity and re-run."
+  exit 1
+fi
 
 echo "Building minified CSS bundle"
 if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then

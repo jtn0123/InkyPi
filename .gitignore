@@ -188,6 +188,9 @@ phosphor-icons/
 
 # Backup files
 *.bak*
+# Pre-restore safety backups created by scripts/restore_config.py — should
+# live next to the config they protect, not in the repo working tree (JTN-538)
+.pre-restore-*.tar.gz
 
 # Local benchmark database
 src/benchmarks.db
