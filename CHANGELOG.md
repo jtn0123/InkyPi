@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v0.30.0 (2026-04-10)
+
+### Features
+
+- Add sim_install.sh + Dockerfile for local install.sh verification (JTN-532)
+  ([#291](https://github.com/jtn0123/InkyPi/pull/291),
+  [`2e5f934`](https://github.com/jtn0123/InkyPi/commit/2e5f93471a8035e6607572d68d50fbe648d8a543))
+
+* feat: add sim_install.sh + Dockerfile for local install.sh verification (JTN-532)
+
+Adds scripts/sim_install.sh and scripts/Dockerfile.sim-install so contributors can run
+  install/install.sh end-to-end in an arm64 container that mimics the Pi Zero 2 W (512 MB RAM)
+  without real hardware.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: address CodeRabbit review on sim_install.sh + Dockerfile (JTN-532)
+
+- Dockerfile: combine raspi.list + apt-get update in single RUN layer and clean apt lists; expand
+  sim-only warning comment for trusted=yes - sim_install.sh: reject extra positional arguments; wrap
+  docker run in if/else so RUN_EXIT is always set regardless of set -e
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.29.0 (2026-04-10)
 
 ### Continuous Integration
