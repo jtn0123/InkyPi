@@ -15,6 +15,7 @@ fi
 RUFF_EXIT=0
 BLACK_EXIT=0
 MYPY_EXIT=0
+SHELLCHECK_EXIT=0
 
 echo "Running Ruff linter..."
 ruff check src tests scripts
@@ -43,13 +44,62 @@ else
     echo "✅ mypy type check passed"
 fi
 
+# Shell scripts that run on user devices — must pass shellcheck.
+SHELLCHECK_FILES=(
+    install/install.sh
+    install/uninstall.sh
+    install/update.sh
+    install/do_update.sh
+    scripts/dev.sh
+    scripts/dev_update.sh
+    scripts/format.sh
+    scripts/lint.sh
+    scripts/logs.sh
+    scripts/test.sh
+    scripts/test_profile.sh
+    scripts/venv.sh
+    scripts/web_only.sh
+    scripts/check_licenses.sh
+    scripts/preflash_validate.sh
+)
+
+# Filter to files that actually exist (guard against future renames).
+EXISTING_SHELLCHECK_FILES=()
+for f in "${SHELLCHECK_FILES[@]}"; do
+    [[ -f "$f" ]] && EXISTING_SHELLCHECK_FILES+=("$f")
+done
+
+echo "Running shellcheck..."
+if command -v shellcheck > /dev/null 2>&1; then
+    if [[ ${#EXISTING_SHELLCHECK_FILES[@]} -gt 0 ]]; then
+        shellcheck --severity=warning "${EXISTING_SHELLCHECK_FILES[@]}"
+        SHELLCHECK_EXIT=$?
+    else
+        echo "No shell script files found to check."
+    fi
+    if [ $SHELLCHECK_EXIT -ne 0 ]; then
+        echo "❌ shellcheck found issues (exit code: $SHELLCHECK_EXIT)"
+    else
+        echo "✅ shellcheck passed"
+    fi
+else
+    # In CI the binary must be present; locally we skip with a warning.
+    if [[ -n "${CI:-}" ]]; then
+        echo "❌ shellcheck not found — install it in the CI image."
+        SHELLCHECK_EXIT=1
+    else
+        echo "⚠️  shellcheck not found — skipping (install via: brew install shellcheck / apt install shellcheck)"
+    fi
+fi
+
 # Report summary — mypy is non-blocking (advisory only) until existing
-# type errors are resolved.  Ruff and Black are blocking.
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ]; then
+# type errors are resolved.  Ruff, Black, and shellcheck are blocking.
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
     [ $RUFF_EXIT -ne 0 ] && echo "  - Ruff: $RUFF_EXIT"
     [ $BLACK_EXIT -ne 0 ] && echo "  - Black: $BLACK_EXIT"
+    [ $SHELLCHECK_EXIT -ne 0 ] && echo "  - shellcheck: $SHELLCHECK_EXIT"
     echo ""
     echo "Post-run actions will continue..."
 else
@@ -58,7 +108,7 @@ else
 fi
 [ $MYPY_EXIT -ne 0 ] && echo "⚠️  mypy issues remain (non-blocking)"
 
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ]; then
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     exit 1
 fi
 
