@@ -2,6 +2,10 @@
 
 A high-level map of how requests flow through the app and how the refresh loop drives the e-ink display.
 
+## Architecture Decision Records
+
+Non-obvious design choices are documented as Architecture Decision Records (ADRs) in [`docs/adr/`](adr/README.md). Each ADR records the context, the decision, its trade-offs, and the alternatives that were considered. File a new ADR whenever you make a choice that is hard to reverse, likely to be re-litigated, or not obvious from reading the code alone.
+
 ## Overview
 
 InkyPi is a Flask web app + a background refresh task that runs in the same process. The web UI lets the user configure plugins and assemble them into playlists; the refresh task picks the next plugin from the playlist on a schedule, runs it, and pushes the resulting image to the display.
