@@ -5,7 +5,7 @@ import pytest
 import requests
 
 import utils.http_client as http_client_mod
-from utils.http_client import close_http_session, get_http_session
+from utils.http_client import close_http_session, get_http_session, reset_for_tests
 
 
 @pytest.fixture(autouse=True)
@@ -140,3 +140,21 @@ def test_atexit_registered():
         get_http_session()
         # atexit.register should have been called with close_http_session
         mock_register.assert_called_with(close_http_session)
+
+
+def test_reset_for_tests_closes_and_clears():
+    """reset_for_tests() closes any open session and resets singleton to None."""
+    session = get_http_session()
+    assert http_client_mod._HTTP_SESSION is not None
+    reset_for_tests()
+    assert http_client_mod._HTTP_SESSION is None
+    # Next call must create a fresh instance
+    new_session = get_http_session()
+    assert new_session is not session
+
+
+def test_reset_for_tests_when_none():
+    """reset_for_tests() is safe to call when no session exists."""
+    assert http_client_mod._HTTP_SESSION is None
+    reset_for_tests()  # must not raise
+    assert http_client_mod._HTTP_SESSION is None

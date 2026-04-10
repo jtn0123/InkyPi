@@ -71,7 +71,7 @@ def get_http_session() -> requests.Session:
     return _HTTP_SESSION
 
 
-def close_http_session():
+def close_http_session() -> None:
     """
     Close the shared HTTP session.
     Should be called on application shutdown.
@@ -82,4 +82,22 @@ def close_http_session():
         if _HTTP_SESSION is not None:
             logger.debug("Closing shared HTTP session")
             _HTTP_SESSION.close()
+            _HTTP_SESSION = None
+
+
+def reset_for_tests() -> None:
+    """Reset the shared HTTP session (testing only).
+
+    Closes any open session and clears the singleton so the next call to
+    ``get_http_session()`` creates a fresh instance.  Call this from a
+    pytest fixture to prevent session state from leaking between tests.
+    """
+    global _HTTP_SESSION
+
+    with _HTTP_SESSION_LOCK:
+        if _HTTP_SESSION is not None:
+            try:
+                _HTTP_SESSION.close()
+            except Exception:
+                pass
             _HTTP_SESSION = None
