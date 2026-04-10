@@ -62,6 +62,21 @@ devbox run dev # alternatively run `devbox shell` and then run `python src/inkyp
 
 **That's it!** Open http://localhost:8080 and start developing.
 
+### Install pre-commit hooks (recommended)
+
+After cloning, install the git hooks so linting runs automatically before each commit:
+
+```bash
+pre-commit install
+```
+
+On every `git commit` this runs: whitespace/YAML/merge-conflict checks, **ruff** (lint + format),
+**mypy** (type checks), **gitleaks** (secret scanning), and **conventional-commit** message
+validation. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the full hook list.
+
+> **Bypass when needed:** `git commit --no-verify` skips the hooks locally, but CI enforces the
+> same checks — failures will surface there instead.
+
 ## What You Can Do
 
 - **Develop plugins** - Create new plugins without hardware (no Raspberry Pi, nor physical displays)
