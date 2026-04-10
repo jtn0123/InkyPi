@@ -77,6 +77,10 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `test:` — adding or updating tests
 - `chore:` — maintenance, dependencies, CI
 
+## Code Style
+
+Private helpers (`_*` functions) longer than ~5 lines or with non-obvious intent should have a docstring.
+
 ## PR Process
 
 1. Fork the repository

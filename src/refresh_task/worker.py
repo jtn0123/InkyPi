@@ -12,6 +12,16 @@ logger = logging.getLogger(__name__)
 
 
 def _get_mp_context():
+    """Return the best available multiprocessing start context for this platform.
+
+    Prefers ``forkserver`` on Linux (lower memory overhead on constrained
+    devices such as Pi Zero 2W) then ``fork``, falling back to the Python
+    default when neither is available.  ``forkserver`` requires all arguments
+    to be picklable, which is satisfied by the worker call site.
+
+    Returns:
+        A ``multiprocessing.context.BaseContext`` instance.
+    """
     # forkserver spawns children from a lean server process, reducing memory
     # on constrained devices like Pi Zero 2W. It requires picklable arguments,
     # so we only prefer it on Linux where the production target runs.
@@ -25,6 +35,19 @@ def _get_mp_context():
 
 
 def _restore_child_config(device_config):
+    """Re-initialise the Config singleton inside a subprocess from a serialised snapshot.
+
+    ``multiprocessing`` serialises ``device_config`` across the process
+    boundary.  The child process must reconstruct the singleton by setting the
+    class-level path attributes before calling ``Config()``.
+
+    Args:
+        device_config: A serialised snapshot of the parent's device config
+            object, carrying the file paths needed to rebuild the singleton.
+
+    Returns:
+        A new :class:`Config` instance initialised from the snapshot paths.
+    """
     from config import Config
 
     Config.config_file = device_config.config_file
@@ -36,6 +59,20 @@ def _restore_child_config(device_config):
 
 
 def _remote_exception(error_type: str, error_message: str) -> BaseException:
+    """Reconstruct an exception from its serialised type name and message.
+
+    Used to re-raise exceptions that were caught in a subprocess and
+    transported across the process boundary via a result queue.  Only a
+    fixed allow-list of exception types is supported; any unknown type
+    falls back to ``RuntimeError``.
+
+    Args:
+        error_type: The ``__class__.__name__`` of the original exception.
+        error_message: The string representation of the original exception.
+
+    Returns:
+        An instance of the matched (or fallback) exception class.
+    """
     exc_types = {
         "RuntimeError": RuntimeError,
         "ValueError": ValueError,
@@ -55,6 +92,23 @@ def _execute_refresh_attempt_worker(
     device_config,
     current_dt,
 ):
+    """Entry point for a plugin execution subprocess.
+
+    Intended to be the ``target`` of a ``multiprocessing.Process``.
+    Restores the config singleton in the child process, executes the refresh
+    action, serialises the resulting image to PNG bytes, and pushes a result
+    dict onto *result_queue*.  Any exception is caught and pushed as a
+    failure payload so the parent process can reconstruct it.
+
+    Args:
+        result_queue: A ``multiprocessing.Queue`` used to return exactly one
+            result dict to the parent process.
+        plugin_config: The raw plugin configuration dict from device.json.
+        refresh_action: The :class:`RefreshAction` describing what to run.
+        device_config: A serialised snapshot of the parent's device config,
+            used to restore the child Config singleton.
+        current_dt: The current device-timezone datetime passed to the plugin.
+    """
     try:
         child_config = _restore_child_config(device_config)
         plugin = get_plugin_instance(plugin_config)
