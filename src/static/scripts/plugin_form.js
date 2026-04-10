@@ -6,27 +6,35 @@
   function $(id){ return document.getElementById(id); }
 
   function initProgress(){
-    const state = {
-      t0: 0,
-      clockTimer: null,
-      lastStepBase: '',
-      els: {
-        block: $('requestProgress'),
-        text: $('requestProgressText'),
-        bar: $('requestProgressBar'),
-        list: $('requestProgressList'),
-        clock: $('requestProgressClock'),
-        elapsed: $('requestProgressElapsed')
-      }
+    // Use InkyPiStore for progress state when available (JTN-502)
+    var store = globalThis.InkyPiStore
+      ? globalThis.InkyPiStore.createStore({ t0: 0, clockTimer: null, lastStepBase: '' })
+      : null;
+
+    var _t0 = 0, _clockTimer = null, _lastStepBase = '';
+    function getT0(){ return store ? store.get('t0') : _t0; }
+    function setT0(v){ if (store) { store.set({ t0: v }); } else { _t0 = v; } }
+    function getClockTimer(){ return store ? store.get('clockTimer') : _clockTimer; }
+    function setClockTimer(v){ if (store) { store.set({ clockTimer: v }); } else { _clockTimer = v; } }
+    function getLastStepBase(){ return store ? store.get('lastStepBase') : _lastStepBase; }
+    function setLastStepBase(v){ if (store) { store.set({ lastStepBase: v }); } else { _lastStepBase = v; } }
+
+    const els = {
+      block: $('requestProgress'),
+      text: $('requestProgressText'),
+      bar: $('requestProgressBar'),
+      list: $('requestProgressList'),
+      clock: $('requestProgressClock'),
+      elapsed: $('requestProgressElapsed')
     };
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
-    function tickClock(){ try { if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - state.t0; if (state.els.elapsed) state.els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && state.lastStepBase && state.els.text && !state.lastStepBase.includes('Done') && !state.lastStepBase.includes('Failed')) { state.els.text.textContent = state.lastStepBase + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
-    function setStep(text, pct){ state.lastStepBase = text; if (state.els.block) { state.els.block.hidden = false; state.els.block.style.display = 'block'; } if (state.els.text) state.els.text.textContent = text; if (state.els.bar && typeof pct === 'number') { state.els.bar.style.width = pct + '%'; state.els.bar.setAttribute('aria-valuenow', pct); }
-      if (state.els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); state.els.list.appendChild(li); try { state.els.list.scrollTop = state.els.list.scrollHeight; } catch(e){} }
+    function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - getT0(); if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && getLastStepBase() && els.text && !getLastStepBase().includes('Done') && !getLastStepBase().includes('Failed')) { els.text.textContent = getLastStepBase() + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
+    function setStep(text, pct){ setLastStepBase(text); if (els.block) { els.block.hidden = false; els.block.style.display = 'block'; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; els.bar.setAttribute('aria-valuenow', pct); }
+      if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch(e){} }
     }
-    function start(){ state.t0 = Date.now(); try { if (state.els.list) state.els.list.innerHTML = ''; if (state.els.elapsed) state.els.elapsed.textContent = '0s'; if (state.els.clock) state.els.clock.textContent = new Date().toLocaleTimeString(); if (state.els.bar) state.els.bar.style.width = '10%'; } catch(e){} tickClock(); state.clockTimer = setInterval(tickClock, 1000); setStep('Preparing…', 10); }
-    function stop(){ try { if (state.clockTimer) clearInterval(state.clockTimer); } catch(e){} setTimeout(() => { if (state.els.block) { state.els.block.style.display = 'none'; state.els.block.hidden = true; } }, 2000); }
+    function start(){ setT0(Date.now()); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; } catch(e){} tickClock(); setClockTimer(setInterval(tickClock, 1000)); setStep('Preparing…', 10); }
+    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} setTimeout(() => { if (els.block) { els.block.style.display = 'none'; els.block.hidden = true; } }, 2000); }
     return { setStep, start, stop };
   }
 
