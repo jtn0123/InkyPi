@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from html import escape
 from time import perf_counter
 
 from flask import (
@@ -18,6 +17,11 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form, resolve_path
+from utils.form_utils import (
+    sanitize_log_field,
+    sanitize_response_value,
+    validate_plugin_required_fields,
+)
 from utils.http_utils import APIError, json_error
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
@@ -35,49 +39,6 @@ _ERR_INTERNAL = "An internal error occurred"
 _ERR_NOT_FOUND = "Not Found"
 _MSG_DISPLAY_UPDATED = "Display updated"
 _ERR_PLUGIN_ID_REQUIRED = "plugin_id is required"
-
-
-def _validate_required_fields(plugin, form_data):
-    """Validate required fields from plugin schema against form data.
-
-    Returns an error message string if any required fields are empty/missing,
-    or None if validation passes.
-    """
-    if not hasattr(plugin, "build_settings_schema"):
-        return None
-    try:
-        schema = plugin.build_settings_schema()
-    except Exception:
-        return None
-
-    missing = []
-
-    def _check_items(items):
-        for item in items:
-            kind = item.get("kind", "")
-            if kind == "row":
-                _check_items(item.get("items", []))
-            elif kind == "field":
-                name = item.get("name", "")
-                if item.get("required") and not str(form_data.get(name, "")).strip():
-                    missing.append(item.get("label", name))
-
-    for section in schema.get("sections", []):
-        _check_items(section.get("items", []))
-
-    if missing:
-        return f"Required fields missing: {', '.join(missing)}"
-    return None
-
-
-def _sanitize_log(value: str) -> str:
-    """Strip control characters from user input before logging to prevent log injection."""
-    return value.replace("\n", "").replace("\r", "").replace("\x00", "")[:200]
-
-
-def _sanitize_response_value(value: object) -> str:
-    """Sanitize user-controlled values before reflecting them in JSON messages."""
-    return escape(_sanitize_log(str(value)), quote=False)
 
 
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
@@ -124,7 +85,7 @@ def plugin_page(plugin_id: str):
             )
             if not plugin_instance:
                 return json_error(
-                    f"Plugin instance: {_sanitize_response_value(plugin_instance_name)} does not exist",
+                    f"Plugin instance: {sanitize_response_value(plugin_instance_name)} does not exist",
                     status=404,
                 )
             template_params["plugin_settings"] = plugin_instance.settings
@@ -245,8 +206,8 @@ def _cleanup_plugin_resources(
     except Exception:
         logger.warning(
             "Could not clean up image for %s/%s",
-            _sanitize_log(plugin_id),
-            _sanitize_log(str(plugin_instance_name)),
+            sanitize_log_field(plugin_id),
+            sanitize_log_field(str(plugin_instance_name)),
             exc_info=True,
         )
 
@@ -259,7 +220,7 @@ def _cleanup_plugin_resources(
                 plugin_obj.cleanup(plugin_settings or {})
     except Exception:
         logger.warning(
-            "Plugin cleanup failed for %s", _sanitize_log(plugin_id), exc_info=True
+            "Plugin cleanup failed for %s", sanitize_log_field(plugin_id), exc_info=True
         )
 
 
@@ -338,7 +299,7 @@ def update_plugin_instance(instance_name: str):
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
             return json_error(
-                f"Plugin instance: {_sanitize_response_value(instance_name)} does not exist",
+                f"Plugin instance: {sanitize_response_value(instance_name)} does not exist",
                 status=404,
             )
 
@@ -347,7 +308,9 @@ def update_plugin_instance(instance_name: str):
         if plugin_config:
             try:
                 plugin = get_plugin_instance(plugin_config)
-                validation_error = _validate_required_fields(plugin, plugin_settings)
+                validation_error = validate_plugin_required_fields(
+                    plugin, plugin_settings
+                )
                 if validation_error:
                     return json_error(validation_error, status=400)
                 settings_error = plugin.validate_settings(plugin_settings)
@@ -401,7 +364,7 @@ def display_plugin_instance():
         plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
         if not plugin_instance:
             return json_error(
-                f"Plugin instance '{_sanitize_response_value(plugin_instance_name)}' not found",
+                f"Plugin instance '{sanitize_response_value(plugin_instance_name)}' not found",
                 status=400,
             )
 
@@ -432,13 +395,13 @@ def force_retry_plugin_instance(plugin_id: str, instance_name: str):
     found = refresh_task.reset_circuit_breaker(plugin_id, instance_name)
     if not found:
         return json_error(
-            f"Plugin instance '{_sanitize_response_value(instance_name)}' not found",
+            f"Plugin instance '{sanitize_response_value(instance_name)}' not found",
             status=404,
         )
     return jsonify(
         {
             "success": True,
-            "message": f"Circuit-breaker reset for '{_sanitize_response_value(instance_name)}'.",
+            "message": f"Circuit-breaker reset for '{sanitize_response_value(instance_name)}'.",
         }
     )
 
@@ -577,14 +540,14 @@ def _save_plugin_settings_common(
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
         return json_error(
-            f"Plugin '{_sanitize_response_value(plugin_id)}' not found",
+            f"Plugin '{sanitize_response_value(plugin_id)}' not found",
             status=404,
         )
 
     # Validate required fields and plugin-specific settings
     try:
         plugin = get_plugin_instance(plugin_config)
-        validation_error = _validate_required_fields(plugin, plugin_settings)
+        validation_error = validate_plugin_required_fields(plugin, plugin_settings)
         if validation_error:
             return json_error(validation_error, status=400)
         settings_error = plugin.validate_settings(plugin_settings)
