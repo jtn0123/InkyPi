@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.28.1 (2026-04-10)
+
+### Bug Fixes
+
+- Enable zramswap on Bullseye/Bookworm/Trixie (JTN-528)
+  ([#283](https://github.com/jtn0123/InkyPi/pull/283),
+  [`f30423e`](https://github.com/jtn0123/InkyPi/commit/f30423ed15522da12d8acbba4e55760fcd23c05c))
+
+The OS version check at install/install.sh:391 only matched Bookworm (12). The default Pi OS image
+  as of 2025-12-04 is now Trixie (13), so fresh installs on a Pi Zero 2 W silently skipped zramswap
+  setup and OOM'd during the pip install of numpy/Pillow/playwright.
+
+Extend the check to enable zramswap on Bullseye (11), Bookworm (12), and Trixie (13). zram-tools is
+  available across all of these. Fix the "Trixe" typo in the get_os_version comment while we're
+  here.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.28.0 (2026-04-09)
 
 ### Features
