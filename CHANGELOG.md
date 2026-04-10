@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v0.28.3 (2026-04-10)
+
+### Bug Fixes
+
+- Cysystemd notify() requires Notification enum, not str (JTN-594)
+  ([#290](https://github.com/jtn0123/InkyPi/pull/290),
+  [`c98fd8d`](https://github.com/jtn0123/InkyPi/commit/c98fd8d79518dd979439073697c6b00a631f08d3))
+
+* fix: cysystemd notify() requires Notification enum, not str (JTN-594)
+
+cysystemd 2.0.1 requires notify() to receive a Notification enum value. Both call sites were passing
+  raw strings ("READY=1", "WATCHDOG=1") and swallowing the resulting TypeError silently with `except
+  Exception: pass`, causing every systemd-managed InkyPi install to stay in a restart loop
+  indefinitely (service never reported READY, watchdog never fed).
+
+- src/inkypi.py: import Notification and call notify(Notification.READY) - src/refresh_task/task.py:
+  add string→enum adapter _sd_notify() so the legacy string-based call sites continue to work via
+  the correct enum API - Replace all `except Exception: pass` blocks in both files with
+  logger.exception() so future API breakage surfaces immediately in logs - Add
+  tests/unit/test_systemd_notify.py with 10 new tests: structural AST checks that both files import
+  Notification, mock-based behavioural tests that verify the adapter dispatches
+  WATCHDOG=1→Notification.WATCHDOG and READY=1→Notification.READY, and graceful-degradation test for
+  missing lib
+
+Verified on real Pi Zero 2 W: service transitions activating→active(running) immediately after the
+  fix, with "Notified systemd: READY=1" in the log.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test: fix test_sd_notify_is_none_when_cysystemd_unavailable on Python 3.12/3.13
+
+The sys.meta_path finder approach was unreliable across Python versions. Switch to
+  patch.dict(sys.modules, {'cysystemd': None, 'cysystemd.daemon': None}) which causes 'from
+  cysystemd.daemon import …' to raise ImportError, properly testing the graceful-degradation path
+  that sets _sd_notify = None.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.28.2 (2026-04-10)
 
 ### Bug Fixes
