@@ -308,13 +308,23 @@
       } catch (e) { console.warn("Failed to refresh preview info:", e); }
     }
 
-    function openModal(modalId) {
+    // Track the element that triggered the most-recently opened modal so focus
+    // can be restored when the modal closes (WAI-ARIA best practice).
+    let _lastModalTrigger = null;
+
+    function openModal(modalId, triggerEl) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
+      if (triggerEl) _lastModalTrigger = triggerEl;
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
       syncModalOpenState(ui);
+      // JTN-463: move focus into the modal on open
+      const focusable = modal.querySelector(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable) setTimeout(() => focusable.focus(), 0);
     }
 
     function closeModal(modalId) {
@@ -324,6 +334,11 @@
       modal.style.display = "none";
       modal.classList.remove("is-open");
       syncModalOpenState(ui);
+      // Restore focus to the trigger element (WAI-ARIA best practice)
+      if (_lastModalTrigger) {
+        try { _lastModalTrigger.focus(); } catch (_) {}
+        _lastModalTrigger = null;
+      }
     }
 
     function selectedFrame(element) {
@@ -558,6 +573,14 @@
           closeModal("scheduleModal");
         }
       });
+      // JTN-461: close #scheduleModal when Escape is pressed
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        const modal = document.getElementById("scheduleModal");
+        if (!modal || modal.hidden) return;
+        event.preventDefault();
+        closeModal("scheduleModal");
+      });
     }
 
     function setWorkflowMode(mode) {
@@ -604,7 +627,7 @@
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
       document.querySelectorAll("[data-open-modal]").forEach((button) => {
-        button.addEventListener("click", () => openModal(button.dataset.openModal));
+        button.addEventListener("click", () => openModal(button.dataset.openModal, button));
       });
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));

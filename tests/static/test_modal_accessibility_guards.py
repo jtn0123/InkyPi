@@ -33,3 +33,19 @@ def test_image_modal_script_handles_escape_and_null_container():
 
     assert "if (!imageContainer) return;" in content
     assert "e.key === 'Escape'" in content
+
+
+def test_plugin_page_schedule_modal_handles_escape():
+    """JTN-461: #scheduleModal closes on Escape key."""
+    content = _read_script("plugin_page.js")
+
+    assert 'event.key !== "Escape"' in content
+    assert "scheduleModal" in content
+
+
+def test_plugin_page_open_modal_focuses_first_focusable():
+    """JTN-463: openModal moves focus to first focusable element on open."""
+    content = _read_script("plugin_page.js")
+
+    assert "focusable.focus()" in content
+    assert "_lastModalTrigger" in content
