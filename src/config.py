@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import threading
+from collections.abc import Callable
 from typing import Any
 
 from dotenv import load_dotenv, set_key, unset_key
@@ -442,6 +443,19 @@ class Config:
             self.config[key] = value
             if write:
                 self.write_config()
+
+    def update_atomic(self, update_fn: Callable[[dict], None]) -> None:
+        """Run update_fn(self._config) while holding the config lock and atomically write.
+
+        This ensures the full read-modify-write cycle is performed under the
+        config lock, preventing concurrent threads from clobbering each other's
+        changes.  Because ``_config_lock`` is a reentrant lock, methods that
+        already hold it (e.g. ``write_config``) are safe to call from within
+        ``update_fn``.
+        """
+        with self._config_lock:
+            update_fn(self.config)
+            self.write_config()
 
     def get_env_file_path(self):
         """Return absolute path to the .env file used for secrets.
