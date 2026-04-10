@@ -292,11 +292,14 @@ def delete_plugin_instance():
         existing = playlist.find_plugin(plugin_id, plugin_instance)
         plugin_settings = dict(existing.settings) if existing else {}
 
-        result = playlist.delete_plugin(plugin_id, plugin_instance)
-        if not result:
-            return json_error("Plugin instance not found", status=400)
+        del_result: list[bool] = []
 
-        device_config.write_config()
+        def _do_delete(cfg):
+            del_result.append(playlist.delete_plugin(plugin_id, plugin_instance))
+
+        device_config.update_atomic(_do_delete)
+        if not del_result or not del_result[0]:
+            return json_error("Plugin instance not found", status=400)
         _cleanup_plugin_resources(
             device_config, plugin_id, plugin_instance, plugin_settings
         )
@@ -354,8 +357,11 @@ def update_plugin_instance(instance_name: str):
                 logger.debug("Could not validate plugin schema for %s", plugin_id)
 
         before_settings = dict(plugin_instance.settings or {})
-        plugin_instance.settings = plugin_settings
-        device_config.write_config()
+
+        def _do_update_instance(cfg):
+            plugin_instance.settings = plugin_settings
+
+        device_config.update_atomic(_do_update_instance)
         config_dir = os.path.dirname(device_config.config_file)
         _record_plugin_change(
             config_dir, instance_name, before_settings, plugin_settings
@@ -594,24 +600,26 @@ def _save_plugin_settings_common(
         playlist = playlist_manager.get_playlist(default_playlist_name)
 
     instance_name = f"{plugin_id}_saved_settings"
-    existing_instance = playlist.find_plugin(plugin_id, instance_name)
     before_settings: dict = {}
-    if existing_instance:
-        before_settings = dict(existing_instance.settings or {})
-        existing_instance.settings = plugin_settings
-    else:
-        playlist.add_plugin(
-            {
-                _PLUGIN_ID: plugin_id,
-                "refresh": {"interval": 3600},
-                "plugin_settings": plugin_settings,
-                "name": instance_name,
-            }
-        )
 
-    # Preserve legacy failure surface for callers/tests that patch config mutation hooks.
-    device_config.update_value("playlist_config", playlist_manager.to_dict())
-    device_config.write_config()
+    def _do_save_settings(cfg):
+        nonlocal before_settings
+        inst = playlist.find_plugin(plugin_id, instance_name)
+        if inst:
+            before_settings = dict(inst.settings or {})
+            inst.settings = plugin_settings
+        else:
+            playlist.add_plugin(
+                {
+                    _PLUGIN_ID: plugin_id,
+                    "refresh": {"interval": 3600},
+                    "plugin_settings": plugin_settings,
+                    "name": instance_name,
+                }
+            )
+        cfg["playlist_config"] = playlist_manager.to_dict()
+
+    device_config.update_atomic(_do_save_settings)
     config_dir = os.path.dirname(device_config.config_file)
     _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
     return (

@@ -215,10 +215,10 @@ def test_update_now_exception_handling(client, flask_app, monkeypatch):
 
 def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch):
     dc = flask_app.config["DEVICE_CONFIG"]
-    # Make update_value raise to simulate config failure
+    # Make update_atomic raise to simulate config failure
     monkeypatch.setattr(
         dc,
-        "update_value",
+        "update_atomic",
         lambda *args, **kwargs: (_ for _ in ()).throw(Exception("test")),
     )
 
