@@ -66,7 +66,21 @@
   function createSettingsPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
-    const state = {
+
+    // Use InkyPiStore for UI state when available (JTN-502)
+    const _store = globalThis.InkyPiStore
+      ? globalThis.InkyPiStore.createStore({
+          logsAutoScroll: true,
+          logsWrap: true,
+          lastLogsRaw: "",
+          updateTimer: null,
+          attachGeo: false,
+          activeTab: "device",
+        })
+      : null;
+
+    // Plain fallback object — used directly when store is not loaded.
+    const _stateFallback = {
       logsAutoScroll: true,
       logsWrap: true,
       lastLogsRaw: "",
@@ -74,6 +88,17 @@
       attachGeo: false,
       activeTab: "device",
     };
+
+    // Proxy that reads/writes through the store when available.
+    const state = new Proxy(_stateFallback, {
+      get(target, key) {
+        return _store ? _store.get(key) : target[key];
+      },
+      set(target, key, value) {
+        if (_store) { _store.set({ [key]: value }); } else { target[key] = value; }
+        return true;
+      },
+    });
 
     function populateIntervalFields() {
       const intervalInput = document.getElementById("interval");

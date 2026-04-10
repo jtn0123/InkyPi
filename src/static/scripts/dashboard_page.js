@@ -26,7 +26,25 @@
   function createDashboardPage(config) {
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
-    let lastImageHash = config.imageHash;
+
+    // Store for polling / image-hash state (JTN-502)
+    const store = globalThis.InkyPiStore
+      ? globalThis.InkyPiStore.createStore({
+          imageHash: config.imageHash,
+          consecutiveFailures: 0,
+        })
+      : null;
+
+    // Compatibility shim: read/write via store when available, plain vars otherwise.
+    function getImageHash() { return store ? store.get('imageHash') : _legacyImageHash; }
+    function setImageHash(v) { if (store) { store.set({ imageHash: v }); } else { _legacyImageHash = v; } }
+    function getConsecutiveFailures() { return store ? store.get('consecutiveFailures') : _legacyFailures; }
+    function setConsecutiveFailures(v) { if (store) { store.set({ consecutiveFailures: v }); } else { _legacyFailures = v; } }
+
+    // Fallback vars used only when store is not loaded.
+    let _legacyImageHash = config.imageHash;
+    let _legacyFailures = 0;
+
     const desktopPreviewQuery =
       globalThis.matchMedia &&
       globalThis.matchMedia("(hover: hover) and (pointer: fine)");
@@ -120,8 +138,6 @@
       setHidden(playlist, !data.playlist);
     }
 
-    let consecutiveFailures = 0;
-
     async function refreshPreview() {
       const previewImg = document.getElementById("previewImage");
       const previewSkel = document.getElementById("previewSkeleton");
@@ -145,17 +161,17 @@
       // Show connectivity warning after repeated failures
       const connWarn = document.getElementById("connectivityWarning");
       if (!info && !up) {
-        consecutiveFailures++;
-        if (consecutiveFailures >= 3 && connWarn) {
+        setConsecutiveFailures(getConsecutiveFailures() + 1);
+        if (getConsecutiveFailures() >= 3 && connWarn) {
           setHidden(connWarn, false);
         }
       } else {
-        consecutiveFailures = 0;
+        setConsecutiveFailures(0);
         if (connWarn) setHidden(connWarn, true);
       }
 
-      if (info?.image_hash && info.image_hash !== lastImageHash && previewImg) {
-        lastImageHash = info.image_hash;
+      if (info?.image_hash && info.image_hash !== getImageHash() && previewImg) {
+        setImageHash(info.image_hash);
         if (previewSkel) { previewSkel.style.display = ''; previewSkel.classList.remove('is-hidden'); }
         setHidden(previewSkel, false);
         previewImg.src = `${config.previewUrl}?t=${Date.now()}`;
