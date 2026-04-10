@@ -347,13 +347,19 @@ def main():
         html.append(f"<td style='font-size:12px;color:#555'>{newp2}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{newp3}</td>")
         html.append(
-            f"<td>{(f'<a href=\'{ghA}\' target=\'_blank\'>GitHub</a>') if ghA else '—'}</td>"
+            "<td>"
+            + (f"<a href='{ghA}' target='_blank'>GitHub</a>" if ghA else "—")
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<a href=\'{ghB}\' target=\'_blank\'>GitHub</a>') if ghB else '—'}</td>"
+            "<td>"
+            + (f"<a href='{ghB}' target='_blank'>GitHub</a>" if ghB else "—")
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<a href=\'{ghC}\' target=\'_blank\'>GitHub</a>') if ghC else '—'}</td>"
+            "<td>"
+            + (f"<a href='{ghC}' target='_blank'>GitHub</a>" if ghC else "—")
+            + "</td>"
         )
         html.append("</tr>")
 
@@ -392,13 +398,31 @@ def main():
             f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u1}\'><br><img class=\'thumb-lg\' src=\'{u1}\'>') if u1 else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u1}'><br><img class='thumb-lg' src='{u1}'>"
+                if u1
+                else "—"
+            )
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u2}\'><br><img class=\'thumb-lg\' src=\'{u2}\'>') if u2 else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u2}'><br><img class='thumb-lg' src='{u2}'>"
+                if u2
+                else "—"
+            )
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u3}\'><br><img class=\'thumb-lg\' src=\'{u3}\'>') if u3 else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u3}'><br><img class='thumb-lg' src='{u3}'>"
+                if u3
+                else "—"
+            )
+            + "</td>"
         )
         html.append(f"<td style='font-size:12px;color:#555'>{p1}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p2}</td>")
@@ -424,16 +448,40 @@ def main():
             f"<td>{label} <div style='color:#555;font-size:12px'>{key}</div></td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{curu2}\'><br><img class=\'thumb-lg\' src=\'{curu2}\'>') if curu2 else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{curu2}'><br><img class='thumb-lg' src='{curu2}'>"
+                if curu2
+                else "—"
+            )
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u1m}\'><br><img class=\'thumb-lg\' src=\'{u1m}\'>') if u1m else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u1m}'><br><img class='thumb-lg' src='{u1m}'>"
+                if u1m
+                else "—"
+            )
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u2m}\'><br><img class=\'thumb-lg\' src=\'{u2m}\'>') if u2m else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u2m}'><br><img class='thumb-lg' src='{u2m}'>"
+                if u2m
+                else "—"
+            )
+            + "</td>"
         )
         html.append(
-            f"<td>{(f'<img class=\'thumb-sm\' src=\'{u3m}\'><br><img class=\'thumb-lg\' src=\'{u3m}\'>') if u3m else '—'}</td>"
+            "<td>"
+            + (
+                f"<img class='thumb-sm' src='{u3m}'><br><img class='thumb-lg' src='{u3m}'>"
+                if u3m
+                else "—"
+            )
+            + "</td>"
         )
         html.append(f"<td style='font-size:12px;color:#555'>{p1m}</td>")
         html.append(f"<td style='font-size:12px;color:#555'>{p2m}</td>")
