@@ -163,6 +163,7 @@ def test_response_modal_script_exists(client):
     # Core functions
     for token in [
         "function ensureToastContainer()",
+        "function dismissStaleErrors()",
         "function showToast(status, message, duration = TOAST_DURATION_MS)",
         "function closeToast(toastId)",
         "function showResponseModal(status, message, useToast = true)",
@@ -175,6 +176,9 @@ def test_response_modal_script_exists(client):
         "function showInfo(message, duration)",
     ]:
         assert token in js
+
+    # Auto-dismiss constants
+    assert "TOAST_ERROR_DURATION_MS" in js
 
 
 def test_handle_json_response_presence(client):
