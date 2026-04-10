@@ -229,6 +229,124 @@ Restart the inkypi service to apply the changes:
 sudo systemctl restart inkypi.service
 ```
 
+## Plugin Development Troubleshooting
+
+> See also: [Building InkyPi Plugins](building_plugins.md) for the full plugin authoring guide.
+
+### API Key Validation Failures
+
+**Symptom:** The plugin error toast reads something like `"OPEN_WEATHER_MAP_SECRET API key not configured"`, `"GITHUB_SECRET API key not configured"`, or `"GOOGLE_AI_SECRET API key not configured"`. The display either retains the previous image or shows blank.
+
+**Likely cause:** The required secret is missing from the `.env` file at the project root, or the file itself does not exist. All API-backed plugins call `device_config.load_env_key("<KEY_NAME>")` and raise a `RuntimeError` when the result is falsy.
+
+**How to verify:**
+```bash
+grep -E 'OPEN_WEATHER_MAP_SECRET|GITHUB_SECRET|GOOGLE_AI_SECRET|OPEN_AI_SECRET|NASA_SECRET' /usr/local/inkypi/.env
+```
+
+**Fix:** Add the missing key to `.env` (create the file if needed) and restart the service. See [API Keys](api_keys.md) for per-plugin key names and where to obtain them.
+
+---
+
+### Plugin Fetch Timeouts (Newspaper, Comic, RSS)
+
+**Symptom:** The journal shows `requests.exceptions.ReadTimeout` or `requests.exceptions.ConnectionError`. The Newspaper plugin may raise `"Newspaper front cover not found."`, the Comic plugin `"Failed to retrieve latest comic."`, and the RSS plugin `"Failed to parse RSS feed: …"`.
+
+**Likely cause:** The upstream source (Freedom Forum, GoComics, the RSS feed URL) is temporarily unreachable or slow. On a Pi Zero the default HTTP timeout (20 s) can be hit during high-load periods. DNS resolution failures also surface as `ConnectionError`.
+
+**How to verify:**
+```bash
+journalctl -u inkypi -n 50 | grep -E 'Timeout|ConnectionError|Failed to'
+```
+Try the URL manually from the Pi: `curl -I <feed_url>`.
+
+**Fix:** Retry after a few minutes. For persistent issues, check that the Pi has network access (`ping 8.8.8.8`) and that the source service is operational. Increase the HTTP timeout via `INKYPI_HTTP_TIMEOUT_DEFAULT_S` in `.env` if the feed is reliably slow.
+
+---
+
+### Image Dimension Mismatch (`OutputDimensionMismatch`)
+
+**Symptom:** The journal contains a log line like:
+
+```
+plugin_lifecycle: dimension_mismatch | plugin_id=my_plugin instance=… expected=800x480 actual=480x800 — skipping display push
+```
+
+The display is not updated; the previous image is retained.
+
+**Likely cause:** The plugin's `generate_image` method returned an image whose size does not match the device resolution stored in `device.json`. This is validated by `OutputDimensionMismatch` in `src/utils/output_validator.py`. A 90-degree transposition is auto-corrected, but any other size mismatch raises the exception.
+
+**How to verify:**
+```bash
+journalctl -u inkypi -n 100 | grep dimension_mismatch
+```
+
+**Fix:** In your plugin call `self.get_oriented_dimensions(device_config)` to obtain the correct `(width, height)` for the current orientation, and use that tuple when creating the `PIL.Image` object or calling `render_image`.
+
+---
+
+### Memory Pressure on Pi Zero
+
+**Symptom:** The service is killed silently (`Main process exited`) or the journal shows `MemoryError` / Python `Killed`. Chromium-based plugins (Weather, Calendar, AI Text) are most affected. The Pi Zero W has only 512 MB of RAM shared with the OS.
+
+**Likely cause:** Launching a headless Chromium instance for `render_image` consumes ~150–200 MB. Under memory pressure the Linux OOM killer terminates either Chromium or the InkyPi process.
+
+**How to verify:**
+```bash
+journalctl -u inkypi -n 50 | grep -E 'Killed|MemoryError|OOM'
+free -m
+```
+
+**Fix:**
+1. Enable zram swap if not already active: `sudo systemctl enable --now zramswap`.
+2. Increase the plugin refresh interval to reduce how often Chromium is launched.
+3. Limit simultaneous playlist plugins to avoid back-to-back Chromium launches.
+4. Consider a Pi Zero 2 W (512 MB with a faster CPU) for Chromium-heavy plugin sets.
+
+---
+
+### Screenshot Plugin Failures (Chromium Not Found / Sandbox Error)
+
+**Symptom:** The error toast or journal reads `"Failed to take screenshot, please check logs."`. The journal may contain `"No supported browser found. Install Chromium or Google Chrome."` or a non-zero Chromium exit code such as `status=127`.
+
+**Likely cause:** The Screenshot, Weather, Calendar, and AI Text plugins all depend on a headless Chromium binary (via `src/utils/image_utils.py`). If Chromium is not installed, or if the binary is present but the `--no-sandbox` flag is blocked by the OS, `take_screenshot` returns `None`.
+
+**How to verify:**
+```bash
+which chromium chromium-headless-shell google-chrome 2>/dev/null
+journalctl -u inkypi -n 50 | grep -i 'screenshot\|chromium\|browser'
+```
+
+**Fix:**
+```bash
+sudo apt-get install -y chromium-browser
+sudo systemctl restart inkypi.service
+```
+If Chromium is present but crashes, check that `/dev/shm` is writable: `ls -la /dev/shm`. On constrained systems the `--disable-dev-shm-usage` flag (already set by InkyPi) moves temp files to `/tmp`; ensure `/tmp` has at least 64 MB free.
+
+---
+
+### Jinja2 Template Render Errors
+
+**Symptom:** Plugin settings page shows a Jinja2 `UndefinedError` such as `'dict object' has no attribute 'foo'`, or the rendered HTML is blank/garbled. In some cases a value that should appear as plain text is HTML-escaped (e.g., `&lt;b&gt;` instead of `<b>`).
+
+**Likely cause:** Two common issues:
+1. A template variable expected by `settings.html` or `render/` templates was not added to the dict returned by `generate_settings_template` (or `template_params` in `render_image`).
+2. Autoescape is enabled for `.html` files (see `base_plugin.py`). Any string that contains HTML and is passed as a template variable will be escaped unless wrapped with `{{ value | safe }}`.
+
+**How to verify:**
+```bash
+journalctl -u inkypi -n 50 | grep -i 'UndefinedError\|TemplateSyntaxError\|jinja'
+```
+Run the dev server and navigate to the plugin settings page to see the full traceback in the terminal.
+
+**Fix:**
+- For missing variables: add the key to `generate_settings_template` before calling `render_image` or returning the template dict.
+- For escaped HTML: use `{{ value | safe }}` only when the value is trusted and intentionally contains markup.
+- For syntax errors: run `python -c "from jinja2 import Environment; env = Environment(); env.parse(open('src/plugins/<id>/render/<file>.html').read())"` to validate the template offline.
+
+---
+
 ## Colors look washed out or incorrect
 
 Some color inaccuracies are expected due to the physical limitations of e-ink displays, especially on multi-color panels with a limited color palette and dithering.
