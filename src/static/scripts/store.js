@@ -31,9 +31,9 @@
    * @returns {{ get: Function, set: Function, subscribe: Function }}
    */
   function createStore(initialState) {
-    var _state = Object.assign({}, initialState);
+    let _state = Object.assign({}, initialState);
     // Map of key -> array of subscriber functions
-    var _listeners = {};
+    const _listeners = {};
 
     /**
      * Read the whole state or a single key.
@@ -54,12 +54,12 @@
      * @param {Object|Function} updater - Plain object to merge, or function (prev) => next.
      */
     function set(updater) {
-      var prev = Object.assign({}, _state);
-      var patch = typeof updater === 'function' ? updater(prev) : updater;
-      var next = Object.assign({}, _state, patch);
+      const prev = Object.assign({}, _state);
+      const patch = typeof updater === 'function' ? updater(prev) : updater;
+      const next = Object.assign({}, _state, patch);
 
       // Collect changed keys before mutating state
-      var changed = Object.keys(patch).filter(function (k) {
+      const changed = Object.keys(patch).filter(function (k) {
         return prev[k] !== next[k];
       });
 
@@ -67,7 +67,7 @@
 
       // Notify subscribers for each changed key
       changed.forEach(function (k) {
-        var fns = _listeners[k] || [];
+        const fns = _listeners[k] || [];
         fns.forEach(function (fn) {
           try {
             fn(next[k], prev[k]);

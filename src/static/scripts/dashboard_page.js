@@ -42,8 +42,8 @@
     function setConsecutiveFailures(v) { if (store) { store.set({ consecutiveFailures: v }); } else { _legacyFailures = v; } }
 
     // Fallback vars used only when store is not loaded.
-    var _legacyImageHash = config.imageHash;
-    var _legacyFailures = 0;
+    let _legacyImageHash = config.imageHash;
+    let _legacyFailures = 0;
 
     const desktopPreviewQuery =
       globalThis.matchMedia &&

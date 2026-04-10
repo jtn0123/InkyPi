@@ -7,11 +7,11 @@
 
   function initProgress(){
     // Use InkyPiStore for progress state when available (JTN-502)
-    var store = globalThis.InkyPiStore
+    const store = globalThis.InkyPiStore
       ? globalThis.InkyPiStore.createStore({ t0: 0, clockTimer: null, lastStepBase: '' })
       : null;
 
-    var _t0 = 0, _clockTimer = null, _lastStepBase = '';
+    let _t0 = 0, _clockTimer = null, _lastStepBase = '';
     function getT0(){ return store ? store.get('t0') : _t0; }
     function setT0(v){ if (store) { store.set({ t0: v }); } else { _t0 = v; } }
     function getClockTimer(){ return store ? store.get('clockTimer') : _clockTimer; }
