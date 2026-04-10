@@ -36,8 +36,8 @@ This starts the web UI on port 8080 without requiring e-ink display hardware.
 ## Running Tests
 
 ```bash
-# Run all tests (skip browser/Playwright tests)
-SKIP_BROWSER=1 .venv/bin/python -m pytest tests/
+# Fast iteration — skip browser/Playwright tests (headless Chromium not required)
+SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --no-header --tb=no -q
 
 # Run a specific test file
 .venv/bin/python -m pytest tests/unit/test_inkypi.py -v
@@ -46,16 +46,65 @@ SKIP_BROWSER=1 .venv/bin/python -m pytest tests/
 SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --cov=src --cov-report=term-missing
 ```
 
-### Browser Tests
+### Running Browser Tests Locally
 
-Browser tests require Playwright with Chromium installed:
+Browser tests use Playwright with a headless Chromium instance. There are two groups:
+
+- **UI tests** — 15+ end-to-end Playwright tests covering form workflows, modal lifecycle,
+  theme toggle, playlist CRUD, and cross-page navigation.
+- **A11y tests** — accessibility audits using axe-core via Playwright.
+
+**First-time setup — install Playwright Chromium:**
 
 ```bash
-playwright install chromium
-.venv/bin/python -m pytest tests/  # runs all tests including browser tests
+.venv/bin/python -m playwright install chromium
 ```
 
-Use `SKIP_A11Y=1` or `SKIP_UI=1` to skip accessibility or UI browser tests independently.
+**Run all tests including browser tests:**
+
+```bash
+SKIP_BROWSER=0 .venv/bin/python -m pytest tests/
+# Or simply omit SKIP_BROWSER — it defaults to unset (tests run); Chromium must
+# be installed or browser tests will fail (they are not auto-skipped on missing Chromium):
+.venv/bin/python -m pytest tests/
+```
+
+**Fine-grained control:**
+
+```bash
+# Skip only a11y tests, keep UI tests
+SKIP_A11Y=1 .venv/bin/python -m pytest tests/
+
+# Skip only UI tests, keep a11y tests
+SKIP_UI=1 .venv/bin/python -m pytest tests/
+```
+
+#### Why does SKIP_BROWSER exist?
+
+`SKIP_BROWSER=1` exists for two legitimate use-cases:
+
+1. **Headless CI environments** that do not have Chromium installed (e.g., minimal Docker
+   images used in some CI pipelines).
+2. **Fast local iteration** — skipping Playwright speeds up the feedback loop when you are
+   working on backend logic unrelated to the frontend.
+
+**`SKIP_BROWSER=1` is NOT acceptable when submitting a PR** that touches any of:
+
+- `src/static/**` (CSS, JS, images)
+- `src/templates/**` (Jinja2 HTML templates)
+- `tests/integration/test_browser_smoke.py` or any other Playwright test file
+
+For any PR touching frontend files, you **must** run:
+
+```bash
+SKIP_BROWSER=0 .venv/bin/python -m pytest tests/
+```
+
+and confirm all browser tests pass before requesting review.
+
+See `tests/conftest.py` — specifically the `pytest_ignore_collect` hook and the
+`UI_BROWSER_TESTS` / `A11Y_BROWSER_TESTS` sets — for the exact logic that governs
+which test files are skipped under each env-var combination.
 
 ## CSS Build
 
@@ -82,9 +131,19 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 1. Fork the repository
 2. Create a feature branch from `main`
 3. Write tests for new functionality
-4. Ensure all tests pass: `SKIP_BROWSER=1 .venv/bin/python -m pytest tests/`
-5. Run pre-commit checks: `pre-commit run --all-files`
+4. Ensure all tests pass:
+   - Backend-only changes: `SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --no-header --tb=no -q`
+   - **Frontend changes** (`src/static/**`, `src/templates/**`): `SKIP_BROWSER=0 .venv/bin/python -m pytest tests/`
+5. Run lint: `scripts/lint.sh`
 6. Open a PR against `main`
+
+### PR Checklist
+
+Before marking your PR ready for review, confirm:
+
+- [ ] All pytest tests pass locally
+- [ ] `scripts/lint.sh` passes (ruff + black are CI blockers)
+- [ ] **If touching `src/static/**` or `src/templates/**`**: ran browser tests with `SKIP_BROWSER=0 .venv/bin/python -m pytest tests/` and all passed
 
 ## Plugin Development
 

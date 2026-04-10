@@ -171,6 +171,33 @@ automatically mocked — no hardware required.
 
 To stop the container, press `Ctrl+C` or run `docker compose down`.
 
+## CI Gate and Required Status Checks
+
+The CI workflow includes a `ci-gate` job that depends on all required jobs — including
+`browser-smoke`. This job is the single handle the repo owner should mark as a required
+status check in GitHub branch protection.
+
+### Making `ci-gate` a required status check (repo owner steps)
+
+1. Go to **GitHub.com → fatihak/InkyPi → Settings → Branches**.
+2. Under "Branch protection rules", click **Edit** next to the `main` rule (or **Add rule**
+   if none exists).
+3. Enable **"Require status checks to pass before merging"**.
+4. In the search box, type `CI gate` and select the check named
+   **`CI gate (all checks pass)`**.
+5. Also enable **"Require branches to be up to date before merging"** for extra safety.
+6. Click **Save changes**.
+
+Once saved, every PR must have a green `ci-gate` result before it can be merged. Because
+`ci-gate` itself `needs: [lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix,
+coverage-gate, security, browser-smoke]`, any failure in any of those jobs will also fail
+the gate.
+
+> **Why a single gate job instead of listing each check?**
+> GitHub's required-checks list is static — adding a new CI job requires a manual settings
+> update. The gate pattern means you only ever need to protect one check name, and the
+> `ci.yml` file controls which sub-jobs are required.
+
 ## Other Requirements
 
 InkyPi relies on system packages for some features, which are normally installed via the `install.sh` script. **(Skip if using devbox method)**
