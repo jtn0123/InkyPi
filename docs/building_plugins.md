@@ -6,6 +6,8 @@ This guide walks you through the process of creating a new plugin for InkyPi.
 
 > **New to the codebase?** Start with the [architecture overview](architecture.md) to see how plugins fit into the request and refresh flows.
 
+> **Hitting a runtime error?** See [Troubleshooting Plugin Development](troubleshooting.md#plugin-development-troubleshooting) for common failures: API key errors, fetch timeouts, dimension mismatches, memory pressure, screenshot issues, and Jinja2 gotchas.
+
 
 ### 1. Create a Directory for Your Plugin
 
