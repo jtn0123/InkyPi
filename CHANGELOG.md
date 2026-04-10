@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.28.5 (2026-04-10)
+
+### Bug Fixes
+
+- Validate cycle_minutes range (1-1440) on update_playlist and expose in to_dict (JTN-469)
+  ([#295](https://github.com/jtn0123/InkyPi/pull/295),
+  [`cfb599c`](https://github.com/jtn0123/InkyPi/commit/cfb599cb779ea6e2ca04104c6590c1d054580016))
+
+Silent data loss occurred when cycle_minutes exceeded the HTML max of 1440 — the backend accepted
+  any value and the template never read cycle_interval_seconds back into the edit modal. Backend now
+  rejects out-of-range values with 400 + error body; frontend surfaces it via the existing
+  handleJsonResponse toast path. Playlist.to_dict() now includes cycle_minutes derived from
+  cycle_interval_seconds so the edit modal pre-fills correctly after save.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Add Plugin Development Troubleshooting section (JTN-523)
+  ([#297](https://github.com/jtn0123/InkyPi/pull/297),
+  [`9a5dade`](https://github.com/jtn0123/InkyPi/commit/9a5dadea537585f2fb5a5ddf4bef75ac30628569))
+
+Adds a new "Plugin Development Troubleshooting" top-level section to docs/troubleshooting.md
+  covering six common runtime failure classes: API key validation failures, plugin fetch timeouts
+  (Newspaper/Comic/RSS), OutputDimensionMismatch errors, memory pressure on Pi Zero, Screenshot
+  plugin failures (Chromium not found/sandbox), and Jinja2 template render errors. Each subsection
+  is grounded in actual source classes (src/utils/output_validator.py, src/utils/image_utils.py,
+  src/utils/http_utils.py). Adds a one-line cross-link in docs/building_plugins.md pointing to the
+  new section.
+
+Note: source-code cross-link inside the OutputDimensionMismatch raise site
+  (src/utils/output_validator.py) was intentionally skipped — that file is owned by sibling PR
+  JTN-499.
+
+Closes JTN-523
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add pre-commit install subsection to development guide (JTN-527, Grade I3)
+  ([#296](https://github.com/jtn0123/InkyPi/pull/296),
+  [`1ea7272`](https://github.com/jtn0123/InkyPi/commit/1ea7272c0e3b4e25e0d6db89dd688d8e90af4d04))
+
+Add "Install pre-commit hooks (recommended)" subsection in the Setup section of docs/development.md,
+  documenting the `pre-commit install` command, what hooks run (ruff, mypy, gitleaks,
+  conventional-commit, etc.), and a bypass note for `git commit --no-verify`.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add profiling guide for benchmark suite and cProfile/py-spy (JTN-526, Grade I2)
+  ([#294](https://github.com/jtn0123/InkyPi/pull/294),
+  [`3bce70d`](https://github.com/jtn0123/InkyPi/commit/3bce70d66b66077cafd02b056a89728d5f018e09))
+
+Adds docs/profiling.md covering when to profile, running pytest-benchmark locally,
+  --benchmark-save/compare/compare-fail, scripts/test_profile.sh behaviour, cProfile+snakeviz,
+  py-spy, and a decision matrix for choosing the right tool.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.28.4 (2026-04-10)
 
 ### Bug Fixes
