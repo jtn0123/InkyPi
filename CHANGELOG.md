@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v0.28.2 (2026-04-10)
+
+### Bug Fixes
+
+- Install hardening + Pi Zero 2 W docs (JTN-534/537/538)
+  ([#284](https://github.com/jtn0123/InkyPi/pull/284),
+  [`2e22450`](https://github.com/jtn0123/InkyPi/commit/2e2245050947eaf7aa3d0f2037139add6413fce9))
+
+JTN-534 — install network resilience: - pip install in install.sh now passes --retries 5 --timeout
+  60 explicitly - update_vendors.sh: --retry-all-errors + --retry-delay 2 so transient curl write
+  errors (exit 23, hit during JTN-528 sim run) actually retry - install.sh now propagates
+  update_vendors.sh exit code instead of silently swallowing it via > /dev/null. Prevents
+  half-installed CSS/JS bundles.
+
+JTN-538 — backup test leaking .pre-restore-*.tar.gz into repo cwd: - _pre_restore_backup() takes an
+  optional output_dir param, defaulting to the parent of config_dir (next to the data it protects,
+  not random cwd) - Test now passes tmp_path so the artifact stays contained - .gitignore entry as
+  belt-and-suspenders
+
+JTN-537 — Pi Zero 2 W setup notes in docs/installation.md: - New section covering OS choice (Trixie
+  now default), arm_64bit=1 requirement, ~15min first-boot install time, cloud-init log location,
+  and clarification that the "Pi Zero W" troubleshooting section is for the original 32-bit Zero W,
+  not the Zero 2 W.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.28.1 (2026-04-10)
 
 ### Bug Fixes
