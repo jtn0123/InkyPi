@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v0.32.0 (2026-04-10)
+
+### Features
+
+- Fallback error-card image + circuit-breaker persistence (JTN-499)
+  ([#299](https://github.com/jtn0123/InkyPi/pull/299),
+  [`25d7755`](https://github.com/jtn0123/InkyPi/commit/25d775527d7f80804c12b0e4e1f461a4f5f22d16))
+
+* feat: fallback error-card image + circuit-breaker persistence (JTN-499, Grade B3)
+
+When a plugin's generate_image() raises, the display no longer stays frozen on stale content. A
+  human-readable error-card (plugin name, instance, error class, truncated message, timestamp) is
+  rendered via the new `utils/fallback_image.render_error_image()` helper and pushed to the display
+  immediately.
+
+The same pattern is applied to the `update_now` direct-execution path in `blueprints/plugin.py` so
+  preview-mode failures are visible on screen.
+
+Circuit-breaker state (consecutive_failure_count, paused) is now persisted to `device.json` via
+  `write_config()` on every failure and on recovery, surviving daemon restarts. A new
+  `disabled_reason` field on PluginInstance is populated when a plugin is paused and cleared on
+  recovery; it is included in `to_dict()` / `from_dict()` so the value round-trips through the
+  config file.
+
+Tests: - 15 new unit tests in tests/unit/test_plugin_failure_fallback.py - Updated
+  tests/integration/test_refresh_cycle.py to assert the fallback is pushed (not absent) on plugin
+  failure
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor: extract _update_now_direct to reduce cognitive complexity (S3776)
+
+Splits the direct-execution branch of update_now() into two focused helpers: _update_now_direct()
+  and _push_update_now_fallback(). This drops the function cognitive complexity from 19 to ≤15 as
+  required by SonarCloud S3776.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.31.0 (2026-04-10)
 
 ### Features
