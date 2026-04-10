@@ -558,17 +558,40 @@ def create_playlist():
     return json_success("Created new Playlist!")
 
 
-def _apply_cycle_override(playlist_manager, new_name, cycle_minutes):
-    """Apply optional cycle interval override to a playlist."""
+_CYCLE_MINUTES_MIN = 1
+_CYCLE_MINUTES_MAX = 1440
+
+
+def _validate_cycle_minutes(cycle_minutes):
+    """Validate cycle_minutes value.
+
+    Returns ``(int_value, error_response)``.  If cycle_minutes is None/absent,
+    returns ``(None, None)`` to indicate "use device default".
+    """
     if cycle_minutes is None:
-        return
+        return None, None
     try:
         cm = int(cycle_minutes)
-        playlist = playlist_manager.get_playlist(new_name)
-        if playlist:
-            playlist.cycle_interval_seconds = max(1, cm) * 60
-    except Exception:
-        pass
+    except (ValueError, TypeError):
+        return None, json_error("cycle_minutes must be an integer", status=400)
+    if cm < _CYCLE_MINUTES_MIN or cm > _CYCLE_MINUTES_MAX:
+        return None, json_error(
+            f"cycle_minutes must be between {_CYCLE_MINUTES_MIN} and {_CYCLE_MINUTES_MAX}",
+            status=400,
+        )
+    return cm, None
+
+
+def _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int):
+    """Apply optional cycle interval override to a playlist.
+
+    ``cycle_minutes_int`` must already be a validated integer or None.
+    """
+    if cycle_minutes_int is None:
+        return
+    playlist = playlist_manager.get_playlist(new_name)
+    if playlist:
+        playlist.cycle_interval_seconds = cycle_minutes_int * 60
 
 
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
@@ -606,12 +629,16 @@ def update_playlist(playlist_name):
     except Exception:
         pass
 
+    cycle_minutes_int, cycle_err = _validate_cycle_minutes(data.get("cycle_minutes"))
+    if cycle_err:
+        return cycle_err
+
     result = playlist_manager.update_playlist(
         playlist_name, new_name, start_time, end_time
     )
     if not result:
         return json_error("Failed to update playlist", status=500)
-    _apply_cycle_override(playlist_manager, new_name, data.get("cycle_minutes"))
+    _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int)
     device_config.write_config()
 
     # Warn if the updated playlist overlaps with Default.
