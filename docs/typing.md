@@ -1,0 +1,59 @@
+# Type-Checking Strategy
+
+InkyPi uses [mypy](https://mypy.readthedocs.io/) for static type analysis.
+Rather than enabling strict mode everywhere at once, we follow an **incremental
+strict** path: a small "strict subset" is enforced as a CI blocker today, with
+more modules added over time as they stabilize.
+
+## Why incremental strict?
+
+Enabling `--strict` across the whole codebase in one shot would produce
+hundreds of errors and risk churn on actively-changing files.  An incremental
+approach lets us raise the quality bar module by module without blocking
+ongoing feature work.
+
+## Current strict subset (CI-blocking)
+
+| Module | Added |
+|---|---|
+| `src/utils/http_utils.py` | JTN-525 |
+| `src/utils/security_utils.py` | JTN-525 |
+
+`src/utils/http_cache.py` was deliberately deferred from the initial strict
+set because it was recently refactored (JTN-493) and is still settling.  It
+will be added in a follow-up once it stabilizes.
+
+## How to add a module to the strict subset
+
+1. **Run mypy strict on the module locally** and fix all errors:
+   ```bash
+   .venv/bin/python -m mypy --strict src/utils/your_module.py
+   ```
+2. **Add a per-module block to `mypy.ini`:**
+   ```ini
+   [mypy-src.utils.your_module]
+   strict = True
+   ```
+3. **Add the file to the blocking check in `scripts/lint.sh`:**
+   ```bash
+   mypy --strict src/utils/http_utils.py src/utils/security_utils.py src/utils/your_module.py
+   ```
+4. **Update the table above** with the module path and Linear issue reference.
+5. Open a PR — CI will enforce strictness from that point forward.
+
+## Advisory whole-codebase check
+
+`scripts/lint.sh` also runs `mypy src tests` (non-strict) over the entire
+codebase.  Failures there are printed with a `⚠️` warning but do **not** block
+the lint step.  This keeps visibility into type drift without blocking PRs on
+pre-existing issues.
+
+## Coding guidelines for typed modules
+
+- Avoid `Any` unless truly unavoidable; prefer `object` or a narrow union.
+- Prefer `collections.abc.Callable`, `Sequence`, `Mapping` over their
+  `typing` counterparts for argument types.
+- Use `cast()` sparingly — only when mypy cannot infer a type that you know is
+  correct (e.g. narrowing an untyped third-party return value).
+- Add `# type: ignore[<code>]` only as a last resort, always with a narrow
+  error code and an inline comment explaining why.
