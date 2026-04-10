@@ -336,7 +336,7 @@
       syncModalOpenState(ui);
       // Restore focus to the trigger element (WAI-ARIA best practice)
       if (_lastModalTrigger) {
-        try { _lastModalTrigger.focus(); } catch (_) {}
+        _lastModalTrigger.focus();
         _lastModalTrigger = null;
       }
     }
@@ -626,8 +626,9 @@
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
-      document.querySelectorAll("[data-open-modal]").forEach((button) => {
-        button.addEventListener("click", () => openModal(button.dataset.openModal, button));
+      document.addEventListener("click", (event) => {
+        const opener = event.target.closest("[data-open-modal]");
+        if (opener) openModal(opener.dataset.openModal, opener);
       });
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
