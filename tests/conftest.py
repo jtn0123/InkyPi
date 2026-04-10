@@ -167,6 +167,26 @@ def mock_screenshot(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_utils_singletons():
+    """Reset utils module-level singletons before each test.
+
+    Prevents HTTP session state, cache contents, and i18n locale state from
+    leaking across tests regardless of execution order.
+    """
+    from utils.http_cache import reset_for_tests as _reset_http_cache
+    from utils.http_client import reset_for_tests as _reset_http_session
+    from utils.i18n import reset_for_tests as _reset_i18n
+
+    _reset_http_session()
+    _reset_http_cache()
+    _reset_i18n()
+    yield
+    _reset_http_session()
+    _reset_http_cache()
+    _reset_i18n()
+
+
+@pytest.fixture(autouse=True)
 def reset_display_next_cooldown():
     """Reset the /display-next rate limiter between tests."""
     from blueprints.main import _reset_display_next_cooldown

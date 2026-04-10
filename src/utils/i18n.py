@@ -79,6 +79,36 @@ def _load_locale(locale: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+def get_translations() -> dict[str, str]:
+    """Return the currently loaded translations mapping.
+
+    Provides controlled read access to the module-level ``_TRANSLATIONS``
+    dict so callers do not need to import the bare global directly.
+    """
+    return _TRANSLATIONS
+
+
+def get_active_locale() -> str:
+    """Return the currently active locale code (e.g. ``"en"``).
+
+    Provides controlled read access to the module-level ``_ACTIVE_LOCALE``
+    variable so callers do not need to import the bare global directly.
+    """
+    return _ACTIVE_LOCALE
+
+
+def reset_for_tests() -> None:
+    """Reset i18n state to defaults (testing only).
+
+    Resets ``_TRANSLATIONS`` to an empty dict and ``_ACTIVE_LOCALE`` to
+    ``"en"`` so that tests which call ``init_i18n()`` or inspect locale state
+    do not affect one another.
+    """
+    global _TRANSLATIONS, _ACTIVE_LOCALE
+    _TRANSLATIONS = {}
+    _ACTIVE_LOCALE = "en"
+
+
 def _(msg: str) -> str:
     """Return the localised form of *msg*, or *msg* itself if not found.
 
