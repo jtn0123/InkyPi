@@ -77,8 +77,8 @@ def test_reorder_plugins_endpoint(client, device_config_dev):
     assert pl2.plugins[0].name == "B"
 
 
-def test_cycle_override_zero_enforces_minimum_60_seconds(client, device_config_dev):
-    """JTN-232: cycle_minutes=0 must not produce cycle_interval_seconds of 0 (infinite loop)."""
+def test_cycle_override_zero_rejected(client, device_config_dev):
+    """JTN-232/JTN-469: cycle_minutes=0 must be rejected with 400 (range: 1-1440)."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("CycleTest", "10:00", "11:00")
     device_config_dev.write_config()
@@ -90,13 +90,14 @@ def test_cycle_override_zero_enforces_minimum_60_seconds(client, device_config_d
         "cycle_minutes": 0,
     }
     resp = client.put("/update_playlist/CycleTest", json=upd)
-    assert resp.status_code == 200
+    assert resp.status_code == 400
+    j = resp.get_json()
+    assert "cycle_minutes" in j.get("error", "").lower()
 
+    # Playlist should remain unchanged (no cycle override applied)
     pl = pm.get_playlist("CycleTest")
     assert pl is not None
-    assert (
-        pl.cycle_interval_seconds >= 60
-    ), f"cycle_interval_seconds should be at least 60, got {pl.cycle_interval_seconds}"
+    assert pl.cycle_interval_seconds is None
 
 
 def test_update_playlist_rejects_special_char_name(client, device_config_dev):
@@ -229,3 +230,117 @@ def test_update_default_playlist_does_not_warn_about_itself(client, device_confi
     data = resp.get_json()
     assert data.get("success") is True
     assert "warning" not in data or data.get("warning") is None
+
+
+# JTN-469: cycle_minutes range validation
+
+
+def test_update_playlist_rejects_cycle_minutes_above_max(client, device_config_dev):
+    """JTN-469: cycle_minutes > 1440 must be rejected with 400 and a clear error."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("RangeTest", "06:00", "10:00")
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "RangeTest",
+        "start_time": "06:00",
+        "end_time": "10:00",
+        "cycle_minutes": 5000,
+    }
+    resp = client.put("/update_playlist/RangeTest", json=upd)
+    assert resp.status_code == 400
+    j = resp.get_json()
+    assert j.get("success") is False
+    assert "cycle_minutes" in j.get("error", "").lower()
+
+    # Confirm no cycle override was applied
+    pl = pm.get_playlist("RangeTest")
+    assert pl.cycle_interval_seconds is None
+
+
+def test_update_playlist_valid_cycle_minutes_persisted(client, device_config_dev):
+    """JTN-469: valid cycle_minutes (30) must be persisted and readable back."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("PersistTest", "08:00", "12:00")
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "PersistTest",
+        "start_time": "08:00",
+        "end_time": "12:00",
+        "cycle_minutes": 30,
+    }
+    resp = client.put("/update_playlist/PersistTest", json=upd)
+    assert resp.status_code == 200
+    j = resp.get_json()
+    assert j.get("success") is True
+
+    pl = pm.get_playlist("PersistTest")
+    assert pl is not None
+    assert pl.cycle_interval_seconds == 30 * 60
+
+
+def test_update_playlist_absent_cycle_minutes_clears_nothing(client, device_config_dev):
+    """JTN-469: omitting cycle_minutes must not change existing cycle override."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("OmitTest", "09:00", "11:00")
+    pl = pm.get_playlist("OmitTest")
+    pl.cycle_interval_seconds = 45 * 60
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "OmitTest",
+        "start_time": "09:00",
+        "end_time": "11:00",
+        # cycle_minutes deliberately absent
+    }
+    resp = client.put("/update_playlist/OmitTest", json=upd)
+    assert resp.status_code == 200
+
+    pl2 = pm.get_playlist("OmitTest")
+    # cycle not modified when key absent
+    assert pl2.cycle_interval_seconds == 45 * 60
+
+
+def test_update_playlist_null_cycle_minutes_leaves_override_unchanged(
+    client, device_config_dev
+):
+    """JTN-469: cycle_minutes=null is treated the same as absent (no-op on cycle)."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("NullTest", "10:00", "12:00")
+    pl = pm.get_playlist("NullTest")
+    pl.cycle_interval_seconds = 20 * 60
+    device_config_dev.write_config()
+
+    upd = {
+        "new_name": "NullTest",
+        "start_time": "10:00",
+        "end_time": "12:00",
+        "cycle_minutes": None,
+    }
+    resp = client.put("/update_playlist/NullTest", json=upd)
+    assert resp.status_code == 200
+
+    pl2 = pm.get_playlist("NullTest")
+    assert pl2.cycle_interval_seconds == 20 * 60
+
+
+def test_playlist_to_dict_exposes_cycle_minutes(device_config_dev):
+    """JTN-469: Playlist.to_dict() must include cycle_minutes when cycle_interval_seconds is set."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("DictTest", "07:00", "08:00")
+    pl = pm.get_playlist("DictTest")
+    pl.cycle_interval_seconds = 15 * 60
+
+    d = pl.to_dict()
+    assert d.get("cycle_minutes") == 15
+
+
+def test_playlist_to_dict_no_cycle_minutes_when_unset(device_config_dev):
+    """JTN-469: Playlist.to_dict() must not include cycle_minutes when no override is set."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("NoCycleDict", "07:00", "08:00")
+    pl = pm.get_playlist("NoCycleDict")
+
+    d = pl.to_dict()
+    assert "cycle_minutes" not in d

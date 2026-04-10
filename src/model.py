@@ -482,6 +482,7 @@ class Playlist:
         }
         if getattr(self, "cycle_interval_seconds", None) is not None:
             data["cycle_interval_seconds"] = self.cycle_interval_seconds
+            data["cycle_minutes"] = int(self.cycle_interval_seconds) // 60
         return data
 
     @classmethod
