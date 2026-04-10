@@ -1,0 +1,35 @@
+ARG CODENAME=trixie
+FROM debian:${CODENAME}
+
+ARG CODENAME=trixie
+
+# Install base dependencies needed by install.sh
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo \
+    lsb-release \
+    ncurses-bin \
+    curl \
+    git \
+    ca-certificates \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add the Raspberry Pi OS apt repo for the matching codename.
+# [trusted=yes] is a sim-only workaround: Debian Trixie's sqv rejects SHA1 keys
+# used by the raspi.com repo. Real Pi OS ships its own patched apt and does NOT
+# hit this issue.
+RUN echo "deb [trusted=yes] http://archive.raspberrypi.com/debian/ ${CODENAME} main" \
+    > /etc/apt/sources.list.d/raspi.list \
+    && apt-get update
+
+# Install a no-op raspi-config shim so install.sh's `raspi-config nonint …`
+# calls succeed without real hardware or the full raspi-config package.
+RUN printf '#!/bin/sh\n# sim-only no-op raspi-config shim\nexit 0\n' \
+    > /usr/sbin/raspi-config \
+    && chmod +x /usr/sbin/raspi-config
+
+# Copy the local checkout into the image so we exercise the branch under test,
+# not whatever is on GitHub.
+COPY . /InkyPi
+
+CMD ["bash", "-c", "cd /InkyPi/install && ./install.sh"]
