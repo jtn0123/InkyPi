@@ -39,3 +39,15 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+
+  # Warn (not block) when frontend files are staged with SKIP_BROWSER=1 set.
+  # This reminds contributors to run browser tests before opening a PR.
+  - repo: local
+    hooks:
+      - id: browser-test-warning
+        name: Browser test reminder (frontend changes)
+        language: script
+        entry: scripts/precommit_browser_warning.sh
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
