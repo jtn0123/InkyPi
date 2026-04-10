@@ -201,6 +201,12 @@ install_debian_dependencies() {
 }
 
 setup_zramswap_service() {
+  # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls zram-swap),
+  # skip zram-tools — they fight over /dev/zram0 and cause mkswap to fail.
+  if grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
+    echo "zram swap already active (likely from preinstalled zram-swap package) — skipping zram-tools install."
+    return 0
+  fi
   echo "Enabling and starting zramswap service."
   sudo apt-get install -y zram-tools > /dev/null
   echo -e "ALGO=zstd\nPERCENT=60" | sudo tee /etc/default/zramswap > /dev/null
