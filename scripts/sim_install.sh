@@ -33,6 +33,13 @@ if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     exit 0
 fi
 
+if [[ "$#" -gt 1 ]]; then
+    echo "ERROR: Too many arguments." >&2
+    echo "" >&2
+    usage >&2
+    exit 1
+fi
+
 if [[ -n "${1:-}" ]]; then
     CODENAME="${1}"
     valid=0
@@ -83,14 +90,17 @@ echo "Running install.sh in container (platform=linux/arm64, memory=512m) ..."
 echo ""
 
 # ── run ───────────────────────────────────────────────────────────────────────
-docker run \
+# Use an explicit if/else so RUN_EXIT is always set regardless of set -e.
+if docker run \
     --rm \
     --platform linux/arm64 \
     --memory=512m \
     --memory-swap=512m \
-    "${IMAGE_TAG}"
-
-RUN_EXIT="${?}"
+    "${IMAGE_TAG}"; then
+    RUN_EXIT=0
+else
+    RUN_EXIT=$?
+fi
 
 # ── footer ────────────────────────────────────────────────────────────────────
 echo ""

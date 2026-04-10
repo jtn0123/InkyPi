@@ -14,13 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Add the Raspberry Pi OS apt repo for the matching codename.
-# [trusted=yes] is a sim-only workaround: Debian Trixie's sqv rejects SHA1 keys
-# used by the raspi.com repo. Real Pi OS ships its own patched apt and does NOT
-# hit this issue.
+# Add the Raspberry Pi OS apt repo and update the package lists in a single
+# RUN to avoid stale-cache issues.
+#
+# NOTE: [trusted=yes] is a sim-only workaround for Debian Trixie's sqv
+# rejecting the SHA1 signature used by archive.raspberrypi.com.  Real Pi OS
+# ships its own patched apt that does NOT hit this issue — do NOT copy this
+# line to production configs.
 RUN echo "deb [trusted=yes] http://archive.raspberrypi.com/debian/ ${CODENAME} main" \
     > /etc/apt/sources.list.d/raspi.list \
-    && apt-get update
+    && apt-get update \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install a no-op raspi-config shim so install.sh's `raspi-config nonint …`
 # calls succeed without real hardware or the full raspi-config package.
