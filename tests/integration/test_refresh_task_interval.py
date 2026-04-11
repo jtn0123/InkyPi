@@ -41,7 +41,7 @@ def test_interval_refresh_logic_without_thread(device_config_dev, monkeypatch):
     dm = DisplayManager(device_config_dev)
     calls = {"display": 0}
 
-    def fake_display_image(img, image_settings=None):
+    def fake_display_image(img, image_settings=None, history_meta=None):
         calls["display"] += 1
 
     monkeypatch.setattr(dm, "display_image", fake_display_image, raising=True)

@@ -407,6 +407,23 @@ def force_retry_plugin_instance(plugin_id: str, instance_name: str):
     )
 
 
+def _safe_display_image(display_manager, image, image_settings, history_meta):
+    """Invoke display_manager.display_image, tolerating older stubs without ``history_meta``.
+
+    Some test doubles monkeypatch ``display_image`` with a (image, image_settings)
+    signature.  We prefer to pass ``history_meta`` so the history sidecar records
+    the plugin_id — without it, /plugin_latest_image/<plugin_id> cannot find the
+    image and the "Latest from this plugin" card stays empty (JTN-341).
+    """
+    try:
+        return display_manager.display_image(
+            image, image_settings=image_settings, history_meta=history_meta
+        )
+    except TypeError:
+        # Legacy/test stub without the history_meta kwarg
+        return display_manager.display_image(image, image_settings=image_settings)
+
+
 def _update_now_direct(plugin_id, plugin_settings, device_config, display_manager):
     """Execute a plugin directly (refresh task not running) and push to display.
 
@@ -416,7 +433,9 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
     """
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return json_error(f"Plugin '{plugin_id}' not found", status=404)
+        return json_error(
+            f"Plugin '{sanitize_response_value(plugin_id)}' not found", status=404
+        )
 
     plugin = get_plugin_instance(plugin_config)
     with track_progress() as tracker:
@@ -424,17 +443,46 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
         _t_gen_start = perf_counter()
         try:
             image = plugin.generate_image(plugin_settings, device_config)
-        except Exception as e:
-            logger.warning("Plugin error in update_now: %s", e)
+        except RuntimeError as e:
+            # RuntimeError is raised by plugins to signal a user-actionable
+            # failure (bad config, upstream API returned empty, etc.).  The
+            # message is explicitly authored by the plugin as user-facing copy
+            # and is safe to surface — plugins should never put secrets there.
+            logger.exception(
+                "Plugin %s failed to generate preview",
+                sanitize_log_field(plugin_id),
+            )
             _push_update_now_fallback(
                 plugin_id, plugin_config, device_config, display_manager, e
             )
-            status = 400 if isinstance(e, RuntimeError) else 500
-            code = "plugin_error" if isinstance(e, RuntimeError) else "internal_error"
-            return json_error(str(e), status=status, code=code)
+            return json_error(
+                sanitize_response_value(str(e)),
+                status=400,
+                code="plugin_error",
+            )
+        except Exception:
+            # Unexpected exceptions must not leak exception text to the client
+            # (JTN-318): could contain stack-traces, DB credentials, etc.
+            logger.exception(
+                "Unexpected error generating preview for plugin %s",
+                sanitize_log_field(plugin_id),
+            )
+            _push_update_now_fallback_from_current_exception(
+                plugin_id, plugin_config, device_config, display_manager
+            )
+            return json_error(_ERR_INTERNAL, status=500, code="internal_error")
         generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-        display_manager.display_image(
-            image, image_settings=plugin_config.get("image_settings", [])
+        history_meta = {
+            "refresh_type": "Manual Update",
+            "plugin_id": plugin_id,
+            "playlist": None,
+            "plugin_instance": None,
+        }
+        _safe_display_image(
+            display_manager,
+            image,
+            plugin_config.get("image_settings", []),
+            history_meta,
         )
         try:
             ri = device_config.get_refresh_info()
@@ -470,16 +518,45 @@ def _push_update_now_fallback(
             error_class=type(exc).__name__,
             error_message=str(exc),
         )
-        display_manager.display_image(
+        _safe_display_image(
+            display_manager,
             fallback,
-            image_settings=plugin_config.get("image_settings", []),
+            plugin_config.get("image_settings", []),
+            {
+                "refresh_type": "Manual Update",
+                "plugin_id": plugin_id,
+                "playlist": None,
+                "plugin_instance": None,
+                "error_class": type(exc).__name__,
+            },
         )
     except Exception:
         logger.warning(
             "update_now: fallback display failed for %s",
-            plugin_id,
+            sanitize_log_field(plugin_id),
             exc_info=True,
         )
+
+
+def _push_update_now_fallback_from_current_exception(
+    plugin_id, plugin_config, device_config, display_manager
+):
+    """Variant of _push_update_now_fallback that uses the currently-raised exception.
+
+    Centralised so callers don't need to capture the exception into a local
+    variable (which would make it too tempting to embed the raw ``str(exc)``
+    in the JSON error response).  The exception text is still rendered on the
+    fallback image because that image is pushed to the e-paper screen, not
+    returned via HTTP.
+    """
+    import sys
+
+    exc = sys.exc_info()[1]
+    if exc is None:
+        return
+    _push_update_now_fallback(
+        plugin_id, plugin_config, device_config, display_manager, exc
+    )
 
 
 @plugin_bp.route("/update_now", methods=["POST"])
