@@ -17,6 +17,7 @@ from time import perf_counter
 
 from flask import Flask, abort, g, make_response, redirect, request, session
 
+from app_setup.smoke import SMOKE_RENDER_PATH, smoke_render_enabled
 from config import Config
 from utils.http_utils import json_error
 from utils.rate_limit import make_auth_bucket, make_mutating_bucket, make_refresh_bucket
@@ -184,6 +185,12 @@ def setup_csrf_protection(app: Flask) -> None:
             return None
         if request.path in _CSRF_EXEMPT_PATHS:
             return None
+        # JTN-613: the smoke-test render endpoint is CSRF-exempt but only when
+        # INKYPI_SMOKE_FORCE_RENDER=1 is set at request time. Checking the env
+        # var here (rather than baking it into _CSRF_EXEMPT_PATHS) means the
+        # exemption can be toggled from tests without restarting the app.
+        if request.path == SMOKE_RENDER_PATH and smoke_render_enabled():
+            return None
         token = session.get("_csrf_token")
         if not token:
             _generate_csrf_token()
@@ -272,6 +279,10 @@ def setup_rate_limiting(app: Flask) -> None:
         if request.method in _CSRF_SAFE_METHODS:
             return None
         if request.path in _RATE_EXEMPT:
+            return None
+        # JTN-613: smoke render endpoint must bypass rate limits so Phase 4
+        # can hammer it without hitting the mutating-path token bucket.
+        if request.path == SMOKE_RENDER_PATH and smoke_render_enabled():
             return None
         addr = request.remote_addr or "unknown"
         bucket_resp = _apply_token_bucket_limits(request.path, addr)

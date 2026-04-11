@@ -1079,21 +1079,137 @@ class TestInstallationDocCloudInit:
         assert "JTN-591" in self.content
 
 
+# ---- test_install_memcap.sh Phase 4 RSS budgets (JTN-608 / JTN-613) ----
+
+
+class TestInstallMemcapSmoke:
+    """Structural guards for scripts/test_install_memcap.sh Phase 4.
+
+    JTN-608 added idle/peak RSS budgets but the first Phase 4 run reported
+    peak == idle because the /update_now POST was blocked by CSRF before any
+    render code ran. JTN-613 fixes the measurement by (a) hitting a CSRF-exempt
+    opt-in /__smoke/render endpoint and (b) asserting peak > idle + floor so a
+    broken harness fails loudly instead of silently green-lighting.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.path = SCRIPTS_DIR / "test_install_memcap.sh"
+        self.content = self.path.read_text()
+
+    def test_script_exists_and_is_executable(self):
+        import stat
+
+        assert self.path.exists()
+        assert self.path.stat().st_mode & stat.S_IXUSR
+
+    def test_script_syntax_valid(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["bash", "-n", str(self.path)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
+
+    def test_phase4_hard_budgets_unchanged(self):
+        # JTN-613 must not regress the JTN-608 thresholds.
+        assert "IDLE_RSS_HARD_MB=200" in self.content
+        assert "PEAK_RSS_HARD_MB=300" in self.content
+
+    def test_phase4_enables_smoke_force_render_env_var(self):
+        # The Phase 3 Dockerfile must set the opt-in env var so the smoke
+        # render endpoint actually registers inside the container.
+        assert "INKYPI_SMOKE_FORCE_RENDER=1" in self.content, (
+            "Phase 3 Dockerfile must export INKYPI_SMOKE_FORCE_RENDER=1 so "
+            "the /__smoke/render endpoint is registered (JTN-613)."
+        )
+
+    def test_phase4_hits_smoke_render_endpoint(self):
+        # The render-exercise loop must call the opt-in endpoint.
+        assert "/__smoke/render" in self.content, (
+            "Phase 4 must POST to /__smoke/render so the render path is "
+            "actually exercised (JTN-613)."
+        )
+
+    def test_phase4_posts_clock_plugin_to_smoke_render(self):
+        # We stress the clock plugin because it has no external HTTP deps.
+        assert "plugin_id=clock" in self.content
+
+    def test_phase4_no_longer_uses_update_now_to_trigger_render(self):
+        # JTN-613 root cause: POST /update_now was blocked by CSRF in web-only
+        # mode so the render path never ran. The smoke test must no longer
+        # rely on /update_now for peak RSS measurement.
+        #
+        # We allow the string "update_now" in comments that explain WHY it was
+        # removed, but it must not appear as an actual curl target.
+        lines = self.content.splitlines()
+        curl_lines = [
+            ln
+            for ln in lines
+            if "curl" in ln and "update_now" in ln and not ln.strip().startswith("#")
+        ]
+        assert not curl_lines, (
+            "scripts/test_install_memcap.sh must not curl /update_now for the "
+            "render exercise — it was CSRF-blocked before reaching render code "
+            "(JTN-613). Use /__smoke/render instead. Offending lines: "
+            f"{curl_lines}"
+        )
+
+    def test_phase4_asserts_peak_greater_than_idle(self):
+        # JTN-613 sanity gate: a valid Phase 4 run must show peak > idle. If
+        # they're equal, the render exercise never ran and we must fail loud.
+        assert "PEAK_RSS_MIN_DELTA_MB" in self.content, (
+            "Phase 4 must define a minimum delta floor (PEAK_RSS_MIN_DELTA_MB) "
+            "between idle and peak RSS (JTN-613)."
+        )
+        assert "RSS_DELTA_MB" in self.content, (
+            "Phase 4 must compute and log the idle-to-peak RSS delta " "(JTN-613)."
+        )
+        # And the check must actually exit on failure — not just log.
+        assert (
+            '${RSS_DELTA_MB}" -lt "${PEAK_RSS_MIN_DELTA_MB}' in self.content
+            or "RSS_DELTA_MB < PEAK_RSS_MIN_DELTA_MB" in self.content
+        ), "Phase 4 must compare delta against the minimum and exit on failure."
+
+    def test_phase4_smoke_render_failure_aborts_the_script(self):
+        # If /__smoke/render returns anything other than 200, the harness is
+        # broken and we must fail loud — not silently skip the peak budget.
+        assert '${SMOKE_RENDER_STATUS}" != "200"' in self.content, (
+            "Phase 4 must abort when /__smoke/render returns a non-200 status "
+            "(JTN-613)."
+        )
+
+    def test_phase4_renders_multiple_times_for_sustained_working_set(self):
+        # Rendering once can get optimised away by Python's allocator; we hit
+        # the endpoint repeatedly so peak RSS reflects the sustained footprint.
+        # The exact count is not load-bearing — just assert there is a loop.
+        import re
+
+        # Match either a `for ... in 1 2 3` or similar looping construct in
+        # proximity to the smoke render curl call.
+        assert re.search(
+            r"for\s+\w+\s+in\s+[0-9]+\s+[0-9]+",
+            self.content,
+        ), (
+            "Phase 4 must render the plugin in a loop so peak RSS reflects "
+            "the sustained working set, not a transient single allocation "
+            "(JTN-613)."
+        )
+
+    def test_phase4_references_jtn_613(self):
+        # Traceability: the JTN-613 fix must be discoverable by grepping.
+        assert "JTN-613" in self.content
+
+
 # ---- install-matrix CI workflow (JTN-530) ----
 
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 
 
 class TestInstallMatrixWorkflow:
-    """Structural guards for the arm64 install.sh matrix CI job (JTN-530).
-
-    JTN-528 silently broke Pi Zero 2 W installs on Trixie for an entire release
-    cycle because no CI job ran install/install.sh against each supported Pi OS
-    base. JTN-530 added an ``install-matrix`` job that runs install.sh inside an
-    arm64 Debian container for bullseye / bookworm / trixie. These assertions
-    guarantee the job (and its supporting files) cannot be silently deleted —
-    removing any of them breaks this test and therefore CI.
-    """
+    """Structural guards for the arm64 install.sh matrix CI job (JTN-530)."""
 
     @pytest.fixture(autouse=True)
     def _load(self):
@@ -1102,31 +1218,21 @@ class TestInstallMatrixWorkflow:
         self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
 
     def test_install_matrix_job_defined(self):
-        # The job must exist in the workflow as `install-matrix:`.
         assert "install-matrix:" in self.ci_yaml
 
     def test_install_matrix_references_all_three_os_bases(self):
-        # A regression that drops any codename from the matrix must fail here.
         import yaml
 
         data = yaml.safe_load(self.ci_yaml)
         job = data["jobs"]["install-matrix"]
         codenames = job["strategy"]["matrix"]["codename"]
-        assert set(codenames) == {
-            "bullseye",
-            "bookworm",
-            "trixie",
-        }, f"install-matrix must cover all three Pi OS bases, got {codenames}"
+        assert set(codenames) == {"bullseye", "bookworm", "trixie"}
 
     def test_install_matrix_runs_on_arm64(self):
-        # The Pi Zero 2 W target is arm64 under QEMU — ensure the platform flag
-        # is still set so we don't accidentally regress to amd64.
         assert "linux/arm64" in self.ci_yaml
         assert "setup-qemu-action" in self.ci_yaml
 
     def test_install_matrix_uses_512m_memory_cap(self):
-        # JTN-536 parity: the 512 MB cap is what actually catches the JTN-528
-        # class of regressions. Removing it defeats the point of the matrix.
         assert "--memory=512m" in self.ci_yaml
         assert "--memory-swap=512m" in self.ci_yaml
 
@@ -1134,61 +1240,41 @@ class TestInstallMatrixWorkflow:
         assert "ci_install_matrix_verify.sh" in self.ci_yaml
 
     def test_install_matrix_feeds_ci_gate(self):
-        # The matrix must be in the ci-gate needs list AND in the required-success
-        # loop — otherwise a failed leg would not block merge.
         import yaml
 
         data = yaml.safe_load(self.ci_yaml)
         gate = data["jobs"]["ci-gate"]
-        assert (
-            "install-matrix" in gate["needs"]
-        ), "install-matrix must be listed in ci-gate.needs so the gate waits for it"
-        # The required-success loop lives in a run: block; grep the raw YAML.
+        assert "install-matrix" in gate["needs"]
         gate_steps_raw = yaml.safe_dump(gate["steps"])
-        assert "install-matrix" in gate_steps_raw, (
-            "install-matrix must appear in ci-gate's required-success loop, "
-            "otherwise failures will not block merge"
-        )
+        assert "install-matrix" in gate_steps_raw
 
     def test_dockerfile_uses_plain_debian_codename(self):
-        # No date pins (rot risk). Plain debian:<codename> only.
         assert "FROM debian:${CODENAME}" in self.dockerfile
-        assert "CODENAME=trixie" in self.dockerfile  # default arg
+        assert "CODENAME=trixie" in self.dockerfile
 
     def test_dockerfile_adds_pi_os_apt_repo(self):
-        # Pi-specific packages (liblgpio-dev, chromium-headless-shell) only
-        # resolve via the Pi OS apt repo — not vanilla Debian.
         assert "archive.raspberrypi.com/debian" in self.dockerfile
 
     def test_dockerfile_ships_raspi_config_shim(self):
-        # install.sh calls `raspi-config nonint do_spi 0` etc. — container has
-        # no real raspi-config, so a no-op shim is required.
         assert "/usr/sbin/raspi-config" in self.dockerfile
 
     def test_dockerfile_ships_systemctl_shim(self):
-        # Container has no real systemd; the shim guarantees install.sh's
-        # systemctl daemon-reload / enable calls succeed.
         assert "/usr/bin/systemctl" in self.dockerfile
 
     def test_dockerfile_installs_systemd_package(self):
-        # systemd package provides systemd-analyze which Phase 4 uses to
-        # validate install/inkypi.service.
         assert "systemd" in self.dockerfile
 
     def test_dockerfile_creates_boot_config_stub(self):
-        # install.sh's enable_interfaces() exits 1 if /boot/firmware/config.txt
-        # is missing. The stub is required for install.sh to proceed.
         assert "/boot/firmware/config.txt" in self.dockerfile
 
     def test_verify_script_asserts_install_exit_zero(self):
         assert "./install.sh" in self.verify_script
-        assert "exit" in self.verify_script  # used via fail()
+        assert "exit" in self.verify_script
 
     def test_verify_script_asserts_venv_created(self):
         assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
 
     def test_verify_script_asserts_required_imports(self):
-        # flask, waitress, Pillow — the exact set JTN-530 requires.
         assert "import flask, waitress, PIL" in self.verify_script
 
     def test_verify_script_runs_systemd_analyze(self):
@@ -1196,8 +1282,6 @@ class TestInstallMatrixWorkflow:
         assert "inkypi.service" in self.verify_script
 
     def test_verify_script_skips_wheelhouse(self):
-        # Pre-built wheelhouse would mask broken requirements.txt — the matrix
-        # must exercise the source pip install path.
         assert "INKYPI_SKIP_WHEELHOUSE=1" in self.verify_script
 
     def test_verify_script_has_shebang_and_strict_mode(self):
@@ -1209,22 +1293,14 @@ class TestInstallMatrixWorkflow:
 
         path = SCRIPTS_DIR / "ci_install_matrix_verify.sh"
         mode = path.stat().st_mode
-        assert mode & stat.S_IXUSR, "ci_install_matrix_verify.sh is not user-executable"
+        assert mode & stat.S_IXUSR
 
 
 # ---- OS drift nightly workflow (JTN-535) ----
 
 
 class TestOsDriftNightlyWorkflow:
-    """Structural assertions for the nightly OS-drift detector (JTN-535).
-
-    The nightly workflow re-runs the install sim against the latest
-    *unpinned* debian:trixie/bookworm/bullseye images so that upstream
-    package churn breaks a nightly job instead of a user's Pi Zero 2 W.
-    These tests exist primarily to prevent the file from being silently
-    deleted — losing this drift detector was the exact class of regression
-    that caused JTN-528 to slip through the whole Trixie release cycle.
-    """
+    """Structural assertions for the nightly OS-drift detector (JTN-535)."""
 
     WORKFLOW_PATH = WORKFLOWS_DIR / "os-drift-nightly.yml"
 
@@ -1240,33 +1316,24 @@ class TestOsDriftNightlyWorkflow:
         assert self.WORKFLOW_PATH.is_file()
 
     def test_has_schedule_block(self):
-        assert re.search(
-            r"^\s*schedule:", self.content, flags=re.MULTILINE
-        ), "os-drift-nightly.yml must keep its schedule: block"
-        assert re.search(
-            r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content
-        ), "os-drift-nightly.yml must run at 08:00 UTC daily (JTN-535)"
+        assert re.search(r"^\s*schedule:", self.content, flags=re.MULTILINE)
+        assert re.search(r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content)
 
     def test_has_workflow_dispatch(self):
         assert "workflow_dispatch:" in self.content
 
     def test_is_not_a_pr_gate(self):
-        assert "pull_request:" not in self.content, (
-            "os-drift-nightly.yml must not have a pull_request: trigger — "
-            "it is a drift detector, not a PR gate (JTN-535)"
-        )
+        assert "pull_request:" not in self.content
 
     def test_matrix_covers_all_three_codenames(self):
         for codename in ("trixie", "bookworm", "bullseye"):
-            assert (
-                codename in self.content
-            ), f"os-drift-nightly.yml must exercise debian:{codename}"
+            assert codename in self.content
 
     def test_uses_unpinned_debian_images(self):
         assert re.search(
             r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
             self.content,
-        ), "os-drift-nightly.yml must use unpinned debian:${{ matrix.codename }}"
+        )
 
     def test_asserts_debian_and_pip_requirements(self):
         assert "install/debian-requirements.txt" in self.content
@@ -1287,20 +1354,15 @@ class TestOsDriftNightlyWorkflow:
 
     def test_workflow_parses_as_yaml(self):
         parsed = yaml.safe_load(self.content)
-        assert isinstance(parsed, dict), "os-drift-nightly.yml must parse to a mapping"
-        assert ("on" in parsed or True in parsed), (
-            "os-drift-nightly.yml must define workflow triggers"
-        )
-        assert "jobs" in parsed, "os-drift-nightly.yml must define jobs"
+        assert isinstance(parsed, dict)
+        assert "on" in parsed or True in parsed
+        assert "jobs" in parsed
 
         jobs = parsed["jobs"]
-        assert isinstance(jobs, dict), "workflow jobs must parse as a mapping"
-
+        assert isinstance(jobs, dict)
         matrix = jobs["drift-check"]["strategy"]["matrix"]
-        assert isinstance(matrix, dict), "drift-check matrix must parse as a mapping"
-        assert isinstance(matrix["codename"], list), (
-            "drift-check matrix.codename must remain a list of distro names"
-        )
+        assert isinstance(matrix, dict)
+        assert isinstance(matrix["codename"], list)
 
 
 # ---- memory-diff workflow ----
