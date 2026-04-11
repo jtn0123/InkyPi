@@ -1,6 +1,233 @@
 # CHANGELOG
 
 
+## v0.43.0 (2026-04-11)
+
+### Bug Fixes
+
+- Validate NASA APOD date range (1995-06-16..today) (JTN-379)
+  ([#345](https://github.com/jtn0123/InkyPi/pull/345),
+  [`b246328`](https://github.com/jtn0123/InkyPi/commit/b24632862f25290b718f631b9845ad549361f6af))
+
+The APOD plugin's Date input previously accepted any value, including pre-1995 and far-future dates.
+  Saves succeeded with a green toast and only failed later when generate_image tried to fetch a
+  non-existent APOD from NASA's API — far from where the user could fix it.
+
+Add a validate_settings hook that rejects custom dates outside the [1995-06-16, today] window (the
+  NASA APOD archive begins on 1995-06-16), plus min/max constraints on the date input field for
+  client-side feedback.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Enforce HTML5 validation before Save submit (JTN-350)
+  ([#344](https://github.com/jtn0123/InkyPi/pull/344),
+  [`96d66d4`](https://github.com/jtn0123/InkyPi/commit/96d66d48fded4a56afaf7d88c6416bee0b8c3165))
+
+The Settings Save button enabled itself on any input event without consulting form.checkValidity(),
+  letting users click Save with deviceName empty or interval=-5 and only learning about the problem
+  from server-side error toasts. The browser's native :invalid popup never fired.
+
+Two changes pin the contract:
+
+1. checkDirty now requires BOTH dirty state AND form.checkValidity() to enable Save. The button
+  remains disabled the moment any constraint is violated, on every keystroke (the existing
+  input/change listeners already trigger the recheck).
+
+2. handleAction calls form.checkValidity() and form.reportValidity() before posting to the server.
+  If anything is invalid, the native HTML5 balloon is shown, the first :invalid field receives
+  focus, and the request is bailed out before contacting the server. This is a defense in depth in
+  case the disabled gate is bypassed (e.g. programmatic click).
+
+A static-analysis test pins the helper, the validity gate, the reportValidity call ordering, and the
+  underlying HTML5 constraints on deviceName / interval so a future refactor can't silently regress
+  the fix.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Add arm64 install.sh end-to-end matrix (JTN-530)
+  ([#340](https://github.com/jtn0123/InkyPi/pull/340),
+  [`7990f47`](https://github.com/jtn0123/InkyPi/commit/7990f47f479b4d621ddfb0b5471ced20785e0d66))
+
+Adds a new install-matrix workflow that runs scripts/test_install_memcap.sh under arm64 QEMU
+  emulation against bullseye, bookworm, and trixie. JTN-528 (Trixie zramswap regression) went
+  undetected for the entire Trixie release cycle because no CI job exercised install.sh on each Pi
+  OS base; this matrix closes that gap. Standalone advisory job for now (not wired into ci-gate).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add per-PR startup memory diff comment (JTN-610)
+  ([#342](https://github.com/jtn0123/InkyPi/pull/342),
+  [`b9c129e`](https://github.com/jtn0123/InkyPi/commit/b9c129efc240ea0e0be1df6f23801fb01e36f24b))
+
+* ci: add per-PR startup memory diff comment (JTN-610)
+
+Every PR now gets a sticky comment showing how its startup allocator breakdown compares to the base
+  branch — an early warning for the slow memory creep that JTN-608's hard RSS budgets would only
+  catch after cumulative damage.
+
+- scripts/memory_diff.py: profiles `import inkypi` with memray (preferred) or stdlib tracemalloc
+  (fallback) and emits a stable JSON summary with the top 20 allocators, peak RSS, and sys.modules
+  count. - scripts/format_memory_diff.py: diffs two JSON summaries and renders a collapsible
+  Markdown table with a hidden sticky marker so force-pushes overwrite the existing comment instead
+  of spamming new ones. - .github/workflows/memory-diff.yml: new pull_request workflow, marked
+  continue-on-error so it never blocks the PR (JTN-608 owns hard budgets). Measures both branches
+  via `git worktree add`, uploads raw JSON as an artifact, and posts/updates the sticky comment via
+  actions/github-script. - install/requirements-dev.in: declares memray (Linux only) so the next
+  lockfile regen picks it up; CI installs it explicitly in the meantime. -
+  tests/unit/test_install_scripts.py: adds TestMemoryDiffWorkflow with 13 structural assertions
+  covering the workflow triggers, non-blocking posture, sticky marker contract, and helper script
+  presence.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(memory-diff): use memray Python API + soft-fail on capture errors
+
+The first CI run exposed two bugs:
+
+1. `memray stats --json` does not emit JSON to stdout — it writes a human-readable report. Switched
+  to memray's FileReader Python API (`get_high_watermark_allocation_records`) which is the
+  documented machine-readable surface and aggregates allocations live at peak RSS (more meaningful
+  than total-ever-allocated because short-lived churn is excluded). 2. A memray backend failure
+  would crash the whole job. Now wrapped in a try/except that falls back to tracemalloc so the
+  comment still posts, matching the JTN-610 "tolerant of first-time setup" requirement.
+
+Also hardened the workflow's PR-measurement step to soft-fail so the formatter always runs and posts
+  a "backend unavailable" comment rather than leaving the PR with no signal at all.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Promote JTN-609 install crash-loop test to a mandatory CI gate (JTN-614)
+  ([#343](https://github.com/jtn0123/InkyPi/pull/343),
+  [`f6de982`](https://github.com/jtn0123/InkyPi/commit/f6de982bfa28e3fad8cce294bfdfb19b51be8e8a))
+
+JTN-609 landed `tests/integration/test_install_crash_loop.py` as a Docker-based regression gate that
+  verifies both JTN-600 (systemctl disable during install) and JTN-607 (install-in-progress
+  lockfile) prevent a mid-install crash from spawning a restart loop that would OOM a Pi Zero 2 W.
+  The test was left auto-skipping on runners without Docker to avoid a merge conflict with JTN-608
+  (PR #336) which was touching the smoke test script in parallel. Both have merged, so it is safe to
+  wire this in as a blocking CI gate.
+
+Changes:
+
+- New job `install-crash-loop-gate` in `.github/workflows/ci.yml`, runs on `ubuntu-latest` (Docker
+  available), 10 min timeout. Sets `REQUIRE_INSTALL_CRASH_LOOP_TEST=1` so the test fails hard if
+  Docker is unexpectedly missing rather than silently skipping. - Added to the `ci-gate` `needs:`
+  list and to the required-success loop (`.github/workflows/ci.yml:661`) alongside
+  `install-smoke-memcap`, so a regression that breaks JTN-600 or JTN-607 now blocks merge. -
+  Documented the CI hookup in `docs/testing.md`'s existing "Pi thrash protection regression gate"
+  section.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add snapshot/golden-file testing harness for plugin image outputs (JTN-509)
+  ([#332](https://github.com/jtn0123/InkyPi/pull/332),
+  [`29fc557`](https://github.com/jtn0123/InkyPi/commit/29fc557c0724bcfdb7bbd8377da396d1b233c17b))
+
+* feat: add snapshot/golden-file testing harness for plugin image outputs (JTN-509)
+
+MVP — follow-ups to expand coverage (more plugins, CI diff upload).
+
+- tests/snapshots/snapshot_helper.py: tiny SHA-256 digest helper; no new deps -
+  tests/snapshots/test_plugin_snapshots.py: 3 snapshot tests covering year_progress (mid-year,
+  start-of-year) and countdown (future date) -
+  tests/snapshots/{year_progress,countdown}/*.{png,sha256}: captured baselines -
+  scripts/update_snapshots.py: interactive baseline regeneration script - .gitattributes: mark
+  tests/snapshots/**/*.png as binary - tests/snapshots/README.md: documents the pattern for future
+  contributors
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(tests): snapshot tests now actually render via Chromium (JTN-509)
+
+The original MVP was silently broken: every baseline was a blank white 2247-byte canvas because two
+  things conspired to bypass real rendering:
+
+1. The parent `tests/conftest.py` has an autouse `mock_screenshot` fixture that replaces
+  `take_screenshot_html` with a blank-canvas stub so the rest of the suite doesn't pay the Chromium
+  startup cost. Snapshot tests inherited this stub and always got the blank fallback. 2. The main
+  `Tests (pytest)` CI job doesn't install Playwright Chromium, so even without the stub the
+  `_screenshot_fallback()` in `base_plugin.py` would have produced the same blank.
+
+The old "tests" compared identical blanks on the sub-agent's macOS env (so they "passed" there),
+  then failed on Ubuntu CI because Pillow's PNG encoder emits slightly different bytes for a blank
+  canvas across envs.
+
+Fix: - Add `tests/snapshots/conftest.py` that overrides `mock_screenshot` with a no-op so real
+  Chromium rendering happens in this directory only. - Gate the tests with `pytestmark = skipif(not
+  REQUIRE_BROWSER_SMOKE)` so they skip cleanly anywhere without a working browser (local macOS dev
+  and the main pytest CI matrix) and only run in the browser-smoke CI job. - Add `tests/snapshots/`
+  to the `browser-smoke` pytest invocation in `.github/workflows/ci.yml`. - Switch
+  `snapshot_helper._image_sha256()` to hash the raw pixel buffer (`mode|WxH|tobytes()`) instead of
+  PNG bytes, so libpng/zlib version differences between environments don't cause spurious
+  mismatches. - Regenerate all 3 baselines inside a `linux/amd64` docker container with the pinned
+  requirements + Playwright Chromium installed, matching the browser-smoke CI env. The new baselines
+  are real rendered content (16-19 KB each, full 0-255 pixel range, all 3 distinct SHA-256 digests).
+  - Document the docker regeneration command and environment gating in `tests/snapshots/README.md`.
+
+Verified: in docker, `SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1 pytest tests/snapshots/` produces
+  real renders in ~6s, and a follow-up verify run without SNAPSHOT_UPDATE passes via digest match.
+  Locally on macOS without `REQUIRE_BROWSER_SMOKE` the 3 tests skip cleanly.
+
+* fix(tests): regenerate snapshot baselines in ubuntu:24.04 to match CI
+
+The previous commit captured baselines in a python:3.12-slim-bookworm (debian bookworm) docker
+  container, which has a different default-font set than the GitHub Actions ubuntu-latest
+  (ubuntu-24.04) runners. Even though plugin CSS injects the bundled Jost font via @font-face with a
+  file:// URL, Chromium's text rendering still varies slightly across base OSes — enough to produce
+  different pixel buffers and different SHA-256 digests.
+
+Regenerate all 3 baselines inside an ubuntu:24.04 container (which matches ubuntu-latest exactly)
+  with the pinned requirements + Playwright Chromium. Update the README's docker regeneration
+  command to use ubuntu:24.04 going forward so future updates don't hit the same drift.
+
+Verified in the same container: UPDATE run stores new baselines, VERIFY run passes via digest match.
+  All 3 PNGs contain real rendered content (full 0-255 pixel range across all channels) and 3
+  distinct SHA-256s.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **install**: Add crash-loop regression gate (JTN-609)
+  ([#338](https://github.com/jtn0123/InkyPi/pull/338),
+  [`4ec7921`](https://github.com/jtn0123/InkyPi/commit/4ec7921b0b9f816e97139cf0e55043bd3c55fbf7))
+
+On 2026-04-10 a real Pi Zero 2 W went into a memory-thrash cascade during an install because
+  install.sh stopped but did not disable inkypi.service. JTN-600 (systemctl disable in stop_service)
+  and JTN-607 (install-in-progress lockfile refused by ExecStartPre) are the fix. This commit is the
+  regression gate that proves both defenses stay effective.
+
+tests/integration/test_install_crash_loop.py boots a systemd-capable Debian container (privileged,
+  512 MB cap), installs inkypi.service verbatim with a stub ExecStart that mimics
+  ModuleNotFoundError: flask and touches a marker file the moment it runs, exercises
+  stop_service()'s disable contract, creates the install-in-progress lockfile, and then repeatedly
+  tries to start the service. The primary assertion is that the stub marker never appears — i.e.
+  ExecStart never runs — because the ExecStartPre guard refuses every attempt. A positive-control
+  step removes the lockfile and confirms ExecStart does run once the install is "complete" so the
+  pass condition is not vacuous.
+
+Observed on a clean run: NRestarts=2 (bounded by default StartLimitBurst), ExecMainPID=0, stub
+  marker absent. Mutation-tested by commenting out the lockfile touch — the test fails loudly with
+  ExecMainPID=132 and "ExecStart ran while install-in-progress lockfile was present", as expected.
+
+The test skips cleanly when Docker is unavailable; set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to
+  force-run and fail hard if Docker is missing. End-to-end wall-clock is ~55 s, well under the <5
+  min budget.
+
+docs/testing.md documents the gate as the canonical "Pi thrash protection regression gate" including
+  the three invariants it asserts.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.42.3 (2026-04-11)
 
 ### Bug Fixes
