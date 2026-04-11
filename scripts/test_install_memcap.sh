@@ -95,12 +95,15 @@ echo "[Phase 2] Running install.sh inside 512 MB-capped container ..."
 echo ""
 
 INSTALL_EXIT=0
+# Override the CMD to invoke install.sh via bash so the +x bit on the file
+# is not required (git stores install.sh as 100644, not 100755).
 if docker run \
     --rm \
     --platform linux/arm64 \
     --memory=512m \
     --memory-swap=512m \
-    "${IMAGE_TAG}"; then
+    "${IMAGE_TAG}" \
+    bash -c "cd /InkyPi/install && bash install.sh"; then
     INSTALL_EXIT=0
 else
     INSTALL_EXIT=$?
