@@ -40,6 +40,11 @@
     // Dirty-tracking state: true when any field has changed since last save/load.
     let _isDirty = false;
 
+    // Monotonic suffix for unique id/name/label on JS-built rows (JTN-383).
+    // Each call to addRow bumps this so assistive-tech and autofill can
+    // distinguish the inputs even when multiple rows are added in a session.
+    let _rowCounter = 0;
+
     function markDirty() {
       _isDirty = true;
       const saveBtn = document.getElementById("saveApiKeysBtn");
@@ -214,6 +219,27 @@
       updateManagedSummary();
     }
 
+    // Keep delete-button + value-input aria-labels in sync with the current
+    // key name so assistive tech hears "API key value for OPEN_AI_SECRET"
+    // instead of the generic "API key value" after the user types a name.
+    function updateRowAriaLabels(row, keyName) {
+      const trimmed = (keyName || "").trim();
+      const valInput = row.querySelector(".apikey-value");
+      const delBtn = row.querySelector(".btn-delete");
+      if (valInput) {
+        valInput.setAttribute(
+          "aria-label",
+          trimmed ? `API key value for ${trimmed}` : "API key value"
+        );
+      }
+      if (delBtn) {
+        delBtn.setAttribute(
+          "aria-label",
+          trimmed ? `Delete ${trimmed} API key` : "Delete API key row"
+        );
+      }
+    }
+
     function addRow(key = "", value = "") {
       markDirty();
       const emptyState = document.getElementById("empty-state");
@@ -223,6 +249,8 @@
         console.warn("api_keys_page: #apikeys-list not found in DOM");
         return;
       }
+      _rowCounter += 1;
+      const suffix = `new-${_rowCounter}`;
       const row = document.createElement("div");
       row.className = "apikey-row";
       row.dataset.existing = "false";
@@ -231,21 +259,31 @@
       keyInput.className = "apikey-key";
       keyInput.value = key;
       keyInput.placeholder = "KEY_NAME";
+      keyInput.id = `apikey-name-${suffix}`;
+      keyInput.name = `apikey-name-${suffix}`;
+      keyInput.setAttribute("aria-label", "API key name");
       const valInput = document.createElement("input");
       valInput.type = "text";
       valInput.className = "apikey-value";
       valInput.value = value;
       valInput.placeholder = "Enter value";
+      valInput.id = `apikey-value-${suffix}`;
+      valInput.name = `apikey-value-${suffix}`;
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "btn-delete";
       delBtn.dataset.apiAction = "delete-row";
       delBtn.title = "Delete";
-      delBtn.setAttribute("aria-label", "Delete API key");
       delBtn.textContent = "\u00d7";
       row.appendChild(keyInput);
       row.appendChild(valInput);
       row.appendChild(delBtn);
+      // Initialize aria-labels now; re-run on every keyInput change so the
+      // label tracks the key name the user just typed.
+      updateRowAriaLabels(row, key);
+      keyInput.addEventListener("input", () =>
+        updateRowAriaLabels(row, keyInput.value)
+      );
       list.appendChild(row);
       (key ? row.querySelector(".apikey-value") : row.querySelector(".apikey-key")).focus();
     }
