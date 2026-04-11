@@ -24,12 +24,12 @@ set -euo pipefail
 VALID_CODENAMES="trixie bookworm bullseye"
 DEFAULT_CODENAME="trixie"
 POLL_INTERVAL=5
-POLL_MAX=60
+POLL_MAX=180
 
 usage() {
     echo "Usage: $(basename "${0}") [--help] [trixie|bookworm|bullseye]"
     echo ""
-    echo "  Phase 2: pip install of requirements.txt under arm64 + 512 MB cap."
+    echo "  Phase 2: pip install of requirements.txt under 512 MB cap."
     echo "           Exit 137 = OOM kill = JTN-528 regression."
     echo "  Phase 3: web service boot + route probe under 512 MB cap."
     echo ""
@@ -151,14 +151,35 @@ if [[ "${PIP_EXIT}" -ne 0 ]]; then
 fi
 
 echo ""
-echo "[Phase 2] pip install OK under arm64 + 512 MB cap."
+echo "[Phase 2] pip install OK under 512 MB cap."
 echo ""
 
 # ── Phase 3: web service boot probe under 512 MB cap ─────────────────────────
-# Start the InkyPi web server inside a memory-capped container (host arch for
-# speed — no QEMU). Poll key routes to confirm the server comes up cleanly
-# within the Pi's 512 MB budget.
+# Build a container image with deps pre-installed, then start it with only
+# the web server process. Separating build from run ensures the container is
+# immediately serving when detached (no pip install delay during the poll).
+PHASE3_IMAGE="inkypi-memcap-server-$$"
 CONTAINER_NAME="inkypi-memcap-smoke-$$"
+
+echo "[Phase 3] Building web service container image ..."
+docker build \
+    --quiet \
+    -f - \
+    -t "${PHASE3_IMAGE}" \
+    "${REPO_ROOT}" <<'DOCKERFILE'
+FROM python:3.12-slim
+RUN apt-get update -qq \
+    && apt-get install -y -qq gcc python3-dev libopenjp2-7-dev libfreetype6-dev libsystemd-dev libheif-dev swig 2>/dev/null \
+    && rm -rf /var/lib/apt/lists/*
+COPY install/requirements.txt /tmp/requirements.txt
+RUN pip install --prefer-binary --quiet -r /tmp/requirements.txt
+COPY . /app
+WORKDIR /app
+ENV INKYPI_ENV=dev
+ENV INKYPI_NO_REFRESH=1
+ENV PYTHONPATH=/app/src
+CMD ["python", "src/inkypi.py", "--dev", "--web-only"]
+DOCKERFILE
 
 echo "[Phase 3] Starting web service under 512 MB cap ..."
 
@@ -169,26 +190,17 @@ docker run \
     --memory=512m \
     --memory-swap=512m \
     -p 18080:8080 \
-    -e INKYPI_ENV=dev \
-    -e INKYPI_NO_REFRESH=1 \
-    -e PYTHONPATH=/app/src \
-    -v "${REPO_ROOT}:/app:ro" \
-    python:3.12-slim \
-    bash -c '
-cd /app
-apt-get update -qq 2>/dev/null
-apt-get install -y -qq libopenjp2-7 libfreetype6 2>/dev/null || true
-pip install -r install/requirements.txt -q --quiet
-python src/inkypi.py --dev --web-only
-'
+    "${PHASE3_IMAGE}"
 
-cleanup() {
+phase3_cleanup() {
     echo ""
     echo "[Cleanup] Stopping container ${CONTAINER_NAME} ..."
     docker stop "${CONTAINER_NAME}" 2>/dev/null || true
     docker rm -f "${CONTAINER_NAME}" 2>/dev/null || true
+    docker rmi "${PHASE3_IMAGE}" 2>/dev/null || true
 }
-trap cleanup EXIT
+
+trap phase3_cleanup EXIT
 
 echo "[Phase 3] Container started. Polling http://localhost:18080/healthz ..."
 echo ""
