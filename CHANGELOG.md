@@ -1,6 +1,278 @@
 # CHANGELOG
 
 
+## v0.43.1 (2026-04-11)
+
+### Bug Fixes
+
+- **ci**: Make peak RSS sample actually exercise render path (JTN-613)
+  ([#348](https://github.com/jtn0123/InkyPi/pull/348),
+  [`feee3cd`](https://github.com/jtn0123/InkyPi/commit/feee3cdb5aa945e0f6ebaedab29f551e95b1ce09))
+
+* fix(ci): make peak RSS sample actually exercise render path (JTN-613)
+
+JTN-608 added idle/peak RSS budgets but the first Phase 4 run reported peak == idle (58 MB both)
+  because the render-exercise loop POSTed to /update_now in a --web-only container without a CSRF
+  token — the request was rejected with 403 before any plugin code ran. The peak budget was silently
+  equivalent to the idle budget and would never catch a render-path regression.
+
+Fix: introduce an opt-in /__smoke/render endpoint (src/app_setup/smoke.py) gated on
+  INKYPI_SMOKE_FORCE_RENDER=1. When the env var is set at startup, Flask registers a CSRF-exempt
+  POST route that calls plugin.generate_image() directly in-process (no display manager push) and
+  returns the image dimensions. Production builds never set the env var, so the route is absent from
+  real deployments.
+
+scripts/test_install_memcap.sh Phase 4 now: - Sets INKYPI_SMOKE_FORCE_RENDER=1 in the Phase 3
+  Dockerfile - Hits /__smoke/render (not /update_now) with plugin_id=clock three times to build up a
+  sustained working set - Aborts loudly if /__smoke/render returns anything other than 200 -
+  Enforces a JTN-613 sanity gate: peak RSS must be >= idle + 5 MB or the harness is considered
+  broken and fails the CI job
+
+Verified locally: `INKYPI_SMOKE_FORCE_RENDER=1 python src/inkypi.py --dev --web-only` registers
+  /__smoke/render and POST clock plugin returns {"ok":true,"width":800,"height":480,...}. Without
+  the env var, the route is not in app.url_map and the POST is rejected with 403 as before.
+
+JTN-608 budgets (idle <200 MB, peak <300 MB) are unchanged — this commit fixes HOW we measure peak,
+  not the thresholds.
+
+Tests: tests/unit/test_smoke_render.py (20 tests covering registration gating, CSRF exemption,
+  generate_image invocation, display-manager isolation, error paths) and a new
+  TestInstallMemcapSmoke class in tests/unit/test_install_scripts.py (11 structural tests pinning
+  the harness changes).
+
+Parent: JTN-608 (PR #336)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(ci): avoid useless cat in smoke render error path (SC2002)
+
+CI shellcheck is stricter than the local version and flagged `cat "${LOG_DIR}/smoke-render.json" |
+  head -20` as SC2002. Rewrite as `head -20 "${LOG_DIR}/smoke-render.json"` to quiet the warning
+  without changing behaviour.
+
+* style: format merged install script tests
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **security**: Suppress CodeQL false positives with justification (JTN-320)
+  ([#347](https://github.com/jtn0123/InkyPi/pull/347),
+  [`a9fb070`](https://github.com/jtn0123/InkyPi/commit/a9fb070ff540c50e7556bd8598240dd2132a7266))
+
+* chore(security): suppress CodeQL false positives with justification (JTN-320)
+
+Triages 12 of 52 open CodeQL alerts. Each suppressed alert lives in code that the taint tracker
+  cannot fully model (validation/sanitization helpers, log sites that handle non-credential data, or
+  static template assertions). Every suppression carries a specific justification at the call site
+  so future maintainers can re-audit it.
+
+- src/plugins/weather/weather_api.py (3) and weather_data.py (1):
+  py/clear-text-logging-sensitive-data — logs OWM/Open-Meteo response bodies and IANA timezone
+  strings, never the api_key. - src/plugins/base_plugin/base_plugin.py (3):
+  py/clear-text-logging-sensitive-data — logs CSS file paths, file-read errors, and user-provided
+  extra_css styling string. None are credentials. - src/static/scripts/playlist.js (1):
+  js/xss-through-dom — assigning to img.src cannot execute JavaScript. - scripts/diag_network.py
+  (1): py/insecure-protocol — ssl.create_default_context() disables TLSv1/1.1 by default since
+  Python 3.6; CodeQL heuristic is wrong. - tests/static/test_plugin_settings_polish.py (1):
+  py/incomplete-url-substring-sanitization — assertion is checking that a Jinja template's static
+  placeholder text contains an example hostname, not validating a URL.
+
+The four py/incomplete-url-substring-sanitization alerts in tests/plugins/ test_apod.py and
+  scripts/render_weather_mock.py were refactored to use urlparse().netloc equality (and path/host
+  inspection in render_weather_mock) rather than suppressed — that is the cleaner fix for those
+  sites.
+
+Adds a "CodeQL suppression policy" section to docs/development.md documenting the lgtm comment
+  format, the requirement that every suppression include a justification, and the prohibition on
+  suppressing alerts in src/blueprints/ files until JTN-318 lands.
+
+Blueprint FP suppressions (~28 alerts in src/blueprints/** and src/utils/http_utils.py) are deferred
+  to a follow-up after JTN-318 closes, since the user is actively rewriting those response paths.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(security): resolve remaining CodeQL alerts
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- Add arm64 install.sh end-to-end matrix for Pi OS bases (JTN-530)
+  ([#341](https://github.com/jtn0123/InkyPi/pull/341),
+  [`1b45c92`](https://github.com/jtn0123/InkyPi/commit/1b45c92d977f71b4051a81c396d3653976ac19a1))
+
+* ci: add arm64 install.sh end-to-end matrix for Pi OS bases (JTN-530)
+
+JTN-528 silently broke Pi Zero 2 W installs on Trixie for an entire release cycle because no CI job
+  ran install/install.sh against each supported Pi OS base. A matrix job would have caught the
+  regression on PR day.
+
+Adds a new install-matrix CI job that runs install.sh end-to-end inside an arm64 Debian container
+  (with the Pi OS apt repo layered on so Pi-only packages resolve) for each supported codename:
+
+* debian:bullseye (Pi OS 11) * debian:bookworm (Pi OS 12) * debian:trixie (Pi OS 13)
+
+Each matrix leg: - builds a dedicated arm64 image (scripts/Dockerfile.install-matrix) with
+  raspi-config and systemctl no-op shims, a /boot/firmware/ config.txt stub, and the systemd package
+  (for systemd-analyze), - runs install.sh under a 512 MB memory cap (JTN-536 parity) so
+  Trixie-specific OOMs during install are also caught, - asserts install.sh exits 0, - asserts the
+  venv was created at /usr/local/inkypi/venv_inkypi, - asserts the venv imports flask, waitress, and
+  Pillow, - asserts install/inkypi.service parses under systemd-analyze verify.
+
+The matrix feeds into ci-gate.needs and the required-success loop so a failing leg blocks merge.
+  INKYPI_SKIP_WHEELHOUSE=1 is set inside the container so the matrix exercises the source pip
+  install path — a pre-built wheelhouse would mask a broken requirements.txt.
+
+Design notes: * Chose the Pi OS apt repo approach over vanilla Debian with a skip-list because
+  install.sh really does install liblgpio-dev and chromium-headless-shell, and both only resolve via
+  archive.raspberrypi.com. The existing Dockerfile.sim-install already has this pattern working. *
+  [trusted=yes] is used on the Pi OS apt line as a sim-only workaround for Debian Trixie's sqv
+  rejecting the SHA1 signature archive.raspberrypi.com uses. Real Pi OS ships its own patched apt
+  and does not hit this; the header comment warns not to copy the line to production configs. *
+  Plain debian:<codename> tags are used with no date pins to avoid silent rot. Bumping the base is a
+  one-line change inside the matrix. * The existing Install smoke (512 MB memory cap) job (JTN-536)
+  is left untouched. This matrix adds to, doesn't replace.
+
+Also adds a TestInstallMatrixWorkflow class in tests/unit/test_install_scripts.py (19 structural
+  assertions) that fails CI if the workflow file, Dockerfile, or verification script are silently
+  deleted or lose their install-matrix wiring.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: drop ln -sf for systemctl shim on usrmerge layouts (JTN-530)
+
+The first install-matrix run failed on bookworm with:
+
+ln: '/usr/bin/systemctl' and '/bin/systemctl' are the same file
+
+On Debian bullseye/bookworm/trixie, /bin is a usrmerge symlink to /usr/bin so overwriting
+  /usr/bin/systemctl already covers /bin/systemctl (they share an inode). Attempting a second `ln
+  -sf` fails with "same file" and kills the build. Drop the redundant symlink — the single
+  /usr/bin/systemctl write now covers both paths on all three codenames.
+
+* fix(ci): invoke install.sh via bash in install matrix
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add nightly OS drift detector for install path (JTN-535)
+  ([#339](https://github.com/jtn0123/InkyPi/pull/339),
+  [`f52da41`](https://github.com/jtn0123/InkyPi/commit/f52da41ec608b9a555b8fbcb885352cf18e11269))
+
+* ci: add nightly OS drift detector for install path (JTN-535)
+
+Add .github/workflows/os-drift-nightly.yml — a daily cron (08:00 UTC) that re-runs the install path
+  against the LATEST unpinned debian:trixie, debian:bookworm, and debian:bullseye images. This is
+  the unpinned complement to the pinned PR-gating install matrix from JTN-530.
+
+Each matrix leg asserts: - every package in install/debian-requirements.txt resolves via apt-cache
+  show on the latest base image - install/requirements.txt still resolves via pip install --dry-run
+  - scripts/sim_install.sh (JTN-532) runs install/install.sh end-to-end inside a 512 MB arm64 sim of
+  the Pi Zero 2 W
+
+On failure, a dedicated job opens a GitHub issue labelled os-drift/bug with the failing codename(s),
+  diagnostic logs, and a link to the run, de-duping against any existing open drift issue so
+  consecutive failures append a comment instead of spamming fresh issues. Workflow has no PR trigger
+  on purpose — it is a drift detector, not a PR gate, and a broken nightly must never block merges.
+
+Add TestOsDriftNightlyWorkflow in tests/unit/test_install_scripts.py with structural assertions
+  (file exists, cron is set, no PR trigger, all three codenames present, unpinned images, end-to-end
+  sim invoked, failure path files an issue, references JTN-535) to prevent silent deletion — losing
+  this drift detector was the exact class of regression that let JTN-528 (zramswap on Trixie) slip
+  through the whole Trixie release cycle.
+
+Document the workflow in docs/testing.md including triage guidance for single-leg vs multi-leg
+  failures.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(ci): address os-drift workflow review feedback
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **image**: Publish pre-installed Pi Zero 2 W image (JTN-533)
+  ([#346](https://github.com/jtn0123/InkyPi/pull/346),
+  [`6fe2c18`](https://github.com/jtn0123/InkyPi/commit/6fe2c18ce1e5594c12a8c5b37e9c7ee9bbe50731))
+
+* ci(image): publish pre-installed Pi Zero 2 W image (JTN-533)
+
+Adds .github/workflows/build-pi-image.yml — a release-time workflow that builds a pre-installed
+  inkypi-<version>-pi-zero-2-w.img.xz, boot-verifies it in qemu-system-aarch64, and attaches it to
+  the GitHub release.
+
+Shipping a pre-installed image collapses the ~15 minute on-device install.sh run on a Pi Zero 2 W
+  into a ~60 second flash-and-boot, and eliminates the install-failure support surface entirely for
+  new users.
+
+How it works: 1. Download + checksum-verify a pinned Pi OS Lite arm64 base image (URL + SHA256 live
+  in a clearly-marked top-of-file PIN POINT block). 2. Loop-mount + bind-mount /proc /sys /dev, copy
+  qemu-aarch64-static. 3. Drop raspi-config / systemctl no-op stubs on PATH inside the chroot so
+  install.sh's runtime hooks don't fail mid-build (does NOT modify install.sh — option 2
+  source-install stays self-contained). 4. Clone InkyPi at the release tag, run install/install.sh
+  unchanged. 5. Clean caches, zero-fill free space, unmount, shrink with pishrink.sh (pinned by full
+  commit SHA), recompress with xz -9. 6. Boot-verify in qemu-system-aarch64 with a 4-minute
+  login-prompt grep. 7. Only if verification passes, attach image + .sha256 via
+  softprops/action-gh-release@v2 (same pattern as JTN-604 wheelhouse).
+
+Docs (docs/installation.md): - New "Option 1 — Pre-built image" section at the top of the install
+  guide, covering download, sha256 verification, Pi Imager advanced options for hostname/Wi-Fi/SSH
+  (no credentials are baked into the image), and Pi Zero 2 W-only scope. - Existing install.sh flow
+  demoted to "Option 2 — Install from source (contributors, custom boards)".
+
+Tests (tests/unit/test_install_scripts.py): - 20 new structural assertions in
+  TestPiImageBuildWorkflow covering trigger events, pinned URL + SHA, chroot + qemu plumbing,
+  release-tag clone, pishrink pinning, xz -9 recompression, boot-verify job, and the attach-release
+  gate that blocks unverified images from shipping. - 5 new assertions in
+  TestInstallationDocPreBuiltImage verifying the new docs section covers .img.xz, .sha256, Pi Zero 2
+  W scope, and references JTN-533.
+
+Unverified vs verified (flagged in PR body): - The workflow's qemu boot-verify step proves kernel +
+  userspace + getty reach "login:" but cannot simulate Pi GPIO/SPI hardware. Treat the first shipped
+  image as dogfood-ready, not production-ready, until real-Pi verification lands (follow-up in the
+  same Linear epic). - qemu-user-static + chroot can give false successes — something that works in
+  the chroot can still fail on real hardware.
+
+Supply-chain: - Pi OS image: pinned URL + 64-char SHA256 in env block - pishrink.sh: pinned 40-char
+  commit SHA, fetched at build time (not vendored — avoids maintaining a third-party script in-tree)
+  - Every GitHub action pinned by major version (@v4 / @v2)
+
+113/113 tests pass in tests/unit/test_install_scripts.py (25 new). Two unrelated failures in
+  tests/unit/test_plugin_registry.py also fail on main at 4ec7921 — tracked separately.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(deps): regenerate pip-compile lockfiles to clear CI drift
+
+CI's Lockfile drift check has been failing on every recent PR because upstream packages have been
+  bumped since the last regeneration. This is a pure `pip-compile --upgrade` refresh — no changes to
+  `.in` files, no scope change. Lockfiles are back in sync with both requirements.in and
+  requirements-dev.in (verified via scripts/check_requirements_drift.sh).
+
+Notable bumps: werkzeug 3.1.6 -> 3.1.8, cyclonedx-bom 6.1.0 -> 6.1.3, cyclonedx-python-lib 9.1.0 ->
+  10.5.0, feedparser 6.0.11 -> 6.0.12, and their transitive closure. All versions still satisfy the
+  ranges in install/requirements*.in, so this is a lockfile refresh only.
+
+The manually-maintained Linux-only block at the bottom of requirements.txt (cysystemd, spidev, etc.)
+  is preserved verbatim — only the pip-compile region above the sentinel changed.
+
+Split from the JTN-533 image-build workflow commit because it's unrelated to image building and
+  should not be gated on that review.
+
+* test(security): avoid substring URL checks in workflow assertions
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.0 (2026-04-11)
 
 ### Bug Fixes
