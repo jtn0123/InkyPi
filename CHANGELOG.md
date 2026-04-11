@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.39.1 (2026-04-11)
+
+### Bug Fixes
+
+- Add OOMScoreAdjust=500 to inkypi.service to preserve sshd during OOM (JTN-601)
+  ([#316](https://github.com/jtn0123/InkyPi/pull/316),
+  [`f3edbc9`](https://github.com/jtn0123/InkyPi/commit/f3edbc91709133593625a289e2021804749c3d4e))
+
+On a real Pi Zero 2 W during install-time memory thrash, earlyoom was killing sshd and making the Pi
+  unreachable (required hard power cycle). Setting OOMScoreAdjust=500 makes inkypi the preferred OOM
+  victim so we can still SSH in to debug.
+
+Positive value is intentional: sshd/systemd-journald run at -500 or -1000 by default, so a +500 bias
+  on inkypi means the kernel picks it first. A negative value would protect inkypi and sacrifice
+  sshd — exactly the opposite of what we want.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.0 (2026-04-11)
 
 ### Features
