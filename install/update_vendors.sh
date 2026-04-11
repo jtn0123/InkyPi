@@ -2,6 +2,20 @@
 
 set -euo pipefail
 
+# JTN-615: vendor file destinations are specified relative to the repo root
+# (e.g. `src/static/styles/select2.min.css`), so the script MUST run with cwd
+# set to the repo root regardless of how install.sh invokes it. install.sh
+# calls us via `bash "$SCRIPT_DIR/update_vendors.sh"`, which does not change
+# cwd — so we were writing to $PWD/src/static/... which only existed when the
+# user happened to invoke install.sh from the repo root. In CI (Dockerfile
+# WORKDIR = /InkyPi/install), the relative path resolved to a non-existent
+# directory and every curl call failed with exit 23 ("Failure writing output
+# to destination"). Anchor cwd to the repo root here so relative paths always
+# resolve correctly.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 # Versions
 SELECT2_VERSION="4.1.0-beta.1"
 FULLCALENDAR_VERSION="6.1.17"

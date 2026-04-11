@@ -1142,6 +1142,69 @@ class TestInstallationDocPreBuiltImage:
         assert "JTN-533" in self.content
 
 
+# ---- update_vendors.sh ----
+
+
+class TestUpdateVendorsScript:
+    """JTN-615: update_vendors.sh must anchor cwd to repo root before writing.
+
+    install.sh invokes it via `bash "$SCRIPT_DIR/update_vendors.sh"` without
+    changing cwd. Vendor destinations are specified relative to the repo root
+    (e.g. `src/static/styles/select2.min.css`), so the script must `cd` to
+    the repo root itself — otherwise curl writes to `$PWD/src/static/...`,
+    which in CI (container WORKDIR=/InkyPi/install) is a non-existent path and
+    every download fails with `curl: (23) Failure writing output to destination`.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("update_vendors.sh")
+
+    def test_script_anchors_cwd_to_repo_root(self):
+        # The fix uses BASH_SOURCE + cd. Assert both pieces are present so
+        # a future refactor can't accidentally drop the cd without tripping
+        # this regression gate.
+        assert "BASH_SOURCE" in self.content, (
+            "update_vendors.sh must derive its own location via BASH_SOURCE "
+            "so relative vendor paths resolve correctly regardless of caller cwd"
+        )
+        assert (
+            "cd " in self.content
+        ), "update_vendors.sh must cd to the repo root before invoking curl"
+
+    def test_script_mentions_jtn_615(self):
+        assert "JTN-615" in self.content, (
+            "update_vendors.sh should reference JTN-615 in a comment explaining "
+            "the cwd-anchoring requirement so the intent survives future edits"
+        )
+
+    def test_vendor_destinations_are_repo_root_relative(self):
+        # Every VENDORS entry has the form "name|url|output_path" on its own
+        # line inside the `declare -a VENDORS=( ... )` block. The output paths
+        # must still start with `src/static/` (not `../src/static/` or an
+        # absolute path) — the fix is to cd *into* the repo root, not to
+        # rewrite every destination.
+        import re
+
+        # Match lines like: `  "Select2 CSS|https://.../x.css|src/static/..."`
+        vendor_lines = re.findall(
+            r'^\s*"[^"|]+\|https?://[^"|]+\|([^"|]+)"', self.content, re.MULTILINE
+        )
+        assert vendor_lines, "No vendor entries found in update_vendors.sh"
+        for path in vendor_lines:
+            assert path.startswith("src/static/"), (
+                f"Vendor destination {path!r} must be relative to the repo "
+                f"root (start with 'src/static/'); update_vendors.sh now "
+                f"anchors cwd to the repo root so this works."
+            )
+
+    def test_install_sh_invokes_update_vendors(self):
+        # Sanity check that install.sh still actually calls update_vendors.sh
+        # (the consumer side of the contract this test exists to protect).
+        install_sh = _read("install.sh")
+        assert "update_vendors.sh" in install_sh
+
+
 # ---- update.sh ----
 
 
