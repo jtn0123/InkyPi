@@ -10,6 +10,7 @@ import gc
 import logging
 import os
 import tempfile
+import threading
 from io import BytesIO
 
 import psutil
@@ -24,7 +25,10 @@ logger = logging.getLogger(__name__)
 # loaded so pi_heif (~3 MB native extension + ~28 ms import time) does not
 # inflate the startup RSS on low-memory devices.  The flag is checked once
 # per load call and the registration is a no-op after the first success.
+# Access is guarded by a lock so concurrent request threads cannot both
+# pass the check-then-act and trigger redundant registration.
 _HEIF_OPENER_REGISTERED = False
+_HEIF_OPENER_LOCK = threading.Lock()
 
 
 def _ensure_heif_opener() -> None:
@@ -32,20 +36,24 @@ def _ensure_heif_opener() -> None:
 
     Called from every ``AdaptiveImageLoader`` entry point so that pi_heif
     is imported only when the process actually decodes an image, rather
-    than eagerly at module load time.
+    than eagerly at module load time.  Uses a double-checked locking
+    pattern so concurrent uploads don't race on first registration.
     """
     global _HEIF_OPENER_REGISTERED
     if _HEIF_OPENER_REGISTERED:
         return
-    try:
-        from pi_heif import register_heif_opener
+    with _HEIF_OPENER_LOCK:
+        if _HEIF_OPENER_REGISTERED:
+            return
+        try:
+            from pi_heif import register_heif_opener
 
-        register_heif_opener()
-    except ImportError:
-        # pi-heif not installed — HEIF/HEIC uploads will fall back to
-        # PIL's native error path.  Flag is still set so we don't retry.
-        pass
-    _HEIF_OPENER_REGISTERED = True
+            register_heif_opener()
+        except ImportError:
+            # pi-heif not installed — HEIF/HEIC uploads will fall back to
+            # PIL's native error path.  Flag is still set so we don't retry.
+            pass
+        _HEIF_OPENER_REGISTERED = True
 
 
 def _is_low_resource_device():
