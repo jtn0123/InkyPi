@@ -85,6 +85,8 @@ jobs:
           bash -n scripts/web_only.sh
           bash -n scripts/check_licenses.sh
           bash -n scripts/precommit_browser_warning.sh
+          bash -n scripts/sim_install.sh
+          bash -n scripts/test_install_memcap.sh
       - name: Run shellcheck
         run: |
           # Run shellcheck linting on all shell scripts
@@ -593,9 +595,29 @@ jobs:
           path: runtime/mock_display_output/browser_smoke_failures
           if-no-files-found: ignore
 
+  install-smoke-memcap:
+    name: Install smoke (512 MB memory cap)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run 512 MB memory-cap smoke test
+        run: |
+          ./scripts/test_install_memcap.sh trixie
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-smoke-memcap-logs
+          path: /tmp/inkypi-smoke-logs
+          if-no-files-found: ignore
+
   ci-gate:
     name: CI gate (all checks pass)
-    needs: [lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke]
+    needs: [lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, install-smoke-memcap]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -608,7 +630,7 @@ jobs:
           echo "$results"
 
           # Jobs that must be 'success'
-          for job in lint shellcheck tests smoke smoke-matrix coverage-gate security browser-smoke; do
+          for job in lint shellcheck tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap; do
             result=$(echo "$results" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$job',{}).get('result','missing'))")
             if [ "$result" != "success" ]; then
               echo "Required job '$job' did not succeed (result: $result)"
