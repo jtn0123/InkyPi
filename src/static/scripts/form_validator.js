@@ -104,14 +104,80 @@
   }
 
   function validateAllInputs(form) {
+    // Backwards-compatible shim: older callers only need the count.
+    return validateAllInputsDetailed(form).count;
+  }
+
+  // Returns the human-facing label for an invalid input, used to build
+  // specific validation messages. Lookup order prefers explicit author hints
+  // (data-label, aria-label) over DOM-derived labels so we never fall back
+  // to an unhelpful titlecased `name` when the author provided a real label.
+  function getInputLabel(input) {
+    if (!input) return "This field";
+    var dataLabel = input.getAttribute("data-label");
+    if (dataLabel) return dataLabel.trim();
+    var ariaLabel = input.getAttribute("aria-label");
+    if (ariaLabel) return ariaLabel.trim();
+    var id = input.id;
+    if (id) {
+      var explicit = document.querySelector('label[for="' + id + '"]');
+      if (explicit && explicit.textContent) {
+        return explicit.textContent.trim().replace(/\s+/g, " ");
+      }
+    }
+    var wrapping = input.closest("label");
+    if (wrapping && wrapping.textContent) {
+      return wrapping.textContent.trim().replace(/\s+/g, " ");
+    }
+    if (input.name) {
+      return input.name.charAt(0).toUpperCase() + input.name.slice(1);
+    }
+    return "This field";
+  }
+
+  function classifyInvalid(input) {
+    var value = (input.value || "").trim();
+    return input.required && !value ? "required" : "invalid";
+  }
+
+  function validateAllInputsDetailed(form) {
     var inputs = form.querySelectorAll(
-      "input[required], input[type='url'], input[type='number'], input[type='time'], select[required]"
+      "input[required], input[type='url'], input[type='number'], input[type='time'], textarea[required], select[required]"
     );
-    var errorCount = 0;
+    var invalid = [];
     inputs.forEach(function (input) {
-      if (!validateInput(input)) errorCount++;
+      if (!validateInput(input)) {
+        invalid.push({
+          input: input,
+          label: getInputLabel(input),
+          reason: classifyInvalid(input),
+        });
+      }
     });
-    return errorCount;
+    return { count: invalid.length, invalid: invalid };
+  }
+
+  function buildValidationMessage(result) {
+    if (!result || result.count === 0) return "";
+    var first = result.invalid[0];
+    var suffix = first.reason === "required" ? " is required" : " is invalid";
+    var base = first.label + suffix;
+    if (result.count === 1) return base;
+    return base + " (and " + (result.count - 1) + " more)";
+  }
+
+  function focusFirstInvalid(form) {
+    var firstInvalid = form.querySelector('[aria-invalid="true"]');
+    if (firstInvalid && typeof firstInvalid.focus === "function") {
+      firstInvalid.focus();
+      if (typeof firstInvalid.scrollIntoView === "function") {
+        try {
+          firstInvalid.scrollIntoView({ block: "center", behavior: "smooth" });
+        } catch {
+          firstInvalid.scrollIntoView();
+        }
+      }
+    }
   }
 
   function initFormValidation(formOrSelector) {
@@ -141,11 +207,11 @@
 
     // Intercept submit to show validation summary
     form.addEventListener("submit", function (e) {
-      var errorCount = validateAllInputs(form);
-      if (errorCount > 0) {
+      var result = validateAllInputsDetailed(form);
+      if (result.count > 0) {
         e.preventDefault();
         if (typeof showToast === "function") {
-          showToast("error", errorCount + (errorCount === 1 ? " error needs" : " errors need") + " fixing before saving.");
+          showToast("error", buildValidationMessage(result));
         }
         // Visual shake feedback on blocked submit
         form.classList.add("form-shake");
@@ -153,9 +219,7 @@
           form.classList.remove("form-shake");
           form.removeEventListener("animationend", handler);
         });
-        // Focus first invalid input
-        var firstInvalid = form.querySelector('[aria-invalid="true"]');
-        if (firstInvalid) firstInvalid.focus();
+        focusFirstInvalid(form);
       }
     });
   }
@@ -171,5 +235,9 @@
     initFormValidation: initFormValidation,
     validateInput: validateInput,
     validateAllInputs: validateAllInputs,
+    validateAllInputsDetailed: validateAllInputsDetailed,
+    getInputLabel: getInputLabel,
+    buildValidationMessage: buildValidationMessage,
+    focusFirstInvalid: focusFirstInvalid,
   };
 })();

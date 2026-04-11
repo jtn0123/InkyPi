@@ -236,15 +236,18 @@
     async function handleAction(action, triggerButton) {
       if (!validateAddToPlaylistAction(action)) return;
 
-      // Validate settingsForm required fields (catches empty calendar URLs, etc.)
+      // Validate settingsForm required fields. Use validateAllInputsDetailed so
+      // the failure modal names the specific field (JTN-378) instead of a
+      // generic "N fields need fixing" count.
       const settingsForm = document.getElementById("settingsForm");
       if (settingsForm && globalThis.FormValidator) {
-        const errorCount = globalThis.FormValidator.validateAllInputs(settingsForm);
-        if (errorCount > 0) {
-          showResponseModal("failure",
-            errorCount + (errorCount === 1 ? " field needs" : " fields need") + " fixing before saving.");
-          const firstInvalid = settingsForm.querySelector("[aria-invalid=\"true\"]");
-          if (firstInvalid) firstInvalid.focus();
+        const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
+        if (result.count > 0) {
+          showResponseModal(
+            "failure",
+            globalThis.FormValidator.buildValidationMessage(result)
+          );
+          globalThis.FormValidator.focusFirstInvalid(settingsForm);
           return;
         }
       }
@@ -252,12 +255,13 @@
       if (action === "add_to_playlist") {
         const scheduleForm = document.getElementById("scheduleForm");
         if (scheduleForm && globalThis.FormValidator) {
-          const scheduleErrors = globalThis.FormValidator.validateAllInputs(scheduleForm);
-          if (scheduleErrors > 0) {
-            showResponseModal("failure",
-              scheduleErrors + (scheduleErrors === 1 ? " field needs" : " fields need") + " fixing before saving.");
-            const firstScheduleInvalid = scheduleForm.querySelector("[aria-invalid=\"true\"]");
-            if (firstScheduleInvalid) firstScheduleInvalid.focus();
+          const scheduleResult = globalThis.FormValidator.validateAllInputsDetailed(scheduleForm);
+          if (scheduleResult.count > 0) {
+            showResponseModal(
+              "failure",
+              globalThis.FormValidator.buildValidationMessage(scheduleResult)
+            );
+            globalThis.FormValidator.focusFirstInvalid(scheduleForm);
             return;
           }
         }
