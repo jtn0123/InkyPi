@@ -10,9 +10,10 @@ from pathlib import Path
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 EXPECTED_FILES = [
-    "src/utils/http_utils.py",
-    "src/utils/image_serving.py",
-    "src/refresh_task/task.py",
+    "src/app_setup/",
+    "src/blueprints/",
+    "src/utils/",
+    "src/refresh_task/",
 ]
 
 
@@ -41,8 +42,9 @@ class TestMutmutConfig:
     def test_expected_files_in_scope(self):
         cfg = _load_mutmut_config()
         paths = cfg.get("paths_to_mutate", "")
+        configured = {p.strip() for p in paths.split(",") if p.strip()}
         for expected in EXPECTED_FILES:
-            assert expected in paths, (
+            assert expected in configured, (
                 f"{expected} is not in paths_to_mutate — "
                 "do not remove files from mutation scope without a deliberate decision"
             )
@@ -68,3 +70,7 @@ class TestMutmutConfig:
                 f"Mutation scope references {rel_path} but file does not exist. "
                 "Either create the file or remove it from paths_to_mutate."
             )
+            if rel_path.endswith("/"):
+                assert full.is_dir(), f"{rel_path} should be a directory path"
+            else:
+                assert full.is_file(), f"{rel_path} should be a file path"

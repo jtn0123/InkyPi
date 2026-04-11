@@ -19,14 +19,18 @@ second opinion on test quality independent of coverage metrics.
 
 ## Which files are currently in scope?
 
-The initial scope is intentionally small to keep nightly run times reasonable.
-See `pyproject.toml` → `[tool.mutmut]` → `paths_to_mutate`:
+As of JTN-508 the scope was expanded from three individual files to four full
+directories. See `pyproject.toml` → `[tool.mutmut]` → `paths_to_mutate`:
 
-| File | Reason chosen |
+| Path | Reason chosen |
 |------|--------------|
-| `src/utils/http_utils.py` | Core HTTP helpers used by every plugin |
-| `src/utils/image_serving.py` | Image pipeline; subtle bugs here are hard to spot |
-| `src/refresh_task/task.py` | Refresh coordinator; scheduling logic is regression-prone |
+| `src/app_setup/` | Application bootstrap and middleware helpers |
+| `src/blueprints/` | All Flask blueprint route handlers |
+| `src/utils/` | All shared utilities (HTTP, image, security, i18n, etc.) |
+| `src/refresh_task/` | Refresh coordinator; scheduling logic is regression-prone |
+
+Any surviving mutations found by the nightly run against these expanded paths
+should be triaged as described in the follow-up issue linked to JTN-508.
 
 ## How to run locally
 
@@ -64,17 +68,17 @@ mutmut unapply
 
 ## How to expand scope
 
-1. Add the file path to `paths_to_mutate` in `pyproject.toml`:
+1. Add the directory (or file, if intentionally narrow) path to `paths_to_mutate` in `pyproject.toml`:
 
    ```toml
    [tool.mutmut]
-   paths_to_mutate = "src/utils/http_utils.py,src/utils/image_serving.py,src/refresh_task/task.py,src/utils/new_module.py"
+   paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/,src/new_area/"
    ```
 
 2. Add the new path to `EXPECTED_FILES` in `tests/test_mutmut_config.py` so the
    config test keeps it honest.
 
-3. Open a PR with the change. The nightly job will pick up the new file on its
+3. Open a PR with the change. The nightly job will pick up the new path on its
    next Sunday run.
 
 ## CI schedule

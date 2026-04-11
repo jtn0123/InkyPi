@@ -45,7 +45,7 @@ combine-as-imports = true
 known-first-party = ["src"]
 
 [tool.mutmut]
-paths_to_mutate = "src/utils/http_utils.py,src/utils/image_serving.py,src/refresh_task/task.py"
+paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/"
 tests_dir = "tests/"
 runner = "python -m pytest tests/ -x --tb=no -q"
 dict_synonyms = ""
