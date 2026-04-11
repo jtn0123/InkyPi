@@ -1,6 +1,67 @@
 # CHANGELOG
 
 
+## v0.33.0 (2026-04-11)
+
+### Documentation
+
+- Add HTTP performance guide and plugin session-adoption smoke tests (JTN-521, Grade G4)
+  ([#304](https://github.com/jtn0123/InkyPi/pull/304),
+  [`81bf6c9`](https://github.com/jtn0123/InkyPi/commit/81bf6c91e9ce87ee3ff0373dd7a864a691f38701))
+
+- Creates docs/http_performance.md grounded in real file/line references: pool size rationale, TLS
+  reuse on Pi Zero, default timeout (20 s via INKYPI_HTTP_TIMEOUT_DEFAULT_S), cache vs raw-session
+  decision table, and a 5-item plugin author checklist. - Adds
+  tests/unit/test_plugin_http_session_adoption.py: two smoke tests that patch get_http_session and
+  assert it is called by wpotd and weather_api, confirming the shared session pool is used. - All
+  plugins already use get_http_session(); no migration needed (comic_parser uses http_get() which
+  wraps get_shared_session() — noted as an accepted exception in the doc).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Enforce strict mypy on http_utils + security_utils (JTN-525)
+  ([#301](https://github.com/jtn0123/InkyPi/pull/301),
+  [`626369a`](https://github.com/jtn0123/InkyPi/commit/626369a5f13f6fdb88f71d9a26242ece8439f6c7))
+
+* feat: enforce strict mypy on http_utils + security_utils (JTN-525, Grade I1)
+
+Add a blocking mypy --strict check for src/utils/http_utils.py and src/utils/security_utils.py so
+  type drift in these security/HTTP critical modules is caught in CI. The whole-codebase mypy run
+  remains advisory.
+
+- mypy.ini: add per-module strict = True blocks for the two modules - scripts/lint.sh: add blocking
+  strict subset check; advisory run now prints a clear ⚠️ warning; exits non-zero only when strict
+  subset fails - src/utils/http_utils.py: add return type annotations on json_error, json_success,
+  json_internal_error; cast cache.get() result to avoid no-any-return; import FlaskResponse for
+  union return type - docs/typing.md: escalation plan — strict module list, how to add yours,
+  rationale for incremental approach
+
+http_cache.py deliberately deferred from the starter set (JTN-493 recently refactored it; will join
+  once it stabilizes). See PR body for details.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: add types-requests to requirements-dev.txt for mypy strict CI
+
+The new mypy --strict check on http_utils.py requires types-requests stubs to be installed. CI
+  doesn't have them; adding the pinned version that already passes locally resolves the
+  import-untyped error in CI.
+
+* fix: correct mypy.ini module names and docs/typing.md markdown style
+
+- mypy.ini: use utils.* (not src.utils.*) for per-module strict sections; with mypy_path=src, the
+  importable names are utils.http_utils and utils.security_utils — the src.* prefix was ignored
+  (CodeRabbit) - docs/typing.md: add blank lines around fenced code blocks in list items to satisfy
+  MD031 markdownlint rule; also fix example module name to match the corrected utils.* convention
+  (CodeRabbit)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.32.0 (2026-04-10)
 
 ### Features
