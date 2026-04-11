@@ -260,10 +260,10 @@ probe_route() {
     fi
 }
 
-probe_route "/healthz"       "200"
-probe_route "/"              "200"
-probe_route "/playlist"      "200|302"
-probe_route "/api/plugins"   "200"
+probe_route "/healthz"            "200"
+probe_route "/"                   "200"
+probe_route "/playlist"           "200|302"
+probe_route "/api/health/plugins" "200"
 
 echo ""
 
