@@ -25,6 +25,8 @@ VALID_CODENAMES="trixie bookworm bullseye"
 DEFAULT_CODENAME="trixie"
 POLL_INTERVAL=5
 POLL_MAX=180
+LOG_DIR="${TMPDIR:-/tmp}/inkypi-smoke-logs"
+mkdir -p "${LOG_DIR}"
 
 usage() {
     echo "Usage: $(basename "${0}") [--help] [trixie|bookworm|bullseye]"
@@ -225,7 +227,8 @@ if [[ "${SERVER_UP}" -eq 0 ]]; then
     echo "ERROR: Server did not respond at /healthz within ${POLL_MAX}s." >&2
     echo "" >&2
     echo "--- Container logs ---" >&2
-    docker logs "${CONTAINER_NAME}" 2>&1 || true
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    echo "Diagnostics saved to ${LOG_DIR}" >&2
     exit 1
 fi
 
@@ -262,14 +265,15 @@ probe_route() {
 
 probe_route "/healthz"            "200"
 probe_route "/"                   "200"
-probe_route "/playlist"           "200|302"
+probe_route "/playlist"           "200"
 probe_route "/api/health/plugins" "200"
 
 echo ""
 
 if [[ "${PROBE_FAILED}" -ne 0 ]]; then
     echo "--- Container logs ---" >&2
-    docker logs "${CONTAINER_NAME}" 2>&1 || true
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    echo "Diagnostics saved to ${LOG_DIR}" >&2
     echo "" >&2
     echo "ERROR: One or more route probes failed — see above." >&2
     exit 1
