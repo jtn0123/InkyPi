@@ -80,12 +80,10 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
     # TLS
     tls_ms = 0
     if p.scheme == "https":
-        # ssl.create_default_context() returns a hardened client context that
-        # disables TLSv1/TLSv1.1 by default (Python 3.6+). CodeQL's
-        # py/insecure-protocol heuristic does not model this and reports a
-        # false positive. This is a diagnostics script that only ever speaks
-        # TLS 1.2+ via the default context — no insecure versions are enabled.
-        ctx = ssl.create_default_context()  # lgtm[py/insecure-protocol]
+        # Explicitly pin the minimum supported TLS version so both the runtime
+        # behavior and static analysis agree that legacy protocols are disabled.
+        ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         t2 = time.perf_counter()
         try:
             s = ctx.wrap_socket(s, server_hostname=host)

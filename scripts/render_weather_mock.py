@@ -250,7 +250,7 @@ def main():
 
         def _json_http_get(url, *a, **kw):
             parsed = _urlparse(url)
-            host = parsed.netloc
+            host = parsed.hostname or ""
             path = parsed.path
             if "onecall" in path:
                 p = _load_json(os.path.join(args.use_json, "weather.json"))
@@ -258,10 +258,10 @@ def main():
             if "air_pollution" in path:
                 p = _load_json(os.path.join(args.use_json, "aqi.json"))
                 return _Resp(p if p is not None else {"list": [{"main": {"aqi": 2}}]})
-            if host.endswith("open-meteo.com") and "/forecast" in path:
+            if host == "api.open-meteo.com" and path == "/v1/forecast":
                 p = _load_json(os.path.join(args.use_json, "open_meteo_weather.json"))
                 return _Resp(p if p is not None else {})
-            if host == "air-quality-api.open-meteo.com":
+            if host == "air-quality-api.open-meteo.com" and path == "/v1/air-quality":
                 p = _load_json(os.path.join(args.use_json, "open_meteo_aqi.json"))
                 return _Resp(p if p is not None else {})
             if "/geo/1.0/reverse" in path:
