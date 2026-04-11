@@ -68,17 +68,17 @@ mutmut unapply
 
 ## How to expand scope
 
-1. Add the file path to `paths_to_mutate` in `pyproject.toml`:
+1. Add the directory (or file, if intentionally narrow) path to `paths_to_mutate` in `pyproject.toml`:
 
    ```toml
    [tool.mutmut]
-   paths_to_mutate = "src/utils/http_utils.py,src/utils/image_serving.py,src/refresh_task/task.py,src/utils/new_module.py"
+   paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/,src/new_area/"
    ```
 
 2. Add the new path to `EXPECTED_FILES` in `tests/test_mutmut_config.py` so the
    config test keeps it honest.
 
-3. Open a PR with the change. The nightly job will pick up the new file on its
+3. Open a PR with the change. The nightly job will pick up the new path on its
    next Sunday run.
 
 ## CI schedule
