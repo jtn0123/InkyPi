@@ -116,6 +116,31 @@ Server-side normalization:
 
 ---
 
+### Pi thrash protection regression gate
+
+`tests/integration/test_install_crash_loop.py` is the canonical regression gate for the "install crash mid-pip → restart loop" failure mode (JTN-609) that caused a real Pi Zero 2 W to require a hard power cycle on 2026-04-10.
+
+The test boots a systemd-capable Debian container (`--privileged`, 512 MB cap), installs `inkypi.service` verbatim with a stub `ExecStart` that mimics `ModuleNotFoundError: flask`, runs `install.sh`'s `stop_service()` disable contract (JTN-600) and creates the `/var/lib/inkypi/.install-in-progress` lockfile (JTN-607), then repeatedly tries to start the service while the lockfile is present. The core invariant: **`ExecStart` must never run while the lockfile exists**. A marker file written by the stub is the primary assertion; if it appears, the defense is broken. A positive-control step removes the lockfile and confirms `ExecStart` does start once the install is "complete" so that the pass condition is not vacuous.
+
+Running the gate locally:
+
+```bash
+# Requires a local Docker daemon. The test skips cleanly when Docker is
+# absent; set REQUIRE_INSTALL_CRASH_LOOP_TEST=1 to force-run and fail hard
+# if Docker is missing (useful in CI).
+PYTHONPATH=$(pwd)/src pytest tests/integration/test_install_crash_loop.py -v -s
+```
+
+The gate runs in under 60 s on a developer laptop and asserts three invariants:
+
+1. JTN-600: after `stop_service()`, `systemctl is-enabled inkypi.service` is `disabled` or `masked`.
+2. JTN-607: while the install-in-progress lockfile is present, `ExecMainPID=0` and the stub marker file is never touched — systemd's `ExecStartPre` refuses every start attempt.
+3. The restart count stays bounded (`NRestarts <= 10`), proving systemd's default `StartLimitBurst` caps any runaway loop rather than thrashing the Pi's RAM.
+
+If you are intentionally changing `install.sh`'s `stop_service()` function or `install/inkypi.service`'s `ExecStartPre` guard, expect this test to need updating — and be prepared to explain in the PR description how the Pi-thrash cascade (JTN-609 context) is still prevented.
+
+---
+
 ### CI
 
 GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gate, security/SBOM checks, flake detection, and the browser-smoke job. Nightly scheduled jobs run the soak and mutation lanes on Linux. The main pytest job remains serial for now while the local xdist path soaks. Workflow file: `.github/workflows/ci.yml`.
