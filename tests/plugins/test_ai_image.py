@@ -474,6 +474,37 @@ def test_ai_image_generate_settings_template():
     assert "settings_schema" in template
 
 
+def test_ai_image_prompt_field_is_textarea():
+    """Prompt field should be a textarea so long prompts are not clipped (JTN-377)."""
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    schema = p.build_settings_schema()
+
+    prompt_field = None
+    for section in schema["sections"]:
+        for item in section["items"]:
+            if item.get("kind") == "field" and item.get("name") == "textPrompt":
+                prompt_field = item
+                break
+        if prompt_field:
+            break
+
+    assert prompt_field is not None, "textPrompt field missing from schema"
+    assert prompt_field["type"] == "textarea"
+    assert prompt_field.get("rows") == 4
+    assert prompt_field.get("required") is True
+
+
+def test_ai_image_prompt_renders_as_textarea(client):
+    """Settings page should render the prompt as a <textarea> (JTN-377)."""
+    resp = client.get("/plugin/ai_image")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "<textarea" in body
+    assert 'name="textPrompt"' in body
+
+
 def test_fetch_image_prompt_api_error_handling():
     """Test fetch_image_prompt with malformed API response."""
     from plugins.ai_image.ai_image import AIImage
