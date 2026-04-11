@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.39.8 (2026-04-11)
+
+### Bug Fixes
+
+- Install-in-progress lockfile blocks mid-install service start (JTN-607)
+  ([#325](https://github.com/jtn0123/InkyPi/pull/325),
+  [`c4bb605`](https://github.com/jtn0123/InkyPi/commit/c4bb605728ad7a019bd7867e4dd8160c1f9f92cb))
+
+Defense-in-depth for JTN-600. install.sh creates /var/lib/inkypi/.install-in-progress near the top
+  and removes it only after all install steps succeed. inkypi.service now has an ExecStartPre that
+  refuses to start while the lockfile exists, so even a manual systemctl start or a systemd
+  auto-restart cannot thrash the Pi mid-install. On failure exit the lockfile is deliberately left
+  in place, forcing the user to rerun install.sh (or manually rm the file) before the service can
+  start.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.7 (2026-04-11)
 
 ### Bug Fixes
