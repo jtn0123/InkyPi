@@ -47,6 +47,24 @@ def list_files_in_folder(folder_path):
 
 
 class ImageFolder(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject missing/unreadable/empty folder paths at save time.
+
+        Without this, a bad ``folder_path`` persists in config and only
+        surfaces later when ``generate_image`` runs — far from where the
+        user can fix the typo. See JTN-355.
+        """
+        folder_path = (settings.get("folder_path") or "").strip()
+        if not folder_path:
+            return "Folder path is required."
+        if not os.path.isdir(folder_path):
+            return "Folder does not exist or is not readable."
+        if not os.access(folder_path, os.R_OK):
+            return "Folder is not readable."
+        if not list_files_in_folder(folder_path):
+            return "Folder contains no image files."
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
