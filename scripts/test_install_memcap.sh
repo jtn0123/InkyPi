@@ -382,7 +382,7 @@ if [[ "${SMOKE_RENDER_STATUS}" != "200" ]]; then
     echo "ERROR: /__smoke/render did not return 200 (got '${SMOKE_RENDER_STATUS}')." >&2
     echo "       The render path was not actually exercised — peak RSS sample is invalid." >&2
     echo "       Response body:" >&2
-    cat "${LOG_DIR}/smoke-render.json" 2>/dev/null | head -20 >&2 || true
+    head -20 "${LOG_DIR}/smoke-render.json" >&2 2>/dev/null || true
     echo "" >&2
     docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
     exit 1
