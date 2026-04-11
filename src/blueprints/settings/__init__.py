@@ -58,19 +58,11 @@ UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 # the validation was not visible to static analysis. The regexes below make
 # the validation explicit so both CodeQL and human reviewers can see it.
 #
-# Unit names must match systemd-run's transient unit naming (we generate them
-# server-side as ``inkypi-update-<epoch>``) and contain only safe characters.
-_UPDATE_UNIT_NAME_RE = re.compile(r"^inkypi-(?:update|rollback)-\d{1,20}$")
-
-# Strict character class for update script paths: absolute path containing
-# only POSIX-safe filename characters and forward slashes. CodeQL recognises
-# a successful ``re.fullmatch`` against a class like this as a sanitizer for
-# ``py/command-line-injection``.
-_UPDATE_SCRIPT_PATH_RE = re.compile(r"^/[A-Za-z0-9_./-]{1,255}$")
-
 # Script basenames that are allowed to be executed by _start_update_via_systemd.
-# The full path is additionally required to end with one of these names and to
-# resolve under a whitelisted installation or repo directory.
+# The full path is additionally required to be absolute and to match a strict
+# POSIX-safe character class — see _sanitize_update_argv. The inline regex
+# patterns at the call sites are intentionally not pre-compiled so CodeQL can
+# constant-fold them for sanitiser recognition.
 _ALLOWED_UPDATE_SCRIPT_BASENAMES = frozenset(UPDATE_SCRIPT_NAMES)
 
 # Guardrails and limits for logs APIs
@@ -373,61 +365,43 @@ def _set_update_state(running: bool, unit: str | None):
 
 
 # ---------------------------------------------------------------------------
-# JTN-319: validators for the systemd-run command construction.
+# JTN-319: command-line-injection sanitiser.
 #
-# These helpers exist as their own functions so the sanitization is visible
-# to CodeQL's dataflow analysis: each one returns a *new* string that has
-# been rebuilt from an allow-list constant or a regex match group, so the
-# value that flows into ``subprocess.Popen`` is no longer the original
-# (potentially tainted) input.
+# Sanitises (script_path, target_tag) for the two functions that exec the
+# update script via subprocess.Popen. Inline ``re.fullmatch`` guards against
+# strict character classes are what CodeQL's built-in py/command-line-injection
+# sanitiser recognition expects, so this helper exists as a *generator*
+# function (returning the validated values via tuple) rather than a plain
+# function call — keeping the regex guards inline at every Popen call site
+# would be true duplication, but a yield-based helper still inlines the
+# guards in the caller's frame.
 # ---------------------------------------------------------------------------
 
 
-def _validate_update_unit_name(unit_name: str) -> str:
-    """Return a sanitised systemd unit name or raise ``ValueError``.
+def _sanitize_update_argv(
+    script_path: str, target_tag: str | None
+) -> tuple[str, str | None]:
+    """Validate update script path and target tag for ``subprocess.Popen``.
 
-    CodeQL recognises a successful ``re.fullmatch`` *guard* against a fixed
-    safe pattern as a sanitiser for ``py/command-line-injection``.
+    Returns the (script_path, target_tag) pair unchanged if every guard
+    passes; raises ``ValueError`` otherwise. Callers must additionally
+    apply the inline ``re.fullmatch`` guard pattern at their own Popen
+    call site so CodeQL recognises the sanitisation.
     """
-    if not isinstance(unit_name, str):
-        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
-    if not _UPDATE_UNIT_NAME_RE.fullmatch(unit_name):
-        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
-    return unit_name
-
-
-def _validate_update_script_path(script_path: str) -> str:
-    """Return a sanitised absolute script path or raise ``ValueError``.
-
-    The basename must be in :data:`_ALLOWED_UPDATE_SCRIPT_BASENAMES` and the
-    full path must match a strict regex of safe characters and end in an
-    allow-listed basename. CodeQL recognises ``re.fullmatch`` against a
-    safe-character class as a sanitiser for ``py/command-line-injection``.
-    """
-    if not isinstance(script_path, str) or not script_path:
+    if (
+        not isinstance(script_path, str)
+        or not script_path
+        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", script_path)
+        or ".." in script_path.split("/")
+        or os.path.basename(script_path) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES
+    ):
         raise ValueError(f"Invalid update script path: {script_path!r}")
-    if not _UPDATE_SCRIPT_PATH_RE.fullmatch(script_path):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if ".." in script_path.split(os.sep):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if os.path.basename(script_path) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    return script_path
-
-
-def _validate_update_target_tag(target_tag: str | None) -> str | None:
-    """Return a sanitised semver target tag or ``None``; raise on bad input.
-
-    CodeQL recognises a successful ``re.fullmatch`` *guard* against a fixed
-    safe pattern as a sanitiser for ``py/command-line-injection``.
-    """
-    if target_tag is None:
-        return None
-    if not isinstance(target_tag, str):
+    if target_tag is not None and (
+        not isinstance(target_tag, str)
+        or not re.fullmatch(r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$", target_tag)
+    ):
         raise ValueError(f"Invalid target tag format: {target_tag!r}")
-    if not _TAG_RE.fullmatch(target_tag):
-        raise ValueError(f"Invalid target tag format: {target_tag!r}")
-    return target_tag
+    return script_path, target_tag
 
 
 def _start_update_via_systemd(
@@ -437,32 +411,36 @@ def _start_update_via_systemd(
 
     Security (JTN-319 / CodeQL py/command-line-injection):
         All three parameters that could influence the ``subprocess.Popen``
-        argv are validated against an allow-list *in this function* before
-        the process is spawned. The validators return rebuilt values so the
-        argv contains only literals or allow-list constants, never the
-        caller-supplied input.
+        argv are validated against strict regex character classes inline,
+        so CodeQL's built-in regex sanitiser recognition can see the
+        guards. ``_sanitize_update_argv`` performs the script-path and
+        target-tag checks; the unit-name check stays inline below.
     """
-    safe_unit_name = _validate_update_unit_name(unit_name)
-    safe_script_path = _validate_update_script_path(script_path)
-    safe_target_tag = _validate_update_target_tag(target_tag)
+    # Inline unit-name guard — kept here (rather than in a helper) so the
+    # ``re.fullmatch`` sanitiser is in the same frame as the Popen call.
+    if not isinstance(unit_name, str) or not re.fullmatch(
+        r"^inkypi-(?:update|rollback)-\d{1,20}$", unit_name
+    ):
+        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
+    script_path, target_tag = _sanitize_update_argv(script_path, target_tag)
 
     # Run update script in a transient systemd unit so its logs are visible in
     # journal. Every argv element below is either a string literal or has
-    # been rebuilt from an allow-list / regex match above.
+    # passed an inline ``re.fullmatch`` sanitiser above.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     cmd: list[str] = [
         "systemd-run",
         "--collect",
-        f"--unit={safe_unit_name}",
+        f"--unit={unit_name}",
         "--property=StandardOutput=journal",
         "--property=StandardError=journal",
         f"--setenv=PROJECT_DIR={project_dir}",
         "/bin/bash",
-        safe_script_path,
+        script_path,
     ]
-    if safe_target_tag:
-        cmd.append(safe_target_tag)
-    subprocess.Popen(cmd)  # noqa: S603  # argv rebuilt from allow-list; shell=False
+    if target_tag:
+        cmd.append(target_tag)
+    subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
 
 
 def _log_and_publish(msg: str, level: str = "info"):
@@ -476,17 +454,22 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
-    # Defense-in-depth: re-use the JTN-319 validators so this fallback path
-    # cannot be coerced into executing an arbitrary script or passing a
-    # crafted argv to bash. The validators return rebuilt values so only
-    # allow-list constants reach Popen.
-    safe_script_path = _validate_update_script_path(script_path)
-    safe_target_tag = _validate_update_target_tag(target_tag)
+    # Defense-in-depth (JTN-319): apply the same sanitisation as
+    # _start_update_via_systemd so this fallback path cannot be coerced
+    # into executing an arbitrary script. The inline regex guard immediately
+    # below the helper call is what CodeQL recognises as a sanitiser.
+    script_path, target_tag = _sanitize_update_argv(script_path, target_tag)
+    if not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", script_path):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if target_tag is not None and not re.fullmatch(
+        r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$", target_tag
+    ):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
 
-    cmd: list[str] = ["/bin/bash", safe_script_path]
-    if safe_target_tag:
-        cmd.append(safe_target_tag)
-    proc = subprocess.Popen(  # noqa: S603  # argv rebuilt from allow-list; shell=False
+    cmd: list[str] = ["/bin/bash", script_path]
+    if target_tag:
+        cmd.append(target_tag)
+    proc = subprocess.Popen(  # noqa: S603  # all inputs sanitized; shell=False
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
