@@ -119,6 +119,12 @@
     // Dirty-state tracking for the Save button
     let _formSnapshot = null;
 
+    function isFormValid() {
+      const form = document.querySelector(".settings-form");
+      if (!form || typeof form.checkValidity !== "function") return true;
+      return form.checkValidity();
+    }
+
     function checkDirty() {
       const saveBtn = document.getElementById("saveSettingsBtn");
       if (!saveBtn || !_formSnapshot) return;
@@ -128,7 +134,11 @@
       for (const key of allKeys) {
         if (_formSnapshot[key] !== current[key]) { dirty = true; break; }
       }
-      saveBtn.disabled = !dirty;
+      // JTN-350: Save must be enabled only when the form is BOTH dirty AND
+      // satisfies all HTML5 constraints (required, min, max, etc.). This
+      // prevents users from clicking Save with `deviceName` empty or
+      // `interval=-5` and only learning about the problem from server toasts.
+      saveBtn.disabled = !(dirty && isFormValid());
     }
 
     async function appendGeoData(formData) {
@@ -153,6 +163,18 @@
     async function handleAction() {
       const form = document.querySelector(".settings-form");
       const saveBtn = document.getElementById("saveSettingsBtn");
+      // JTN-350: Always enforce HTML5 constraint validation before contacting
+      // the server. Even if the Save button slipped through the disabled
+      // gate (e.g. dispatched programmatically), reportValidity() shows the
+      // browser's native :invalid popup and focuses the first invalid field.
+      if (form && typeof form.checkValidity === "function" && !form.checkValidity()) {
+        if (typeof form.reportValidity === "function") form.reportValidity();
+        const firstInvalid = form.querySelector(":invalid");
+        if (firstInvalid && typeof firstInvalid.focus === "function") {
+          firstInvalid.focus();
+        }
+        return;
+      }
       if (saveBtn?.disabled) {
         showResponseModal("success", "No changes to save.");
         return;
