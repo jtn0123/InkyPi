@@ -91,10 +91,10 @@ MAX_RESPONSE_BYTES = 512 * 1024
 # IMPORTANT: this MUST stay byte-for-byte equivalent to the bash regex used in
 # install/do_update.sh — both validators only accept ``v?\d+\.\d+\.\d+`` with
 # an optional ``-[A-Za-z0-9.]+`` suffix (no underscores; \w in Python would
-# diverge from POSIX bracket classes).
-_TAG_RE = re.compile(
-    r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$"
-)  # 512 KB safety cap
+# diverge from POSIX bracket classes). ``re.ASCII`` keeps ``\d`` limited to
+# ``[0-9]`` so Unicode digit spoofing (e.g. Arabic-Indic numerals) cannot
+# smuggle a value past the validator.
+_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$", re.ASCII)
 
 # Simple in-process rate limiter (per remote addr)
 _logs_limiter = SlidingWindowLimiter(120, 60)
@@ -476,10 +476,10 @@ def _start_update_via_systemd(target_tag: str | None = None) -> None:
         in the same function frame so CodeQL's built-in regex sanitiser
         recognition can see the guard.
     """
-    # 1. Inline regex sanitiser — visible to CodeQL in the same frame as Popen.
-    if target_tag is not None and not re.fullmatch(
-        r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$", target_tag
-    ):
+    # 1. Regex sanitiser — ``_TAG_RE`` is a module-level ``re.Pattern`` compiled
+    #    with ``re.ASCII``; CodeQL's Python security model recognises
+    #    ``re.Pattern.fullmatch`` as a sanitiser just like the inline form.
+    if target_tag is not None and not _TAG_RE.fullmatch(target_tag):
         raise ValueError(f"Invalid target tag format: {target_tag!r}")
 
     # 2. Resolve PROJECT_DIR from a hardcoded default and validate it has the
@@ -531,13 +531,11 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
-    # Defense-in-depth (JTN-319): inline ``re.fullmatch`` sanitiser for
-    # ``target_tag`` and trusted-root validation for ``script_path``, both
-    # in the same frame as the Popen call so CodeQL's regex-sanitiser
-    # recognition fires.
-    if target_tag is not None and not re.fullmatch(
-        r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$", target_tag
-    ):
+    # Defense-in-depth (JTN-319): ``_TAG_RE`` (module-level compiled pattern,
+    # ASCII-only) sanitises ``target_tag`` and ``_validate_update_script_path``
+    # resolves ``script_path`` to a canonical trusted-root path — both in the
+    # same frame as the Popen call so CodeQL's sanitiser recognition fires.
+    if target_tag is not None and not _TAG_RE.fullmatch(target_tag):
         raise ValueError(f"Invalid target tag format: {target_tag!r}")
     # ``_validate_update_script_path`` returns the canonicalised realpath; the
     # original (possibly symlinked) input is dropped so the value flowing into
