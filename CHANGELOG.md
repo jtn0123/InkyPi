@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.42.1 (2026-04-11)
+
+### Performance Improvements
+
+- **install**: Migrate pip to uv in install.sh for faster, lighter installs (JTN-605)
+  ([#326](https://github.com/jtn0123/InkyPi/pull/326),
+  [`403ea1f`](https://github.com/jtn0123/InkyPi/commit/403ea1f9cd6eb4c58f231992d02e26c45efc5e1e))
+
+On a Pi Zero 2 W (512 MB RAM), pip's Python-based resolver consumes ~100-150 MB during dependency
+  resolution, a significant fraction of total RAM. uv (Rust-based pip replacement from the ruff
+  team) uses ~10-20 MB peak and installs 3-5x faster, cutting the install-time bottleneck from ~15
+  min to ~3-5 min.
+
+- Bootstrap uv into the venv via `pip install uv` (uses trusted PyPI + hashes we already trust — no
+  extra network trust root from curl-pipe) - Use `uv pip install --python $VENV --no-cache
+  --require-hashes` for main deps; `--require-hashes` is fully honored so JTN-516 supply-chain
+  integrity is preserved - Fall back cleanly to plain `pip install` if uv cannot be installed or run
+  (e.g. unsupported arch) — uv is an optimization, not a hard dep - Same uv-or-pip branching for the
+  optional Waveshare requirements - Extend tests/unit/test_install_scripts.py with four new
+  structural checks: uv bootstrap exists, uv pip install used for main deps with hash enforcement
+  preserved, pip fallback branch exists, bootstrap precedes first uv call - Document the improvement
+  in docs/installation.md under "First-boot install time"
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.42.0 (2026-04-11)
 
 ### Features
