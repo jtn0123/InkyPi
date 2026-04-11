@@ -385,6 +385,29 @@ ask_for_reboot() {
   fi
 }
 
+# Wait for NTP sync before proceeding with network-dependent installs.
+# Pi Zero 2 W has no RTC battery; on boot, the clock starts at the last
+# fake-hwclock value (potentially months out of date). Running pip/apt before
+# NTP syncs can cause TLS cert validation failures. See JTN-592.
+wait_for_clock() {
+  if ! command -v timedatectl >/dev/null 2>&1; then
+    echo "timedatectl not available — skipping NTP sync wait."
+    return 0
+  fi
+  echo "Waiting for system clock to sync via NTP (max 60s)..."
+  for i in $(seq 1 60); do
+    if timedatectl show -p NTPSynchronized --value 2>/dev/null | grep -q yes; then
+      echo "✓ Clock synced (took ${i}s)."
+      return 0
+    fi
+    sleep 1
+  done
+  echo "WARNING: Clock did not sync within 60s. TLS errors during pip install may occur."
+  echo "         Current time: $(date -u). If this is wrong, set it manually with:"
+  echo "         sudo date -u -s 'YYYY-MM-DD HH:MM:SS'"
+  return 0  # don't block install on timeout — warn only
+}
+
 # check if we have an argument for WS display support.  Parameter is not required
 # to maintain default INKY display support.
 parse_arguments "$@"
@@ -395,6 +418,7 @@ if [[ -n "$WS_TYPE" ]]; then
   fetch_waveshare_driver
 fi
 enable_interfaces
+wait_for_clock                # JTN-592: defer until NTP sync to avoid TLS failures
 install_debian_dependencies
 # Setup zramswap on any modern Pi OS that ships zram-tools (Bullseye/Bookworm/Trixie).
 # This is critical on low-RAM boards like the Pi Zero 2 W (512 MB) — without
