@@ -1076,3 +1076,98 @@ class TestInstallationDocCloudInit:
 
     def test_references_jtn_591(self):
         assert "JTN-591" in self.content
+
+
+# ---- OS drift nightly workflow (JTN-535) ----
+
+WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
+
+
+class TestOsDriftNightlyWorkflow:
+    """Structural assertions for the nightly OS-drift detector (JTN-535).
+
+    The nightly workflow re-runs the install sim against the latest
+    *unpinned* debian:trixie/bookworm/bullseye images so that upstream
+    package churn breaks a nightly job instead of a user's Pi Zero 2 W.
+    These tests exist primarily to prevent the file from being silently
+    deleted — losing this drift detector was the exact class of regression
+    that caused JTN-528 to slip through the whole Trixie release cycle.
+    """
+
+    WORKFLOW_PATH = WORKFLOWS_DIR / "os-drift-nightly.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.WORKFLOW_PATH.exists(), (
+            "os-drift-nightly.yml is missing — the JTN-535 drift detector "
+            "must not be deleted without an explicit follow-up issue."
+        )
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_file_exists(self):
+        # Explicit companion to the fixture assertion so the file's
+        # presence is checked in a named test too — easier to grep in CI
+        # logs when it fails.
+        assert self.WORKFLOW_PATH.is_file()
+
+    def test_has_schedule_block(self):
+        # The drift detector is worthless without its cron — make sure
+        # nobody disables it by removing the schedule.
+        assert re.search(
+            r"^\s*schedule:", self.content, flags=re.MULTILINE
+        ), "os-drift-nightly.yml must keep its schedule: block"
+        assert re.search(
+            r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content
+        ), "os-drift-nightly.yml must run at 08:00 UTC daily (JTN-535)"
+
+    def test_has_workflow_dispatch(self):
+        # Manual re-runs are the only way to investigate a failure fast.
+        assert "workflow_dispatch:" in self.content
+
+    def test_is_not_a_pr_gate(self):
+        # This workflow is a drift detector, not a PR gate. A broken
+        # nightly must not block merges — losing that property is a
+        # high-severity regression.
+        assert "pull_request:" not in self.content, (
+            "os-drift-nightly.yml must not have a pull_request: trigger — "
+            "it is a drift detector, not a PR gate (JTN-535)"
+        )
+
+    def test_matrix_covers_all_three_codenames(self):
+        for codename in ("trixie", "bookworm", "bullseye"):
+            assert (
+                codename in self.content
+            ), f"os-drift-nightly.yml must exercise debian:{codename}"
+
+    def test_uses_unpinned_debian_images(self):
+        # The whole point of the nightly is to catch upstream drift. If
+        # someone pins to a digest or to debian:bookworm-20240101 we lose
+        # the "latest unpinned" property and the file stops detecting
+        # drift — the pinned matrix (JTN-530) already covers that case.
+        assert re.search(
+            r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
+            self.content,
+        ), "os-drift-nightly.yml must use unpinned debian:${{ matrix.codename }}"
+
+    def test_asserts_debian_and_pip_requirements(self):
+        # Both package manifests must be checked — dropping either one
+        # leaves half the install path untested against upstream drift.
+        assert "install/debian-requirements.txt" in self.content
+        assert "install/requirements.txt" in self.content
+        assert "apt-cache show" in self.content
+        assert "--dry-run" in self.content
+
+    def test_runs_end_to_end_install_sim(self):
+        # The sim exercises the actual install.sh against the same OS
+        # base, using the JTN-532 sim_install.sh helper.
+        assert "scripts/sim_install.sh" in self.content
+
+    def test_files_issue_on_failure(self):
+        # Failure handling must open a GitHub issue so drift is visible
+        # without anyone manually reading workflow logs.
+        assert "actions/github-script" in self.content
+        assert "os-drift" in self.content
+        assert "issues.create" in self.content
+
+    def test_references_jtn_535(self):
+        assert "JTN-535" in self.content

@@ -165,6 +165,12 @@ Notes:
 
 ---
 
+### OS drift nightly (JTN-535)
+
+`.github/workflows/os-drift-nightly.yml` is a daily cron (08:00 UTC) that re-runs the install path against the **latest unpinned** `debian:trixie`, `debian:bookworm`, and `debian:bullseye` images. It is the unpinned complement to the pinned PR-gating install matrix (JTN-530) and exists to catch upstream Debian/Pi OS package churn — the exact failure class that let JTN-528 (zramswap on Trixie) slip through the whole Trixie release cycle. Each matrix leg asserts that every package in `install/debian-requirements.txt` resolves via `apt-cache show` on the latest base image, that every pinned dependency in `install/requirements.txt` still resolves via `pip install --dry-run`, and that `scripts/sim_install.sh` (JTN-532) runs `install/install.sh` end-to-end inside a 512 MB arm64 sim of the Pi Zero 2 W. **The nightly has no `pull_request:` trigger on purpose** — it is a drift detector, not a PR gate, and a broken nightly must never block merges. On failure it opens a GitHub issue labelled `os-drift` / `bug` with the failing codename(s) and a link to the run; a single-leg failure usually means upstream package change specific to that release, while a multi-leg failure usually points at something our repo changed. Manual runs are available via the workflow_dispatch "Run workflow" button with an optional codename filter for targeted debugging.
+
+---
+
 ### Adding New Tests
 
 1) Place tests under `tests/` (unit, integration, or plugin subfolders).
