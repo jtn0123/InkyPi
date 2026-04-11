@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
@@ -1171,3 +1172,20 @@ class TestOsDriftNightlyWorkflow:
 
     def test_references_jtn_535(self):
         assert "JTN-535" in self.content
+
+    def test_workflow_parses_as_yaml(self):
+        parsed = yaml.safe_load(self.content)
+        assert isinstance(parsed, dict), "os-drift-nightly.yml must parse to a mapping"
+        assert ("on" in parsed or True in parsed), (
+            "os-drift-nightly.yml must define workflow triggers"
+        )
+        assert "jobs" in parsed, "os-drift-nightly.yml must define jobs"
+
+        jobs = parsed["jobs"]
+        assert isinstance(jobs, dict), "workflow jobs must parse as a mapping"
+
+        matrix = jobs["drift-check"]["strategy"]["matrix"]
+        assert isinstance(matrix, dict), "drift-check matrix must parse as a mapping"
+        assert isinstance(matrix["codename"], list), (
+            "drift-check matrix.codename must remain a list of distro names"
+        )

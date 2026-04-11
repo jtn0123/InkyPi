@@ -34,7 +34,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
 
 concurrency:
   group: os-drift-nightly-${{ github.ref }}
@@ -56,14 +55,22 @@ jobs:
     container:
       image: debian:${{ matrix.codename }}
       options: --user root
-    # Allow a single matrix leg to be skipped by the workflow_dispatch input.
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.codename == '' ||
-      github.event.inputs.codename == matrix.codename
     steps:
+      - name: Skip leg if not selected (workflow_dispatch)
+        id: skip
+        run: |
+          set -euo pipefail
+          selected='${{ github.event.inputs.codename }}'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "${{ matrix.codename }}" ]; then
+            echo "Leg ${{ matrix.codename }} not selected; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Record base image digest
         id: image
+        if: steps.skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
           echo "Image       : debian:${{ matrix.codename }}"
@@ -74,6 +81,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Bootstrap container tooling
+        if: steps.skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
           # `container:` images start bare — install just enough to check
@@ -92,10 +100,12 @@ jobs:
             sudo
 
       - name: Checkout
+        if: steps.skip.outputs.skip != 'true'
         uses: actions/checkout@v4
 
       - name: Assert debian-requirements.txt resolves on this OS
         id: apt_check
+        if: steps.skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
           REQ_FILE=install/debian-requirements.txt
@@ -137,6 +147,7 @@ jobs:
 
       - name: Assert requirements.txt resolves via pip (dry-run)
         id: pip_check
+        if: steps.skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
           REQ_FILE=install/requirements.txt
@@ -180,7 +191,7 @@ jobs:
           echo "pip resolver accepted all pinned dependencies."
 
       - name: Upload drift artifacts
-        if: always()
+        if: always() && steps.skip.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: os-drift-${{ matrix.codename }}
@@ -225,13 +236,24 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         run: |
           set -euo pipefail
+          mkdir -p artifacts
+          LOG="artifacts/install-sim-${{ matrix.codename }}.log"
           # Reuse the JTN-532 simulator — it already handles the Pi OS apt
           # repo, the raspi-config shim, the 512 MB memory cap, and arm64
           # emulation to match real Pi Zero 2 W hardware. The codename is
           # passed straight through as the unpinned base image tag, so this
           # is the nightly drift-detection variant of the same sim the day
           # job runs against pinned digests.
-          ./scripts/sim_install.sh ${{ matrix.codename }}
+          ./scripts/sim_install.sh ${{ matrix.codename }} 2>&1 | tee "$LOG"
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload install sim log
+        if: always() && steps.skip.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-sim-${{ matrix.codename }}
+          path: artifacts/install-sim-${{ matrix.codename }}.log
+          if-no-files-found: error
 
   open-issue-on-failure:
     name: Open drift issue on failure
