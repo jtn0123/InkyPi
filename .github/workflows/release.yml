@@ -25,8 +25,8 @@ jobs:
           cache: 'pip'
           cache-dependency-path: install/requirements.txt
 
-      - name: Install semantic-release
-        run: pip install python-semantic-release==9.21.1
+      - name: Install semantic-release and SBOM tools
+        run: pip install python-semantic-release==9.21.1 cyclonedx-bom
 
       - name: Semantic Release — version & publish
         env:
@@ -34,3 +34,30 @@ jobs:
         run: |
           semantic-release version
           semantic-release publish
+
+      - name: Generate SBOM
+        run: |
+          pip install -r install/requirements.txt
+          python -m venv .venv
+          .venv/bin/pip install -r install/requirements.txt
+          mkdir -p artifacts/security
+          python -m cyclonedx_py environment .venv/bin/python --of JSON \
+            -o artifacts/security/sbom.json
+
+      - name: Attach SBOM to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(cat VERSION)
+          TAG="v${VERSION}"
+          SBOM_FILE="inkypi-${TAG}-bom.json"
+          cp artifacts/security/sbom.json "${SBOM_FILE}"
+          # Only upload if the release exists (semantic-release may not bump on every push)
+          if gh release view "${TAG}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            gh release upload "${TAG}" "${SBOM_FILE}" \
+              --repo "${{ github.repository }}" \
+              --clobber
+            echo "Uploaded ${SBOM_FILE} to release ${TAG}"
+          else
+            echo "No release found for ${TAG}, skipping SBOM upload"
+          fi
