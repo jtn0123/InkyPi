@@ -34,7 +34,8 @@ def test_generic_api_keys_list_inputs_have_aria_labels(client, monkeypatch, tmp_
     html = resp.get_data(as_text=True)
 
     assert 'aria-label="ANOTHER_KEY key name"' in html
-    assert 'aria-label="ANOTHER_KEY value"' in html
+    # JTN-382: value input is now type=password with ", hidden" suffix in aria-label
+    assert 'aria-label="ANOTHER_KEY value, hidden"' in html
 
 
 def test_managed_api_keys_card_delete_button_has_aria_label(client, device_config_dev):
