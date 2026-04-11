@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 
 import icalendar
@@ -23,6 +24,34 @@ logger = logging.getLogger(__name__)
 
 
 class Calendar(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject non-URL ICS values at save time (JTN-357).
+
+        Each submitted calendar URL must parse to an http(s) scheme with a
+        non-empty host.  ``webcal://`` is also accepted because the runtime
+        rewrites it to https before fetching.  Empty URLs and invalid values
+        (e.g. ``not-a-url`` or ``javascript:alert(1)``) are rejected so the
+        user cannot persist junk rows from the settings form.
+        """
+        calendar_urls = settings.get("calendarURLs[]")
+        if not calendar_urls:
+            return "At least one calendar URL is required."
+
+        allowed_schemes = {"http", "https", "webcal"}
+        for raw in calendar_urls:
+            url = (raw or "").strip()
+            if not url:
+                return "Calendar URL is required."
+            try:
+                parsed = urlparse(url)
+            except ValueError:
+                return f"Calendar URL is not valid: {url!r}"
+            if parsed.scheme.lower() not in allowed_schemes:
+                return f"Calendar URL is not valid: {url!r}"
+            if not parsed.netloc:
+                return f"Calendar URL is not valid: {url!r}"
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
