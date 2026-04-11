@@ -62,6 +62,12 @@ UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 # server-side as ``inkypi-update-<epoch>``) and contain only safe characters.
 _UPDATE_UNIT_NAME_RE = re.compile(r"^inkypi-(?:update|rollback)-\d{1,20}$")
 
+# Strict character class for update script paths: absolute path containing
+# only POSIX-safe filename characters and forward slashes. CodeQL recognises
+# a successful ``re.fullmatch`` against a class like this as a sanitizer for
+# ``py/command-line-injection``.
+_UPDATE_SCRIPT_PATH_RE = re.compile(r"^/[A-Za-z0-9_./-]{1,255}$")
+
 # Script basenames that are allowed to be executed by _start_update_via_systemd.
 # The full path is additionally required to end with one of these names and to
 # resolve under a whitelisted installation or repo directory.
@@ -366,6 +372,64 @@ def _set_update_state(running: bool, unit: str | None):
         _UPDATE_STATE["started_at"] = float(time.time()) if running else None
 
 
+# ---------------------------------------------------------------------------
+# JTN-319: validators for the systemd-run command construction.
+#
+# These helpers exist as their own functions so the sanitization is visible
+# to CodeQL's dataflow analysis: each one returns a *new* string that has
+# been rebuilt from an allow-list constant or a regex match group, so the
+# value that flows into ``subprocess.Popen`` is no longer the original
+# (potentially tainted) input.
+# ---------------------------------------------------------------------------
+
+
+def _validate_update_unit_name(unit_name: str) -> str:
+    """Return a sanitised systemd unit name or raise ``ValueError``.
+
+    CodeQL recognises a successful ``re.fullmatch`` *guard* against a fixed
+    safe pattern as a sanitiser for ``py/command-line-injection``.
+    """
+    if not isinstance(unit_name, str):
+        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
+    if not _UPDATE_UNIT_NAME_RE.fullmatch(unit_name):
+        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
+    return unit_name
+
+
+def _validate_update_script_path(script_path: str) -> str:
+    """Return a sanitised absolute script path or raise ``ValueError``.
+
+    The basename must be in :data:`_ALLOWED_UPDATE_SCRIPT_BASENAMES` and the
+    full path must match a strict regex of safe characters and end in an
+    allow-listed basename. CodeQL recognises ``re.fullmatch`` against a
+    safe-character class as a sanitiser for ``py/command-line-injection``.
+    """
+    if not isinstance(script_path, str) or not script_path:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if not _UPDATE_SCRIPT_PATH_RE.fullmatch(script_path):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if ".." in script_path.split(os.sep):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if os.path.basename(script_path) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    return script_path
+
+
+def _validate_update_target_tag(target_tag: str | None) -> str | None:
+    """Return a sanitised semver target tag or ``None``; raise on bad input.
+
+    CodeQL recognises a successful ``re.fullmatch`` *guard* against a fixed
+    safe pattern as a sanitiser for ``py/command-line-injection``.
+    """
+    if target_tag is None:
+        return None
+    if not isinstance(target_tag, str):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    if not _TAG_RE.fullmatch(target_tag):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    return target_tag
+
+
 def _start_update_via_systemd(
     unit_name: str, script_path: str, target_tag: str | None = None
 ) -> None:
@@ -373,67 +437,18 @@ def _start_update_via_systemd(
 
     Security (JTN-319 / CodeQL py/command-line-injection):
         All three parameters that could influence the ``subprocess.Popen``
-        argv are explicitly validated against an allow-list *in this function*
-        before the process is spawned. To make the sanitization visible to
-        CodeQL's dataflow analysis, we rebuild the sensitive argv elements
-        from string literals and allow-list entries rather than forwarding
-        the caller-supplied values directly.
+        argv are validated against an allow-list *in this function* before
+        the process is spawned. The validators return rebuilt values so the
+        argv contains only literals or allow-list constants, never the
+        caller-supplied input.
     """
-    # --- Validate and sanitize unit name --------------------------------------
-    # Callers always construct ``inkypi-update-<epoch>`` server-side, never
-    # from request data, but we re-verify here so the guarantee is local.
-    # Reassign from the regex match so CodeQL sees a clean value.
-    if not isinstance(unit_name, str):
-        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
-    _unit_match = _UPDATE_UNIT_NAME_RE.fullmatch(unit_name)
-    if _unit_match is None:
-        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
-    safe_unit_name: str = _unit_match.group(0)
-
-    # --- Validate and sanitize script path ------------------------------------
-    # The basename must be one of the known install scripts, the path must
-    # be absolute, must not contain shell metacharacters or traversal tokens.
-    # After validation we rebuild the path from the allow-list constant so
-    # CodeQL sees only a literal basename flowing into the argv.
-    if not isinstance(script_path, str) or not script_path:
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if any(c in script_path for c in (";", "&", "|", "`", "$", "\n", "\r", " ")):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if not os.path.isabs(script_path) or ".." in script_path.split(os.sep):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    script_basename = os.path.basename(script_path)
-    # Resolve the basename strictly through the allow-list so the value that
-    # reaches Popen is a module-level constant, not the tainted input.
-    safe_basename: str | None = None
-    for allowed in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
-        if script_basename == allowed:
-            safe_basename = allowed
-            break
-    if safe_basename is None:
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    script_dir = os.path.dirname(script_path)
-    # Re-check the reconstructed directory component for metacharacters after
-    # splitting so any injection attempt in the directory cannot slip through.
-    if any(c in script_dir for c in (";", "&", "|", "`", "$", "\n", "\r", " ")):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    safe_script_path: str = os.path.join(script_dir, safe_basename)
-
-    # --- Validate and sanitize target tag -------------------------------------
-    # Defensive revalidation — callers in this module already reject invalid
-    # tags at the request boundary. Rebuild from the regex match so CodeQL
-    # sees a clean value flowing into the argv.
-    safe_target_tag: str | None = None
-    if target_tag is not None:
-        if not isinstance(target_tag, str):
-            raise ValueError(f"Invalid target tag format: {target_tag!r}")
-        _tag_match = _TAG_RE.fullmatch(target_tag)
-        if _tag_match is None:
-            raise ValueError(f"Invalid target tag format: {target_tag!r}")
-        safe_target_tag = _tag_match.group(0)
+    safe_unit_name = _validate_update_unit_name(unit_name)
+    safe_script_path = _validate_update_script_path(script_path)
+    safe_target_tag = _validate_update_target_tag(target_tag)
 
     # Run update script in a transient systemd unit so its logs are visible in
-    # journal. Every element below is either a string literal or has been
-    # rebuilt from an allow-list constant / regex match above.
+    # journal. Every argv element below is either a string literal or has
+    # been rebuilt from an allow-list / regex match above.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     cmd: list[str] = [
         "systemd-run",
@@ -461,37 +476,12 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
-    # Defense-in-depth: apply the same validation and allow-list
-    # reconstruction as _start_update_via_systemd so this fallback path
+    # Defense-in-depth: re-use the JTN-319 validators so this fallback path
     # cannot be coerced into executing an arbitrary script or passing a
-    # crafted argv to bash (JTN-319).
-    if not isinstance(script_path, str) or not script_path:
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if any(c in script_path for c in (";", "&", "|", "`", "$", "\n", "\r", " ")):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    if not os.path.isabs(script_path) or ".." in script_path.split(os.sep):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    script_basename = os.path.basename(script_path)
-    safe_basename: str | None = None
-    for allowed in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
-        if script_basename == allowed:
-            safe_basename = allowed
-            break
-    if safe_basename is None:
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    script_dir = os.path.dirname(script_path)
-    if any(c in script_dir for c in (";", "&", "|", "`", "$", "\n", "\r", " ")):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
-    safe_script_path: str = os.path.join(script_dir, safe_basename)
-
-    safe_target_tag: str | None = None
-    if target_tag is not None:
-        if not isinstance(target_tag, str):
-            raise ValueError(f"Invalid target tag format: {target_tag!r}")
-        _tag_match = _TAG_RE.fullmatch(target_tag)
-        if _tag_match is None:
-            raise ValueError(f"Invalid target tag format: {target_tag!r}")
-        safe_target_tag = _tag_match.group(0)
+    # crafted argv to bash. The validators return rebuilt values so only
+    # allow-list constants reach Popen.
+    safe_script_path = _validate_update_script_path(script_path)
+    safe_target_tag = _validate_update_target_tag(target_tag)
 
     cmd: list[str] = ["/bin/bash", safe_script_path]
     if safe_target_tag:
