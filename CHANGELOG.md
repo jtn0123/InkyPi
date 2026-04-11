@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.40.3 (2026-04-11)
+
+### Bug Fixes
+
+- Use type=password for existing API key value inputs (JTN-382)
+  ([#331](https://github.com/jtn0123/InkyPi/pull/331),
+  [`44bdb56`](https://github.com/jtn0123/InkyPi/commit/44bdb56d54b4a524eec90f87b2a9edd94151e432))
+
+Replace the type=text inputs filled with literal U+25CF bullet characters with type=password inputs
+  having value="" and placeholder="(unchanged)". This fixes screen reader output, password manager
+  recognition, and prevents garbage being copied when a user selects the masked field.
+
+Also update the aria-label to include ", hidden" to communicate the masked state to assistive
+  technology.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.40.2 (2026-04-11)
 
 ### Bug Fixes
