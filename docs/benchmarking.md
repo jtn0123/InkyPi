@@ -39,7 +39,7 @@ Use the export script (to be added) or query the DB directly. A generated summar
 
 ### pytest-benchmark plugin render tests
 
-`tests/benchmarks/test_plugin_render.py` contains three micro-benchmarks (`bench_clock_render`, `bench_weather_render`, `bench_html_render`) that measure the plugin render pipeline end-to-end with all network I/O mocked.  Run them with `pytest tests/benchmarks/test_plugin_render.py --benchmark-only`.
+`tests/benchmarks/test_plugin_render.py` contains three micro-benchmarks (`test_bench_clock_render`, `test_bench_weather_render`, `test_bench_html_render`) that measure the plugin render pipeline end-to-end with all network I/O mocked. Run them with `pytest tests/benchmarks/test_plugin_render.py --benchmark-only`.
 
 ### Roadmap (next)
 
