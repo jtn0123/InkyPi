@@ -336,6 +336,46 @@ class TestInstallScript:
                 f"when package is missing: {line!r}"
             )
 
+    def test_install_disables_service_during_install(self):
+        # JTN-600: stop_service() must DISABLE (not just stop) the service so
+        # systemd cannot auto-restart the half-installed service during the ~15 min
+        # install window and cause a memory-thrash cascade on the Pi Zero 2 W.
+        fn_start = self.content.index("stop_service() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        assert 'systemctl disable "$SERVICE_FILE"' in fn_body, (
+            "stop_service() must call 'systemctl disable \"$SERVICE_FILE\"' to "
+            "prevent systemd from restarting the half-installed service"
+        )
+
+    def test_install_re_enables_service_at_end(self):
+        # JTN-600: Regression guard — install_app_service() must re-enable the
+        # service at the end of the install after stop_service() disabled it.
+        fn_start = self.content.index("install_app_service() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        assert "systemctl enable" in fn_body, (
+            "install_app_service() must call 'systemctl enable' to re-enable the "
+            "service after stop_service() disabled it during the install window"
+        )
+
+    def test_stop_service_disable_tolerates_already_disabled(self):
+        # JTN-600: The disable call must not fail if the service is already
+        # disabled (e.g. fresh install). Must use '|| true' or '2>/dev/null'.
+        fn_start = self.content.index("stop_service() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        # Find the disable line and confirm it has an error-tolerant fallback.
+        disable_lines = [
+            line.strip() for line in fn_body.splitlines() if "systemctl disable" in line
+        ]
+        assert disable_lines, "No 'systemctl disable' line found in stop_service()"
+        for line in disable_lines:
+            assert "|| true" in line or "2>/dev/null" in line, (
+                f"systemctl disable call must have '|| true' or '2>/dev/null' so "
+                f"it doesn't fail when the service is already disabled: {line!r}"
+            )
+
 
 # ---- update.sh ----
 
