@@ -80,6 +80,7 @@ class RefreshTask:
         self.event_bus = get_event_bus()
         self.plugin_health: dict[str, dict] = {}
         self._tick_count: int = 0
+        self.watchdog_thread: threading.Thread | None = None
 
     @staticmethod
     def _get_circuit_breaker_threshold() -> int:
@@ -101,6 +102,14 @@ class RefreshTask:
             )
             self.running = True
             self.thread.start()
+            # JTN-596: separate thread keeps systemd watchdog fed independent of cycle.
+            if _sd_notify is not None:
+                self.watchdog_thread = threading.Thread(
+                    target=self._watchdog_heartbeat_loop,
+                    daemon=True,
+                    name="WatchdogHeartbeat",
+                )
+                self.watchdog_thread.start()
 
     def stop(self):
         """Stops the refresh task by notifying the background thread to exit."""
@@ -118,6 +127,33 @@ class RefreshTask:
             self.thread.join(timeout=5)
             if self.thread.is_alive():
                 logger.warning("Refresh task thread did not stop within timeout")
+
+    @staticmethod
+    def _watchdog_interval_seconds() -> float:
+        """Half of WATCHDOG_USEC (set by systemd when WatchdogSec= is in the unit file).
+
+        Defaults to 30s if WATCHDOG_USEC is unset (e.g. running outside systemd).
+        """
+        try:
+            usec = int(os.environ.get("WATCHDOG_USEC", "0"))
+        except (ValueError, TypeError):
+            usec = 0
+        if usec <= 0:
+            return 30.0
+        return max(1.0, (usec / 1_000_000) / 2)
+
+    def _watchdog_heartbeat_loop(self) -> None:
+        """Background loop that feeds the systemd watchdog at WatchdogSec/2 cadence.
+
+        Decoupled from the refresh cycle so a long plugin_cycle_interval_seconds
+        cannot stall the heartbeat (JTN-596).
+        """
+        interval = self._watchdog_interval_seconds()
+        while self.running:
+            self._notify_watchdog()
+            # Wake on stop() so shutdown is responsive.
+            with self.condition:
+                self.condition.wait(timeout=interval)
 
     @staticmethod
     def _notify_watchdog():
