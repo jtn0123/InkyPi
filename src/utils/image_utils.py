@@ -79,6 +79,16 @@ def load_image_from_path(
 
 
 def get_image(image_url, timeout_seconds: float = 10.0):
+    """Fetch an image from a URL and return a PIL Image, or None on failure.
+
+    Args:
+        image_url: The URL of the image to fetch.
+        timeout_seconds: Request timeout in seconds (default 10).
+
+    Returns:
+        A ``PIL.Image.Image`` on success, or ``None`` if the request fails or
+        the response body cannot be decoded as an image.
+    """
     try:
         try:
             response = http_get(image_url, timeout=timeout_seconds)
@@ -143,6 +153,26 @@ def change_orientation(image, orientation, inverted: bool = False):
 
 
 def resize_image(image, desired_size, image_settings=None):
+    """Crop and resize an image to the desired dimensions while preserving aspect ratio.
+
+    The image is first cropped to match the target aspect ratio (centred by
+    default, or left-aligned when ``"keep-width"`` is present in
+    *image_settings*), then scaled to the exact *desired_size*.
+
+    Args:
+        image: A ``PIL.Image.Image`` to transform.
+        desired_size: A ``(width, height)`` tuple specifying the output
+            dimensions in pixels.
+        image_settings: An optional list of setting strings.  Passing
+            ``"keep-width"`` suppresses the horizontal centring crop so the
+            left edge of the original image is preserved.
+
+    Returns:
+        A new ``PIL.Image.Image`` resized to exactly *desired_size*.
+
+    Raises:
+        ValueError: If the image height or desired height is zero.
+    """
     img_width, img_height = image.size
     desired_width, desired_height = desired_size
     desired_width, desired_height = int(desired_width), int(desired_height)
@@ -183,7 +213,20 @@ def resize_image(image, desired_size, image_settings=None):
 
 
 def apply_image_enhancement(img, image_settings=None):
+    """Apply brightness, contrast, saturation, and sharpness adjustments to an image.
 
+    Each parameter defaults to ``1.0`` (no change) when absent from
+    *image_settings*.
+
+    Args:
+        img: A ``PIL.Image.Image`` to enhance.
+        image_settings: A dict with optional float keys ``"brightness"``,
+            ``"contrast"``, ``"saturation"``, and ``"sharpness"``.  Values
+            below 1.0 reduce the property; values above 1.0 increase it.
+
+    Returns:
+        The enhanced ``PIL.Image.Image``.
+    """
     if image_settings is None:
         image_settings = {}
 
@@ -203,6 +246,20 @@ def apply_image_enhancement(img, image_settings=None):
 
 
 def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
+    """Fit an image into *dimensions* with a blurred letterbox background.
+
+    Creates a background by scaling the image to fill *dimensions* and
+    applying a ``BoxBlur``, then pastes a ``contain``-scaled version of the
+    original image centred on top.
+
+    Args:
+        img: A ``PIL.Image.Image`` to pad.
+        dimensions: The target ``(width, height)`` in pixels.
+
+    Returns:
+        A new ``PIL.Image.Image`` of exactly *dimensions* with the original
+        image centred on a blurred background.
+    """
     bkg = ImageOps.fit(img, dimensions)
     bkg = bkg.filter(ImageFilter.BoxBlur(8))
     img = ImageOps.contain(img, dimensions)
@@ -280,6 +337,21 @@ def _playwright_screenshot_html(
 
 
 def take_screenshot_html(html_str, dimensions, timeout_ms=None):
+    """Render an HTML string as an image by writing it to a temporary file.
+
+    Prefers Playwright for rendering (better local-asset support); falls back
+    to the headless browser subprocess path if Playwright is unavailable.
+
+    Args:
+        html_str: The HTML content to render.
+        dimensions: A ``(width, height)`` tuple specifying the viewport size
+            in pixels.
+        timeout_ms: Optional screenshot timeout in milliseconds passed to the
+            headless browser subprocess.
+
+    Returns:
+        A ``PIL.Image.Image`` of the rendered page, or ``None`` on failure.
+    """
     image = None
     html_file_path = None
     try:
@@ -360,6 +432,23 @@ def _find_browser_command(
 
 
 def take_screenshot(target, dimensions, timeout_ms=None):
+    """Capture a screenshot of *target* using a headless browser subprocess.
+
+    Iterates through known browser binaries (Chrome, Chromium) to find one
+    available on the system, launches it with ``--headless``, and reads the
+    resulting PNG back into a PIL Image.
+
+    Args:
+        target: A URL or ``file://`` path to render.
+        dimensions: A ``(width, height)`` tuple specifying the viewport size
+            in pixels.
+        timeout_ms: Optional screenshot timeout in milliseconds passed to the
+            browser via ``--timeout``.
+
+    Returns:
+        A ``PIL.Image.Image`` of the captured page, or ``None`` if no browser
+        is found or the subprocess fails.
+    """
     image = None
     img_file_path = None
     try:

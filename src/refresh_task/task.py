@@ -121,6 +121,13 @@ class RefreshTask:
 
     @staticmethod
     def _notify_watchdog():
+        """Send a WATCHDOG=1 keepalive notification to systemd, if available.
+
+        The ``cysystemd`` import is optional; when the library is absent or the
+        process is not running under systemd, this method is a no-op.  Errors
+        from the notification call are caught and logged rather than propagated,
+        so a watchdog hiccup never aborts the refresh loop.
+        """
         if _sd_notify:
             try:
                 _sd_notify("WATCHDOG=1")
@@ -129,6 +136,18 @@ class RefreshTask:
 
     @staticmethod
     def _complete_manual_request(manual_request, metrics=None, exception=None):
+        """Signal the waiting caller that a manual update request has finished.
+
+        Sets the ``done`` event on *manual_request* so the thread blocked in
+        :meth:`manual_update` can unblock and inspect the outcome.
+
+        Args:
+            manual_request: A :class:`ManualUpdateRequest` to complete, or
+                ``None`` (in which case this is a no-op).
+            metrics: Optional timing/steps dict to attach to the request.
+            exception: If set, the exception will be stored on the request so
+                the waiting caller can re-raise it.
+        """
         if manual_request is None:
             return
         if exception is not None:
@@ -645,6 +664,15 @@ class RefreshTask:
             logger.debug("Failed to save refresh benchmark event", exc_info=True)
 
     def _stale_display_path(self) -> str | None:
+        """Return the path to an existing display image file, or ``None``.
+
+        Checks ``processed_image_file`` first, then ``current_image_file``.
+        Used to detect whether the display currently shows stale content that
+        can be retained when a plugin refresh fails.
+
+        Returns:
+            An absolute path string if an image file exists, otherwise ``None``.
+        """
         for path in (
             getattr(self.device_config, "processed_image_file", None),
             getattr(self.device_config, "current_image_file", None),
@@ -890,6 +918,30 @@ class RefreshTask:
     def _execute_with_policy(
         self, refresh_action, plugin_config, current_dt: datetime, request_id=None
     ):
+        """Run a plugin with the configured retry and isolation policy.
+
+        Reads environment variables to determine the execution strategy:
+        - ``INKYPI_PLUGIN_ISOLATION``: ``"process"`` (default) spawns a
+          subprocess per attempt; ``"none"`` runs in-process via a worker thread.
+        - ``INKYPI_PLUGIN_RETRY_MAX``: Maximum number of retries (default 1).
+        - ``INKYPI_PLUGIN_RETRY_BACKOFF_MS``: Sleep between retries (default 500 ms).
+        - ``INKYPI_PLUGIN_TIMEOUT_S``: Per-attempt timeout in seconds (default 60).
+
+        Args:
+            refresh_action: The :class:`RefreshAction` describing what to run.
+            plugin_config: The raw plugin configuration dict from device.json.
+            current_dt: The current device-timezone datetime used by the plugin.
+            request_id: Optional correlation ID for logging and benchmarking.
+
+        Returns:
+            A ``(image, plugin_meta)`` tuple where *image* is a
+            ``PIL.Image.Image`` and *plugin_meta* is optional metadata from the
+            plugin.
+
+        Raises:
+            TimeoutError: If all attempts time out.
+            RuntimeError: If all attempts fail with an unrecoverable error.
+        """
         plugin_id = refresh_action.get_plugin_id()
         retries = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
         backoff_ms = int(os.getenv("INKYPI_PLUGIN_RETRY_BACKOFF_MS", "500") or "500")
@@ -1047,6 +1099,20 @@ class RefreshTask:
         metrics: dict | None,
         error: str | None,
     ) -> None:
+        """Update the in-memory health entry for a plugin and trigger circuit-breaker logic.
+
+        Increments success or failure counters, stamps ``last_seen``, records
+        timing metrics, and delegates to :meth:`_cb_on_success` or
+        :meth:`_cb_on_failure` to manage the circuit-breaker state.
+
+        Args:
+            plugin_id: The unique plugin type identifier (e.g. ``"clock"``).
+            instance: The named plugin instance within the playlist, or ``None``
+                when the instance is unavailable.
+            ok: ``True`` if the refresh succeeded; ``False`` on failure.
+            metrics: Optional timing/steps dict to store on the health entry.
+            error: Human-readable error string to store when *ok* is ``False``.
+        """
         now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
         entry = self.plugin_health.get(plugin_id, {})
         entry.setdefault("success_count", 0)
@@ -1290,6 +1356,13 @@ class RefreshTask:
         return None, None
 
     def log_system_stats(self):
+        """Log a snapshot of CPU, memory, disk, swap, and network I/O metrics.
+
+        Uses ``psutil`` to gather system statistics.  If ``psutil`` is not
+        installed the method logs a warning and returns without raising.
+        Statistics are emitted at INFO level and include load averages where
+        the platform supports them.
+        """
         try:
             import psutil
         except Exception:
