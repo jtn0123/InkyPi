@@ -18,6 +18,9 @@ StandardError=journal
 CPUQuota=40%
 MemoryHigh=250M
 MemoryMax=350M
+# JTN-601: Prefer to kill inkypi over sshd/systemd during memory crunch
+# so we can still SSH in to debug. Default is 0; +500 raises the OOM score.
+OOMScoreAdjust=500
 
 [Install]
 WantedBy=multi-user.target

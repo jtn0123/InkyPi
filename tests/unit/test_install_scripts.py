@@ -47,6 +47,33 @@ class TestSystemdService:
     def test_service_watchdog(self):
         assert "WatchdogSec=120" in self.content
 
+    def test_service_has_oom_score_adjust(self):
+        # JTN-601: inkypi must declare OOMScoreAdjust so the kernel prefers to
+        # kill it over sshd during memory pressure, keeping SSH accessible.
+        assert "OOMScoreAdjust=" in self.content
+
+    def test_service_oom_score_adjust_value(self):
+        # JTN-601: The value must be positive (>= 100) — a positive score makes
+        # inkypi MORE likely to be killed. A negative value would protect inkypi
+        # and sacrifice sshd, which is the opposite of our intent.
+        match = re.search(r"OOMScoreAdjust=(-?\d+)", self.content)
+        assert match is not None, "OOMScoreAdjust= line not found in inkypi.service"
+        value = int(match.group(1))
+        assert value >= 100, (
+            f"OOMScoreAdjust={value} is not positive enough — must be >= 100 "
+            "to reliably prefer inkypi over sshd as the OOM victim."
+        )
+
+    def test_service_oom_score_adjust_within_systemd_range(self):
+        # JTN-601: systemd only accepts -1000 to 1000; values outside that range
+        # cause systemd to reject the unit file entirely.
+        match = re.search(r"OOMScoreAdjust=(-?\d+)", self.content)
+        assert match is not None, "OOMScoreAdjust= line not found in inkypi.service"
+        value = int(match.group(1))
+        assert (
+            -1000 <= value <= 1000
+        ), f"OOMScoreAdjust={value} is outside the systemd-valid range [-1000, 1000]"
+
     def test_service_working_directory(self):
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
