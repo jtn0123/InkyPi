@@ -1,6 +1,86 @@
 # CHANGELOG
 
 
+## v0.42.3 (2026-04-11)
+
+### Bug Fixes
+
+- Validate calendar URL + prevent empty row spam (JTN-357)
+  ([#337](https://github.com/jtn0123/InkyPi/pull/337),
+  [`d8dfae0`](https://github.com/jtn0123/InkyPi/commit/d8dfae05ab465a0a198b0f2b0992113d6a8ada17))
+
+Frontend: The calendar URL input now uses type="url" with a
+
+https?://.+ pattern hint and required, so the browser enforces basic URL constraints before
+  submission.
+
+JS: The Add Calendar button refuses to append a new empty row while the last existing row is empty
+  or fails HTML5 constraint validation, and surfaces a toast via showError instead of a browser
+  dialog. This closes the empty-row spam loop reported during dogfooding on 2026-04-08.
+
+Backend: Calendar.validate_settings now rejects non-http(s)/webcal URLs at save time via
+  urllib.parse.urlparse, so bad values can never be persisted even if the client-side guard is
+  bypassed.
+
+Tests: tests/plugins/test_calendar_validation.py covers the validate_settings contract
+  (http/https/webcal accepted, empty, whitespace, javascript:, file:, bare strings rejected, any-row
+  rejection) plus a template render test asserting the input is type="url" and required.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Validate image_folder path exists on save (JTN-355)
+  ([#334](https://github.com/jtn0123/InkyPi/pull/334),
+  [`bb8be7f`](https://github.com/jtn0123/InkyPi/commit/bb8be7f170ee53f0ae6df7736147bc104885ee33))
+
+* fix: validate image_folder path exists on save (JTN-355)
+
+Previously the Image Folder plugin accepted any folder_path at save time and silently persisted bad
+  values, failing later at refresh time with no link back to the save action. Add
+  validate_settings() so the existing save_plugin_settings flow rejects missing, non-existent,
+  unreadable, or empty folders with an inline 400 error — matching the pattern used by Weather
+  (JTN-354) and Screenshot.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: use real dirs for image_folder positive integration cases
+
+The happy-path integration tests in test_plugin_validation.py used /tmp/test-images and
+  /tmp/new-path as placeholder paths — paths that never existed on CI runners. The old image_folder
+  save handler did not check folder existence, so those tests passed. Now that validate_settings
+  (JTN-355) rejects missing/empty folders, switch the positive cases to tmp_path-backed directories
+  containing a real PNG so they still exercise the required-field success path.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ci**: Assert post-install RSS budgets in smoke test (JTN-608)
+  ([#336](https://github.com/jtn0123/InkyPi/pull/336),
+  [`d08c63b`](https://github.com/jtn0123/InkyPi/commit/d08c63b9764fbe6fdfd15956d0038825f0db15b9))
+
+Extends the JTN-536 memory-capped smoke test with a Phase 4 RSS budget gate so a regression that
+  balloons baseline memory passes install.sh and the boot probes but still fails CI before reaching
+  a Pi Zero 2 W (which caps inkypi.service at MemoryMax=350M).
+
+Phase 4 reads VmRSS from /proc/1/status inside the 512 MB-capped container (no procps dependency),
+  samples twice:
+
+- Idle after a 30s settle, hard fail >200 MB (target <150 MB) - Peak after exercising /, /playlist,
+  /api/plugins, /api/health/plugins, and POST /update_now with plugin_id=clock, hard fail >300 MB
+  (target <250 MB)
+
+Both samples print a BUDGET CHECK: line so regressions are grep-friendly in CI logs, and failure
+  dumps docker logs via tee to ${LOG_DIR}.
+
+The 100-request memory-growth leak check from the ticket is intentionally deferred — the two-sample
+  idle/peak gate catches the regressions we care about at PR time without adding minutes to every
+  run. Documented in docs/testing.md under "CI memory budgets".
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.42.2 (2026-04-11)
 
 ### Bug Fixes
