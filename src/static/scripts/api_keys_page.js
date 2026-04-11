@@ -25,14 +25,6 @@
       if (providerChip && config.mode === "managed") providerChip.textContent = "6 providers";
     }
 
-    function clearField(inputId) {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      input.value = "";
-      markDirty();
-      input.focus();
-    }
-
     function updateConfiguredStatus(updatedKeys) {
       updatedKeys.forEach((key) => {
         const mapping = {
@@ -53,39 +45,25 @@
         const statusElement = document.getElementById(statusId);
         const inputElement = document.getElementById(inputId);
         const value = inputElement ? inputElement.value : "";
-        if (statusElement && value && value !== config.maskPlaceholder) {
+        if (statusElement && value) {
           statusElement.textContent = "";
           const strong1 = document.createElement("strong");
           strong1.textContent = "Status:";
           statusElement.appendChild(strong1);
-          statusElement.appendChild(document.createTextNode(` Configured (${config.maskPlaceholder})`));
-          inputElement.value = config.maskPlaceholder;
-          addDeleteAndClearButtons(sectionId, key);
-        } else if (statusElement && value === "") {
-          statusElement.textContent = "";
-          const strong2 = document.createElement("strong");
-          strong2.textContent = "Status:";
-          statusElement.appendChild(strong2);
-          statusElement.appendChild(document.createTextNode(" Not configured"));
-          removeDeleteAndClearButtons(sectionId);
+          statusElement.appendChild(document.createTextNode(" Configured"));
+          // Clear the input and update its placeholder so subsequent edits start from empty
+          // rather than appending to the prior entry.
+          inputElement.value = "";
+          inputElement.placeholder = "(leave blank to keep current)";
+          addDeleteButton(sectionId, key);
         }
       });
       updateManagedSummary();
     }
 
-    function addDeleteAndClearButtons(sectionId, keyName) {
+    function addDeleteButton(sectionId, keyName) {
       const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      const inputContainer = formGroup?.querySelector(".input-container");
-      if (!formGroup || !inputContainer) return;
-      if (!inputContainer.querySelector(".clear-button")) {
-        const clearButton = document.createElement("button");
-        clearButton.type = "button";
-        clearButton.className = "clear-button";
-        clearButton.dataset.apiAction = "clear-field";
-        clearButton.dataset.inputId = `${sectionId}-input`;
-        clearButton.textContent = "×";
-        inputContainer.appendChild(clearButton);
-      }
+      if (!formGroup) return;
       if (!formGroup.querySelector(".delete-button")) {
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
@@ -97,10 +75,8 @@
       }
     }
 
-    function removeDeleteAndClearButtons(sectionId) {
+    function removeDeleteButton(sectionId) {
       const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      const inputContainer = formGroup?.querySelector(".input-container");
-      inputContainer?.querySelector(".clear-button")?.remove();
       formGroup?.querySelector(".delete-button")?.remove();
     }
 
@@ -184,8 +160,11 @@
         statusElement.appendChild(strong3);
         statusElement.appendChild(document.createTextNode(" Not configured"));
       }
-      if (inputElement) inputElement.value = "";
-      removeDeleteAndClearButtons(sectionId);
+      if (inputElement) {
+        inputElement.value = "";
+        inputElement.placeholder = "Enter API key";
+      }
+      removeDeleteButton(sectionId);
       updateManagedSummary();
     }
 
@@ -416,9 +395,7 @@
         const actionEl = event.target.closest("[data-api-action]");
         if (!actionEl) return;
         const action = actionEl.dataset.apiAction;
-        if (action === "clear-field") {
-          clearField(actionEl.dataset.inputId);
-        } else if (action === "delete-key") {
+        if (action === "delete-key") {
           deleteKey(actionEl.dataset.keyName);
         } else if (action === "delete-row") {
           deleteRow(actionEl);
@@ -433,7 +410,6 @@
     Object.assign(globalThis, {
       addPreset,
       addRow,
-      clearField,
       deleteKey,
       deleteRow,
       saveKeys,

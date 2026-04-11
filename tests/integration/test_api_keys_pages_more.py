@@ -72,15 +72,19 @@ def test_managed_unconfigured_provider_has_empty_input(client):
     ), "Unsplash input should have an empty value when no key is configured"
 
 
-def test_managed_configured_provider_clear_button_has_title(client, device_config_dev):
-    """JTN-215: clear button has a tooltip explaining it only clears the input field."""
+def test_managed_configured_provider_has_no_clear_button(client, device_config_dev):
+    """JTN-598: The Clear input button was removed because inputs now start empty
+    (no literal bullet-character pre-fill). There's nothing to clear, so the
+    button itself was removed to avoid confusing users. This test ensures the
+    removal sticks."""
     device_config_dev.set_env_key("NASA_SECRET", "nasa-test-value")
 
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert 'title="Clear input field \u2014 save to confirm"' in html
+    assert "clear-button" not in html
+    assert 'data-api-action="clear-field"' not in html
 
 
 def test_managed_configured_provider_delete_button_has_title(client, device_config_dev):
