@@ -243,3 +243,72 @@ def test_service_exec_matches_cli_wrapper():
 
 def test_install_references_valid_config_base():
     assert (INSTALL_DIR / "config_base").is_dir()
+
+
+# ---- cloud_init_clean.sh (JTN-591) ----
+
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+DOCS_DIR = REPO_ROOT / "docs"
+
+
+class TestCloudInitCleanScript:
+    """Structural validation for the cloud-init cleanup helper (JTN-591)."""
+
+    def test_script_exists(self):
+        assert (SCRIPTS_DIR / "cloud_init_clean.sh").exists()
+
+    def test_script_is_executable(self):
+        import stat
+
+        path = SCRIPTS_DIR / "cloud_init_clean.sh"
+        mode = path.stat().st_mode
+        assert mode & stat.S_IXUSR, "cloud_init_clean.sh is not user-executable"
+
+    def test_script_syntax_valid(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["bash", "-n", str(SCRIPTS_DIR / "cloud_init_clean.sh")],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
+
+    def test_script_has_set_euo_pipefail(self):
+        content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
+        assert "set -euo pipefail" in content
+
+    def test_script_checks_cloud_init_installed(self):
+        content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
+        assert "command -v cloud-init" in content
+
+    def test_script_calls_cloud_init_clean(self):
+        content = (SCRIPTS_DIR / "cloud_init_clean.sh").read_text()
+        assert "cloud-init clean" in content
+
+
+class TestInstallationDocCloudInit:
+    """Verify the cloud-init runcmd one-shot trap is documented (JTN-591)."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = (DOCS_DIR / "installation.md").read_text()
+
+    def test_cloud_init_re_edit_section_exists(self):
+        # The section header must mention both cloud-init and re-editing user-data.
+        assert "Re-editing user-data after first boot" in self.content
+
+    def test_documents_per_instance_one_shot_behaviour(self):
+        assert "per-instance" in self.content
+
+    def test_documents_instance_id_file_path(self):
+        assert "/var/lib/cloud/data/instance-id" in self.content
+
+    def test_documents_clean_logs_recovery_command(self):
+        assert "cloud-init clean --logs" in self.content
+
+    def test_documents_reboot_after_clean(self):
+        assert "sudo reboot" in self.content
+
+    def test_references_jtn_591(self):
+        assert "JTN-591" in self.content
