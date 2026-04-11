@@ -110,17 +110,36 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
         ):
             return None
         # Defend against open-redirect via spoofed Host header (JTN-317,
-        # CodeQL py/url-redirection alert #52). We must never echo a
-        # caller-controlled hostname back in a Location header, so we
-        # validate ``request.host`` against an allow-list before using
-        # ``request.url`` to build the redirect target.
+        # CodeQL py/url-redirection alert #52). ``request.url`` is
+        # built from the client-supplied ``Host`` header, so using it
+        # directly in a ``Location`` header lets an attacker point the
+        # redirect at an arbitrary domain. Instead we:
+        #   1. Validate the request host against an allow-list.
+        #   2. Rebuild the redirect target from the allow-listed host
+        #      value (not the raw header) plus the request path.
         allowed_hosts = _load_allowed_hosts()
-        host = (request.host or "").split(":", 1)[0].lower()
-        if host not in allowed_hosts:
+        raw_host = request.host or ""
+        host_name, _sep, host_port = raw_host.partition(":")
+        host_name = host_name.lower()
+        if host_name not in allowed_hosts:
             abort(400, description="Invalid host")
-        # NOSONAR — the http:// literal is intentional: we are upgrading the
-        # request to https. SonarCloud rule S5332 is a false positive here.
-        url = request.url.replace("http://", "https://", 1)  # NOSONAR
+        # Rebuild the authority from the allow-listed host. Preserving
+        # the port lets ``localhost:5000`` → ``https://localhost:5000``
+        # still work for local development.
+        safe_authority = host_name
+        # ``request.host`` already ran through Werkzeug parsing, so
+        # the port (if present) is digits-only; still, guard it.
+        if host_port and host_port.isdigit():
+            safe_authority = f"{host_name}:{host_port}"
+        # Preserve path + query string. ``full_path`` always ends with
+        # a ``?`` even when there are no query args, so strip it.
+        path_and_query = request.full_path
+        if path_and_query.endswith("?"):
+            path_and_query = path_and_query[:-1]
+        # NOSONAR — the https:// literal is intentional: we are
+        # upgrading the request to https. SonarCloud rule S5332 is a
+        # false positive here.
+        url = f"https://{safe_authority}{path_and_query}"  # NOSONAR
         return redirect(url, code=301)
 
 

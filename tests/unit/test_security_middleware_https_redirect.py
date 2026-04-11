@@ -115,8 +115,7 @@ def test_allowed_host_still_redirects(monkeypatch):
     resp = client.get("/settings", headers={"Host": "localhost"})
 
     assert resp.status_code == 301
-    assert resp.location is not None
-    assert resp.location.startswith("https://localhost")
+    assert resp.location == "https://localhost/settings"
 
 
 def test_default_allowed_hosts_include_inkypi_local(monkeypatch):
@@ -131,8 +130,7 @@ def test_default_allowed_hosts_include_inkypi_local(monkeypatch):
     resp = client.get("/settings", headers={"Host": "inkypi.local"})
 
     assert resp.status_code == 301
-    assert resp.location is not None
-    assert resp.location.startswith("https://inkypi.local")
+    assert resp.location == "https://inkypi.local/settings"
 
 
 def test_x_forwarded_proto_https_bypass_still_works(monkeypatch):
@@ -171,12 +169,39 @@ def test_custom_allowed_hosts_env_var(monkeypatch):
     client = app.test_client()
     resp = client.get("/settings", headers={"Host": "mypi.example.com"})
     assert resp.status_code == 301
-    assert resp.location is not None
-    assert resp.location.startswith("https://mypi.example.com")
+    assert resp.location == "https://mypi.example.com/settings"
 
     # A host not in the custom allow-list is still rejected.
     resp2 = client.get("/settings", headers={"Host": "evil.example"})
     assert resp2.status_code == 400
+
+
+def test_redirect_preserves_path_and_query_string(monkeypatch):
+    """The upgrade redirect must preserve the original path and query string."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = mod.app
+
+    client = app.test_client()
+    resp = client.get("/settings?foo=bar&baz=1", headers={"Host": "localhost"})
+    assert resp.status_code == 301
+    assert resp.location == "https://localhost/settings?foo=bar&baz=1"
+
+
+def test_redirect_omits_trailing_question_mark_when_no_query(monkeypatch):
+    """A request with no query string must not end the Location in ``?``."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = mod.app
+
+    client = app.test_client()
+    resp = client.get("/", headers={"Host": "localhost"})
+    assert resp.status_code == 301
+    assert resp.location == "https://localhost/"
 
 
 def test_allowed_host_ignores_port_suffix(monkeypatch):
@@ -191,5 +216,4 @@ def test_allowed_host_ignores_port_suffix(monkeypatch):
     resp = client.get("/settings", headers={"Host": "localhost:5000"})
 
     assert resp.status_code == 301
-    assert resp.location is not None
-    assert resp.location.startswith("https://localhost:5000")
+    assert resp.location == "https://localhost:5000/settings"
