@@ -1076,3 +1076,107 @@ class TestInstallationDocCloudInit:
 
     def test_references_jtn_591(self):
         assert "JTN-591" in self.content
+
+
+# ---- memory-diff workflow ----
+
+
+class TestMemoryDiffWorkflow:
+    """JTN-610: per-PR memory diff sticky comment."""
+
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "memory-diff.yml"
+    SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.WORKFLOW_PATH.exists(), (
+            f"Expected memory-diff workflow at {self.WORKFLOW_PATH}. "
+            "See JTN-610 for the per-PR memory diff comment design."
+        )
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_runs_on_pull_requests(self):
+        # Every PR must get a memory diff comment — this is the whole point
+        # of JTN-610. Running on push or schedule instead would defeat the
+        # purpose.
+        assert "pull_request:" in self.content
+
+    def test_workflow_cancels_superseded_runs(self):
+        # A force-push should not stack memory-diff runs on top of each
+        # other; the concurrency group must cancel stale runs so we only
+        # ever post the freshest comment.
+        assert "concurrency:" in self.content
+        assert "cancel-in-progress: true" in self.content
+
+    def test_workflow_references_memray(self):
+        # The preferred backend per JTN-610 is memray. Even though the
+        # helper script falls back to tracemalloc, the workflow should
+        # install memray explicitly so the comment contains the richer
+        # per-allocator breakdown whenever possible.
+        assert "memray" in self.content
+
+    def test_workflow_is_non_blocking(self):
+        # Hard RSS budgets are JTN-608's job. This job must not fail the PR
+        # even when memory regresses — it is informational. Both the job
+        # and every step need to keep going on failure.
+        assert "continue-on-error: true" in self.content
+
+    def test_workflow_invokes_helper_scripts(self):
+        # The workflow must call both the capture helper and the formatter
+        # helper — bypassing them would drift the comment format away from
+        # what the unit tests exercise.
+        assert "scripts/memory_diff.py" in self.content
+        assert "scripts/format_memory_diff.py" in self.content
+
+    def test_workflow_posts_sticky_comment(self):
+        # Uses actions/github-script (or an equivalent sticky-comment
+        # action) and searches by the marker so force-pushes overwrite the
+        # existing comment instead of piling new ones onto the PR.
+        assert "github-script" in self.content or "comment-pull-request" in self.content
+        assert "memory-diff:jtn-610" in self.content
+
+    def test_workflow_grants_pr_write_permission(self):
+        # Posting/updating comments requires pull-requests: write. Without
+        # this the github-script step cannot create the sticky comment.
+        assert "pull-requests: write" in self.content
+
+    def test_workflow_checks_out_base_branch(self):
+        # The diff is only meaningful if we measure both sides — the
+        # workflow must explicitly checkout the base branch.
+        assert "github.base_ref" in self.content
+
+    def test_capture_helper_exists_and_is_valid_python(self):
+        # Structural check that the capture helper is present; we compile
+        # it to catch syntax errors introduced by future edits.
+        helper = self.SCRIPTS_DIR / "memory_diff.py"
+        assert helper.exists(), f"Missing {helper}"
+        compile(helper.read_text(), str(helper), "exec")
+
+    def test_formatter_helper_exists_and_is_valid_python(self):
+        helper = self.SCRIPTS_DIR / "format_memory_diff.py"
+        assert helper.exists(), f"Missing {helper}"
+        compile(helper.read_text(), str(helper), "exec")
+
+    def test_formatter_uses_stable_sticky_marker(self):
+        # The marker is the contract between the formatter and the
+        # workflow. If either side changes it without the other the
+        # sticky-comment overwrite logic silently regresses to spam mode.
+        formatter = (self.SCRIPTS_DIR / "format_memory_diff.py").read_text()
+        assert 'STICKY_MARKER = "<!-- memory-diff:jtn-610 -->"' in formatter
+
+    def test_capture_helper_supports_both_backends(self):
+        # memray is preferred but tracemalloc is the graceful fallback
+        # when memray is missing (JTN-610: tolerant of first-time setup).
+        capture = (self.SCRIPTS_DIR / "memory_diff.py").read_text()
+        assert "memray" in capture
+        assert "tracemalloc" in capture
+
+    def test_memray_listed_in_requirements_dev_in(self):
+        # The lockfile regen happens under JTN-597's advisory
+        # lockfile-drift check, but the .in file must be updated so the
+        # next regen picks up memray for future PRs.
+        content = (INSTALL_DIR / "requirements-dev.in").read_text()
+        assert "memray" in content, (
+            "memray must be declared in install/requirements-dev.in so the "
+            "memory-diff workflow can install it from the lockfile."
+        )
