@@ -794,6 +794,9 @@
                 try {
                     const resp = await fetch(url, { method: 'HEAD' });
                     if (resp.ok) {
+                        // lgtm[js/xss-through-dom] — assigning to img.src can never
+                        // execute JavaScript. The browser fetches the URL as an image;
+                        // even javascript:/data: URIs in <img src> do not run script.
                         img.src = url;
                         img.style.display = '';
                         img.setAttribute('data-loaded', '1');

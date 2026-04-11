@@ -91,6 +91,10 @@ def get_wind_arrow(wind_deg: float) -> str:
 def parse_timezone(weatherdata):
     """Parse timezone from weather data"""
     if "timezone" in weatherdata:
+        # lgtm[py/clear-text-logging-sensitive-data] — logs the IANA timezone
+        # string (e.g. "America/Los_Angeles") from a public weather API response.
+        # CodeQL taints `weatherdata` because callers pass api_key to fetch it,
+        # but the timezone field never contains credentials.
         logger.info(f"Using timezone from weather data: {weatherdata['timezone']}")
         return ZoneInfo(weatherdata["timezone"])
     else:
