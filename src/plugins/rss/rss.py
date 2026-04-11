@@ -1,6 +1,7 @@
 import html
 import logging
 import re
+from urllib.parse import urlparse
 
 import feedparser
 
@@ -19,8 +20,40 @@ logger = logging.getLogger(__name__)
 
 FONT_SIZES = {"x-small": 0.7, "small": 0.9, "normal": 1, "large": 1.1, "x-large": 1.3}
 
+# Only http(s) feeds are supported; anything else (file://, javascript:, ftp://,
+# bare strings like "not-a-feed") is rejected at save time so the user sees the
+# problem immediately instead of discovering it later when generate_image runs.
+_ALLOWED_FEED_SCHEMES = frozenset({"http", "https"})
+
 
 class Rss(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject non-URL RSS feed values at save time (JTN-380).
+
+        The frontend ``<input type="url">`` enforces a URL-shaped value, but a
+        direct POST can still bypass it. Without server-side validation a bad
+        feed URL (e.g. ``definitely-not-a-feed-url``) persists with a success
+        toast and only fails later when the plugin tries to fetch the feed.
+        """
+        feed_url = (settings.get("feedUrl") or "").strip()
+        if not feed_url:
+            # ``required=True`` + validate_plugin_required_fields already
+            # rejects missing values with its own error message.
+            return None
+        try:
+            parsed = urlparse(feed_url)
+        except ValueError:
+            return f"Invalid RSS Feed URL: {feed_url!r}"
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in _ALLOWED_FEED_SCHEMES:
+            return (
+                "RSS Feed URL must start with http:// or https:// "
+                f"(got {feed_url!r})."
+            )
+        if not parsed.netloc:
+            return f"RSS Feed URL is missing a host: {feed_url!r}"
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
@@ -53,9 +86,11 @@ class Rss(BasePlugin):
                 ),
                 field(
                     "feedUrl",
+                    "url",
                     label="RSS Feed URL",
                     placeholder="https://example.com/feed.xml",
                     required=True,
+                    hint="Must start with http:// or https://",
                 ),
                 callout(
                     "Only use trusted RSS feeds. Untrusted URLs can introduce security and reliability risks.",
