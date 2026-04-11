@@ -1236,3 +1236,69 @@ x-wr-timezone==2.0.1 \
     --hash=sha256:9166c40e6ffd4c0edebabc354e1a1e2cffc1bb473f88007694793757685cc8c3 \
     --hash=sha256:e74a53b9f4f7def8138455c240e65e47c224778bce3c024fcd6da2cbe91ca038
     # via recurring-ical-events
+
+# ============================================================
+# Linux-only packages: manually pinned with hashes because
+# pip-compile cannot resolve sys_platform=="linux" packages
+# when running on macOS (the development platform).
+# These are installed ONLY on Linux (Pi hardware) by pip's
+# environment marker evaluation.
+# ============================================================
+cysystemd==2.0.1 ; sys_platform == "linux" \
+    --hash=sha256:19a0b380622a11b42e7823e95a1f12312142d5a13d1b6e3cb400272e5aa3d07f \
+    --hash=sha256:d0aaaa11ca96e706b1a2fbe2e9ec1c3739583e00ed88dcd1d987663b7b519870 \
+    --hash=sha256:8f50d7d4057406c4b30ae5604f061687fcaa7c5e541935c7b4817166c870fc11 \
+    --hash=sha256:78dc5187193b2b959987e38c29d66e9fb625de5f93f2aec58eb7553aa504ed1d \
+    --hash=sha256:cd5543e1b1d96c5f327203506a46df96235e8b984cf0cfb4b85f0348975b7957 \
+    --hash=sha256:39b03dcfced76957ede5f3f21956b5687a0511bdd1d0d41f2d3dffc9df32320d \
+    --hash=sha256:017b924d42ee92f6736714b78d51f81aded6b5f34e44dc7e2e92cbe2598e3611 \
+    --hash=sha256:d9d89125cafee3cc0a898faf9fe53f9166ea6625393b75d606eef2901a8c3023 \
+    --hash=sha256:b2dcd4f5788955787d08e43de1276cb5a6720e13e7fc6765aed4fe6fa3355144 \
+    --hash=sha256:292f3f38b6fc6dc01a44c1053d8e2907ef857c09282fa904ed4742113eb36fdc \
+    --hash=sha256:ed55acd18bcc576a5b1af81ae59fb86042ee019b642f6cfed9221b963f05aeea \
+    --hash=sha256:0bb9b4380cb82202aeb5aedb5a6e63f257eac5d6192c24d054656e8329ab6cf0 \
+    --hash=sha256:632fe56264a18b7af3d1efd09125d6d5c1ec97d29ad6192c412ee43105821d61
+    # via -r install/requirements.in
+gpiod==2.4.2 ; sys_platform == "linux" \
+    --hash=sha256:7fabcf8a3d7fd014d8499f9fd02e261c6ad69ff22359f860baa20d8c5008b74e \
+    --hash=sha256:8e0c831ebd49eb103ff48354cc9b7443884dc2bc68e60a88eefa866700d1d55f \
+    --hash=sha256:5e07b927919ac03c41c14dfdb38ae8f2a75dda104c028b58a71138537d3ecfeb \
+    --hash=sha256:d9f555185ad3ab10355a108213ec2436f0b37edab6c8dbc8ae9cbcc257beb4af \
+    --hash=sha256:f37be705406efa4d2170c03be2191f2be81bb5463c981d53e505084bc135132f \
+    --hash=sha256:ec1526a258d251c93f0ad4589f47ff98b512f95f87ba283e33a107026c26ddcf \
+    --hash=sha256:81c28fd8fca36202d5269596d602406fdc8bf6940563560ba7c4f188c78b79d5 \
+    --hash=sha256:9d52c4a04e581ea7c8e1eebd27a38139d52b034ad8d80d5bbf94c5f80d70861d \
+    --hash=sha256:452defdf75edf175a5f85d42a4186e3ad16b8d99aeac1843d1da939ec4643d0f \
+    --hash=sha256:64c5c53785d7d8c95471dc45cf9b5b701f967fc4b82f73ff0a909685e20fa677 \
+    --hash=sha256:1ba4d8e2ebc83ac50d4546134f2222cf67d50534eda7433f03f496950991611f \
+    --hash=sha256:6b983c4b51b8d337def1c4c8440f2cc1ee0fdcbf15ce92f2fb0811bd5a7951f5 \
+    --hash=sha256:7c1acb30691ecbf946d2948a3453acb8058872ed5ab185f2b3e49be8c11303a5 \
+    --hash=sha256:89adeb36a8816b3f6352c755ccc2ac6b68be357331b1ed87f8f4b50a4986ea53 \
+    --hash=sha256:6e8b22b7942ff5c70304c8a86d6bf6f78ce1b8b16a0fdee0fa06a1c056865f5c \
+    --hash=sha256:515c60a56be2eb74f4c277a1b4d5560aab9d1148d4815a7585e63269bd2fcbd0 \
+    --hash=sha256:d7a327a0f5e3fb6f6b72b55aea3ada7e7d179337559a403cabc6e18ccb670d1d \
+    --hash=sha256:00839630503fae47157c7a4c163d0c43f33af9bea48e425bb3b1cf2883cdf529 \
+    --hash=sha256:f5e264b0601e15c5de2b7ebfec3a8159f18a86c74e95ce0930dd7e866ce86cae \
+    --hash=sha256:0e588cf9f361def5515bdb40a58280be58e5dca805a42de8780c5febc7b5cb9c \
+    --hash=sha256:54425eb9b04ddc5763e52cfaf1f81773d0a5e292c39f012b4f2aa633b446da89 \
+    --hash=sha256:d0c406b5643a32dea0f692274e7b37c7ebe2d17862a89c6eb60b941d4cb697d5 \
+    --hash=sha256:8b07eb7213884164d07e21248e40d1f681efb3174c161b162d2d717d719ae4fb \
+    --hash=sha256:45d19745760507664a8c509d8c82b9234e2dad315b567eadf49fdd447ebe0faf \
+    --hash=sha256:602aae17ff365bb8e2a30ce65c6bbf2d8e7a7e64bf016e82e4fd4c730ef69ab7
+    # via gpiodevice
+gpiodevice==0.0.5 ; sys_platform == "linux" \
+    --hash=sha256:b808250cd1d89379b69f98cc6442b6b098aa32604c3ed7fb194a39607ee35253 \
+    --hash=sha256:cca01ff4319e0ba906ff46dcb8113d8d532b3f5ee03d683d8a11037c8e89140c
+    # via inky
+inky==2.3.0 ; sys_platform == "linux" \
+    --hash=sha256:08dfae735a3329889472ce0b18e17359f1f050a64566fa8c62974ce025c13173 \
+    --hash=sha256:fe417eab9d9147dd5c9ec0f7e75358b3ce096ea0349a3de81562aafc0d8f2b0c
+    # via -r install/requirements.in
+smbus2==0.6.1 ; sys_platform == "linux" \
+    --hash=sha256:650feeb27ca0ed58b07db4c10201c2a662c41305b7bf6e5fab9d888056f48180 \
+    --hash=sha256:2b043372abf8f6029a632c3aab36b641c5d5872b1cbad599fc68e17ac4fd90a5
+    # via inky
+spidev==3.8 ; sys_platform == "linux" \
+    --hash=sha256:07d0da112ca944df41f080811bb123b910df63bb38b66712289bc4fd9d682185 \
+    --hash=sha256:2bc02fb8c6312d519ebf1f4331067427c0921d3f77b8bcaf05189a2e8b8382c0
+    # via inky

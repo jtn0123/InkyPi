@@ -71,6 +71,25 @@ deps. This means pip will refuse to install any package whose wheel hash does no
 appear in `install/requirements.txt`. If a new package needs to be added, the
 lockfile must be regenerated (see above) before the installer will accept it.
 
+## Linux-only packages (inky, cysystemd and their transitive deps)
+
+`inky`, `cysystemd`, `gpiod`, `gpiodevice`, `smbus2`, and `spidev` are hardware
+drivers that only ship Linux wheels (or build from source on Linux). pip-compile
+cannot include them in the lockfile when run on macOS because the `sys_platform
+== "linux"` condition is False at compile time.
+
+These packages are appended manually to the bottom of `install/requirements.txt`
+with `; sys_platform == "linux"` markers and all their PyPI hashes. pip skips
+them silently on macOS/Windows because the environment marker is False. On Linux
+(the Pi), pip installs and hash-verifies them.
+
+To update a Linux-only package:
+1. Find all new hashes on PyPI: `curl https://pypi.org/pypi/<pkg>/<ver>/json | python3 -c "import json,sys; [print(u['digests']['sha256']) for u in json.load(sys.stdin)['urls']]"`
+2. Edit the manually-appended block at the bottom of `install/requirements.txt`.
+3. Update `install/requirements.in` with the new version pin.
+4. Run `pip-compile --generate-hashes ...` to re-lock the rest of the file.
+5. Manually re-append the Linux-only block.
+
 ## Cross-platform note (Pi Zero 2 W — armv7l)
 
 `pip-compile` is run on a development machine (typically x86_64 or arm64 macOS).
