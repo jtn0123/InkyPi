@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.42.2 (2026-04-11)
+
+### Bug Fixes
+
+- Unify image_upload background fill label to "Color" (JTN-358)
+  ([#335](https://github.com/jtn0123/InkyPi/pull/335),
+  [`a6b62bd`](https://github.com/jtn0123/InkyPi/commit/a6b62bd683a6cfda8088837a23f3644cb4f16f70))
+
+Image Upload's Background Fill toggle showed "Solid Color" while the sibling Image Folder and Image
+  Album plugins showed "Color". Since two of three plugins already used "Color", rename image_upload
+  to match so the three image plugins present a consistent UI.
+
+Also add a schema-level regression test that asserts the backgroundOption option labels stay in sync
+  across image_upload, image_folder, and image_album.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.42.1 (2026-04-11)
 
 ### Performance Improvements
