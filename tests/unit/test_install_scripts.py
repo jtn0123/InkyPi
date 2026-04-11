@@ -8,6 +8,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
+DOCS_DIR = REPO_ROOT / "docs"
 
 
 # ---- Helpers ----
@@ -951,6 +953,191 @@ class TestWheelhouseBuildWorkflow:
         assert ".sha256" in self.content
 
 
+class TestPiImageBuildWorkflow:
+    """JTN-533: release-time workflow that builds a pre-installed .img.xz."""
+
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-pi-image.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert (
+            self.WORKFLOW_PATH.exists()
+        ), f"Expected workflow file at {self.WORKFLOW_PATH}"
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_is_valid_yaml(self):
+        import yaml
+
+        doc = yaml.safe_load(self.content)
+        assert isinstance(doc, dict)
+        # 'on' is parsed as Python True in PyYAML 5.x — accept either key
+        assert "on" in doc or True in doc
+        assert "jobs" in doc
+
+    def test_workflow_triggers_on_release_published(self):
+        # Must run on every tagged release so each release ships an image.
+        assert "release:" in self.content
+        assert "published" in self.content
+
+    def test_workflow_supports_manual_rebuild(self):
+        # workflow_dispatch lets maintainers rebuild an image for an existing
+        # tag without cutting a new release (same pattern as JTN-604).
+        assert "workflow_dispatch:" in self.content
+
+    def test_workflow_pins_pi_os_image_url_in_env_block(self):
+        # The Pi OS base image URL must live in a clearly-labeled top-of-file
+        # variable so bumping the base image is a single-line change.
+        assert "PI_OS_IMAGE_URL:" in self.content
+        assert "downloads.raspberrypi.org" in self.content
+        assert "PIN POINT" in self.content, (
+            "build-pi-image.yml must have a PIN POINT comment block so future "
+            "maintainers know exactly how to bump the Pi OS image"
+        )
+
+    def test_workflow_pins_pi_os_image_sha256(self):
+        # Defense against a compromised CDN — SHA must travel with the URL.
+        assert "PI_OS_IMAGE_SHA256:" in self.content
+        # A real 64-char lowercase hex sha256 must be present in the env
+        # block (defense against an empty placeholder slipping through).
+        sha_match = re.search(r"PI_OS_IMAGE_SHA256:\s*([0-9a-f]{64})", self.content)
+        assert (
+            sha_match is not None
+        ), "PI_OS_IMAGE_SHA256 must be a 64-char lowercase hex digest"
+
+    def test_workflow_verifies_base_image_checksum(self):
+        # The downloaded base image must be checksum-verified before use.
+        assert "sha256sum -c" in self.content
+
+    def test_workflow_uses_qemu_user_static_and_chroot(self):
+        # Building arm64 binaries on an x86_64 runner requires
+        # qemu-user-static for binfmt + chroot + copy of qemu-aarch64-static
+        # into the mounted rootfs.
+        assert "qemu-user-static" in self.content
+        assert "qemu-aarch64-static" in self.content
+        assert "chroot" in self.content
+
+    def test_workflow_bind_mounts_proc_sys_dev(self):
+        # chroot needs /proc, /sys, /dev visible for install.sh to succeed.
+        assert "/proc" in self.content
+        assert "/sys" in self.content
+        assert "/dev" in self.content
+        assert "mount --bind" in self.content
+
+    def test_workflow_clones_at_release_tag_not_main(self):
+        # Must build from the release tag so install.sh/requirements match
+        # the shipped version.
+        assert "--branch" in self.content
+        assert "tag_name" in self.content or "inputs.tag" in self.content
+        # Never pin to main/HEAD
+        assert "--branch main" not in self.content
+        assert "--branch master" not in self.content
+
+    def test_workflow_runs_install_sh_in_chroot(self):
+        # The whole point — chroot + install.sh is what produces the image.
+        assert "install/install.sh" in self.content or "install.sh" in self.content
+
+    def test_workflow_does_not_modify_install_sh(self):
+        # JTN-533 constraint: install.sh must stay self-contained for
+        # source-install users. The workflow uses PATH stubs, not a patched
+        # install.sh, to deal with raspi-config/systemctl in a chroot.
+        # Detect a modification by looking for sed/patch/awk rewrites of
+        # install.sh content — `checkout` of a workflow file itself is fine.
+        lowered = self.content.lower()
+        assert (
+            "sed -i" not in lowered
+            or "install.sh" not in lowered
+            or (
+                # Allow sed usage as long as it does not target install.sh.
+                "install.sh"
+                not in self.content.split("sed -i")[-1][:200]
+            )
+        )
+
+    def test_workflow_pishrink_pinned_by_commit(self):
+        # pishrink.sh has no tagged releases — must be pinned by full SHA.
+        assert "PISHRINK_COMMIT:" in self.content
+        sha_match = re.search(r"PISHRINK_COMMIT:\s*([0-9a-f]{40})", self.content)
+        assert (
+            sha_match is not None
+        ), "PISHRINK_COMMIT must be a 40-char lowercase hex commit SHA"
+
+    def test_workflow_runs_pishrink(self):
+        assert "pishrink.sh" in self.content
+
+    def test_workflow_zero_fills_free_space_before_compression(self):
+        # Better xz ratio — zero-fill unused blocks so they compress away.
+        assert "dd if=/dev/zero" in self.content
+
+    def test_workflow_recompresses_with_xz(self):
+        assert "xz -9" in self.content
+
+    def test_workflow_produces_expected_image_name(self):
+        assert "inkypi-" in self.content
+        assert "pi-zero-2-w.img" in self.content
+
+    def test_workflow_generates_sha256_sidecar(self):
+        assert "sha256sum" in self.content
+        assert ".sha256" in self.content
+
+    def test_workflow_has_boot_verification_job(self):
+        # JTN-533: unverified images must not ship. A separate job boots the
+        # image in qemu and grep's for "login:" before attach-release runs.
+        assert "verify-boot" in self.content or "boot-verify" in self.content
+        assert (
+            "qemu-system-aarch64" in self.content or "qemu-system-arm" in self.content
+        )
+        assert "login:" in self.content
+
+    def test_workflow_attach_release_requires_boot_verification(self):
+        # The attach job must `needs: verify-boot` AND gate on its verified
+        # output so a failed boot cannot silently upload an image.
+        assert "needs: [build-image, verify-boot]" in self.content or (
+            "needs:" in self.content and "verify-boot" in self.content
+        )
+        assert "verify-boot.outputs.verified" in self.content
+
+    def test_workflow_uses_pinned_action_versions(self):
+        # Supply-chain: every external action must be pinned by major version.
+        # (SHA pinning is stronger but the rest of the repo uses @v4/@v2.)
+        assert "actions/checkout@v4" in self.content
+        assert "softprops/action-gh-release@v2" in self.content
+        assert "actions/upload-artifact@v4" in self.content
+        assert "actions/download-artifact@v4" in self.content
+
+    def test_workflow_uploads_release_asset(self):
+        assert "softprops/action-gh-release" in self.content
+
+    def test_workflow_attach_gated_on_release_event(self):
+        # attach-release step must only fire on `release` events, never on
+        # workflow_dispatch (which is a dry run).
+        assert "github.event_name == 'release'" in self.content
+
+
+class TestInstallationDocPreBuiltImage:
+    """JTN-533: docs/installation.md must surface the pre-built image path."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = (DOCS_DIR / "installation.md").read_text()
+
+    def test_documents_prebuilt_image_option(self):
+        # Users should see the .img.xz option front and center.
+        assert "Pre-built image" in self.content or "pre-built image" in self.content
+
+    def test_documents_image_file_extension(self):
+        assert ".img.xz" in self.content
+
+    def test_documents_sha256_verification(self):
+        assert ".sha256" in self.content
+
+    def test_documents_pi_zero_2_w_only_scope(self):
+        # Callers on other Pi models must be pointed at install.sh instead.
+        assert "Pi Zero 2 W" in self.content
+
+    def test_references_jtn_533(self):
+        assert "JTN-533" in self.content
+
+
 # ---- update.sh ----
 
 
@@ -1010,9 +1197,6 @@ def test_install_references_valid_config_base():
 
 
 # ---- cloud_init_clean.sh (JTN-591) ----
-
-SCRIPTS_DIR = REPO_ROOT / "scripts"
-DOCS_DIR = REPO_ROOT / "docs"
 
 
 class TestCloudInitCleanScript:
