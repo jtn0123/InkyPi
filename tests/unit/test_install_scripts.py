@@ -69,6 +69,38 @@ class TestSystemdService:
     def test_service_watchdog(self):
         assert "WatchdogSec=120" in self.content
 
+    def test_service_execstartpre_checks_install_lockfile(self):
+        # JTN-607: Defense-in-depth for JTN-600. If install.sh is running it
+        # creates /var/lib/inkypi/.install-in-progress; the service must
+        # refuse to start while the lockfile exists so systemd cannot thrash
+        # the Pi with a start+crash+restart loop mid-install.
+        assert "ExecStartPre=" in self.content, (
+            "inkypi.service must have an ExecStartPre directive that checks "
+            "the install-in-progress lockfile (JTN-607)"
+        )
+        assert "/var/lib/inkypi/.install-in-progress" in self.content, (
+            "ExecStartPre must reference the /var/lib/inkypi/.install-in-progress "
+            "lockfile path so the service refuses to start mid-install (JTN-607)"
+        )
+        # The directive must also produce a clear log message so operators
+        # can tell why the service failed to start.
+        assert "Install in progress" in self.content, (
+            "ExecStartPre must echo a clear 'Install in progress' message "
+            "so operators understand why the service refused to start"
+        )
+        # ExecStartPre must live in the [Service] section.
+        service_start = self.content.index("[Service]")
+        install_start = self.content.index("[Install]", service_start)
+        pre_pos = self.content.index("ExecStartPre=")
+        assert (
+            service_start < pre_pos < install_start
+        ), "ExecStartPre must be inside the [Service] section"
+        # And it must come before ExecStart so systemd runs the check first.
+        exec_start_pos = self.content.index("ExecStart=/usr/local/bin/inkypi")
+        assert (
+            pre_pos < exec_start_pos
+        ), "ExecStartPre must appear before ExecStart in the service file"
+
     def test_service_working_directory(self):
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
@@ -358,6 +390,85 @@ class TestInstallScript:
             "install_app_service() must call 'systemctl enable' to re-enable the "
             "service after stop_service() disabled it during the install window"
         )
+
+    def test_install_creates_lockfile_near_top(self):
+        # JTN-607: install.sh must create /var/lib/inkypi/.install-in-progress
+        # early in the main script body (after check_permissions) so any
+        # concurrent systemctl start attempt hits the ExecStartPre guard.
+        # Locate the call site — must appear after check_permissions and
+        # before the later install steps (install_debian_dependencies etc.).
+        assert (
+            "/var/lib/inkypi" in self.content
+        ), "install.sh must reference /var/lib/inkypi for the lockfile (JTN-607)"
+        assert (
+            ".install-in-progress" in self.content
+        ), "install.sh must reference the .install-in-progress lockfile (JTN-607)"
+
+        # The lockfile must be created (touch) in the main script body.
+        # Find the first 'touch "$LOCKFILE"' outside function definitions by
+        # searching after the last function closing brace before main flow.
+        main_start = self.content.index('parse_arguments "$@"')
+        main_body = self.content[main_start:]
+        assert (
+            'mkdir -p "$LOCKFILE_DIR"' in main_body
+        ), "install.sh main body must mkdir -p the lockfile directory (JTN-607)"
+        assert (
+            'touch "$LOCKFILE"' in main_body
+        ), "install.sh main body must touch the lockfile (JTN-607)"
+
+        # Ordering: touch must come after check_permissions (so we only create
+        # the lockfile once we know we're running as root) and before the
+        # heavy install steps.
+        check_pos = main_body.index("check_permissions")
+        touch_pos = main_body.index('touch "$LOCKFILE"')
+        install_deps_pos = main_body.index("install_debian_dependencies")
+        assert check_pos < touch_pos < install_deps_pos, (
+            'touch "$LOCKFILE" must run after check_permissions and before '
+            "install_debian_dependencies (JTN-607)"
+        )
+
+    def test_install_removes_lockfile_at_end_on_success(self):
+        # JTN-607: At the very end of install.sh, after every install step
+        # has succeeded, remove the lockfile so the service is allowed to
+        # start. The removal must come AFTER install_app_service and the CSS
+        # build so a failure in any earlier step leaves the lockfile in place.
+        main_start = self.content.index('parse_arguments "$@"')
+        main_body = self.content[main_start:]
+
+        assert (
+            'rm -f "$LOCKFILE"' in main_body
+        ), "install.sh must remove the lockfile on success (JTN-607)"
+
+        # Ordering: rm must come after install_app_service and after the CSS
+        # build so an earlier failure leaves the lockfile in place.
+        rm_pos = main_body.index('rm -f "$LOCKFILE"')
+        install_app_pos = main_body.index("install_app_service")
+        css_pos = main_body.index("CSS bundle built")
+        assert (
+            install_app_pos < rm_pos
+        ), 'rm -f "$LOCKFILE" must come after install_app_service (JTN-607)'
+        assert css_pos < rm_pos, (
+            'rm -f "$LOCKFILE" must come after the CSS bundle build step '
+            "so a CSS build failure leaves the lockfile in place (JTN-607)"
+        )
+
+    def test_install_lockfile_not_removed_by_error_trap(self):
+        # JTN-607: On failure exit, the lockfile must be LEFT in place so the
+        # user is forced to rerun install.sh (or manually rm the file) before
+        # the service can start. This means there must be NO trap that
+        # removes the lockfile on EXIT/ERR/INT/TERM — only the explicit
+        # rm -f at the end of a successful run.
+        trap_lines = [
+            line
+            for line in self.content.splitlines()
+            if line.strip().startswith("trap ")
+        ]
+        for line in trap_lines:
+            assert "$LOCKFILE" not in line and ".install-in-progress" not in line, (
+                "install.sh must NOT register a trap that removes the lockfile "
+                "on failure exit — leaving it in place forces the user to "
+                f"rerun install.sh before the service can start (JTN-607): {line!r}"
+            )
 
     def test_stop_service_disable_tolerates_already_disabled(self):
         # JTN-600: The disable call must not fail if the service is already

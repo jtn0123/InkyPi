@@ -32,6 +32,17 @@ SRC_PATH="$SCRIPT_DIR/../src"
 BINPATH="/usr/local/bin"
 VENV_PATH="$INSTALL_PATH/venv_$APPNAME"
 
+# JTN-607: Defense-in-depth for JTN-600. While install.sh is running, create
+# /var/lib/inkypi/.install-in-progress. inkypi.service's ExecStartPre refuses
+# to start if this file exists, so even if someone manually runs
+# `systemctl start inkypi.service` or systemd tries to auto-restart, the
+# service cannot thrash the Pi mid-install. The lockfile is removed once all
+# install steps succeed (see end of script). On failure exit the file is
+# deliberately left in place so the user MUST rerun install.sh (or manually
+# remove it) before the service can start.
+LOCKFILE_DIR="/var/lib/inkypi"
+LOCKFILE="$LOCKFILE_DIR/.install-in-progress"
+
 SERVICE_FILE="$APPNAME.service"
 SERVICE_FILE_SOURCE="$SCRIPT_DIR/$SERVICE_FILE"
 SERVICE_FILE_TARGET="/etc/systemd/system/$SERVICE_FILE"
@@ -448,6 +459,16 @@ wait_for_clock() {
 # to maintain default INKY display support.
 parse_arguments "$@"
 check_permissions
+
+# JTN-607: Create the install-in-progress lockfile. inkypi.service's
+# ExecStartPre refuses to start while this file exists (defense-in-depth for
+# JTN-600's systemctl disable). The lockfile is removed once all install
+# steps succeed (see near end of script); on failure exit it is left in place
+# so the user must rerun install.sh (or manually rm it) before the service
+# can start.
+mkdir -p "$LOCKFILE_DIR"
+touch "$LOCKFILE"
+
 stop_service
 # fetch the WS display driver if defined.
 if [[ -n "$WS_TYPE" ]]; then
@@ -500,5 +521,12 @@ if [ ! -f "$CSS_OUTPUT" ]; then
   exit 1
 fi
 echo_success "CSS bundle built."
+
+# JTN-607: All install steps succeeded — remove the install-in-progress
+# lockfile so the service is allowed to start. If install.sh exits early due
+# to a failure above, this line is never reached and the lockfile stays in
+# place, forcing the user to rerun install.sh (or manually rm the file)
+# before the service can start.
+rm -f "$LOCKFILE"
 
 ask_for_reboot
