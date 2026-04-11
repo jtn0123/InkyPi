@@ -6,9 +6,12 @@ so they can be unit-tested without an application context.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from html import escape
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Sanitization helpers
@@ -48,6 +51,117 @@ def sanitize_response_value(value: Any) -> str:
         A sanitized, HTML-escaped string.
     """
     return escape(sanitize_log_field(str(value)), quote=False)
+
+
+# Canonical alias so callers can use the more descriptive name.
+sanitize_for_log = sanitize_log_field
+
+
+# ---------------------------------------------------------------------------
+# Validation error
+# ---------------------------------------------------------------------------
+
+
+class ValidationError(ValueError):
+    """Raised when input fails range, type, or schema validation.
+
+    Attributes:
+        message: Human-readable description of the failure.
+        field: Optional field name associated with the failure.
+    """
+
+    def __init__(self, message: str, *, field: str | None = None) -> None:
+        self.message = message
+        self.field: str | None = field
+        super().__init__(message)
+
+
+# ---------------------------------------------------------------------------
+# Range validation
+# ---------------------------------------------------------------------------
+
+
+def validate_int_range(
+    value: Any,
+    *,
+    field: str,
+    min: int,
+    max: int,
+) -> int:
+    """Validate that *value* is an integer within [*min*, *max*].
+
+    Mirrors the pattern established by ``_validate_cycle_minutes`` in
+    ``src/blueprints/playlist.py`` but raises :class:`ValidationError`
+    instead of returning an error response, so it can be used in pure
+    validation code without Flask context.
+
+    Args:
+        value: The raw value to validate (will be coerced via ``int()``).
+        field: Human-readable field name included in any error message.
+        min: Inclusive lower bound.
+        max: Inclusive upper bound.
+
+    Returns:
+        The validated integer value.
+
+    Raises:
+        ValidationError: If *value* cannot be converted to ``int`` or is
+            outside [*min*, *max*].
+    """
+    try:
+        int_val = int(value)
+    except (ValueError, TypeError) as exc:
+        raise ValidationError(f"{field} must be an integer", field=field) from exc
+    if int_val < min or int_val > max:
+        raise ValidationError(
+            f"{field} must be between {min} and {max}",
+            field=field,
+        )
+    return int_val
+
+
+# ---------------------------------------------------------------------------
+# Schema-based validation
+# ---------------------------------------------------------------------------
+
+try:
+    import jsonschema as _jsonschema  # type: ignore[assignment]
+except ImportError:  # pragma: no cover
+    _jsonschema = None  # type: ignore[assignment]
+
+
+def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[str]:
+    """Validate *data* against *schema* (JSON Schema draft 2020-12).
+
+    Uses ``jsonschema`` when available; falls back to a no-op when the
+    library is absent (library is listed in requirements, so this is a
+    safety net only).
+
+    Args:
+        data: The dictionary to validate.
+        schema: A JSON Schema dict.
+
+    Returns:
+        A list of human-readable error strings.  An empty list means
+        validation passed.
+    """
+    if _jsonschema is None:  # pragma: no cover
+        logger.debug("jsonschema not available; skipping schema validation")
+        return []
+
+    errors: list[str] = []
+    try:
+        validator = _jsonschema.Draft202012Validator(schema)
+        for err in validator.iter_errors(data):
+            try:
+                path = ".".join(str(p) for p in err.path)
+                msg = f"{path}: {err.message}" if path else err.message
+            except Exception:
+                msg = str(err)
+            errors.append(msg)
+    except Exception as exc:
+        logger.debug("JSON schema validation encountered an error: %s", exc)
+    return errors
 
 
 # ---------------------------------------------------------------------------
