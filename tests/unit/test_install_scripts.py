@@ -376,6 +376,63 @@ class TestInstallScript:
                 f"it doesn't fail when the service is already disabled: {line!r}"
             )
 
+    def test_install_uses_no_cache_dir(self):
+        # JTN-602: every pip install invocation in install.sh must include
+        # --no-cache-dir to avoid wasting ~200 MB of SD card space and ~50 MB
+        # of RAM on a Pi Zero 2 W (pip runs once per install cycle, cache is useless).
+        pip_install_lines = [
+            line.strip()
+            for line in self.content.splitlines()
+            if re.search(r"-m pip install", line) and not line.strip().startswith("#")
+        ]
+        assert pip_install_lines, "No 'pip install' invocations found in install.sh"
+        for line in pip_install_lines:
+            assert (
+                "--no-cache-dir" in line
+            ), f"pip install invocation is missing --no-cache-dir (JTN-602): {line!r}"
+
+    def test_install_no_cache_dir_in_all_venv_pip_calls(self):
+        # JTN-602: parse the create_venv() function body and assert every
+        # pip install call inside it carries --no-cache-dir.
+        lines = self.content.splitlines()
+
+        # Extract the create_venv() function body.
+        fn_start_idx = None
+        for i, line in enumerate(lines):
+            if "create_venv()" in line and "{" in line:
+                fn_start_idx = i
+                break
+        assert (
+            fn_start_idx is not None
+        ), "create_venv() function not found in install.sh"
+
+        depth = 0
+        fn_lines = []
+        for line in lines[fn_start_idx:]:
+            fn_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and fn_lines:
+                break
+        fn_body = "\n".join(fn_lines)
+
+        pip_calls = [
+            line.strip()
+            for line in fn_lines
+            if re.search(r"-m pip install", line) and not line.strip().startswith("#")
+        ]
+        assert pip_calls, "No pip install calls found inside create_venv()"
+        for call in pip_calls:
+            assert (
+                "--no-cache-dir" in call
+            ), f"pip install inside create_venv() missing --no-cache-dir (JTN-602): {call!r}"
+        # Sanity: all 3 call sites must be present (pip/setuptools/wheel upgrade,
+        # main requirements, optional Waveshare requirements).
+        assert (
+            len(pip_calls) >= 2
+        ), f"Expected at least 2 pip install calls in create_venv(), found {len(pip_calls)}"
+        # Suppress unused variable warning — fn_body used as context in debugging
+        _ = fn_body
+
 
 # ---- update.sh ----
 
