@@ -1,6 +1,94 @@
 # CHANGELOG
 
 
+## v0.39.0 (2026-04-11)
+
+### Features
+
+- 512 MB memory-cap install smoke test for Pi Zero 2 W (JTN-536)
+  ([#307](https://github.com/jtn0123/InkyPi/pull/307),
+  [`85b0143`](https://github.com/jtn0123/InkyPi/commit/85b0143857a67a86a6e32a7e64c8f85e535b74a7))
+
+* feat: add 512 MB memory-cap install smoke test for Pi Zero 2 W (JTN-536)
+
+Add scripts/test_install_memcap.sh which runs install.sh inside a 512 MB-capped arm64 Docker
+  container matching Pi Zero 2 W constraints, then boots the web service and probes /healthz, /,
+  /playlist, and /api/plugins to assert the server comes up healthy under the same RAM budget a real
+  Pi experiences.
+
+Add install-smoke-memcap CI job with QEMU arm64 emulation and add it to the ci-gate needs list so
+  any OOM regression during pip install or server boot blocks merge automatically.
+
+Closes JTN-536
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: invoke install.sh via bash to handle 100644 git mode (JTN-536)
+
+install.sh is stored as 100644 in git (no execute bit), so Docker COPY preserves that — meaning
+  './install.sh' fails with permission denied. Override the CMD to use 'bash install.sh' explicitly.
+
+* fix: restructure memcap test — pip-only arm64 Phase 2, native Phase 3 (JTN-536)
+
+Phase 2: test pip install of requirements.txt under arm64 + 512 MB cap (the actual JTN-528
+  regression mode — OOM kill of pip). Uses the existing sim image with pre-built arm64 wheels from
+  PyPI; no full install.sh run needed since that requires Pi hardware shims (config.txt, systemd,
+  etc.).
+
+Phase 3: start the web server in a native Python container under 512 MB cap and probe /healthz, /,
+  /playlist, /api/plugins. Avoids QEMU overhead for the boot test while still enforcing the memory
+  budget.
+
+* fix: use python:3.12-slim arm64 for Phase 2 — no Python in sim image (JTN-536)
+
+Dockerfile.sim-install only installs system tools (git, curl, gnupg) but not Python, so python3 was
+  missing in the arm64 container. Switch Phase 2 to docker run python:3.12-slim --platform
+  linux/arm64 mounted with the repo — Python is pre-installed, pip fetches arm64 binary wheels under
+  the 512 MB cap.
+
+Remove Phase 1 (sim image build) since it is no longer needed by Phase 2 or Phase 3; the sim image
+  is still validated by sim_install.sh locally.
+
+* fix: drop arm64 QEMU from CI — use native with 512 MB cap + build deps (JTN-536)
+
+QEMU arm64 emulation caused compilation failures for Pi-specific packages that lack arm64 binary
+  wheels (spidev, cysystemd, inky). Running the pip install natively (amd64) with the 512 MB cap is
+  simpler, faster, and still catches the OOM regression — the memory budget is what matters, not the
+  ISA.
+
+Add --prefer-binary so pip uses binary wheels when available, and install build tools (gcc,
+  libsystemd-dev, swig, etc.) for packages that must compile. Remove QEMU/Buildx CI steps since
+  they're no longer needed.
+
+* fix: pre-build Phase 3 image to avoid container exit before poll starts (JTN-536)
+
+Previously Phase 3 ran apt-get + pip inside a detached container, causing the container to exit (on
+  failure) or timeout (> 60s startup) before the healthz poll could see it. Instead, build a server
+  image first (deps pre-installed) then detach only the server process — the container is
+  immediately serving on start.
+
+Also increase POLL_MAX to 180s, fix comment inconsistencies (arm64 refs), and add `|| true` guards
+  on apt-get so missing packages don't abort the Phase 2 build step.
+
+* fix: probe /api/health/plugins (not /api/plugins which does not exist) (JTN-536)
+
+The spec mentioned /api/plugins but the actual route is /api/health/plugins. /api/plugins returns
+  404.
+
+* fix: assert /playlist=200, persist failure diagnostics to LOG_DIR (JTN-536)
+
+- Change probe_route "/playlist" from "200|302" to "200" — /playlist is a direct GET handler
+  (playlist.py:372-382), so a 302 is a real regression the smoke test should catch, not silently
+  accept. - Add LOG_DIR="${TMPDIR:-/tmp}/inkypi-smoke-logs" at top of script and mkdir -p it so the
+  directory always exists before any failure path runs. - In both failure blocks (SERVER_UP=0 and
+  PROBE_FAILED!=0) pipe docker logs through tee to ${LOG_DIR}/container.log so the CI
+  upload-artifact step actually captures useful diagnostics when the job fails.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.38.0 (2026-04-11)
 
 ### Features
