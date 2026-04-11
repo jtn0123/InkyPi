@@ -1,0 +1,2 @@
+# Mark snapshot PNGs as binary so git doesn't try to diff them as text.
+tests/snapshots/**/*.png binary

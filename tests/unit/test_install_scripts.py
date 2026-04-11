@@ -1189,3 +1189,74 @@ class TestOsDriftNightlyWorkflow:
         assert isinstance(matrix["codename"], list), (
             "drift-check matrix.codename must remain a list of distro names"
         )
+
+
+# ---- memory-diff workflow ----
+
+
+class TestMemoryDiffWorkflow:
+    """JTN-610: per-PR memory diff sticky comment."""
+
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "memory-diff.yml"
+    SCRIPTS_DIR = REPO_ROOT / "scripts"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.WORKFLOW_PATH.exists(), (
+            f"Expected memory-diff workflow at {self.WORKFLOW_PATH}. "
+            "See JTN-610 for the per-PR memory diff comment design."
+        )
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_runs_on_pull_requests(self):
+        assert "pull_request:" in self.content
+
+    def test_workflow_cancels_superseded_runs(self):
+        assert "concurrency:" in self.content
+        assert "cancel-in-progress: true" in self.content
+
+    def test_workflow_references_memray(self):
+        assert "memray" in self.content
+
+    def test_workflow_is_non_blocking(self):
+        assert "continue-on-error: true" in self.content
+
+    def test_workflow_invokes_helper_scripts(self):
+        assert "scripts/memory_diff.py" in self.content
+        assert "scripts/format_memory_diff.py" in self.content
+
+    def test_workflow_posts_sticky_comment(self):
+        assert "github-script" in self.content or "comment-pull-request" in self.content
+        assert "memory-diff:jtn-610" in self.content
+
+    def test_workflow_grants_pr_write_permission(self):
+        assert "pull-requests: write" in self.content
+
+    def test_workflow_checks_out_base_branch(self):
+        assert "github.base_ref" in self.content
+
+    def test_capture_helper_exists_and_is_valid_python(self):
+        helper = self.SCRIPTS_DIR / "memory_diff.py"
+        assert helper.exists(), f"Missing {helper}"
+        compile(helper.read_text(), str(helper), "exec")
+
+    def test_formatter_helper_exists_and_is_valid_python(self):
+        helper = self.SCRIPTS_DIR / "format_memory_diff.py"
+        assert helper.exists(), f"Missing {helper}"
+        compile(helper.read_text(), str(helper), "exec")
+
+    def test_formatter_uses_stable_sticky_marker(self):
+        formatter = (self.SCRIPTS_DIR / "format_memory_diff.py").read_text()
+        assert 'STICKY_MARKER = "<!-- memory-diff:jtn-610 -->"' in formatter
+
+    def test_capture_helper_supports_both_backends(self):
+        capture = (self.SCRIPTS_DIR / "memory_diff.py").read_text()
+        assert "memray" in capture
+        assert "tracemalloc" in capture
+
+    def test_memray_listed_in_requirements_dev_in(self):
+        content = (INSTALL_DIR / "requirements-dev.in").read_text()
+        assert "memray" in content, (
+            "memray must be declared in install/requirements-dev.in so the "
+            "memory-diff workflow can install it from the lockfile."
+        )

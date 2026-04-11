@@ -7,7 +7,7 @@ For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO
 from random import randint
 
@@ -19,8 +19,43 @@ from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
+# NASA's Astronomy Picture of the Day archive begins on 1995-06-16. Requesting
+# any date earlier than this — or any future date — returns a 404 from the
+# upstream API, so we reject such values at save time rather than letting the
+# bad config persist until ``generate_image`` runs.
+_APOD_MIN_DATE = date(1995, 6, 16)
+
 
 class Apod(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject out-of-range custom dates at save time (JTN-379).
+
+        The frontend ``<input type="date">`` enforces ``min``/``max``, but a
+        direct POST can still bypass it. Without server-side validation a bad
+        date persists with a success toast and only fails later when the
+        plugin tries to fetch a non-existent APOD from NASA.
+        """
+        if settings.get("randomizeApod") == "true":
+            # Random mode picks its own date — ignore customDate.
+            return None
+        custom_date_str = (settings.get("customDate") or "").strip()
+        if not custom_date_str:
+            # No custom date set — ``generate_image`` falls back to today.
+            return None
+        try:
+            parsed = date.fromisoformat(custom_date_str)
+        except ValueError:
+            return f"Invalid date format: {custom_date_str!r} (expected YYYY-MM-DD)"
+        today = date.today()
+        if parsed < _APOD_MIN_DATE:
+            return (
+                f"Date must be on or after {_APOD_MIN_DATE.isoformat()} "
+                "(NASA APOD archive start)."
+            )
+        if parsed > today:
+            return f"Date must be on or before today ({today.isoformat()})."
+        return None
+
     def build_settings_schema(self):
         today = datetime.today().strftime("%Y-%m-%d")
         return schema(
@@ -44,6 +79,12 @@ class Apod(BasePlugin):
                     "date",
                     label="Date",
                     default=today,
+                    min=_APOD_MIN_DATE.isoformat(),
+                    max=today,
+                    hint=(
+                        f"NASA APOD archive runs from {_APOD_MIN_DATE.isoformat()} "
+                        "to today."
+                    ),
                     visible_if={"field": "randomizeApod", "equals": "false"},
                 ),
             )
