@@ -68,9 +68,12 @@ RUN printf '#!/bin/sh\n# CI-only no-op raspi-config shim (JTN-530)\nexit 0\n' \
 # The shim always exits 0 except for `is-active` (exits 3 = "not active") so
 # install.sh's `stop_service` takes the "not running" branch.
 #
-# We install into both /bin and /usr/bin because install.sh uses
-# `/usr/bin/systemctl` explicitly in a couple of places (see JTN-600's
-# stop_service hardening).
+# install.sh uses `/usr/bin/systemctl` explicitly in a couple of places (see
+# JTN-600's stop_service hardening) and `systemctl` via PATH elsewhere. On
+# bullseye / bookworm / trixie `/bin` is a usrmerge symlink to `/usr/bin`, so
+# overwriting `/usr/bin/systemctl` also covers `/bin/systemctl` (they are the
+# same inode). No extra `ln` is needed — attempting one fails with "same
+# file" on usrmerge layouts.
 RUN printf '%s\n' \
         '#!/bin/sh' \
         '# CI-only no-op systemctl shim (JTN-530)' \
@@ -79,8 +82,7 @@ RUN printf '%s\n' \
         '  *) exit 0 ;;' \
         'esac' \
     > /usr/bin/systemctl \
-    && chmod +x /usr/bin/systemctl \
-    && ln -sf /usr/bin/systemctl /bin/systemctl
+    && chmod +x /usr/bin/systemctl
 
 # install.sh's enable_interfaces() reads /boot/firmware/config.txt (or
 # /boot/config.txt) and will exit 1 if neither exists. Create a minimal stub
