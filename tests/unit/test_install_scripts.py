@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
@@ -1202,6 +1203,168 @@ class TestInstallMemcapSmoke:
         assert "JTN-613" in self.content
 
 
+# ---- install-matrix CI workflow (JTN-530) ----
+
+WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
+
+
+class TestInstallMatrixWorkflow:
+    """Structural guards for the arm64 install.sh matrix CI job (JTN-530)."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.ci_yaml = (WORKFLOWS_DIR / "ci.yml").read_text()
+        self.dockerfile = (SCRIPTS_DIR / "Dockerfile.install-matrix").read_text()
+        self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
+
+    def test_install_matrix_job_defined(self):
+        assert "install-matrix:" in self.ci_yaml
+
+    def test_install_matrix_references_all_three_os_bases(self):
+        import yaml
+
+        data = yaml.safe_load(self.ci_yaml)
+        job = data["jobs"]["install-matrix"]
+        codenames = job["strategy"]["matrix"]["codename"]
+        assert set(codenames) == {"bullseye", "bookworm", "trixie"}
+
+    def test_install_matrix_runs_on_arm64(self):
+        assert "linux/arm64" in self.ci_yaml
+        assert "setup-qemu-action" in self.ci_yaml
+
+    def test_install_matrix_uses_512m_memory_cap(self):
+        assert "--memory=512m" in self.ci_yaml
+        assert "--memory-swap=512m" in self.ci_yaml
+
+    def test_install_matrix_invokes_verify_script(self):
+        assert "ci_install_matrix_verify.sh" in self.ci_yaml
+
+    def test_install_matrix_feeds_ci_gate(self):
+        import yaml
+
+        data = yaml.safe_load(self.ci_yaml)
+        gate = data["jobs"]["ci-gate"]
+        assert "install-matrix" in gate["needs"]
+        gate_steps_raw = yaml.safe_dump(gate["steps"])
+        assert "install-matrix" in gate_steps_raw
+
+    def test_dockerfile_uses_plain_debian_codename(self):
+        assert "FROM debian:${CODENAME}" in self.dockerfile
+        assert "CODENAME=trixie" in self.dockerfile
+
+    def test_dockerfile_adds_pi_os_apt_repo(self):
+        assert "archive.raspberrypi.com/debian" in self.dockerfile
+
+    def test_dockerfile_ships_raspi_config_shim(self):
+        assert "/usr/sbin/raspi-config" in self.dockerfile
+
+    def test_dockerfile_ships_systemctl_shim(self):
+        assert "/usr/bin/systemctl" in self.dockerfile
+
+    def test_dockerfile_installs_systemd_package(self):
+        assert "systemd" in self.dockerfile
+
+    def test_dockerfile_creates_boot_config_stub(self):
+        assert "/boot/firmware/config.txt" in self.dockerfile
+
+    def test_verify_script_asserts_install_exit_zero(self):
+        assert "./install.sh" in self.verify_script
+        assert "exit" in self.verify_script
+
+    def test_verify_script_asserts_venv_created(self):
+        assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
+
+    def test_verify_script_asserts_required_imports(self):
+        assert "import flask, waitress, PIL" in self.verify_script
+
+    def test_verify_script_runs_systemd_analyze(self):
+        assert "systemd-analyze verify" in self.verify_script
+        assert "inkypi.service" in self.verify_script
+
+    def test_verify_script_skips_wheelhouse(self):
+        assert "INKYPI_SKIP_WHEELHOUSE=1" in self.verify_script
+
+    def test_verify_script_has_shebang_and_strict_mode(self):
+        assert self.verify_script.startswith("#!/usr/bin/env bash")
+        assert "set -euo pipefail" in self.verify_script
+
+    def test_verify_script_is_executable(self):
+        import stat
+
+        path = SCRIPTS_DIR / "ci_install_matrix_verify.sh"
+        mode = path.stat().st_mode
+        assert mode & stat.S_IXUSR
+
+
+# ---- OS drift nightly workflow (JTN-535) ----
+
+
+class TestOsDriftNightlyWorkflow:
+    """Structural assertions for the nightly OS-drift detector (JTN-535)."""
+
+    WORKFLOW_PATH = WORKFLOWS_DIR / "os-drift-nightly.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.WORKFLOW_PATH.exists(), (
+            "os-drift-nightly.yml is missing — the JTN-535 drift detector "
+            "must not be deleted without an explicit follow-up issue."
+        )
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_file_exists(self):
+        assert self.WORKFLOW_PATH.is_file()
+
+    def test_has_schedule_block(self):
+        assert re.search(r"^\s*schedule:", self.content, flags=re.MULTILINE)
+        assert re.search(r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content)
+
+    def test_has_workflow_dispatch(self):
+        assert "workflow_dispatch:" in self.content
+
+    def test_is_not_a_pr_gate(self):
+        assert "pull_request:" not in self.content
+
+    def test_matrix_covers_all_three_codenames(self):
+        for codename in ("trixie", "bookworm", "bullseye"):
+            assert codename in self.content
+
+    def test_uses_unpinned_debian_images(self):
+        assert re.search(
+            r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
+            self.content,
+        )
+
+    def test_asserts_debian_and_pip_requirements(self):
+        assert "install/debian-requirements.txt" in self.content
+        assert "install/requirements.txt" in self.content
+        assert "apt-cache show" in self.content
+        assert "--dry-run" in self.content
+
+    def test_runs_end_to_end_install_sim(self):
+        assert "scripts/sim_install.sh" in self.content
+
+    def test_files_issue_on_failure(self):
+        assert "actions/github-script" in self.content
+        assert "os-drift" in self.content
+        assert "issues.create" in self.content
+
+    def test_references_jtn_535(self):
+        assert "JTN-535" in self.content
+
+    def test_workflow_parses_as_yaml(self):
+        parsed = yaml.safe_load(self.content)
+        assert isinstance(parsed, dict)
+        assert "on" in parsed or True in parsed
+        assert "jobs" in parsed
+
+        jobs = parsed["jobs"]
+        assert isinstance(jobs, dict)
+        matrix = jobs["drift-check"]["strategy"]["matrix"]
+        assert isinstance(matrix, dict)
+        assert isinstance(matrix["codename"], list)
+
+
 # ---- memory-diff workflow ----
 
 
@@ -1220,58 +1383,33 @@ class TestMemoryDiffWorkflow:
         self.content = self.WORKFLOW_PATH.read_text()
 
     def test_workflow_runs_on_pull_requests(self):
-        # Every PR must get a memory diff comment — this is the whole point
-        # of JTN-610. Running on push or schedule instead would defeat the
-        # purpose.
         assert "pull_request:" in self.content
 
     def test_workflow_cancels_superseded_runs(self):
-        # A force-push should not stack memory-diff runs on top of each
-        # other; the concurrency group must cancel stale runs so we only
-        # ever post the freshest comment.
         assert "concurrency:" in self.content
         assert "cancel-in-progress: true" in self.content
 
     def test_workflow_references_memray(self):
-        # The preferred backend per JTN-610 is memray. Even though the
-        # helper script falls back to tracemalloc, the workflow should
-        # install memray explicitly so the comment contains the richer
-        # per-allocator breakdown whenever possible.
         assert "memray" in self.content
 
     def test_workflow_is_non_blocking(self):
-        # Hard RSS budgets are JTN-608's job. This job must not fail the PR
-        # even when memory regresses — it is informational. Both the job
-        # and every step need to keep going on failure.
         assert "continue-on-error: true" in self.content
 
     def test_workflow_invokes_helper_scripts(self):
-        # The workflow must call both the capture helper and the formatter
-        # helper — bypassing them would drift the comment format away from
-        # what the unit tests exercise.
         assert "scripts/memory_diff.py" in self.content
         assert "scripts/format_memory_diff.py" in self.content
 
     def test_workflow_posts_sticky_comment(self):
-        # Uses actions/github-script (or an equivalent sticky-comment
-        # action) and searches by the marker so force-pushes overwrite the
-        # existing comment instead of piling new ones onto the PR.
         assert "github-script" in self.content or "comment-pull-request" in self.content
         assert "memory-diff:jtn-610" in self.content
 
     def test_workflow_grants_pr_write_permission(self):
-        # Posting/updating comments requires pull-requests: write. Without
-        # this the github-script step cannot create the sticky comment.
         assert "pull-requests: write" in self.content
 
     def test_workflow_checks_out_base_branch(self):
-        # The diff is only meaningful if we measure both sides — the
-        # workflow must explicitly checkout the base branch.
         assert "github.base_ref" in self.content
 
     def test_capture_helper_exists_and_is_valid_python(self):
-        # Structural check that the capture helper is present; we compile
-        # it to catch syntax errors introduced by future edits.
         helper = self.SCRIPTS_DIR / "memory_diff.py"
         assert helper.exists(), f"Missing {helper}"
         compile(helper.read_text(), str(helper), "exec")
@@ -1282,23 +1420,15 @@ class TestMemoryDiffWorkflow:
         compile(helper.read_text(), str(helper), "exec")
 
     def test_formatter_uses_stable_sticky_marker(self):
-        # The marker is the contract between the formatter and the
-        # workflow. If either side changes it without the other the
-        # sticky-comment overwrite logic silently regresses to spam mode.
         formatter = (self.SCRIPTS_DIR / "format_memory_diff.py").read_text()
         assert 'STICKY_MARKER = "<!-- memory-diff:jtn-610 -->"' in formatter
 
     def test_capture_helper_supports_both_backends(self):
-        # memray is preferred but tracemalloc is the graceful fallback
-        # when memray is missing (JTN-610: tolerant of first-time setup).
         capture = (self.SCRIPTS_DIR / "memory_diff.py").read_text()
         assert "memray" in capture
         assert "tracemalloc" in capture
 
     def test_memray_listed_in_requirements_dev_in(self):
-        # The lockfile regen happens under JTN-597's advisory
-        # lockfile-drift check, but the .in file must be updated so the
-        # next regen picks up memray for future PRs.
         content = (INSTALL_DIR / "requirements-dev.in").read_text()
         assert "memray" in content, (
             "memray must be declared in install/requirements-dev.in so the "
