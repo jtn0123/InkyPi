@@ -1,6 +1,46 @@
 # CHANGELOG
 
 
+## v0.35.0 (2026-04-11)
+
+### Documentation
+
+- Add Google-style docstrings to private helpers (JTN-524)
+  ([#305](https://github.com/jtn0123/InkyPi/pull/305),
+  [`2db0bab`](https://github.com/jtn0123/InkyPi/commit/2db0bab3c6f0840b0c43f846c76044829bc469ff))
+
+Adds docstrings to all private helpers longer than ~5 lines or with non-obvious intent in
+  image_utils.py, refresh_task/task.py, and refresh_task/worker.py. Also adds a one-line docstring
+  norm to CONTRIBUTING.md. No logic changes. Ruff D rule enablement is deferred as a follow-up per
+  the issue scope.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Expand mutmut paths_to_mutate to full directories (JTN-508)
+  ([#302](https://github.com/jtn0123/InkyPi/pull/302),
+  [`943f7d4`](https://github.com/jtn0123/InkyPi/commit/943f7d477cb12198f109a6172f4d205c6e9c2684))
+
+* feat: expand mutmut paths_to_mutate to 4 full directories (JTN-508)
+
+Widens mutation testing coverage from 3 individual files to entire src/app_setup/, src/blueprints/,
+  src/utils/, and src/refresh_task/ directories so the nightly job covers ~95% of application logic.
+  Updates test_mutmut_config.py EXPECTED_FILES and docs accordingly.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: address CodeRabbit review — harden mutmut scope validation
+
+Update docs/mutation_testing.md "How to expand scope" example to use directory-level paths matching
+  current policy. Harden test_mutmut_config.py to use exact set membership (not substring) and
+  validate dir-vs-file type for each configured path.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.34.0 (2026-04-11)
 
 ### Features
