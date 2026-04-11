@@ -15,10 +15,14 @@ to pytest (which sets the SNAPSHOT_UPDATE env-var that this helper honours).
 
 Storage layout
 --------------
-tests/snapshots/<plugin_name>/<case_name>.png   — the canonical PNG
-tests/snapshots/<plugin_name>/<case_name>.sha256 — SHA-256 hex digest
+tests/snapshots/<plugin_name>/<case_name>.png   — the canonical PNG (for human review)
+tests/snapshots/<plugin_name>/<case_name>.sha256 — SHA-256 of raw RGB pixels + mode/size
 
-The digest file is what the test compares; the PNG is kept for human review.
+We hash the raw decoded pixel buffer (``image.tobytes()``) rather than PNG bytes
+so that libpng / zlib version differences between environments don't produce
+spurious failures — identical rendered pixels → identical digest regardless of
+how the PNG was encoded.  The PNG itself is still stored alongside for humans
+to inspect on failure.
 """
 
 from __future__ import annotations
@@ -41,12 +45,16 @@ def _snapshot_paths(plugin_name: str, case_name: str) -> tuple[Path, Path]:
 
 
 def _image_sha256(image: Image.Image) -> str:
-    """Return the SHA-256 hex digest of the raw PNG bytes of *image*."""
-    import io
+    """Return the SHA-256 hex digest of the image's raw pixel buffer.
 
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    return hashlib.sha256(buf.getvalue()).hexdigest()
+    Hashes ``mode|width|height|tobytes()`` so the digest is invariant to PNG
+    encoder choices (compression level, chunk ordering, ancillary metadata)
+    but still catches any real change in pixels, size, or color mode.
+    """
+    fingerprint = (
+        f"{image.mode}|{image.width}x{image.height}|".encode() + image.tobytes()
+    )
+    return hashlib.sha256(fingerprint).hexdigest()
 
 
 def save_snapshot(image: Image.Image, plugin_name: str, case_name: str) -> None:
@@ -54,14 +62,10 @@ def save_snapshot(image: Image.Image, plugin_name: str, case_name: str) -> None:
     png_path, digest_path = _snapshot_paths(plugin_name, case_name)
     png_path.parent.mkdir(parents=True, exist_ok=True)
 
-    import io
-
-    buf = io.BytesIO()
-    image.save(buf, format="PNG")
-    png_bytes = buf.getvalue()
-
-    png_path.write_bytes(png_bytes)
-    digest_path.write_text(hashlib.sha256(png_bytes).hexdigest() + "\n")
+    # Write the PNG for human review, but derive the digest from the raw
+    # pixel buffer so cross-environment PNG encoder drift doesn't trip us.
+    image.save(png_path, format="PNG")
+    digest_path.write_text(_image_sha256(image) + "\n")
 
 
 def assert_image_snapshot(

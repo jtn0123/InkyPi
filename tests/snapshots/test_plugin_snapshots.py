@@ -4,12 +4,31 @@
 Each test freezes time (and any other non-deterministic inputs) then compares
 the SHA-256 digest of the rendered PNG against a stored baseline.
 
+Browser requirement
+-------------------
+Plugins under test render HTML→PNG via Playwright/Chromium.  Without the
+browser installed, ``_screenshot_fallback()`` in ``base_plugin.py`` returns a
+blank white canvas — every plugin produces the same bytes and the test
+degrades into a useless no-op.  To prevent that, these tests only run when
+``REQUIRE_BROWSER_SMOKE=1`` is set (same gate the browser-smoke CI job uses).
+In the main ``Tests (pytest)`` CI job the files are still collected but
+skip cleanly because the env var is absent.
+
+The parent ``tests/conftest.py`` also has an autouse ``mock_screenshot``
+fixture that stubs ``take_screenshot_html`` into a blank canvas so the rest
+of the suite doesn't pay the Chromium startup cost.  A sibling
+``tests/snapshots/conftest.py`` overrides that fixture (with the same name +
+``autouse=True``) so real Chromium rendering happens here.
+
 Updating baselines
 ------------------
-Run ``python scripts/update_snapshots.py`` or set SNAPSHOT_UPDATE=1 before
-running pytest.  See tests/snapshots/README.md for the full workflow.
+Run ``python scripts/update_snapshots.py`` or set
+``SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1`` before running pytest.  See
+``tests/snapshots/README.md`` for the full workflow (including the docker
+one-liner that matches the CI environment).
 """
 
+import os
 from datetime import UTC, datetime
 from unittest.mock import patch
 
@@ -17,6 +36,14 @@ import pytest
 from PIL import Image
 
 from tests.snapshots.snapshot_helper import assert_image_snapshot
+
+pytestmark = pytest.mark.skipif(
+    os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() not in ("1", "true"),
+    reason=(
+        "Plugin snapshot tests render HTML via Playwright Chromium. "
+        "Set REQUIRE_BROWSER_SMOKE=1 to run them (see tests/snapshots/README.md)."
+    ),
+)
 
 # ---------------------------------------------------------------------------
 # year_progress

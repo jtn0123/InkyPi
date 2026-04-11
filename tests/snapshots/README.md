@@ -17,38 +17,68 @@ tests/snapshots/<plugin_name>/<case_name>.sha256  # SHA-256 hex digest (what tes
 4. If the digest matches → test passes.  If not → the test fails with a clear message
    pointing at the baseline file so you can inspect the diff.
 
-## Running the snapshot tests
+## Browser requirement
+
+The plugins under test render HTML→PNG via Playwright Chromium.  Without a
+working browser, `base_plugin.py`'s `_screenshot_fallback()` returns a blank
+white canvas — every plugin produces the same bytes, and the "test" degrades
+into a meaningless no-op.
+
+Because of this, the snapshot tests are gated on `REQUIRE_BROWSER_SMOKE=1`
+(the same env var the browser-smoke CI job uses):
+
+| Environment                       | Runs snapshot tests? |
+|-----------------------------------|----------------------|
+| Main `Tests (pytest)` CI matrix   | collected but **skipped** — no `REQUIRE_BROWSER_SMOKE`, no browser |
+| `Browser smoke` CI job            | **yes** — sets `REQUIRE_BROWSER_SMOKE=1`, Chromium installed |
+| Local dev without the env var     | skipped with a clear reason |
+| Local dev with `REQUIRE_BROWSER_SMOKE=1` + `playwright install chromium` | runs |
+
+## Running the snapshot tests locally
 
 ```bash
-# Normal comparison run (included in the full test suite):
-SKIP_BROWSER=1 .venv/bin/python -m pytest tests/snapshots/ -v
+# One-time: install Playwright browsers
+.venv/bin/python -m playwright install chromium
 
-# Or via the full suite:
-SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --no-header --tb=no 2>&1 | tail -1
+# Then run:
+REQUIRE_BROWSER_SMOKE=1 .venv/bin/python -m pytest tests/snapshots/ -v
 ```
+
+Note: baselines are captured on Linux x86_64 in the same env as the
+`browser-smoke` CI job.  Running on macOS or another Linux distro may produce
+different PNG bytes because Chromium's font fallback picks up different
+system fonts — when in doubt, regenerate via the docker command below.
 
 ## Updating baselines (intentional changes)
 
-When a plugin's output changes *intentionally* (template tweak, font bump, etc.) you must
-regenerate the stored baselines.  Use the interactive helper script:
+Because baselines are sensitive to Chromium version + available system fonts,
+regenerate them **inside a docker container that matches the
+`browser-smoke` CI job**.  From the project root:
 
 ```bash
-python scripts/update_snapshots.py
+docker run --rm --platform linux/amd64 -v "$(pwd):/app" -w /app \
+  python:3.12-slim-bookworm bash -c '
+    set -e
+    apt-get update -qq
+    apt-get install -y --no-install-recommends -qq \
+      libopenjp2-7 libopenblas-dev libfreetype6-dev fonts-noto-color-emoji \
+      build-essential libjpeg-dev zlib1g-dev > /dev/null
+    pip install --no-cache-dir --quiet -r install/requirements.txt \
+                                       -r install/requirements-dev.txt
+    python -m playwright install --with-deps chromium
+    SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1 SKIP_BROWSER=1 \
+      INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
+      python -m pytest tests/snapshots/ -v
+  '
 ```
 
-Or, to skip the confirmation prompt (e.g. in a CI pipeline where regeneration is wanted):
+After the run, commit the updated `tests/snapshots/<plugin>/*.png` +
+`*.sha256` files together.
 
-```bash
-python scripts/update_snapshots.py --yes
-```
-
-You can also set the env-var directly for a targeted run:
-
-```bash
-SNAPSHOT_UPDATE=1 pytest tests/snapshots/ -v
-```
-
-After updating, commit both the new `.png` and `.sha256` files together.
+> `scripts/update_snapshots.py` still works for running inside a properly
+> set-up environment (local venv with chromium, or the Pi).  It is a thin
+> wrapper that sets `SNAPSHOT_UPDATE=1` and re-executes pytest — you still
+> need `REQUIRE_BROWSER_SMOKE=1` and a working Chromium install.
 
 ## Adding snapshots for a new plugin
 
@@ -56,8 +86,12 @@ After updating, commit both the new `.png` and `.sha256` files together.
    this directory) that:
    - Freezes time / mocks network calls so the output is deterministic.
    - Calls `assert_image_snapshot(result, "<plugin_name>", "<case_name>")`.
-2. Run `python scripts/update_snapshots.py` to capture the initial baseline.
-3. Commit the `.png` + `.sha256` files alongside the test.
+2. Regenerate baselines via the docker command above.
+3. Verify the new `.png` files contain **real rendered content** (not a blank
+   white canvas) before committing — if they're blank, Chromium isn't
+   actually rendering and you need to debug the environment before trusting
+   the baseline.
+4. Commit the `.png` + `.sha256` files alongside the test.
 
 ## Design decisions
 
