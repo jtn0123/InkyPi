@@ -37,6 +37,10 @@ Use the export script (to be added) or query the DB directly. A generated summar
 - Best-effort writes with exceptions swallowed to avoid impacting refresh cycles.
 - Sampling control via `benchmark_sample_rate` for production.
 
+### pytest-benchmark plugin render tests
+
+`tests/benchmarks/test_plugin_render.py` contains three micro-benchmarks (`test_bench_clock_render`, `test_bench_weather_render`, `test_bench_html_render`) that measure the plugin render pipeline end-to-end with all network I/O mocked. Run them with `pytest tests/benchmarks/test_plugin_render.py --benchmark-only`.
+
 ### Roadmap (next)
 
 - Add `/api/benchmarks/*` endpoints and simple dashboard.
