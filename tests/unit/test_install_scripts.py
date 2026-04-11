@@ -1201,6 +1201,7 @@ class TestInstallMemcapSmoke:
         # Traceability: the JTN-613 fix must be discoverable by grepping.
         assert "JTN-613" in self.content
 
+
 # ---- memory-diff workflow ----
 
 
