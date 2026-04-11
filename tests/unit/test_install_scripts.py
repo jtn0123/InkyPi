@@ -1079,9 +1079,140 @@ class TestInstallationDocCloudInit:
         assert "JTN-591" in self.content
 
 
-# ---- OS drift nightly workflow (JTN-535) ----
+# ---- install-matrix CI workflow (JTN-530) ----
 
 WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
+
+
+class TestInstallMatrixWorkflow:
+    """Structural guards for the arm64 install.sh matrix CI job (JTN-530).
+
+    JTN-528 silently broke Pi Zero 2 W installs on Trixie for an entire release
+    cycle because no CI job ran install/install.sh against each supported Pi OS
+    base. JTN-530 added an ``install-matrix`` job that runs install.sh inside an
+    arm64 Debian container for bullseye / bookworm / trixie. These assertions
+    guarantee the job (and its supporting files) cannot be silently deleted —
+    removing any of them breaks this test and therefore CI.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.ci_yaml = (WORKFLOWS_DIR / "ci.yml").read_text()
+        self.dockerfile = (SCRIPTS_DIR / "Dockerfile.install-matrix").read_text()
+        self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
+
+    def test_install_matrix_job_defined(self):
+        # The job must exist in the workflow as `install-matrix:`.
+        assert "install-matrix:" in self.ci_yaml
+
+    def test_install_matrix_references_all_three_os_bases(self):
+        # A regression that drops any codename from the matrix must fail here.
+        import yaml
+
+        data = yaml.safe_load(self.ci_yaml)
+        job = data["jobs"]["install-matrix"]
+        codenames = job["strategy"]["matrix"]["codename"]
+        assert set(codenames) == {
+            "bullseye",
+            "bookworm",
+            "trixie",
+        }, f"install-matrix must cover all three Pi OS bases, got {codenames}"
+
+    def test_install_matrix_runs_on_arm64(self):
+        # The Pi Zero 2 W target is arm64 under QEMU — ensure the platform flag
+        # is still set so we don't accidentally regress to amd64.
+        assert "linux/arm64" in self.ci_yaml
+        assert "setup-qemu-action" in self.ci_yaml
+
+    def test_install_matrix_uses_512m_memory_cap(self):
+        # JTN-536 parity: the 512 MB cap is what actually catches the JTN-528
+        # class of regressions. Removing it defeats the point of the matrix.
+        assert "--memory=512m" in self.ci_yaml
+        assert "--memory-swap=512m" in self.ci_yaml
+
+    def test_install_matrix_invokes_verify_script(self):
+        assert "ci_install_matrix_verify.sh" in self.ci_yaml
+
+    def test_install_matrix_feeds_ci_gate(self):
+        # The matrix must be in the ci-gate needs list AND in the required-success
+        # loop — otherwise a failed leg would not block merge.
+        import yaml
+
+        data = yaml.safe_load(self.ci_yaml)
+        gate = data["jobs"]["ci-gate"]
+        assert (
+            "install-matrix" in gate["needs"]
+        ), "install-matrix must be listed in ci-gate.needs so the gate waits for it"
+        # The required-success loop lives in a run: block; grep the raw YAML.
+        gate_steps_raw = yaml.safe_dump(gate["steps"])
+        assert "install-matrix" in gate_steps_raw, (
+            "install-matrix must appear in ci-gate's required-success loop, "
+            "otherwise failures will not block merge"
+        )
+
+    def test_dockerfile_uses_plain_debian_codename(self):
+        # No date pins (rot risk). Plain debian:<codename> only.
+        assert "FROM debian:${CODENAME}" in self.dockerfile
+        assert "CODENAME=trixie" in self.dockerfile  # default arg
+
+    def test_dockerfile_adds_pi_os_apt_repo(self):
+        # Pi-specific packages (liblgpio-dev, chromium-headless-shell) only
+        # resolve via the Pi OS apt repo — not vanilla Debian.
+        assert "archive.raspberrypi.com/debian" in self.dockerfile
+
+    def test_dockerfile_ships_raspi_config_shim(self):
+        # install.sh calls `raspi-config nonint do_spi 0` etc. — container has
+        # no real raspi-config, so a no-op shim is required.
+        assert "/usr/sbin/raspi-config" in self.dockerfile
+
+    def test_dockerfile_ships_systemctl_shim(self):
+        # Container has no real systemd; the shim guarantees install.sh's
+        # systemctl daemon-reload / enable calls succeed.
+        assert "/usr/bin/systemctl" in self.dockerfile
+
+    def test_dockerfile_installs_systemd_package(self):
+        # systemd package provides systemd-analyze which Phase 4 uses to
+        # validate install/inkypi.service.
+        assert "systemd" in self.dockerfile
+
+    def test_dockerfile_creates_boot_config_stub(self):
+        # install.sh's enable_interfaces() exits 1 if /boot/firmware/config.txt
+        # is missing. The stub is required for install.sh to proceed.
+        assert "/boot/firmware/config.txt" in self.dockerfile
+
+    def test_verify_script_asserts_install_exit_zero(self):
+        assert "./install.sh" in self.verify_script
+        assert "exit" in self.verify_script  # used via fail()
+
+    def test_verify_script_asserts_venv_created(self):
+        assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
+
+    def test_verify_script_asserts_required_imports(self):
+        # flask, waitress, Pillow — the exact set JTN-530 requires.
+        assert "import flask, waitress, PIL" in self.verify_script
+
+    def test_verify_script_runs_systemd_analyze(self):
+        assert "systemd-analyze verify" in self.verify_script
+        assert "inkypi.service" in self.verify_script
+
+    def test_verify_script_skips_wheelhouse(self):
+        # Pre-built wheelhouse would mask broken requirements.txt — the matrix
+        # must exercise the source pip install path.
+        assert "INKYPI_SKIP_WHEELHOUSE=1" in self.verify_script
+
+    def test_verify_script_has_shebang_and_strict_mode(self):
+        assert self.verify_script.startswith("#!/usr/bin/env bash")
+        assert "set -euo pipefail" in self.verify_script
+
+    def test_verify_script_is_executable(self):
+        import stat
+
+        path = SCRIPTS_DIR / "ci_install_matrix_verify.sh"
+        mode = path.stat().st_mode
+        assert mode & stat.S_IXUSR, "ci_install_matrix_verify.sh is not user-executable"
+
+
+# ---- OS drift nightly workflow (JTN-535) ----
 
 
 class TestOsDriftNightlyWorkflow:
@@ -1106,14 +1237,9 @@ class TestOsDriftNightlyWorkflow:
         self.content = self.WORKFLOW_PATH.read_text()
 
     def test_workflow_file_exists(self):
-        # Explicit companion to the fixture assertion so the file's
-        # presence is checked in a named test too — easier to grep in CI
-        # logs when it fails.
         assert self.WORKFLOW_PATH.is_file()
 
     def test_has_schedule_block(self):
-        # The drift detector is worthless without its cron — make sure
-        # nobody disables it by removing the schedule.
         assert re.search(
             r"^\s*schedule:", self.content, flags=re.MULTILINE
         ), "os-drift-nightly.yml must keep its schedule: block"
@@ -1122,13 +1248,9 @@ class TestOsDriftNightlyWorkflow:
         ), "os-drift-nightly.yml must run at 08:00 UTC daily (JTN-535)"
 
     def test_has_workflow_dispatch(self):
-        # Manual re-runs are the only way to investigate a failure fast.
         assert "workflow_dispatch:" in self.content
 
     def test_is_not_a_pr_gate(self):
-        # This workflow is a drift detector, not a PR gate. A broken
-        # nightly must not block merges — losing that property is a
-        # high-severity regression.
         assert "pull_request:" not in self.content, (
             "os-drift-nightly.yml must not have a pull_request: trigger — "
             "it is a drift detector, not a PR gate (JTN-535)"
@@ -1141,31 +1263,21 @@ class TestOsDriftNightlyWorkflow:
             ), f"os-drift-nightly.yml must exercise debian:{codename}"
 
     def test_uses_unpinned_debian_images(self):
-        # The whole point of the nightly is to catch upstream drift. If
-        # someone pins to a digest or to debian:bookworm-20240101 we lose
-        # the "latest unpinned" property and the file stops detecting
-        # drift — the pinned matrix (JTN-530) already covers that case.
         assert re.search(
             r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
             self.content,
         ), "os-drift-nightly.yml must use unpinned debian:${{ matrix.codename }}"
 
     def test_asserts_debian_and_pip_requirements(self):
-        # Both package manifests must be checked — dropping either one
-        # leaves half the install path untested against upstream drift.
         assert "install/debian-requirements.txt" in self.content
         assert "install/requirements.txt" in self.content
         assert "apt-cache show" in self.content
         assert "--dry-run" in self.content
 
     def test_runs_end_to_end_install_sim(self):
-        # The sim exercises the actual install.sh against the same OS
-        # base, using the JTN-532 sim_install.sh helper.
         assert "scripts/sim_install.sh" in self.content
 
     def test_files_issue_on_failure(self):
-        # Failure handling must open a GitHub issue so drift is visible
-        # without anyone manually reading workflow logs.
         assert "actions/github-script" in self.content
         assert "os-drift" in self.content
         assert "issues.create" in self.content
