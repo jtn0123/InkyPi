@@ -545,6 +545,221 @@ class TestInstallScript:
         _ = fn_body
 
 
+# ---- Wheelhouse release asset (JTN-604) ----
+
+
+class TestInstallWheelhouseFetch:
+    """JTN-604: install.sh must prefer a pre-built wheelhouse bundle attached
+    to the current version's GitHub release, fall back gracefully on any
+    failure, and honour the INKYPI_SKIP_WHEELHOUSE opt-out.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("install.sh")
+
+    def _fetch_fn_body(self):
+        fn_start = self.content.index("fetch_wheelhouse() {")
+        # Function body ends at the first matching closing brace at depth 0.
+        depth = 0
+        i = fn_start
+        while i < len(self.content):
+            ch = self.content[i]
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return self.content[fn_start : i + 1]
+            i += 1
+        raise AssertionError("fetch_wheelhouse() body not terminated")
+
+    def test_fetch_wheelhouse_function_defined(self):
+        assert "fetch_wheelhouse() {" in self.content
+        assert "cleanup_wheelhouse() {" in self.content
+
+    def test_create_venv_calls_fetch_wheelhouse(self):
+        # fetch_wheelhouse must be invoked from inside create_venv so the
+        # bundle is downloaded before the main pip install runs.
+        fn_start = self.content.index("create_venv(){")
+        lines = self.content[fn_start:].splitlines()
+        depth = 0
+        body_lines: list[str] = []
+        for line in lines:
+            body_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and body_lines:
+                break
+        body = "\n".join(body_lines)
+        assert "fetch_wheelhouse" in body
+        assert "cleanup_wheelhouse" in body
+
+    def test_respects_skip_opt_out_env_var(self):
+        # INKYPI_SKIP_WHEELHOUSE=1 must short-circuit the fetch before any
+        # network call. The check must live near the top of the function.
+        body = self._fetch_fn_body()
+        assert "INKYPI_SKIP_WHEELHOUSE:-0" in body or "INKYPI_SKIP_WHEELHOUSE" in body
+        skip_pos = body.index("INKYPI_SKIP_WHEELHOUSE")
+        curl_pos = (
+            body.index("curl", skip_pos) if "curl" in body[skip_pos:] else len(body)
+        )
+        assert (
+            skip_pos < curl_pos
+        ), "INKYPI_SKIP_WHEELHOUSE check must precede the curl download"
+
+    def test_uses_uname_to_pick_arch(self):
+        body = self._fetch_fn_body()
+        assert "uname -m" in body
+        # Must support both Pi Zero 2 W (armv7l) and Pi 4/5 (aarch64/arm64).
+        assert "armv7l" in body
+        assert "aarch64" in body
+
+    def test_downloads_from_jtn0123_fork(self):
+        # The wheelhouse download URL must target the fork, not upstream,
+        # since that's where our release workflow publishes artifacts.
+        body = self._fetch_fn_body()
+        # Default repo value lives just above the function definition.
+        assert "jtn0123/InkyPi" in self.content
+        # URL is assembled from the repo variable so it tracks overrides.
+        assert "WHEELHOUSE_REPO" in body
+        assert "releases/download" in body
+        assert "fatihak/InkyPi" not in body
+
+    def test_fetch_reads_version_file(self):
+        body = self._fetch_fn_body()
+        # Must derive the tag from the VERSION file rather than hard-coding it.
+        assert "VERSION" in body
+        assert "$SCRIPT_DIR/../VERSION" in body
+
+    def test_fetch_is_graceful_on_curl_failure(self):
+        body = self._fetch_fn_body()
+        # On curl failure we must return 1 (not exit) and clean up the temp dir
+        # so the caller can continue with the normal source install.
+        assert "curl --fail" in body
+        assert "return 1" in body
+        assert "rm -rf" in body  # temp dir cleanup path
+        # The body must reference a "falling back" message so operators can
+        # see in logs which path was taken.
+        assert "falling back" in body.lower()
+
+    def test_fetch_verifies_optional_checksum(self):
+        body = self._fetch_fn_body()
+        # Checksum verification must be opportunistic — a missing sha256 file
+        # is OK (continues), but a mismatch must fail and fall back.
+        assert ".sha256" in body
+        assert "sha256sum" in body or "shasum -a 256" in body
+        assert "checksum mismatch" in body.lower()
+
+    def test_fetch_checks_tarball_has_wheels(self):
+        # Guard against an empty or corrupted tarball masquerading as a
+        # successful bundle — at least one .whl must exist after extract.
+        body = self._fetch_fn_body()
+        assert "*.whl" in body
+
+    def test_pip_install_uses_find_links_when_available(self):
+        # create_venv must pass --find-links $WHEELHOUSE_DIR --prefer-binary
+        # to the main pip install so local wheels take precedence.
+        fn_start = self.content.index("create_venv(){")
+        depth = 0
+        body_lines: list[str] = []
+        for line in self.content[fn_start:].splitlines():
+            body_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and body_lines:
+                break
+        body = "\n".join(body_lines)
+        assert "--find-links" in body
+        assert "--prefer-binary" in body
+        assert "WHEELHOUSE_DIR" in body
+
+    def test_fetch_sets_temp_dir_and_cleans_on_failure(self):
+        body = self._fetch_fn_body()
+        # mktemp must be used so parallel invocations don't collide, and
+        # every failure path must rm -rf the temp dir.
+        assert "mktemp" in body
+        # Count return 1 vs rm -rf so we know the failure paths clean up.
+        # Relax: we only require at least one paired rm -rf "$tmp_dir".
+        assert 'rm -rf "$tmp_dir"' in body
+
+    def test_no_cache_dir_still_present_after_wheelhouse_change(self):
+        # Regression guard for JTN-602 — the wheelhouse change must not
+        # accidentally drop --no-cache-dir from create_venv's pip calls.
+        fn_start = self.content.index("create_venv(){")
+        depth = 0
+        body_lines: list[str] = []
+        for line in self.content[fn_start:].splitlines():
+            body_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and body_lines:
+                break
+        pip_lines = [
+            line
+            for line in body_lines
+            if re.search(r"-m pip install", line) and not line.strip().startswith("#")
+        ]
+        assert pip_lines, "no pip install calls found in create_venv()"
+        for line in pip_lines:
+            assert (
+                "--no-cache-dir" in line
+            ), f"JTN-602 regression — pip install missing --no-cache-dir: {line!r}"
+
+
+class TestWheelhouseBuildWorkflow:
+    """JTN-604: the release-time workflow that produces the wheelhouse asset."""
+
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "build-wheelhouse.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert (
+            self.WORKFLOW_PATH.exists()
+        ), f"Expected workflow file at {self.WORKFLOW_PATH}"
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_triggers_on_release_published(self):
+        # The workflow must run on release publish so every tagged release
+        # automatically gets a wheelhouse attached.
+        assert "release:" in self.content
+        assert "published" in self.content
+
+    def test_workflow_supports_manual_rebuild(self):
+        # workflow_dispatch lets maintainers rebuild a wheelhouse for an
+        # existing tag without cutting a new release.
+        assert "workflow_dispatch:" in self.content
+
+    def test_workflow_builds_both_target_architectures(self):
+        # Pi Zero 2 W (armv7) + Pi 4/5 (aarch64) are the two supported
+        # InkyPi targets — both must be built.
+        assert "linux_armv7l" in self.content
+        assert "linux_aarch64" in self.content
+        assert "linux/arm/v7" in self.content
+        assert "linux/arm64" in self.content
+
+    def test_workflow_uses_qemu_and_docker(self):
+        # The wheels are built inside a QEMU-emulated Debian Trixie container
+        # so wheel tags match what the Pi will install them against.
+        assert "docker/setup-qemu-action" in self.content
+        assert "debian:trixie" in self.content
+
+    def test_workflow_runs_pip_wheel_against_requirements(self):
+        assert "pip wheel" in self.content
+        assert "install/requirements.txt" in self.content
+
+    def test_workflow_produces_expected_tarball_name(self):
+        # Name must exactly match the format install.sh downloads.
+        assert "inkypi-wheels-" in self.content
+        assert ".tar.gz" in self.content
+
+    def test_workflow_uploads_release_asset(self):
+        assert "softprops/action-gh-release" in self.content
+
+    def test_workflow_attaches_sha256_alongside_tarball(self):
+        # sha256 checksum must travel with the tarball so install.sh can
+        # verify the download.
+        assert "sha256sum" in self.content
+        assert ".sha256" in self.content
+
+
 # ---- update.sh ----
 
 
