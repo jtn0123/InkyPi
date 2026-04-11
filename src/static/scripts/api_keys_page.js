@@ -1,4 +1,41 @@
 (function () {
+  // Module-scoped DOM helpers for the delete button inside a managed API key
+  // card. Hoisted out of `createApiKeysPage` because they don't close over any
+  // state (SonarCloud javascript:S7721).
+  function addDeleteButton(sectionId, keyName) {
+    // The Delete button lives inside `.api-key-actions` (the input row), NOT
+    // `.api-key-card-head` (which holds the label + status). Walk up to the
+    // card and then into the actions container so new buttons land next to
+    // the input rather than next to the status line.
+    const card = document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+    const actions = card?.querySelector(".api-key-actions");
+    if (!actions) return;
+    if (
+      !actions.querySelector('.delete-button[data-api-action="delete-key"]')
+    ) {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "header-button delete-button delete-button-danger";
+      deleteButton.dataset.apiAction = "delete-key";
+      deleteButton.dataset.keyName = keyName;
+      deleteButton.textContent = "Delete";
+      actions.appendChild(deleteButton);
+    }
+  }
+
+  function removeDeleteButton(sectionId) {
+    const card = document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+    card
+      ?.querySelector(
+        '.api-key-actions .delete-button[data-api-action="delete-key"]'
+      )
+      ?.remove();
+  }
+
   function createApiKeysPage(config) {
     // Dirty-tracking state: true when any field has changed since last save/load.
     let _isDirty = false;
@@ -61,38 +98,41 @@
       updateManagedSummary();
     }
 
-    function addDeleteButton(sectionId, keyName) {
-      // The Delete button lives inside `.api-key-actions` (the input row), NOT
-      // `.api-key-card-head` (which holds the label + status). Walk up to the
-      // card and then into the actions container so new buttons land next to
-      // the input rather than next to the status line.
-      const card = document
-        .getElementById(`${sectionId}-status`)
-        ?.closest(".api-key-card");
-      const actions = card?.querySelector(".api-key-actions");
-      if (!actions) return;
-      if (
-        !actions.querySelector('.delete-button[data-api-action="delete-key"]')
-      ) {
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.className = "header-button delete-button delete-button-danger";
-        deleteButton.dataset.apiAction = "delete-key";
-        deleteButton.dataset.keyName = keyName;
-        deleteButton.textContent = "Delete";
-        actions.appendChild(deleteButton);
+    // Extracted to keep saveManagedKeys below the cognitive-complexity
+    // threshold (SonarCloud javascript:S3776). Shows the appropriate modal
+    // for a successful resp.ok response and refreshes the configured-status
+    // UI for keys that were actually written.
+    function handleManagedSaveSuccess(result) {
+      const skipped = Array.isArray(result.skipped_placeholder)
+        ? result.skipped_placeholder
+        : [];
+      if (skipped.length > 0) {
+        // Some values were rejected as bullet-character placeholders
+        // (JTN-598). Tell the user which ones so they can retype if they
+        // actually wanted to update those keys.
+        showResponseModal(
+          "failure",
+          `Saved with warnings. Skipped placeholder-only values for: ${skipped.join(
+            ", "
+          )}. Type a real key and save again to update these.`
+        );
+      } else {
+        showResponseModal("success", `Success! ${result.message}`);
+      }
+      if (result.updated && result.updated.length > 0) {
+        updateConfiguredStatus(result.updated);
       }
     }
 
-    function removeDeleteButton(sectionId) {
-      const card = document
-        .getElementById(`${sectionId}-status`)
-        ?.closest(".api-key-card");
-      card
-        ?.querySelector(
-          '.api-key-actions .delete-button[data-api-action="delete-key"]'
-        )
-        ?.remove();
+    function finalizeSaveButton(saveBtn, savedOk) {
+      if (!saveBtn) return;
+      saveBtn.textContent = "Save";
+      if (savedOk) {
+        markClean();
+      } else {
+        // Re-enable so user can retry
+        saveBtn.disabled = false;
+      }
     }
 
     async function saveManagedKeys() {
@@ -109,38 +149,14 @@
         const result = await resp.json();
         if (resp.ok) {
           savedOk = true;
-          const skipped = Array.isArray(result.skipped_placeholder)
-            ? result.skipped_placeholder
-            : [];
-          if (skipped.length > 0) {
-            // Some values were rejected as bullet-character placeholders
-            // (JTN-598). Tell the user which ones so they can retype if they
-            // actually wanted to update those keys.
-            showResponseModal(
-              "failure",
-              `Saved with warnings. Skipped placeholder-only values for: ${skipped.join(
-                ", "
-              )}. Type a real key and save again to update these.`
-            );
-          } else {
-            showResponseModal("success", `Success! ${result.message}`);
-          }
-          if (result.updated && result.updated.length > 0) {
-            updateConfiguredStatus(result.updated);
-          }
+          handleManagedSaveSuccess(result);
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
         }
       } catch (e) {
         showResponseModal("failure", "Failed to save keys. Please try again.");
       } finally {
-        if (saveBtn) { saveBtn.textContent = "Save"; }
-        if (savedOk) {
-          markClean();
-        } else {
-          // Re-enable so user can retry
-          if (saveBtn) saveBtn.disabled = false;
-        }
+        finalizeSaveButton(saveBtn, savedOk);
       }
     }
 
@@ -349,12 +365,7 @@
       } catch (error) {
         showResponseModal("failure", "Failed to save API keys");
       } finally {
-        if (saveBtn) { saveBtn.textContent = "Save"; }
-        if (savedOk) {
-          markClean();
-        } else {
-          if (saveBtn) saveBtn.disabled = false;
-        }
+        finalizeSaveButton(saveBtn, savedOk);
       }
     }
 
