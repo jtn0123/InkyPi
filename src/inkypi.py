@@ -45,6 +45,7 @@ from app_setup.signals import (
     setup_signal_handlers,
     setup_signal_handlers as _setup_signal_handlers,
 )
+from app_setup.smoke import register_smoke_endpoints
 from config import Config
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins, pop_hot_reload_info
@@ -300,6 +301,9 @@ def create_app():
     setup_asset_helpers(app)
     init_sri(app)
     register_health_endpoints(app)
+    # JTN-613: opt-in smoke-test render endpoint. No-op unless
+    # INKYPI_SMOKE_FORCE_RENDER=1 is set in the environment.
+    register_smoke_endpoints(app)
 
     @app.before_request
     def _ensure_refresh_task_started():

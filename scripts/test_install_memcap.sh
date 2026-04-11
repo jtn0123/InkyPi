@@ -188,6 +188,11 @@ WORKDIR /app
 ENV INKYPI_ENV=dev
 ENV INKYPI_NO_REFRESH=1
 ENV PYTHONPATH=/app/src
+# JTN-613: enable the opt-in smoke render endpoint (/__smoke/render) so Phase 4
+# can actually call plugin.generate_image() in-process instead of bouncing off
+# CSRF on /update_now. The endpoint is registered ONLY when this var is set;
+# production builds (install.sh, inkypi.service) never set it.
+ENV INKYPI_SMOKE_FORCE_RENDER=1
 CMD ["python", "src/inkypi.py", "--dev", "--web-only"]
 DOCKERFILE
 
@@ -300,8 +305,13 @@ fi
 # RSS is read from /proc/1/status (VmRSS) inside the container. The python
 # process is PID 1 because it is the container's CMD. /proc avoids requiring
 # `ps` / procps in the slim base image.
+#
+# JTN-613 sanity gate: peak must be at least PEAK_RSS_MIN_DELTA_MB larger than
+# idle. If they come back equal, the harness is broken — the render path did
+# not actually run — and we fail loud instead of silently passing the budget.
 IDLE_RSS_HARD_MB=200
 PEAK_RSS_HARD_MB=300
+PEAK_RSS_MIN_DELTA_MB=5
 
 read_container_rss_mb() {
     # Echoes the VmRSS of PID 1 inside the container, in MB (integer).
@@ -339,20 +349,44 @@ if [[ "${IDLE_RSS_MB}" -gt "${IDLE_RSS_HARD_MB}" ]]; then
 fi
 
 echo "[Phase 4] Exercising plugin-render path to measure peak RSS ..."
-# Hit render-adjacent routes plus a /update_now POST to drive the hottest
-# codepath the idle service has. In --web-only mode /update_now returns an
-# error response because the refresh task isn't running, but parsing the
-# request, importing plugin modules, and building the response still exercises
-# the same allocation pattern that dominates peak memory on the Pi.
+# Hit render-adjacent routes plus the opt-in /__smoke/render endpoint (JTN-613)
+# to drive the hottest codepath the idle service has.
+#
+# Prior to JTN-613 this section POSTed to /update_now, but /update_now requires
+# a CSRF token so the POST was rejected with 403 before ever reaching plugin
+# code — idle and peak came back identical because generate_image() never ran.
+#
+# /__smoke/render is registered only when INKYPI_SMOKE_FORCE_RENDER=1 (set in
+# the Phase 3 Dockerfile above), is CSRF-exempt, and calls plugin.generate_image()
+# in-process so the allocation happens inside PID 1 where read_container_rss_mb
+# can observe it.
 curl -fsS "http://localhost:18080/"                   -o /dev/null --max-time 10 || true
 curl -fsS "http://localhost:18080/playlist"           -o /dev/null --max-time 10 || true
 curl -fsS "http://localhost:18080/api/plugins"        -o /dev/null --max-time 10 || true
 curl -fsS "http://localhost:18080/api/health/plugins" -o /dev/null --max-time 10 || true
-curl -sS  -X POST "http://localhost:18080/update_now" \
-    --max-time 10 \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    --data "plugin_id=clock" \
-    -o /dev/null || true
+
+# Render the clock plugin several times so peak RSS reflects the sustained
+# working set, not just a one-off allocation that Python immediately frees.
+# Clock has no external HTTP deps so it renders deterministically in CI.
+SMOKE_RENDER_STATUS=""
+for _ in 1 2 3; do
+    SMOKE_RENDER_STATUS=$(curl -sS -o "${LOG_DIR}/smoke-render.json" -w "%{http_code}" \
+        -X POST "http://localhost:18080/__smoke/render" \
+        --max-time 20 \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        --data "plugin_id=clock" || true)
+done
+echo "[Phase 4] /__smoke/render last status: ${SMOKE_RENDER_STATUS:-unknown}"
+if [[ "${SMOKE_RENDER_STATUS}" != "200" ]]; then
+    echo "" >&2
+    echo "ERROR: /__smoke/render did not return 200 (got '${SMOKE_RENDER_STATUS}')." >&2
+    echo "       The render path was not actually exercised — peak RSS sample is invalid." >&2
+    echo "       Response body:" >&2
+    cat "${LOG_DIR}/smoke-render.json" 2>/dev/null | head -20 >&2 || true
+    echo "" >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
 
 echo "[Phase 4] Sleeping 10s to let peak-RSS settle ..."
 sleep 10
@@ -375,10 +409,28 @@ if [[ "${PEAK_RSS_MB}" -gt "${PEAK_RSS_HARD_MB}" ]]; then
     exit 1
 fi
 
+# JTN-613 sanity gate: if peak == idle (or within MIN_DELTA_MB), the render
+# exercise never actually ran and the peak budget is silently useless. Fail
+# loud so a future regression that breaks the harness surfaces immediately
+# instead of hiding behind a "budgets OK" green check.
+RSS_DELTA_MB=$(( PEAK_RSS_MB - IDLE_RSS_MB ))
+echo "BUDGET CHECK: peak-vs-idle RSS delta = ${RSS_DELTA_MB} MB (sanity floor >= ${PEAK_RSS_MIN_DELTA_MB} MB)"
+if [[ "${RSS_DELTA_MB}" -lt "${PEAK_RSS_MIN_DELTA_MB}" ]]; then
+    echo "" >&2
+    echo "ERROR: peak RSS (${PEAK_RSS_MB} MB) is not meaningfully greater than idle RSS" >&2
+    echo "       (${IDLE_RSS_MB} MB) — delta ${RSS_DELTA_MB} MB < ${PEAK_RSS_MIN_DELTA_MB} MB floor." >&2
+    echo "       The render exercise loop did not actually allocate any Pillow buffers." >&2
+    echo "       This is the JTN-613 regression mode: the peak budget becomes silently" >&2
+    echo "       equivalent to the idle budget and stops catching render-path leaks." >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
+
 echo ""
 echo "[Phase 4] RSS budgets OK."
-echo "         idle = ${IDLE_RSS_MB} MB / ${IDLE_RSS_HARD_MB} MB"
-echo "         peak = ${PEAK_RSS_MB} MB / ${PEAK_RSS_HARD_MB} MB"
+echo "         idle  = ${IDLE_RSS_MB} MB / ${IDLE_RSS_HARD_MB} MB"
+echo "         peak  = ${PEAK_RSS_MB} MB / ${PEAK_RSS_HARD_MB} MB"
+echo "         delta = ${RSS_DELTA_MB} MB (render exercise confirmed, JTN-613)"
 echo ""
 
 echo "======================================================================"

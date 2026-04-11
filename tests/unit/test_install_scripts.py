@@ -1076,3 +1076,127 @@ class TestInstallationDocCloudInit:
 
     def test_references_jtn_591(self):
         assert "JTN-591" in self.content
+
+
+# ---- test_install_memcap.sh Phase 4 RSS budgets (JTN-608 / JTN-613) ----
+
+
+class TestInstallMemcapSmoke:
+    """Structural guards for scripts/test_install_memcap.sh Phase 4.
+
+    JTN-608 added idle/peak RSS budgets but the first Phase 4 run reported
+    peak == idle because the /update_now POST was blocked by CSRF before any
+    render code ran. JTN-613 fixes the measurement by (a) hitting a CSRF-exempt
+    opt-in /__smoke/render endpoint and (b) asserting peak > idle + floor so a
+    broken harness fails loudly instead of silently green-lighting.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.path = SCRIPTS_DIR / "test_install_memcap.sh"
+        self.content = self.path.read_text()
+
+    def test_script_exists_and_is_executable(self):
+        import stat
+
+        assert self.path.exists()
+        assert self.path.stat().st_mode & stat.S_IXUSR
+
+    def test_script_syntax_valid(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["bash", "-n", str(self.path)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"
+
+    def test_phase4_hard_budgets_unchanged(self):
+        # JTN-613 must not regress the JTN-608 thresholds.
+        assert "IDLE_RSS_HARD_MB=200" in self.content
+        assert "PEAK_RSS_HARD_MB=300" in self.content
+
+    def test_phase4_enables_smoke_force_render_env_var(self):
+        # The Phase 3 Dockerfile must set the opt-in env var so the smoke
+        # render endpoint actually registers inside the container.
+        assert "INKYPI_SMOKE_FORCE_RENDER=1" in self.content, (
+            "Phase 3 Dockerfile must export INKYPI_SMOKE_FORCE_RENDER=1 so "
+            "the /__smoke/render endpoint is registered (JTN-613)."
+        )
+
+    def test_phase4_hits_smoke_render_endpoint(self):
+        # The render-exercise loop must call the opt-in endpoint.
+        assert "/__smoke/render" in self.content, (
+            "Phase 4 must POST to /__smoke/render so the render path is "
+            "actually exercised (JTN-613)."
+        )
+
+    def test_phase4_posts_clock_plugin_to_smoke_render(self):
+        # We stress the clock plugin because it has no external HTTP deps.
+        assert "plugin_id=clock" in self.content
+
+    def test_phase4_no_longer_uses_update_now_to_trigger_render(self):
+        # JTN-613 root cause: POST /update_now was blocked by CSRF in web-only
+        # mode so the render path never ran. The smoke test must no longer
+        # rely on /update_now for peak RSS measurement.
+        #
+        # We allow the string "update_now" in comments that explain WHY it was
+        # removed, but it must not appear as an actual curl target.
+        lines = self.content.splitlines()
+        curl_lines = [
+            ln
+            for ln in lines
+            if "curl" in ln and "update_now" in ln and not ln.strip().startswith("#")
+        ]
+        assert not curl_lines, (
+            "scripts/test_install_memcap.sh must not curl /update_now for the "
+            "render exercise — it was CSRF-blocked before reaching render code "
+            "(JTN-613). Use /__smoke/render instead. Offending lines: "
+            f"{curl_lines}"
+        )
+
+    def test_phase4_asserts_peak_greater_than_idle(self):
+        # JTN-613 sanity gate: a valid Phase 4 run must show peak > idle. If
+        # they're equal, the render exercise never ran and we must fail loud.
+        assert "PEAK_RSS_MIN_DELTA_MB" in self.content, (
+            "Phase 4 must define a minimum delta floor (PEAK_RSS_MIN_DELTA_MB) "
+            "between idle and peak RSS (JTN-613)."
+        )
+        assert "RSS_DELTA_MB" in self.content, (
+            "Phase 4 must compute and log the idle-to-peak RSS delta " "(JTN-613)."
+        )
+        # And the check must actually exit on failure — not just log.
+        assert (
+            '${RSS_DELTA_MB}" -lt "${PEAK_RSS_MIN_DELTA_MB}' in self.content
+            or "RSS_DELTA_MB < PEAK_RSS_MIN_DELTA_MB" in self.content
+        ), "Phase 4 must compare delta against the minimum and exit on failure."
+
+    def test_phase4_smoke_render_failure_aborts_the_script(self):
+        # If /__smoke/render returns anything other than 200, the harness is
+        # broken and we must fail loud — not silently skip the peak budget.
+        assert '${SMOKE_RENDER_STATUS}" != "200"' in self.content, (
+            "Phase 4 must abort when /__smoke/render returns a non-200 status "
+            "(JTN-613)."
+        )
+
+    def test_phase4_renders_multiple_times_for_sustained_working_set(self):
+        # Rendering once can get optimised away by Python's allocator; we hit
+        # the endpoint repeatedly so peak RSS reflects the sustained footprint.
+        # The exact count is not load-bearing — just assert there is a loop.
+        import re
+
+        # Match either a `for ... in 1 2 3` or similar looping construct in
+        # proximity to the smoke render curl call.
+        assert re.search(
+            r"for\s+\w+\s+in\s+[0-9]+\s+[0-9]+",
+            self.content,
+        ), (
+            "Phase 4 must render the plugin in a loop so peak RSS reflects "
+            "the sustained working set, not a transient single allocation "
+            "(JTN-613)."
+        )
+
+    def test_phase4_references_jtn_613(self):
+        # Traceability: the JTN-613 fix must be discoverable by grepping.
+        assert "JTN-613" in self.content
