@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v0.40.0 (2026-04-11)
+
+### Features
+
+- Ship pre-built wheelhouse as release asset (JTN-604)
+  ([#327](https://github.com/jtn0123/InkyPi/pull/327),
+  [`86664f5`](https://github.com/jtn0123/InkyPi/commit/86664f5125f5dc1f05ccd97ef248659cdd7d05e2))
+
+First-boot install on a Pi Zero 2 W spends ~12 of its ~15 minutes building wheels for
+  numpy/Pillow/cffi/playwright on a single Cortex-A53 core — the exact scenario that caused the
+  memory thrash cascade on 2026-04-10. Pre-compile every dep in CI and attach a wheelhouse tarball
+  to each release; install.sh prefers the bundle and falls back to source install on any failure.
+
+New build-wheelhouse workflow builds wheels inside a QEMU-emulated Debian Trixie container for
+  linux_armv7l (Pi Zero 2 W) and linux_aarch64 (Pi 4/5) on release publish, attaches
+  inkypi-wheels-<version>-<arch>.tar.gz + sha256 to the release.
+
+install.sh create_venv now calls fetch_wheelhouse before the main pip install. The fetch: detects
+  arch from uname -m, downloads the tarball from the jtn0123/InkyPi release matching the local
+  VERSION, verifies sha256 when available, extracts it, and passes --find-links + --prefer-binary to
+  pip. Every failure path (missing tarball, network error, checksum mismatch, empty bundle,
+  unsupported arch) cleans up the temp dir and returns non-zero so the caller falls back to the
+  normal online install. INKYPI_SKIP_WHEELHOUSE=1 opts out entirely.
+
+Regression guards keep JTN-602 --no-cache-dir intact on the new pip invocation and confirm the
+  wheelhouse path never bypasses --require-hashes (JTN-516 supply-chain integrity).
+
+Tests: 20 new structural assertions in test_install_scripts.py cover the fetch function, its
+  opt-out, the create_venv integration, and the build-wheelhouse workflow shape. No wheel build runs
+  in unit tests.
+
+Docs: new "Pre-built wheelhouse" subsection in docs/installation.md under the Pi Zero 2 W notes
+  explains expected impact (~15 min → ~2-3 min, ~400 MB → <200 MB RAM peak), the fallback behaviour,
+  and how to opt out.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.8 (2026-04-11)
 
 ### Bug Fixes
