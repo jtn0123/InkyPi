@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.43.2 (2026-04-11)
+
+### Bug Fixes
+
+- **ui**: Keep Show Logs action above mobile safe area (JTN-339)
+  ([#355](https://github.com/jtn0123/InkyPi/pull/355),
+  [`758d185`](https://github.com/jtn0123/InkyPi/commit/758d18544bc257a0915351eab0189e25bedf3a46))
+
+On narrow mobile viewports the floating "Show Logs" button on /settings sat at a flat 16px from the
+  bottom edge, which placed it underneath the iOS home indicator and Safari's bottom toolbar — users
+  could not tap it without scrolling. The settings page also had no bottom padding to keep in-flow
+  content from being covered by the fixed button.
+
+- Use max(16px, env(safe-area-inset-bottom) + 16px) for the toggle's bottom offset and mirror the
+  same idea on the right inset. - Reserve padding-bottom on .page-shell-management so the last
+  in-flow action (Save/Reset) is never hidden by the floating toggle. - Add a regression test in
+  tests/static/test_ui_ia_polish.py asserting the new safe-area handling and the management shell
+  padding.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.1 (2026-04-11)
 
 ### Bug Fixes
