@@ -374,9 +374,35 @@ def _validate_settings_form(form_data):
             details={"field": "interval"},
         )
 
+    # Validate orientation enum
+    orientation = form_data.get("orientation")
+    if orientation is not None and orientation not in ("horizontal", "vertical"):
+        return json_error(
+            "orientation must be 'horizontal' or 'vertical'",
+            status=422,
+            code="validation_error",
+            details={"field": "orientation"},
+        )
+
+    # Validate preview size mode enum
+    preview_size_mode = form_data.get("previewSizeMode")
+    if preview_size_mode is not None and preview_size_mode not in (
+        "native",
+        "scaled",
+        "fit",
+    ):
+        return json_error(
+            "previewSizeMode must be 'native', 'scaled', or 'fit'",
+            status=422,
+            code="validation_error",
+            details={"field": "previewSizeMode"},
+        )
+
     # Validate numeric image settings
     import math
 
+    _IMAGE_SETTING_MIN = 0.0
+    _IMAGE_SETTING_MAX = 10.0
     for field in (
         "saturation",
         "brightness",
@@ -398,6 +424,13 @@ def _validate_settings_form(form_data):
             if not math.isfinite(value):
                 return json_error(
                     f"Invalid numeric value for {field}",
+                    status=422,
+                    code="validation_error",
+                    details={"field": field},
+                )
+            if value < _IMAGE_SETTING_MIN or value > _IMAGE_SETTING_MAX:
+                return json_error(
+                    f"{field} must be between {_IMAGE_SETTING_MIN} and {_IMAGE_SETTING_MAX}",
                     status=422,
                     code="validation_error",
                     details={"field": field},
