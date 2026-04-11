@@ -1525,7 +1525,18 @@ class TestInstallMatrixWorkflow:
         assert "/usr/local/inkypi/venv_inkypi" in self.verify_script
 
     def test_verify_script_asserts_required_imports(self):
-        assert "import flask, waitress, PIL" in self.verify_script
+        # JTN-615: the check was rewritten to use importlib.metadata.version()
+        # because waitress has no module-level __version__ attribute and Flask
+        # 3.2 deprecates its own `__version__`. The test now asserts the three
+        # distribution names are still covered rather than pinning a specific
+        # import-statement string.
+        for dist in ("flask", "waitress", "Pillow"):
+            assert (
+                dist in self.verify_script
+            ), f"Phase 3 verification script must still check {dist}"
+        # And the three module names that correspond to those distributions.
+        for mod in ("flask", "waitress", "PIL"):
+            assert mod in self.verify_script
 
     def test_verify_script_runs_systemd_analyze(self):
         assert "systemd-analyze verify" in self.verify_script
