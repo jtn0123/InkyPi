@@ -18,6 +18,10 @@ StandardError=journal
 CPUQuota=40%
 MemoryHigh=250M
 MemoryMax=350M
+# JTN-601: Prefer inkypi as OOM victim over sshd/systemd-journald so we can
+# still SSH in during memory crunch. Positive value makes the kernel more
+# likely to kill inkypi first. See install/inkypi.service history.
+OOMScoreAdjust=500
 
 [Install]
 WantedBy=multi-user.target
