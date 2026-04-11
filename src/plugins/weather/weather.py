@@ -18,6 +18,31 @@ logger = logging.getLogger(__name__)
 
 
 class Weather(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject out-of-range latitude/longitude at save time.
+
+        Without this, the map widget's readonly inputs can still be bypassed by
+        a direct POST, and bad values persist until ``generate_image`` runs —
+        far from where the user can fix them.
+        """
+        lat_raw = settings.get("latitude")
+        lon_raw = settings.get("longitude")
+        if lat_raw in (None, "") or lon_raw in (None, ""):
+            return "Latitude and longitude are required."
+        try:
+            lat = float(lat_raw)
+        except (TypeError, ValueError):
+            return "Latitude must be a number between -90 and 90."
+        try:
+            lon = float(lon_raw)
+        except (TypeError, ValueError):
+            return "Longitude must be a number between -180 and 180."
+        if not -90.0 <= lat <= 90.0:
+            return "Latitude must be between -90 and 90."
+        if not -180.0 <= lon <= 180.0:
+            return "Longitude must be between -180 and 180."
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
