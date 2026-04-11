@@ -487,6 +487,52 @@ def test_history_pagination_invalid_params(client, device_config_dev):
     assert "1 items" in body
 
 
+def test_history_pagination_clamps_upper_bound(client, device_config_dev):
+    """JTN-359: ?page=99999 should clamp to the last valid page, not render
+    "Page 99999 of N" over an empty grid."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    # Clear any leftover files from other tests in the same worker
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    # 30 items with per_page=10 -> total_pages=3
+    for i in range(30):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_clamp_{i:03d}.png")
+        )
+
+    resp = client.get("/history?page=99999&per_page=10")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Must NOT render the unclamped page number
+    assert "Page 99999" not in body
+    # Should clamp to last valid page
+    assert "Page 3 of 3" in body
+    # And the grid should not be empty — the last page's items should render
+    assert "display_clamp_" in body
+
+
+def test_history_pagination_clamps_upper_bound_empty_history(client, device_config_dev):
+    """JTN-359: ?page=99999 on an empty history renders the empty-state
+    cleanly (page clamps to 1 via total_pages floor, no crash, no bogus
+    'Page 99999 of 1')."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+
+    resp = client.get("/history?page=99999")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # Empty-state copy still renders
+    assert "No history yet." in body
+    # No leaked unclamped page number
+    assert "Page 99999" not in body
+    # With total_pages==1 the pagination nav is hidden entirely, so
+    # "Page 1 of 1" should not appear either.
+    assert "Page 1 of 1" not in body
+
+
 def test_history_storage_exception_handling(client, flask_app, monkeypatch):
     import shutil as _shutil
 
