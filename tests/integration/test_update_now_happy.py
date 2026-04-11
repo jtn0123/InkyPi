@@ -16,8 +16,9 @@ def test_update_now_happy_path(client, monkeypatch, flask_app):
     # Mock display
     called = {"displayed": False}
 
-    def fake_display_image(image, image_settings=None):
+    def fake_display_image(image, image_settings=None, history_meta=None):
         called["displayed"] = True
+        called["history_meta"] = history_meta
 
     display_manager = flask_app.config["DISPLAY_MANAGER"]
     monkeypatch.setattr(
@@ -40,3 +41,7 @@ def test_update_now_happy_path(client, monkeypatch, flask_app):
     assert resp.status_code == 200
     assert resp.json.get("success") is True
     assert called["displayed"] is True
+    # Regression for JTN-341: direct update_now path must pass history_meta
+    # containing plugin_id so /plugin_latest_image/<plugin_id> can find it.
+    assert called["history_meta"] is not None
+    assert called["history_meta"].get("plugin_id") == "ai_text"
