@@ -1069,3 +1069,20 @@
         max-height: 90vh;
     }
 }
+
+/* ── Short laptop viewports (JTN-572 / JTN-599) ──
+   On common laptop screens shorter than ~860px (1280×800, 1366×768, 1280×768),
+   the Save button at the bottom of /settings and /settings/api-keys sits below
+   the fold, and there is no visible scroll affordance to reveal it. Pin the
+   buttons container to the bottom of the viewport so the primary action is
+   always one click away regardless of scroll position. */
+@media (max-height: 860px) {
+    .settings-panel > .buttons-container,
+    .api-keys-frame .buttons-container {
+        position: sticky;
+        bottom: 8px;
+        z-index: 6;
+        padding-top: 8px;
+        background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+    }
+}

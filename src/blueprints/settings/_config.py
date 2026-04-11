@@ -264,6 +264,7 @@ def save_api_keys():
     try:
         form_data = request.form.to_dict()
         updated = []
+        skipped_placeholder = []
         for key in (
             "OPEN_AI_SECRET",
             "OPEN_WEATHER_MAP_SECRET",
@@ -273,12 +274,35 @@ def save_api_keys():
             "GOOGLE_AI_SECRET",
         ):
             value = form_data.get(key)
-            if value:
-                device_config.set_env_key(key, value)
-                updated.append(key)
-        return jsonify(
-            {"success": True, "message": "API keys saved.", "updated": updated}
-        )
+            if not value:
+                # Empty field means "leave current key unchanged" (JTN-598).
+                continue
+            # Defense-in-depth against JTN-598: reject any value that is solely the
+            # U+2022 BLACK CIRCLE placeholder. Historically the form pre-filled the
+            # value attribute with literal bullet characters to fake a mask; if a
+            # stale page (or anything else) POSTs that string back, we must not
+            # overwrite the real key with bullets. Strip whitespace first so we
+            # also catch values like "  ••••  " that a stale client could send.
+            stripped = value.strip()
+            if not stripped:
+                # Whitespace-only input is treated the same as empty — keep
+                # the existing key unchanged.
+                continue
+            if set(stripped) <= {"\u2022"}:
+                _mod.logger.warning(
+                    "Rejected save_api_keys value for %s: value is only U+2022 "
+                    "placeholder characters (likely a stale cached page or a "
+                    "client that appended to the legacy bullet pre-fill).",
+                    key,
+                )
+                skipped_placeholder.append(key)
+                continue
+            device_config.set_env_key(key, value)
+            updated.append(key)
+        response = {"success": True, "message": "API keys saved.", "updated": updated}
+        if skipped_placeholder:
+            response["skipped_placeholder"] = skipped_placeholder
+        return jsonify(response)
     except Exception:
         _mod.logger.exception("Error saving API keys")
         return json_internal_error(

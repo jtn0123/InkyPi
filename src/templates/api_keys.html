@@ -39,7 +39,7 @@
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
         <div class="page-intro">
             <div class="page-intro-body">
-                <p class="page-subtitle">Store service credentials in one place. Existing values stay masked so you can update only the keys that changed.</p>
+                <p class="page-subtitle">Store service credentials in one place. Configured fields start blank — leave a field blank to keep its current key, or type to replace it.</p>
             </div>
             <div class="page-summary">
                 <span id="providerCountSummary" class="status-chip info">{{ key_summary.provider_count }} providers</span>
@@ -92,7 +92,7 @@
             <span class="info-banner-icon">{{ icon('info', 'icon-image') | safe }}</span>
             <span class="info-banner-text">
                 API keys are stored in the <code>.env</code> file on the device.
-                Existing values remain masked. Some plugins may require a restart after changes.
+                Leave an input blank to keep the existing key. Some plugins may require a restart after changes.
             </span>
         </div>
 
@@ -106,7 +106,6 @@
     <script>
         window.__INKYPI_API_KEYS_BOOT__ = {
             deleteManagedUrl: {{ url_for('settings.delete_api_key') | tojson }},
-            maskPlaceholder: {{ '••••••••••••••••••••••••••••••••' | tojson }},
             mode: {{ api_keys_mode | default('managed') | tojson }},
             saveGenericUrl: {{ url_for('apikeys.save_apikeys') | tojson }},
             saveManagedUrl: {{ url_for('settings.save_api_keys') | tojson }},

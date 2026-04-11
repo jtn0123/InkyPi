@@ -1,4 +1,41 @@
 (function () {
+  // Module-scoped DOM helpers for the delete button inside a managed API key
+  // card. Hoisted out of `createApiKeysPage` because they don't close over any
+  // state (SonarCloud javascript:S7721).
+  function addDeleteButton(sectionId, keyName) {
+    // The Delete button lives inside `.api-key-actions` (the input row), NOT
+    // `.api-key-card-head` (which holds the label + status). Walk up to the
+    // card and then into the actions container so new buttons land next to
+    // the input rather than next to the status line.
+    const card = document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+    const actions = card?.querySelector(".api-key-actions");
+    if (!actions) return;
+    if (
+      !actions.querySelector('.delete-button[data-api-action="delete-key"]')
+    ) {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "header-button delete-button delete-button-danger";
+      deleteButton.dataset.apiAction = "delete-key";
+      deleteButton.dataset.keyName = keyName;
+      deleteButton.textContent = "Delete";
+      actions.appendChild(deleteButton);
+    }
+  }
+
+  function removeDeleteButton(sectionId) {
+    const card = document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+    card
+      ?.querySelector(
+        '.api-key-actions .delete-button[data-api-action="delete-key"]'
+      )
+      ?.remove();
+  }
+
   function createApiKeysPage(config) {
     // Dirty-tracking state: true when any field has changed since last save/load.
     let _isDirty = false;
@@ -25,14 +62,6 @@
       if (providerChip && config.mode === "managed") providerChip.textContent = "6 providers";
     }
 
-    function clearField(inputId) {
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      input.value = "";
-      markDirty();
-      input.focus();
-    }
-
     function updateConfiguredStatus(updatedKeys) {
       updatedKeys.forEach((key) => {
         const mapping = {
@@ -53,55 +82,57 @@
         const statusElement = document.getElementById(statusId);
         const inputElement = document.getElementById(inputId);
         const value = inputElement ? inputElement.value : "";
-        if (statusElement && value && value !== config.maskPlaceholder) {
+        if (statusElement && value) {
           statusElement.textContent = "";
           const strong1 = document.createElement("strong");
           strong1.textContent = "Status:";
           statusElement.appendChild(strong1);
-          statusElement.appendChild(document.createTextNode(` Configured (${config.maskPlaceholder})`));
-          inputElement.value = config.maskPlaceholder;
-          addDeleteAndClearButtons(sectionId, key);
-        } else if (statusElement && value === "") {
-          statusElement.textContent = "";
-          const strong2 = document.createElement("strong");
-          strong2.textContent = "Status:";
-          statusElement.appendChild(strong2);
-          statusElement.appendChild(document.createTextNode(" Not configured"));
-          removeDeleteAndClearButtons(sectionId);
+          statusElement.appendChild(document.createTextNode(" Configured"));
+          // Clear the input and update its placeholder so subsequent edits start from empty
+          // rather than appending to the prior entry.
+          inputElement.value = "";
+          inputElement.placeholder = "(leave blank to keep current)";
+          addDeleteButton(sectionId, key);
         }
       });
       updateManagedSummary();
     }
 
-    function addDeleteAndClearButtons(sectionId, keyName) {
-      const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      const inputContainer = formGroup?.querySelector(".input-container");
-      if (!formGroup || !inputContainer) return;
-      if (!inputContainer.querySelector(".clear-button")) {
-        const clearButton = document.createElement("button");
-        clearButton.type = "button";
-        clearButton.className = "clear-button";
-        clearButton.dataset.apiAction = "clear-field";
-        clearButton.dataset.inputId = `${sectionId}-input`;
-        clearButton.textContent = "×";
-        inputContainer.appendChild(clearButton);
+    // Extracted to keep saveManagedKeys below the cognitive-complexity
+    // threshold (SonarCloud javascript:S3776). Shows the appropriate modal
+    // for a successful resp.ok response and refreshes the configured-status
+    // UI for keys that were actually written.
+    function handleManagedSaveSuccess(result) {
+      const skipped = Array.isArray(result.skipped_placeholder)
+        ? result.skipped_placeholder
+        : [];
+      if (skipped.length > 0) {
+        // Some values were rejected as bullet-character placeholders
+        // (JTN-598). Tell the user which ones so they can retype if they
+        // actually wanted to update those keys.
+        showResponseModal(
+          "failure",
+          `Saved with warnings. Skipped placeholder-only values for: ${skipped.join(
+            ", "
+          )}. Type a real key and save again to update these.`
+        );
+      } else {
+        showResponseModal("success", `Success! ${result.message}`);
       }
-      if (!formGroup.querySelector(".delete-button")) {
-        const deleteButton = document.createElement("button");
-        deleteButton.type = "button";
-        deleteButton.className = "header-button delete-button delete-button-danger";
-        deleteButton.dataset.apiAction = "delete-key";
-        deleteButton.dataset.keyName = keyName;
-        deleteButton.textContent = "Delete";
-        formGroup.appendChild(deleteButton);
+      if (result.updated && result.updated.length > 0) {
+        updateConfiguredStatus(result.updated);
       }
     }
 
-    function removeDeleteAndClearButtons(sectionId) {
-      const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      const inputContainer = formGroup?.querySelector(".input-container");
-      inputContainer?.querySelector(".clear-button")?.remove();
-      formGroup?.querySelector(".delete-button")?.remove();
+    function finalizeSaveButton(saveBtn, savedOk) {
+      if (!saveBtn) return;
+      saveBtn.textContent = "Save";
+      if (savedOk) {
+        markClean();
+      } else {
+        // Re-enable so user can retry
+        saveBtn.disabled = false;
+      }
     }
 
     async function saveManagedKeys() {
@@ -118,23 +149,14 @@
         const result = await resp.json();
         if (resp.ok) {
           savedOk = true;
-          showResponseModal("success", `Success! ${result.message}`);
-          if (result.updated && result.updated.length > 0) {
-            updateConfiguredStatus(result.updated);
-          }
+          handleManagedSaveSuccess(result);
         } else {
           showResponseModal("failure", `Error! ${result.error}`);
         }
       } catch (e) {
         showResponseModal("failure", "Failed to save keys. Please try again.");
       } finally {
-        if (saveBtn) { saveBtn.textContent = "Save"; }
-        if (savedOk) {
-          markClean();
-        } else {
-          // Re-enable so user can retry
-          if (saveBtn) saveBtn.disabled = false;
-        }
+        finalizeSaveButton(saveBtn, savedOk);
       }
     }
 
@@ -184,8 +206,11 @@
         statusElement.appendChild(strong3);
         statusElement.appendChild(document.createTextNode(" Not configured"));
       }
-      if (inputElement) inputElement.value = "";
-      removeDeleteAndClearButtons(sectionId);
+      if (inputElement) {
+        inputElement.value = "";
+        inputElement.placeholder = "Enter API key";
+      }
+      removeDeleteButton(sectionId);
       updateManagedSummary();
     }
 
@@ -340,12 +365,7 @@
       } catch (error) {
         showResponseModal("failure", "Failed to save API keys");
       } finally {
-        if (saveBtn) { saveBtn.textContent = "Save"; }
-        if (savedOk) {
-          markClean();
-        } else {
-          if (saveBtn) saveBtn.disabled = false;
-        }
+        finalizeSaveButton(saveBtn, savedOk);
       }
     }
 
@@ -416,9 +436,7 @@
         const actionEl = event.target.closest("[data-api-action]");
         if (!actionEl) return;
         const action = actionEl.dataset.apiAction;
-        if (action === "clear-field") {
-          clearField(actionEl.dataset.inputId);
-        } else if (action === "delete-key") {
+        if (action === "delete-key") {
           deleteKey(actionEl.dataset.keyName);
         } else if (action === "delete-row") {
           deleteRow(actionEl);
@@ -433,7 +451,6 @@
     Object.assign(globalThis, {
       addPreset,
       addRow,
-      clearField,
       deleteKey,
       deleteRow,
       saveKeys,
