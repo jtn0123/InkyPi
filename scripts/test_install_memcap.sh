@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test_install_memcap.sh — 512 MB memory-cap smoke test for Pi Zero 2 W installs.
 #
-# Runs two phases inside memory-capped Docker containers:
+# Runs three phases inside memory-capped Docker containers:
 #
 #   Phase 2 — pip install under a strict 512 MB memory cap (the JTN-528 OOM
 #             regression gate). Installs install/requirements.txt inside a
@@ -12,6 +12,13 @@
 #             server, and polls /healthz, /, /playlist, and /api/plugins to
 #             confirm the server comes up healthy within the Pi's RAM budget.
 #             Runs on the host arch (no QEMU) for speed.
+#
+#   Phase 4 — RSS budget gate (JTN-608). Samples VmRSS of the web service from
+#             /proc/1/status inside the container after a 30s idle settle and
+#             again after exercising the render-adjacent routes. Fails CI when
+#             the running service exceeds the Pi Zero 2 W memory envelope even
+#             though install.sh and the boot probes pass (the regression mode
+#             where baseline RSS balloons past MemoryMax=350M).
 #
 # Usage:
 #   ./scripts/test_install_memcap.sh [trixie|bookworm|bullseye]
@@ -34,6 +41,7 @@ usage() {
     echo "  Phase 2: pip install of requirements.txt under 512 MB cap."
     echo "           Exit 137 = OOM kill = JTN-528 regression."
     echo "  Phase 3: web service boot + route probe under 512 MB cap."
+    echo "  Phase 4: RSS budget gate (JTN-608) — idle <200 MB, peak <300 MB."
     echo ""
     echo "  Supported codenames: ${VALID_CODENAMES}"
     echo "  Default codename   : ${DEFAULT_CODENAME}"
@@ -279,10 +287,105 @@ if [[ "${PROBE_FAILED}" -ne 0 ]]; then
     exit 1
 fi
 
+# ── Phase 4: RSS budget checks (JTN-608) ─────────────────────────────────────
+# Asserts the running web service stays within the Pi Zero 2 W memory envelope.
+# A Pi Zero 2 W has 512 MB RAM and the systemd unit caps InkyPi at MemoryMax=350M,
+# so a service that idles around 250 MB in CI would OOM on the real hardware even
+# though install.sh and the initial boot probes pass.
+#
+# Budgets (see docs/testing.md "CI memory budgets"):
+#   Post-install idle RSS          : target <150 MB / hard fail 200 MB
+#   Peak RSS during plugin render  : target <250 MB / hard fail 300 MB
+#
+# RSS is read from /proc/1/status (VmRSS) inside the container. The python
+# process is PID 1 because it is the container's CMD. /proc avoids requiring
+# `ps` / procps in the slim base image.
+IDLE_RSS_HARD_MB=200
+PEAK_RSS_HARD_MB=300
+
+read_container_rss_mb() {
+    # Echoes the VmRSS of PID 1 inside the container, in MB (integer).
+    # Returns empty string on failure so the caller can handle it.
+    local rss_kb
+    rss_kb=$(docker exec "${CONTAINER_NAME}" \
+        sh -c "awk '/^VmRSS:/ {print \$2}' /proc/1/status" 2>/dev/null || true)
+    if [[ -z "${rss_kb}" ]]; then
+        echo ""
+        return
+    fi
+    echo $(( rss_kb / 1024 ))
+}
+
+echo "[Phase 4] RSS budget checks (JTN-608)"
+echo "[Phase 4] Letting the service settle for 30s before sampling idle RSS ..."
+sleep 30
+
+IDLE_RSS_MB=$(read_container_rss_mb)
+if [[ -z "${IDLE_RSS_MB}" ]]; then
+    echo "" >&2
+    echo "ERROR: Could not read /proc/1/status from container." >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
+
+echo "BUDGET CHECK: post-install idle RSS = ${IDLE_RSS_MB} MB (hard fail > ${IDLE_RSS_HARD_MB} MB)"
+
+if [[ "${IDLE_RSS_MB}" -gt "${IDLE_RSS_HARD_MB}" ]]; then
+    echo "" >&2
+    echo "ERROR: idle RSS ${IDLE_RSS_MB} MB exceeds the ${IDLE_RSS_HARD_MB} MB hard budget." >&2
+    echo "       This would OOM on a Pi Zero 2 W (MemoryMax=350M) after the refresh task starts." >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
+
+echo "[Phase 4] Exercising plugin-render path to measure peak RSS ..."
+# Hit render-adjacent routes plus a /update_now POST to drive the hottest
+# codepath the idle service has. In --web-only mode /update_now returns an
+# error response because the refresh task isn't running, but parsing the
+# request, importing plugin modules, and building the response still exercises
+# the same allocation pattern that dominates peak memory on the Pi.
+curl -fsS "http://localhost:18080/"                   -o /dev/null --max-time 10 || true
+curl -fsS "http://localhost:18080/playlist"           -o /dev/null --max-time 10 || true
+curl -fsS "http://localhost:18080/api/plugins"        -o /dev/null --max-time 10 || true
+curl -fsS "http://localhost:18080/api/health/plugins" -o /dev/null --max-time 10 || true
+curl -sS  -X POST "http://localhost:18080/update_now" \
+    --max-time 10 \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    --data "plugin_id=clock" \
+    -o /dev/null || true
+
+echo "[Phase 4] Sleeping 10s to let peak-RSS settle ..."
+sleep 10
+
+PEAK_RSS_MB=$(read_container_rss_mb)
+if [[ -z "${PEAK_RSS_MB}" ]]; then
+    echo "" >&2
+    echo "ERROR: Could not read /proc/1/status from container for peak sample." >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
+
+echo "BUDGET CHECK: peak RSS after render exercise = ${PEAK_RSS_MB} MB (hard fail > ${PEAK_RSS_HARD_MB} MB)"
+
+if [[ "${PEAK_RSS_MB}" -gt "${PEAK_RSS_HARD_MB}" ]]; then
+    echo "" >&2
+    echo "ERROR: peak RSS ${PEAK_RSS_MB} MB exceeds the ${PEAK_RSS_HARD_MB} MB hard budget." >&2
+    echo "       A plugin render that allocates this much will OOM on the Pi Zero 2 W." >&2
+    docker logs "${CONTAINER_NAME}" 2>&1 | tee "${LOG_DIR}/container.log" >&2 || true
+    exit 1
+fi
+
+echo ""
+echo "[Phase 4] RSS budgets OK."
+echo "         idle = ${IDLE_RSS_MB} MB / ${IDLE_RSS_HARD_MB} MB"
+echo "         peak = ${PEAK_RSS_MB} MB / ${PEAK_RSS_HARD_MB} MB"
+echo ""
+
 echo "======================================================================"
 echo "  All checks passed."
 echo "  Phase 2: pip install OK under 512 MB cap"
 echo "  Phase 3: web service boot + routes OK under 512 MB cap"
+echo "  Phase 4: RSS budgets (idle ${IDLE_RSS_MB} MB, peak ${PEAK_RSS_MB} MB) OK"
 echo ""
 echo "  REMINDER: This is a simulation. Always test on real Pi Zero 2 W"
 echo "  hardware before shipping install path changes."
