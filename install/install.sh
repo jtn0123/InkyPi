@@ -340,9 +340,13 @@ stop_service() {
     then
       /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
       show_loader "Stopping $APPNAME service"
-    else  
+    else
       echo_success "\t$SERVICE_FILE not running"
     fi
+    # JTN-600: DISABLE (not just stop) during install so systemd cannot
+    # restart the half-installed service and thrash the Pi. install_app_service
+    # re-enables it at the end of the install.
+    /usr/bin/systemctl disable "$SERVICE_FILE" 2>/dev/null || true
 }
 
 start_service() {
