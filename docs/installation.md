@@ -63,6 +63,12 @@ runcmd:
 
 Then SSH in and `tail -f /var/log/inkypi-install.log`. Check for `/var/log/inkypi-install.done` or `/var/log/inkypi-install.failed` to know when it's done.
 
+### NTP clock sync on first boot
+
+The Pi Zero 2 W has no RTC battery. On boot, the system clock starts at the last `fake-hwclock` value, which can be months out of date if the Pi has been off for a while. Running `pip install` or `apt-get` before NTP syncs can cause TLS certificate validation failures ("certificate is not yet valid") because the system clock predates the server's SSL cert `notBefore` date.
+
+As of the version that resolves [JTN-592](https://linear.app/jtn0123/issue/JTN-592), `install.sh` now waits up to 60 seconds for `systemd-timesyncd` to confirm NTP sync via `timedatectl show -p NTPSynchronized` before starting any package installs. If your Pi is connected to a network with NTP access, the clock typically syncs within 5–10 seconds of boot. If the clock does not sync within 60 seconds (e.g. on an offline network), install will proceed with a warning — TLS errors may still occur in that case, and you can set the clock manually with `sudo date -u -s 'YYYY-MM-DD HH:MM:SS'`.
+
 ### Pi Zero W vs Pi Zero 2 W
 
 The "[Known Issues during Pi Zero W Installation](./troubleshooting.md#known-issues-during-pi-zero-w-installation)" section in the troubleshooting guide refers to the **original** 32-bit Pi Zero W, not the Pi Zero 2 W. The Zero 2 W is much more capable (4× Cortex-A53, ARMv8) and doesn't hit the same pip install issues — provided zramswap is enabled, which is automatic on InkyPi v0.28.1+.

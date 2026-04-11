@@ -135,6 +135,59 @@ class TestInstallScript:
         # The skip branch should still exist for unknown future releases.
         assert "skipping zramswap setup" in self.content
 
+    def test_install_waits_for_clock(self):
+        # JTN-592: wait_for_clock function must be defined in install.sh
+        assert "wait_for_clock() {" in self.content
+
+    def test_install_calls_wait_for_clock_before_apt(self):
+        # JTN-592: wait_for_clock must be called before install_debian_dependencies
+        lines = self.content.splitlines()
+        wait_line = None
+        apt_line = None
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            is_call = stripped.startswith("wait_for_clock") and "() {" not in line
+            if is_call and wait_line is None:
+                wait_line = i
+            if stripped == "install_debian_dependencies":
+                apt_line = i
+        assert wait_line is not None, "wait_for_clock call not found in install.sh"
+        assert (
+            apt_line is not None
+        ), "install_debian_dependencies call not found in install.sh"
+        assert wait_line < apt_line, (
+            f"wait_for_clock (line {wait_line}) must come before "
+            f"install_debian_dependencies (line {apt_line})"
+        )
+
+    def test_wait_for_clock_uses_timedatectl(self):
+        # JTN-592: the function must reference timedatectl to check NTP sync
+        assert "timedatectl show -p NTPSynchronized" in self.content
+
+    def test_wait_for_clock_warns_but_does_not_fail_on_timeout(self):
+        # JTN-592: on timeout the function must return 0, not exit 1
+        # Find the function body between wait_for_clock() { and the closing }
+        lines = self.content.splitlines()
+        in_func = False
+        depth = 0
+        func_lines = []
+        for line in lines:
+            if "wait_for_clock() {" in line:
+                in_func = True
+                depth = 1
+                func_lines.append(line)
+                continue
+            if in_func:
+                func_lines.append(line)
+                depth += line.count("{") - line.count("}")
+                if depth <= 0:
+                    break
+        func_body = "\n".join(func_lines)
+        # Must not have an exit (non-zero) after the loop
+        assert "exit 1" not in func_body, "wait_for_clock must not exit 1 on timeout"
+        # Must have return 0 after the timeout warning (don't block install)
+        assert "return 0" in func_body
+
     def test_install_os_version_comment_lists_correct_codenames(self):
         # The comment near get_os_version should list 11/12/13 with correct
         # codenames — including the 'Trixie' typo fix from JTN-528.
