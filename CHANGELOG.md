@@ -1,6 +1,124 @@
 # CHANGELOG
 
 
+## v0.40.2 (2026-04-11)
+
+### Bug Fixes
+
+- Harden systemd-run command construction in updater (JTN-319)
+  ([#322](https://github.com/jtn0123/InkyPi/pull/322),
+  [`dc321a4`](https://github.com/jtn0123/InkyPi/commit/dc321a440038677f0964036fb12c0d7d07f69e12))
+
+* fix: harden systemd-run command construction in updater (JTN-319)
+
+CodeQL py/command-line-injection alert #47 flagged _start_update_via_systemd because the "script
+  path validated" claim in its nosec comment was not visible to static analysis or human review.
+
+Make the validation explicit and defense-in-depth:
+
+- Reject unit names that do not match ^inkypi-(update|rollback)-\d+$. - Reject script paths whose
+  basename is not in UPDATE_SCRIPT_NAMES, that contain shell metacharacters, that are not absolute,
+  or that contain traversal tokens. - Re-validate target_tag against the strict semver _TAG_RE
+  inside the function, not only at the request boundary. - Apply the same allow-list validation to
+  _run_real_update for the non-systemd fallback path so both branches share the same invariants. -
+  Harden install/do_update.sh: validate the target tag format before passing it to git, resolve it
+  as refs/tags/<tag>, and use the -- separator on git checkout so a crafted tag cannot be
+  interpreted as an option. - Replace the misleading "# nosec" comment with a "# noqa: S603" that
+  documents the now-visible allow-list. - Add 16 unit tests covering bad/good unit names, script
+  paths, and target tags, plus the _run_real_update defense-in-depth path.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(settings): rebuild Popen argv from allow-list for CodeQL clarity
+
+CodeQL's dataflow analysis did not recognise our basename-set-membership check as a sanitizer, so
+  the py/command-line-injection alert re-fired on the PR scan. Rebuild the sensitive argv elements
+  from allow-list constants and regex-match results instead of forwarding the tainted
+  caller-supplied values, so CodeQL sees only clean values reaching subprocess.Popen.
+
+- _start_update_via_systemd and _run_real_update now construct a ``safe_script_path`` from a literal
+  basename in the allow-list plus the pre-validated directory component. - ``safe_unit_name`` and
+  ``safe_target_tag`` come from the regex match objects, so the values that flow into the argv are
+  the matched substrings rather than the original inputs. - Add a space character to the
+  shell-metacharacter rejection list for script paths (installed paths never contain spaces and this
+  further tightens the allow-list).
+
+* refactor(settings): extract update validators and use guard-style sanitization
+
+Address two follow-up findings from CI:
+
+1. SonarCloud quality gate failed on duplicated lines density (17.6%) because
+  _start_update_via_systemd and _run_real_update both inlined the same allow-list checks. Extract
+  three module-level helpers (_validate_update_unit_name, _validate_update_script_path,
+  _validate_update_target_tag) and call them from both sites.
+
+2. CodeQL still flagged py/command-line-injection because it does not recognise
+  ``re.fullmatch(...).group(0)`` as a sanitizer when the matched value is then placed in an argv
+  list. Restructure the validators to use ``re.fullmatch`` purely as a guard followed by returning
+  the original (now-proven-safe) string, which is the form CodeQL's built-in sanitizer recognition
+  expects. Add a new _UPDATE_SCRIPT_PATH_RE that constrains the full path to a strict POSIX-safe
+  character class so the script-path argument is sanitised by a regex guard rather than by the
+  previous ad-hoc loop.
+
+* fix(settings): inline re.fullmatch sanitiser at Popen call sites
+
+CodeQL's py/command-line-injection sanitiser recognition for Python fires only when the
+  ``re.fullmatch`` (or ``re.match``) call is in the same call frame as the subprocess.Popen
+  invocation, with the regex literal visible. The previous version routed validation through
+  ``_validate_update_*`` helpers and a module-level pre-compiled ``_TAG_RE`` /
+  ``_UPDATE_UNIT_NAME_RE``, neither of which CodeQL recognised as a barrier.
+
+Restructure so:
+
+- ``_sanitize_update_argv`` performs the script-path / target-tag guards once and is used from both
+  _start_update_via_systemd and _run_real_update (avoiding the SonarCloud duplicated-lines failure).
+  - Both call sites also include an *inline* ``re.fullmatch`` immediately before subprocess.Popen,
+  with the regex pattern as a string literal. This is the form CodeQL recognises as a sanitiser. -
+  The unit_name guard is inlined directly in _start_update_via_systemd for the same reason. - Drop
+  the now-unused module-level ``_UPDATE_UNIT_NAME_RE`` and ``_UPDATE_SCRIPT_PATH_RE`` constants.
+
+* Potential fix for pull request finding 'CodeQL / Uncontrolled command line'
+
+Co-authored-by: Copilot Autofix powered by AI
+  <62310815+github-advanced-security[bot]@users.noreply.github.com>
+
+* fix: address CodeRabbit feedback + CodeQL false-positives (JTN-319)
+
+Rescue PR #322:
+
+- Add _validate_update_script_path() with realpath + trusted-root enforcement (CodeRabbit Major:
+  directory-root enforcement was missing). - Align _TAG_RE with bash regex in install/do_update.sh —
+  both now reject underscores by using [A-Za-z0-9.] instead of \w (CodeRabbit Major: regex
+  divergence). - Drop unit_name and script_path parameters from _start_update_via_systemd so the
+  only Popen-bound variable is target_tag, regex-validated inline in the same function frame for
+  CodeQL #83 (the previous helper-based approach failed taint propagation across boundaries). -
+  Update _updates.py caller to drop the now-removed positional args. - Replace "/tmp/evil.sh" test
+  fixture with "/opt/attacker/evil.sh" so ruff S108 stops flagging the negative-path test
+  (CodeRabbit Major). - Refresh TestStartUpdateViaSystemdValidation to match the new
+  single-parameter contract; add TestValidateUpdateScriptPath covering symlink resolution,
+  traversal, and trusted-root enforcement.
+
+* fix: dedupe semver regex into _TAG_RE constant with re.ASCII (JTN-319)
+
+SonarCloud S1192 flagged the target-tag regex literal repeated 3 times across
+  _start_update_via_systemd and _run_real_update. S6353 (9 instances) flagged [0-9] usage that
+  should be \d.
+
+Switch both inline call sites to use the module-level _TAG_RE compiled pattern (already present at
+  line 97), and rewrite it as re.compile(r"^v?\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$", re.ASCII)
+
+The re.ASCII flag is load-bearing: without it, \d in Python 3 matches Unicode digit categories,
+  which would let spoofed tags like v\u0661.\u0662.\u0663 (Arabic-Indic numerals) pass validation.
+  With re.ASCII, \d is equivalent to [0-9], matching the POSIX pattern in install/do_update.sh.
+
+CodeQL's Python security model recognises re.Pattern.fullmatch as a sanitiser just like the inline
+  re.fullmatch form, so this keeps the py/command-line-injection alerts closed.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.40.1 (2026-04-11)
 
 ### Performance Improvements
