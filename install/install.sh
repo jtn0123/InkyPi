@@ -219,6 +219,33 @@ setup_earlyoom_service() {
   sudo systemctl enable --now earlyoom
 }
 
+maybe_disable_dphys_swapfile() {
+  # JTN-593: When zram is active, dphys-swapfile is dead weight on the SD card
+  # (Pi OS Trixie ships both — zram-swap preinstalled + dphys-swapfile preinstalled).
+  # Reclaim ~425MB from /var/swap and stop the dphys-swapfile service.
+  if ! grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
+    echo "zram swap not active — leaving dphys-swapfile alone."
+    return 0
+  fi
+  if [ ! -f /var/swap ] && ! systemctl list-unit-files dphys-swapfile.service >/dev/null 2>&1; then
+    echo "dphys-swapfile not present — nothing to clean up."
+    return 0
+  fi
+  echo "zram swap is active — disabling unused dphys-swapfile and reclaiming /var/swap..."
+  if systemctl is-active --quiet dphys-swapfile.service 2>/dev/null; then
+    sudo systemctl disable --now dphys-swapfile.service 2>/dev/null || true
+  fi
+  if command -v dphys-swapfile >/dev/null 2>&1; then
+    sudo dphys-swapfile swapoff 2>/dev/null || true
+    sudo dphys-swapfile uninstall 2>/dev/null || true
+  fi
+  if dpkg -l dphys-swapfile 2>/dev/null | grep -q "^ii"; then
+    sudo apt-get remove -y dphys-swapfile >/dev/null 2>&1 || true
+  fi
+  sudo rm -f /var/swap
+  echo "✓ Reclaimed dphys-swapfile space."
+}
+
 configure_journal_size() {
   local conf="/etc/systemd/journald.conf"
   if [ -f "$conf" ] && ! grep -q "^SystemMaxUse=" "$conf"; then
@@ -406,6 +433,7 @@ if [[ "$os_version" =~ ^(11|12|13)$ ]] ; then
 else
   echo "OS version is $os_version - skipping zramswap setup (zram-tools not available on this release)."
 fi
+maybe_disable_dphys_swapfile      # JTN-593: reclaim /var/swap when zram is active
 setup_earlyoom_service
 configure_journal_size
 install_src

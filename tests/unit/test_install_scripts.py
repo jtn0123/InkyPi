@@ -186,6 +186,81 @@ class TestInstallScript:
             "zramswap branch when adding a new Debian release."
         )
 
+    def test_install_disables_dphys_swapfile_when_zram_active(self):
+        # JTN-593: maybe_disable_dphys_swapfile must be defined in install.sh
+        # so it can reclaim /var/swap (~425 MB) when zram is already active.
+        assert "maybe_disable_dphys_swapfile()" in self.content
+        assert "dphys-swapfile" in self.content
+
+    def test_install_calls_disable_dphys_after_zramswap(self):
+        # JTN-593: The call to maybe_disable_dphys_swapfile must appear AFTER
+        # the zramswap setup conditional and BEFORE setup_earlyoom_service so
+        # we never attempt to reclaim /var/swap before zram is guaranteed active.
+        zramswap_call = "setup_zramswap_service"
+        disable_call = "maybe_disable_dphys_swapfile"
+        earlyoom_call = "setup_earlyoom_service"
+
+        # Use the main script body (after function definitions) for ordering.
+        # Functions are defined before the main call site — find the call positions
+        # that occur after the last function definition closing brace.
+        fn_def_start = self.content.index("maybe_disable_dphys_swapfile() {")
+        fn_def_end = self.content.index("}", fn_def_start)
+
+        # All three calls must exist after the function definitions.
+        zram_pos = self.content.index(zramswap_call, fn_def_end)
+        disable_pos = self.content.index(disable_call, fn_def_end)
+        earlyoom_pos = self.content.index(earlyoom_call, fn_def_end)
+
+        assert zram_pos < disable_pos < earlyoom_pos, (
+            "maybe_disable_dphys_swapfile() call must appear after setup_zramswap_service "
+            "and before setup_earlyoom_service in install.sh"
+        )
+
+    def test_disable_dphys_only_runs_when_zram_active(self):
+        # JTN-593: The function must check /proc/swaps for /dev/zram BEFORE
+        # removing anything — it must be a no-op on systems without zram.
+        fn_start = self.content.index("maybe_disable_dphys_swapfile() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        zram_guard = 'grep -q "^/dev/zram" /proc/swaps'
+        rm_swap = "rm -f /var/swap"
+
+        assert zram_guard in fn_body, (
+            "maybe_disable_dphys_swapfile() must check /proc/swaps for /dev/zram "
+            "before removing /var/swap (safety guard for non-zram systems)"
+        )
+        assert rm_swap in fn_body, "Function should remove /var/swap"
+
+        guard_pos = fn_body.index(zram_guard)
+        rm_pos = fn_body.index(rm_swap)
+        assert (
+            guard_pos < rm_pos
+        ), "/dev/zram guard must appear before rm -f /var/swap in maybe_disable_dphys_swapfile()"
+
+    def test_disable_dphys_does_not_fail_if_package_missing(self):
+        # JTN-593: All dphys-swapfile commands must have || true guards so the
+        # function is safe on systems where the package is already gone.
+        fn_start = self.content.index("maybe_disable_dphys_swapfile() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        # Every line that calls dphys-swapfile binary commands should be guarded.
+        dphys_cmd_lines = [
+            line.strip()
+            for line in fn_body.splitlines()
+            if "dphys-swapfile" in line
+            and line.strip().startswith("sudo dphys-swapfile")
+        ]
+        assert (
+            dphys_cmd_lines
+        ), "Expected sudo dphys-swapfile command lines in the function"
+        for line in dphys_cmd_lines:
+            assert "|| true" in line, (
+                f"dphys-swapfile command must have '|| true' guard to avoid failures "
+                f"when package is missing: {line!r}"
+            )
+
 
 # ---- update.sh ----
 
