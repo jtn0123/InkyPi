@@ -3,11 +3,9 @@
 #
 # Runs two phases inside memory-capped Docker containers:
 #
-#   Phase 2 — pip install under arm64 + 512 MB cap (the JTN-528 OOM regression
-#             gate). Uses python:3.12-slim with --platform linux/arm64 so the
-#             pip resolver fetches arm64 binary wheels from PyPI — replicating
-#             the exact download + install step that OOM-killed pip on a Pi
-#             Zero 2 W without zramswap. Exit 137 = OOM kill.
+#   Phase 2 — pip install under a strict 512 MB memory cap (the JTN-528 OOM
+#             regression gate). Installs install/requirements.txt inside a
+#             capped Python container. Exit 137 = OOM kill = regression.
 #
 #   Phase 3 — web service boot probe under a 512 MB cap. Mounts the repo into a
 #             standard Python container, installs deps, starts the InkyPi web
@@ -92,20 +90,16 @@ echo ""
 # This is the core OOM regression gate (JTN-528 / JTN-536).
 #
 # On a Pi Zero 2 W without zramswap, pip install of numpy/Pillow was killed by
-# the OOM killer (exit 137). The 512 MB cap plus arm64 emulation replicates
-# that exact pressure — if the requirements grow too large, pip will be
-# killed again and this job will fail with exit 137.
-#
-# We use python:3.12-slim (arm64) so Python is pre-installed and pip can
-# fetch arm64 binary wheels directly without needing the full sim image.
-echo "[Phase 2] Running pip install under arm64 + 512 MB memory cap ..."
+# the OOM killer (exit 137). The 512 MB cap replicates that exact pressure —
+# if the requirements grow too large, pip will be killed again and this job
+# will fail with exit 137.
+echo "[Phase 2] Running pip install under 512 MB memory cap ..."
 echo "          Exit 137 = OOM kill (the JTN-528 regression mode)."
 echo ""
 
 PIP_EXIT=0
 if docker run \
     --rm \
-    --platform linux/arm64 \
     --memory=512m \
     --memory-swap=512m \
     -v "${REPO_ROOT}:/InkyPi:ro" \
@@ -115,14 +109,31 @@ set -euo pipefail
 echo "Architecture : $(uname -m)"
 echo "Python       : $(python3 --version)"
 echo ""
-echo "Installing runtime requirements under 512 MB arm64 cap ..."
+# Install OS libraries required by packages that need to compile C extensions
+# (inky / spidev / cysystemd / pi-heif) — mirrors what install.sh installs
+# via debian-requirements.txt on a real Pi.
+apt-get update -qq 2>/dev/null
+apt-get install -y -qq \
+    gcc \
+    python3-dev \
+    libopenjp2-7-dev \
+    libfreetype6-dev \
+    libsystemd-dev \
+    libheif-dev \
+    swig \
+    2>/dev/null || true
+echo ""
+echo "Installing runtime requirements under 512 MB cap ..."
+# --prefer-binary avoids source compilation where a binary wheel exists.
+# Any remaining OOM kill (exit 137) signals the JTN-528 regression.
 pip install \
     --retries 5 \
     --timeout 120 \
+    --prefer-binary \
     -r /InkyPi/install/requirements.txt \
     -q
 echo ""
-echo "pip install completed successfully inside 512 MB arm64 cap."
+echo "pip install completed successfully inside 512 MB cap."
 '; then
     PIP_EXIT=0
 else
@@ -131,7 +142,7 @@ fi
 
 if [[ "${PIP_EXIT}" -ne 0 ]]; then
     echo "" >&2
-    echo "ERROR: pip install failed under the 512 MB arm64 cap (exit ${PIP_EXIT})." >&2
+    echo "ERROR: pip install failed under the 512 MB cap (exit ${PIP_EXIT})." >&2
     if [[ "${PIP_EXIT}" -eq 137 ]]; then
         echo "  Exit 137 = OOM kill — this is the JTN-528 regression." >&2
     fi
@@ -254,7 +265,7 @@ fi
 
 echo "======================================================================"
 echo "  All checks passed."
-echo "  Phase 2: pip install OK under arm64 + 512 MB cap"
+echo "  Phase 2: pip install OK under 512 MB cap"
 echo "  Phase 3: web service boot + routes OK under 512 MB cap"
 echo ""
 echo "  REMINDER: This is a simulation. Always test on real Pi Zero 2 W"
