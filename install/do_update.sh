@@ -72,6 +72,14 @@ if [ -z "$TARGET_TAG" ]; then
   fi
 fi
 
+# Defense-in-depth: validate the tag format even though the Flask caller
+# (src/blueprints/settings/__init__.py::_start_update_via_systemd) already
+# enforces a strict semver regex before exec. See JTN-319.
+if ! [[ "$TARGET_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+  echo "ERROR: Invalid target tag format: $TARGET_TAG" >&2
+  exit 1
+fi
+
 echo "Target version: $TARGET_TAG"
 
 # ---------------------------------------------------------------------------
@@ -81,7 +89,10 @@ if [ "$CURRENT_VERSION" = "$TARGET_TAG" ]; then
   echo "Already at $TARGET_TAG — re-running update.sh for dependency sync."
 else
   echo "Checking out $TARGET_TAG..."
-  git -C "$REPO_DIR" checkout "$TARGET_TAG"
+  # Pass the tag via an explicit revision argument before ``--`` so it
+  # cannot be interpreted as a flag by git checkout, and add a trailing
+  # ``--`` to make clear nothing after it is a pathspec.
+  git -C "$REPO_DIR" checkout "refs/tags/$TARGET_TAG" --
 fi
 
 # ---------------------------------------------------------------------------
