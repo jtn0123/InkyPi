@@ -122,6 +122,24 @@ GitHub Actions runs the pytest matrix, pre-flash validation matrix, coverage gat
 
 ---
 
+### CI memory budgets
+
+The `install-smoke-memcap` job (`scripts/test_install_memcap.sh`, Phase 4) asserts the running web service stays within the Pi Zero 2 W memory envelope. Budgets map to the hardware: the Pi Zero 2 W has 512 MB RAM and the systemd unit caps InkyPi at `MemoryMax=350M`, so a PR that ships an idle RSS of ~250 MB passes the install step but OOMs on real hardware.
+
+The checks run inside the 512 MB-capped Phase 3 container and read `VmRSS` from `/proc/1/status` (the `CMD` python process). Both failures print a `BUDGET CHECK:` line to the CI log so regressions are easy to grep for.
+
+| Metric | Target | Hard fail | Tracked by |
+| --- | --- | --- | --- |
+| Post-install idle RSS (30s after `/healthz`) | <150 MB | >200 MB | JTN-608 |
+| Peak RSS during plugin render exercise | <250 MB | >300 MB | JTN-608 |
+
+Notes:
+- Phase 4 sleeps 30s before the idle sample, then hits `/`, `/playlist`, `/api/plugins`, `/api/health/plugins`, and a `POST /update_now` with `plugin_id=clock` to exercise the render codepath. `--web-only` mode short-circuits the actual refresh, but the request still drives the hottest allocation path (form parsing, plugin import, response build).
+- If you add a plugin or import that pushes baseline RSS above the target, bump the plugin's lazy-import boundary rather than raising the budget.
+- The 100-request memory-growth leak check from the JTN-608 ticket is intentionally deferred; the two-sample idle/peak gate catches the class of regressions we care about at PR time without adding minutes to CI.
+
+---
+
 ### Adding New Tests
 
 1) Place tests under `tests/` (unit, integration, or plugin subfolders).
