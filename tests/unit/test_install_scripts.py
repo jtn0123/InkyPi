@@ -3,6 +3,7 @@
 
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -987,8 +988,10 @@ class TestPiImageBuildWorkflow:
     def test_workflow_pins_pi_os_image_url_in_env_block(self):
         # The Pi OS base image URL must live in a clearly-labeled top-of-file
         # variable so bumping the base image is a single-line change.
-        assert "PI_OS_IMAGE_URL:" in self.content
-        assert "downloads.raspberrypi.org" in self.content
+        match = re.search(r"PI_OS_IMAGE_URL:\s*(https?://\S+)", self.content)
+        assert match is not None, "build-pi-image.yml must define PI_OS_IMAGE_URL"
+        parsed = urlparse(match.group(1))
+        assert parsed.hostname == "downloads.raspberrypi.org"
         assert "PIN POINT" in self.content, (
             "build-pi-image.yml must have a PIN POINT comment block so future "
             "maintainers know exactly how to bump the Pi OS image"
