@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v0.43.3 (2026-04-11)
+
+### Bug Fixes
+
+- **ai_image**: Use textarea for prompt input (JTN-377)
+  ([#352](https://github.com/jtn0123/InkyPi/pull/352),
+  [`a6dfb1b`](https://github.com/jtn0123/InkyPi/commit/a6dfb1b0ce797212e85ea0b9bbddff8c6a8edfd0))
+
+The AI Image plugin rendered its prompt field as a single-line <input>, so long prompts were clipped
+  in the UI. Match the AI Text plugin by switching the textPrompt schema field to type "textarea"
+  with rows=4, preserving placeholder, required, and label. Form submission is unchanged since the
+  field name stays the same.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **history**: Clamp ?page upper bound to total_pages (JTN-359)
+  ([#353](https://github.com/jtn0123/InkyPi/pull/353),
+  [`ac3e72c`](https://github.com/jtn0123/InkyPi/commit/ac3e72c6afc3964feeae190f1a38236a02c73aaa))
+
+GET /history?page=99999 rendered "Page 99999 of 4" over an empty grid because the page parameter
+  only had a lower-bound clamp (max(page, 1)). Add the symmetric upper-bound clamp so out-of-range
+  page values snap to the last valid page. Handle the empty-history case (total_pages == 1, page
+  stays at 1) so the empty-state template still renders.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.2 (2026-04-11)
 
 ### Bug Fixes
