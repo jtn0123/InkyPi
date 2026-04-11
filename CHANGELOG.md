@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.39.3 (2026-04-11)
+
+### Bug Fixes
+
+- Default waitress threads to 2 for Pi Zero 2 W (JTN-603)
+  ([#320](https://github.com/jtn0123/InkyPi/pull/320),
+  [`1c66866`](https://github.com/jtn0123/InkyPi/commit/1c66866315a2ff2d584053614880d2b8ddc88263))
+
+Replace hardcoded threads=4 with _get_web_threads() that defaults to 2, saving ~50-100 MB idle RSS
+  on Pi Zero 2 W. Configurable via INKYPI_WEB_THREADS env var; invalid values fall back to 2,
+  zero/negative clamped to 1. Adds 7 unit tests covering all env var paths.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Validate weather plugin latitude/longitude range (JTN-354)
+  ([#323](https://github.com/jtn0123/InkyPi/pull/323),
+  [`47aae5c`](https://github.com/jtn0123/InkyPi/commit/47aae5c965c00ea9811537adafd92ff15e67807b))
+
+Weather plugin accepted out-of-range coordinates (e.g. latitude=999.999) and persisted them, failing
+  later inside generate_image far from where the user could correct the input. Add validate_settings
+  to reject values outside [-90, 90] and [-180, 180] at save time, and tighten the map widget inputs
+  to type=number with min/max/step constraints.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.2 (2026-04-11)
 
 ### Bug Fixes
