@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.37.1 (2026-04-11)
+
+### Bug Fixes
+
+- Wait for NTP clock sync before install (JTN-592)
+  ([#314](https://github.com/jtn0123/InkyPi/pull/314),
+  [`9a71278`](https://github.com/jtn0123/InkyPi/commit/9a71278960129933f56b9b0adc236f3f5afb15f1))
+
+Pi Zero 2 W has no RTC battery; on boot the clock starts at the last fake-hwclock value (months
+  stale), which can cause TLS cert validation failures when pip/apt fetch from HTTPS endpoints. Add
+  wait_for_clock() to install.sh that polls timedatectl for up to 60s before package installs begin.
+  On timeout it warns and proceeds rather than blocking the install (offline setups). Includes 4 new
+  structural tests and Pi Zero 2 W documentation note.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- Add chaos tests for RefreshTask error-injection paths (JTN-512)
+  ([#311](https://github.com/jtn0123/InkyPi/pull/311),
+  [`7502716`](https://github.com/jtn0123/InkyPi/commit/7502716c88ad4751a87e110a91b48ecb5323e398))
+
+Adds 11 tests covering subprocess hang timeout, output queue overflow, DisplayManager mid-display
+  failure, and config reload during an active refresh — each asserting the fallback image path and
+  circuit breaker behaviour introduced in PR #299 (JTN-499).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.37.0 (2026-04-11)
 
 ### Features
