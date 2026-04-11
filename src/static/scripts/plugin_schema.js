@@ -211,11 +211,13 @@
     const toolbar = document.createElement("div");
     toolbar.className = "dynamic-list-toolbar compact-repeater-toolbar";
     const urlInput = document.createElement("input");
-    urlInput.type = "text";
+    urlInput.type = "url";
     urlInput.name = "calendarURLs[]";
     urlInput.className = "form-input";
     urlInput.placeholder = "https://calendar.google.com/…/basic.ics";
     urlInput.required = true;
+    urlInput.setAttribute("aria-label", "Calendar URL");
+    urlInput.pattern = "https?://.+";
     urlInput.value = url || "";
     const removeBtn = document.createElement("button");
     removeBtn.type = "button";
@@ -312,6 +314,28 @@
     updateRepeaterEmptyState(list);
     syncRemoveButtonStates(list);
     addButton.addEventListener("click", () => {
+      // JTN-357: Refuse to append a new empty row while the previous row
+      // holds an empty or invalid value.  This prevents users from spamming
+      // empty/invalid rows into the form.
+      const items = list.querySelectorAll(".dynamic-list-item");
+      if (items.length > 0) {
+        const lastItem = items[items.length - 1];
+        const lastInput = lastItem.querySelector('input[name="calendarURLs[]"]');
+        if (lastInput) {
+          const value = (lastInput.value || "").trim();
+          if (!value || !lastInput.checkValidity()) {
+            lastInput.focus();
+            lastInput.reportValidity?.();
+            const message = value
+              ? "Fix the previous calendar URL before adding another."
+              : "Enter a calendar URL before adding another.";
+            if (typeof showError === "function") {
+              showError(message);
+            }
+            return;
+          }
+        }
+      }
       list.appendChild(createCalendarEntry("", "#007BFF"));
       updateRepeaterEmptyState(list);
       syncRemoveButtonStates(list);
