@@ -15,7 +15,7 @@ import os
 import secrets
 from time import perf_counter
 
-from flask import Flask, g, make_response, redirect, request, session
+from flask import Flask, abort, g, make_response, redirect, request, session
 
 from config import Config
 from utils.http_utils import json_error
@@ -36,9 +36,30 @@ _MUTATE_MAX = 60  # requests per IP per window
 
 _TRUTHY = frozenset({"1", "true", "yes"})
 
+#: Default allow-list of hostnames that may appear in a redirect ``Location``
+#: header when upgrading HTTP to HTTPS. Operators can override this via the
+#: ``INKYPI_ALLOWED_HOSTS`` env var (comma-separated). Only requests whose
+#: ``Host`` header matches one of these entries are eligible for the HTTPS
+#: upgrade redirect — everything else is rejected with a 400 to prevent
+#: open-redirect attacks via spoofed ``Host`` headers (JTN-317, CodeQL
+#: ``py/url-redirection`` alert #52).
+_DEFAULT_ALLOWED_HOSTS = "inkypi.local,localhost,127.0.0.1"
+
 
 def _env_bool(name: str, default: str = "") -> bool:
     return os.getenv(name, default).strip().lower() in _TRUTHY
+
+
+def _load_allowed_hosts() -> frozenset[str]:
+    """Parse ``INKYPI_ALLOWED_HOSTS`` into a lowercase frozenset.
+
+    Read at request time (not import time) so tests and operators can
+    override the allow-list via environment variables without having to
+    reload the module. Hostnames are compared case-insensitively and
+    without any port suffix.
+    """
+    raw = os.getenv("INKYPI_ALLOWED_HOSTS") or _DEFAULT_ALLOWED_HOSTS
+    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
 
 
 # ---------------------------------------------------------------------------
@@ -88,6 +109,15 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
             or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
         ):
             return None
+        # Defend against open-redirect via spoofed Host header (JTN-317,
+        # CodeQL py/url-redirection alert #52). We must never echo a
+        # caller-controlled hostname back in a Location header, so we
+        # validate ``request.host`` against an allow-list before using
+        # ``request.url`` to build the redirect target.
+        allowed_hosts = _load_allowed_hosts()
+        host = (request.host or "").split(":", 1)[0].lower()
+        if host not in allowed_hosts:
+            abort(400, description="Invalid host")
         # NOSONAR — the http:// literal is intentional: we are upgrading the
         # request to https. SonarCloud rule S5332 is a false positive here.
         url = request.url.replace("http://", "https://", 1)  # NOSONAR
