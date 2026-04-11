@@ -69,7 +69,20 @@ fi
 banner "Phase 3/4 — assert venv imports flask, waitress, Pillow"
 # Run each import in a single python invocation so we fail on the first missing
 # dependency with a clear error. Using `python -c` keeps this portable.
-if "${VENV_PATH}/bin/python" -c "import flask, waitress, PIL; print('flask', flask.__version__); print('waitress', waitress.__version__); print('Pillow', PIL.__version__)"; then
+#
+# JTN-615: `waitress.__version__` does not exist (and flask deprecated its own
+# `__version__` attribute in Flask 3.2). Use `importlib.metadata.version()` for
+# all three so this check is resilient to package-level attribute churn. The
+# whole point of Phase 3 is "can the venv import these modules at all" — a
+# version print-out is a nice-to-have, not the assertion itself.
+if "${VENV_PATH}/bin/python" -c '
+import importlib
+import importlib.metadata as md
+mods = {"flask": "flask", "waitress": "waitress", "Pillow": "PIL"}
+for dist, mod in mods.items():
+    importlib.import_module(mod)
+    print(dist, md.version(dist))
+'; then
     pass "flask, waitress, Pillow importable from install venv"
 else
     fail "one or more required packages missing from install venv"

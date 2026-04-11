@@ -22,9 +22,13 @@
 #
 # NOTE: `[trusted=yes]` on the Pi OS apt line is a sim-only workaround for
 # Debian Trixie's sqv rejecting the SHA1 signature used by archive.raspberrypi.com.
-# Real Pi OS ships its own patched apt that does NOT hit this issue — do NOT
-# copy this line to production configs. The same caveat applies to
-# Dockerfile.sim-install.
+# Real Pi OS does not hit this issue — uses its own patched apt that does NOT
+# hit this issue. An earlier JTN-615 attempt replaced this with a
+# `[signed-by=...]` keyring approach, but that fails at image build time on
+# trixie because even after manual key import, trixie's sqv policy rejects
+# the Pi archive key's SHA1 signatures outright. Keep `[trusted=yes]` —
+# it is the documented workaround for this exact class of problem. The same
+# caveat applies to Dockerfile.sim-install.
 
 ARG CODENAME=trixie
 FROM debian:${CODENAME}
@@ -35,6 +39,21 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Base dependencies needed by install.sh plus systemd (for `systemd-analyze
 # verify`) and sudo (install.sh uses sudo even when running as root).
+#
+# JTN-615: pre-install python3-venv + python3-pip here rather than relying on
+# install.sh's apt step to pull them via debian-requirements.txt. That step
+# can fail silently on bullseye (Pi OS repo indexing quirks) — leaving
+# create_venv to crash with "ensurepip is not available" deep inside the pip
+# fallback path. Doing the venv bootstrap up front keeps it reproducible.
+#
+# Also pre-install the C toolchain (gcc + python3-dev) and the native headers
+# for the handful of requirements.txt entries that do not ship an arm64 wheel
+# on PyPI (spidev, sgmllib3k → gcc; cysystemd → libsystemd-dev; Pillow →
+# libopenjp2-7-dev + libfreetype6-dev; pi-heif → libheif-dev; inky/lgpio →
+# liblgpio-dev if it's available in the base distro, otherwise install.sh's
+# apt step will pull it from the Pi OS repo). Matches the set already used by
+# scripts/test_install_memcap.sh so the two smoke paths can't diverge on
+# build-time deps.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         sudo \
@@ -45,6 +64,16 @@ RUN apt-get update \
         ca-certificates \
         gnupg \
         systemd \
+        python3 \
+        python3-venv \
+        python3-pip \
+        python3-dev \
+        gcc \
+        libsystemd-dev \
+        libopenjp2-7-dev \
+        libfreetype6-dev \
+        libheif-dev \
+        swig \
     && rm -rf /var/lib/apt/lists/*
 
 # Add the Raspberry Pi OS apt repo so Pi-only packages (liblgpio-dev,
