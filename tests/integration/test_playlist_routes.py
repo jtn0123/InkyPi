@@ -344,3 +344,67 @@ def test_playlist_to_dict_no_cycle_minutes_when_unset(device_config_dev):
 
     d = pl.to_dict()
     assert "cycle_minutes" not in d
+
+
+def test_create_playlist_accepts_wraparound_times(client):
+    """JTN-353: Playlists with start > end (wraps past midnight) should be accepted.
+
+    The model already supports wraparound via Playlist.is_active(), so we accept
+    the reverse-time case rather than rejecting it.
+    """
+    payload = {
+        "playlist_name": "NightShift",
+        "start_time": "20:00",
+        "end_time": "08:00",
+    }
+    resp = client.post("/create_playlist", json=payload)
+    assert resp.status_code == 200
+    j = resp.get_json()
+    assert j.get("success") is True
+
+
+def test_playlist_page_labels_wraparound_next_day(client):
+    """JTN-353: The playlist list summary must mark wrap-past-midnight ranges with '(next day)'.
+
+    Without the label the UI renders '20:00 - 08:00' identically to a normal
+    same-day range, so users cannot tell that it wraps.
+    """
+    payload = {
+        "playlist_name": "Overnight",
+        "start_time": "22:00",
+        "end_time": "06:00",
+    }
+    resp = client.post("/create_playlist", json=payload)
+    assert resp.status_code == 200
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    # The summary line for Overnight should contain the wrap label.
+    # Find the Overnight summary section and check for the label nearby.
+    assert "22:00 - 06:00" in body
+    assert "(next day)" in body
+    assert "playlist-wrap-label" in body
+
+
+def test_playlist_page_no_wrap_label_for_normal_range(client):
+    """JTN-353: Normal same-day ranges must NOT get the '(next day)' label."""
+    payload = {
+        "playlist_name": "Daytime",
+        "start_time": "09:00",
+        "end_time": "17:00",
+    }
+    resp = client.post("/create_playlist", json=payload)
+    assert resp.status_code == 200
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "09:00 - 17:00" in body
+    # The Daytime row should not carry the wrap label. We can't easily scope to
+    # just the Daytime row, so assert that when Daytime is the only non-default
+    # playlist the label markup is absent unless another wrap-range exists.
+    # To keep the assertion robust, check the substring around "09:00 - 17:00".
+    idx = body.find("09:00 - 17:00")
+    # Look within the next 200 chars for the label — it must not appear.
+    assert "(next day)" not in body[idx : idx + 200]

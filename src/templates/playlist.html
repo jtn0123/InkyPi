@@ -72,7 +72,7 @@
                             {% if playlist.name == playlist_config.active_playlist %}
                             <span class="status-chip success">Active</span>
                             {% endif %}
-                            <span class="playlist-summary-copy">{{ playlist.start_time }} - {{ playlist.end_time }}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
+                            <span class="playlist-summary-copy">{{ playlist.start_time }} - {{ playlist.end_time }}{% if playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
                         </div>
                         </div>
                         <div class="playlist-toolbar">
