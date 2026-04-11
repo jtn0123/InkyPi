@@ -20,6 +20,33 @@ from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
+# HEIF opener registration is deferred until the first image is actually
+# loaded so pi_heif (~3 MB native extension + ~28 ms import time) does not
+# inflate the startup RSS on low-memory devices.  The flag is checked once
+# per load call and the registration is a no-op after the first success.
+_HEIF_OPENER_REGISTERED = False
+
+
+def _ensure_heif_opener() -> None:
+    """Register the HEIF/HEIC PIL opener on first use.
+
+    Called from every ``AdaptiveImageLoader`` entry point so that pi_heif
+    is imported only when the process actually decodes an image, rather
+    than eagerly at module load time.
+    """
+    global _HEIF_OPENER_REGISTERED
+    if _HEIF_OPENER_REGISTERED:
+        return
+    try:
+        from pi_heif import register_heif_opener
+
+        register_heif_opener()
+    except ImportError:
+        # pi-heif not installed — HEIF/HEIC uploads will fall back to
+        # PIL's native error path.  Flag is still set so we don't retry.
+        pass
+    _HEIF_OPENER_REGISTERED = True
+
 
 def _is_low_resource_device():
     """
@@ -82,6 +109,7 @@ class AdaptiveImageLoader:
             PIL Image object resized to dimensions, or None on error
         """
         logger.debug(f"Loading image from URL: {url}")
+        _ensure_heif_opener()
 
         if self.is_low_resource:
             return self._load_from_url_lowmem(
@@ -105,6 +133,7 @@ class AdaptiveImageLoader:
             PIL Image object resized to dimensions, or None on error
         """
         logger.debug(f"Loading image from file: {path}")
+        _ensure_heif_opener()
 
         if not os.path.exists(path):
             logger.error(f"File not found: {path}")
@@ -132,6 +161,7 @@ class AdaptiveImageLoader:
             PIL Image object resized to dimensions, or None on error
         """
         logger.debug("Loading image from BytesIO")
+        _ensure_heif_opener()
 
         try:
             img = Image.open(data)

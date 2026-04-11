@@ -4,13 +4,18 @@ import logging
 import os
 import threading
 from time import perf_counter
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import requests
 from flask import Request, g, jsonify, request
 from flask.wrappers import Response as FlaskResponse
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+
+# ``requests`` / ``urllib3`` are imported lazily (JTN-606) because they add
+# ~8 MB of RSS at process startup.  The json_* helpers used by error
+# handlers do not need them, so deferring the import to the first
+# ``http_get`` / ``get_shared_session`` call keeps the critical path light.
+if TYPE_CHECKING:  # pragma: no cover — type hints only
+    import requests
+    from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +226,10 @@ DEFAULT_HEADERS: dict[str, str] = {
 
 
 def _build_retry() -> Retry:
-    # Retry idempotent methods on common transient failures
+    # Retry idempotent methods on common transient failures.  ``urllib3`` is
+    # imported lazily to keep it off the startup path (JTN-606).
+    from urllib3.util.retry import Retry  # noqa: F811
+
     retries_total = _env_int("INKYPI_HTTP_RETRIES", 3)
     retries_connect = _env_int("INKYPI_HTTP_RETRIES_CONNECT", retries_total)
     retries_read = _env_int("INKYPI_HTTP_RETRIES_READ", retries_total)
@@ -247,6 +255,10 @@ def _build_retry() -> Retry:
 
 
 def _build_session() -> requests.Session:
+    # ``requests`` / HTTPAdapter are imported lazily — see module docstring.
+    import requests  # noqa: F811
+    from requests.adapters import HTTPAdapter  # noqa: F811
+
     s = requests.Session()
     adapter = HTTPAdapter(max_retries=_build_retry())
     s.headers.update(DEFAULT_HEADERS)
@@ -317,6 +329,10 @@ def http_get(
     Returns:
         Response object (may be from cache)
     """
+    # Lazy import: see module docstring (JTN-606).  ``requests`` is only
+    # loaded when an HTTP call is actually made.
+    import requests  # noqa: F811
+
     # Check cache first (unless streaming or caching disabled)
     if use_cache and not stream:
         try:

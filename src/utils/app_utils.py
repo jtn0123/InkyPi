@@ -7,8 +7,11 @@ import time
 from io import BytesIO
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-
+# PIL imports are deferred to function scope to reduce startup RSS on
+# low-memory devices (JTN-606).  The ImageDraw/ImageFont/ImageOps submodules
+# only load when ``generate_startup_image`` or the upload validation helpers
+# are actually invoked.  ``Image`` itself is only needed by the same
+# functions and is imported lazily alongside the submodules.
 logger = logging.getLogger(__name__)
 
 # Google's public DNS server — used for local IP detection (UDP connect,
@@ -85,6 +88,8 @@ def is_connected():
 
 
 def get_font(font_name, font_size=50, font_weight="normal", strict=False):
+    from PIL import ImageFont
+
     font_variants = FONT_FAMILIES.get(font_name)
     if not font_variants:
         logger.warning(f"Requested font not found: font_name={font_name}")
@@ -124,6 +129,8 @@ def get_font_path(font_name):
 
 
 def generate_startup_image(dimensions=(800, 480)):
+    from PIL import Image, ImageDraw
+
     bg_color = (255, 255, 255)
     text_color = (0, 0, 0)
     width, height = dimensions
@@ -194,7 +201,14 @@ def _process_uploaded_file(extension: str, file_path: str, content: bytes) -> No
     if extension == "pdf":
         with open(file_path, "wb") as out:
             out.write(content)
-    elif extension in {"jpg", "jpeg"}:
+        return
+
+    from PIL import Image, ImageOps
+
+    from utils.image_loader import _ensure_heif_opener
+
+    _ensure_heif_opener()
+    if extension in {"jpg", "jpeg"}:
         try:
             with Image.open(BytesIO(content)) as img:
                 img = ImageOps.exif_transpose(img)
@@ -282,6 +296,11 @@ def _validate_image_content(content: bytes, extension: str) -> None:
     if not _check_magic_bytes(content, extension):
         raise RuntimeError("Uploaded file is not a valid image")
 
+    from PIL import Image
+
+    from utils.image_loader import _ensure_heif_opener
+
+    _ensure_heif_opener()
     # PIL verification: catches malformed files that pass the magic-byte check.
     try:
         with Image.open(BytesIO(content)) as img:

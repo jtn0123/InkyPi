@@ -8,10 +8,15 @@ from collections.abc import Callable
 from io import BytesIO
 from typing import Any
 
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from PIL import Image
 from PIL.Image import Resampling
 
 from utils.http_utils import http_get
+
+# ImageEnhance / ImageFilter / ImageOps are imported lazily from the
+# functions that use them (JTN-606).  Keeping them at module scope inflated
+# startup RSS by ~8 MB on Pi Zero 2 W because every import of image_utils
+# pulled them in — even for pure hashing callers that never touch them.
 
 LANCZOS = Resampling.LANCZOS
 
@@ -227,6 +232,8 @@ def apply_image_enhancement(img, image_settings=None):
     Returns:
         The enhanced ``PIL.Image.Image``.
     """
+    from PIL import ImageEnhance
+
     if image_settings is None:
         image_settings = {}
 
@@ -260,6 +267,8 @@ def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:
         A new ``PIL.Image.Image`` of exactly *dimensions* with the original
         image centred on a blurred background.
     """
+    from PIL import ImageFilter, ImageOps
+
     bkg = ImageOps.fit(img, dimensions)
     bkg = bkg.filter(ImageFilter.BoxBlur(8))
     img = ImageOps.contain(img, dimensions)
