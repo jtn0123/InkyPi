@@ -66,7 +66,12 @@ jobs:
           INKYPI_ENV: dev
           INKYPI_NO_REFRESH: '1'
         run: |
-          python scripts/memory_diff.py --output pr.json --backend auto
+          # Soft-fail: if the helper crashes we still want the formatter to
+          # run and post a "backend unavailable" comment rather than bail.
+          python scripts/memory_diff.py --output pr.json --backend auto || {
+            echo "PR measurement failed — writing empty summary"
+            echo '{"backend":"unavailable","total_rss_bytes":0,"module_count":0,"allocators":[]}' > pr.json
+          }
           echo "--- pr.json summary ---"
           python -c "import json; d=json.load(open('pr.json')); print('backend:', d['backend'], 'modules:', d['module_count'], 'rss:', d['total_rss_bytes'])"
 

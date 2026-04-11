@@ -136,12 +136,16 @@ def _run_tracemalloc() -> dict:
 def _run_memray() -> dict:
     """Profile ``import inkypi`` using memray.
 
-    We shell out to ``memray run`` so the capture file uses the same format
-    as ``memray stats`` expects, then parse ``memray stats --json``.
+    Runs ``memray run`` in a subprocess to produce a capture file, then
+    opens it with memray's Python API (``FileReader``) to aggregate
+    high-watermark allocations by source location. The CLI's ``stats``
+    subcommand emits a human-readable report to stdout (not JSON), so we
+    go straight to the API for a stable machine-readable result.
     """
     # Verify memray is actually importable before we try to use it.
     try:
         import memray  # noqa: F401,PLC0415
+        from memray import FileReader  # noqa: PLC0415
     except ImportError as exc:
         raise RuntimeError("memray backend requested but not installed") from exc
 
@@ -173,51 +177,41 @@ def _run_memray() -> dict:
                 f"stdout:\n{proc.stdout}\n\nstderr:\n{proc.stderr}"
             )
 
-        stats_cmd = [
-            sys.executable,
-            "-m",
-            "memray",
-            "stats",
-            "--json",
-            str(capture),
-        ]
-        stats_proc = subprocess.run(  # noqa: S603 — fixed argv
-            stats_cmd,
-            env=_startup_env(),
-            capture_output=True,
-            text=True,
-            timeout=60,
-            check=False,
+        # Aggregate high-watermark allocations by source location using the
+        # FileReader API. ``get_high_watermark_allocation_records`` returns
+        # the set of allocations live at peak RSS — a better signal than
+        # total-ever-allocated because short-lived churn is excluded.
+        reader = FileReader(str(capture))
+        by_location: dict[str, int] = {}
+        records = reader.get_high_watermark_allocation_records(
+            merge_threads=True,
         )
-        if stats_proc.returncode != 0:
-            raise RuntimeError(
-                "memray stats failed.\n"
-                f"stdout:\n{stats_proc.stdout}\n\nstderr:\n{stats_proc.stderr}"
-            )
+        for rec in records:
+            size = int(getattr(rec, "size", 0) or 0)
+            if size <= 0:
+                continue
+            # Try Python-only stack first (always available on Python frames),
+            # then fall back to the hybrid/native stack if the allocation
+            # happened inside a C extension. Each yields (func, file, lineno)
+            # tuples from innermost frame outward.
+            loc = "<unknown>"
+            for stack_method in ("stack_trace", "hybrid_stack_trace"):
+                try:
+                    frames = list(getattr(rec, stack_method)())
+                except Exception:
+                    frames = []
+                if frames:
+                    _func, fname, lineno = frames[0]
+                    loc = f"{fname}:{lineno}"
+                    break
+            by_location[loc] = by_location.get(loc, 0) + size
 
-        # memray stats --json shape: {"total_bytes_allocated": int,
-        #                              "top_locations_by_size": [...]}
-        # Field names vary across versions; handle both "top_locations_by_size"
-        # and "top_allocations_by_size".
-        raw = json.loads(stats_proc.stdout)
-        candidates = (
-            raw.get("top_locations_by_size")
-            or raw.get("top_allocations_by_size")
-            or raw.get("top_locations")
-            or []
-        )
-        allocators: list[dict] = []
-        for entry in candidates[:100]:
-            loc = (
-                entry.get("location")
-                or entry.get("file")
-                or entry.get("name")
-                or "<unknown>"
-            )
-            size = int(
-                entry.get("size") or entry.get("total_bytes") or entry.get("bytes") or 0
-            )
-            allocators.append({"location": str(loc), "bytes": size})
+        allocators: list[dict] = [
+            {"location": loc, "bytes": total}
+            for loc, total in sorted(
+                by_location.items(), key=lambda kv: kv[1], reverse=True
+            )[:100]
+        ]
 
     # Also count modules loaded after import to feed the summary row.
     module_code = textwrap.dedent("""
@@ -298,7 +292,22 @@ def main(argv: list[str] | None = None) -> int:
     backend = _detect_backend(args.backend)
     print(f"memory_diff: using backend={backend}", file=sys.stderr)
 
-    result = _run_memray() if backend == "memray" else _run_tracemalloc()
+    # memray is preferred, but if it blows up (missing method, bad capture,
+    # container sandboxing quirks) we fall back to tracemalloc so the job
+    # still produces *a* comment instead of dying with a traceback. JTN-610
+    # specifically calls out "Tolerant of first-time setup".
+    if backend == "memray":
+        try:
+            result = _run_memray()
+        except Exception as exc:  # noqa: BLE001 — intentional broad fallback
+            print(
+                f"memory_diff: memray backend failed ({exc}); "
+                "falling back to tracemalloc",
+                file=sys.stderr,
+            )
+            result = _run_tracemalloc()
+    else:
+        result = _run_tracemalloc()
 
     # Trim to the top-N allocators by bytes before writing.
     allocators = sorted(
