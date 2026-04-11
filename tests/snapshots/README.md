@@ -51,22 +51,28 @@ system fonts — when in doubt, regenerate via the docker command below.
 
 ## Updating baselines (intentional changes)
 
-Because baselines are sensitive to Chromium version + available system fonts,
-regenerate them **inside a docker container that matches the
-`browser-smoke` CI job**.  From the project root:
+Because baselines are sensitive to Chromium's system-font fallback, regenerate
+them **inside an `ubuntu:24.04` docker container** — the same base image that
+GitHub Actions' `ubuntu-latest` currently resolves to.  Debian-bookworm or
+`python:3.12-slim-*` images have different default fonts and will produce
+baselines that fail on CI.  From the project root:
 
 ```bash
 docker run --rm --platform linux/amd64 -v "$(pwd):/app" -w /app \
-  python:3.12-slim-bookworm bash -c '
+  ubuntu:24.04 bash -c '
     set -e
+    export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y --no-install-recommends -qq \
+      python3 python3-venv python3-pip python3-dev ca-certificates \
       libopenjp2-7 libopenblas-dev libfreetype6-dev fonts-noto-color-emoji \
-      build-essential libjpeg-dev zlib1g-dev > /dev/null
-    pip install --no-cache-dir --quiet -r install/requirements.txt \
-                                       -r install/requirements-dev.txt
+      build-essential libjpeg-dev zlib1g-dev
+    python3 -m venv /tmp/venv
+    . /tmp/venv/bin/activate
+    pip install --no-cache-dir -r install/requirements.txt \
+                               -r install/requirements-dev.txt
     python -m playwright install --with-deps chromium
-    SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1 SKIP_BROWSER=1 \
+    SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1 \
       INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
       python -m pytest tests/snapshots/ -v
   '
