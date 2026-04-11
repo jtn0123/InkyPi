@@ -8,6 +8,10 @@ Type=notify
 User=root
 RuntimeDirectory=inkypi
 WorkingDirectory=/run/inkypi
+# JTN-607: Defense-in-depth for JTN-600. If install.sh is running it creates
+# /var/lib/inkypi/.install-in-progress; refuse to start so systemd cannot
+# thrash the Pi with a start+crash+restart loop mid-install.
+ExecStartPre=/bin/bash -c '[ ! -f /var/lib/inkypi/.install-in-progress ] || (echo "Install in progress — refusing to start" && exit 1)'
 ExecStart=/usr/local/bin/inkypi run
 Restart=on-failure
 RestartSec=60

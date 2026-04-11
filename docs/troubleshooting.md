@@ -22,6 +22,8 @@ If the service is running, this should output `Active: active (running)`:
 
 If the service is not running, check the logs for any errors or issues.
 
+If the journal shows `Install in progress — refusing to start` (JTN-607), an earlier `install.sh` run left the `/var/lib/inkypi/.install-in-progress` lockfile in place — rerun `install.sh` to let it complete and clear the lockfile, or manually remove it with `sudo rm /var/lib/inkypi/.install-in-progress` if you are certain no install is running.
+
 ## Debugging
 
 View the latest logs for the InkyPi service:
