@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.37.0 (2026-04-11)
+
+### Features
+
+- Add plugin render pipeline benchmarks (JTN-520)
+  ([#306](https://github.com/jtn0123/InkyPi/pull/306),
+  [`5e3e401`](https://github.com/jtn0123/InkyPi/commit/5e3e401dd94aa96725b9ebcb49c576835b465d19))
+
+* feat: add plugin render pipeline benchmarks (JTN-520, Grade G3)
+
+Add tests/benchmarks/test_plugin_render.py with three micro-benchmarks (bench_clock_render,
+  bench_weather_render, bench_html_render) that measure the full plugin render pipeline — the path
+  users wait on when clicking "Update Preview" — with all network I/O mocked and each completing in
+  <1ms.
+
+Add one-line note in docs/benchmarking.md referencing the new benchmarks.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: align benchmark names in docs with actual pytest node IDs
+
+Update the benchmarking.md note to use the real function names test_bench_clock_render /
+  test_bench_weather_render / test_bench_html_render rather than the shorthand names listed
+  initially.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.36.0 (2026-04-11)
 
 ### Bug Fixes
