@@ -9,8 +9,6 @@ changed, rather than stale content.
 import logging
 from datetime import UTC, datetime
 
-from PIL import Image, ImageDraw
-
 logger = logging.getLogger(__name__)
 
 # Maximum characters for the error message before truncation
@@ -27,7 +25,7 @@ def render_error_image(
     error_class: str,
     error_message: str,
     timestamp: str | None = None,
-) -> Image.Image:
+):
     """Render a plain error-card image sized to the display dimensions.
 
     Uses only PIL primitives (no custom fonts) so it never fails due to
@@ -49,6 +47,8 @@ def render_error_image(
     Returns:
         A new RGBA :class:`PIL.Image.Image` containing the error card.
     """
+    from PIL import Image, ImageDraw
+
     if timestamp is None:
         timestamp = datetime.now(UTC).isoformat(timespec="seconds")
 

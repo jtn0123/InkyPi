@@ -72,14 +72,10 @@ __all__ = [
 # suppress warning from inky library https://github.com/pimoroni/inky/issues/205
 warnings.filterwarnings("ignore", message=".*Busy Wait: Held high.*")
 
-# Register HEIF/HEIC image support (for iPhone photos)
-try:
-    from pi_heif import register_heif_opener
-
-    register_heif_opener()
-except ImportError:
-    pass  # pi-heif not installed, skip HEIF support
-
+# HEIF/HEIC opener is registered lazily on first use by
+# ``utils.image_loader._ensure_heif_opener()`` so pi_heif (and its ~3 MB
+# native extension) is only loaded when an actual HEIF/HEIC image is
+# decoded, not during process startup.
 
 setup_logging()
 

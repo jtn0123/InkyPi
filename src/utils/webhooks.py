@@ -8,9 +8,24 @@ must never block or raise so that it cannot interfere with the refresh cycle.
 import logging
 from typing import Any
 
-import requests
+# ``requests`` is imported lazily via ``__getattr__`` to keep it off the
+# startup path (JTN-606).  Webhooks are only fired when a plugin refresh
+# fails, so importing the library at module load time is wasteful.
+# Existing tests that patch ``utils.webhooks.requests.post`` still work
+# because module ``__getattr__`` exposes the name on first attribute access.
 
 logger = logging.getLogger(__name__)
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy module-level attribute resolver for ``requests`` (JTN-606)."""
+    if name == "requests":
+        import requests as _requests
+
+        # Cache on the module so subsequent accesses skip this dispatcher.
+        globals()["requests"] = _requests
+        return _requests
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def send_failure_webhook(
@@ -34,9 +49,14 @@ def send_failure_webhook(
     if not urls:
         return
 
+    # Trigger the lazy ``__getattr__`` so ``requests`` is bound on the module.
+    import utils.webhooks as _self
+
+    requests_mod = _self.requests
+
     for url in urls:
         try:
-            response = requests.post(url, json=payload, timeout=timeout)
+            response = requests_mod.post(url, json=payload, timeout=timeout)
             logger.info(
                 "webhook: sent | url=%s status=%s",
                 url,
