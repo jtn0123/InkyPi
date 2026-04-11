@@ -44,6 +44,28 @@ class TestSystemdService:
         assert "MemoryHigh=250M" in self.content
         assert "MemoryMax=350M" in self.content
 
+    def test_service_oom_score_adjust_prefers_inkypi_as_victim(self):
+        # JTN-601: During memory crunch on Pi Zero 2 W, earlyoom was killing
+        # sshd and making the Pi unreachable. Positive OOMScoreAdjust makes
+        # inkypi the preferred OOM victim so we can still SSH in to debug.
+        # Value MUST be positive (+500); a negative value would protect
+        # inkypi and sacrifice sshd — the opposite of what we want.
+        assert "OOMScoreAdjust=500" in self.content
+
+        # The directive must live in the [Service] section, not [Unit] or
+        # [Install]. Parse the section boundaries and verify placement.
+        service_start = self.content.index("[Service]")
+        install_start = self.content.index("[Install]", service_start)
+        oom_pos = self.content.index("OOMScoreAdjust=500")
+        assert (
+            service_start < oom_pos < install_start
+        ), "OOMScoreAdjust=500 must be inside the [Service] section"
+
+        # Guard against someone accidentally re-introducing the wrong sign.
+        # The issue title originally said -500 which would protect inkypi
+        # and get sshd killed — exactly the opposite of what we want.
+        assert "OOMScoreAdjust=-500" not in self.content
+
     def test_service_watchdog(self):
         assert "WatchdogSec=120" in self.content
 
