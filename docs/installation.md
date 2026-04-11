@@ -1,5 +1,88 @@
 # InkyPi Detailed Installation
 
+InkyPi offers two installation paths. Pick whichever matches your hardware and
+tolerance for waiting.
+
+## Option 1 — Pre-built image (easiest, Pi Zero 2 W only)
+
+> Added in [JTN-533](https://linear.app/jtn0123/issue/JTN-533). Available from
+> v0.43.0 onwards. Flash and go — skips the ~15 minute on-device `install.sh`
+> run entirely.
+
+Every tagged GitHub release ships a pre-installed `.img.xz` built by
+`.github/workflows/build-pi-image.yml`. The image is Debian-based Pi OS Lite
+with InkyPi already installed, enabled as a systemd service, and ready to
+serve the web UI on first boot.
+
+**What the image is:** Pi OS Lite arm64 + InkyPi at the matching release tag,
+built inside a chroot with `qemu-aarch64-static`, shrunk with `pishrink.sh`,
+and boot-verified in `qemu-system-aarch64` before it ships. Nothing personal
+(no hostname, no Wi-Fi, no SSH credentials) is baked into the image — Pi
+Imager's advanced options still handle all of that at flash time.
+
+**What the image is not:** not a substitute for a real-Pi dogfooding pass.
+The workflow's qemu boot verification proves the kernel reaches userspace
+and spawns getty, but cannot simulate the Pi's GPIO / SPI hardware. Treat
+the pre-built image like any other OS image — flash to a spare SD card and
+verify the display lights up before retiring your existing Pi.
+
+**Scope:** currently **Pi Zero 2 W only** (arm64, though install.sh itself
+runs on 32-bit armv7l on this board). If you're on a Pi 4, Pi 5, or a
+Compute Module, use [Option 2](#option-2--install-from-source-contributors-custom-boards)
+below — those paths build an arch-matched wheelhouse (JTN-604) and run the
+same install.sh flow on-device in about 2–3 minutes.
+
+### Install steps
+
+1. Download the latest release from the
+   [InkyPi releases page](https://github.com/jtn0123/InkyPi/releases).
+   You want both files:
+    - `inkypi-<version>-pi-zero-2-w.img.xz`
+    - `inkypi-<version>-pi-zero-2-w.img.xz.sha256`
+2. Verify the download with the `.sha256` sidecar:
+   ```bash
+   shasum -a 256 -c inkypi-<version>-pi-zero-2-w.img.xz.sha256
+   ```
+   If the check fails, **do not flash it** — re-download or open an issue.
+3. Open Pi Imager, click **Choose OS → Use custom** and select the
+   `.img.xz` you just downloaded. Pi Imager handles the `.xz` decompression
+   transparently.
+4. **Critical:** click the gear icon (advanced options) and set hostname,
+   SSH, Wi-Fi SSID + password, locale, and a non-default user. Pi Imager
+   writes these into `/boot/firmware/user-data` for cloud-init to apply on
+   first boot. The pre-built image intentionally does not carry any of
+   these — that's what Pi Imager is for.
+5. Flash the SD card, insert it into the Pi Zero 2 W, and power up.
+6. On first boot cloud-init applies the hostname/Wi-Fi/SSH settings from
+   step 4, the InkyPi systemd service starts automatically, and the web UI
+   becomes available at `http://<hostname>.local/` (typically within
+   30–60 seconds of power-on).
+
+If the web UI never comes up, see
+[Option 2](#option-2--install-from-source-contributors-custom-boards) — you
+can always reflash with plain Pi OS and run `install.sh` by hand to get a
+detailed install log.
+
+### Why the image exists
+
+On a Pi Zero 2 W, `install.sh` takes ~15 minutes end-to-end (numpy + Pillow
++ playwright wheels compile on a single Cortex-A53 core; zramswap is
+critical to avoid OOM). Even with the JTN-604 wheelhouse it's ~2–3 minutes
+plus apt package fetch. Shipping a pre-installed image collapses all of
+that into the time it takes cloud-init to run its first-boot steps.
+
+The image is also easier to support: if a new user's install fails, we can
+ask them to reflash with the known-good `.img.xz` instead of triaging
+wheelhouse / apt / Wi-Fi / clock-drift interactions on their specific SD card.
+
+---
+
+## Option 2 — Install from source (contributors, custom boards)
+
+Use this path when you want the latest main branch, are contributing to
+InkyPi, are on a Pi model other than the Zero 2 W, or want full visibility
+into the install process.
+
 ## Flashing Raspberry Pi OS 
 
 1. Install the Raspberry Pi Imager from the [official download page](https://www.raspberrypi.com/software/)

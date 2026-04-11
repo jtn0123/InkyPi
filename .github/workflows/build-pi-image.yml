@@ -1,0 +1,428 @@
+name: Build pre-installed Pi image
+
+# JTN-533: Build a pre-installed `.img.xz` for the Pi Zero 2 W and attach it
+# to each GitHub release. The resulting artifact lets a new user flash with
+# Pi Imager, boot, and land on a working InkyPi web UI in ~60 seconds without
+# running install.sh on-device (which takes ~15 minutes on a Pi Zero 2 W).
+#
+# How it works:
+#   1. Download + checksum-verify a pinned Pi OS Lite arm64 base image.
+#   2. Loop-mount the root partition, copy qemu-aarch64-static into it.
+#   3. Bind-mount /proc /sys /dev /dev/pts, drop in systemctl/raspi-config
+#      stubs on PATH so install.sh's runtime hooks don't fail in a chroot.
+#   4. Chroot in, clone InkyPi at the release tag, run install/install.sh.
+#   5. Clean caches, zero free space, unmount, shrink with pishrink.sh,
+#      recompress with xz -9.
+#   6. Boot-verify the shrunken image in qemu-system-aarch64 until "login:"
+#      appears on the serial console.
+#   7. Only if boot verification succeeds, attach the image + sha256 to the
+#      release (same pattern as .github/workflows/build-wheelhouse.yml).
+#
+# Related: JTN-604 (wheelhouse), JTN-529 (install path hardening epic).
+# Does NOT modify install.sh — option 2 (source install) stays self-contained.
+
+on:
+  release:
+    types: [published]
+  # Manual trigger so maintainers can rebuild against an existing tag
+  # without cutting a new release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build an image for (e.g. v0.42.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-pi-image-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+# =============================================================================
+# PIN POINT — bump these when rolling to a newer Pi OS base image.
+# The URL + SHA256 must stay in sync. Fetch a new sha256 from:
+#   https://downloads.raspberrypi.org/raspios_lite_arm64/images/<dated-dir>/
+# and paste both fields below in the same commit.
+# =============================================================================
+env:
+  PI_OS_IMAGE_URL: https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz
+  PI_OS_IMAGE_SHA256: 7ecb0943c0c0a2f0a21d47ad1193ad403fa9d0c8e4e9bc41e7c99fc0b4b90f6e
+  PI_OS_IMAGE_FILENAME: 2025-05-13-raspios-bookworm-arm64-lite.img.xz
+  # pishrink.sh pinned by commit SHA — upstream has no tagged releases.
+  # https://github.com/Drewsif/PiShrink
+  PISHRINK_COMMIT: a46e1fc90ca697f3e9f2e1c2dd6e98d47d2e33e8
+
+jobs:
+  build-image:
+    name: Build pre-installed Pi image
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      image_name: ${{ steps.package.outputs.image_name }}
+      image_sha256: ${{ steps.package.outputs.image_sha256 }}
+      image_size: ${{ steps.package.outputs.image_size }}
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - name: Checkout InkyPi repo (workflow + pishrink.sh)
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "ERROR: No release tag resolved" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install host build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-user-static binfmt-support \
+            qemu-system-arm qemu-system-aarch64 qemu-utils \
+            xz-utils parted kpartx \
+            util-linux dosfstools e2fsprogs \
+            curl ca-certificates
+
+      - name: Download pinned Pi OS Lite base image
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          echo "Downloading ${PI_OS_IMAGE_URL}"
+          curl -fsSL -o "build/${PI_OS_IMAGE_FILENAME}" "${PI_OS_IMAGE_URL}"
+          echo "${PI_OS_IMAGE_SHA256}  build/${PI_OS_IMAGE_FILENAME}" > build/base.sha256
+          sha256sum -c build/base.sha256
+          ls -la build/
+
+      - name: Decompress base image
+        run: |
+          set -euo pipefail
+          cd build
+          xz -dk -T 0 "${PI_OS_IMAGE_FILENAME}"
+          # Resulting file has .img extension (xz strips .xz)
+          BASE_IMG="${PI_OS_IMAGE_FILENAME%.xz}"
+          ls -la "${BASE_IMG}"
+          echo "BASE_IMG=${BASE_IMG}" >> "$GITHUB_ENV"
+
+      - name: Grow base image so install has room
+        # Pi OS Lite is ~2.5GB; install.sh adds ~1GB of venv + apt packages.
+        # Add 3GB of slack so pip install / apt unpack / wheelhouse extraction
+        # don't ENOSPC mid-run. pishrink.sh will reclaim it before we ship.
+        run: |
+          set -euo pipefail
+          cd build
+          truncate -s +3G "${BASE_IMG}"
+          # parted in-place grow of partition 2 (rootfs) to fill the new space.
+          sudo parted --script "${BASE_IMG}" resizepart 2 100%
+          parted --script "${BASE_IMG}" print
+
+      - name: Loop-mount base image
+        id: mount
+        run: |
+          set -euo pipefail
+          cd build
+          LOOP=$(sudo losetup --show -Pf "${BASE_IMG}")
+          echo "loop=${LOOP}" >> "$GITHUB_OUTPUT"
+          echo "Loop device: ${LOOP}"
+          sudo partprobe "${LOOP}"
+          # p1 = /boot/firmware FAT, p2 = rootfs ext4
+          sudo e2fsck -f -y "${LOOP}p2" || true
+          sudo resize2fs "${LOOP}p2"
+          sudo mkdir -p /mnt/pi-root
+          sudo mount "${LOOP}p2" /mnt/pi-root
+          sudo mkdir -p /mnt/pi-root/boot/firmware
+          sudo mount "${LOOP}p1" /mnt/pi-root/boot/firmware
+          df -h /mnt/pi-root /mnt/pi-root/boot/firmware
+
+      - name: Stage qemu + chroot plumbing
+        run: |
+          set -euo pipefail
+          # Make the chroot able to execute aarch64 binaries on x86_64.
+          sudo cp /usr/bin/qemu-aarch64-static /mnt/pi-root/usr/bin/
+          # Standard chroot bind mounts.
+          sudo mount --bind /dev     /mnt/pi-root/dev
+          sudo mount --bind /dev/pts /mnt/pi-root/dev/pts
+          sudo mount --bind /proc    /mnt/pi-root/proc
+          sudo mount --bind /sys     /mnt/pi-root/sys
+          # resolv.conf for network access inside the chroot (apt, pip, git).
+          sudo cp --remove-destination /etc/resolv.conf /mnt/pi-root/etc/resolv.conf
+
+      - name: Inject runtime-hook stubs so install.sh succeeds in chroot
+        # install.sh calls raspi-config / systemctl start / systemctl
+        # daemon-reload — none of these make sense in an offline chroot and
+        # some of them actively fail. We shadow them with no-op stubs on PATH
+        # INSIDE the chroot (written to /usr/local/sbin which is earlier on
+        # PATH than /usr/sbin). This does NOT modify install.sh. The real
+        # binaries on the shipped image are untouched — Pi OS's own runtime
+        # hooks still run on first boot.
+        run: |
+          set -euo pipefail
+          STUB_DIR=/mnt/pi-root/usr/local/sbin
+          sudo mkdir -p "$STUB_DIR"
+          # raspi-config stub: swallow nonint calls, exit 0.
+          # Using printf instead of a heredoc to avoid YAML-indentation
+          # leaking into the generated file.
+          sudo bash -c "cat > '$STUB_DIR/raspi-config'" <<'STUB'
+          #!/bin/sh
+          echo "[chroot stub] raspi-config $* — no-op (real raspi-config runs on first boot)"
+          exit 0
+          STUB
+          # systemctl stub: allow daemon-reload/enable/disable to succeed
+          # (they only touch /etc/systemd and work fine), but short-circuit
+          # start/stop/restart/is-active which need a live systemd.
+          sudo bash -c "cat > '$STUB_DIR/systemctl'" <<'STUB'
+          #!/bin/sh
+          case "$1" in
+            start|stop|restart|reload|is-active|is-enabled|status)
+              echo "[chroot stub] systemctl $* — deferred to first boot"
+              exit 0
+              ;;
+            *)
+              exec /bin/systemctl "$@"
+              ;;
+          esac
+          STUB
+          # Strip the YAML indentation prefix that the heredoc preserved.
+          sudo sed -i 's/^          //' "$STUB_DIR/raspi-config" "$STUB_DIR/systemctl"
+          sudo chmod +x "$STUB_DIR/raspi-config" "$STUB_DIR/systemctl"
+
+      - name: Run install.sh inside the chroot at release tag
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Non-interactive + stubs on PATH. We clone into /opt/inkypi-src so
+          # the repo path mirrors a user-cloned layout for install.sh's
+          # relative path assumptions.
+          sudo chroot /mnt/pi-root /usr/bin/env \
+            PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            DEBIAN_FRONTEND=noninteractive \
+            INKYPI_CI_IMAGE_BUILD=1 \
+            /bin/bash -euxo pipefail -c "
+              apt-get update
+              apt-get install -y --no-install-recommends git ca-certificates
+              rm -rf /opt/inkypi-src
+              git clone --branch '${TAG}' --depth 1 https://github.com/jtn0123/InkyPi.git /opt/inkypi-src
+              cd /opt/inkypi-src/install
+              ./install.sh
+            "
+
+      - name: Seed first-boot cloud-init overlay
+        # Pi OS Lite already supports cloud-init via /boot/firmware/user-data
+        # when present on the boot partition. We drop in a minimal placeholder
+        # banner so the first-boot Pi Imager flow (which rewrites user-data
+        # with the user's Wi-Fi/hostname/password) still works. This avoids
+        # baking any credentials into the shipped image — the user picks them
+        # in Pi Imager's advanced options at flash time.
+        run: |
+          set -euo pipefail
+          sudo bash -c 'cat > /mnt/pi-root/boot/firmware/inkypi-readme.txt' <<'NOTE'
+          InkyPi pre-installed image (JTN-533)
+          ====================================
+
+          This image already has InkyPi installed and enabled. On first boot:
+            * Set your Wi-Fi / hostname / SSH credentials in Pi Imager's
+              "advanced options" BEFORE flashing. Pi Imager writes these into
+              /boot/firmware/user-data so cloud-init applies them on first boot.
+            * Once the Pi joins your network, visit:
+                http://<hostname>.local/
+              in a browser on the same LAN — the InkyPi web UI will be up.
+          NOTE
+          sudo sed -i 's/^          //' /mnt/pi-root/boot/firmware/inkypi-readme.txt
+
+      - name: Shrink on-disk footprint before repack
+        # Zero-fill free space so xz can compress it; wipe caches and logs.
+        run: |
+          set -euo pipefail
+          sudo chroot /mnt/pi-root /bin/bash -euxo pipefail -c '
+            apt-get clean
+            rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*.deb
+            rm -rf /root/.cache/pip /root/.cache/uv
+            rm -rf /tmp/* /var/tmp/*
+            find /var/log -type f -exec truncate -s 0 {} +
+          '
+          # Zero-fill unused blocks so xz compresses them away.
+          sudo dd if=/dev/zero of=/mnt/pi-root/ZEROFILL bs=1M status=progress || true
+          sudo rm -f /mnt/pi-root/ZEROFILL
+
+      - name: Unmount image (nested first, then loop)
+        if: always()
+        run: |
+          set -euxo pipefail
+          LOOP="${{ steps.mount.outputs.loop }}"
+          sudo umount /mnt/pi-root/dev/pts || true
+          sudo umount /mnt/pi-root/dev || true
+          sudo umount /mnt/pi-root/proc || true
+          sudo umount /mnt/pi-root/sys || true
+          sudo umount /mnt/pi-root/boot/firmware || true
+          sudo umount /mnt/pi-root || true
+          if [ -n "${LOOP}" ]; then
+            sudo losetup -d "${LOOP}" || true
+          fi
+
+      - name: Fetch pishrink.sh at pinned commit
+        # Vendored at build time, not committed to repo (avoids drift and
+        # avoids maintaining a MIT'd third-party script in-tree). Pinned by
+        # full commit SHA so a compromised upstream cannot swap it out.
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            -o build/pishrink.sh \
+            "https://raw.githubusercontent.com/Drewsif/PiShrink/${PISHRINK_COMMIT}/pishrink.sh"
+          chmod +x build/pishrink.sh
+          # Print first 5 lines as a smoke test
+          head -5 build/pishrink.sh
+
+      - name: Shrink image with pishrink
+        run: |
+          set -euo pipefail
+          cd build
+          # -s skips auto-expand on first boot (we want the image as-shipped
+          # to be as small as possible — Pi OS will expand at first boot
+          # anyway via its own init-resize.service hook).
+          sudo ./pishrink.sh -s "${BASE_IMG}"
+          ls -la "${BASE_IMG}"
+
+      - name: Package + checksum final image
+        id: package
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd build
+          IMG_NAME="inkypi-${VERSION}-pi-zero-2-w.img"
+          mv "${BASE_IMG}" "${IMG_NAME}"
+          xz -9 -T 0 -v "${IMG_NAME}"
+          XZ_NAME="${IMG_NAME}.xz"
+          sha256sum "${XZ_NAME}" > "${XZ_NAME}.sha256"
+          SIZE=$(stat -c %s "${XZ_NAME}")
+          SHA=$(awk '{print $1}' "${XZ_NAME}.sha256")
+          echo "image_name=${XZ_NAME}" >> "$GITHUB_OUTPUT"
+          echo "image_sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_size=${SIZE}" >> "$GITHUB_OUTPUT"
+          ls -la "${XZ_NAME}" "${XZ_NAME}.sha256"
+
+      - name: Upload unverified image as workflow artifact
+        # Always uploaded (even on workflow_dispatch) so maintainers can
+        # inspect it before the boot-verification job decides whether to
+        # attach it to the release.
+        uses: actions/upload-artifact@v4
+        with:
+          name: inkypi-pi-image-${{ steps.tag.outputs.version }}
+          path: |
+            build/${{ steps.package.outputs.image_name }}
+            build/${{ steps.package.outputs.image_name }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-boot:
+    name: Boot-verify image in qemu
+    needs: build-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      verified: ${{ steps.verify.outputs.verified }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install qemu
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-arm qemu-system-aarch64 \
+            qemu-utils xz-utils
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: inkypi-pi-image-${{ needs.build-image.outputs.version }}
+          path: build
+
+      - name: Decompress + boot-verify
+        id: verify
+        run: |
+          set -euxo pipefail
+          cd build
+          XZ=$(ls -1 inkypi-*-pi-zero-2-w.img.xz | head -1)
+          xz -dk -T 0 "${XZ}"
+          IMG="${XZ%.xz}"
+
+          # Boot the image in qemu-system-aarch64 with a 4-minute budget and
+          # scrape the serial console for "login:" — that proves the kernel
+          # booted, init finished, and getty spawned. This is the single
+          # best proof that pishrink didn't shrink the rootfs so hard that
+          # systemd can't write its tmpfiles, and that install.sh didn't
+          # break /etc/fstab or /boot/firmware/cmdline.txt.
+          #
+          # We use the generic "virt" machine with a Pi OS rootfs because
+          # raspi0/raspi3b machine models in qemu-system-aarch64 are fiddly
+          # about kernel/dtb pairs. virt + direct-kernel boot is good enough
+          # for boot verification (we're not testing Pi hardware — we're
+          # testing that the rootfs boots an arm64 Linux kernel to userspace).
+          #
+          # NOTE: if you need a hardware-faithful boot test, run arm-runner
+          # in a follow-up job.
+          timeout 240 qemu-system-aarch64 \
+            -M virt -cpu cortex-a72 -m 1024 \
+            -smp 2 \
+            -nographic \
+            -kernel /usr/lib/linux-image-*-cloud-arm64/vmlinuz 2>&1 \
+            -drive file="${IMG}",format=raw,if=none,id=hd0 \
+            -device virtio-blk-device,drive=hd0 \
+            -append "root=/dev/vda2 rootfstype=ext4 rw console=ttyAMA0" \
+            | tee qemu-boot.log &
+          QPID=$!
+
+          # Poll the log for login prompt for up to 4 minutes.
+          for i in $(seq 1 240); do
+            if grep -q "login:" qemu-boot.log 2>/dev/null; then
+              echo "Boot verified — login prompt observed at $i seconds"
+              echo "verified=true" >> "$GITHUB_OUTPUT"
+              kill -9 $QPID 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+
+          # Timed out. Print what we got so CI has a diagnostic trail.
+          echo "Boot verification timed out after 240s — no login: prompt"
+          tail -200 qemu-boot.log || true
+          kill -9 $QPID 2>/dev/null || true
+          echo "verified=false" >> "$GITHUB_OUTPUT"
+          # JTN-533 constraint: "If boot verification fails, the release asset
+          # MUST NOT be uploaded. The build job should fail loud."
+          # We surface this by failing the step; the release-attach job below
+          # has `needs: verify-boot` + an `if` guard, so a failure here blocks
+          # upload without a silent skip.
+          exit 1
+
+  attach-release:
+    name: Attach image to GitHub release
+    needs: [build-image, verify-boot]
+    if: github.event_name == 'release' && needs.verify-boot.outputs.verified == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: inkypi-pi-image-${{ needs.build-image.outputs.version }}
+          path: build
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            build/inkypi-*-pi-zero-2-w.img.xz
+            build/inkypi-*-pi-zero-2-w.img.xz.sha256
+          fail_on_unmatched_files: true
