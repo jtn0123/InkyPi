@@ -59,11 +59,26 @@ UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 # the validation explicit so both CodeQL and human reviewers can see it.
 #
 # Script basenames that are allowed to be executed by _start_update_via_systemd.
-# The full path is additionally required to be absolute and to match a strict
-# POSIX-safe character class — see _sanitize_update_argv. The inline regex
-# patterns at the call sites are intentionally not pre-compiled so CodeQL can
+# The full path is additionally required to be an absolute, canonicalised
+# (realpath-resolved) path that lives under one of the trusted install roots
+# below — see _validate_update_script_path. Inline ``re.fullmatch`` guards at
+# every Popen call site are intentionally not pre-compiled so CodeQL can
 # constant-fold them for sanitiser recognition.
 _ALLOWED_UPDATE_SCRIPT_BASENAMES = frozenset(UPDATE_SCRIPT_NAMES)
+
+# Trusted install roots for update scripts. The realpath of any script we are
+# willing to exec via subprocess.Popen MUST be inside one of these directories.
+# Repo-relative developer environments are added at runtime via
+# ``_trusted_update_dirs()`` so this constant remains a hardcoded literal.
+_TRUSTED_UPDATE_DIRS: tuple[str, ...] = (
+    "/usr/local/inkypi/install",
+    "/opt/inkypi/install",
+)
+
+# Hardcoded literal prefix for the transient systemd unit. The dynamic suffix
+# is appended in-function from a Python int (time.time()) so the final string
+# is provably not user-influenced.
+_UPDATE_UNIT_PREFIX = "inkypi-update"
 
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
@@ -72,8 +87,14 @@ MAX_LOG_LINES = 2000
 MIN_LOG_LINES = 50
 MAX_RESPONSE_BYTES = 512 * 1024
 
-# Strict semver pattern for update target tags (e.g. "v1.2.3", "1.0.0-rc1")
-_TAG_RE = re.compile(r"^v?\d+\.\d+\.\d+(-[\w.]+)?$")  # 512 KB safety cap
+# Strict semver pattern for update target tags (e.g. "v1.2.3", "1.0.0-rc1").
+# IMPORTANT: this MUST stay byte-for-byte equivalent to the bash regex used in
+# install/do_update.sh — both validators only accept ``v?\d+\.\d+\.\d+`` with
+# an optional ``-[A-Za-z0-9.]+`` suffix (no underscores; \w in Python would
+# diverge from POSIX bracket classes).
+_TAG_RE = re.compile(
+    r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$"
+)  # 512 KB safety cap
 
 # Simple in-process rate limiter (per remote addr)
 _logs_limiter = SlidingWindowLimiter(120, 60)
@@ -365,76 +386,122 @@ def _set_update_state(running: bool, unit: str | None):
 
 
 # ---------------------------------------------------------------------------
-# JTN-319: command-line-injection sanitiser.
+# JTN-319: command-line-injection sanitisers.
 #
-# Sanitises (script_path, target_tag) for the two functions that exec the
-# update script via subprocess.Popen. Inline ``re.fullmatch`` guards against
-# strict character classes are what CodeQL's built-in py/command-line-injection
-# sanitiser recognition expects, so this helper exists as a *generator*
-# function (returning the validated values via tuple) rather than a plain
-# function call — keeping the regex guards inline at every Popen call site
-# would be true duplication, but a yield-based helper still inlines the
-# guards in the caller's frame.
+# CodeQL's py/command-line-injection taint tracker does not propagate sanitiser
+# recognition across helper boundaries — the regex guard MUST be visible in
+# the same function that calls subprocess.Popen.  We therefore:
+#
+#   1. Drop ``unit_name``/``script_path`` parameters from
+#      ``_start_update_via_systemd`` entirely.  The unit name is built from a
+#      hardcoded literal prefix plus a Python int, and the script path is
+#      resolved internally via ``_get_update_script_path`` (which itself only
+#      walks a fixed candidate list under PROJECT_DIR).
+#   2. Validate the resolved script path against a hardcoded list of trusted
+#      install roots via ``os.path.realpath`` so symlinks/path-traversal can
+#      not escape the allow-list.
+#   3. The only parameter that survives is ``target_tag``, and it is matched
+#      against ``_TAG_RE`` inline immediately above the Popen call so CodeQL
+#      sees the regex sanitiser in the same frame.
 # ---------------------------------------------------------------------------
 
 
-def _sanitize_update_argv(
-    script_path: str, target_tag: str | None
-) -> tuple[str, str | None]:
-    """Validate update script path and target tag for ``subprocess.Popen``.
+def _trusted_update_dirs() -> tuple[str, ...]:
+    """Return the canonical list of directories whose update scripts are exec-allowed.
 
-    Returns the (script_path, target_tag) pair unchanged if every guard
-    passes; raises ``ValueError`` otherwise. Callers must additionally
-    apply the inline ``re.fullmatch`` guard pattern at their own Popen
-    call site so CodeQL recognises the sanitisation.
+    The hardcoded ``_TRUSTED_UPDATE_DIRS`` constants are joined with the
+    repo-relative ``install/`` directory (developer environments) and the
+    realpath of ``$PROJECT_DIR/install`` if PROJECT_DIR is set.  All entries
+    are passed through ``os.path.realpath`` so the comparison in
+    ``_validate_update_script_path`` is symlink-safe.
     """
-    if (
-        not isinstance(script_path, str)
-        or not script_path
-        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", script_path)
-        or ".." in script_path.split("/")
-        or os.path.basename(script_path) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES
-    ):
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_install = os.path.abspath(os.path.join(here, "..", "..", "..", "install"))
+    dirs = list(_TRUSTED_UPDATE_DIRS) + [repo_install]
+    project_dir = os.getenv("PROJECT_DIR")
+    if project_dir and isinstance(project_dir, str) and project_dir.startswith("/"):
+        dirs.append(os.path.join(project_dir, "install"))
+        # Follow the src→repo symlink production install layout uses.
+        src_link = os.path.join(project_dir, "src")
+        if os.path.islink(src_link):
+            try:
+                repo_root = os.path.dirname(os.path.realpath(src_link))
+                dirs.append(os.path.join(repo_root, "install"))
+            except OSError:
+                pass
+    return tuple(os.path.realpath(d) for d in dirs)
+
+
+def _validate_update_script_path(script_path: str) -> str:
+    """Resolve and validate an update script path against trusted install roots.
+
+    Returns the canonical (realpath-resolved) path on success.  Raises
+    ``ValueError`` if the path is non-string, empty, has a disallowed
+    basename, or — after symlink resolution — does not live under one of
+    the trusted install directories from ``_trusted_update_dirs``.
+    """
+    if not isinstance(script_path, str) or not script_path:
         raise ValueError(f"Invalid update script path: {script_path!r}")
-    if target_tag is not None and (
-        not isinstance(target_tag, str)
-        or not re.fullmatch(r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$", target_tag)
-    ):
-        raise ValueError(f"Invalid target tag format: {target_tag!r}")
-    return script_path, target_tag
+    real = os.path.realpath(script_path)
+    # Symlink-safe trusted-root enforcement: ``commonpath`` is the canonical
+    # primitive for "is X under directory Y" without TOCTOU prefix-string
+    # tricks.  Both arguments are absolute realpaths so commonpath cannot
+    # raise on differing drives (POSIX-only project).
+    trusted = _trusted_update_dirs()
+    in_trusted_root = False
+    for root in trusted:
+        try:
+            if os.path.commonpath([real, root]) == root:
+                in_trusted_root = True
+                break
+        except ValueError:
+            # Different filesystem roots; not a match.
+            continue
+    if not in_trusted_root:
+        raise ValueError(
+            f"Invalid update script path (not under trusted root): {script_path!r}"
+        )
+    if os.path.basename(real) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
+        raise ValueError(f"Invalid update script basename: {script_path!r}")
+    return real
 
 
-def _start_update_via_systemd(
-    unit_name: str, script_path: str, target_tag: str | None = None
-) -> None:
+def _start_update_via_systemd(target_tag: str | None = None) -> None:
     """Launch the update script in a transient systemd unit.
 
     Security (JTN-319 / CodeQL py/command-line-injection):
-        All three parameters that could influence the ``subprocess.Popen``
-        argv are validated against strict regex character classes inline,
-        so CodeQL's built-in regex sanitiser recognition can see the
-        guards. ``_sanitize_update_argv`` performs the script-path and
-        target-tag checks; the unit-name check stays inline below.
+        All argv elements passed to ``subprocess.Popen`` are either string
+        literals, values derived from hardcoded constants, or — for
+        ``target_tag`` — matched against the strict ``_TAG_RE`` semver regex
+        in the same function frame so CodeQL's built-in regex sanitiser
+        recognition can see the guard.
     """
-    # Inline unit-name guard — kept here (rather than in a helper) so the
-    # ``re.fullmatch`` sanitiser is in the same frame as the Popen call.
-    if not isinstance(unit_name, str) or not re.fullmatch(
-        r"^inkypi-(?:update|rollback)-\d{1,20}$", unit_name
+    # 1. Inline regex sanitiser — visible to CodeQL in the same frame as Popen.
+    if target_tag is not None and not re.fullmatch(
+        r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$", target_tag
     ):
-        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
-    script_path, target_tag = _sanitize_update_argv(script_path, target_tag)
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
 
-    # Run update script in a transient systemd unit so its logs are visible in
-    # journal. Every argv element below is either a string literal or has
-    # passed an inline ``re.fullmatch`` sanitiser above.
+    # 2. Resolve PROJECT_DIR from a hardcoded default and validate it has the
+    #    shape of an absolute POSIX path.  Anything user-controlled (env var)
+    #    falls back to the literal default.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     if (
         not isinstance(project_dir, str)
-        or not project_dir
         or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
         or ".." in project_dir.split("/")
     ):
         project_dir = "/usr/local/inkypi"
+
+    # 3. Resolve the script path purely from internal candidates (the helper
+    #    walks a fixed list under PROJECT_DIR / repo-relative install/) and
+    #    re-validate against the trusted-root allow-list.  No caller can
+    #    influence this string.
+    candidate = _get_update_script_path() or "/usr/local/inkypi/install/do_update.sh"
+    script_path = _validate_update_script_path(candidate)
+
+    # 4. Build the unit name from a hardcoded literal prefix + a fresh int.
+    unit_name = f"{_UPDATE_UNIT_PREFIX}-{int(time.time())}"
 
     cmd: list[str] = [
         "systemd-run",
@@ -446,8 +513,10 @@ def _start_update_via_systemd(
         "/bin/bash",
         script_path,
     ]
-    if target_tag:
+    if target_tag is not None:
         cmd.append(target_tag)
+    # All argv elements above are either string literals or have been
+    # validated by the inline ``re.fullmatch`` guards / trusted-root check.
     subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
 
 
@@ -462,20 +531,21 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
-    # Defense-in-depth (JTN-319): apply the same sanitisation as
-    # _start_update_via_systemd so this fallback path cannot be coerced
-    # into executing an arbitrary script. The inline regex guard immediately
-    # below the helper call is what CodeQL recognises as a sanitiser.
-    script_path, target_tag = _sanitize_update_argv(script_path, target_tag)
-    if not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", script_path):
-        raise ValueError(f"Invalid update script path: {script_path!r}")
+    # Defense-in-depth (JTN-319): inline ``re.fullmatch`` sanitiser for
+    # ``target_tag`` and trusted-root validation for ``script_path``, both
+    # in the same frame as the Popen call so CodeQL's regex-sanitiser
+    # recognition fires.
     if target_tag is not None and not re.fullmatch(
-        r"^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?$", target_tag
+        r"^v?[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$", target_tag
     ):
         raise ValueError(f"Invalid target tag format: {target_tag!r}")
+    # ``_validate_update_script_path`` returns the canonicalised realpath; the
+    # original (possibly symlinked) input is dropped so the value flowing into
+    # Popen is provably under a trusted install root.
+    script_path = _validate_update_script_path(script_path)
 
     cmd: list[str] = ["/bin/bash", script_path]
-    if target_tag:
+    if target_tag is not None:
         cmd.append(target_tag)
     proc = subprocess.Popen(  # noqa: S603  # all inputs sanitized; shell=False
         cmd,

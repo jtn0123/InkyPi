@@ -261,7 +261,7 @@ class TestStartUpdateEdge:
 
 
 class TestUpdateRunnerHelpers:
-    def test_run_real_update_passes_target_tag(self, monkeypatch):
+    def test_run_real_update_passes_target_tag(self, monkeypatch, tmp_path):
         import blueprints.settings as mod
 
         popen_calls = {}
@@ -277,13 +277,20 @@ class TestUpdateRunnerHelpers:
             popen_calls["cmd"] = cmd
             return FakeProc()
 
+        # Place the script under a tmp_path directory and mark it trusted so
+        # the validator inside _run_real_update accepts it.
+        script = tmp_path / "do_update.sh"
+        script.write_text("#!/bin/bash\n")
+        trusted = (str(tmp_path.resolve()),)
+        monkeypatch.setattr(mod, "_trusted_update_dirs", lambda: trusted)
+
         log_mock = MagicMock()
         monkeypatch.setattr("blueprints.settings.subprocess.Popen", fake_popen)
         monkeypatch.setattr(mod, "_log_and_publish", log_mock)
 
-        mod._run_real_update("/fake/do_update.sh", target_tag="v1.2.3")
+        mod._run_real_update(str(script), target_tag="v1.2.3")
 
-        assert popen_calls["cmd"] == ["/bin/bash", "/fake/do_update.sh", "v1.2.3"]
+        assert popen_calls["cmd"] == ["/bin/bash", str(script.resolve()), "v1.2.3"]
         assert (
             log_mock.call_args_list[-1].args[0] == "web_update: completed successfully"
         )
@@ -439,14 +446,21 @@ class TestStartUpdateTOCTOURace:
 class TestStartUpdateViaSystemdValidation:
     """JTN-319 — hardened systemd-run command construction.
 
-    ``_start_update_via_systemd`` MUST validate all three of its parameters
-    against strict allow-lists BEFORE reaching ``subprocess.Popen``. These
-    tests lock in that invariant so the CodeQL py/command-line-injection
-    finding cannot regress.
+    ``_start_update_via_systemd`` no longer accepts ``unit_name`` or
+    ``script_path`` parameters: both are derived from hardcoded constants /
+    internal helpers so CodeQL can prove the Popen argv is not user-influenced.
+    Only ``target_tag`` survives, and these tests lock in that the regex
+    sanitiser at the top of the function rejects every flavour of shell-meta /
+    flag-style injection before subprocess.Popen is invoked.
     """
 
-    def _patch_popen_tracker(self, monkeypatch):
-        """Replace subprocess.Popen with a spy that records invocations."""
+    def _patch_popen_tracker(self, monkeypatch, script_path: str | None = None):
+        """Replace subprocess.Popen with a spy that records invocations.
+
+        Also patches ``_validate_update_script_path`` so the test does not
+        require the trusted install directories to exist on the test host —
+        we only care about the *argv shape* fed to Popen.
+        """
         import blueprints.settings as mod
 
         calls: list[list[str]] = []
@@ -460,111 +474,23 @@ class TestStartUpdateViaSystemdValidation:
             return _FakeProc()
 
         monkeypatch.setattr(mod.subprocess, "Popen", _fake_popen)
+        if script_path is not None:
+            monkeypatch.setattr(
+                mod, "_validate_update_script_path", lambda _p: script_path
+            )
+            monkeypatch.setattr(mod, "_get_update_script_path", lambda: script_path)
         return calls
-
-    def test_rejects_unit_name_with_shell_metachars(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid systemd unit name"):
-            mod._start_update_via_systemd(
-                "inkypi-update-1; rm -rf /",
-                "/usr/local/inkypi/install/do_update.sh",
-            )
-        assert calls == []
-
-    def test_rejects_unit_name_with_wrong_prefix(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid systemd unit name"):
-            mod._start_update_via_systemd(
-                "evil-unit-12345",
-                "/usr/local/inkypi/install/do_update.sh",
-            )
-        assert calls == []
-
-    def test_rejects_unit_name_non_string(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid systemd unit name"):
-            mod._start_update_via_systemd(
-                None,  # type: ignore[arg-type]
-                "/usr/local/inkypi/install/do_update.sh",
-            )
-        assert calls == []
-
-    def test_rejects_script_path_with_bad_basename(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid update script path"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "/usr/local/inkypi/install/evil.sh",
-            )
-        assert calls == []
-
-    def test_rejects_script_path_with_shell_metachars(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid update script path"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "/usr/local/inkypi/install/do_update.sh; rm -rf /",
-            )
-        assert calls == []
-
-    def test_rejects_script_path_relative(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid update script path"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "install/do_update.sh",
-            )
-        assert calls == []
-
-    def test_rejects_script_path_with_traversal(self, monkeypatch):
-        import pytest
-
-        import blueprints.settings as mod
-
-        calls = self._patch_popen_tracker(monkeypatch)
-        with pytest.raises(ValueError, match="Invalid update script path"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "/usr/local/inkypi/install/../../etc/passwd",
-            )
-        assert calls == []
 
     def test_rejects_target_tag_with_shell_injection(self, monkeypatch):
         import pytest
 
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
         with pytest.raises(ValueError, match="Invalid target tag"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "/usr/local/inkypi/install/do_update.sh",
-                target_tag="v1.0.0; rm -rf /",
-            )
+            mod._start_update_via_systemd(target_tag="v1.0.0; rm -rf /")
         assert calls == []
 
     def test_rejects_target_tag_flag_style(self, monkeypatch):
@@ -572,29 +498,40 @@ class TestStartUpdateViaSystemdValidation:
 
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
         with pytest.raises(ValueError, match="Invalid target tag"):
-            mod._start_update_via_systemd(
-                "inkypi-update-12345",
-                "/usr/local/inkypi/install/do_update.sh",
-                target_tag="--upload-pack=/tmp/evil",
-            )
+            mod._start_update_via_systemd(target_tag="--upload-pack=/tmp/evil")
+        assert calls == []
+
+    def test_rejects_target_tag_with_underscores(self, monkeypatch):
+        """Underscores must be rejected — Python ``\\w`` would accept them but
+        the bash regex in install/do_update.sh does not."""
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
+        with pytest.raises(ValueError, match="Invalid target tag"):
+            mod._start_update_via_systemd(target_tag="v1.2.3-rc_1")
         assert calls == []
 
     def test_accepts_valid_invocation(self, monkeypatch):
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
-        mod._start_update_via_systemd(
-            "inkypi-update-1712345678",
-            "/usr/local/inkypi/install/do_update.sh",
-            target_tag="v0.28.1",
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
         )
+        mod._start_update_via_systemd(target_tag="v0.28.1")
         assert len(calls) == 1
         cmd = calls[0]
         assert cmd[0] == "systemd-run"
         assert "--collect" in cmd
-        assert "--unit=inkypi-update-1712345678" in cmd
+        # Unit name is now hardcoded prefix + a fresh int.
+        assert any(arg.startswith("--unit=inkypi-update-") for arg in cmd)
         assert "/bin/bash" in cmd
         assert "/usr/local/inkypi/install/do_update.sh" in cmd
         assert "v0.28.1" in cmd
@@ -602,12 +539,10 @@ class TestStartUpdateViaSystemdValidation:
     def test_accepts_valid_invocation_without_target_tag(self, monkeypatch):
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
-        mod._start_update_via_systemd(
-            "inkypi-update-1712345678",
-            "/usr/local/inkypi/install/update.sh",
-            target_tag=None,
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/update.sh"
         )
+        mod._start_update_via_systemd(target_tag=None)
         assert len(calls) == 1
         cmd = calls[0]
         assert "/usr/local/inkypi/install/update.sh" in cmd
@@ -617,32 +552,131 @@ class TestStartUpdateViaSystemdValidation:
     def test_accepts_valid_semver_variants(self, monkeypatch):
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
+        )
         for tag in ("v0.28.1", "0.28.1", "v1.0.0-beta.1", "2.3.4-rc1"):
-            mod._start_update_via_systemd(
-                "inkypi-update-99",
-                "/usr/local/inkypi/install/do_update.sh",
-                target_tag=tag,
-            )
+            mod._start_update_via_systemd(target_tag=tag)
         assert len(calls) == 4
         for call, tag in zip(
             calls, ("v0.28.1", "0.28.1", "v1.0.0-beta.1", "2.3.4-rc1"), strict=True
         ):
             assert call[-1] == tag
 
-    def test_rollback_unit_prefix_allowed(self, monkeypatch):
-        """The allow-list reserves ``inkypi-rollback-<epoch>`` for future use."""
+    def test_unit_name_uses_hardcoded_prefix(self, monkeypatch):
+        """The systemd unit prefix MUST be the hardcoded ``inkypi-update``
+        literal — no caller-controlled value can influence it."""
         import blueprints.settings as mod
 
-        calls = self._patch_popen_tracker(monkeypatch)
-        mod._start_update_via_systemd(
-            "inkypi-rollback-1712345678",
-            "/usr/local/inkypi/install/do_update.sh",
+        calls = self._patch_popen_tracker(
+            monkeypatch, "/usr/local/inkypi/install/do_update.sh"
         )
+        mod._start_update_via_systemd(target_tag="v1.2.3")
         assert len(calls) == 1
+        unit_args = [arg for arg in calls[0] if arg.startswith("--unit=")]
+        assert len(unit_args) == 1
+        assert unit_args[0].startswith("--unit=inkypi-update-")
+        # Suffix should be a base-10 integer (epoch seconds).
+        suffix = unit_args[0].removeprefix("--unit=inkypi-update-")
+        assert suffix.isdigit()
+
+
+class TestValidateUpdateScriptPath:
+    """JTN-319 — trusted-root enforcement for the update script realpath.
+
+    These tests cover the standalone validator that
+    ``_start_update_via_systemd`` and ``_run_real_update`` both delegate to.
+    """
+
+    def test_rejects_path_outside_trusted_root(self, monkeypatch, tmp_path):
+        """A do_update.sh basename under /opt/attacker is rejected."""
+        import pytest
+
+        import blueprints.settings as mod
+
+        with pytest.raises(ValueError, match="not under trusted root"):
+            mod._validate_update_script_path("/opt/attacker/do_update.sh")
+
+    def test_rejects_bad_basename_inside_trusted_root(self, monkeypatch, tmp_path):
+        """An evil.sh under a trusted root is still rejected by basename check."""
+        import pytest
+
+        import blueprints.settings as mod
+
+        # Force a tmp directory to count as a trusted root so the realpath
+        # check passes and the basename check is what fails.
+        evil = tmp_path / "evil.sh"
+        evil.write_text("#!/bin/bash\necho boom\n")
+        monkeypatch.setattr(
+            mod, "_trusted_update_dirs", lambda: (str(tmp_path.resolve()),)
+        )
+        with pytest.raises(ValueError, match="Invalid update script basename"):
+            mod._validate_update_script_path(str(evil))
+
+    def test_rejects_path_traversal(self, monkeypatch):
+        """``..`` segments are normalised by realpath, then checked against trusted roots."""
+        import pytest
+
+        import blueprints.settings as mod
+
+        with pytest.raises(ValueError, match="not under trusted root"):
+            mod._validate_update_script_path(
+                "/usr/local/inkypi/install/../../etc/passwd"
+            )
+
+    def test_rejects_non_string(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._validate_update_script_path(None)  # type: ignore[arg-type]
+
+    def test_rejects_empty_string(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._validate_update_script_path("")
+
+    def test_accepts_path_inside_trusted_root(self, monkeypatch, tmp_path):
+        """A do_update.sh inside a fixture-trusted root is returned as realpath."""
+        import blueprints.settings as mod
+
+        script = tmp_path / "do_update.sh"
+        script.write_text("#!/bin/bash\n")
+        trusted = (str(tmp_path.resolve()),)
+        monkeypatch.setattr(mod, "_trusted_update_dirs", lambda: trusted)
+        result = mod._validate_update_script_path(str(script))
+        assert result == str(script.resolve())
+
+    def test_resolves_symlink_to_real_target(self, monkeypatch, tmp_path):
+        """Symlinks are followed before the trusted-root check."""
+        import blueprints.settings as mod
+
+        real_dir = tmp_path / "real"
+        real_dir.mkdir()
+        real_script = real_dir / "do_update.sh"
+        real_script.write_text("#!/bin/bash\n")
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        link_script = link_dir / "do_update.sh"
+        link_script.symlink_to(real_script)
+        # Only the *real* directory is trusted; the symlink lives elsewhere.
+        monkeypatch.setattr(
+            mod, "_trusted_update_dirs", lambda: (str(real_dir.resolve()),)
+        )
+        result = mod._validate_update_script_path(str(link_script))
+        assert result == str(real_script.resolve())
 
     def test_run_real_update_rejects_bad_script_path(self, monkeypatch):
-        """Defense-in-depth: _run_real_update must also validate its inputs."""
+        """Defense-in-depth: _run_real_update must also validate its inputs.
+
+        Uses a non-temp absolute path that is clearly outside any trusted
+        install root so the negative-path semantics are preserved without
+        tripping ruff S108 (hardcoded /tmp directory).
+        """
         import pytest
 
         import blueprints.settings as mod
@@ -650,7 +684,7 @@ class TestStartUpdateViaSystemdValidation:
         popen_mock = MagicMock()
         monkeypatch.setattr(mod.subprocess, "Popen", popen_mock)
         with pytest.raises(ValueError, match="Invalid update script path"):
-            mod._run_real_update("/tmp/evil.sh", target_tag="v1.0.0")
+            mod._run_real_update("/opt/attacker/evil.sh", target_tag="v1.0.0")
         popen_mock.assert_not_called()
 
     def test_run_real_update_rejects_bad_target_tag(self, monkeypatch):

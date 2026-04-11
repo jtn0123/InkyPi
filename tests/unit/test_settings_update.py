@@ -51,7 +51,9 @@ class TestStartUpdate:
 
         monkeypatch.setattr(mod, "_systemd_available", lambda: True)
         monkeypatch.setattr(mod, "_get_update_script_path", lambda: "/fake/update.sh")
-        monkeypatch.setattr(mod, "_start_update_via_systemd", lambda u, s: None)
+        monkeypatch.setattr(
+            mod, "_start_update_via_systemd", lambda target_tag=None: None
+        )
         mod._set_update_state(False, None)
 
         resp = client.post("/settings/update")
@@ -244,9 +246,7 @@ class TestUpdateStatus:
 
         captured_args = {}
 
-        def mock_systemd(unit, script, target_tag=None):
-            captured_args["unit"] = unit
-            captured_args["script"] = script
+        def mock_systemd(target_tag=None):
             captured_args["target_tag"] = target_tag
 
         monkeypatch.setattr(mod, "_start_update_via_systemd", mock_systemd)
@@ -258,7 +258,6 @@ class TestUpdateStatus:
         )
         assert resp.status_code == 200
         assert captured_args["target_tag"] == "v1.2.0"
-        assert captured_args["script"] == "/fake/do_update.sh"
         mod._set_update_state(False, None)
 
     def test_start_update_rejects_invalid_target_tag(self, client, monkeypatch):
@@ -297,7 +296,7 @@ class TestUpdateStatus:
 
         captured_args = {}
 
-        def mock_systemd(unit, script, target_tag=None):
+        def mock_systemd(target_tag=None):
             captured_args["target_tag"] = target_tag
 
         monkeypatch.setattr(mod, "_start_update_via_systemd", mock_systemd)

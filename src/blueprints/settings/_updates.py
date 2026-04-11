@@ -43,6 +43,11 @@ def start_update():
             )
 
         script_path = _mod._get_update_script_path()
+        # NOTE: the systemd unit name is now generated *inside*
+        # ``_start_update_via_systemd`` from a hardcoded literal prefix.
+        # We still mirror the same prefix here for the running-state breadcrumb
+        # surfaced via /settings/update_status — the value below is purely an
+        # in-process state hint and is never passed to subprocess.Popen.
         unit = f"inkypi-update-{int(time.time())}"
         use_systemd = _mod._systemd_available()
 
@@ -76,11 +81,11 @@ def start_update():
         # block other threads that only need a brief lock).
         if use_systemd:
             try:
-                _mod._start_update_via_systemd(
-                    unit,
-                    script_path or "/usr/local/inkypi/install/do_update.sh",
-                    target_tag=target_tag,
-                )
+                # JTN-319: ``_start_update_via_systemd`` no longer accepts an
+                # external script path or unit name — both are derived from
+                # hardcoded constants inside the function so CodeQL can prove
+                # the Popen argv is not user-influenced.
+                _mod._start_update_via_systemd(target_tag=target_tag)
             except Exception:
                 # If systemd-run fails unexpectedly, fall back to thread runner
                 _mod.logger.exception(

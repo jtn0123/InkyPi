@@ -9,7 +9,7 @@ def test_settings_update_systemd_and_fallback(client, monkeypatch):
 
     called = {"systemd": False, "thread": False}
 
-    def fake_systemd(unit_name, script_path, target_tag=None):
+    def fake_systemd(target_tag=None):
         called["systemd"] = True
         raise RuntimeError("systemd-run failed")
 
