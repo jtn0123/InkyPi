@@ -1,6 +1,136 @@
 # CHANGELOG
 
 
+## v0.43.6 (2026-04-11)
+
+### Bug Fixes
+
+- **install**: Anchor update_vendors.sh cwd to repo root (JTN-615)
+  ([#360](https://github.com/jtn0123/InkyPi/pull/360),
+  [`49c3754`](https://github.com/jtn0123/InkyPi/commit/49c3754a882a3c618b4e6806c50ccc40c4e83ef3))
+
+* fix(install): anchor update_vendors.sh cwd to repo root (JTN-615)
+
+The ci.yml install-matrix job has been failing on every PR and on main since the JTN-534 exit-code
+  propagation landed because install.sh calls update_vendors.sh with `install/` as cwd, and the
+  script's vendor destinations are specified relative to the repo root (e.g.
+  `src/static/styles/select2.min.css`). Curl then tries to write to `$PWD/src/static/...` which
+  resolves to `install/src/static/...` — a non-existent directory — and every download fails with
+  `curl: (23) Failure writing output to destination`. Six retries all hit the same disk-write error
+  and install.sh exits 1.
+
+Before JTN-534 the curl failure was silently ignored, masking the always-broken relative-path
+  assumption.
+
+Fix: derive the script's own location via BASH_SOURCE and cd to the repo root at the top of
+  update_vendors.sh, so relative destinations always resolve correctly regardless of caller cwd.
+  Mirrors the pattern already used by other project scripts.
+
+Adds a regression test class in tests/unit/test_install_scripts.py that asserts (1) the
+  cwd-anchoring is present, (2) vendor destinations remain repo-root-relative, and (3) install.sh
+  still invokes the script. Verified the fix locally by running update_vendors.sh from
+  /tmp/vendor-sim and confirming all five vendor files download successfully.
+
+Unblocks the ci-gate meta-check that every recent PR has been admin-overriding.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(ci): unblock install-matrix — verifier imports + Dockerfile venv/GPG (JTN-615)
+
+The initial JTN-615 fix (commit b666630) correctly anchored update_vendors.sh cwd and got
+  `install.sh` past the vendor-download step. Three downstream bugs then surfaced on first CI run:
+
+**Bug A — verifier uses non-existent waitress.__version__**
+
+`ci_install_matrix_verify.sh` Phase 3 ran `python -c "import flask, waitress, PIL; print(...
+  waitress.__version__ ...)"`. Flask 3.2 deprecates `flask.__version__` and waitress has never
+  exposed a module-level `__version__`, so on bookworm (where uv successfully installed every
+  package) the verifier crashed with `AttributeError: module 'waitress' has no attribute
+  '__version__'` and incorrectly reported "one or more required packages missing". Rewrite the check
+  to use `importlib.metadata.version()` so it's resilient to package-level attribute churn — the
+  point of Phase 3 is "can the venv import these modules", a version print is nice-to-have.
+
+**Bug B — bullseye apt rejects `[trusted=yes]` Pi OS repo**
+
+Bullseye's older apt does not honour `[trusted=yes]` the same way bookworm/trixie do when the repo
+  emits a NO_PUBKEY InRelease signature. Net effect: `apt-get install chromium-headless-shell
+  liblgpio-dev` returned "Unable to locate package", the batch install failed, and **python3-venv
+  was silently never installed** — so `python3 -m venv` later bombed inside install.sh with
+  "ensurepip is not available". Fetch the real archive.raspberrypi.com GPG key via curl and use
+  `[signed-by=...]` so all three codenames behave consistently.
+
+**Bug C — defensive venv bootstrap**
+
+Pre-install `python3 python3-venv python3-pip` in the Dockerfile before install.sh runs. If the Pi
+  OS apt layer ever has issues again, the venv creation path still works — separating "container
+  bootstrap" from "install.sh happy path" so regressions fail loudly in a known place.
+
+install.sh's own silent-exit-code bug (it ran the pip fallback after ensurepip died with "No module
+  named pip" and still exited 0) is tracked separately as a hardening follow-up — fixing the two
+  root causes above should take install-matrix green without needing that change.
+
+Updated regression test in TestInstallMatrixWorkflow to assert the new distribution-name-based check
+  rather than pinning the old import-statement string.
+
+* fix(ci): revert GPG keyring approach, add C build deps (JTN-615)
+
+The previous commit (c49e525) tried to replace `[trusted=yes]` on the Pi OS apt repo with a
+  `[signed-by=...]` keyring approach. That broke the image build entirely on trixie: trixie's sqv
+  (sequoia gpg) policy rejects the Raspberry Pi archive key because it carries SHA1 self-signatures,
+  which stopped being accepted on 2026-02-01. Even after manually importing the key, sqv refuses to
+  bind it and apt-get update exits non-zero. `[trusted=yes]` is the documented workaround for
+  exactly this case — restore it and expand the header comment so a future refactor doesn't make the
+  same mistake.
+
+Separately, the install-matrix job has never successfully built arm64 C-extension requirements
+  inside the Docker image because the Dockerfile doesn't install a C toolchain or the native header
+  packages that scripts/test_install_memcap.sh already lists:
+
+gcc, python3-dev, libsystemd-dev, libopenjp2-7-dev, libfreetype6-dev, libheif-dev, swig
+
+Add them here so the two smoke paths can't diverge on build-time deps. Observed on bookworm with the
+  previous commit:
+
+error: command 'aarch64-linux-gnu-gcc' failed: No such file or directory
+
+during uv's `Building spidev==3.8` / `Building sgmllib3k==1.0.0` step. Adding gcc + python3-dev
+  unblocks the same pip/uv install path that runs on a real Pi (real Pi OS Lite doesn't ship gcc
+  either, but the pre-built wheelhouse from JTN-604 papers over that on-device; CI runs with
+  INKYPI_SKIP_WHEELHOUSE=1 so it must build from source).
+
+* ci(install-matrix): drop bullseye — Python 3.9 can't install py311 reqs (JTN-615)
+
+Bookworm + trixie now pass the install-matrix after the previous commits (update_vendors.sh cwd fix,
+  verifier importlib.metadata, C toolchain in Dockerfile). Bullseye still fails at the uv
+  dependency-resolve step:
+
+Because the current Python version (3.9.2) does not satisfy Python>=3.10 and anyio==4.13.0 depends
+  on Python>=3.10, we can conclude that anyio==4.13.0 cannot be used. And because you require
+  anyio==4.13.0, we can conclude that your requirements are unsatisfiable.
+
+Debian 11 (bullseye) ships python3=3.9.2 in its main archive. InkyPi's requirements.txt pins several
+  packages that hard-require Python>=3.10 (anyio is the first to trip the resolver; openai,
+  google-genai, pydantic etc. all follow). pyproject.toml also sets `target-version = "py311"` in
+  both the black and ruff configs, so bullseye has never been a real install target.
+
+The install-matrix job only appeared to cover bullseye historically because install.sh silently
+  swallowed the uv/pip failures (tracked as a follow-up hardening item — install.sh needs to
+  propagate dep-install exit codes loudly so this class of regression fails fast in one place).
+
+Drop bullseye from the ci.yml install-matrix to reflect reality. The standalone Install matrix
+  (arm64 e2e) workflow still exercises bullseye via scripts/test_install_memcap.sh, which uses a
+  python:3.12-slim base image and therefore isn't blocked by the codename's own Python version. That
+  job can't catch install.sh misbehavior that's specific to Debian 11, but neither can the broken
+  version that existed before this PR — it was failing on every run — so nothing is lost.
+
+Updated TestInstallMatrixWorkflow's matrix assertion to match the new {bookworm, trixie} set, with a
+  comment explaining why bullseye is absent.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.5 (2026-04-11)
 
 ### Bug Fixes
