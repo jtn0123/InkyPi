@@ -46,3 +46,16 @@ def test_main_css_contains_new_ia_polish_classes(client):
     assert ".status-chip" in css
     assert ".loading-panel" in css
     assert ".section-focus" in css
+
+
+def test_settings_logs_toggle_respects_safe_area(client):
+    """JTN-339: Show Logs floating action must clear the iOS safe area
+    and the settings page must reserve bottom padding so the toggle
+    never covers the last in-flow action on narrow mobile viewports."""
+    css = _read_all_css()
+
+    assert ".settings-logs-toggle" in css
+    # Floating button accounts for the iOS home indicator / chrome.
+    assert "env(safe-area-inset-bottom" in css
+    # Settings shell reserves bottom padding for the floating action.
+    assert ".page-shell-management" in css
