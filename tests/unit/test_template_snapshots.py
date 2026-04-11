@@ -154,3 +154,38 @@ def test_calendar_url_input_has_aria_label(client):
     html = resp.get_data(as_text=True)
     assert 'name="calendarURLs[]"' in html
     assert 'aria-label="Calendar URL"' in html
+
+
+# ---------------------------------------------------------------------------
+# JTN-382: Existing-secret inputs must use type=password, not bullet chars
+# ---------------------------------------------------------------------------
+
+
+def test_api_keys_existing_row_uses_password_input(client):
+    """Existing-key rows render as type=password with empty value (JTN-382).
+
+    The old implementation used type=text with literal U+25CF bullet characters
+    as the value, which breaks screen readers, password managers, and copy-paste.
+    The fix renders type=password with value="" and placeholder="(unchanged)".
+    """
+    from unittest.mock import patch
+
+    fake_entries = [("MY_API_KEY", "supersecret")]
+
+    with patch("blueprints.apikeys.parse_env_file", return_value=fake_entries):
+        resp = client.get("/api-keys")
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # Must use type=password for the value column
+    assert 'type="password"' in html
+
+    # Must NOT contain the U+25CF bullet-character hack
+    assert "\u25cf" not in html.lower()
+
+    # The secret value itself must not appear in the HTML source
+    assert "supersecret" not in html
+
+    # The empty-value + placeholder pattern must be present
+    assert 'placeholder="(unchanged)"' in html
