@@ -207,6 +207,17 @@ def history_page():
     images, total = _list_history_images(history_dir, offset=start, limit=per_page)
     total_pages = max(1, (total + per_page - 1) // per_page)
 
+    # Clamp upper bound: ?page=99999 should render the last valid page rather
+    # than "Page 99999 of N" over an empty grid.  When total == 0 we keep
+    # page = 1 so the empty-state template still renders correctly.
+    if page > total_pages:
+        page = total_pages
+        start = (page - 1) * per_page
+        if total > 0:
+            images, total = _list_history_images(
+                history_dir, offset=start, limit=per_page
+            )
+
     # Pull latest timing metrics if available
     try:
         ri = device_config.get_refresh_info()
