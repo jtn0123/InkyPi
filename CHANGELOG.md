@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.34.0 (2026-04-11)
+
+### Features
+
+- Extract form sanitization helpers into shared form_utils module (JTN-496)
+  ([#303](https://github.com/jtn0123/InkyPi/pull/303),
+  [`b95e765`](https://github.com/jtn0123/InkyPi/commit/b95e765bbcb76e60817b77e2445eb2067f885e75))
+
+* feat: extract form sanitization helpers to src/utils/form_utils.py (JTN-496, Grade A4)
+
+Moves inline _sanitize_log, _sanitize_response_value, and _validate_required_fields from
+  src/blueprints/plugin.py into a new pure-function module src/utils/form_utils.py, eliminating
+  copy-paste risk across blueprints. Adds FormRequest dataclass, MissingFieldsError,
+  validate_required, validate_plugin_required_fields, sanitize_log_field, and
+  sanitize_response_value with full type annotations. Adds 47 unit tests in
+  tests/unit/test_form_utils.py covering all helpers and edge cases.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* ci: re-trigger CI for JTN-496
+
+* ci: force re-trigger CI (JTN-496)
+
+* ci: ping CI runner (JTN-496)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.33.0 (2026-04-11)
 
 ### Documentation
