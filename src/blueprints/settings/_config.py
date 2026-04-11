@@ -281,8 +281,14 @@ def save_api_keys():
             # U+2022 BLACK CIRCLE placeholder. Historically the form pre-filled the
             # value attribute with literal bullet characters to fake a mask; if a
             # stale page (or anything else) POSTs that string back, we must not
-            # overwrite the real key with bullets.
-            if set(value) <= {"\u2022"}:
+            # overwrite the real key with bullets. Strip whitespace first so we
+            # also catch values like "  ••••  " that a stale client could send.
+            stripped = value.strip()
+            if not stripped:
+                # Whitespace-only input is treated the same as empty — keep
+                # the existing key unchanged.
+                continue
+            if set(stripped) <= {"\u2022"}:
                 _mod.logger.warning(
                     "Rejected save_api_keys value for %s: value is only U+2022 "
                     "placeholder characters (likely a stale cached page or a "

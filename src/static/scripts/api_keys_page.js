@@ -62,22 +62,37 @@
     }
 
     function addDeleteButton(sectionId, keyName) {
-      const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      if (!formGroup) return;
-      if (!formGroup.querySelector(".delete-button")) {
+      // The Delete button lives inside `.api-key-actions` (the input row), NOT
+      // `.api-key-card-head` (which holds the label + status). Walk up to the
+      // card and then into the actions container so new buttons land next to
+      // the input rather than next to the status line.
+      const card = document
+        .getElementById(`${sectionId}-status`)
+        ?.closest(".api-key-card");
+      const actions = card?.querySelector(".api-key-actions");
+      if (!actions) return;
+      if (
+        !actions.querySelector('.delete-button[data-api-action="delete-key"]')
+      ) {
         const deleteButton = document.createElement("button");
         deleteButton.type = "button";
         deleteButton.className = "header-button delete-button delete-button-danger";
         deleteButton.dataset.apiAction = "delete-key";
         deleteButton.dataset.keyName = keyName;
         deleteButton.textContent = "Delete";
-        formGroup.appendChild(deleteButton);
+        actions.appendChild(deleteButton);
       }
     }
 
     function removeDeleteButton(sectionId) {
-      const formGroup = document.querySelector(`#${sectionId}-status`)?.parentElement;
-      formGroup?.querySelector(".delete-button")?.remove();
+      const card = document
+        .getElementById(`${sectionId}-status`)
+        ?.closest(".api-key-card");
+      card
+        ?.querySelector(
+          '.api-key-actions .delete-button[data-api-action="delete-key"]'
+        )
+        ?.remove();
     }
 
     async function saveManagedKeys() {
@@ -94,7 +109,22 @@
         const result = await resp.json();
         if (resp.ok) {
           savedOk = true;
-          showResponseModal("success", `Success! ${result.message}`);
+          const skipped = Array.isArray(result.skipped_placeholder)
+            ? result.skipped_placeholder
+            : [];
+          if (skipped.length > 0) {
+            // Some values were rejected as bullet-character placeholders
+            // (JTN-598). Tell the user which ones so they can retype if they
+            // actually wanted to update those keys.
+            showResponseModal(
+              "failure",
+              `Saved with warnings. Skipped placeholder-only values for: ${skipped.join(
+                ", "
+              )}. Type a real key and save again to update these.`
+            );
+          } else {
+            showResponseModal("success", `Success! ${result.message}`);
+          }
           if (result.updated && result.updated.length > 0) {
             updateConfiguredStatus(result.updated);
           }

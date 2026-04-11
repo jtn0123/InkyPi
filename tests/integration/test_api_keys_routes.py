@@ -31,7 +31,8 @@ def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):
     # Dynamically import config.py
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
@@ -43,7 +44,8 @@ def test_save_api_keys_empty_value_preserves_existing(client, monkeypatch, tmp_p
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
@@ -67,7 +69,8 @@ def test_save_api_keys_bullet_placeholder_preserves_existing(
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
@@ -129,6 +132,62 @@ def test_api_keys_page_configured_fields_have_leave_blank_placeholder(
     assert "enter unsplash" in unsplash_input.group(0).lower()
 
 
+def test_save_api_keys_whitespace_padded_bullets_are_rejected(
+    client, monkeypatch, tmp_path
+):
+    """JTN-598 (CodeRabbit follow-up): the bullet-placeholder rejection must
+    also catch values where leading/trailing whitespace has been added by a
+    client (e.g. '  ••••  '). Otherwise a stale page could send a whitespace-
+    padded bullet string and bypass the defense-in-depth check."""
+    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+    src_dir = Path(__file__).resolve().parents[2] / "src"
+    spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
+    assert spec
+    assert spec.loader
+    config_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_mod)
+    cfg = config_mod.Config()
+    cfg.set_env_key("OPEN_AI_SECRET", "real-key-should-not-be-clobbered")
+
+    resp = client.post(
+        "/settings/save_api_keys",
+        data={"OPEN_AI_SECRET": "  " + "\u2022" * 16 + "  "},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "OPEN_AI_SECRET" not in body["updated"]
+    assert body["skipped_placeholder"] == ["OPEN_AI_SECRET"]
+    assert cfg.load_env_key("OPEN_AI_SECRET") == "real-key-should-not-be-clobbered"
+
+
+def test_save_api_keys_whitespace_only_is_treated_as_unchanged(
+    client, monkeypatch, tmp_path
+):
+    """JTN-598 (CodeRabbit follow-up): a whitespace-only submission must be
+    treated the same as empty (leave current key unchanged), not saved as a
+    whitespace string."""
+    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+    src_dir = Path(__file__).resolve().parents[2] / "src"
+    spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
+    assert spec
+    assert spec.loader
+    config_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_mod)
+    cfg = config_mod.Config()
+    cfg.set_env_key("OPEN_AI_SECRET", "real-key-preserved")
+
+    resp = client.post(
+        "/settings/save_api_keys",
+        data={"OPEN_AI_SECRET": "   \t  "},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "OPEN_AI_SECRET" not in body["updated"]
+    # Whitespace-only is "empty/unchanged", not "rejected as placeholder".
+    assert "skipped_placeholder" not in body
+    assert cfg.load_env_key("OPEN_AI_SECRET") == "real-key-preserved"
+
+
 def test_save_api_keys_mixed_bullet_and_real_chars_is_accepted(
     client, monkeypatch, tmp_path
 ):
@@ -139,7 +198,8 @@ def test_save_api_keys_mixed_bullet_and_real_chars_is_accepted(
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
@@ -180,7 +240,8 @@ def test_save_api_keys_partial_placeholder_reject(client, monkeypatch, tmp_path)
     monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
@@ -256,7 +317,7 @@ def test_api_keys_template_no_longer_references_bullet_placeholder():
 
 def test_api_keys_responsive_css_has_short_viewport_sticky_rule():
     """JTN-599: the Save button must be sticky on short laptop viewports
-    (max-height ≤ 860px covers 1280×800, 1366×768, 1280×768). Static check
+    (max-height ≤ 860px covers 1280x800, 1366x768, 1280x768). Static check
     against accidental deletion of the media query."""
     css_path = (
         Path(__file__).resolve().parents[2]
@@ -281,7 +342,8 @@ def test_delete_api_key(client, monkeypatch, tmp_path):
     # Prime .env
     src_dir = Path(__file__).resolve().parents[2] / "src"
     spec = importlib.util.spec_from_file_location("config", str(src_dir / "config.py"))
-    assert spec and spec.loader
+    assert spec
+    assert spec.loader
     config_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(config_mod)
     cfg = config_mod.Config()
