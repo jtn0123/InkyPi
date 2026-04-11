@@ -52,7 +52,7 @@ A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-en
 
 ### Pre-built wheelhouse (faster first boot — JTN-604)
 
-As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-604), tagged releases ship a pre-built **wheelhouse** — a tarball of every Python dependency compiled in advance for `linux_armv7l` (Pi Zero 2 W, 32-bit Trixie) and `linux_aarch64` (Pi 4/5, 64-bit). `install.sh` detects your architecture from `uname -m`, fetches the matching `inkypi-wheels-<version>-<arch>.tar.gz` from the current release's GitHub assets, verifies its sha256, and hands the extracted wheelhouse to pip via `--find-links` + `--prefer-binary` so no on-device compilation runs.
+As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-604), tagged releases ship a pre-built **wheelhouse** — a tarball of every Python dependency compiled in advance for `linux_armv7l` (Pi Zero 2 W, 32-bit Trixie) and `linux_aarch64` (Pi 4/5, 64-bit). `install.sh` detects your architecture from `uname -m`, fetches the matching `inkypi-wheels-<version>-<arch>.tar.gz` from the current release's GitHub assets, verifies its sha256, and hands the extracted wheelhouse to pip/uv via `--find-links` so no on-device compilation runs.
 
 **Expected impact on a Pi Zero 2 W:**
 
@@ -68,6 +68,12 @@ As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-6
 ```bash
 sudo INKYPI_SKIP_WHEELHOUSE=1 ./install.sh
 ```
+
+### uv resolver (faster + lighter dependency install — JTN-605)
+
+As of the version that resolves [JTN-605](https://linear.app/jtn0123/issue/JTN-605), InkyPi now uses [uv](https://github.com/astral-sh/uv) (a Rust-based pip replacement from the `ruff` team) for package installation. On a Pi Zero 2 W this drops the resolver's peak memory from **~100–150 MB down to ~10–20 MB** and installs **3–5× faster** than pip. Combined with the JTN-604 wheelhouse above, the full dependency install can run in **under 3 minutes** with **well under 200 MB** peak RAM.
+
+`uv` is installed into the venv via `pip install uv` as a one-time bootstrap (no curl-pipe from a third-party host — same PyPI + hashes the venv already trusts), and `uv pip install --require-hashes` fully honors the JTN-516 hash-pinned lockfile for supply-chain integrity. `install.sh` sets `UV_HTTP_TIMEOUT=60` on each uv invocation so network hiccups on flaky Wi-Fi (JTN-534) don't hang the install indefinitely. If `uv` cannot be installed for any reason (e.g. unsupported arch, PyPI outage), `install.sh` cleanly falls back to plain `pip` — uv is purely an optimization, not a hard dependency.
 
 ### Watching the install via cloud-init
 

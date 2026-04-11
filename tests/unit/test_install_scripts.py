@@ -502,6 +502,197 @@ class TestInstallScript:
                 "--no-cache-dir" in line
             ), f"pip install invocation is missing --no-cache-dir (JTN-602): {line!r}"
 
+    def test_install_installs_uv_into_venv(self):
+        # JTN-605: uv (Rust-based pip replacement) must be installed into the
+        # venv BEFORE the main dependency install so the resolver uses ~10-20 MB
+        # peak instead of pip's ~100-150 MB on a Pi Zero 2 W.
+        lines = self.content.splitlines()
+
+        # Find create_venv() function body.
+        fn_start_idx = None
+        for i, line in enumerate(lines):
+            if "create_venv()" in line and "{" in line:
+                fn_start_idx = i
+                break
+        assert fn_start_idx is not None, "create_venv() not found"
+
+        depth = 0
+        fn_lines = []
+        for line in lines[fn_start_idx:]:
+            fn_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and fn_lines:
+                break
+        fn_body = "\n".join(fn_lines)
+
+        # uv must be installed via the venv's pip.
+        # Split into two asserts (PT018) for clearer failure diagnostics.
+        assert (
+            "-m pip install" in fn_body
+        ), "create_venv() must contain a pip install call (JTN-605)"
+        assert (
+            " uv" in fn_body
+        ), "create_venv() must install uv into the venv via 'pip install uv' (JTN-605)"
+
+    def _logical_shell_lines(self, body: str) -> list[str]:
+        """Join backslash-continued shell lines into single logical lines.
+
+        Shell continuations ( \\ at EOL ) carry a single command across
+        multiple source lines. Tests that grep for "flag X and argument Y
+        on the same invocation" would otherwise miss them after a refactor
+        wraps the command for readability.
+        """
+        out: list[str] = []
+        buf = ""
+        for raw in body.splitlines():
+            # Preserve comment-only lines as-is (they never continue).
+            stripped = raw.rstrip()
+            if stripped.endswith("\\"):
+                buf += stripped[:-1] + " "
+            else:
+                out.append(buf + stripped)
+                buf = ""
+        if buf:
+            out.append(buf)
+        return out
+
+    def test_install_uses_uv_for_main_dependency_install(self):
+        # JTN-605: the main dependency install should prefer uv when available.
+        # Structural: there must be a `uv pip install ... -r ... requirements.txt`
+        # invocation in create_venv() that carries --no-cache and --require-hashes.
+        fn_start = self.content.index("create_venv(){")
+        fn_end_marker = "\n}"
+        fn_end = self.content.index(fn_end_marker, fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        # The uv-based install command must reference uv pip install.
+        assert (
+            "uv pip install" in fn_body
+        ), "create_venv() must use 'uv pip install' for the main dependency install (JTN-605)"
+
+        # Locate the uv-based main install block after joining backslash
+        # continuations so the single logical command (which spans several
+        # source lines) is searched as one string.
+        logical_lines = self._logical_shell_lines(fn_body)
+        uv_main_install_lines = [
+            line
+            for line in logical_lines
+            if "uv pip install" in line and "PIP_REQUIREMENTS_FILE" in line
+        ]
+        assert uv_main_install_lines, (
+            "create_venv() must have a 'uv pip install ... -r "
+            "$PIP_REQUIREMENTS_FILE' invocation (JTN-605)"
+        )
+        joined = "\n".join(uv_main_install_lines)
+        # The uv-based main install must preserve hash enforcement.
+        assert (
+            "--require-hashes" in joined
+        ), "uv pip install for main requirements must preserve --require-hashes (JTN-516)"
+        # uv uses --no-cache (not --no-cache-dir) — equivalent savings.
+        assert (
+            "--no-cache" in joined
+        ), "uv pip install must use --no-cache equivalent of --no-cache-dir (JTN-602)"
+
+    def test_install_uv_pip_install_has_http_timeout(self):
+        # JTN-605 / JTN-534: the pip fallback sets --retries 5 --timeout 60 to
+        # survive flaky Wi-Fi on a Pi Zero 2 W. uv doesn't accept
+        # --default-timeout as a CLI flag; it reads UV_HTTP_TIMEOUT from the
+        # environment. Every `uv pip install` invocation must prefix
+        # UV_HTTP_TIMEOUT (on the same source line as the command, so bash
+        # scopes it to that subprocess only) otherwise uv can block
+        # indefinitely on a network hiccup.
+        fn_start = self.content.index("create_venv(){")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        lines = fn_body.splitlines()
+        uv_install_line_indices = [
+            i for i, line in enumerate(lines) if "-m uv pip install" in line
+        ]
+        assert (
+            uv_install_line_indices
+        ), "create_venv() must have at least one 'uv pip install' invocation (JTN-605)"
+        for idx in uv_install_line_indices:
+            line = lines[idx]
+            assert "UV_HTTP_TIMEOUT=" in line, (
+                "uv pip install invocation must prefix UV_HTTP_TIMEOUT so it "
+                "has a finite network timeout and matches pip fallback "
+                f"--timeout behavior (JTN-534): {line.strip()!r}"
+            )
+
+    def test_install_has_pip_fallback_path(self):
+        # JTN-605: if uv cannot be installed or run (e.g. unsupported arch,
+        # wheel download failure), install.sh must cleanly fall back to plain
+        # pip. Structural grep: both a uv branch and a pip fallback branch must
+        # exist inside create_venv(), and the pip fallback must still install
+        # the main requirements.
+        fn_start = self.content.index("create_venv(){")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        # A gating variable/conditional must exist.
+        assert (
+            "use_uv" in fn_body
+        ), "create_venv() must gate the uv vs pip path on a use_uv flag (JTN-605)"
+        # An else branch (pip fallback) must exist and must run pip install
+        # against PIP_REQUIREMENTS_FILE with --require-hashes preserved.
+        assert (
+            "else" in fn_body
+        ), "create_venv() must have an else branch for the pip fallback (JTN-605)"
+        # The fallback must still use --no-cache-dir, --require-hashes, and
+        # PIP_REQUIREMENTS_FILE. Join backslash-continued shell lines so the
+        # multi-line pip invocation is matched as one logical command.
+        logical_lines = self._logical_shell_lines(fn_body)
+        pip_fallback_lines = [
+            line
+            for line in logical_lines
+            if "-m pip install" in line
+            and "PIP_REQUIREMENTS_FILE" in line
+            and "uv pip install" not in line
+        ]
+        assert pip_fallback_lines, (
+            "create_venv() must retain a pip-based install of PIP_REQUIREMENTS_FILE "
+            "as a fallback when uv is unavailable (JTN-605)"
+        )
+        joined = "\n".join(pip_fallback_lines)
+        assert "--require-hashes" in joined
+        assert "--no-cache-dir" in joined
+
+    def test_install_uv_path_available_before_main_install(self):
+        # JTN-605: uv must be installed into the venv BEFORE the main
+        # dependency install — otherwise the uv branch can never be taken.
+        fn_start = self.content.index("create_venv(){")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        # Strip comments so we only look at executable shell lines.
+        def _strip_comments(body: str) -> str:
+            out = []
+            for line in body.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    out.append("")
+                else:
+                    out.append(line)
+            return "\n".join(out)
+
+        code_only = _strip_comments(fn_body)
+
+        # Position of the uv bootstrap (pip install uv).
+        uv_bootstrap_pos = None
+        for m in re.finditer(r"-m pip install[^\n]*\buv\b", code_only):
+            uv_bootstrap_pos = m.start()
+            break
+        assert (
+            uv_bootstrap_pos is not None
+        ), "uv bootstrap (pip install uv) not found in create_venv()"
+
+        # Position of the first actual `uv pip install` call (not in a comment).
+        uv_main_pos = code_only.index("uv pip install")
+        assert (
+            uv_bootstrap_pos < uv_main_pos
+        ), "uv must be installed into the venv before the first 'uv pip install' call"
+
     def test_install_no_cache_dir_in_all_venv_pip_calls(self):
         # JTN-602: parse the create_venv() function body and assert every
         # pip install call inside it carries --no-cache-dir.
