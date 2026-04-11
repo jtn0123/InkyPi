@@ -1,6 +1,80 @@
 # CHANGELOG
 
 
+## v0.40.1 (2026-04-11)
+
+### Performance Improvements
+
+- Lazy-import heavy modules to cut startup RSS (JTN-606)
+  ([#328](https://github.com/jtn0123/InkyPi/pull/328),
+  [`16192bb`](https://github.com/jtn0123/InkyPi/commit/16192bb3bed88d9e62b2faa68d3a0fd8b4202707))
+
+* perf: lazy-import heavy modules to reduce startup RSS (JTN-606)
+
+Defer pi_heif, PIL.ImageDraw/Font/Filter/Enhance/Ops, requests/urllib3, and charset_normalizer from
+  module-load to first-use so they no longer inflate the startup resident set on low-memory devices
+  like the Pi Zero 2 W (425 MB RAM).
+
+Why --- * inkypi.py unconditionally registered the HEIF PIL opener at startup, importing pi_heif (~3
+  MB native ext, ~28 ms) every boot even on devices that never see an iPhone upload. *
+  utils.app_utils pulled PIL.ImageDraw/ImageFont/ImageOps at module load, but they are only used
+  inside generate_startup_image() and the upload validation helpers. * utils.http_utils imported
+  requests + urllib3 at module scope, which pulled charset_normalizer/chardet into every process —
+  the json_* error helpers used by error_handlers do not need them. * utils.image_utils /
+  fallback_image / webhooks had the same issue: heavy imports for functions that only run during
+  render or error.
+
+Changes ------- * inkypi.py: drop module-level pi_heif registration; utils.image_loader now lazily
+  registers the HEIF opener on first image load via _ensure_heif_opener(). * utils.app_utils: move
+  PIL imports into get_font, generate_startup_image, _process_uploaded_file and
+  _validate_image_content. * utils.fallback_image: move PIL.Image / ImageDraw into
+  render_error_image; drop the PIL.Image.Image return annotation so the module no longer needs PIL
+  at import time. * utils.image_utils: keep PIL.Image at module scope (used by many callers via type
+  hints and LANCZOS) but defer ImageEnhance, ImageFilter, ImageOps into the functions that use them.
+  * utils.http_utils: move ``requests`` / HTTPAdapter / urllib3 Retry into _build_retry,
+  _build_session and http_get; TYPE_CHECKING block keeps strict mypy typing intact. *
+  utils.webhooks: expose ``requests`` via module __getattr__ so existing
+  patch("utils.webhooks.requests.post", ...) tests keep working while the real import only happens
+  on the first webhook fire.
+
+Impact (measured via /usr/bin/time -l on macOS) ----------------------------------------------- *
+  Peak memory footprint: 47.2 MB -> 37.9 MB (~9.3 MB, ~20% drop). * Modules loaded by ``import
+  inkypi``: 844 -> 543 (-301). * On the real Pi Zero 2 W (glibc + native codec libs) the reduction
+  is expected to be materially larger because pi_heif / PIL submodules pull in shared objects that
+  macOS Python links differently.
+
+Tests ----- New tests/unit/test_lazy_imports.py runs a fresh Python subprocess that imports inkypi
+  and asserts that none of {playwright, PIL.ImageDraw, PIL.ImageFont, PIL.ImageFilter,
+  PIL.ImageEnhance, PIL.ImageOps, pi_heif, requests, urllib3, charset_normalizer, chardet, openai,
+  anthropic} appear in sys.modules — a structural guard against regressions. Also bounds the total
+  module count (<750) so a future accidental numpy/ pandas import would fail loudly. Existing suite:
+  3371 -> 3372 passing (plus 17 new tests); the two pre-existing pyenv-related plugin_registry
+  failures on main are unrelated to this change.
+
+Refs: parent epic JTN-529 (install path hardening).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: thread-safe HEIF opener + subprocess check=False (CodeRabbit)
+
+Address CodeRabbit review on PR #328:
+
+* utils.image_loader: guard _ensure_heif_opener with a double-checked lock so concurrent upload
+  threads cannot race on first registration. Previous check-then-act was not thread-safe under
+  waitress; while pi_heif.register_heif_opener() is likely idempotent, making the serialization
+  explicit avoids any edge case and silences the Ruff PLW0603 concern surfaced in review.
+
+* tests/unit/test_lazy_imports: pass check=False to the import-probe subprocess.run call so the
+  manual returncode handling is explicit (PLW1510). No behavior change — the test already raised on
+  non-zero exit.
+
+Refs: JTN-606, parent epic JTN-529.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.40.0 (2026-04-11)
 
 ### Features
