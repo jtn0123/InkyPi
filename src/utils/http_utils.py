@@ -4,10 +4,11 @@ import logging
 import os
 import threading
 from time import perf_counter
-from typing import Any
+from typing import Any, cast
 
 import requests
 from flask import Request, g, jsonify, request
+from flask.wrappers import Response as FlaskResponse
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -80,7 +81,7 @@ def json_error(
     status: int = 400,
     code: int | str | None = None,
     details: dict[str, Any] | None = None,
-):
+) -> tuple[FlaskResponse | dict[str, Any], int]:
     payload: dict[str, Any] = {"success": False, "error": message}
     if code is not None:
         payload["code"] = code
@@ -96,7 +97,9 @@ def json_error(
         return payload, status
 
 
-def json_success(message: str | None = None, status: int = 200, **payload: Any):
+def json_success(
+    message: str | None = None, status: int = 200, **payload: Any
+) -> tuple[FlaskResponse | dict[str, Any], int]:
     body: dict[str, Any] = {"success": True}
     if message is not None:
         body["message"] = message
@@ -116,7 +119,7 @@ def json_internal_error(
     status: int = 500,
     code: int | str | None = "internal_error",
     details: dict[str, Any] | None = None,
-):
+) -> tuple[FlaskResponse | dict[str, Any], int]:
     """Return a standardized internal error JSON while preserving existing error strings.
 
     - Keeps top-level error as a generic string for backward compatibility/tests
@@ -320,7 +323,7 @@ def http_get(
             from utils.http_cache import get_cache
 
             cache = get_cache()
-            cached_response = cache.get(url, params)
+            cached_response = cast(requests.Response, cache.get(url, params))
             if cached_response is not None:
                 return cached_response
         except Exception:

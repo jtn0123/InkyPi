@@ -15,6 +15,7 @@ fi
 RUFF_EXIT=0
 BLACK_EXIT=0
 MYPY_EXIT=0
+MYPY_STRICT_EXIT=0
 SHELLCHECK_EXIT=0
 
 echo "Running Ruff linter..."
@@ -35,13 +36,24 @@ else
     echo "✅ Black formatting check passed"
 fi
 
-echo "Running mypy type checker..."
+echo "Running mypy type checker (advisory — whole codebase)..."
 mypy src tests
 MYPY_EXIT=$?
 if [ $MYPY_EXIT -ne 0 ]; then
-    echo "⚠️  mypy found type issues (exit code: $MYPY_EXIT) — non-blocking"
+    echo "⚠️  mypy: advisory only (except strict subset) — $MYPY_EXIT issue(s) found"
 else
-    echo "✅ mypy type check passed"
+    echo "✅ mypy advisory type check passed"
+fi
+
+echo "Running mypy strict check (blocking — strict subset only)..."
+# Strict subset: src/utils/http_utils.py and src/utils/security_utils.py
+# See docs/typing.md for how to add more modules to this list.
+mypy --strict src/utils/http_utils.py src/utils/security_utils.py
+MYPY_STRICT_EXIT=$?
+if [ $MYPY_STRICT_EXIT -ne 0 ]; then
+    echo "❌ mypy strict: http_utils + security_utils failed (exit code: $MYPY_STRICT_EXIT)"
+else
+    echo "✅ mypy strict: http_utils + security_utils clean"
 fi
 
 # Shell scripts under install/ and scripts/ — must pass shellcheck.
@@ -73,13 +85,14 @@ else
     fi
 fi
 
-# Report summary — mypy is non-blocking (advisory only) until existing
-# type errors are resolved.  Ruff, Black, and shellcheck are blocking.
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+# Report summary — whole-codebase mypy is advisory only; the strict subset
+# (http_utils + security_utils) is blocking.  Ruff, Black, and shellcheck are blocking.
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
     [ $RUFF_EXIT -ne 0 ] && echo "  - Ruff: $RUFF_EXIT"
     [ $BLACK_EXIT -ne 0 ] && echo "  - Black: $BLACK_EXIT"
+    [ $MYPY_STRICT_EXIT -ne 0 ] && echo "  - mypy strict subset: $MYPY_STRICT_EXIT"
     [ $SHELLCHECK_EXIT -ne 0 ] && echo "  - shellcheck: $SHELLCHECK_EXIT"
     echo ""
     echo "Post-run actions will continue..."
@@ -87,9 +100,9 @@ else
     echo ""
     echo "✅ All checks passed!"
 fi
-[ $MYPY_EXIT -ne 0 ] && echo "⚠️  mypy issues remain (non-blocking)"
+[ $MYPY_EXIT -ne 0 ] && echo "⚠️  mypy: advisory only (except strict subset) — issues remain (non-blocking)"
 
-if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
+if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     exit 1
 fi
 
