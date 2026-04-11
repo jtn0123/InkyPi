@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.39.4 (2026-04-11)
+
+### Bug Fixes
+
+- Prevent open redirect in HTTPS upgrade middleware (JTN-317)
+  ([#317](https://github.com/jtn0123/InkyPi/pull/317),
+  [`4f3f45b`](https://github.com/jtn0123/InkyPi/commit/4f3f45bb3a548b7965eb51aeb20df2700982fa1d))
+
+* fix: prevent open redirect in HTTPS upgrade middleware (JTN-317)
+
+The _redirect_to_https before_request hook rebuilt the redirect URL from request.url, which echoes
+  the caller-supplied Host header. With INKYPI_FORCE_HTTPS=1, a request with a spoofed Host:
+  evil.com would produce Location: https://evil.com/, an open-redirect flagged by CodeQL
+  py/url-redirection (alert #52).
+
+Validate request.host against an allow-list (configurable via INKYPI_ALLOWED_HOSTS, defaulting to
+  inkypi.local, localhost and 127.0.0.1) before emitting the redirect. Unknown hosts abort 400
+  instead of being reflected in a Location header.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: rebuild HTTPS redirect URL from validated host (JTN-317)
+
+CodeQL still flagged the original py/url-redirection site because request.url is built from the
+  untrusted Host header and its taint doesn't propagate through the allow-list check. Rebuild the
+  Location target from the (now validated) host plus request.full_path so the Host header never
+  reaches the Location header.
+
+Also tighten test assertions to use exact equality instead of startswith(), avoiding CodeQL's
+  incomplete-URL-substring-sanitization warning on the test file itself.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.3 (2026-04-11)
 
 ### Bug Fixes
