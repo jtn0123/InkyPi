@@ -46,7 +46,7 @@ export TERM="${TERM:-dumb}"
 # wheelhouse would mask a broken requirements.txt.
 export INKYPI_SKIP_WHEELHOUSE=1
 
-if ./install.sh; then
+if bash ./install.sh; then
     pass "install.sh exited 0"
 else
     rc=$?
