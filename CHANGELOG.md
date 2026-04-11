@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## v0.43.4 (2026-04-11)
+
+### Bug Fixes
+
+- **rss**: Validate feedUrl at save time (JTN-380)
+  ([#356](https://github.com/jtn0123/InkyPi/pull/356),
+  [`4356389`](https://github.com/jtn0123/InkyPi/commit/4356389d61f9d20a4b66354291eb612e0f93ea9f))
+
+The RSS Feed plugin previously persisted any string in feedUrl, even values like
+  "definitely-not-a-feed-url". This adds both client-side and server-side validation matching the
+  JTN-357 Calendar pattern:
+
+- Schema field now uses type="url" with pattern="https?://.+" and required, so the browser rejects
+  obviously bad values before submit. - New validate_settings() parses the URL and rejects anything
+  without an http(s) scheme or with an empty netloc. Empty/whitespace/None values return a
+  "required" error; other bad values return a "not valid" error with the offending input. - Adds 16
+  unit/integration tests covering accepted URLs, rejected schemes (javascript/file/ftp/webcal),
+  empty/whitespace/None, and the rendered settings template.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.3 (2026-04-11)
 
 ### Bug Fixes
