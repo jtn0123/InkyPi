@@ -1,6 +1,57 @@
 # CHANGELOG
 
 
+## v0.38.0 (2026-04-11)
+
+### Features
+
+- Pip-compile hash-pinned lockfiles for supply-chain integrity (JTN-516)
+  ([#308](https://github.com/jtn0123/InkyPi/pull/308),
+  [`e1963e4`](https://github.com/jtn0123/InkyPi/commit/e1963e4a76d9077dac67f884a352f9c196035372))
+
+* feat: add pip-compile hash-pinned lockfiles for supply-chain integrity (JTN-516, Grade F1)
+
+Introduce requirements.in / requirements-dev.in source files compiled with pip-compile
+  --generate-hashes. Every transitive dep is now verified with SHA-256 hashes before installation.
+  install.sh passes --require-hashes to pip, rejecting tampered wheels from compromised mirrors. A
+  new unit test prevents future regressions where a non-hashed file replaces the lockfile. Docs and
+  CONTRIBUTING updated with the regen workflow.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: restore pi-heif to all-platforms in requirements.in (fix pre-flash CI)
+
+pi-heif has macOS/Windows wheels and must NOT carry the sys_platform=="linux" guard that was
+  incorrectly added. preflash_validate.sh creates a temp venv with only requirements.txt; excluding
+  pi-heif broke the import smoke check.
+
+Also tighten psutil cap to >=7.0,<8 to match the originally-pinned 7.2.2.
+
+* fix: manually append Linux-only packages with hashes to requirements.txt
+
+pip-compile on macOS excludes sys_platform=="linux" packages (inky, cysystemd, gpiod, gpiodevice,
+  smbus2, spidev) from the generated lockfile. preflash_validate.sh creates a temp venv with ONLY
+  requirements.txt, so on Linux CI the import smoke check fails for cysystemd.
+
+Manually append all six Linux-only packages and their transitive deps with full PyPI hashes and
+  sys_platform=="linux" markers. pip skips these on macOS (marker is False) and verifies hashes on
+  Linux.
+
+Document the manual-append workflow in docs/dependencies.md.
+
+* fix: add google-genai to requirements-dev.in; clarify pi-heif platform note
+
+CodeRabbit review fixes: - Add google-genai>=1.14,<2 to requirements-dev.in to keep runtime deps in
+  sync with requirements.in (was missing, could cause dev import errors) - Regenerate
+  requirements-dev.txt to include google-genai lockfile entry - Clarify docs/dependencies.md:
+  pi-heif is NOT Linux-only (has macOS/Windows wheels); only inky and cysystemd carry sys_platform
+  == "linux" guards
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.37.2 (2026-04-11)
 
 ### Bug Fixes
