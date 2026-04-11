@@ -262,7 +262,10 @@ create_venv(){
   # JTN-534: pass --retries 5 --timeout 60 to survive flaky Wi-Fi on a Pi Zero 2 W.
   # pip's default retries=5 already; explicit so a future change to pip default doesn't bite us.
   "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --upgrade pip setuptools wheel > /dev/null
-  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
+  # --require-hashes enforces supply-chain integrity: every wheel is verified
+  # against a cryptographic hash before installation.  The lockfile (generated
+  # by pip-compile --generate-hashes) contains the expected hashes.
+  "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --require-hashes -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null &
   show_loader "\tInstalling python dependencies. "
 
   # do additional dependencies for Waveshare support.
