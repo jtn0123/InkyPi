@@ -6,7 +6,7 @@ from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.app_utils import get_font
 
-from .comic_parser import COMICS, get_panel
+from .comic_parser import COMIC_LABELS, COMICS, get_panel
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,10 @@ class Comic(BasePlugin):
                         "select",
                         label="Comic",
                         default="XKCD",
-                        options=[option(comic, comic) for comic in COMICS],
+                        options=[
+                            option(comic, COMIC_LABELS.get(comic, comic))
+                            for comic in COMICS
+                        ],
                     ),
                     field(
                         "fontSize",

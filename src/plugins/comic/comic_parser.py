@@ -89,6 +89,11 @@ COMICS = {
     },
 }
 
+# Display labels for comics whose key differs from the official title.
+COMIC_LABELS = {
+    "webcomic name": "Webcomic Name",
+}
+
 
 def get_panel(comic_name):
     response = http_get(COMICS[comic_name]["feed"], timeout=20.0, use_cache=False)
