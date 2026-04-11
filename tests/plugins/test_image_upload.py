@@ -363,6 +363,65 @@ def test_image_upload_generate_image_with_padding(monkeypatch, device_config_dev
         assert result is not None
 
 
+def test_image_upload_background_option_labels_match_sibling_plugins():
+    """JTN-358: Image Upload's Background Fill options must use the same
+    labels ('Blur' / 'Color') as Image Folder and Image Album so that all
+    three image plugins present a consistent UI. Previously Image Upload
+    used 'Solid Color' while the others used 'Color'."""
+    from plugins.image_album.image_album import ImageAlbum
+    from plugins.image_folder.image_folder import ImageFolder
+    from plugins.image_upload.image_upload import ImageUpload
+
+    def _find_background_option_labels(obj):
+        """Recursively locate the backgroundOption field and return its
+        ordered (value, label) pairs."""
+        if isinstance(obj, dict):
+            if obj.get("name") == "backgroundOption":
+                return [
+                    (opt.get("value"), opt.get("label"))
+                    for opt in obj.get("options", [])
+                ]
+            for v in obj.values():
+                found = _find_background_option_labels(v)
+                if found is not None:
+                    return found
+        elif isinstance(obj, list):
+            for item in obj:
+                found = _find_background_option_labels(item)
+                if found is not None:
+                    return found
+        return None
+
+    upload_labels = _find_background_option_labels(
+        ImageUpload({"id": "image_upload"}).build_settings_schema()
+    )
+    folder_labels = _find_background_option_labels(
+        ImageFolder({"id": "image_folder"}).build_settings_schema()
+    )
+    album_labels = _find_background_option_labels(
+        ImageAlbum({"id": "image_album"}).build_settings_schema()
+    )
+
+    assert upload_labels is not None, "image_upload missing backgroundOption field"
+    assert folder_labels is not None, "image_folder missing backgroundOption field"
+    assert album_labels is not None, "image_album missing backgroundOption field"
+
+    # Regression guard: 'Solid Color' must not reappear in image_upload.
+    upload_label_strings = [label for _value, label in upload_labels]
+    assert "Solid Color" not in upload_label_strings, (
+        "image_upload should use 'Color' (matching image_folder/image_album), "
+        "not 'Solid Color' (JTN-358)"
+    )
+    assert "Color" in upload_label_strings
+
+    # All three image plugins should expose the same (value, label) pairs.
+    assert upload_labels == folder_labels == album_labels, (
+        "Background Fill labels must match across image_upload, image_folder, "
+        f"and image_album. Got: upload={upload_labels}, folder={folder_labels}, "
+        f"album={album_labels}"
+    )
+
+
 def test_image_upload_invalid_background_color_falls_back(
     monkeypatch, device_config_dev
 ):
