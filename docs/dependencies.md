@@ -111,6 +111,9 @@ install time. In that case:
    armv7l wheels.
 3. Document the constraint in `requirements.in` with an inline comment.
 
-Packages currently guarded with `sys_platform == "linux"` in `requirements.in`
-(`inky`, `cysystemd`, `pi-heif`) are Pi-only and do not need to be resolved on
-dev machines.
+Packages with `sys_platform == "linux"` guards in `requirements.in` (`inky`,
+`cysystemd`) only ship Linux wheels and cannot install on macOS/Windows; they
+are excluded from the pip-compile lockfile on macOS and manually appended with
+hashes (see "Linux-only packages" section above). `pi-heif`, by contrast, ships
+macOS/Windows wheels and is NOT platform-guarded — it resolves normally via
+pip-compile on all dev platforms.

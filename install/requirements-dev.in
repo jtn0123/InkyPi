@@ -41,6 +41,7 @@ pillow>=11.0,<13
 pi-heif==1.2.0
 tzdata>=2024.1
 openai>=2.0,<3
+google-genai>=1.14,<2
 numpy>=2.0,<3
 icalendar>=6.0,<7
 recurring-ical-events>=3.0,<4
