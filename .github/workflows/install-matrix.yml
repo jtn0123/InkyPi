@@ -1,0 +1,60 @@
+name: Install matrix (arm64 e2e)
+
+# JTN-530: Run install/install.sh end-to-end inside an arm64 Debian container
+# under a 512 MB memory cap for each supported Pi OS base (Bullseye, Bookworm,
+# Trixie). JTN-528 (a Trixie zramswap regression) went undetected for an entire
+# release cycle because no CI job exercised the install script on each base.
+# This matrix closes that gap.
+#
+# Wraps scripts/test_install_memcap.sh, which already accepts the codename as
+# its first positional argument and runs the same Phase 2/3/4 install + boot
+# probes used by the existing single-codename install-smoke-memcap job in
+# ci.yml.
+#
+# This workflow is intentionally a standalone advisory job for now — it is not
+# wired into the ci-gate `needs:` list. A follow-up ticket can promote it to
+# required once we've watched it run green for a few cycles. Each matrix cell
+# runs install.sh under arm64 QEMU emulation, which is slow (hence the 30 min
+# timeout per codename).
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  install-matrix:
+    name: install.sh e2e (${{ matrix.codename }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        codename: [bullseye, bookworm, trixie]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Run install smoke test (${{ matrix.codename }})
+        run: |
+          ./scripts/test_install_memcap.sh ${{ matrix.codename }}
+
+      - name: Upload container logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-matrix-${{ matrix.codename }}-logs
+          path: /tmp/inkypi-smoke-logs
+          if-no-files-found: ignore
