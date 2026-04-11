@@ -3181,17 +3181,29 @@ textarea:focus-visible {
     animation: shake-item 0.35s ease-in-out;
 }
 
-/* Mobile logs toggle */
+/* Mobile logs toggle (JTN-339)
+   Uses env(safe-area-inset-bottom) so the floating "Show Logs" action
+   stays above the iOS home indicator and the dynamic mobile address bar
+   on narrow viewports. The companion padding-bottom on
+   .page-shell-management ensures the last in-flow element isn't hidden
+   underneath this fixed button. */
 .settings-logs-toggle {
   display: block;
   position: fixed;
-  bottom: 16px;
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right, 0px) + 8px);
+  bottom: max(16px, env(safe-area-inset-bottom, 0px) + 16px);
   z-index: 10;
   border-radius: 999px;
   padding: 12px 18px;
   font-weight: 700;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Reserve space at the bottom of the settings page so the fixed
+   "Show Logs" toggle never overlaps the last action in the panel
+   (e.g. Save / Reset buttons) on narrow mobile viewports. */
+.page-shell-management {
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
 .api-key-label {
