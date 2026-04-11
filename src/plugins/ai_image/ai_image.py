@@ -29,9 +29,11 @@ class AIImage(BasePlugin):
                 "Prompt",
                 field(
                     "textPrompt",
+                    "textarea",
                     label="Prompt",
                     placeholder="A surreal breakfast floating through a neon sky.",
                     required=True,
+                    rows=4,
                 ),
                 field(
                     "randomizePrompt",
