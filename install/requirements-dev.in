@@ -37,13 +37,14 @@ requests>=2.32,<3
 urllib3>=2.0,<3
 werkzeug>=3.1,<4
 pillow>=11.0,<13
-pi-heif>=1.2,<2
+# pi-heif has wheels for all major platforms — no platform guard needed.
+pi-heif==1.2.0
 tzdata>=2024.1
 openai>=2.0,<3
 numpy>=2.0,<3
 icalendar>=6.0,<7
 recurring-ical-events>=3.0,<4
-psutil>=5.0,<7
+psutil>=7.0,<8
 feedparser>=6.0,<7
 waitress>=3.0,<4
 jsonschema>=4.0,<5

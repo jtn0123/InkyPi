@@ -12,14 +12,15 @@ requests>=2.32,<3
 urllib3>=2.0,<3
 werkzeug>=3.1,<4
 pillow>=11.0,<13
-pi-heif>=1.2,<2; sys_platform == "linux"
+# pi-heif has wheels for all major platforms (Linux, macOS, Windows) — no platform guard.
+pi-heif==1.2.0
 tzdata>=2024.1
 openai>=2.0,<3
 google-genai>=1.14,<2
 numpy>=2.0,<3
 icalendar>=6.0,<7
 recurring-ical-events>=3.0,<4
-psutil>=5.0,<7
+psutil>=7.0,<8
 # cysystemd — only available on Linux; provides journald integration
 cysystemd>=2.0,<3; sys_platform == "linux"
 waitress>=3.0,<4
