@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.43.5 (2026-04-11)
+
+### Bug Fixes
+
+- **playlist**: Label wrap-past-midnight ranges as "(next day)" (JTN-353)
+  ([#354](https://github.com/jtn0123/InkyPi/pull/354),
+  [`b5d0408`](https://github.com/jtn0123/InkyPi/commit/b5d04081c9b80f7492b3bafa55de6c9a00b4b759))
+
+New Playlist silently accepted reverse times (e.g. 20:00 - 08:00), and the listing showed them
+  identically to a normal 09:00 - 17:00 range, so users couldn't tell if the range wrapped past
+  midnight. The model's Playlist.is_active already supports wraparound (start > end), so the
+  ergonomic fix is to keep accepting these ranges (night shifts are a real use case) and label them
+  in the UI.
+
+Append "(next day)" next to the summary when end_time < start_time so the intent is visible at a
+  glance. Regression tests cover acceptance of the reverse range and presence/absence of the wrap
+  label.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.4 (2026-04-11)
 
 ### Bug Fixes
