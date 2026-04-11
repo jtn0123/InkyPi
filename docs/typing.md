@@ -26,15 +26,20 @@ will be added in a follow-up once it stabilizes.
 ## How to add a module to the strict subset
 
 1. **Run mypy strict on the module locally** and fix all errors:
+
    ```bash
    .venv/bin/python -m mypy --strict src/utils/your_module.py
    ```
+
 2. **Add a per-module block to `mypy.ini`:**
+
    ```ini
-   [mypy-src.utils.your_module]
+   [mypy-utils.your_module]
    strict = True
    ```
+
 3. **Add the file to the blocking check in `scripts/lint.sh`:**
+
    ```bash
    mypy --strict src/utils/http_utils.py src/utils/security_utils.py src/utils/your_module.py
    ```
