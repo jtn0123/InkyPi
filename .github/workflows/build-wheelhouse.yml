@@ -1,0 +1,144 @@
+name: Build release wheelhouse
+
+# JTN-604: Build pre-compiled wheels for Pi Zero 2 W (armv7) and Pi 4/5 (arm64)
+# and attach them as release assets. install.sh prefers the bundle when
+# available, dropping first-boot install time on a Pi Zero 2 W from ~15 min
+# down to ~2-3 min (no on-device wheel compilation for numpy/Pillow/cffi/etc).
+#
+# Triggers only when a release is published (e.g. by semantic-release). The
+# workflow itself is not exercised in PR CI — install.sh carries a graceful
+# fallback so a missing bundle is a no-op.
+
+on:
+  release:
+    types: [published]
+  # Manual trigger so maintainers can rebuild wheels for an existing tag
+  # without cutting a new release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build wheels for (e.g. v0.28.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-wheelhouse-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-wheels:
+    name: Build wheels (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: linux_armv7l
+            docker_platform: linux/arm/v7
+          - arch: linux_aarch64
+            docker_platform: linux/arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "ERROR: No release tag resolved" >&2
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.docker_platform }}
+
+      - name: Build wheels in Trixie container
+        env:
+          PLATFORM: ${{ matrix.docker_platform }}
+          ARCH: ${{ matrix.arch }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/wheels
+
+          # Trixie container matches the Pi OS 13 target; python3.13 is the
+          # default interpreter. Mirrors the runtime the wheels will be
+          # installed onto so wheel tags line up exactly with what pip sees
+          # during install on-device.
+          docker run --rm \
+            --platform "$PLATFORM" \
+            -v "$PWD:/src" \
+            -w /src \
+            debian:trixie-slim \
+            bash -c '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                python3 python3-venv python3-pip python3-dev \
+                build-essential pkg-config \
+                libtiff-dev libopenjp2-7-dev libfreetype6-dev \
+                libopenblas-dev libjpeg-dev zlib1g-dev \
+                libffi-dev libssl-dev libxml2-dev libxslt1-dev \
+                libcairo2-dev libgirepository1.0-dev \
+                swig ca-certificates
+              python3 -m venv /tmp/buildvenv
+              . /tmp/buildvenv/bin/activate
+              python3 -m pip install --upgrade pip wheel build
+              # Build wheels for every dep in the locked requirements file.
+              # --no-deps is intentional: pip wheel already walks the
+              # dependency graph from the requirements file, and we do not
+              # want to pull in extras.
+              python3 -m pip wheel \
+                --wheel-dir=/src/dist/wheels \
+                -r /src/install/requirements.txt
+            '
+
+          ls -la dist/wheels | head -40
+          echo "Wheel count: $(find dist/wheels -name '*.whl' | wc -l)"
+
+      - name: Package wheelhouse tarball
+        id: package
+        env:
+          ARCH: ${{ matrix.arch }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          TARBALL="inkypi-wheels-${VERSION}-${ARCH}.tar.gz"
+          tar -czf "$TARBALL" -C dist/wheels .
+          sha256sum "$TARBALL" > "${TARBALL}.sha256"
+          echo "tarball=${TARBALL}" >> "$GITHUB_OUTPUT"
+          ls -la "$TARBALL" "${TARBALL}.sha256"
+
+      - name: Attach wheelhouse to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: |
+            ${{ steps.package.outputs.tarball }}
+            ${{ steps.package.outputs.tarball }}.sha256
+          fail_on_unmatched_files: true
+
+      - name: Upload workflow artifact (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheelhouse-${{ matrix.arch }}
+          path: |
+            ${{ steps.package.outputs.tarball }}
+            ${{ steps.package.outputs.tarball }}.sha256
+          if-no-files-found: error

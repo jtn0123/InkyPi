@@ -50,6 +50,25 @@ The 2025-12-04 Trixie image sets `arm_64bit=1` explicitly in `/boot/firmware/con
 
 A fresh `install.sh` run on a Pi Zero 2 W takes **roughly 15 minutes** end-to-end. The bottleneck is `pip install` building wheels for `numpy`, `Pillow`, and `playwright` on a single Cortex-A53 core. Don't kill the install or assume it's hung — `htop` will show `pip` consuming one core. zramswap (auto-enabled by `install.sh` on Bullseye/Bookworm/Trixie) is critical here; without it the build OOMs.
 
+### Pre-built wheelhouse (faster first boot — JTN-604)
+
+As of the version that resolves [JTN-604](https://linear.app/jtn0123/issue/JTN-604), tagged releases ship a pre-built **wheelhouse** — a tarball of every Python dependency compiled in advance for `linux_armv7l` (Pi Zero 2 W, 32-bit Trixie) and `linux_aarch64` (Pi 4/5, 64-bit). `install.sh` detects your architecture from `uname -m`, fetches the matching `inkypi-wheels-<version>-<arch>.tar.gz` from the current release's GitHub assets, verifies its sha256, and hands the extracted wheelhouse to pip via `--find-links` + `--prefer-binary` so no on-device compilation runs.
+
+**Expected impact on a Pi Zero 2 W:**
+
+- First-boot install time drops from **~15 min to ~2–3 min**
+- Peak RAM during install drops from **~400 MB to < 200 MB** (no native compilation)
+- SD card wear drops because pip never writes intermediate build objects
+- The `--require-hashes` lockfile still applies — every wheel is verified against the hashes in `install/requirements.txt` before install
+
+**Graceful fallback.** If the wheelhouse is missing (dev branches, network failure, unsupported arch, checksum mismatch, etc.), `install.sh` logs a `falling back to source install` message and runs the normal online pip install — no manual intervention needed.
+
+**Opt out.** Set `INKYPI_SKIP_WHEELHOUSE=1` before running `install.sh` to skip the fetch entirely. Useful if you want to verify wheel builds reproduce locally or if you're debugging a dependency pin:
+
+```bash
+sudo INKYPI_SKIP_WHEELHOUSE=1 ./install.sh
+```
+
 ### Watching the install via cloud-init
 
 If you're driving an unattended install via cloud-init (e.g. via a `runcmd:` block in `user-data`), redirect the install output so you can watch it after the Pi boots:
