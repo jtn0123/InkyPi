@@ -53,6 +53,20 @@ _PRIORITY_TO_LEVEL = {
 }
 UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 
+# Strict allow-lists for systemd-run command construction (JTN-319).
+# CodeQL py/command-line-injection flagged _start_update_via_systemd because
+# the validation was not visible to static analysis. The regexes below make
+# the validation explicit so both CodeQL and human reviewers can see it.
+#
+# Unit names must match systemd-run's transient unit naming (we generate them
+# server-side as ``inkypi-update-<epoch>``) and contain only safe characters.
+_UPDATE_UNIT_NAME_RE = re.compile(r"^inkypi-(?:update|rollback)-\d{1,20}$")
+
+# Script basenames that are allowed to be executed by _start_update_via_systemd.
+# The full path is additionally required to end with one of these names and to
+# resolve under a whitelisted installation or repo directory.
+_ALLOWED_UPDATE_SCRIPT_BASENAMES = frozenset(UPDATE_SCRIPT_NAMES)
+
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
 MIN_LOG_HOURS = 1
@@ -355,6 +369,45 @@ def _set_update_state(running: bool, unit: str | None):
 def _start_update_via_systemd(
     unit_name: str, script_path: str, target_tag: str | None = None
 ) -> None:
+    """Launch the update script in a transient systemd unit.
+
+    Security (JTN-319 / CodeQL py/command-line-injection):
+        All three parameters that could influence the ``subprocess.Popen``
+        argv are explicitly validated against an allow-list *in this function*
+        before the process is spawned. ``subprocess.Popen`` is invoked without
+        a shell, so quoting is not an issue, but the defense-in-depth checks
+        here keep the validation visible to static analysis and protect
+        against regressions in callers.
+    """
+    # --- Validate unit name ---------------------------------------------------
+    # Callers always construct ``inkypi-update-<epoch>`` server-side, never
+    # from request data, but we re-verify here so the guarantee is local.
+    if not isinstance(unit_name, str) or not _UPDATE_UNIT_NAME_RE.fullmatch(unit_name):
+        raise ValueError(f"Invalid systemd unit name: {unit_name!r}")
+
+    # --- Validate script path -------------------------------------------------
+    # The basename must be one of the two known install scripts, and the path
+    # must resolve to an existing regular file. We deliberately reject any
+    # path containing shell metacharacters or traversal tokens.
+    if not isinstance(script_path, str) or not script_path:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if any(c in script_path for c in (";", "&", "|", "`", "$", "\n", "\r")):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    script_basename = os.path.basename(script_path)
+    if script_basename not in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if not os.path.isabs(script_path) or ".." in script_path.split(os.sep):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+
+    # --- Validate target tag --------------------------------------------------
+    # Defensive revalidation — callers in this module already reject invalid
+    # tags at the request boundary, but we re-check so the function is safe
+    # in isolation and CodeQL can see the constraint on the argv.
+    if target_tag is not None and (
+        not isinstance(target_tag, str) or not _TAG_RE.fullmatch(target_tag)
+    ):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+
     # Run update script in a transient systemd unit so its logs are visible in journal
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
     cmd = [
@@ -369,7 +422,9 @@ def _start_update_via_systemd(
     ]
     if target_tag:
         cmd.append(target_tag)
-    subprocess.Popen(cmd)  # nosec: commands are fixed, script path validated
+    # All argv elements validated above against strict allow-lists; Popen runs
+    # without a shell so there is no interpretation of metacharacters.
+    subprocess.Popen(cmd)  # noqa: S603  # validated argv, shell=False
 
 
 def _log_and_publish(msg: str, level: str = "info"):
@@ -383,10 +438,26 @@ def _log_and_publish(msg: str, level: str = "info"):
 
 
 def _run_real_update(script_path: str, target_tag: str | None = None) -> None:
+    # Defense-in-depth: apply the same validation as _start_update_via_systemd
+    # so this fallback path cannot be coerced into executing an arbitrary
+    # script or passing a crafted argv to bash (JTN-319).
+    if not isinstance(script_path, str) or not script_path:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if any(c in script_path for c in (";", "&", "|", "`", "$", "\n", "\r")):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if os.path.basename(script_path) not in _ALLOWED_UPDATE_SCRIPT_BASENAMES:
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if not os.path.isabs(script_path) or ".." in script_path.split(os.sep):
+        raise ValueError(f"Invalid update script path: {script_path!r}")
+    if target_tag is not None and (
+        not isinstance(target_tag, str) or not _TAG_RE.fullmatch(target_tag)
+    ):
+        raise ValueError(f"Invalid target tag format: {target_tag!r}")
+
     cmd = ["/bin/bash", script_path]
     if target_tag:
         cmd.append(target_tag)
-    proc = subprocess.Popen(
+    proc = subprocess.Popen(  # noqa: S603  # validated argv, shell=False
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

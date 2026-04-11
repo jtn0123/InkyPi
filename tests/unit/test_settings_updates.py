@@ -434,3 +434,235 @@ class TestStartUpdateTOCTOURace:
             ], f"Expected one 200 and one 409, got: {results}"
         finally:
             mod._set_update_state(False, None)
+
+
+class TestStartUpdateViaSystemdValidation:
+    """JTN-319 — hardened systemd-run command construction.
+
+    ``_start_update_via_systemd`` MUST validate all three of its parameters
+    against strict allow-lists BEFORE reaching ``subprocess.Popen``. These
+    tests lock in that invariant so the CodeQL py/command-line-injection
+    finding cannot regress.
+    """
+
+    def _patch_popen_tracker(self, monkeypatch):
+        """Replace subprocess.Popen with a spy that records invocations."""
+        import blueprints.settings as mod
+
+        calls: list[list[str]] = []
+
+        def _fake_popen(cmd, *args, **kwargs):
+            calls.append(list(cmd))
+
+            class _FakeProc:
+                pass
+
+            return _FakeProc()
+
+        monkeypatch.setattr(mod.subprocess, "Popen", _fake_popen)
+        return calls
+
+    def test_rejects_unit_name_with_shell_metachars(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid systemd unit name"):
+            mod._start_update_via_systemd(
+                "inkypi-update-1; rm -rf /",
+                "/usr/local/inkypi/install/do_update.sh",
+            )
+        assert calls == []
+
+    def test_rejects_unit_name_with_wrong_prefix(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid systemd unit name"):
+            mod._start_update_via_systemd(
+                "evil-unit-12345",
+                "/usr/local/inkypi/install/do_update.sh",
+            )
+        assert calls == []
+
+    def test_rejects_unit_name_non_string(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid systemd unit name"):
+            mod._start_update_via_systemd(
+                None,  # type: ignore[arg-type]
+                "/usr/local/inkypi/install/do_update.sh",
+            )
+        assert calls == []
+
+    def test_rejects_script_path_with_bad_basename(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "/usr/local/inkypi/install/evil.sh",
+            )
+        assert calls == []
+
+    def test_rejects_script_path_with_shell_metachars(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "/usr/local/inkypi/install/do_update.sh; rm -rf /",
+            )
+        assert calls == []
+
+    def test_rejects_script_path_relative(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "install/do_update.sh",
+            )
+        assert calls == []
+
+    def test_rejects_script_path_with_traversal(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "/usr/local/inkypi/install/../../etc/passwd",
+            )
+        assert calls == []
+
+    def test_rejects_target_tag_with_shell_injection(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid target tag"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "/usr/local/inkypi/install/do_update.sh",
+                target_tag="v1.0.0; rm -rf /",
+            )
+        assert calls == []
+
+    def test_rejects_target_tag_flag_style(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        with pytest.raises(ValueError, match="Invalid target tag"):
+            mod._start_update_via_systemd(
+                "inkypi-update-12345",
+                "/usr/local/inkypi/install/do_update.sh",
+                target_tag="--upload-pack=/tmp/evil",
+            )
+        assert calls == []
+
+    def test_accepts_valid_invocation(self, monkeypatch):
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        mod._start_update_via_systemd(
+            "inkypi-update-1712345678",
+            "/usr/local/inkypi/install/do_update.sh",
+            target_tag="v0.28.1",
+        )
+        assert len(calls) == 1
+        cmd = calls[0]
+        assert cmd[0] == "systemd-run"
+        assert "--collect" in cmd
+        assert "--unit=inkypi-update-1712345678" in cmd
+        assert "/bin/bash" in cmd
+        assert "/usr/local/inkypi/install/do_update.sh" in cmd
+        assert "v0.28.1" in cmd
+
+    def test_accepts_valid_invocation_without_target_tag(self, monkeypatch):
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        mod._start_update_via_systemd(
+            "inkypi-update-1712345678",
+            "/usr/local/inkypi/install/update.sh",
+            target_tag=None,
+        )
+        assert len(calls) == 1
+        cmd = calls[0]
+        assert "/usr/local/inkypi/install/update.sh" in cmd
+        # target tag must not be appended when None
+        assert cmd[-1] == "/usr/local/inkypi/install/update.sh"
+
+    def test_accepts_valid_semver_variants(self, monkeypatch):
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        for tag in ("v0.28.1", "0.28.1", "v1.0.0-beta.1", "2.3.4-rc1"):
+            mod._start_update_via_systemd(
+                "inkypi-update-99",
+                "/usr/local/inkypi/install/do_update.sh",
+                target_tag=tag,
+            )
+        assert len(calls) == 4
+        for call, tag in zip(
+            calls, ("v0.28.1", "0.28.1", "v1.0.0-beta.1", "2.3.4-rc1"), strict=True
+        ):
+            assert call[-1] == tag
+
+    def test_rollback_unit_prefix_allowed(self, monkeypatch):
+        """The allow-list reserves ``inkypi-rollback-<epoch>`` for future use."""
+        import blueprints.settings as mod
+
+        calls = self._patch_popen_tracker(monkeypatch)
+        mod._start_update_via_systemd(
+            "inkypi-rollback-1712345678",
+            "/usr/local/inkypi/install/do_update.sh",
+        )
+        assert len(calls) == 1
+
+    def test_run_real_update_rejects_bad_script_path(self, monkeypatch):
+        """Defense-in-depth: _run_real_update must also validate its inputs."""
+        import pytest
+
+        import blueprints.settings as mod
+
+        popen_mock = MagicMock()
+        monkeypatch.setattr(mod.subprocess, "Popen", popen_mock)
+        with pytest.raises(ValueError, match="Invalid update script path"):
+            mod._run_real_update("/tmp/evil.sh", target_tag="v1.0.0")
+        popen_mock.assert_not_called()
+
+    def test_run_real_update_rejects_bad_target_tag(self, monkeypatch):
+        import pytest
+
+        import blueprints.settings as mod
+
+        popen_mock = MagicMock()
+        monkeypatch.setattr(mod.subprocess, "Popen", popen_mock)
+        with pytest.raises(ValueError, match="Invalid target tag"):
+            mod._run_real_update(
+                "/usr/local/inkypi/install/do_update.sh",
+                target_tag="v1.0.0; rm -rf /",
+            )
+        popen_mock.assert_not_called()
