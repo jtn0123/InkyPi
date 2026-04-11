@@ -1,6 +1,7 @@
 import html
 import logging
 import re
+from urllib.parse import urlparse
 
 import feedparser
 
@@ -21,6 +22,28 @@ FONT_SIZES = {"x-small": 0.7, "small": 0.9, "normal": 1, "large": 1.1, "x-large"
 
 
 class Rss(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject non-URL feed values at save time (JTN-380).
+
+        The submitted ``feedUrl`` must parse to an http(s) URL with a
+        non-empty host.  Empty URLs and invalid values (e.g. ``not-a-feed``
+        or ``javascript:alert(1)``) are rejected so junk values cannot be
+        persisted even if the client-side ``type="url"`` guard is bypassed.
+        """
+        raw = settings.get("feedUrl")
+        url = (raw or "").strip() if isinstance(raw, str) else ""
+        if not url:
+            return "RSS Feed URL is required."
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return f"RSS Feed URL is not valid: {url!r}"
+        if parsed.scheme.lower() not in {"http", "https"}:
+            return f"RSS Feed URL is not valid: {url!r}"
+        if not parsed.netloc:
+            return f"RSS Feed URL is not valid: {url!r}"
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
@@ -53,9 +76,11 @@ class Rss(BasePlugin):
                 ),
                 field(
                     "feedUrl",
+                    "url",
                     label="RSS Feed URL",
                     placeholder="https://example.com/feed.xml",
                     required=True,
+                    pattern="https?://.+",
                 ),
                 callout(
                     "Only use trusted RSS feeds. Untrusted URLs can introduce security and reliability risks.",
