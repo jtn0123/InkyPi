@@ -1,6 +1,156 @@
 # CHANGELOG
 
 
+## v0.39.7 (2026-04-11)
+
+### Bug Fixes
+
+- Api-keys placeholder clobbers real keys + Save button below fold (JTN-598, JTN-599)
+  ([#315](https://github.com/jtn0123/InkyPi/pull/315),
+  [`f08ea99`](https://github.com/jtn0123/InkyPi/commit/f08ea99b787873efbf7b9df799d539d18d7e1d08))
+
+* fix: api-keys placeholder clobbers real keys + Save button below fold (JTN-598, JTN-599)
+
+## JTN-598 — Data destruction (Urgent)
+
+The /settings/api-keys template pre-filled each configured secret input with 32 literal U+2022 BLACK
+  CIRCLE characters in the `value=` attribute as a faux password mask. Because the chars are real
+  text, any user who clicked into the field and typed/pasted would append to (or replace) the
+  bullets. On Save, `new FormData(form)` serialized the current input value — often `••••…•••<user
+  text>` or just 32 bullets if untouched — and POSTed it to /settings/save_api_keys. The backend had
+  no placeholder check and wrote the bullet-polluted string verbatim, silently overwriting the real
+  API key.
+
+JTN-382 reported the same underlying issue and was closed after switching type=text → type=password.
+  The fix only addressed the cosmetic half; the literal-bullet value= pre-fill stayed and is the
+  root cause of this data-destruction bug.
+
+### Fix
+
+Frontend — stop pre-filling value= with bullets: - api_key_card.html macro: `value=""` + placeholder
+  "(leave blank to keep current)" for configured providers. Fields start genuinely empty. -
+  api_keys_page.js: removed the `maskPlaceholder` constant and the `clearField` / clear-button dead
+  code (no bullets means nothing to clear). updateConfiguredStatus now clears the field and updates
+  the placeholder instead of re-filling with bullets. - api_keys.html: removed maskPlaceholder from
+  the boot config, updated page subtitle and info-banner text to match the new UX.
+
+Backend — defense-in-depth in /settings/save_api_keys: - Reject any posted value that is solely
+  U+2022 characters. Logs a warning and reports skipped keys in a new `skipped_placeholder` field in
+  the JSON response. Protects stale cached pages and any client that still sends the legacy bullet
+  string.
+
+## JTN-599 — Save button below the fold on short laptops
+
+At viewport heights of 600–860px (covers 1280x768, 1366x768, 1280x800 — the most common laptop
+  resolutions), the Save button sat at y≈769 with no visible scroll affordance. Even real mouse
+  clicks at the button's coordinates hit nothing because the point is outside the viewport.
+
+_responsive.css: new `@media (max-height: 860px)` rule pins `.settings-panel > .buttons-container`
+  and `.api-keys-frame .buttons-container` sticky at `bottom: 8px`. Extends the existing mobile
+  (max-width: 768px) sticky rule to cover short-but-wide laptop screens. Same fix also addresses
+  JTN-572 (Settings page fold issue).
+
+## Tests (+14 new)
+
+tests/integration/test_api_keys_routes.py — +10 regression tests: - Empty value preserves existing
+  key (the "leave blank" contract) - Pure-bullet value is rejected, existing key preserved, response
+  reports skipped_placeholder - Mixed real+bullet values: real ones save, bullets are rejected -
+  Mixed-content values ("abc•••") save normally (rejection is pure-placeholder only) - Normal save
+  response omits the skipped_placeholder field (forward-compatible response shape) - Rendered page
+  HTML has no U+2022 chars in any value="..." attribute - Configured fields render the "leave blank
+  to keep current" placeholder, unconfigured fields keep the "Enter <provider> API key" placeholder
+  - Static checks: api_keys_page.js no longer references `maskPlaceholder` or a 4+ bullet sequence,
+  api_keys.html and api_key_card.html macro have no bullet sequences, macro still renders `value=""`
+  - Static check: _responsive.css has the `max-height: 860px` rule scoped to `.api-keys-frame
+  .buttons-container`
+
+tests/integration/test_api_keys_pages_more.py: - Replaced the JTN-215 clear-button-tooltip test with
+  a JTN-598 test asserting the clear button is removed entirely (fields start blank, nothing to
+  clear).
+
+Test count: 3219 → 3226 passing. 2 pre-existing pyenv-env failures (test_plugin_registry) unrelated
+  to this change.
+
+## Not touched
+
+- src/config/device_dev.json was already modified when the session started; left alone.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: address CodeRabbit review comments on JTN-598 fix
+
+## Actionable comments from CodeRabbit (PR #315)
+
+### 1. Backend — strip whitespace before bullet-placeholder check
+  `src/blueprints/settings/_config.py`: the pure-bullet rejection check only called `set(value)`
+  directly, so a value like `" •••• "` (bullets with leading/trailing whitespace) would bypass the
+  defense-in-depth check and be written to .env. Now strips whitespace first, and a whitespace-only
+  submission is treated as "empty/unchanged" just like a genuinely empty field.
+
+### 2. Frontend JS — handle skipped_placeholder in save response
+  `src/static/scripts/api_keys_page.js`: `saveManagedKeys` previously treated every resp.ok as full
+  success and ignored the backend's `skipped_placeholder` field. Now shows a warning modal listing
+  the skipped keys so users know which fields were rejected and need to be retyped. Still runs
+  `updateConfiguredStatus` for the keys that *were* updated.
+
+### 3. Frontend JS — delete button placed in wrong DOM container
+  `src/static/scripts/api_keys_page.js`: `addDeleteButton` and `removeDeleteButton` walked up from
+  `#<section>-status` via `.parentElement`, landing on `.api-key-card-head` — but the Delete button
+  actually lives inside `.api-key-actions` (the input row). Adding from script would misplace the
+  button next to the status line, and removing would leave stale buttons because the remove selector
+  didn't find them in the head container.
+
+Now uses `.closest(".api-key-card")` to walk up to the card, then queries `.api-key-actions` for the
+  correct container. Also scopes the selector to `[data-api-action="delete-key"]` so it doesn't
+  accidentally match other buttons that happen to use the `.delete-button` class.
+
+### 4. Test lint — split combined assertions (PT018) `tests/integration/test_api_keys_routes.py`: 6
+  occurrences of `assert spec and spec.loader` split into two separate assertions each. Better
+  failure diagnostics and satisfies the PT018 rule.
+
+### 5. Test lint — ambiguous × → plain x (RUF002) `tests/integration/test_api_keys_routes.py`:
+  replaced `1280×800, 1366×768, 1280×768` (U+00D7 MULTIPLICATION SIGN) with plain `x` in the
+  docstring of the sticky-CSS regression test.
+
+## New regression tests (+2)
+
+- `test_save_api_keys_whitespace_padded_bullets_are_rejected`: posting `" •••••••••••••••• "` must
+  still be rejected and reported in `skipped_placeholder`, existing key preserved. -
+  `test_save_api_keys_whitespace_only_is_treated_as_unchanged`: posting `" \t "` must leave the
+  existing key alone and NOT appear in `skipped_placeholder` (whitespace-only is "empty/unchanged",
+  not "rejected placeholder").
+
+## Test results
+
+- 3338 passing (was 3336 before these fixes — +2 new tests) - 2 pre-existing unrelated pyenv
+  failures in test_plugin_registry - scripts/lint.sh: ruff/black/shellcheck/mypy-strict all green
+
+* refactor: reduce saveManagedKeys complexity + hoist delete-button helpers (Sonar)
+
+SonarCloud flagged 3 new issues on PR #315 after the CodeRabbit follow-up:
+
+1. javascript:S3776 (Critical) — src/static/scripts/api_keys_page.js:98 `saveManagedKeys` cognitive
+  complexity 17, threshold 15. Fix: extracted two small helpers so the orchestration is linear — -
+  `handleManagedSaveSuccess(result)` owns the success-path branching (skipped_placeholder vs normal
+  success + updateConfiguredStatus call) - `finalizeSaveButton(saveBtn, savedOk)` owns the
+  save-button cleanup path and is reused by saveGenericKeys too, deduplicating the
+  `saveBtn.textContent = "Save"` / markClean / re-enable logic `saveManagedKeys` is now a
+  straight-line try/catch/finally.
+
+2. javascript:S7721 (Major) — api_keys_page.js:64 (addDeleteButton) 3. javascript:S7721 (Major) —
+  api_keys_page.js:87 (removeDeleteButton) Both helpers don't close over any state from
+  `createApiKeysPage` (they only touch the DOM), so Sonar wants them at the outer IIFE scope. Fix:
+  hoisted them out of `createApiKeysPage` to the module scope just inside the IIFE. Callers inside
+  `createApiKeysPage` continue to resolve them via lexical scope.
+
+No behavior changes. All 24 api-keys tests still pass; scripts/lint.sh green
+  (ruff/black/shellcheck/mypy-strict).
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.6 (2026-04-11)
 
 ### Bug Fixes
