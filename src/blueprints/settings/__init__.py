@@ -428,6 +428,14 @@ def _start_update_via_systemd(
     # journal. Every argv element below is either a string literal or has
     # passed an inline ``re.fullmatch`` sanitiser above.
     project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
+    if (
+        not isinstance(project_dir, str)
+        or not project_dir
+        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
+        or ".." in project_dir.split("/")
+    ):
+        project_dir = "/usr/local/inkypi"
+
     cmd: list[str] = [
         "systemd-run",
         "--collect",
