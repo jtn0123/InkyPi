@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_DIR = REPO_ROOT / "install"
@@ -1211,6 +1212,97 @@ class TestInstallMatrixWorkflow:
         assert mode & stat.S_IXUSR, "ci_install_matrix_verify.sh is not user-executable"
 
 
+# ---- OS drift nightly workflow (JTN-535) ----
+
+
+class TestOsDriftNightlyWorkflow:
+    """Structural assertions for the nightly OS-drift detector (JTN-535).
+
+    The nightly workflow re-runs the install sim against the latest
+    *unpinned* debian:trixie/bookworm/bullseye images so that upstream
+    package churn breaks a nightly job instead of a user's Pi Zero 2 W.
+    These tests exist primarily to prevent the file from being silently
+    deleted — losing this drift detector was the exact class of regression
+    that caused JTN-528 to slip through the whole Trixie release cycle.
+    """
+
+    WORKFLOW_PATH = WORKFLOWS_DIR / "os-drift-nightly.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert self.WORKFLOW_PATH.exists(), (
+            "os-drift-nightly.yml is missing — the JTN-535 drift detector "
+            "must not be deleted without an explicit follow-up issue."
+        )
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_workflow_file_exists(self):
+        assert self.WORKFLOW_PATH.is_file()
+
+    def test_has_schedule_block(self):
+        assert re.search(
+            r"^\s*schedule:", self.content, flags=re.MULTILINE
+        ), "os-drift-nightly.yml must keep its schedule: block"
+        assert re.search(
+            r"cron:\s*['\"]0 8 \* \* \*['\"]", self.content
+        ), "os-drift-nightly.yml must run at 08:00 UTC daily (JTN-535)"
+
+    def test_has_workflow_dispatch(self):
+        assert "workflow_dispatch:" in self.content
+
+    def test_is_not_a_pr_gate(self):
+        assert "pull_request:" not in self.content, (
+            "os-drift-nightly.yml must not have a pull_request: trigger — "
+            "it is a drift detector, not a PR gate (JTN-535)"
+        )
+
+    def test_matrix_covers_all_three_codenames(self):
+        for codename in ("trixie", "bookworm", "bullseye"):
+            assert (
+                codename in self.content
+            ), f"os-drift-nightly.yml must exercise debian:{codename}"
+
+    def test_uses_unpinned_debian_images(self):
+        assert re.search(
+            r"image:\s*debian:\$\{\{\s*matrix\.codename\s*\}\}",
+            self.content,
+        ), "os-drift-nightly.yml must use unpinned debian:${{ matrix.codename }}"
+
+    def test_asserts_debian_and_pip_requirements(self):
+        assert "install/debian-requirements.txt" in self.content
+        assert "install/requirements.txt" in self.content
+        assert "apt-cache show" in self.content
+        assert "--dry-run" in self.content
+
+    def test_runs_end_to_end_install_sim(self):
+        assert "scripts/sim_install.sh" in self.content
+
+    def test_files_issue_on_failure(self):
+        assert "actions/github-script" in self.content
+        assert "os-drift" in self.content
+        assert "issues.create" in self.content
+
+    def test_references_jtn_535(self):
+        assert "JTN-535" in self.content
+
+    def test_workflow_parses_as_yaml(self):
+        parsed = yaml.safe_load(self.content)
+        assert isinstance(parsed, dict), "os-drift-nightly.yml must parse to a mapping"
+        assert ("on" in parsed or True in parsed), (
+            "os-drift-nightly.yml must define workflow triggers"
+        )
+        assert "jobs" in parsed, "os-drift-nightly.yml must define jobs"
+
+        jobs = parsed["jobs"]
+        assert isinstance(jobs, dict), "workflow jobs must parse as a mapping"
+
+        matrix = jobs["drift-check"]["strategy"]["matrix"]
+        assert isinstance(matrix, dict), "drift-check matrix must parse as a mapping"
+        assert isinstance(matrix["codename"], list), (
+            "drift-check matrix.codename must remain a list of distro names"
+        )
+
+
 # ---- memory-diff workflow ----
 
 
@@ -1229,58 +1321,33 @@ class TestMemoryDiffWorkflow:
         self.content = self.WORKFLOW_PATH.read_text()
 
     def test_workflow_runs_on_pull_requests(self):
-        # Every PR must get a memory diff comment — this is the whole point
-        # of JTN-610. Running on push or schedule instead would defeat the
-        # purpose.
         assert "pull_request:" in self.content
 
     def test_workflow_cancels_superseded_runs(self):
-        # A force-push should not stack memory-diff runs on top of each
-        # other; the concurrency group must cancel stale runs so we only
-        # ever post the freshest comment.
         assert "concurrency:" in self.content
         assert "cancel-in-progress: true" in self.content
 
     def test_workflow_references_memray(self):
-        # The preferred backend per JTN-610 is memray. Even though the
-        # helper script falls back to tracemalloc, the workflow should
-        # install memray explicitly so the comment contains the richer
-        # per-allocator breakdown whenever possible.
         assert "memray" in self.content
 
     def test_workflow_is_non_blocking(self):
-        # Hard RSS budgets are JTN-608's job. This job must not fail the PR
-        # even when memory regresses — it is informational. Both the job
-        # and every step need to keep going on failure.
         assert "continue-on-error: true" in self.content
 
     def test_workflow_invokes_helper_scripts(self):
-        # The workflow must call both the capture helper and the formatter
-        # helper — bypassing them would drift the comment format away from
-        # what the unit tests exercise.
         assert "scripts/memory_diff.py" in self.content
         assert "scripts/format_memory_diff.py" in self.content
 
     def test_workflow_posts_sticky_comment(self):
-        # Uses actions/github-script (or an equivalent sticky-comment
-        # action) and searches by the marker so force-pushes overwrite the
-        # existing comment instead of piling new ones onto the PR.
         assert "github-script" in self.content or "comment-pull-request" in self.content
         assert "memory-diff:jtn-610" in self.content
 
     def test_workflow_grants_pr_write_permission(self):
-        # Posting/updating comments requires pull-requests: write. Without
-        # this the github-script step cannot create the sticky comment.
         assert "pull-requests: write" in self.content
 
     def test_workflow_checks_out_base_branch(self):
-        # The diff is only meaningful if we measure both sides — the
-        # workflow must explicitly checkout the base branch.
         assert "github.base_ref" in self.content
 
     def test_capture_helper_exists_and_is_valid_python(self):
-        # Structural check that the capture helper is present; we compile
-        # it to catch syntax errors introduced by future edits.
         helper = self.SCRIPTS_DIR / "memory_diff.py"
         assert helper.exists(), f"Missing {helper}"
         compile(helper.read_text(), str(helper), "exec")
@@ -1291,23 +1358,15 @@ class TestMemoryDiffWorkflow:
         compile(helper.read_text(), str(helper), "exec")
 
     def test_formatter_uses_stable_sticky_marker(self):
-        # The marker is the contract between the formatter and the
-        # workflow. If either side changes it without the other the
-        # sticky-comment overwrite logic silently regresses to spam mode.
         formatter = (self.SCRIPTS_DIR / "format_memory_diff.py").read_text()
         assert 'STICKY_MARKER = "<!-- memory-diff:jtn-610 -->"' in formatter
 
     def test_capture_helper_supports_both_backends(self):
-        # memray is preferred but tracemalloc is the graceful fallback
-        # when memray is missing (JTN-610: tolerant of first-time setup).
         capture = (self.SCRIPTS_DIR / "memory_diff.py").read_text()
         assert "memray" in capture
         assert "tracemalloc" in capture
 
     def test_memray_listed_in_requirements_dev_in(self):
-        # The lockfile regen happens under JTN-597's advisory
-        # lockfile-drift check, but the .in file must be updated so the
-        # next regen picks up memray for future PRs.
         content = (INSTALL_DIR / "requirements-dev.in").read_text()
         assert "memray" in content, (
             "memray must be declared in install/requirements-dev.in so the "

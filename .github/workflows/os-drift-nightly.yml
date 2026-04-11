@@ -1,0 +1,360 @@
+name: OS drift nightly
+
+# Drift detector for the install path (JTN-535). Re-runs the install
+# simulator against the LATEST unpinned debian:trixie, debian:bookworm, and
+# debian:bullseye images so any upstream package rename, GPG-signature
+# tightening, or repo change breaks a nightly job instead of a user's Pi.
+#
+# This is the UNPINNED complement to the PR-gating install matrix (JTN-530).
+# On the day job, pinned images catch regressions introduced by our code.
+# On the nightly, unpinned images catch regressions introduced by Debian
+# or Pi OS shipping a new upstream package set under us.
+#
+# IMPORTANT: this workflow intentionally has NO PR trigger. It is a drift
+# detector, not a PR gate — a broken nightly must not block merges. See
+# docs/testing.md ("OS drift nightly") for failure triage guidance.
+
+on:
+  schedule:
+    # 08:00 UTC daily, deliberately after the Debian/Pi OS mirror rebuild
+    # windows so we see the day's fresh packages.
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      codename:
+        description: 'Limit the run to a single codename (optional)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - trixie
+          - bookworm
+          - bullseye
+
+permissions:
+  contents: read
+
+concurrency:
+  group: os-drift-nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  drift-check:
+    name: OS drift — debian:${{ matrix.codename }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        codename: [trixie, bookworm, bullseye]
+    # Run all steps directly inside the unpinned debian:${codename} image so
+    # the apt-cache and pip resolution checks exercise the same package set
+    # install.sh would see on that OS base. The :latest tag is intentional —
+    # we WANT to fail if Debian ships a breaking change.
+    container:
+      image: debian:${{ matrix.codename }}
+      options: --user root
+    steps:
+      - name: Skip leg if not selected (workflow_dispatch)
+        id: skip
+        run: |
+          set -euo pipefail
+          selected='${{ github.event.inputs.codename }}'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "${{ matrix.codename }}" ]; then
+            echo "Leg ${{ matrix.codename }} not selected; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record base image digest
+        id: image
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          echo "Image       : debian:${{ matrix.codename }}"
+          echo "Container   : $(cat /etc/os-release | grep PRETTY_NAME)"
+          echo "Architecture: $(uname -m)"
+          {
+            echo "pretty_name=$(grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release || echo unknown)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap container tooling
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          # `container:` images start bare — install just enough to check
+          # out the repo and run the later steps. Keep this small so the
+          # failure modes we actually care about (apt-cache lookups, pip
+          # resolution, install.sh) are the dominant signal.
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            gnupg \
+            python3 \
+            python3-pip \
+            python3-venv \
+            sudo
+
+      - name: Checkout
+        if: steps.skip.outputs.skip != 'true'
+        uses: actions/checkout@v4
+
+      - name: Assert debian-requirements.txt resolves on this OS
+        id: apt_check
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          REQ_FILE=install/debian-requirements.txt
+          if [ ! -f "$REQ_FILE" ]; then
+            echo "ERROR: $REQ_FILE is missing" >&2
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          FAILED_LOG=artifacts/apt-missing-${{ matrix.codename }}.txt
+          : > "$FAILED_LOG"
+
+          # Refresh the apt index from the unpinned debian mirror.
+          apt-get update
+
+          MISSING=0
+          # Read the requirements file, skipping blank lines and comments.
+          # Each line is a single package name (no versions).
+          while IFS= read -r pkg; do
+            # Trim whitespace and strip inline comments.
+            pkg="${pkg%%#*}"
+            pkg="$(echo "$pkg" | tr -d '[:space:]')"
+            [ -z "$pkg" ] && continue
+
+            if apt-cache show "$pkg" >/dev/null 2>&1; then
+              echo "  OK   $pkg"
+            else
+              echo "  MISS $pkg" | tee -a "$FAILED_LOG"
+              MISSING=$((MISSING + 1))
+            fi
+          done < "$REQ_FILE"
+
+          echo "missing_count=${MISSING}" >> "$GITHUB_OUTPUT"
+          if [ "$MISSING" -gt 0 ]; then
+            echo "ERROR: ${MISSING} apt package(s) missing on debian:${{ matrix.codename }}" >&2
+            exit 1
+          fi
+          echo "All apt packages resolve on debian:${{ matrix.codename }}."
+
+      - name: Assert requirements.txt resolves via pip (dry-run)
+        id: pip_check
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          REQ_FILE=install/requirements.txt
+          if [ ! -f "$REQ_FILE" ]; then
+            echo "ERROR: $REQ_FILE is missing" >&2
+            exit 1
+          fi
+
+          mkdir -p artifacts
+          LOG=artifacts/pip-dryrun-${{ matrix.codename }}.log
+
+          # Install just enough build tooling for pip's resolver. We do NOT
+          # install OS build deps here — the intent is to check the RESOLVER
+          # sees every pinned wheel/hash, not to compile from source. If a
+          # package is unavailable on PyPI the dry-run will fail with a clear
+          # "No matching distribution" message.
+          python3 -m venv /tmp/drift-venv
+          # shellcheck disable=SC1091
+          . /tmp/drift-venv/bin/activate
+          python -m pip install --upgrade pip wheel
+
+          set +e
+          # --dry-run exercises the resolver + hash verification without
+          # actually installing anything, so it is fast and deterministic.
+          # --ignore-installed avoids skipping deps that happen to be present
+          # on the base image.
+          pip install \
+            --dry-run \
+            --ignore-installed \
+            --retries 3 \
+            --timeout 60 \
+            -r "$REQ_FILE" 2>&1 | tee "$LOG"
+          rc=${PIPESTATUS[0]}
+          set -e
+
+          echo "exit_code=${rc}" >> "$GITHUB_OUTPUT"
+          if [ "$rc" -ne 0 ]; then
+            echo "ERROR: pip resolver failed for install/requirements.txt on debian:${{ matrix.codename }}" >&2
+            exit "$rc"
+          fi
+          echo "pip resolver accepted all pinned dependencies."
+
+      - name: Upload drift artifacts
+        if: always() && steps.skip.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-drift-${{ matrix.codename }}
+          path: artifacts/
+          if-no-files-found: ignore
+
+  install-sim:
+    name: Install sim — debian:${{ matrix.codename }} (end-to-end)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    needs: drift-check
+    # Run even if drift-check fails — a missing package on one leg should not
+    # prevent the install sim from exercising the other legs.
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        codename: [trixie, bookworm, bullseye]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Skip leg if not selected (workflow_dispatch)
+        id: skip
+        run: |
+          set -euo pipefail
+          selected='${{ github.event.inputs.codename }}'
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "${{ matrix.codename }}" ]; then
+            echo "Leg ${{ matrix.codename }} not selected; skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up QEMU for arm64 emulation
+        if: steps.skip.outputs.skip != 'true'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Run install sim end-to-end
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          LOG="artifacts/install-sim-${{ matrix.codename }}.log"
+          # Reuse the JTN-532 simulator — it already handles the Pi OS apt
+          # repo, the raspi-config shim, the 512 MB memory cap, and arm64
+          # emulation to match real Pi Zero 2 W hardware. The codename is
+          # passed straight through as the unpinned base image tag, so this
+          # is the nightly drift-detection variant of the same sim the day
+          # job runs against pinned digests.
+          ./scripts/sim_install.sh ${{ matrix.codename }} 2>&1 | tee "$LOG"
+          exit ${PIPESTATUS[0]}
+
+      - name: Upload install sim log
+        if: always() && steps.skip.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-sim-${{ matrix.codename }}
+          path: artifacts/install-sim-${{ matrix.codename }}.log
+          if-no-files-found: error
+
+  open-issue-on-failure:
+    name: Open drift issue on failure
+    needs: [drift-check, install-sim]
+    if: failure() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download drift artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+        continue-on-error: true
+
+      - name: Summarise failures and file issue
+        uses: actions/github-script@v7
+        env:
+          DRIFT_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Gather any per-codename diagnostic logs produced by drift-check.
+            const artifactRoot = 'artifacts';
+            const sections = [];
+            if (fs.existsSync(artifactRoot)) {
+              for (const entry of fs.readdirSync(artifactRoot)) {
+                const dir = path.join(artifactRoot, entry);
+                if (!fs.statSync(dir).isDirectory()) continue;
+                for (const file of fs.readdirSync(dir)) {
+                  const full = path.join(dir, file);
+                  try {
+                    const body = fs.readFileSync(full, 'utf8').trim();
+                    if (body.length === 0) continue;
+                    const truncated = body.length > 4000 ? body.slice(0, 4000) + '\n... (truncated)' : body;
+                    sections.push(`### \`${file}\`\n\n\`\`\`\n${truncated}\n\`\`\``);
+                  } catch (err) {
+                    core.warning(`Could not read ${full}: ${err.message}`);
+                  }
+                }
+              }
+            }
+
+            const runUrl = process.env.DRIFT_RUN_URL;
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `OS drift nightly failed (${today})`;
+
+            const body = [
+              `The nightly OS drift detector failed. See [run log](${runUrl}) for full details.`,
+              ``,
+              `This workflow re-runs the install sim against **unpinned** \`debian:trixie\`, \`debian:bookworm\`, and \`debian:bullseye\` images. A failure means either:`,
+              ``,
+              `- An apt package in \`install/debian-requirements.txt\` was renamed/removed in Debian`,
+              `- A pinned pip dependency in \`install/requirements.txt\` no longer resolves`,
+              `- \`install/install.sh\` broke end-to-end under the latest OS base`,
+              ``,
+              `**Triage:** compare which matrix legs failed (trixie / bookworm / bullseye) — a single-leg failure usually means an upstream package change specific to that release; a multi-leg failure usually means our repo changed.`,
+              ``,
+              `---`,
+              ``,
+              sections.length > 0 ? sections.join('\n\n') : '_No diagnostic artifacts were captured._',
+              ``,
+              `---`,
+              ``,
+              `Tracked via JTN-535. If you are closing this issue without a code change, also check whether the upstream package or Pi OS repo has since self-healed before the next nightly run.`,
+            ].join('\n');
+
+            // De-dupe: if an open drift issue with the same title already
+            // exists, just add a comment pointing to this run instead of
+            // filing a fresh one.
+            const { owner, repo } = context.repo;
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner,
+              repo,
+              labels: 'os-drift',
+              state: 'open',
+              per_page: 50,
+            });
+            const dupe = existing.find(i => i.title === title);
+            if (dupe) {
+              core.info(`Appending comment to existing issue #${dupe.number}`);
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: dupe.number,
+                body: `Another nightly run failed: ${runUrl}`,
+              });
+              return;
+            }
+
+            const { data: created } = await github.rest.issues.create({
+              owner,
+              repo,
+              title,
+              body,
+              labels: ['os-drift', 'bug'],
+            });
+            core.info(`Filed drift issue #${created.number}: ${created.html_url}`);
