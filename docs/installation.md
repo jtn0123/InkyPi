@@ -72,3 +72,94 @@ As of the version that resolves [JTN-592](https://linear.app/jtn0123/issue/JTN-5
 ### Pi Zero W vs Pi Zero 2 W
 
 The "[Known Issues during Pi Zero W Installation](./troubleshooting.md#known-issues-during-pi-zero-w-installation)" section in the troubleshooting guide refers to the **original** 32-bit Pi Zero W, not the Pi Zero 2 W. The Zero 2 W is much more capable (4× Cortex-A53, ARMv8) and doesn't hit the same pip install issues — provided zramswap is enabled, which is automatic on InkyPi v0.28.1+.
+
+## Re-editing user-data after first boot (cloud-init runcmd one-shot trap)
+
+> **Observed on a real Pi Zero 2 W on 2026-04-10 (JTN-591).** This section exists because it's a completely silent failure that is very hard to diagnose on your own.
+
+### What the trap looks like
+
+You flash an SD card with Pi Imager, boot the Pi (maybe Wi-Fi fails, or you just want to add InkyPi later), re-mount the card on your computer, add a `runcmd:` block to `/boot/firmware/user-data`, insert the card, and boot again. The Pi joins the network fine — but `runcmd` never ran. The cloned repo is missing. No `inkypi.service`. No install logs.
+
+### Why it happens
+
+cloud-init's `runcmd` is a **per-instance one-shot module**. On first boot, cloud-init records a unique instance ID (typically something like `rpi-imager-1772926083770`) in:
+
+```
+/var/lib/cloud/data/instance-id
+```
+
+On every subsequent boot of that same SD card, cloud-init compares the current instance ID against the recorded one. They match, so cloud-init considers this boot "already done" and **skips all per-instance modules — including `runcmd` — completely silently**. It will not log an error. It will not warn you. The rendered `runcmd` shell script at `/var/lib/cloud/instances/<id>/scripts/runcmd` is simply the one baked during first boot (which was empty if you hadn't added `runcmd:` yet).
+
+**This trap fires whenever:**
+1. You flash an SD card and boot the Pi at least once (even a failed Wi-Fi boot counts).
+2. You re-mount the SD card on your computer and add or change the `runcmd:` block in `user-data`.
+3. You boot the Pi again.
+
+### How to detect it
+
+SSH into the Pi and check these signals:
+
+```bash
+# Is the instance-id file present? (It will be if the Pi booted at least once.)
+cat /var/lib/cloud/data/instance-id
+
+# Is the rendered runcmd script empty or missing the InkyPi commands?
+cat /var/lib/cloud/instances/$(cat /var/lib/cloud/data/instance-id)/scripts/runcmd
+
+# Check cloud-init logs — you will NOT see any runcmd output if it was skipped.
+sudo journalctl -u cloud-init -n 100
+sudo cat /var/log/cloud-init-output.log
+```
+
+If `runcmd` lines are absent from the logs and the rendered script is empty, you've hit the trap.
+
+### How to recover — Option A (recommended)
+
+On the Pi (via SSH), reset cloud-init state and reboot:
+
+```bash
+sudo cloud-init clean --logs
+sudo reboot
+```
+
+After reboot, cloud-init will treat this as a fresh instance, regenerate the rendered `runcmd` script from the current `user-data`, and execute it. The InkyPi install will proceed normally.
+
+A convenience wrapper script is provided at `scripts/cloud_init_clean.sh` — you can copy it to the Pi and run it there.
+
+### How to recover — Option B (without SSH)
+
+If you cannot SSH into the Pi, you can reset the instance ID from your computer while the SD card is mounted:
+
+```bash
+# On your Mac/Linux machine, with the SD card mounted (adjust the mount path):
+sudo rm -rf /Volumes/bootfs/../rootfs/var/lib/cloud/instances/
+sudo rm -f  /Volumes/bootfs/../rootfs/var/lib/cloud/data/instance-id
+```
+
+On your next boot, cloud-init will create a new instance record and run `runcmd` from scratch.
+
+### How to recover — Option C (edit instance-id)
+
+Alternatively, you can force a new instance ID by editing the file before reboot:
+
+```bash
+# On the Pi via SSH:
+echo "fresh-instance-$(date +%s)" | sudo tee /var/lib/cloud/data/instance-id
+sudo reboot
+```
+
+cloud-init will see a new instance ID and re-run all per-instance modules.
+
+### Preventing the trap
+
+If you know you'll need to iterate on `user-data` before the install is final, add the following at the **top** of your `user-data` file so cloud-init always runs `runcmd` regardless of instance ID:
+
+```yaml
+#cloud-config
+# Force cloud-init to re-run per-instance modules on every boot.
+# Remove this line once the install is stable.
+always_rerun_modules: [runcmd]
+```
+
+> **Warning:** `always_rerun_modules: [runcmd]` makes `runcmd` run on *every* boot. Remove it once your install is confirmed working, or the install script will re-run each time the Pi reboots.
