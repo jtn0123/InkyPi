@@ -1,6 +1,55 @@
 # CHANGELOG
 
 
+## v0.36.0 (2026-04-11)
+
+### Bug Fixes
+
+- Separate watchdog heartbeat thread (JTN-596) ([#310](https://github.com/jtn0123/InkyPi/pull/310),
+  [`6cc2c74`](https://github.com/jtn0123/InkyPi/commit/6cc2c74be9a8e5d4ebd8eb0186088e37ce272769))
+
+Spawn a dedicated WatchdogHeartbeat daemon thread in RefreshTask.start() that pings systemd every
+  WATCHDOG_USEC/2 seconds (default 30s), completely decoupled from the refresh cycle.
+
+Previously _notify_watchdog() was called only once per loop in _run(), then _wait_for_trigger()
+  blocked for up to plugin_cycle_interval_seconds (default 3600s). With WatchdogSec=120 in
+  inkypi.service this caused systemd to SIGABRT the process at T+120s on every fresh install with an
+  empty playlist, producing a restart loop (80+ restarts/hour observed on a real Pi Zero 2 W).
+
+The heartbeat interval is auto-calculated from WATCHDOG_USEC (set by systemd when WatchdogSec= is
+  configured), so it tracks the unit file without code changes. The thread wakes on
+  condition.notify_all() so shutdown is responsive.
+
+Adds 11 unit tests covering interval parsing, thread lifecycle, ping cadence, graceful shutdown, and
+  the no-op path when cysystemd is unavailable.
+
+Fixes: JTN-596 (chain bug with JTN-594)
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- Consistent input validation and log sanitization (JTN-501, Grade B5)
+  ([#309](https://github.com/jtn0123/InkyPi/pull/309),
+  [`03925d3`](https://github.com/jtn0123/InkyPi/commit/03925d3315ccef4c8c1d629942950ba3bd76e496))
+
+Extends src/utils/form_utils.py with ValidationError, validate_int_range, sanitize_for_log alias,
+  and validate_json_schema — making schema-backed validation available to all blueprints without
+  extra dependencies.
+
+Hardens src/blueprints/settings/_config.py to reject out-of-range image adjustment values
+  (saturation/brightness/sharpness/contrast now bounded 0–10), invalid orientation and
+  previewSizeMode enum values, and NaN/inf floats that were previously silently saved.
+
+Adds 38 unit tests (tests/unit/test_input_validator.py) and 22 integration tests
+  (tests/integration/test_validation_routes.py) covering valid paths, missing fields, wrong types,
+  range violations, and enum enforcement. Test count: 3174 → 3272 (+98).
+
+Closes JTN-501
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.35.0 (2026-04-11)
 
 ### Documentation
