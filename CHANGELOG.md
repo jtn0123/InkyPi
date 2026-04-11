@@ -1,6 +1,35 @@
 # CHANGELOG
 
 
+## v0.37.2 (2026-04-11)
+
+### Bug Fixes
+
+- Reclaim /var/swap when zram is active (JTN-593)
+  ([#313](https://github.com/jtn0123/InkyPi/pull/313),
+  [`d2fb804`](https://github.com/jtn0123/InkyPi/commit/d2fb804fe999770d249002559745dd7ed4c8edb2))
+
+Pi OS Trixie ships both zram-swap (active at /dev/zram0) and dphys-swapfile (leaves a ~425 MB
+  /var/swap on the SD card). The file is dead weight because zram takes priority and dphys-swapfile
+  never swaps to it. Add maybe_disable_dphys_swapfile() which detects an active zram device in
+  /proc/swaps and, only then, disables and removes dphys-swapfile to reclaim ~425 MB. The function
+  is a strict no-op on any system without /dev/zram active.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Cloud-init runcmd one-shot trap recovery (JTN-591)
+  ([#312](https://github.com/jtn0123/InkyPi/pull/312),
+  [`5aa7f4d`](https://github.com/jtn0123/InkyPi/commit/5aa7f4d5eccb3c6eb401c2e03d925e7652edc639))
+
+Document the silent cloud-init runcmd skip that occurs when a user re-mounts an SD card and edits
+  user-data after first boot. Observed on a real Pi Zero 2 W on 2026-04-10. Adds recovery steps
+  (cloud-init clean --logs + reboot), a convenience helper script, and structural tests.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.37.1 (2026-04-11)
 
 ### Bug Fixes
