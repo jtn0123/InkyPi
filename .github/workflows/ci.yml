@@ -626,25 +626,37 @@ jobs:
           if-no-files-found: ignore
 
   install-matrix:
-    # JTN-530: end-to-end install.sh matrix against every supported Pi OS base
-    # (Bullseye/Bookworm/Trixie). JTN-528 silently broke Trixie installs for
-    # an entire release cycle because no CI job ran install.sh against each
-    # OS. This job guarantees that never happens again: every PR runs the real
-    # install.sh inside an arm64 Debian container (with the Pi OS apt repo
-    # layered on for liblgpio-dev / chromium-headless-shell) for each codename
-    # and asserts exit 0 + venv + systemd unit parse.
+    # JTN-530: end-to-end install.sh matrix against every supported Pi OS base.
+    # JTN-528 silently broke Trixie installs for an entire release cycle
+    # because no CI job ran install.sh against each OS. This job guarantees
+    # that never happens again: every PR runs the real install.sh inside an
+    # arm64 Debian container (with the Pi OS apt repo layered on for
+    # liblgpio-dev / chromium-headless-shell) for each codename and asserts
+    # exit 0 + venv + systemd unit parse.
     #
     # The Dockerfile is scripts/Dockerfile.install-matrix; the verification
     # script that runs inside the container is scripts/ci_install_matrix_verify.sh.
     # Memory is capped at 512 MB to inherit the JTN-536 OOM regression gate so
-    # this job also catches Trixie-specific OOMs during install.
+    # this job also catches codename-specific OOMs during install.
+    #
+    # JTN-615: bullseye (Debian 11) ships Python 3.9.2 but InkyPi's
+    # requirements.txt pins packages that require Python>=3.10 (anyio==4.13.0
+    # is the first to bomb the uv resolver; others follow). The project also
+    # declares `target-version = "py311"` in pyproject.toml's ruff + black
+    # config, so bullseye has never been a real install target — the matrix
+    # only appeared to cover it historically because install.sh silently
+    # swallowed uv/pip failures (see JTN-615 root cause analysis). Dropping
+    # bullseye here reflects reality; the standalone Install matrix (arm64 e2e)
+    # workflow still runs bullseye via test_install_memcap.sh, which uses a
+    # python:3.12-slim base image and therefore isn't blocked by Debian 11's
+    # interpreter version.
     name: Install matrix (${{ matrix.codename }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        codename: [bullseye, bookworm, trixie]
+        codename: [bookworm, trixie]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

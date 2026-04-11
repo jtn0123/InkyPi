@@ -1470,13 +1470,21 @@ class TestInstallMatrixWorkflow:
     def test_install_matrix_job_defined(self):
         assert "install-matrix:" in self.ci_yaml
 
-    def test_install_matrix_references_all_three_os_bases(self):
+    def test_install_matrix_references_supported_os_bases(self):
+        # JTN-615: bullseye was removed from the ci.yml install-matrix
+        # because Debian 11 ships Python 3.9.2 while InkyPi's requirements
+        # pin packages that need Python>=3.10 (anyio==4.13.0 is the first
+        # to bomb the uv resolver). pyproject.toml also targets py311. The
+        # standalone Install matrix (arm64 e2e) workflow still exercises
+        # bullseye via test_install_memcap.sh because that path uses a
+        # python:3.12-slim base image and therefore isn't blocked by the
+        # codename's own interpreter version.
         import yaml
 
         data = yaml.safe_load(self.ci_yaml)
         job = data["jobs"]["install-matrix"]
         codenames = job["strategy"]["matrix"]["codename"]
-        assert set(codenames) == {"bullseye", "bookworm", "trixie"}
+        assert set(codenames) == {"bookworm", "trixie"}
 
     def test_install_matrix_runs_on_arm64(self):
         assert "linux/arm64" in self.ci_yaml
