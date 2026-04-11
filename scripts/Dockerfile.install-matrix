@@ -1,0 +1,104 @@
+# syntax=docker/dockerfile:1.6
+#
+# Dockerfile.install-matrix — CI-only image that runs install/install.sh
+# end-to-end against a Pi OS codename (bullseye / bookworm / trixie) inside an
+# arm64 container.
+#
+# This file is used by the `install-matrix` job in .github/workflows/ci.yml
+# (JTN-530). It is *NOT* the same as Dockerfile.sim-install (which powers the
+# local `scripts/sim_install.sh` developer harness). The two files intentionally
+# diverge on two points:
+#
+#   1. This image ships the `systemd` package so `systemd-analyze verify` can
+#      parse install/inkypi.service as part of post-install assertions.
+#   2. This image ships an explicit `/usr/bin/systemctl` no-op shim so install.sh
+#      calls like `systemctl daemon-reload` / `systemctl enable --now <unit>` are
+#      guaranteed to succeed inside a non-systemd chroot, regardless of what the
+#      `systemd` package installed.
+#
+# We deliberately use plain `debian:<codename>` tags (no date pins). The Pi OS
+# apt repo is layered on top so Pi-specific packages like `liblgpio-dev` and
+# `chromium-headless-shell` resolve without requiring a full Pi OS image.
+#
+# NOTE: `[trusted=yes]` on the Pi OS apt line is a sim-only workaround for
+# Debian Trixie's sqv rejecting the SHA1 signature used by archive.raspberrypi.com.
+# Real Pi OS ships its own patched apt that does NOT hit this issue — do NOT
+# copy this line to production configs. The same caveat applies to
+# Dockerfile.sim-install.
+
+ARG CODENAME=trixie
+FROM debian:${CODENAME}
+
+ARG CODENAME=trixie
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Base dependencies needed by install.sh plus systemd (for `systemd-analyze
+# verify`) and sudo (install.sh uses sudo even when running as root).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        sudo \
+        lsb-release \
+        ncurses-bin \
+        curl \
+        git \
+        ca-certificates \
+        gnupg \
+        systemd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add the Raspberry Pi OS apt repo so Pi-only packages (liblgpio-dev,
+# chromium-headless-shell, ...) resolve. See the header note for why
+# [trusted=yes] is used.
+RUN echo "deb [trusted=yes] http://archive.raspberrypi.com/debian/ ${CODENAME} main" \
+    > /etc/apt/sources.list.d/raspi.list \
+    && apt-get update \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install a no-op raspi-config shim so install.sh's `raspi-config nonint …`
+# calls succeed without real hardware or the full raspi-config package.
+RUN printf '#!/bin/sh\n# CI-only no-op raspi-config shim (JTN-530)\nexit 0\n' \
+    > /usr/sbin/raspi-config \
+    && chmod +x /usr/sbin/raspi-config
+
+# Install a no-op systemctl shim that swallows the handful of calls install.sh
+# makes (daemon-reload, enable, is-active, disable, start, stop). This is
+# belt-and-suspenders on top of the `systemd` package: a container has no
+# running systemd, so the real systemctl binary errors on every call anyway.
+# The shim always exits 0 except for `is-active` (exits 3 = "not active") so
+# install.sh's `stop_service` takes the "not running" branch.
+#
+# We install into both /bin and /usr/bin because install.sh uses
+# `/usr/bin/systemctl` explicitly in a couple of places (see JTN-600's
+# stop_service hardening).
+RUN printf '%s\n' \
+        '#!/bin/sh' \
+        '# CI-only no-op systemctl shim (JTN-530)' \
+        'case "$1" in' \
+        '  is-active) exit 3 ;;' \
+        '  *) exit 0 ;;' \
+        'esac' \
+    > /usr/bin/systemctl \
+    && chmod +x /usr/bin/systemctl \
+    && ln -sf /usr/bin/systemctl /bin/systemctl
+
+# install.sh's enable_interfaces() reads /boot/firmware/config.txt (or
+# /boot/config.txt) and will exit 1 if neither exists. Create a minimal stub
+# that looks like a Pi boot config so the sed/grep lines operate on real data.
+RUN mkdir -p /boot/firmware \
+    && printf '%s\n' \
+        '# CI-only /boot/firmware/config.txt stub (JTN-530)' \
+        'dtparam=audio=on' \
+        'dtparam=spi=off' \
+        'dtparam=i2c_arm=off' \
+    > /boot/firmware/config.txt
+
+# Copy the local checkout into the image so we exercise the branch under test,
+# not whatever is on GitHub. The entrypoint script (passed in via docker run)
+# will cd to /InkyPi/install and invoke install.sh.
+COPY . /InkyPi
+
+WORKDIR /InkyPi/install
+
+# Default command runs install.sh; CI overrides this to add verification steps.
+CMD ["bash", "./install.sh"]
