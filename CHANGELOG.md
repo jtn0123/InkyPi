@@ -1,6 +1,247 @@
 # CHANGELOG
 
 
+## v0.32.0 (2026-04-10)
+
+### Features
+
+- Fallback error-card image + circuit-breaker persistence (JTN-499)
+  ([#299](https://github.com/jtn0123/InkyPi/pull/299),
+  [`25d7755`](https://github.com/jtn0123/InkyPi/commit/25d775527d7f80804c12b0e4e1f461a4f5f22d16))
+
+* feat: fallback error-card image + circuit-breaker persistence (JTN-499, Grade B3)
+
+When a plugin's generate_image() raises, the display no longer stays frozen on stale content. A
+  human-readable error-card (plugin name, instance, error class, truncated message, timestamp) is
+  rendered via the new `utils/fallback_image.render_error_image()` helper and pushed to the display
+  immediately.
+
+The same pattern is applied to the `update_now` direct-execution path in `blueprints/plugin.py` so
+  preview-mode failures are visible on screen.
+
+Circuit-breaker state (consecutive_failure_count, paused) is now persisted to `device.json` via
+  `write_config()` on every failure and on recovery, surviving daemon restarts. A new
+  `disabled_reason` field on PluginInstance is populated when a plugin is paused and cleared on
+  recovery; it is included in `to_dict()` / `from_dict()` so the value round-trips through the
+  config file.
+
+Tests: - 15 new unit tests in tests/unit/test_plugin_failure_fallback.py - Updated
+  tests/integration/test_refresh_cycle.py to assert the fallback is pushed (not absent) on plugin
+  failure
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor: extract _update_now_direct to reduce cognitive complexity (S3776)
+
+Splits the direct-execution branch of update_now() into two focused helpers: _update_now_direct()
+  and _push_update_now_fallback(). This drops the function cognitive complexity from 19 to ≤15 as
+  required by SonarCloud S3776.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.31.0 (2026-04-10)
+
+### Features
+
+- Accessor + reset_for_tests() for utils singletons (JTN-493)
+  ([#298](https://github.com/jtn0123/InkyPi/pull/298),
+  [`56715b0`](https://github.com/jtn0123/InkyPi/commit/56715b00f89a95f90f18eaa4ba615e7b917cb5fa))
+
+* feat: add explicit accessors and reset_for_tests() to utils singletons (JTN-493)
+
+Add get_http_session()/reset_for_tests() to http_client, get_http_cache()/reset_for_tests() to
+  http_cache, and get_translations()/get_active_locale()/reset_for_tests() to i18n. Wire an autouse
+  pytest fixture in conftest.py to scrub all three singletons between tests, eliminating
+  order-dependent test pollution. src/inkypi.py and plugin_registry.py globals are intentionally out
+  of scope (follow-up). Grade A1.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: add coverage for accessor and reset_for_tests() functions (JTN-493)
+
+Cover the new get_http_cache(), reset_for_tests() (http_client/http_cache/i18n), get_translations(),
+  and get_active_locale() helpers so the SonarCloud new-code coverage gate reaches >= 80%.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.30.0 (2026-04-10)
+
+### Features
+
+- Add sim_install.sh + Dockerfile for local install.sh verification (JTN-532)
+  ([#291](https://github.com/jtn0123/InkyPi/pull/291),
+  [`2e5f934`](https://github.com/jtn0123/InkyPi/commit/2e5f93471a8035e6607572d68d50fbe648d8a543))
+
+* feat: add sim_install.sh + Dockerfile for local install.sh verification (JTN-532)
+
+Adds scripts/sim_install.sh and scripts/Dockerfile.sim-install so contributors can run
+  install/install.sh end-to-end in an arm64 container that mimics the Pi Zero 2 W (512 MB RAM)
+  without real hardware.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix: address CodeRabbit review on sim_install.sh + Dockerfile (JTN-532)
+
+- Dockerfile: combine raspi.list + apt-get update in single RUN layer and clean apt lists; expand
+  sim-only warning comment for trusted=yes - sim_install.sh: reject extra positional arguments; wrap
+  docker run in if/else so RUN_EXIT is always set regardless of set -e
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
+## v0.29.0 (2026-04-10)
+
+### Continuous Integration
+
+- Enforce browser-smoke as required CI check via ci-gate job (JTN-510)
+  ([#292](https://github.com/jtn0123/InkyPi/pull/292),
+  [`2b2ed59`](https://github.com/jtn0123/InkyPi/commit/2b2ed597fd25c2d01cea4fe7da8b4b1ad6c13ee2))
+
+* ci: add ci-gate job and enforce browser-smoke as required check (JTN-510)
+
+- Add `ci-gate` summary job that needs lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix,
+  coverage-gate, security, and browser-smoke; the single gate name is what repo owner must mark as
+  required in GitHub branch protection (steps documented in docs/development.md) - Expand
+  CONTRIBUTING.md with a dedicated "Running Browser Tests Locally" section explaining SKIP_BROWSER
+  purpose, when it is and isn't acceptable, and the exact command required for frontend-touching PRs
+  - Update PR checklist (pull_request_template.md + CONTRIBUTING.md) with an explicit browser-test
+  checkbox for src/static/** and src/templates/** changes - Add scripts/precommit_browser_warning.sh
+  and wire it into .pre-commit-config.yaml as a warn-only local hook that fires when frontend files
+  are staged with SKIP_BROWSER=1 set - Add precommit_browser_warning.sh to CI shellcheck/bash-syntax
+  validation
+
+Closes JTN-510
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* docs: fix SKIP_BROWSER wording and repo path per CodeRabbit review
+
+- CONTRIBUTING.md: clarify that SKIP_BROWSER defaults to unset and browser tests will fail (not
+  skip) when Chromium is absent - docs/development.md: use fatihak/InkyPi (upstream) not fork path
+  in the ci-gate branch protection step instructions
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Documentation
+
+- Add Architecture Decision Records for 6 key design choices (JTN-522, Grade H1)
+  ([#300](https://github.com/jtn0123/InkyPi/pull/300),
+  [`85097f7`](https://github.com/jtn0123/InkyPi/commit/85097f7749ff1d5e4c3bcc8b792059d097c6952a))
+
+Creates docs/adr/ with a template, README index, and 6 grounded ADRs covering subprocess plugin
+  isolation, HTTP cache strategy, playlist scheduling, JSON config store, Waitress vs Gunicorn, and
+  WebP on-the-fly encoding. Links index from docs/architecture.md. All rationale traced to actual
+  src/ files and commit history.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Add InkyPiStore reactive store and migrate page state (JTN-502)
+  ([#293](https://github.com/jtn0123/InkyPi/pull/293),
+  [`6cdae29`](https://github.com/jtn0123/InkyPi/commit/6cdae29c11afa0d1ceac9edb5dd87de273d01ee9))
+
+* feat: add InkyPiStore and migrate page state (JTN-502, Grade C1)
+
+Introduces a lightweight reactive store (`store.js`) that provides a centralized, observable place
+  for page-level state, eliminating scattered module-level variables and reducing polling/state race
+  risk.
+
+- `src/static/scripts/store.js`: new `createStore(initialState)` with `get`, `set` (object-merge or
+  function updater), and `subscribe` (key- level, shallow-compare, returns unsubscribe). Exposed as
+  `window.InkyPiStore` / `globalThis.InkyPiStore`. - `dashboard_page.js`: `lastImageHash` and
+  `consecutiveFailures` now read/written via store instance; plain-var fallback for environments
+  without store. - `plugin_form.js`: `initProgress` state (`t0`, `clockTimer`, `lastStepBase`)
+  backed by store instance. - `settings_page.js`: `state` object proxied through store so all
+  reads/writes flow through observable keys. - `tests/static/test_store_contract.py`: 12 new
+  contract tests covering public API presence and per-file store usage.
+
+No behavior change — pure refactor. `playlist.js` migration is deliberately deferred to the JTN-469
+  sibling PR.
+
+Closes JTN-502
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: replace var with let/const in store and migrated files (JTN-502)
+
+Addresses 2 SonarCloud S3504 issues: unexpected var declarations in dashboard_page.js and
+  plugin_form.js. Also proactively modernises the same pattern in store.js for consistency.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.28.5 (2026-04-10)
+
+### Bug Fixes
+
+- Validate cycle_minutes range (1-1440) on update_playlist and expose in to_dict (JTN-469)
+  ([#295](https://github.com/jtn0123/InkyPi/pull/295),
+  [`cfb599c`](https://github.com/jtn0123/InkyPi/commit/cfb599cb779ea6e2ca04104c6590c1d054580016))
+
+Silent data loss occurred when cycle_minutes exceeded the HTML max of 1440 — the backend accepted
+  any value and the template never read cycle_interval_seconds back into the edit modal. Backend now
+  rejects out-of-range values with 400 + error body; frontend surfaces it via the existing
+  handleJsonResponse toast path. Playlist.to_dict() now includes cycle_minutes derived from
+  cycle_interval_seconds so the edit modal pre-fills correctly after save.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- Add Plugin Development Troubleshooting section (JTN-523)
+  ([#297](https://github.com/jtn0123/InkyPi/pull/297),
+  [`9a5dade`](https://github.com/jtn0123/InkyPi/commit/9a5dadea537585f2fb5a5ddf4bef75ac30628569))
+
+Adds a new "Plugin Development Troubleshooting" top-level section to docs/troubleshooting.md
+  covering six common runtime failure classes: API key validation failures, plugin fetch timeouts
+  (Newspaper/Comic/RSS), OutputDimensionMismatch errors, memory pressure on Pi Zero, Screenshot
+  plugin failures (Chromium not found/sandbox), and Jinja2 template render errors. Each subsection
+  is grounded in actual source classes (src/utils/output_validator.py, src/utils/image_utils.py,
+  src/utils/http_utils.py). Adds a one-line cross-link in docs/building_plugins.md pointing to the
+  new section.
+
+Note: source-code cross-link inside the OutputDimensionMismatch raise site
+  (src/utils/output_validator.py) was intentionally skipped — that file is owned by sibling PR
+  JTN-499.
+
+Closes JTN-523
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- Add pre-commit install subsection to development guide (JTN-527, Grade I3)
+  ([#296](https://github.com/jtn0123/InkyPi/pull/296),
+  [`1ea7272`](https://github.com/jtn0123/InkyPi/commit/1ea7272c0e3b4e25e0d6db89dd688d8e90af4d04))
+
+Add "Install pre-commit hooks (recommended)" subsection in the Setup section of docs/development.md,
+  documenting the `pre-commit install` command, what hooks run (ruff, mypy, gitleaks,
+  conventional-commit, etc.), and a bypass note for `git commit --no-verify`.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add profiling guide for benchmark suite and cProfile/py-spy (JTN-526, Grade I2)
+  ([#294](https://github.com/jtn0123/InkyPi/pull/294),
+  [`3bce70d`](https://github.com/jtn0123/InkyPi/commit/3bce70d66b66077cafd02b056a89728d5f018e09))
+
+Adds docs/profiling.md covering when to profile, running pytest-benchmark locally,
+  --benchmark-save/compare/compare-fail, scripts/test_profile.sh behaviour, cProfile+snakeviz,
+  py-spy, and a decision matrix for choosing the right tool.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.28.4 (2026-04-10)
 
 ### Bug Fixes

@@ -482,6 +482,7 @@ class Playlist:
         }
         if getattr(self, "cycle_interval_seconds", None) is not None:
             data["cycle_interval_seconds"] = self.cycle_interval_seconds
+            data["cycle_minutes"] = int(self.cycle_interval_seconds) // 60
         return data
 
     @classmethod
@@ -532,6 +533,7 @@ class PluginInstance:
         snooze_until=None,
         consecutive_failure_count=0,
         paused=False,
+        disabled_reason: str | None = None,
     ):
         self.plugin_id = plugin_id
         self.name = name
@@ -542,6 +544,7 @@ class PluginInstance:
         self.snooze_until = snooze_until
         self.consecutive_failure_count = consecutive_failure_count
         self.paused = paused
+        self.disabled_reason = disabled_reason
 
     def update(self, updated_data):
         """Update attributes of the class with the dictionary values.
@@ -655,7 +658,7 @@ class PluginInstance:
         return latest_refresh
 
     def to_dict(self):
-        return {
+        d = {
             "plugin_id": self.plugin_id,
             "name": self.name,
             "plugin_settings": self.settings,
@@ -666,6 +669,9 @@ class PluginInstance:
             "consecutive_failure_count": self.consecutive_failure_count,
             "paused": self.paused,
         }
+        if self.disabled_reason is not None:
+            d["disabled_reason"] = self.disabled_reason
+        return d
 
     @classmethod
     def from_dict(cls, data):
@@ -679,4 +685,5 @@ class PluginInstance:
             snooze_until=data.get("snooze_until"),
             consecutive_failure_count=data.get("consecutive_failure_count", 0),
             paused=data.get("paused", False),
+            disabled_reason=data.get("disabled_reason"),
         )

@@ -19,6 +19,7 @@
 - [ ] No breaking API route/path changes
 - [ ] Error responses follow JSON contract (`success:false,error,code,details,request_id`)
 - [ ] Docs updated for new flags/endpoints/UI
+- [ ] **Frontend changes** (`src/static/**`, `src/templates/**`): ran browser tests (`SKIP_BROWSER=0 .venv/bin/python -m pytest tests/`) and all passed
 
 ## Testing
 

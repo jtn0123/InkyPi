@@ -143,6 +143,23 @@ This process ensures that any new updates, including code changes and additional
 
 ## Development
 
+### Local install verification
+
+To verify `install/install.sh` against the current branch without real Pi hardware,
+use the provided simulator (requires Docker with multi-platform support):
+
+```bash
+./scripts/sim_install.sh trixie    # Debian Trixie (default)
+./scripts/sim_install.sh bookworm  # Debian Bookworm
+./scripts/sim_install.sh bullseye  # Debian Bullseye
+```
+
+This builds an arm64 container capped at 512 MB RAM (matching the Pi Zero 2 W)
+and runs `install.sh` end-to-end against your local checkout.
+Always confirm on real hardware before merging install path changes.
+
+### Running the web UI locally
+
 To run the web UI locally without e-ink hardware:
 
 ```bash

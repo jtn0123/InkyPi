@@ -438,6 +438,25 @@ def get_cache_stats() -> dict[str, Any]:
     return get_cache().get_stats()
 
 
+def get_http_cache() -> HTTPCache:
+    """Get or create the global HTTP cache instance.
+
+    Alias for :func:`get_cache` that follows the ``get_<resource>()`` naming
+    convention used by the other utils modules.
+    """
+    return get_cache()
+
+
+def reset_for_tests() -> None:
+    """Reset the global HTTP cache singleton (testing only).
+
+    Clears the singleton so the next call to ``get_cache()`` / ``get_http_cache()``
+    creates a fresh instance.  Call this from a pytest fixture to prevent cache
+    state from leaking between tests.
+    """
+    _reset_cache_for_tests()
+
+
 def _reset_cache_for_tests() -> None:
     """Reset the global cache (testing only)."""
     global _global_cache
