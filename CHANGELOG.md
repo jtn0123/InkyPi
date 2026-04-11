@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v0.39.2 (2026-04-11)
+
+### Bug Fixes
+
+- Disable inkypi.service during install to prevent thrash loop (JTN-600)
+  ([#319](https://github.com/jtn0123/InkyPi/pull/319),
+  [`7314c5c`](https://github.com/jtn0123/InkyPi/commit/7314c5c8e1ba9f9b52e6549e0b4abfee05d249e9))
+
+On a real Pi Zero 2 W (2026-04-10), install.sh stopped but did not disable inkypi.service. systemd
+  auto-restarted the half-installed service mid-pip-install, hit ModuleNotFoundError: flask, entered
+  Restart=on-failure loop, and caused a memory-thrash cascade that required a hard power cycle to
+  recover.
+
+Modify stop_service() to also call `systemctl disable` with a 2>/dev/null||true fallback so the
+  service cannot be restarted during the ~15 min install window. install_app_service() already calls
+  `systemctl enable` at the end, restoring the service to enabled state after install completes.
+
+Add 3 structural tests to test_install_scripts.py asserting the disable call is present in
+  stop_service(), the re-enable call is present in install_app_service(), and the disable call has
+  an error-tolerant fallback.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.39.1 (2026-04-11)
 
 ### Bug Fixes
