@@ -1,6 +1,71 @@
 # CHANGELOG
 
 
+## v0.39.5 (2026-04-11)
+
+### Bug Fixes
+
+- Surface clock plugin preview errors + fix silent failure (JTN-341, JTN-318)
+  ([#324](https://github.com/jtn0123/InkyPi/pull/324),
+  [`95ec400`](https://github.com/jtn0123/InkyPi/commit/95ec400c82af71d682d7ab8572b978b39157a0eb))
+
+Root cause (JTN-341): the direct `_update_now_direct` code path (used when the background refresh
+  task is not running, e.g. dev mode, web-only mode, first request after boot, or when the worker
+  crashed) called `display_manager.display_image()` without the `history_meta` kwarg. As a result
+  the history sidecar JSON was written with only `refresh_time` and no `plugin_id`. The
+  `/plugin_latest_image/<plugin_id>` endpoint filters by `meta.get("plugin_id") == plugin_id`, so
+  the lookup always 404'd and the "Latest from this plugin" card stayed empty — even though the
+  image was generated and saved correctly. Verified by reproducing against the dev server before and
+  after the fix.
+
+This bug is the lead case of a 14-issue cluster (JTN-333, 341-346, 366-375) all reporting the same
+  symptom across different plugins. Fixing the shared code path resolves the entire cluster.
+
+Changes:
+
+- `_update_now_direct` now builds a `history_meta` dict containing `refresh_type`, `plugin_id`,
+  `playlist`, and `plugin_instance` (mirroring the structure the background worker writes in
+  `refresh_task.task._push_to_display`) and passes it through a new `_safe_display_image` helper
+  which tolerates older test stubs that do not accept the `history_meta` kwarg. - Bonus (JTN-318):
+  exception exposure hardening in `plugin.py`. * `RuntimeError` from `generate_image` keeps its
+  user-facing message (plugins raise RuntimeError precisely to author user-visible copy, e.g. "NASA
+  API Key not configured."), but the message is now passed through `sanitize_response_value` and the
+  failure is logged via `logger.exception` instead of `logger.warning` so full stacktraces reach
+  Loki/Sentry. * Unexpected (non-RuntimeError) exceptions no longer leak `str(exc)` to the HTTP
+  response; they return a generic "internal error" message with `logger.exception` capturing the
+  full traceback. * `Plugin '{plugin_id}' not found` now runs through `sanitize_response_value` to
+  prevent reflected XSS via attacker-controlled plugin IDs. - New helper
+  `_push_update_now_fallback_from_current_exception` keeps the fallback error-card rendering path
+  intact without requiring callers to capture the exception into a local variable (which would make
+  it tempting to embed raw `str(exc)` in the JSON response).
+
+Tests:
+
+- New regression suite `tests/integration/test_jtn_341_clock_preview.py`: *
+  `test_clock_update_preview_populates_latest_plugin_image` — end-to-end test that POSTs to
+  `/update_now` with default Clock settings and asserts the history sidecar contains
+  `plugin_id=clock` and that `/plugin_latest_image/clock` returns 200 with an image payload. Uses
+  the REAL `DisplayManager._save_history_entry` so the full pipeline is exercised. *
+  `test_clock_update_preview_runtime_error_returns_400_and_logs` — asserts RuntimeError from a
+  plugin yields a 400 with the plugin-authored message preserved AND `logger.exception` is called. *
+  `test_clock_update_preview_unexpected_exception_returns_500_and_logs` — asserts ValueError
+  containing a secret marker is NEVER echoed to the client, response is 500 with generic message,
+  and `logger.exception` captures the full traceback. - Updated `test_update_now_happy.py` to assert
+  the new `history_meta` contract (plugin_id must flow through to `display_image`). - Updated
+  `fake_display_image` stubs in `test_update_now_happy.py` and `test_refresh_task_interval.py` to
+  accept the `history_meta` kwarg.
+
+Manual verification on the dev server confirms that after clicking "Update Preview" on
+  `/plugin/clock`, the "Latest from this plugin" card now populates immediately. Before the fix the
+  endpoint returned 404; after the fix it returns a 92KB PNG.
+
+Fixes JTN-341 Addresses JTN-318 exception exposure patterns in plugin.py Likely resolves cluster:
+  JTN-333, JTN-342, JTN-343, JTN-344, JTN-345, JTN-346, JTN-366, JTN-367, JTN-368, JTN-369, JTN-370,
+  JTN-371, JTN-372, JTN-373, JTN-374, JTN-375 (user verifies each independently)
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.39.4 (2026-04-11)
 
 ### Bug Fixes
