@@ -105,7 +105,7 @@ def register_smoke_endpoints(app: Flask) -> None:
 
         plugin_config = device_config.get_plugin(plugin_id)
         if not plugin_config:
-            return json_error(f"Plugin {plugin_id!r} not found", status=404)
+            return json_error("Plugin not found", status=404)
 
         # Import lazily so non-smoke test runs never pull in the plugin
         # registry just to import this module.
@@ -128,7 +128,6 @@ def register_smoke_endpoints(app: Flask) -> None:
         return (
             {
                 "ok": True,
-                "plugin_id": plugin_id,
                 "width": width,
                 "height": height,
             },

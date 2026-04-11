@@ -136,7 +136,6 @@ def test_smoke_render_calls_generate_image(monkeypatch):
     payload = resp.get_json()
     assert payload == {
         "ok": True,
-        "plugin_id": "clock",
         "width": 800,
         "height": 480,
     }
