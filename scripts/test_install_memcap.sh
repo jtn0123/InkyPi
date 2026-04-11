@@ -3,24 +3,24 @@
 #
 # Runs two phases inside memory-capped Docker containers:
 #
-#   Phase 2 — pip install under a 512 MB memory cap.
-#             Installs install/requirements.txt inside a capped container so any
-#             OOM-kill of pip (the JTN-528 symptom) is caught immediately.
-#             Uses the existing scripts/Dockerfile.sim-install arm64 image to
-#             exercise the correct dependency set; arm64 wheels are fetched from
-#             PyPI so no cross-compilation is needed.
+#   Phase 2 — pip install under arm64 + 512 MB cap (the JTN-528 OOM regression
+#             gate). Uses python:3.12-slim with --platform linux/arm64 so the
+#             pip resolver fetches arm64 binary wheels from PyPI — replicating
+#             the exact download + install step that OOM-killed pip on a Pi
+#             Zero 2 W without zramswap. Exit 137 = OOM kill.
 #
-#   Phase 3 — web service boot probe under a 512 MB cap.
-#             Mounts the repo into a standard Python container, installs deps,
-#             starts the InkyPi web server, and polls /healthz, /, /playlist,
-#             and /api/plugins to confirm the server comes up healthy within the
-#             Pi Zero 2 W RAM budget.
+#   Phase 3 — web service boot probe under a 512 MB cap. Mounts the repo into a
+#             standard Python container, installs deps, starts the InkyPi web
+#             server, and polls /healthz, /, /playlist, and /api/plugins to
+#             confirm the server comes up healthy within the Pi's RAM budget.
+#             Runs on the host arch (no QEMU) for speed.
 #
 # Usage:
 #   ./scripts/test_install_memcap.sh [trixie|bookworm|bullseye]
 #   ./scripts/test_install_memcap.sh --help
 #
-# Defaults to trixie when no codename is supplied.
+# Defaults to trixie when no codename is supplied (matches the Dockerfile.sim-install
+# default used by the companion sim_install.sh tool).
 set -euo pipefail
 
 VALID_CODENAMES="trixie bookworm bullseye"
@@ -31,7 +31,8 @@ POLL_MAX=60
 usage() {
     echo "Usage: $(basename "${0}") [--help] [trixie|bookworm|bullseye]"
     echo ""
-    echo "  Phase 2: pip install under a 512 MB cap (OOM regression gate)."
+    echo "  Phase 2: pip install of requirements.txt under arm64 + 512 MB cap."
+    echo "           Exit 137 = OOM kill = JTN-528 regression."
     echo "  Phase 3: web service boot + route probe under 512 MB cap."
     echo ""
     echo "  Supported codenames: ${VALID_CODENAMES}"
@@ -87,28 +88,16 @@ echo "  Simulates Pi Zero 2 W RAM budget (512 MB, no swap headroom)."
 echo "======================================================================"
 echo ""
 
-IMAGE_TAG="inkypi-sim:${CODENAME}"
-DOCKERFILE="${SCRIPT_DIR}/Dockerfile.sim-install"
-
-# ── Phase 1: build the sim image ──────────────────────────────────────────────
-echo "[Phase 1] Building sim image ${IMAGE_TAG} (platform: linux/arm64) ..."
-docker build \
-    --platform linux/arm64 \
-    -f "${DOCKERFILE}" \
-    --build-arg "CODENAME=${CODENAME}" \
-    -t "${IMAGE_TAG}" \
-    "${REPO_ROOT}"
-echo "[Phase 1] Image built OK."
-echo ""
-
 # ── Phase 2: pip install under arm64 + 512 MB cap ─────────────────────────────
-# This is the core OOM regression gate. On a Pi Zero 2 W without zramswap,
-# pip install of numpy/Pillow was OOM-killed (JTN-528). The 512 MB cap
-# reproduces that exact pressure. Pre-built arm64 wheels are fetched from
-# PyPI — no cross-compilation is needed.
+# This is the core OOM regression gate (JTN-528 / JTN-536).
 #
-# If pip is killed by the OOM killer the exit code will be 137, which
-# propagates through docker run and out of this script.
+# On a Pi Zero 2 W without zramswap, pip install of numpy/Pillow was killed by
+# the OOM killer (exit 137). The 512 MB cap plus arm64 emulation replicates
+# that exact pressure — if the requirements grow too large, pip will be
+# killed again and this job will fail with exit 137.
+#
+# We use python:3.12-slim (arm64) so Python is pre-installed and pip can
+# fetch arm64 binary wheels directly without needing the full sim image.
 echo "[Phase 2] Running pip install under arm64 + 512 MB memory cap ..."
 echo "          Exit 137 = OOM kill (the JTN-528 regression mode)."
 echo ""
@@ -119,20 +108,21 @@ if docker run \
     --platform linux/arm64 \
     --memory=512m \
     --memory-swap=512m \
-    "${IMAGE_TAG}" \
+    -v "${REPO_ROOT}:/InkyPi:ro" \
+    python:3.12-slim \
     bash -c '
 set -euo pipefail
-cd /InkyPi
-echo "Python version: $(python3 --version)"
-python3 -m venv /tmp/pip-test-venv
-/tmp/pip-test-venv/bin/python -m pip install --upgrade pip setuptools wheel -q
-echo "Installing runtime requirements under 512 MB arm64 cap..."
-/tmp/pip-test-venv/bin/python -m pip install \
+echo "Architecture : $(uname -m)"
+echo "Python       : $(python3 --version)"
+echo ""
+echo "Installing runtime requirements under 512 MB arm64 cap ..."
+pip install \
     --retries 5 \
     --timeout 120 \
-    -r install/requirements.txt \
+    -r /InkyPi/install/requirements.txt \
     -q
-echo "pip install completed successfully."
+echo ""
+echo "pip install completed successfully inside 512 MB arm64 cap."
 '; then
     PIP_EXIT=0
 else
@@ -154,13 +144,12 @@ echo "[Phase 2] pip install OK under arm64 + 512 MB cap."
 echo ""
 
 # ── Phase 3: web service boot probe under 512 MB cap ─────────────────────────
-# Mount the repo into a standard Python container capped at 512 MB, install
-# deps, and start the web server. Poll key routes to confirm the server boots
-# cleanly within the Pi's memory budget. Running on the host arch avoids QEMU
-# overhead while still enforcing the memory limit.
+# Start the InkyPi web server inside a memory-capped container (host arch for
+# speed — no QEMU). Poll key routes to confirm the server comes up cleanly
+# within the Pi's 512 MB budget.
 CONTAINER_NAME="inkypi-memcap-smoke-$$"
 
-echo "[Phase 3] Starting web service under 512 MB cap (mount + host arch) ..."
+echo "[Phase 3] Starting web service under 512 MB cap ..."
 
 docker run \
     --rm \
@@ -176,7 +165,8 @@ docker run \
     python:3.12-slim \
     bash -c '
 cd /app
-apt-get update -qq && apt-get install -y -qq libopenjp2-7 libfreetype6 2>/dev/null || true
+apt-get update -qq 2>/dev/null
+apt-get install -y -qq libopenjp2-7 libfreetype6 2>/dev/null || true
 pip install -r install/requirements.txt -q --quiet
 python src/inkypi.py --dev --web-only
 '
