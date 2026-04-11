@@ -91,6 +91,28 @@ logger = logging.getLogger(__name__)
 
 _TRUTHY = frozenset({"1", "true", "yes"})
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
+_DEFAULT_WEB_THREADS = 2
+
+
+def _get_web_threads() -> int:
+    """Return the waitress thread count, env-configurable via INKYPI_WEB_THREADS.
+
+    Defaults to 2 (suitable for Pi Zero 2 W's 425 MB RAM). Users with more
+    headroom can set INKYPI_WEB_THREADS=4 or higher via a systemd drop-in.
+    """
+    raw = os.environ.get("INKYPI_WEB_THREADS")
+    if raw is None or raw == "":
+        return _DEFAULT_WEB_THREADS
+    try:
+        value = int(raw)
+    except (ValueError, TypeError):
+        logger.warning(
+            "Invalid INKYPI_WEB_THREADS=%r, falling back to default (%d)",
+            raw,
+            _DEFAULT_WEB_THREADS,
+        )
+        return _DEFAULT_WEB_THREADS
+    return max(1, value)
 
 
 def _env_bool(name: str, default: str = "") -> bool:
@@ -367,7 +389,9 @@ if __name__ == "__main__":
             if local_ip:
                 logger.info(f"Serving on http://{local_ip}:{PORT}")
 
-        serve(created_app, host="0.0.0.0", port=PORT, threads=4)
+        web_threads = _get_web_threads()
+        logger.info(f"waitress threads: {web_threads}")
+        serve(created_app, host="0.0.0.0", port=PORT, threads=web_threads)
     finally:
         refresh_task_obj = created_app.config.get("REFRESH_TASK")
         if refresh_task_obj is not None:
