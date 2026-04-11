@@ -1,6 +1,33 @@
 # CHANGELOG
 
 
+## v0.41.0 (2026-04-11)
+
+### Bug Fixes
+
+- Display "Webcomic Name" (title case) in Daily Comic dropdown (JTN-386)
+  ([#329](https://github.com/jtn0123/InkyPi/pull/329),
+  [`ddf6833`](https://github.com/jtn0123/InkyPi/commit/ddf6833d24ac524cabb8a06defff98bbd73ad9ac))
+
+The comic key "webcomic name" is preserved for backward compatibility with existing device configs.
+  A COMIC_LABELS mapping provides the correct display label "Webcomic Name" (Alex Norris's official
+  title) in the plugin dropdown.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- Publish CycloneDX SBOM as release asset (JTN-517)
+  ([#330](https://github.com/jtn0123/InkyPi/pull/330),
+  [`6dce07a`](https://github.com/jtn0123/InkyPi/commit/6dce07ab44caa62c39b699562e608c3b930edfc5))
+
+Regenerates the SBOM during release and attaches it to every GitHub release as
+  inkypi-vX.Y.Z-bom.json using gh release upload. Adds docs/security.md explaining how to download
+  and validate the SBOM with cyclonedx-cli and pip-audit.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.40.3 (2026-04-11)
 
 ### Bug Fixes
