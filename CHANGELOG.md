@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.42.0 (2026-04-11)
+
+### Features
+
+- Add pip-compile drift check to CI (JTN-597) ([#333](https://github.com/jtn0123/InkyPi/pull/333),
+  [`149d097`](https://github.com/jtn0123/InkyPi/commit/149d097059cb635094b1a1777a7c204268baa74b))
+
+Adds scripts/check_requirements_drift.sh that compares the pip-compile region of
+  install/requirements.txt (stripping the manually-maintained Linux-only block at the sentinel
+  comment) and install/requirements-dev.txt against a fresh pip-compile run, failing with an
+  actionable diff if they diverge.
+
+Adds a new lockfile-drift CI job in ci.yml that installs pip-tools and runs the script. The job is
+  currently advisory (continue-on-error: true) because packages have drifted on PyPI since the last
+  lockfile regeneration; remove that flag after refreshing requirements.txt under Python 3.12. The
+  shellcheck job is extended to syntax-check the new script.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.41.0 (2026-04-11)
 
 ### Bug Fixes
