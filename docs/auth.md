@@ -55,6 +55,44 @@ Add an `auth` section to your device config:
 
 ---
 
+# HTTPS upgrade redirect
+
+InkyPi can transparently redirect plain HTTP requests to HTTPS via a
+`before_request` hook in the security middleware.
+
+## Enabling the redirect
+
+Set the following environment variables before starting InkyPi:
+
+```bash
+export INKYPI_FORCE_HTTPS=1
+# Optional — override the default allow-list of hostnames that may
+# appear in the redirect Location header. Comma-separated. Defaults to
+# "inkypi.local,localhost,127.0.0.1".
+export INKYPI_ALLOWED_HOSTS="inkypi.local,inkypi.example.com"
+```
+
+Requests arriving with `X-Forwarded-Proto: https` (e.g. behind a TLS-
+terminating reverse proxy) are treated as already-HTTPS and pass through
+unchanged. In `--dev` mode the redirect is always skipped regardless of
+`INKYPI_FORCE_HTTPS`.
+
+## Host allow-list (JTN-317)
+
+The redirect hook validates the inbound `Host` header against
+`INKYPI_ALLOWED_HOSTS` before building the new `Location`. Requests whose
+host is not in the allow-list receive a `400 Bad Request` instead of a
+redirect. This defends against open-redirect attacks (CodeQL rule
+`py/url-redirection`) where an attacker could previously spoof the
+`Host` header to have InkyPi emit `Location: https://evil.example/`.
+
+When the server is reached by a hostname that is not in the default
+allow-list (for example a custom mDNS name or a public DNS record), add
+it to `INKYPI_ALLOWED_HOSTS` — otherwise all HTTP traffic will be
+rejected with a 400.
+
+---
+
 # Read-only API Token (JTN-477)
 
 InkyPi supports an optional read-only bearer token for monitoring scripts and
