@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v0.39.6 (2026-04-11)
+
+### Bug Fixes
+
+- Add --no-cache-dir to pip install for SD + RAM savings (JTN-602)
+  ([#321](https://github.com/jtn0123/InkyPi/pull/321),
+  [`bfffa69`](https://github.com/jtn0123/InkyPi/commit/bfffa69053c2f0367a682ddd2153c4212e3f43ff))
+
+Pip's wheel and HTTP cache (~/.cache/pip/) reaches 200-400 MB on a Pi Zero 2 W but provides zero
+  benefit: pip runs once per install cycle and the venv is rebuilt from scratch on reinstall. Adding
+  --no-cache-dir to all three call sites in create_venv() saves ~200 MB of SD card space and ~50 MB
+  of RAM during install.
+
+Also adds two unit tests to assert --no-cache-dir is present on every pip install invocation in
+  install.sh and inside create_venv() specifically.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.39.5 (2026-04-11)
 
 ### Bug Fixes
