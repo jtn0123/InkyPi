@@ -80,7 +80,10 @@ def measure_http(url: str, timeout: float = 15.0) -> Timings:
     # TLS
     tls_ms = 0
     if p.scheme == "https":
+        # Explicitly pin the minimum supported TLS version so both the runtime
+        # behavior and static analysis agree that legacy protocols are disabled.
         ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         t2 = time.perf_counter()
         try:
             s = ctx.wrap_socket(s, server_hostname=host)

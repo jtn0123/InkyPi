@@ -226,3 +226,43 @@ Different platforms have different available browser packages; refer to the tabl
 | Windows | Chromium or Google Chrome | devbox installs chromium on WSL2; on native Windows (without WSL2), chromium or google-chrome should be in `PATH` |
 
 InkyPi will search for a Chrome-like browser in the project's `PATH` (when using devbox) and then your system `PATH`.
+
+## CodeQL suppression policy
+
+CodeQL runs on every push and pull request. Most alerts represent real issues
+and should be fixed in code. A small number are taint-tracker false positives
+where CodeQL cannot model a validation/sanitization helper. When that happens,
+suppress the alert at the flagged line with an `lgtm` comment, **always with a
+specific justification**.
+
+**Format**
+
+- Python: `# lgtm[<rule-id>] — <why this is a false positive>`
+- JavaScript: `// lgtm[<rule-id>] — <why this is a false positive>`
+
+**Required**
+
+1. Use the exact rule ID from the CodeQL alert (e.g. `py/clear-text-logging-sensitive-data`,
+   `js/xss-through-dom`).
+2. Include a justification after the em dash that explains *why* the alert
+   does not apply to this specific call site. Reference the data flow,
+   sanitization, or runtime invariant that makes the alert wrong.
+3. Place the comment on the flagged line itself (not the line above or below)
+   so CodeQL's suppression matcher picks it up.
+
+**Forbidden**
+
+- Generic comments like `# lgtm — false positive` or `# noqa`. They give
+  the next maintainer no signal about whether the suppression is still valid.
+- Suppressing a rule across an entire file or module unless every site has
+  been audited and the rationale is documented in the policy section.
+- Suppressing alerts in `src/blueprints/**` or `src/utils/http_utils.py`
+  without coordinating with the JTN-318 cleanup; those files are still being
+  hardened against raw exception strings in API responses.
+
+**When in doubt**
+
+If you are not sure whether an alert is a false positive, open a Linear issue
+under the CodeQL epic (JTN-326) and tag it `security` rather than suppressing.
+A real alert that is silenced by mistake is much worse than an unsuppressed
+false positive that the dashboard learns to ignore.

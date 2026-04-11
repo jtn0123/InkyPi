@@ -246,20 +246,25 @@ def main():
             def json(self):
                 return self._payload
 
+        from urllib.parse import urlparse as _urlparse
+
         def _json_http_get(url, *a, **kw):
-            if "onecall" in url:
+            parsed = _urlparse(url)
+            host = parsed.hostname or ""
+            path = parsed.path
+            if "onecall" in path:
                 p = _load_json(os.path.join(args.use_json, "weather.json"))
                 return _Resp(p if p is not None else {})
-            if "air_pollution" in url:
+            if "air_pollution" in path:
                 p = _load_json(os.path.join(args.use_json, "aqi.json"))
                 return _Resp(p if p is not None else {"list": [{"main": {"aqi": 2}}]})
-            if "open-meteo.com" in url and "/forecast" in url:
+            if host == "api.open-meteo.com" and path == "/v1/forecast":
                 p = _load_json(os.path.join(args.use_json, "open_meteo_weather.json"))
                 return _Resp(p if p is not None else {})
-            if "air-quality-api.open-meteo" in url:
+            if host == "air-quality-api.open-meteo.com" and path == "/v1/air-quality":
                 p = _load_json(os.path.join(args.use_json, "open_meteo_aqi.json"))
                 return _Resp(p if p is not None else {})
-            if "/geo/1.0/reverse" in url:
+            if "/geo/1.0/reverse" in path:
                 return _Resp([{"name": "Cached City", "state": "CA", "country": "US"}])
             return _Resp({})
 

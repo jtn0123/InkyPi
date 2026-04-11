@@ -1,5 +1,6 @@
 # pyright: reportMissingImports=false
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -17,7 +18,7 @@ def test_apod_success(
     api_resp.json.return_value = realistic_nasa_apod_response
 
     def fake_get(url, params=None, **kwargs):
-        if "api.nasa.gov" in url:
+        if urlparse(url).netloc == "api.nasa.gov":
             return api_resp
         return fake_image_response
 
@@ -142,7 +143,7 @@ def test_apod_randomize_date(monkeypatch, device_config_dev):
             # Verify API was called with random date parameter
             assert mock_session.get.call_count >= 2
             api_call = mock_session.get.call_args_list[0]
-            assert "api.nasa.gov" in api_call[0][0]
+            assert urlparse(api_call[0][0]).netloc == "api.nasa.gov"
             assert "date" in api_call[1]["params"]
             assert result is not None
 

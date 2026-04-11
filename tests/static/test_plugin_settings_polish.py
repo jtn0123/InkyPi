@@ -14,6 +14,9 @@ def test_todo_remove_last_item_guarded():
 def test_calendar_repeater_has_descriptive_placeholder():
     """Calendar URL input should have a descriptive placeholder."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
+    # lgtm[py/incomplete-url-substring-sanitization] — not URL sanitization;
+    # asserting that a Jinja template's static placeholder contains an example
+    # hostname for UX. No URL is parsed or trusted here.
     assert ".ics" in html or "calendar.google.com" in html
 
 
