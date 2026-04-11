@@ -68,7 +68,7 @@ class ImageUpload(BasePlugin):
                         default="blur",
                         options=[
                             option("blur", "Blur"),
-                            option("color", "Solid Color"),
+                            option("color", "Color"),
                         ],
                     ),
                     field(
