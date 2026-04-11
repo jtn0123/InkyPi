@@ -1,0 +1,29 @@
+# InkyPi runtime dependencies — loose constraints for pip-compile.
+# Edit this file to add/upgrade dependencies, then regenerate:
+#   pip-compile --generate-hashes install/requirements.in -o install/requirements.txt
+#
+# Packages with sys_platform guards are only installed on Linux (Pi).
+
+flask>=3.1,<4
+python-dotenv>=1.0,<2
+# inky display driver — only needed on Pi hardware
+inky>=2.3,<3; sys_platform == "linux"
+requests>=2.32,<3
+urllib3>=2.0,<3
+werkzeug>=3.1,<4
+pillow>=11.0,<13
+pi-heif>=1.2,<2; sys_platform == "linux"
+tzdata>=2024.1
+openai>=2.0,<3
+google-genai>=1.14,<2
+numpy>=2.0,<3
+icalendar>=6.0,<7
+recurring-ical-events>=3.0,<4
+psutil>=5.0,<7
+# cysystemd — only available on Linux; provides journald integration
+cysystemd>=2.0,<3; sys_platform == "linux"
+waitress>=3.0,<4
+feedparser>=6.0,<7
+jsonschema>=4.0,<5
+astral>=3.0,<4
+prometheus-client>=0.21,<1

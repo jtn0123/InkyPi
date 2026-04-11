@@ -145,6 +145,21 @@ Before marking your PR ready for review, confirm:
 - [ ] `scripts/lint.sh` passes (ruff + black are CI blockers)
 - [ ] **If touching `src/static/**` or `src/templates/**`**: ran browser tests with `SKIP_BROWSER=0 .venv/bin/python -m pytest tests/` and all passed
 
+## Dependency Management
+
+Dependencies are managed via pip-tools lockfiles with cryptographic hashes. Edit
+`install/requirements.in` (runtime) or `install/requirements-dev.in` (dev), then
+regenerate the corresponding `.txt` lockfile:
+
+```bash
+pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
+    install/requirements.in -o install/requirements.txt
+```
+
+Always commit both the `.in` source file and the regenerated `.txt` together. See
+[docs/dependencies.md](docs/dependencies.md) for full details including CVE
+upgrades and cross-platform notes.
+
 ## Plugin Development
 
 See [docs/building_plugins.md](docs/building_plugins.md) for a guide on creating new plugins.
