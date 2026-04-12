@@ -1,6 +1,81 @@
 # CHANGELOG
 
 
+## v0.45.2 (2026-04-12)
+
+### Bug Fixes
+
+- **history**: Wire up Next/Prev pagination links (JTN-330)
+  ([#366](https://github.com/jtn0123/InkyPi/pull/366),
+  [`ba4900d`](https://github.com/jtn0123/InkyPi/commit/ba4900d28e41e59a4760ffe433a0ec38546e5106))
+
+The HTMX pagination swap replaced #history-grid-container but did not scroll the viewport back to
+  the grid, so the user saw the same bottom-of-page content after clicking Next. Add
+  show:#history-grid-container:top to hx-swap so the browser scrolls the grid into view after each
+  page change. Also listen for htmx:afterSettle to re-bind image skeleton handlers on newly swapped
+  content.
+
+Four tests added: - HTMX partial returns disjoint images for page 1 vs page 2 - Pagination links
+  include the show: scroll modifier - HTMX partial omits the full page shell - JS contains
+  htmx:afterSettle listener for image rebinding
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Return specific error for out-of-range cycle interval (JTN-351)
+  ([#363](https://github.com/jtn0123/InkyPi/pull/363),
+  [`c722324`](https://github.com/jtn0123/InkyPi/commit/c7223244ed4931427212f725900e9bb371e1ed6a))
+
+Replace the generic "Refresh interval is required" error that was returned for negative/non-numeric
+  interval values with distinct messages: - Missing/empty → "Refresh interval is required" -
+  Non-numeric → "Refresh interval must be a number" - Below minimum → "Refresh interval must be at
+  least 1"
+
+The root cause was `str.isnumeric()` returning False for negative numbers (due to the minus sign),
+  causing them to fall into the "is required" branch instead of a range-check branch.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Show inline result for Check for Updates (JTN-352)
+  ([#374](https://github.com/jtn0123/InkyPi/pull/374),
+  [`9a54748`](https://github.com/jtn0123/InkyPi/commit/9a547482898d5893076df5553552f9eb2bd129e6))
+
+Add spinner and disabled state to the Check for Updates button during the version check fetch. The
+  badge already displays status text (Checking.../Up to date/Update available/Check failed) but the
+  button itself had no loading indicator, making it appear unresponsive.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **css**: Split components into per-component partials (JTN-504)
+  ([#369](https://github.com/jtn0123/InkyPi/pull/369),
+  [`543b259`](https://github.com/jtn0123/InkyPi/commit/543b259b555573db652bc3f84675cf5839fba585))
+
+* refactor(css): split _components.css into per-component partials (JTN-504)
+
+Reshape CSS partials from page-oriented to component-oriented: - Split _components.css into
+  _button.css, _form.css, _toggle.css - Colocate responsive @media blocks with their component
+  definitions - Centralize breakpoint reference values in _tokens.css - Add .stylelintrc.json for
+  advisory linting (max specificity, no dupes) - Update _imports.css manifest with new partial order
+  - Rebuilt main.css (selector coverage identical: 824 selectors)
+
+No CSS class names changed — templates are unaffected.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(test): read main.css instead of _components.css for .image-option check (JTN-504)
+
+The CSS reshape moved `.image-option` from `_components.css` to `_form.css`. The test was hardcoded
+  to read `_components.css`, causing CI failure. Read the built `main.css` instead so the test is
+  resilient to future partial reorganizations.
+
+* style: black format test file
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.45.1 (2026-04-12)
 
 ### Bug Fixes
