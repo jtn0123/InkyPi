@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## v0.49.3 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Small polish pass — pagination, jargon, 24:00, colons (JTN-636, JTN-640, JTN-639, JTN-645)
+  ([#396](https://github.com/jtn0123/InkyPi/pull/396),
+  [`c165085`](https://github.com/jtn0123/InkyPi/commit/c165085eb55597f9168da1b555b66347ae45fc30))
+
+- JTN-636: Disabled Previous/Next pagination controls now use a dedicated .pagination-disabled class
+  (reduced opacity, cursor:default, pointer-events: none, aria-disabled=true) instead of an inline
+  style, so page 1 Previous is visually distinguishable from the active Next link. - JTN-640:
+  Playlists header chip now reads "Refresh interval" instead of the internal jargon "Device
+  cadence". - JTN-639: Playlists whose range spans the full day (00:00 to 24:00/23:59) now render as
+  "All day" instead of the non-standard "24:00" end time. - JTN-645: Image Processing slider labels
+  (Saturation, Contrast, Sharpness, Brightness, Inky Driver Saturation) no longer end with trailing
+  colons, matching the rest of the settings form.
+
+Adds regression assertions in tests/integration/test_history.py, test_playlist_routes.py, and
+  test_settings_routes.py.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.2 (2026-04-12)
 
 ### Bug Fixes
