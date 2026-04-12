@@ -1,6 +1,116 @@
 # CHANGELOG
 
 
+## v0.49.4 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Warn on API Required navigation when form has unsaved changes (JTN-629)
+  ([#397](https://github.com/jtn0123/InkyPi/pull/397),
+  [`0db65fb`](https://github.com/jtn0123/InkyPi/commit/0db65fb9216ff33941a7c67b16b538d28cc5ce13))
+
+On plugin pages that require an API key (AI Image, GitHub, etc.), the "API Required" chip in the
+  header was a plain <a> link that immediately navigated to /settings/api-keys. A user who had typed
+  a long prompt and tapped the chip lost all of it without warning.
+
+The chip is now intercepted by plugin_page.js. On first page load the settings form is snapshotted;
+  on chip click, we compare the current form state to the snapshot. If the form is dirty, a
+  confirmation modal opens warning about discarding unsaved changes — matching the Reboot/Shutdown
+  modal UX introduced in JTN-621. If the form is clean, navigation proceeds normally. The confirm
+  button is still an <a href> to the API keys page so no-JS fallback keeps working.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.3 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Small polish pass — pagination, jargon, 24:00, colons (JTN-636, JTN-640, JTN-639, JTN-645)
+  ([#396](https://github.com/jtn0123/InkyPi/pull/396),
+  [`c165085`](https://github.com/jtn0123/InkyPi/commit/c165085eb55597f9168da1b555b66347ae45fc30))
+
+- JTN-636: Disabled Previous/Next pagination controls now use a dedicated .pagination-disabled class
+  (reduced opacity, cursor:default, pointer-events: none, aria-disabled=true) instead of an inline
+  style, so page 1 Previous is visually distinguishable from the active Next link. - JTN-640:
+  Playlists header chip now reads "Refresh interval" instead of the internal jargon "Device
+  cadence". - JTN-639: Playlists whose range spans the full day (00:00 to 24:00/23:59) now render as
+  "All day" instead of the non-standard "24:00" end time. - JTN-645: Image Processing slider labels
+  (Saturation, Contrast, Sharpness, Brightness, Inky Driver Saturation) no longer end with trailing
+  colons, matching the rest of the settings form.
+
+Adds regression assertions in tests/integration/test_history.py, test_playlist_routes.py, and
+  test_settings_routes.py.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.2 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Hide raw slug subtitle and explain DRAFT badge (JTN-622, JTN-644)
+  ([#395](https://github.com/jtn0123/InkyPi/pull/395),
+  [`52b5b38`](https://github.com/jtn0123/InkyPi/commit/52b5b38b8a38987783ff3d28c74eea25cba64093))
+
+- Remove the visible plugin.id subtitle from the plugin page header by default. The raw filesystem
+  slug (ai_image, clock, weather, ...) is an internal identifier and has no meaning to end users.
+  Kept behind ?debug=1 for diagnostics. - Add title and aria-describedby to the Draft status chip so
+  users (and screen readers) learn what the badge means and how to clear it. - Extend the
+  status_chip macro to accept optional title / describedby args. - Add integration tests covering
+  both fixes.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.1 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Render System Health and Isolation Summary as tables (JTN-646)
+  ([#394](https://github.com/jtn0123/InkyPi/pull/394),
+  [`0d7b5fb`](https://github.com/jtn0123/InkyPi/commit/0d7b5fbe2f1daebf14d1fea47c8cfe88bdb3af7d))
+
+Extends JTN-384 to the remaining Diagnostics panels. System Health, Plugin Health, and Isolation
+  Summary no longer dump raw JSON.stringify output; instead they render as labeled .bench-table
+  tables with human-friendly units (percent, uptime) and a "No plugins isolated" empty state.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.0 (2026-04-12)
+
+### Features
+
+- **plugin**: Use HTMX for plugin settings form submission (JTN-506)
+  ([#383](https://github.com/jtn0123/InkyPi/pull/383),
+  [`c6ad4a8`](https://github.com/jtn0123/InkyPi/commit/c6ad4a84eeed03ec08b721a336e95221702ad39f))
+
+* feat(plugin): use HTMX for plugin settings form submission (JTN-506)
+
+The base template already loads HTMX on every page, but nothing on the plugin page was using it —
+  the settings form was posting via fetch() and rendering errors through a toast modal. Phase 1 of
+  JTN-506 migrates the "Save Settings" button to an HTMX-driven flow so validation errors swap
+  inline and successes fire an HX-Trigger-backed toast, while legacy JSON clients still see JSON
+  (gated on the HX-Request header).
+
+Progressive enhancement: the form now carries action/method so it stays valid HTML, and an error
+  container (#plugin-form-errors) hosts the swap target. update_now, update_instance, and
+  add_to_playlist keep using the existing sendForm path; those are deferred to follow-up PRs.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(plugin): add coverage for _is_htmx_request RuntimeError + error Content-Type (JTN-506)
+
+Push SonarCloud new_coverage past the 80% gate. Covers two previously unexercised branches: -
+  `_is_htmx_request()` called outside a Flask request context - Internal error response sets
+  `text/html` content-type (sep from body check)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.48.1 (2026-04-12)
 
 ### Bug Fixes

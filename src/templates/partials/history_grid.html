@@ -45,7 +45,7 @@
        hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Previous</a>
     {% else %}
-    <span class="btn" style="opacity: 0.4; pointer-events: none;">Previous</span>
+    <span class="btn pagination-disabled" aria-disabled="true">Previous</span>
     {% endif %}
     <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
     {% if page < total_pages %}
@@ -56,7 +56,7 @@
        hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Next</a>
     {% else %}
-    <span class="btn" style="opacity: 0.4; pointer-events: none;">Next</span>
+    <span class="btn pagination-disabled" aria-disabled="true">Next</span>
     {% endif %}
 </nav>
 {% endif %}

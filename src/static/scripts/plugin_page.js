@@ -574,6 +574,70 @@
       }, 100);
     }
 
+    // JTN-629: Capture a snapshot of the settings form on load so we can
+    // detect unsaved changes. `formDirty` compares each input value to its
+    // initial value. Files/passwords are omitted — just string values from
+    // inputs/textareas/selects are enough to catch the common case (a typed
+    // prompt in AI Image) without false positives from checkbox serialization.
+    function getSettingsFormSnapshot() {
+      const form = document.getElementById("settingsForm");
+      if (!form) return null;
+      const snapshot = {};
+      form.querySelectorAll("input, textarea, select").forEach((el) => {
+        if (!el.name && !el.id) return;
+        const key = el.name || el.id;
+        if (el.type === "file") return;
+        if (el.type === "checkbox" || el.type === "radio") {
+          snapshot[`${key}:${el.value}`] = el.checked ? "1" : "0";
+        } else {
+          snapshot[key] = el.value == null ? "" : String(el.value);
+        }
+      });
+      return snapshot;
+    }
+
+    let _settingsFormSnapshot = null;
+
+    function isSettingsFormDirty() {
+      const current = getSettingsFormSnapshot();
+      if (!_settingsFormSnapshot || !current) return false;
+      const keys = new Set([
+        ...Object.keys(_settingsFormSnapshot),
+        ...Object.keys(current),
+      ]);
+      for (const key of keys) {
+        if (_settingsFormSnapshot[key] !== current[key]) return true;
+      }
+      return false;
+    }
+
+    function initApiKeysLeaveGuard() {
+      const link = document.querySelector("[data-api-keys-link]");
+      const modal = document.getElementById("apiKeysLeaveConfirmModal");
+      if (!link || !modal) return;
+      // Snapshot AFTER the rest of init runs so schema-populated defaults are
+      // captured as the baseline, not flagged as "dirty" on first click.
+      setTimeout(() => {
+        _settingsFormSnapshot = getSettingsFormSnapshot();
+      }, 0);
+      link.addEventListener("click", (event) => {
+        if (!isSettingsFormDirty()) return; // fall through to normal navigation
+        event.preventDefault();
+        const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
+        if (confirmBtn && link.href) confirmBtn.href = link.href;
+        openModal("apiKeysLeaveConfirmModal", link);
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (modal.hidden) return;
+        event.preventDefault();
+        closeModal("apiKeysLeaveConfirmModal");
+      });
+      globalThis.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal("apiKeysLeaveConfirmModal");
+      });
+    }
+
     function bindModalClose() {
       globalThis.addEventListener("click", (event) => {
         if (actionInFlight) return;
@@ -707,6 +771,7 @@
       initStatusBar();
       initPreviewInteractions();
       initApiIndicator();
+      initApiKeysLeaveGuard();
       initColorPreviews();
       bindModalClose();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {

@@ -408,3 +408,33 @@ def test_playlist_page_no_wrap_label_for_normal_range(client):
     idx = body.find("09:00 - 17:00")
     # Look within the next 200 chars for the label — it must not appear.
     assert "(next day)" not in body[idx : idx + 200]
+
+
+def test_playlist_header_chip_uses_plain_language_refresh_interval(client):
+    """JTN-640: Playlists header chip must say 'Refresh interval', not jargon
+    'Device cadence'."""
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Device cadence" not in body
+    assert "Refresh interval" in body
+
+
+def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
+    """JTN-639: A playlist spanning 00:00 - 24:00 should render 'All day'
+    instead of the non-standard '24:00' end time."""
+    pm = device_config_dev.get_playlist_manager()
+    # Ensure a Default-like playlist exists with the full-day range
+    pm.add_playlist("JTN639AllDay", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Find the all-day playlist block and assert its summary copy
+    idx = body.find("JTN639AllDay")
+    assert idx != -1
+    chunk = body[idx : idx + 600]
+    assert "All day" in chunk
+    assert "00:00 - 24:00" not in chunk

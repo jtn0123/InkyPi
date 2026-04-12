@@ -177,3 +177,29 @@ def test_settings_responsive_css_sticky_save_selector_matches_real_dom():
         "matches the real DOM (buttons-container is nested inside "
         ".settings-console-main). Use the descendant combinator instead."
     )
+
+
+def test_settings_image_processing_labels_have_no_trailing_colon(client):
+    """JTN-645: Image Processing slider labels should not end in a colon —
+    the rest of the settings form uses colon-free labels."""
+    resp = client.get("/settings")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    for bad in (
+        ">Saturation:<",
+        ">Contrast:<",
+        ">Sharpness:<",
+        ">Brightness:<",
+        ">Inky Driver Saturation:<",
+    ):
+        assert bad not in body, f"Found unwanted trailing colon label: {bad!r}"
+
+    # Positive: colon-free labels are present
+    for good in (
+        ">Saturation<",
+        ">Contrast<",
+        ">Sharpness<",
+        ">Brightness<",
+    ):
+        assert good in body, f"Expected label without colon: {good!r}"
