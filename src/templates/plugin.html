@@ -33,6 +33,7 @@
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-workflow" data-page-shell="workflow">
     <div class="frame workflow-frame">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb, PLUGIN_ICON_MAP %}
+        {% from 'macros/components.html' import status_chip, modal %}
 
         <!-- Plugin Title and Icon -->
         <div class="app-header">
@@ -76,9 +77,9 @@
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}
-            <span class="status-chip success">Instance</span>
+            {{ status_chip('Instance', 'success') }}
             {% else %}
-            <span class="status-chip warning">Draft</span>
+            {{ status_chip('Draft', 'warning') }}
             {% endif %}
         </div>
 
@@ -327,13 +328,9 @@
     </div>
 
     <!-- Image preview (lightbox) for plugin page -->
-    <div id="imagePreviewModal" class="modal image-modal" role="dialog" aria-modal="true" aria-labelledby="imagePreviewTitle" hidden>
-        <div class="modal-content">
-            <h2 id="imagePreviewTitle" class="sr-only">Image preview</h2>
-            <button class="close-button" type="button" data-lightbox-close aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <img id="imagePreviewImg" alt="Large preview" class="lightbox-preview-image"/>
-        </div>
-    </div>
+    {% call modal('imagePreviewModal', 'Image preview') %}
+        <img id="imagePreviewImg" alt="Large preview" class="lightbox-preview-image"/>
+    {% endcall %}
     <div id="requestProgress" class="progress-block" hidden>
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>

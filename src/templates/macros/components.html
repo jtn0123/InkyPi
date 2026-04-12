@@ -1,0 +1,54 @@
+{#- Reusable UI component macros with built-in accessibility attributes.
+    Import with: {% from 'macros/components.html' import button, form_field, modal, status_chip, card %}
+-#}
+
+{% macro button(text, type="button", variant="primary", icon=None, disabled=False, attrs={}) -%}
+<button type="{{ type }}" class="action-button{% if variant != 'primary' %} {{ variant }}{% endif %}"{% if disabled %} disabled{% endif %}{% for key, val in attrs.items() %} {{ key }}="{{ val }}"{% endfor %}>
+    {%- if icon %}<span class="button-icon" aria-hidden="true">{{ icon }}</span> {% endif -%}
+    {{ text }}
+</button>
+{%- endmacro %}
+
+{% macro form_field(name, label, type="text", required=False, value="", help_text="", error="", id="") -%}
+{% set field_id = id if id else name %}
+{% set help_id = field_id ~ '-help' if help_text else '' %}
+{% set error_id = field_id ~ '-error' if error else '' %}
+{% set described_parts = [] %}
+{%- if help_text %}{% if described_parts.append(help_id) %}{% endif %}{% endif -%}
+{%- if error %}{% if described_parts.append(error_id) %}{% endif %}{% endif -%}
+<div class="form-group">
+    <label for="{{ field_id }}" class="form-label">{{ label }}</label>
+    <input type="{{ type }}" id="{{ field_id }}" name="{{ name }}" class="form-input" value="{{ value }}"{% if required %} required aria-required="true"{% endif %}{% if error %} aria-invalid="true"{% endif %}{% if described_parts %} aria-describedby="{{ described_parts | join(' ') }}"{% endif %}>
+    {%- if help_text %}
+    <small id="{{ help_id }}" class="form-help">{{ help_text }}</small>
+    {%- endif %}
+    {%- if error %}
+    <span id="{{ error_id }}" class="validation-message" role="alert">{{ error }}</span>
+    {%- endif %}
+</div>
+{%- endmacro %}
+
+{% macro modal(id, title) -%}
+{% set title_id = id ~ 'Title' %}
+<div id="{{ id }}" class="modal" role="dialog" aria-modal="true" aria-labelledby="{{ title_id }}" hidden>
+    <div class="modal-content">
+        <button class="close-button" type="button" data-close-modal="{{ id }}" aria-label="Close">&times;</button>
+        <h2 id="{{ title_id }}">{{ title }}</h2>
+        <div class="separator"></div>
+        {{ caller() }}
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro status_chip(text, variant="info") -%}
+<span class="status-chip {{ variant }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro card(title) -%}
+<div class="status-card">
+    {% if title %}<div class="status-title">{{ title }}</div>{% endif %}
+    <div class="status-body">
+        {{ caller() }}
+    </div>
+</div>
+{%- endmacro %}
