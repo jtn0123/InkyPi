@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.49.14 (2026-04-12)
+
+### Bug Fixes
+
+- Sync uv lockfile
+  ([`7faaea3`](https://github.com/jtn0123/InkyPi/commit/7faaea3b39da206a4c00ccca498dee801cb9a47e))
+
+- **csp**: Drop redundant UnicodeDecodeError in except clause (JTN-653)
+  ([`4addf70`](https://github.com/jtn0123/InkyPi/commit/4addf7040846bc2536693e3256d757db5c5e0c75))
+
+SonarCloud python:S5713 on src/blueprints/csp_report.py:68 flagged the `except (ValueError,
+  UnicodeDecodeError)` tuple as redundant because UnicodeDecodeError is a subclass of ValueError and
+  is therefore already caught by the base branch.
+
+Drop UnicodeDecodeError from the tuple and leave a comment noting that non-UTF-8 payloads are still
+  covered via inheritance. No behavior change; all 18 CSP-report tests (including malformed-JSON
+  coverage) still pass.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Clarify Sonar suppression comment
+  ([`b82d0c0`](https://github.com/jtn0123/InkyPi/commit/b82d0c03f7fd2357b767c935a4ad5ed4e5d90dc7))
+
+- **security**: Rebuild redirect URL to close CodeQL open-redirect alert (JTN-317)
+  ([`5afe67f`](https://github.com/jtn0123/InkyPi/commit/5afe67f765b20f7e1c35d329443f8a09b07a99e7))
+
+Validate-then-reuse of request.full_path left CodeQL py/url-redirection alert #52 open even after
+  the host allow-list was added in PR #317: the taint flow from the untrusted Host header into
+  redirect() was still present because the final URL was built by f-string concatenation with
+  request.full_path.
+
+Rebuild the redirect target from individually validated components using urlunsplit: hard-coded
+  "https" scheme literal + allow-listed authority + re-quoted path + re-urlencoded query. This
+  breaks the taint flow and matches the repo's established fix pattern for this rule.
+
+Add regression tests covering: * path re-quoting (spaces survive as %20) * multi-value query
+  round-trip * spoofed "@evil.com/path" in the request path cannot shift the authority in the
+  Location header.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **lockfile**: Sync uv.lock with project version
+  ([`d74bb9e`](https://github.com/jtn0123/InkyPi/commit/d74bb9e9c68b1b55f8ebcc821287b6e38d9b3af5))
+
+
 ## v0.49.13 (2026-04-12)
 
 ### Bug Fixes
