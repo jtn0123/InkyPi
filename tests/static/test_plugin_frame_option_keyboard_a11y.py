@@ -47,11 +47,7 @@ def test_image_option_css_has_transparent_background():
     # the per-component CSS reshape. Read the built main.css so this test is
     # resilient to future partial reorganizations.
     css_path = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "static"
-        / "styles"
-        / "main.css"
+        Path(__file__).resolve().parents[2] / "src" / "static" / "styles" / "main.css"
     )
     content = css_path.read_text(encoding="utf-8")
     # Find the .image-option block and verify background is reset
