@@ -133,7 +133,7 @@
 
                                 <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" aria-label="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
-                                    <span class="sr-only">Edit plugin {{ pi_label }}</span>
+                                    <span class="action-button-label">Edit</span>
                                 </a>
                                 <button class="edit-button refresh-settings-btn" type="button"
                                         aria-label="Edit refresh settings for {{ pi_label }}"
@@ -143,15 +143,15 @@
                                         data-instance-label="{{ pi_label }}"
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
-                                    <span class="sr-only">Edit refresh settings for {{ pi_label }}</span>
+                                    <span class="action-button-label">Refresh settings</span>
                                 </button>
                                 <button class="edit-button plugin-display-btn" type="button" aria-label="Display {{ pi_label }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
-                                    <span class="sr-only">Display {{ pi_label }} now</span>
+                                    <span class="action-button-label">Display</span>
                                 </button>
                                 <button class="delete-button delete-instance-btn" type="button" aria-label="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('trash', 'action-icon') | safe }}
-                                    <span class="sr-only">Delete plugin instance {{ pi_label }}</span>
+                                    <span class="action-button-label">Delete</span>
                                 </button>
                             </div>
                         </div>

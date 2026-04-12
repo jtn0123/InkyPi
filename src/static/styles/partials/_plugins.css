@@ -22,6 +22,9 @@
 }
 
 .plugin-actions { display:flex; justify-content:flex-end; gap:6px; align-items:center; }
+.plugin-actions .edit-button,
+.plugin-actions .delete-button { gap: 6px; }
+.plugin-actions .action-button-label { display: inline; font-size: 0.82rem; font-weight: 700; }
 .plugin-actions .btn { display:inline-flex; align-items:center; gap:6px; padding: 6px 10px; border:1px solid var(--surface-border); border-radius:6px; background: var(--surface); color: var(--text); }
 .plugin-actions .btn:hover { background: var(--hover-overlay, rgba(255,255,255,0.04)); }
 .plugin-actions .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -40,6 +40,31 @@ def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev)
     assert "Display Next" in html
 
 
+def test_playlist_plugin_actions_render_visible_labels(client, device_config_dev):
+    """Plugin action buttons should include visible labels, not just icons."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("WithLabels", "06:00", "09:00")
+    pl = pm.get_playlist("WithLabels")
+    pl.add_plugin(
+        {
+            "plugin_id": "clock",
+            "name": "Clock_saved_settings",
+            "plugin_settings": {},
+            "refresh": {"interval": 60},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+
+    assert '<span class="action-button-label">Edit</span>' in html
+    assert '<span class="action-button-label">Refresh settings</span>' in html
+    assert '<span class="action-button-label">Display</span>' in html
+    assert '<span class="action-button-label">Delete</span>' in html
+
+
 def test_playlist_display_next_mixed(client, device_config_dev):
     """Display Next appears only for the playlist that has plugins."""
     pm = device_config_dev.get_playlist_manager()
