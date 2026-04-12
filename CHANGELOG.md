@@ -1,6 +1,131 @@
 # CHANGELOG
 
 
+## v0.48.0 (2026-04-12)
+
+### Bug Fixes
+
+- **security**: Exempt /api/csp-report from CSRF and return 400 on malformed JSON (JTN-628)
+  ([#387](https://github.com/jtn0123/InkyPi/pull/387),
+  [`500627b`](https://github.com/jtn0123/InkyPi/commit/500627b8711ece5f78fb4c007e52f26624828339))
+
+Browsers never attach a CSRF token or session cookie to automatic CSP violation reports, so POST
+  /api/csp-report was being rejected by the global CSRF middleware with HTTP 403. All violation
+  reports were silently discarded, and the dev console filled with 403s.
+
+Changes: - Add /api/csp-report to _CSRF_EXEMPT_PATHS and _RATE_EXEMPT so the endpoint's own 20/min
+  per-IP sliding-window limiter is authoritative. - Return HTTP 400 (application/json) on malformed
+  JSON bodies instead of swallowing them as 204 — surfaces parser bugs and matches RFC expectations.
+  The response never echoes the request body. - Cap the accepted body at 16 KiB; oversized payloads
+  are discarded silently (204) so the limiter can't be fingerprinted. - Extend tests: integration
+  cases proving POST without CSRF succeeds, malformed JSON yields 400, oversized bodies are dropped,
+  and application/reports+json (Reporting API v2) is accepted.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Add /settings/diagnostics route to prevent 404 (JTN-627)
+  ([#386](https://github.com/jtn0123/InkyPi/pull/386),
+  [`4de5857`](https://github.com/jtn0123/InkyPi/commit/4de585728113ab9bc4b92db4a042996c353299a4))
+
+Users who bookmark or follow direct links to /settings/diagnostics previously received a 404.
+  Diagnostics is an accordion embedded in the main /settings page rather than a standalone sub-page,
+  so add a small redirect route that points visitors at the accordion anchor instead.
+
+- Add GET /settings/diagnostics -> 302 /settings#diagnostics - Add id="diagnostics" anchor target
+  next to the Diagnostics accordion so the fragment actually resolves to the right section - Cover
+  with integration tests asserting 302 target, no 404, and that following the redirect renders the
+  settings page with the anchor
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- **ui**: Unify loading/error states with FormState manager (JTN-505)
+  ([#382](https://github.com/jtn0123/InkyPi/pull/382),
+  [`7c686ec`](https://github.com/jtn0123/InkyPi/commit/7c686ec2c10cd03c5eaf31d72596cb89d0b94fd2))
+
+* feat(ui): unify loading/error states with FormState manager (JTN-505)
+
+Adds src/static/scripts/form_state.js — a framework-free manager that wires any <form
+  data-form-state> element with a uniform submit lifecycle:
+
+- Disables the submit button and shows its .btn-spinner while in flight - Flips aria-busy="true" on
+  the form during the request - setFieldError / setFieldErrors render inline next to fields via
+  existing aria-describedby validation-message regions; first invalid field receives focus -
+  clearErrors resets all inline validation-messages and aria-invalid flags at the start of every
+  submit
+
+Settings form and playlist schedule/refresh forms now opt in through data-form-state +
+  data-form-state-submit attributes. settings_page.js handleAction and playlist.js
+  createPlaylist/updatePlaylist route their save requests through FormState.run() so duplicate
+  submissions are no longer possible, and server-side field_errors (when present) surface inline
+  instead of only in a dismissible toast.
+
+form_state.js is added to the build_assets.py bundle manifest and to base.html so it loads on every
+  page.
+
+Plugin form (plugin.html / plugin_form.js) is intentionally untouched — that path is being migrated
+  to HTMX in JTN-506.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(a11y): update image preview modal tests for modal() macro
+
+Plugin.html was refactored in JTN-503 to render #imagePreviewModal via the shared modal() macro,
+  which emits aria-labelledby and the <h2> title element at render time. The existing text-based
+  tests were asserting against the raw plugin.html source and no longer matched. Tests now accept
+  either path (direct literal or macro invocation) and also verify the macro itself emits the
+  required aria-labelledby + h2 id.
+
+* test(a11y): accept macro-generated title id and quote style
+
+The modal() macro emits aria-labelledby="<id>Title", so invoking it as modal('imagePreviewModal',
+  ...) renders id='imagePreviewModalTitle' (not the original hand-written 'imagePreviewTitle').
+  Update the rendered-page assertion to accept either id and either quote style, preserving a11y
+  coverage without coupling to a specific naming convention.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **api**: Standardize JSON response envelope across blueprints (JTN-500)
+  ([#384](https://github.com/jtn0123/InkyPi/pull/384),
+  [`2122e21`](https://github.com/jtn0123/InkyPi/commit/2122e21b357d0454fcf8d4714ca945fbd041b22e))
+
+Migrates success-shaped ``jsonify({"success": True, ...})`` calls and the remaining raw-error
+  payloads in blueprints to the central ``json_success`` / ``json_error`` helpers so every JSON
+  response carries the canonical envelope (``success``, ``message`` / ``error``, ``request_id``,
+  ...).
+
+- Document the canonical envelope in ``src/utils/http_utils.py`` - Migrate ``main.py``,
+  ``plugin.py``, ``stats.py``, and the ``settings/_*`` blueprints to ``json_success`` /
+  ``json_error`` - Add ``tests/contracts/test_json_envelope.py`` covering success, error, and
+  ``X-Request-Id`` round-trip envelopes for a representative set of routes - Keep legacy top-level
+  ``running``/``unit`` fields on the 409 duplicate-update response for backward compatibility with
+  existing clients/tests
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **plugin_registry**: Use sys.executable for pyenv compatibility (JTN-625)
+  ([#385](https://github.com/jtn0123/InkyPi/pull/385),
+  [`8c7c146`](https://github.com/jtn0123/InkyPi/commit/8c7c14675d71b96ddeb4321f23c5ce7bd8e45976))
+
+The two shell-based tests (test_venv_shell_sets_pythonpath and test_plugin_import_with_pythonpath)
+  invoked a bare `python` via bash, which failed on macOS local dev when a pyenv shim pointed at an
+  unavailable interpreter ("pyenv: python: command not found"). The tests were only meant to
+  exercise PYTHONPATH propagation, not PATH resolution for `python`.
+
+Switch the in-shell interpreter invocation to the currently-running sys.executable (shell-escaped
+  via shlex.quote). Behavior under test is unchanged; the tests now run regardless of whether
+  `python` is on PATH.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.47.0 (2026-04-12)
 
 ### Bug Fixes
