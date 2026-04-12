@@ -19,6 +19,7 @@ import logging
 
 from flask import Blueprint, current_app, jsonify
 
+from utils.http_utils import json_error
 from utils.refresh_stats import compute_stats
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ def refresh_stats():
         }
     except Exception:
         logger.exception("Failed to compute refresh stats")
-        return jsonify({"error": "failed to compute stats"}), 500
+        return json_error("failed to compute stats", status=500)
 
     response = jsonify(payload)
     response.headers["Cache-Control"] = "public, max-age=60"

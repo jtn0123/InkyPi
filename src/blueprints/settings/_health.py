@@ -5,10 +5,10 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from flask import Response, current_app, jsonify, request, stream_with_context
+from flask import Response, current_app, request, stream_with_context
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 from utils.progress_events import get_progress_bus, to_sse
 
 
@@ -44,7 +44,7 @@ def health_plugins():
         except Exception:
             window_min = 1440
         health = _filter_health_by_window(health, window_min)
-        return jsonify({"success": True, "items": health})
+        return json_success(items=health)
     except Exception as e:
         return json_internal_error("health plugins", details={"error": str(e)})
 
@@ -52,7 +52,7 @@ def health_plugins():
 @_mod.settings_bp.route("/api/health/system", methods=["GET"])
 def health_system():
     try:
-        data: dict[str, Any] = {"success": True}
+        data: dict[str, Any] = {}
         try:
             import psutil  # type: ignore
 
@@ -65,7 +65,7 @@ def health_system():
             data["memory_percent"] = None
             data["disk_percent"] = None
             data["uptime_seconds"] = None
-        return jsonify(data)
+        return json_success(**data)
     except Exception as e:
         return json_internal_error("health system", details={"error": str(e)})
 

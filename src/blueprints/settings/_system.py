@@ -2,10 +2,10 @@
 
 import subprocess
 
-from flask import jsonify, request
+from flask import request
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 
 
 def _sanitize_log_value(value: str, max_len: int = 500) -> str:
@@ -49,7 +49,7 @@ def client_log():
             _mod.logger.error(line)
         else:
             _mod.logger.info(line)
-        return jsonify({"success": True})
+        return json_success()
     except Exception:
         _mod.logger.exception("/settings/client_log failure")
         return json_internal_error(
@@ -93,7 +93,7 @@ def shutdown():
             subprocess.run(["sudo", "shutdown", "-h", "now"], check=True)
         # Refresh the cooldown timestamp to the actual success time
         _mod._shutdown_limiter.record()
-        return jsonify({"success": True})
+        return json_success()
     except subprocess.CalledProcessError as e:
         # Roll back so the cooldown isn't consumed by a failed attempt
         _mod._shutdown_limiter.reset()

@@ -15,7 +15,7 @@ from flask import (
     send_from_directory,
 )
 
-from utils.http_utils import json_error
+from utils.http_utils import json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.rate_limiter import CooldownLimiter
 
@@ -243,7 +243,7 @@ def save_plugin_order():
             status=400,
         )
     device_config.set_plugin_order(order)
-    return jsonify({"success": True})
+    return json_success()
 
 
 @main_bp.route("/sw.js", methods=["GET"])
@@ -459,20 +459,14 @@ def display_next():
     except Exception:
         pass
 
-    return (
-        jsonify(
-            {
-                "success": True,
-                "message": "Display updated",
-                "metrics": {
-                    "request_ms": request_ms,
-                    "generate_ms": generate_ms,
-                    "preprocess_ms": preprocess_ms,
-                    "display_ms": display_ms,
-                },
-            }
-        ),
-        200,
+    return json_success(
+        message="Display updated",
+        metrics={
+            "request_ms": request_ms,
+            "generate_ms": generate_ms,
+            "preprocess_ms": preprocess_ms,
+            "display_ms": display_ms,
+        },
     )
 
 
