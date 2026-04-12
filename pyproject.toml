@@ -1,3 +1,55 @@
+[project]
+name = "inkypi"
+version = "0.46.3"
+description = "InkyPi — e-ink dashboard for Raspberry Pi"
+requires-python = ">=3.11,<3.14"
+# Runtime dependencies mirror install/requirements.in during the uv-lock migration
+# window (JTN-616). The source of truth is this pyproject.toml + uv.lock; the
+# install/requirements.txt file is regenerated from uv.lock via `uv export`.
+dependencies = [
+  "flask>=3.1,<4",
+  "python-dotenv>=1.0,<2",
+  "inky>=2.3,<3; sys_platform == 'linux'",
+  "requests>=2.32,<3",
+  "urllib3>=2.0,<3",
+  "werkzeug>=3.1,<4",
+  "pillow>=11.0,<13",
+  "pi-heif==1.2.0",
+  "tzdata>=2024.1",
+  "openai>=2.0,<3",
+  "google-genai>=1.14,<2",
+  "numpy>=2.0,<3",
+  "icalendar>=6.0,<7",
+  "recurring-ical-events>=3.0,<4",
+  "psutil>=7.0,<8",
+  "cysystemd>=2.0,<3; sys_platform == 'linux'",
+  "waitress>=3.0,<4",
+  "feedparser>=6.0,<7",
+  "jsonschema>=4.0,<5",
+  "astral>=3.0,<4",
+  "prometheus-client>=0.21,<1",
+]
+
+[tool.uv]
+# uv needs to know we support Linux (Pi) + macOS (dev) + arm64/aarch64/armhf wheels.
+# A universal resolution covers all supported platforms in a single lockfile.
+required-environments = [
+  "sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "sys_platform == 'linux' and platform_machine == 'armv7l'",
+  "sys_platform == 'linux' and platform_machine == 'armv6l'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "sys_platform == 'darwin' and platform_machine == 'x86_64'",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# We only use pyproject.toml for dependency metadata; no packages are published.
+packages = []
+
 [tool.black]
 line-length = 88
 target-version = ["py311"]

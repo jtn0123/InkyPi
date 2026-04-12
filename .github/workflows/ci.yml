@@ -120,22 +120,18 @@ jobs:
   lockfile-drift:
     name: Lockfile drift check
     runs-on: ubuntu-latest
-    # JTN-597: advisory until the lockfile is regenerated under this Python version.
-    # Remove continue-on-error once requirements.txt is refreshed by running:
-    #   pip-compile --generate-hashes --no-strip-extras --allow-unsafe \
-    #       install/requirements.in -o install/requirements.txt
+    # JTN-616: migrated to `uv lock` + `uv export` for a universal cross-platform
+    # lockfile. Kept advisory for this PR so a follow-up can promote it to
+    # required after it has been stable on main.
     continue-on-error: true
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          # Must match the Python version used to generate the committed lockfile.
           python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: install/requirements-dev.txt
-      - name: Install pip-tools
-        run: pip install pip-tools
+      - name: Install uv
+        run: pip install uv
       - name: Check requirements drift
         run: bash scripts/check_requirements_drift.sh
 
