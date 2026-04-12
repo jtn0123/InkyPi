@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.49.1 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Render System Health and Isolation Summary as tables (JTN-646)
+  ([#394](https://github.com/jtn0123/InkyPi/pull/394),
+  [`0d7b5fb`](https://github.com/jtn0123/InkyPi/commit/0d7b5fbe2f1daebf14d1fea47c8cfe88bdb3af7d))
+
+Extends JTN-384 to the remaining Diagnostics panels. System Health, Plugin Health, and Isolation
+  Summary no longer dump raw JSON.stringify output; instead they render as labeled .bench-table
+  tables with human-friendly units (percent, uptime) and a "No plugins isolated" empty state.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.0 (2026-04-12)
 
 ### Features
