@@ -675,25 +675,45 @@
     async function isolatePlugin() {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
       if (!pluginId) return;
-      await fetch("/settings/isolation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plugin_id: pluginId }),
-      });
-      await refreshIsolation();
-      await refreshHealth();
+      try {
+        const resp = await fetch("/settings/isolation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plugin_id: pluginId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", data.error || "Failed to isolate plugin");
+          return;
+        }
+        await refreshIsolation();
+        await refreshHealth();
+      } catch (e) {
+        console.warn("Failed to isolate plugin:", e);
+        showResponseModal("failure", "Failed to isolate plugin");
+      }
     }
 
     async function unIsolatePlugin() {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
       if (!pluginId) return;
-      await fetch("/settings/isolation", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plugin_id: pluginId }),
-      });
-      await refreshIsolation();
-      await refreshHealth();
+      try {
+        const resp = await fetch("/settings/isolation", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plugin_id: pluginId }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", data.error || "Failed to unisolate plugin");
+          return;
+        }
+        await refreshIsolation();
+        await refreshHealth();
+      } catch (e) {
+        console.warn("Failed to unisolate plugin:", e);
+        showResponseModal("failure", "Failed to unisolate plugin");
+      }
     }
 
     async function safeReset() {
