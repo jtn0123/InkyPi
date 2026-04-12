@@ -6062,7 +6062,7 @@ body.modal-open {
         min-height: 180px;
     }
 
-    .settings-panel > .buttons-container,
+    .settings-panel .buttons-container,
     .api-keys-frame .buttons-container {
         position: sticky;
         bottom: 8px;
@@ -6446,7 +6446,7 @@ body.modal-open {
    buttons container to the bottom of the viewport so the primary action is
    always one click away regardless of scroll position. */
 @media (max-height: 860px) {
-    .settings-panel > .buttons-container,
+    .settings-panel .buttons-container,
     .api-keys-frame .buttons-container {
         position: sticky;
         bottom: 8px;

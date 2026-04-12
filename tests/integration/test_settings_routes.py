@@ -146,3 +146,34 @@ def test_settings_page_image_sliders_present(client):
         assert (
             slider_name.encode() in resp.data
         ), f"Slider '{slider_name}' missing from settings page"
+
+
+def test_settings_responsive_css_sticky_save_selector_matches_real_dom():
+    """JTN-572: the Save button must actually become sticky on /settings.
+
+    The earlier JTN-599 rule used ``.settings-panel > .buttons-container`` (child
+    combinator), but the settings DOM nests the buttons-container inside
+    ``.settings-console-main``, so the selector matched zero elements and the
+    sticky rule was dead on /settings. The fix is a descendant combinator.
+    """
+    from pathlib import Path
+
+    css_path = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "static"
+        / "styles"
+        / "partials"
+        / "_responsive.css"
+    )
+    content = css_path.read_text(encoding="utf-8")
+    assert ".settings-panel .buttons-container" in content, (
+        "JTN-572: _responsive.css must pin the Save button on /settings with "
+        "a descendant combinator selector."
+    )
+    # Regression guard: the broken child-combinator selector must NOT reappear.
+    assert ".settings-panel > .buttons-container" not in content, (
+        "JTN-572 regression: `.settings-panel > .buttons-container` never "
+        "matches the real DOM (buttons-container is nested inside "
+        ".settings-console-main). Use the descendant combinator instead."
+    )
