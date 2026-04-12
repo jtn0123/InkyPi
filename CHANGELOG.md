@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.49.4 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Warn on API Required navigation when form has unsaved changes (JTN-629)
+  ([#397](https://github.com/jtn0123/InkyPi/pull/397),
+  [`0db65fb`](https://github.com/jtn0123/InkyPi/commit/0db65fb9216ff33941a7c67b16b538d28cc5ce13))
+
+On plugin pages that require an API key (AI Image, GitHub, etc.), the "API Required" chip in the
+  header was a plain <a> link that immediately navigated to /settings/api-keys. A user who had typed
+  a long prompt and tapped the chip lost all of it without warning.
+
+The chip is now intercepted by plugin_page.js. On first page load the settings form is snapshotted;
+  on chip click, we compare the current form state to the snapshot. If the form is dirty, a
+  confirmation modal opens warning about discarding unsaved changes — matching the Reboot/Shutdown
+  modal UX introduced in JTN-621. If the form is clean, navigation proceeds normally. The confirm
+  button is still an <a href> to the API keys page so no-JS fallback keeps working.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.3 (2026-04-12)
 
 ### Bug Fixes
