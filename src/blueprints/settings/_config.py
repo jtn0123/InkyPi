@@ -2,7 +2,7 @@
 
 from zoneinfo import available_timezones
 
-from flask import current_app, render_template, request
+from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
@@ -87,6 +87,18 @@ def settings_page():
     return render_template(
         "settings.html", device_settings=device_config.get_config(), timezones=timezones
     )
+
+
+@_mod.settings_bp.route("/settings/diagnostics", methods=["GET"])
+def diagnostics_redirect():
+    """Redirect /settings/diagnostics to the Diagnostics accordion on /settings.
+
+    Diagnostics is an accordion embedded in the main settings page rather than
+    a standalone page. Users who bookmark or follow direct links to
+    ``/settings/diagnostics`` previously hit a 404 (JTN-627); redirect them to
+    the anchor on the settings page instead.
+    """
+    return redirect("/settings#diagnostics", code=302)
 
 
 @_mod.settings_bp.route("/settings/backup", methods=["GET"])
