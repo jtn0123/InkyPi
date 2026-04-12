@@ -282,6 +282,13 @@
       bindThumbLightbox();
       bindActions();
       globalThis.updateHistoryStorage = updateStorage;
+
+      // Re-bind skeleton handlers after HTMX swaps new grid content.
+      // The htmx:afterSettle event fires after the DOM has fully settled,
+      // ensuring the new images are available for binding.
+      document.body.addEventListener("htmx:afterSettle", function () {
+        bindImages();
+      });
     }
 
     return { init };

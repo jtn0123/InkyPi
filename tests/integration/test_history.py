@@ -787,3 +787,77 @@ def test_list_history_images_only_reads_limit_sidecars(device_config_dev, monkey
     assert len(images) == limit
     # Should have loaded at most `limit` sidecars, not all 10
     assert load_count["n"] <= limit
+
+
+# ---------------------------------------------------------------------------
+# HTMX pagination partial swap tests (JTN-330)
+# ---------------------------------------------------------------------------
+
+
+def test_htmx_pagination_returns_different_content_per_page(client, device_config_dev):
+    """JTN-330: HTMX partial for page 1 and page 2 must contain different images."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    names = [f"display_20250301_{i:06d}.png" for i in range(20)]
+    for name in names:
+        Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+
+    hx = {"HX-Request": "true"}
+    r1 = client.get("/history?page=1&per_page=10", headers=hx)
+    r2 = client.get("/history?page=2&per_page=10", headers=hx)
+
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+    body1 = r1.get_data(as_text=True)
+    body2 = r2.get_data(as_text=True)
+
+    imgs_p1 = {n for n in names if n in body1}
+    imgs_p2 = {n for n in names if n in body2}
+
+    assert len(imgs_p1) == 10, f"Page 1 should show 10 images, got {len(imgs_p1)}"
+    assert len(imgs_p2) == 10, f"Page 2 should show 10 images, got {len(imgs_p2)}"
+    assert not imgs_p1 & imgs_p2, "HTMX partials for page 1 and 2 must not overlap"
+
+
+def test_pagination_links_include_scroll_show_modifier(client, device_config_dev):
+    """JTN-330: pagination links must include show: modifier so the grid
+    scrolls into view after HTMX swap."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(15):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_20250301_{i:06d}.png")
+        )
+
+    resp = client.get("/history?page=1&per_page=10")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    assert "show:#history-grid-container:top" in body, (
+        "Next link hx-swap must include show:#history-grid-container:top "
+        "so the browser scrolls to the grid after swap"
+    )
+
+
+def test_htmx_partial_is_not_full_page(client, device_config_dev):
+    """JTN-330: HTMX partial must not include the full page shell."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(5):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_20250301_{i:06d}.png")
+        )
+
+    resp = client.get("/history", headers={"HX-Request": "true"})
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    assert "<html" not in body, "HTMX partial must not include <html> tag"
+    assert "history-grid-container" in body, "Partial must contain the grid container"

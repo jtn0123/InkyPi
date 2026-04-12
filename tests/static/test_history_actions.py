@@ -454,3 +454,18 @@ def test_history_template_boot_invokes_page_controller(client):
     assert "InkyPiHistoryPage" in body, "Boot script must reference InkyPiHistoryPage"
     assert ".create(" in body, "Boot script must call .create() to instantiate the page"
     assert ".init()" in body, "Boot script must call .init() to wire up event handlers"
+
+
+def test_history_page_js_rebinds_images_after_htmx_swap(client):
+    """JTN-330: history_page.js must listen for htmx:afterSettle to rebind
+    image skeleton handlers after HTMX swaps the grid."""
+    resp = client.get("/static/scripts/history_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert (
+        "htmx:afterSettle" in js
+    ), "history_page.js must listen for htmx:afterSettle to rebind images after swap"
+    assert (
+        "bindImages" in js
+    ), "htmx:afterSettle handler must call bindImages to rebind skeleton handlers"
