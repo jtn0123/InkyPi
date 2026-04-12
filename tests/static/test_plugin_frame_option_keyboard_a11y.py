@@ -43,13 +43,11 @@ def test_frame_option_button_has_aria_label():
 
 def test_image_option_css_has_transparent_background():
     """The .image-option CSS must set background: transparent so button elements render correctly."""
+    # JTN-504: .image-option moved from _components.css to _form.css during
+    # the per-component CSS reshape. Read the built main.css so this test is
+    # resilient to future partial reorganizations.
     css_path = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "static"
-        / "styles"
-        / "partials"
-        / "_components.css"
+        Path(__file__).resolve().parents[2] / "src" / "static" / "styles" / "main.css"
     )
     content = css_path.read_text(encoding="utf-8")
     # Find the .image-option block and verify background is reset

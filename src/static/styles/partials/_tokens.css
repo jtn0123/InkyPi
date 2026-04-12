@@ -135,6 +135,18 @@
 
     /* Animation */
     --transition-speed: 0.18s;
+
+    /* Breakpoint reference (CSS custom properties cannot be used in
+       @media queries, so these serve as a single-source-of-truth
+       reference for the values used throughout _responsive.css and
+       per-component @media blocks):
+       --bp-xs:  430px   Narrowest phones
+       --bp-sm:  520px   Small phones
+       --bp-md:  640px   Progress-step threshold
+       --bp-tab: 768px   Tablet / mobile boundary
+       --bp-lg:  900px   Enhanced responsive
+       --bp-xl:  1024px  Tablet landscape
+       --bp-2xl: 1440px  Large screens */
 }
 [data-theme="dark"] {
     /* Hardware diagnostic console */
