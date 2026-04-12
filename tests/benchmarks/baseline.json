@@ -1,0 +1,112 @@
+{
+  "benchmarks": [
+    {
+      "name": "test_http_cache_hit_lookup",
+      "group": null,
+      "stats": {
+        "min": 2.6670004444895312e-06,
+        "max": 1.1084001016570255e-05,
+        "mean": 3.073696185326998e-06,
+        "stddev": 1.9828953396683793e-07,
+        "median": 3.041999661945738e-06,
+        "rounds": 12606
+      }
+    },
+    {
+      "name": "test_image_resize_and_convert",
+      "group": null,
+      "stats": {
+        "min": 0.0004975829997420078,
+        "max": 0.0009295420004491461,
+        "mean": 0.0005390981099085816,
+        "stddev": 1.2251213784594628e-05,
+        "median": 0.0005370420003600884,
+        "rounds": 1565
+      }
+    },
+    {
+      "name": "test_image_png_encode",
+      "group": null,
+      "stats": {
+        "min": 0.0007753749996481929,
+        "max": 0.0008217909999075346,
+        "mean": 0.0007871493842064477,
+        "stddev": 8.792896194230107e-06,
+        "median": 0.0007835209999029757,
+        "rounds": 164
+      }
+    },
+    {
+      "name": "test_config_read",
+      "group": null,
+      "stats": {
+        "min": 1.3749995559919626e-06,
+        "max": 4.933300078846514e-05,
+        "mean": 1.6586585905952594e-06,
+        "stddev": 2.7946909559845255e-07,
+        "median": 1.625001459615305e-06,
+        "rounds": 193536
+      }
+    },
+    {
+      "name": "test_plugin_registry_list_scan",
+      "group": null,
+      "stats": {
+        "min": 0.000325707998854341,
+        "max": 0.0004834159990423359,
+        "mean": 0.0003590348832191746,
+        "stddev": 8.333975963231975e-06,
+        "median": 0.0003575409991753986,
+        "rounds": 2603
+      }
+    },
+    {
+      "name": "test_config_read_cached",
+      "group": null,
+      "stats": {
+        "min": 1.3749995559919626e-06,
+        "max": 1.790266712002146e-05,
+        "mean": 1.6063933219075346e-06,
+        "stddev": 1.5062079373665897e-07,
+        "median": 1.5969999367371202e-06,
+        "rounds": 195122
+      }
+    },
+    {
+      "name": "test_bench_clock_render",
+      "group": "plugin_render",
+      "stats": {
+        "min": 0.0012608329998329282,
+        "max": 0.0019517909986461746,
+        "mean": 0.0013042798985632795,
+        "stddev": 3.5529547062033747e-05,
+        "median": 0.0012969170002179453,
+        "rounds": 493
+      }
+    },
+    {
+      "name": "test_bench_weather_render",
+      "group": "plugin_render",
+      "stats": {
+        "min": 0.0006526659999508411,
+        "max": 0.0011150409991387278,
+        "mean": 0.0007077328394059025,
+        "stddev": 7.667693412570043e-05,
+        "median": 0.0006702079990645871,
+        "rounds": 112
+      }
+    },
+    {
+      "name": "test_bench_html_render",
+      "group": "plugin_render",
+      "stats": {
+        "min": 0.00017179200040118303,
+        "max": 0.00023358299949904904,
+        "mean": 0.00018454996419179848,
+        "stddev": 5.020381644372901e-06,
+        "median": 0.00018358299894316588,
+        "rounds": 391
+      }
+    }
+  ]
+}
