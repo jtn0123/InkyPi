@@ -688,7 +688,7 @@ def test_list_history_images_no_limit_returns_all(device_config_dev):
 
 
 def test_history_action_buttons_have_aria_labels(client, device_config_dev):
-    """JTN-202: action buttons include aria-label with filename for assistive tech."""
+    """JTN-642: action buttons include aria-label with human-readable timestamp for assistive tech."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     fname = "display_20250101_060000.png"
@@ -698,9 +698,17 @@ def test_history_action_buttons_have_aria_labels(client, device_config_dev):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
 
-    assert f'aria-label="Display {fname}"' in body
-    assert f'aria-label="Download {fname}"' in body
-    assert f'aria-label="Delete {fname}"' in body
+    # Labels must not embed the raw timestamp-based filename (poor SR UX).
+    assert f'aria-label="Display {fname}"' not in body
+    assert f'aria-label="Download {fname}"' not in body
+    assert f'aria-label="Delete {fname}"' not in body
+
+    # Labels should reference a human-readable mtime (e.g., "Apr 08, 2026 08:01 PM").
+    # Assert the descriptive prefix is present for each action.
+    assert 'aria-label="Display image from ' in body
+    assert 'aria-label="Download image from ' in body
+    assert 'aria-label="Delete image from ' in body
+    assert 'aria-label="Preview image from ' in body
 
 
 # ---------------------------------------------------------------------------
