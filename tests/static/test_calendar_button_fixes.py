@@ -1,10 +1,14 @@
-"""Tests for JTN-311 and JTN-312: calendar plugin button bug fixes.
+"""Tests for JTN-311, JTN-312, and JTN-347 cluster: plugin button bug fixes.
 
 JTN-311: Remove calendar button must be disabled (not a silent no-op) when
          only one calendar row is present.
 JTN-312: Last progress button must call a handler that makes progress visible,
          not leave the panel hidden due to the HTML `hidden` attribute.
+JTN-347/348/331/332: "Show last progress" button must produce visible feedback
+         on Clock, To-Do List, Calendar, and Screenshot plugin pages.
 """
+
+import pytest
 
 # ---------------------------------------------------------------------------
 # JTN-311: Remove calendar button disabled when only one row
@@ -160,3 +164,76 @@ def test_request_progress_block_present_on_calendar_page(client):
         "Calendar plugin page must render requestProgress block so "
         "showLastProgress has an element to reveal (JTN-312)"
     )
+
+
+# ---------------------------------------------------------------------------
+# JTN-347/348/331/332: "Show last progress" visible feedback across plugins
+# ---------------------------------------------------------------------------
+
+
+def test_show_last_progress_clears_inline_display_style(client):
+    """JTN-347: showLastProgress must clear inline style.display left by
+    progress.stop(), otherwise the progress block stays invisible even
+    after the hidden attribute is removed."""
+    resp = client.get("/static/scripts/plugin_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert 'progress.style.display = ""' in js, (
+        "showLastProgress must reset progress.style.display to '' so inline "
+        "display:none from progress.stop() does not keep the block hidden "
+        "(JTN-347)"
+    )
+
+
+def test_progress_stop_does_not_set_display_none(client):
+    """JTN-347: progress.stop() must hide via the hidden attribute only,
+    not set style.display='none' which conflicts with showLastProgress."""
+    resp = client.get("/static/scripts/plugin_form.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # Extract the stop function body (between "function stop()" and the next
+    # "return" that closes the initProgress IIFE).
+    stop_start = js.find("function stop()")
+    assert stop_start != -1, "stop function not found in plugin_form.js"
+    stop_body = js[stop_start : stop_start + 300]
+
+    assert "style.display = 'none'" not in stop_body, (
+        "progress.stop() must not set style.display = 'none'; "
+        "use the hidden attribute instead (JTN-347)"
+    )
+
+
+@pytest.mark.parametrize(
+    "plugin_id",
+    ["clock", "todo_list", "calendar", "screenshot"],
+    ids=["JTN-347-clock", "JTN-348-todo", "JTN-331-calendar", "JTN-332-screenshot"],
+)
+def test_show_last_progress_btn_present_on_plugin_page(client, plugin_id):
+    """JTN-347/348/331/332: Each affected plugin page must render the
+    showLastProgressBtn so users get visible feedback."""
+    resp = client.get(f"/plugin/{plugin_id}")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert (
+        'id="showLastProgressBtn"' in body
+    ), f"{plugin_id} plugin page must render showLastProgressBtn"
+
+
+@pytest.mark.parametrize(
+    "plugin_id",
+    ["clock", "todo_list", "calendar", "screenshot"],
+    ids=["JTN-347-clock", "JTN-348-todo", "JTN-331-calendar", "JTN-332-screenshot"],
+)
+def test_request_progress_block_present_on_plugin_page(client, plugin_id):
+    """JTN-347/348/331/332: Each affected plugin page must include the
+    requestProgress block that showLastProgress reveals."""
+    resp = client.get(f"/plugin/{plugin_id}")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert (
+        'id="requestProgress"' in body
+    ), f"{plugin_id} plugin page must render requestProgress block"

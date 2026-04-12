@@ -147,7 +147,12 @@
         if (bar) { bar.style.width = "100%"; bar.setAttribute("aria-valuenow", 100); }
         // JTN-312: clear the HTML `hidden` attribute so the block is visible;
         // setting style.display alone does not override the `hidden` attribute.
-        if (progress) setHidden(progress, false);
+        // JTN-347: also clear inline display:none left by progress.stop() —
+        // otherwise the block stays invisible even after removing `hidden`.
+        if (progress) {
+          setHidden(progress, false);
+          progress.style.display = "";
+        }
       } catch (e) { console.warn("Failed to show last progress:", e); }
     }
 
