@@ -56,32 +56,53 @@
             </div>
         </div>
         {% if metrics and (metrics.request_ms is not none or metrics.generate_ms is not none or metrics.preprocess_ms is not none or metrics.display_ms is not none) %}
-        <div class="metric-strip compact">
-            {% if metrics.request_ms is not none %}
-            <div class="metric-pill">
-                <span class="metric-pill-label">Request</span>
-                <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
+        {% set _plugin_label = metrics.plugin_display_name or metrics.plugin_id or 'the most recent plugin' %}
+        {% set _when_label = metrics.refresh_time_str or metrics.refresh_time %}
+        {% set _context_suffix %}{% if _when_label %} on {{ _when_label }}{% endif %}{% endset %}
+        <section class="metric-strip-block" aria-labelledby="latestRenderHeading">
+            <h2 id="latestRenderHeading" class="metric-strip-heading">Last render timings</h2>
+            <p class="metric-strip-caption">
+                {% if metrics.plugin_display_name or metrics.plugin_id %}
+                    Most recent refresh for <strong>{{ _plugin_label }}</strong>{% if _when_label %} on {{ _when_label }}{% endif %}{% if metrics.refresh_type %} ({{ metrics.refresh_type }}){% endif %}.
+                {% else %}
+                    Timings from the most recent refresh{% if _when_label %} on {{ _when_label }}{% endif %}.
+                {% endif %}
+            </p>
+            <div class="metric-strip compact" role="list">
+                {% if metrics.request_ms is not none %}
+                <div class="metric-pill" role="listitem"
+                     title="Request phase of the last image generation for {{ _plugin_label }}{{ _context_suffix }}"
+                     aria-label="Request phase: {{ metrics.request_ms }} milliseconds for {{ _plugin_label }}{{ _context_suffix }}">
+                    <span class="metric-pill-label">Request</span>
+                    <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
+                </div>
+                {% endif %}
+                {% if metrics.generate_ms is not none %}
+                <div class="metric-pill" role="listitem"
+                     title="Last image generation for {{ _plugin_label }}{{ _context_suffix }}"
+                     aria-label="Generate phase: {{ metrics.generate_ms }} milliseconds for {{ _plugin_label }}{{ _context_suffix }}">
+                    <span class="metric-pill-label">Generate</span>
+                    <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
+                </div>
+                {% endif %}
+                {% if metrics.preprocess_ms is not none %}
+                <div class="metric-pill" role="listitem"
+                     title="Preprocess phase of the last image generation for {{ _plugin_label }}{{ _context_suffix }}"
+                     aria-label="Preprocess phase: {{ metrics.preprocess_ms }} milliseconds for {{ _plugin_label }}{{ _context_suffix }}">
+                    <span class="metric-pill-label">Preprocess</span>
+                    <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
+                </div>
+                {% endif %}
+                {% if metrics.display_ms is not none %}
+                <div class="metric-pill" role="listitem"
+                     title="Display update phase of the last render for {{ _plugin_label }}{{ _context_suffix }}"
+                     aria-label="Display phase: {{ metrics.display_ms }} milliseconds for {{ _plugin_label }}{{ _context_suffix }}">
+                    <span class="metric-pill-label">Display</span>
+                    <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
-            {% if metrics.generate_ms is not none %}
-            <div class="metric-pill">
-                <span class="metric-pill-label">Generate</span>
-                <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
-            </div>
-            {% endif %}
-            {% if metrics.preprocess_ms is not none %}
-            <div class="metric-pill">
-                <span class="metric-pill-label">Preprocess</span>
-                <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
-            </div>
-            {% endif %}
-            {% if metrics.display_ms is not none %}
-            <div class="metric-pill">
-                <span class="metric-pill-label">Display</span>
-                <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
-            </div>
-            {% endif %}
-        </div>
+        </section>
         {% endif %}
         <div class="separator"></div>
 

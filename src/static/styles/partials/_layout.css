@@ -447,6 +447,27 @@ main[data-page-shell="workflow"] .frame {
   padding: 12px;
 }
 
+.metric-strip-block {
+  margin-bottom: 18px;
+}
+
+.metric-strip-block .metric-strip {
+  margin-bottom: 0;
+}
+
+.metric-strip-heading {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: var(--text);
+}
+
+.metric-strip-caption {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 10px 0;
+}
+
 .empty-state {
   text-align: center;
   padding: 40px 20px;

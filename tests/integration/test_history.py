@@ -99,6 +99,67 @@ def test_history_page_moves_clear_action_to_reset_cache(client, device_config_de
     assert 'id="historyClearBtn"' in body
 
 
+def test_history_metric_chips_include_plugin_context(client, device_config_dev):
+    """JTN-626: header timing chips must carry provenance context.
+
+    The GENERATE / Request / Preprocess / Display chips shown above the grid
+    must be labelled with the plugin and refresh timestamp they came from,
+    both as a visible caption and via ``title`` / ``aria-label`` attributes so
+    screen-reader and hover users get the same disambiguating context.
+    """
+    from model import RefreshInfo
+
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2026-04-08T19:40:00+00:00",
+        image_hash=0,
+        request_ms=123,
+        generate_ms=2622,
+        preprocess_ms=45,
+        display_ms=678,
+    )
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    # Visible label / caption so the chips are explained in-page.
+    assert "Last render timings" in body
+    assert "Most recent refresh for" in body
+    # Plugin name resolves to the registered display_name ("Weather") when
+    # the plugin_id is registered, otherwise falls back to the raw plugin_id.
+    assert "Weather" in body or "weather" in body
+    # Refresh timestamp is surfaced in the caption.
+    assert "2026-04-08" in body
+    assert "Playlist" in body
+
+    # Every rendered chip must carry both a title tooltip and an aria-label
+    # that names the plugin and timestamp; the Generate chip specifically must
+    # reference "image generation" (the event being measured).
+    assert 'title="Last image generation for' in body
+    assert "on 2026-04-08 19:40" in body
+    assert 'aria-label="Generate phase: 2622 milliseconds for' in body
+    assert 'aria-label="Request phase: 123 milliseconds for' in body
+
+
+def test_history_metric_chips_hidden_when_no_metrics(client, device_config_dev):
+    """Without any timing data the header block should not render at all."""
+    from model import RefreshInfo
+
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Manual Update",
+        plugin_id="",
+        refresh_time=None,
+        image_hash=None,
+    )
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert "Last render timings" not in body
+
+
 def test_history_image_blocks_path_traversal(client):
     """Bug 4: history_image should reject path traversal attempts."""
     resp = client.get("/history/image/../../etc/passwd")

@@ -218,22 +218,61 @@ def history_page():
                 history_dir, offset=start, limit=per_page
             )
 
-    # Pull latest timing metrics if available
+    # Pull latest timing metrics if available, along with provenance context
+    # (plugin + timestamp) so the template can label the chips unambiguously.
+    metrics: dict = {
+        "request_ms": None,
+        "generate_ms": None,
+        "preprocess_ms": None,
+        "display_ms": None,
+        "plugin_id": None,
+        "plugin_display_name": None,
+        "refresh_type": None,
+        "refresh_time": None,
+        "refresh_time_str": None,
+    }
     try:
         ri = device_config.get_refresh_info()
-        metrics = {
-            "request_ms": getattr(ri, "request_ms", None),
-            "generate_ms": getattr(ri, "generate_ms", None),
-            "preprocess_ms": getattr(ri, "preprocess_ms", None),
-            "display_ms": getattr(ri, "display_ms", None),
-        }
+        metrics["request_ms"] = getattr(ri, "request_ms", None)
+        metrics["generate_ms"] = getattr(ri, "generate_ms", None)
+        metrics["preprocess_ms"] = getattr(ri, "preprocess_ms", None)
+        metrics["display_ms"] = getattr(ri, "display_ms", None)
+        plugin_id = getattr(ri, "plugin_id", None) or None
+        metrics["plugin_id"] = plugin_id
+        metrics["refresh_type"] = getattr(ri, "refresh_type", None) or None
+        refresh_time = getattr(ri, "refresh_time", None) or None
+        metrics["refresh_time"] = refresh_time
+        # Resolve plugin display name if we have a plugin id.
+        if plugin_id:
+            try:
+                plugins_list = device_config.get_plugins() or []
+                for p in plugins_list:
+                    if p.get("id") == plugin_id:
+                        metrics["plugin_display_name"] = (
+                            p.get("display_name") or plugin_id
+                        )
+                        break
+            except Exception:
+                logger.exception("Failed to resolve plugin display name")
+        # Format the refresh timestamp in the device timezone when possible.
+        if refresh_time:
+            try:
+                dt = datetime.fromisoformat(refresh_time)
+                tz_now = (
+                    now_device_tz(device_config)
+                    if device_config
+                    else datetime.now(tz=get_timezone("UTC"))
+                )
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+                dt = dt.astimezone(tz_now.tzinfo)
+                metrics["refresh_time_str"] = (
+                    dt.strftime("%Y-%m-%d %H:%M").lstrip("0").replace(" 0", " ")
+                )
+            except Exception:
+                metrics["refresh_time_str"] = refresh_time
     except Exception:
-        metrics = {
-            "request_ms": None,
-            "generate_ms": None,
-            "preprocess_ms": None,
-            "display_ms": None,
-        }
+        logger.exception("Failed to load refresh metrics for history page")
     # Compute storage usage for the history directory's filesystem
     free_bytes = None
     total_bytes = None
