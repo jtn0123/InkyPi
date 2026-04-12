@@ -642,9 +642,8 @@
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });
-      document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
-        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
-      });
+      // Collapsible toggle is bound via delegation in ui_helpers.js so every
+      // `[data-collapsible-toggle]` button updates aria-expanded consistently.
       document.querySelectorAll("[data-frame-option]").forEach((option) => {
         option.addEventListener("click", () => selectedFrame(option));
         option.addEventListener("keydown", (event) => {

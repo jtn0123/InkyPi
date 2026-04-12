@@ -157,12 +157,48 @@ def test_empty_body_returns_204(csp_client):
     assert resp.status_code == 204
 
 
-def test_invalid_json_body_returns_204(csp_client):
-    """Malformed JSON must not crash — returns 204."""
+def test_invalid_json_body_returns_400(csp_client):
+    """Malformed JSON must be rejected with HTTP 400 (JTN-628)."""
     resp = csp_client.post(
         "/api/csp-report",
         data=b"not-json!!!",
         content_type="application/csp-report",
+    )
+    assert resp.status_code == 400
+    # The response MUST NOT echo the malformed body back (defensive).
+    assert b"not-json" not in resp.data
+
+
+def test_invalid_json_body_reports_application_json(csp_client):
+    """400 response uses application/json content-type."""
+    resp = csp_client.post(
+        "/api/csp-report",
+        data=b"{broken",
+        content_type="application/csp-report",
+    )
+    assert resp.status_code == 400
+    assert resp.content_type.startswith("application/json")
+
+
+def test_oversized_body_is_discarded(csp_client):
+    """Bodies larger than 16 KiB are discarded without logging."""
+    huge = b'{"csp-report":{"blocked-uri":"' + (b"A" * 20_000) + b'"}}'
+    resp = csp_client.post(
+        "/api/csp-report",
+        data=huge,
+        content_type="application/csp-report",
+    )
+    # Oversized bodies get a 204 (silently discarded) — the server MUST
+    # NOT fingerprint the limiter by returning a distinct error code.
+    assert resp.status_code == 204
+
+
+def test_reports_api_v2_content_type_accepted(csp_client):
+    """application/reports+json (Reporting API v2) is accepted."""
+    resp = csp_client.post(
+        "/api/csp-report",
+        data=json.dumps(_MODERN_CSP_REPORT),
+        content_type="application/reports+json",
     )
     assert resp.status_code == 204
 
@@ -240,6 +276,65 @@ def test_custom_csp_with_existing_report_uri_not_duplicated(monkeypatch):
     assert (
         csp.count("report-uri") == 1
     ), f"'report-uri' must appear exactly once; got: {csp!r}"
+
+
+def _make_csp_app_with_full_middleware() -> Flask:
+    """Build an app with the real CSRF + rate-limit middleware registered.
+
+    This exercises the exemption added in JTN-628: /api/csp-report MUST
+    bypass CSRF and the sliding-window rate limiter even though it is a
+    POST to a path that would otherwise be rejected with 403.
+    """
+    app = Flask(__name__)
+    app.secret_key = "test-csp-integration"
+    app.config["TESTING"] = True
+
+    from app_setup.security_middleware import (
+        setup_csrf_protection,
+        setup_rate_limiting,
+    )
+    from blueprints.csp_report import csp_report_bp
+
+    setup_csrf_protection(app)
+    setup_rate_limiting(app)
+    app.register_blueprint(csp_report_bp)
+    return app
+
+
+def test_post_without_csrf_token_succeeds_full_middleware():
+    """Integration: POST without CSRF token returns 204 (JTN-628)."""
+    client = _make_csp_app_with_full_middleware().test_client()
+    resp = client.post(
+        "/api/csp-report",
+        data=json.dumps(_SAMPLE_CSP_REPORT),
+        content_type="application/csp-report",
+    )
+    # Before JTN-628 this returned 403 (CSRF rejection).
+    assert resp.status_code == 204
+
+
+def test_malformed_json_through_full_middleware_returns_400():
+    """Integration: malformed JSON yields 400 even with CSRF+rate-limit registered."""
+    client = _make_csp_app_with_full_middleware().test_client()
+    resp = client.post(
+        "/api/csp-report",
+        data=b"definitely-not-json",
+        content_type="application/csp-report",
+    )
+    assert resp.status_code == 400
+
+
+def test_wrong_content_type_still_accepted_if_valid_json():
+    """Unexpected content-type with valid JSON is logged and returns 204."""
+    client = _make_csp_app_with_full_middleware().test_client()
+    resp = client.post(
+        "/api/csp-report",
+        data=json.dumps(_SAMPLE_CSP_REPORT),
+        content_type="text/plain",
+    )
+    # Browsers sometimes send odd content-types; we accept the body if
+    # it parses, and return 204 regardless of content-type.
+    assert resp.status_code == 204
 
 
 def test_modern_report_api_returns_204_and_logs(caplog, csp_client):

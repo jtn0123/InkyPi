@@ -2,6 +2,7 @@
 import importlib
 import logging
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -54,9 +55,16 @@ def _base_env() -> dict[str, str]:
 def _read_pythonpath_from_shell(
     env: dict[str, str],
 ) -> subprocess.CompletedProcess[str]:
+    # Use sys.executable rather than the bare string "python" so this test does
+    # not depend on PATH resolution. On macOS with pyenv, a `python` shim may
+    # resolve to a version that is not installed, causing
+    # "pyenv: python: command not found" even though the running interpreter
+    # is perfectly healthy. The behavior under test is PYTHONPATH propagation
+    # from scripts/venv.sh, which is independent of which interpreter is used.
+    python_bin = shlex.quote(sys.executable)
     command = (
         "source scripts/venv.sh >/dev/null 2>&1 && "
-        "python - <<'PY'\n"
+        f"{python_bin} - <<'PY'\n"
         "import os\n"
         "print(os.environ.get('PYTHONPATH', ''))\n"
         "PY\n"

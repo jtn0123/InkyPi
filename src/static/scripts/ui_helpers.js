@@ -1,14 +1,15 @@
 (function () {
   function toggleCollapsible(button) {
     const content = button?.nextElementSibling;
-    const icon = button?.querySelector(".collapsible-icon");
     if (!button || !content) return;
     const isOpen = content.classList.contains("is-open");
     button.classList.toggle("active", !isOpen);
     button.setAttribute("aria-expanded", String(!isOpen));
     content.classList.toggle("is-open", !isOpen);
     content.removeAttribute("hidden");
-    if (icon) icon.textContent = isOpen ? "▼" : "▲";
+    // Chevron direction is driven by CSS via `[aria-expanded="true"]` so we
+    // don't mutate textContent here — that would double-flip against the
+    // CSS rotate transform. See src/static/styles/partials/_toggle.css.
     const sectionId = button.closest('.collapsible')?.id;
     if (sectionId) {
       savePref('collapsible_', sectionId, !isOpen);
@@ -25,7 +26,6 @@
       if (saved === null) return;
       const shouldBeOpen = saved === 'true';
       const content = button.nextElementSibling;
-      const icon = button.querySelector(".collapsible-icon");
       const isOpen = content?.classList.contains("is-open");
       if (shouldBeOpen !== isOpen) {
         button.classList.toggle("active", shouldBeOpen);
@@ -34,7 +34,6 @@
           content.classList.toggle("is-open", shouldBeOpen);
           content.removeAttribute("hidden");
         }
-        if (icon) icon.textContent = shouldBeOpen ? "▲" : "▼";
       }
     });
   }
@@ -45,14 +44,12 @@
     );
     buttons.forEach((button) => {
       const content = button.nextElementSibling;
-      const icon = button.querySelector(".collapsible-icon");
       button.classList.toggle("active", open);
       button.setAttribute("aria-expanded", String(open));
       if (content) {
         content.classList.toggle("is-open", open);
         content.removeAttribute("hidden");
       }
-      if (icon) icon.textContent = open ? "▲" : "▼";
     });
   }
 
@@ -114,4 +111,16 @@
     syncModalOpenState,
     toggleCollapsible,
   };
+
+  // Delegated click handler so every `[data-collapsible-toggle]` button
+  // reliably toggles aria-expanded, regardless of whether a page script
+  // remembered to wire its own listener. Guarded to only run once even if
+  // this module is evaluated multiple times.
+  if (typeof document !== "undefined" && !document.__inkypiCollapsibleBound) {
+    document.__inkypiCollapsibleBound = true;
+    document.addEventListener("click", (event) => {
+      const button = event.target?.closest?.("[data-collapsible-toggle]");
+      if (button) toggleCollapsible(button);
+    });
+  }
 })();

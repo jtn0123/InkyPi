@@ -179,39 +179,84 @@
         showResponseModal("success", "No changes to save.");
         return;
       }
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+      // JTN-505: FormState owns the disabled/aria-busy/spinner lifecycle.
+      const fs = (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
+      if (fs) fs.clearErrors();
       const formData = new FormData(form);
       await appendGeoData(formData);
 
-      try {
-        const response = await fetch(config.saveSettingsUrl, {
-          method: "POST",
-          body: formData,
-        });
-        const result = await response.json();
-        if (response.ok) {
-          _formSnapshot = getFormSnapshot(form);
-          if (saveBtn) saveBtn.disabled = true;
-          showResponseModal("success", `Success! ${result.message}`);
-        } else {
-          showResponseModal("failure", `Error! ${result.error}`);
-          restoreFormFromSnapshot(form, _formSnapshot);
+      const doSubmit = async () => {
+        try {
+          const response = await fetch(config.saveSettingsUrl, {
+            method: "POST",
+            body: formData,
+          });
+          const result = await response.json();
+          if (response.ok) {
+            _formSnapshot = getFormSnapshot(form);
+            if (saveBtn) saveBtn.disabled = true;
+            showResponseModal("success", `Success! ${result.message}`);
+          } else {
+            // Surface field-level errors inline when the server returns them.
+            if (fs && result && result.field_errors && typeof result.field_errors === "object") {
+              fs.setFieldErrors(result.field_errors);
+            }
+            showResponseModal("failure", `Error! ${result.error}`);
+            restoreFormFromSnapshot(form, _formSnapshot);
+          }
+        } catch (error) {
+          console.error("Settings save failed:", error);
+          showResponseModal(
+            "failure",
+            "An error occurred while processing your request. Please try again."
+          );
+          checkDirty();
         }
-      } catch (error) {
-        console.error("Settings save failed:", error);
-        showResponseModal(
-          "failure",
-          "An error occurred while processing your request. Please try again."
-        );
-        checkDirty();
-      } finally {
-        if (saveBtn?.textContent === "Saving\u2026") {
-          saveBtn.textContent = "Save";
+      };
+
+      if (fs) {
+        await fs.run(doSubmit);
+      } else {
+        // Fallback path for environments without FormState (should not occur).
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+        try { await doSubmit(); } finally {
+          if (saveBtn?.textContent === "Saving\u2026") saveBtn.textContent = "Save";
         }
       }
     }
 
+    function setDeviceActionModalOpen(modalId, open) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.hidden = !open;
+      modal.style.display = open ? "block" : "none";
+    }
+
+    function openRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", true);
+    }
+
+    function closeRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", false);
+    }
+
+    function openShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", true);
+    }
+
+    function closeShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", false);
+    }
+
     async function handleShutdown(reboot) {
+      // JTN-621: callers must gate this behind a confirmation modal. The
+      // modal ensures an accidental tap on a touch screen doesn't make the
+      // device unreachable without physical access to recover.
+      if (reboot) {
+        closeRebootConfirm();
+      } else {
+        closeShutdownConfirm();
+      }
       showResponseModal(
         "success",
         reboot
@@ -978,9 +1023,8 @@
     }
 
     function bindButtons() {
-      for (const button of document.querySelectorAll("[data-collapsible-toggle]")) {
-        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
-      }
+      // Collapsible toggle is bound via delegation in ui_helpers.js so every
+      // `[data-collapsible-toggle]` button updates aria-expanded consistently.
 
       // Dirty-state: snapshot initial form values and disable Save until something changes
       const saveBtn = document.getElementById("saveSettingsBtn");
@@ -1009,8 +1053,16 @@
       document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
       document.getElementById("checkUpdatesBtn")?.addEventListener("click", checkForUpdates);
       document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
-      document.getElementById("rebootBtn")?.addEventListener("click", () => handleShutdown(true));
-      document.getElementById("shutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      // JTN-621: Reboot/Shutdown are gated behind a confirmation modal so
+      // an accidental touch doesn't make the device unreachable.
+      document.getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm);
+      document.getElementById("shutdownBtn")?.addEventListener("click", openShutdownConfirm);
+      document.getElementById("confirmRebootBtn")?.addEventListener("click", () => handleShutdown(true));
+      document.getElementById("cancelRebootBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("closeRebootConfirmModalBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("confirmShutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      document.getElementById("cancelShutdownBtn")?.addEventListener("click", closeShutdownConfirm);
+      document.getElementById("closeShutdownConfirmModalBtn")?.addEventListener("click", closeShutdownConfirm);
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);
       });
