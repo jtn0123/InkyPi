@@ -767,6 +767,128 @@
       }
     }
 
+    function formatPercent(val) {
+      if (val === null || val === undefined || Number.isNaN(Number(val))) {
+        return "\u2014";
+      }
+      return Number(val).toFixed(1) + "%";
+    }
+
+    function formatUptime(seconds) {
+      if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+        return "\u2014";
+      }
+      const total = Math.floor(Number(seconds));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      if (days > 0) return days + "d " + hours + "h " + mins + "m";
+      if (hours > 0) return hours + "h " + mins + "m";
+      return mins + "m";
+    }
+
+    const SYSTEM_HEALTH_ROWS = [
+      { key: "cpu_percent", label: "CPU", formatter: formatPercent },
+      { key: "memory_percent", label: "Memory", formatter: formatPercent },
+      { key: "disk_percent", label: "Disk", formatter: formatPercent },
+      { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
+    ];
+
+    function buildSystemHealthTable(systemData) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Metric</th><th>Value</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      for (const spec of SYSTEM_HEALTH_ROWS) {
+        const row = document.createElement("tr");
+        const labelCell = document.createElement("td");
+        labelCell.textContent = spec.label;
+        const valueCell = document.createElement("td");
+        valueCell.textContent = spec.formatter(systemData ? systemData[spec.key] : null);
+        row.appendChild(labelCell);
+        row.appendChild(valueCell);
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function buildPluginHealthTable(items) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Plugin</th><th>Status</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      const entries = Array.isArray(items)
+        ? items.map(function (it) {
+            return [it.plugin_id || "\u2014", it.status || it.state || "\u2014"];
+          })
+        : Object.entries(items || {}).map(function (pair) {
+            const [pid, info] = pair;
+            let status = "\u2014";
+            if (info && typeof info === "object") {
+              status = info.status || info.state || (info.ok === false ? "error" : "ok");
+            } else if (typeof info === "string") {
+              status = info;
+            }
+            return [pid, status];
+          });
+      if (entries.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 2;
+        cell.textContent = "No plugin health data";
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      } else {
+        entries.forEach(function (pair) {
+          const row = document.createElement("tr");
+          const pidCell = document.createElement("td");
+          pidCell.textContent = pair[0];
+          const statusCell = document.createElement("td");
+          statusCell.textContent = pair[1];
+          row.appendChild(pidCell);
+          row.appendChild(statusCell);
+          tbody.appendChild(row);
+        });
+      }
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function buildIsolationTable(isolationData) {
+      const list = Array.isArray(isolationData?.isolated_plugins)
+        ? isolationData.isolated_plugins
+        : [];
+      if (list.length === 0) {
+        const msg = document.createElement("div");
+        msg.className = "bench-empty";
+        msg.textContent = "No plugins isolated";
+        return msg;
+      }
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Plugin</th><th>Isolated</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      list.forEach(function (pluginId) {
+        const row = document.createElement("tr");
+        const pidCell = document.createElement("td");
+        pidCell.textContent = pluginId;
+        const statusCell = document.createElement("td");
+        statusCell.textContent = "Yes";
+        row.appendChild(pidCell);
+        row.appendChild(statusCell);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
     async function refreshHealth() {
       ui.setPanelLoading?.("healthSummary", true);
       try {
@@ -776,14 +898,19 @@
         ]);
         const plugins = await pluginsResp.json();
         const system = await systemResp.json();
-        const output = [
-          "System Health",
-          JSON.stringify(system, null, 2),
-          "",
-          "Plugin Health",
-          JSON.stringify(plugins.items || {}, null, 2),
-        ];
-        document.getElementById("healthSummary").textContent = output.join("\n");
+
+        const panel = document.getElementById("healthSummary");
+        panel.textContent = "";
+
+        const heading1 = document.createElement("strong");
+        heading1.textContent = "System Health";
+        panel.appendChild(heading1);
+        panel.appendChild(buildSystemHealthTable(system || {}));
+
+        const heading2 = document.createElement("strong");
+        heading2.textContent = "Plugin Health";
+        panel.appendChild(heading2);
+        panel.appendChild(buildPluginHealthTable(plugins.items || {}));
       } catch (e) {
         console.warn("Failed to load health data:", e);
         document.getElementById("healthSummary").textContent =
@@ -798,11 +925,9 @@
       try {
         const resp = await fetch("/settings/isolation", { cache: "no-store" });
         const data = await resp.json();
-        document.getElementById("isolationSummary").textContent = JSON.stringify(
-          data,
-          null,
-          2
-        );
+        const panel = document.getElementById("isolationSummary");
+        panel.textContent = "";
+        panel.appendChild(buildIsolationTable(data || {}));
       } catch (e) {
         console.warn("Failed to load isolation list:", e);
         document.getElementById("isolationSummary").textContent =
