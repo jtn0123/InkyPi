@@ -601,6 +601,79 @@
       }
     }
 
+    function formatMs(val) {
+      if (val === null || val === undefined) return "\u2014";
+      const seconds = val / 1000;
+      return seconds < 10
+        ? seconds.toFixed(1) + "s"
+        : Math.round(seconds) + "s";
+    }
+
+    const STAGE_LABELS = {
+      request_ms: "Request",
+      generate_ms: "Generate",
+      preprocess_ms: "Preprocess",
+      display_ms: "Display",
+    };
+
+    function buildSummaryTable(summaryData) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML =
+        "<tr><th>Stage</th><th>p50</th><th>p95</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      for (const [key, label] of Object.entries(STAGE_LABELS)) {
+        const row = document.createElement("tr");
+        const stage = summaryData[key] || {};
+        row.innerHTML =
+          "<td>" +
+          label +
+          "</td><td>" +
+          formatMs(stage.p50) +
+          "</td><td>" +
+          formatMs(stage.p95) +
+          "</td>";
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      return table;
+    }
+
+    const PLUGIN_AVG_LABELS = {
+      request_avg: "Request",
+      generate_avg: "Generate",
+      display_avg: "Display",
+    };
+
+    function buildPluginsTable(items) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      const cols = ["Plugin", "Runs"].concat(
+        Object.values(PLUGIN_AVG_LABELS)
+      );
+      thead.innerHTML =
+        "<tr>" + cols.map(function (c) { return "<th>" + c + "</th>"; }).join("") + "</tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      items.slice(0, 10).forEach(function (item) {
+        const row = document.createElement("tr");
+        const cells = [
+          item.plugin_id || "\u2014",
+          String(item.runs || 0),
+        ];
+        for (const key of Object.keys(PLUGIN_AVG_LABELS)) {
+          cells.push(formatMs(item[key]));
+        }
+        row.innerHTML = cells.map(function (c) { return "<td>" + c + "</td>"; }).join("");
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
     async function refreshBenchmarks() {
       ui.setPanelLoading?.("benchSummary", true);
       try {
@@ -610,14 +683,21 @@
         ]);
         const summary = await summaryResp.json();
         const plugins = await pluginsResp.json();
-        const output = [
-          "Benchmark Summary (24h)",
-          JSON.stringify(summary.summary || {}, null, 2),
-          "",
-          "Per-plugin Averages",
-          JSON.stringify((plugins.items || []).slice(0, 10), null, 2),
-        ];
-        document.getElementById("benchSummary").textContent = output.join("\n");
+
+        const panel = document.getElementById("benchSummary");
+        panel.textContent = "";
+
+        const heading1 = document.createElement("strong");
+        heading1.textContent = "Benchmark Summary (24h)";
+        panel.appendChild(heading1);
+        panel.appendChild(buildSummaryTable(summary.summary || {}));
+
+        if ((plugins.items || []).length > 0) {
+          const heading2 = document.createElement("strong");
+          heading2.textContent = "Per-plugin Averages";
+          panel.appendChild(heading2);
+          panel.appendChild(buildPluginsTable(plugins.items));
+        }
       } catch (e) {
         console.warn("Failed to load benchmark summary:", e);
         document.getElementById("benchSummary").textContent =
