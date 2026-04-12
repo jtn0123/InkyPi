@@ -165,7 +165,7 @@
             <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="modalTitle">New Playlist</h2>
             <div class="separator"></div>
-            <form id="scheduleForm" class="settings-form">
+            <form id="scheduleForm" class="settings-form" data-form-state aria-busy="false">
                 <input type="hidden" id="editingPlaylistName" value="">  <!-- Track existing playlist -->
 
                 <div class="form-group">
@@ -181,12 +181,13 @@
                 </div>
                 <div class="form-group">
                     <label for="cycle_minutes" class="form-label">Cycle override (minutes)</label>
-                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" class="form-input" aria-label="Cycle override in minutes">
+                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" class="form-input" aria-label="Cycle override in minutes" aria-invalid="false" aria-describedby="cycle-minutes-error">
+                    <span id="cycle-minutes-error" class="validation-message" role="alert"></span>
                     <small class="form-help">Leave blank to use device default</small>
                 </div>
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveButton">Save</button>
+                <button type="button" class="action-button" id="saveButton" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
                 <button type="button" class="action-button warn hidden" id="deleteButton">Delete</button>
             </div>
         </div>
@@ -198,12 +199,12 @@
             <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="refreshSettingsTitle">Refresh Settings</h2>
             <div class="separator"></div>
-            <form id="refreshSettingsForm" class="settings-form">
+            <form id="refreshSettingsForm" class="settings-form" data-form-state aria-busy="false">
                 {% set prefix = "modal" %}
                 {% include 'refresh_settings_form.html' %}
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveRefreshSettingsBtn">Save</button>
+                <button type="button" class="action-button" id="saveRefreshSettingsBtn" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
             </div>
         </div>
     </div>

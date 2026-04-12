@@ -542,38 +542,57 @@
         return name;
     }
 
+    function _scheduleFormState() {
+        const form = document.getElementById('scheduleForm');
+        return (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
+    }
+
     async function createPlaylist() {
+        const fs = _scheduleFormState();
+        if (fs) fs.clearErrors();
         let playlistName = _validatePlaylistName();
         if (!playlistName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
-        try {
-            const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
-            const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){
-                closeModal();
-                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
-                location.reload();
-            }
-        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        const submit = async () => {
+            try {
+                const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
+                const result = await handleJsonResponse(response);
+                if (response.ok && result && result.success){
+                    closeModal();
+                    if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                    location.reload();
+                } else if (fs && result && result.field_errors) {
+                    fs.setFieldErrors(result.field_errors);
+                }
+            } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        };
+        if (fs) await fs.run(submit); else await submit();
     }
 
     async function updatePlaylist() {
+        const fs = _scheduleFormState();
+        if (fs) fs.clearErrors();
         let oldName = document.getElementById("editingPlaylistName").value;
         let newName = _validatePlaylistName();
         if (!newName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         let cycleMinutes = document.getElementById('cycle_minutes').value;
-        try {
-            const response = await fetch(C.update_playlist_base_url + encodeURIComponent(oldName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
-            const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){
-                closeModal();
-                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
-                location.reload();
-            }
-        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        const submit = async () => {
+            try {
+                const response = await fetch(C.update_playlist_base_url + encodeURIComponent(oldName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
+                const result = await handleJsonResponse(response);
+                if (response.ok && result && result.success){
+                    closeModal();
+                    if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                    location.reload();
+                } else if (fs && result && result.field_errors) {
+                    fs.setFieldErrors(result.field_errors);
+                }
+            } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        };
+        if (fs) await fs.run(submit); else await submit();
     }
 
     async function deletePlaylist() {
