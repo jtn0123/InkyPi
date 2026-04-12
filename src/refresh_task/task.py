@@ -13,6 +13,7 @@ from uuid import uuid4
 from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh
+from refresh_task.context import RefreshContext
 from refresh_task.worker import (
     _execute_refresh_attempt_worker,
     _get_mp_context,
@@ -70,6 +71,7 @@ class RefreshTask:
     def __init__(self, device_config, display_manager):
         self.device_config = device_config
         self.display_manager = display_manager
+        self.refresh_context = RefreshContext.from_config(device_config)
 
         self.thread = None
         self.lock = threading.Lock()
@@ -925,7 +927,7 @@ class RefreshTask:
                 result_queue,
                 plugin_config,
                 refresh_action,
-                self.device_config,
+                self.refresh_context,
                 current_dt,
             ),
             daemon=True,
@@ -1325,7 +1327,12 @@ class RefreshTask:
         return dict(self.plugin_health)
 
     def signal_config_change(self):
-        """Notify the background thread that config has changed (e.g., interval updated)."""
+        """Notify the background thread that config has changed (e.g., interval updated).
+
+        Also rebuilds the ``RefreshContext`` snapshot so that subsequent
+        subprocess launches pick up the latest configuration values.
+        """
+        self.refresh_context = RefreshContext.from_config(self.device_config)
         if self.running:
             with self.condition:
                 self.condition.notify_all()

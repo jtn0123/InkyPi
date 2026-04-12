@@ -10,6 +10,7 @@ from refresh_task.actions import (
     PlaylistRefresh,
     RefreshAction,
 )
+from refresh_task.context import RefreshContext
 from refresh_task.task import RefreshTask
 from refresh_task.worker import (
     _execute_refresh_attempt_worker,
@@ -19,6 +20,7 @@ from refresh_task.worker import (
 )
 
 __all__ = [
+    "RefreshContext",
     "RefreshTask",
     "RefreshAction",
     "ManualRefresh",

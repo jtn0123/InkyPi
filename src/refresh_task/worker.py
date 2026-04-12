@@ -37,17 +37,25 @@ def _get_mp_context():
 def _restore_child_config(device_config):
     """Re-initialise the Config singleton inside a subprocess from a serialised snapshot.
 
-    ``multiprocessing`` serialises ``device_config`` across the process
-    boundary.  The child process must reconstruct the singleton by setting the
-    class-level path attributes before calling ``Config()``.
+    Accepts either a :class:`RefreshContext` dataclass (preferred) or a
+    legacy pickled ``Config`` object.  When a ``RefreshContext`` is provided
+    its :meth:`restore_child_config` method is used directly; otherwise the
+    legacy path-attribute dance is performed for backwards compatibility.
 
     Args:
-        device_config: A serialised snapshot of the parent's device config
-            object, carrying the file paths needed to rebuild the singleton.
+        device_config: A :class:`RefreshContext` snapshot **or** a legacy
+            serialised ``Config`` object carrying the file paths needed to
+            rebuild the singleton in the child process.
 
     Returns:
         A new :class:`Config` instance initialised from the snapshot paths.
     """
+    from refresh_task.context import RefreshContext
+
+    if isinstance(device_config, RefreshContext):
+        return device_config.restore_child_config()
+
+    # Legacy fallback: raw Config object was pickled across the boundary.
     from config import Config
 
     Config.config_file = device_config.config_file
@@ -89,7 +97,7 @@ def _execute_refresh_attempt_worker(
     result_queue,
     plugin_config: dict,
     refresh_action,
-    device_config,
+    refresh_context,
     current_dt,
 ):
     """Entry point for a plugin execution subprocess.
@@ -105,12 +113,12 @@ def _execute_refresh_attempt_worker(
             result dict to the parent process.
         plugin_config: The raw plugin configuration dict from device.json.
         refresh_action: The :class:`RefreshAction` describing what to run.
-        device_config: A serialised snapshot of the parent's device config,
-            used to restore the child Config singleton.
+        refresh_context: A :class:`RefreshContext` snapshot (or legacy
+            ``Config`` object) used to restore the child Config singleton.
         current_dt: The current device-timezone datetime passed to the plugin.
     """
     try:
-        child_config = _restore_child_config(device_config)
+        child_config = _restore_child_config(refresh_context)
         plugin = get_plugin_instance(plugin_config)
         image = refresh_action.execute(plugin, child_config, current_dt)
         plugin_meta = None
