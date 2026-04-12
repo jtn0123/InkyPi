@@ -180,3 +180,25 @@ def test_save_settings_success_triggers_config_change_signal(client, monkeypatch
     assert resp.status_code == 200
     # Signal should be invoked at least once
     assert called["signal"] >= 1
+
+
+def test_save_settings_rejects_invalid_timezone(client):
+    """JTN-650: Unknown timezone strings must be rejected, not silently persisted."""
+    data = dict(_VALID_BASE)
+    data["interval"] = "10"
+    data["timezoneName"] = "NotATimezone"
+    resp = client.post("/save_settings", data=data)
+    assert resp.status_code == 422
+    body = resp.get_json()
+    assert body["code"] == "validation_error"
+    assert body["details"]["field"] == "timezoneName"
+    assert "IANA" in body["error"] or "valid" in body["error"].lower()
+
+
+def test_save_settings_accepts_valid_iana_timezone(client):
+    """JTN-650: A known IANA zone (America/New_York) must still save successfully."""
+    data = dict(_VALID_BASE)
+    data["interval"] = "10"
+    data["timezoneName"] = "America/New_York"
+    resp = client.post("/save_settings", data=data)
+    assert resp.status_code == 200
