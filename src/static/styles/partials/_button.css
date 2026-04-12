@@ -1,0 +1,316 @@
+/* Optimized button grid with better performance and consistency */
+.button-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 140px));
+    gap: 20px;
+    overflow-y: auto;
+    padding: 20px;
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 400px;
+    justify-content: center;
+    /* Ensure consistent sizing across all grid items */
+    align-items: stretch;
+}
+
+/* Improved button styling with better touch targets and consistent sizing */
+.icon-button {
+    border: var(--card-border);
+    border-radius: var(--card-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 90px;
+    height: 90px;
+    aspect-ratio: 1;
+    padding: 12px;
+    cursor: pointer;
+    transition: transform var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                border-color var(--transition-speed) ease;
+    box-shadow: var(--shadow-xs);
+    background-color: var(--surface);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+}
+
+.icon-button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent);
+}
+
+.icon-button:active {
+    transform: translateY(0);
+    transition-duration: 0.1s;
+    box-shadow: var(--shadow-xs);
+}
+
+.icon-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease;
+}
+
+.icon-button:hover::before {
+    opacity: 0.04;
+}
+
+/* Ensure icon buttons inherit high-contrast color */
+.icon-button svg,
+.icon-button .icon-image {
+    color: var(--text);
+}
+
+/* Buttons container */
+.buttons-container {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+}
+
+/* Enhanced action buttons */
+.action-button {
+    flex: 1;
+    background-color: var(--primary);
+    color: var(--on-accent);
+    border: none;
+    border-radius: var(--border-radius-md);
+    padding: 16px;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: var(--tracking-wide);
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+    min-height: 48px;
+    position: relative;
+    overflow: hidden;
+    transition: transform var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                box-shadow var(--transition-speed) cubic-bezier(0.2, 0, 0.38, 0.9),
+                background-color var(--transition-speed) ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.action-button.warn {
+    background-color: var(--error);
+}
+
+.action-button.warn:hover {
+    background-color: var(--danger-hover);
+}
+
+.action-button:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.action-button:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-xs);
+    transition-duration: 0.1s;
+}
+
+.action-button.compact {
+    font-size: 0.9rem;
+    padding: 10px;
+    width: auto;
+}
+
+/* Loading state for action buttons */
+.action-button.loading {
+    pointer-events: none;
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.action-button.loading::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    margin-left: -9px;
+    margin-top: -9px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: var(--on-accent);
+    border-radius: 50%;
+    animation: button-spin 0.8s linear infinite;
+    z-index: 1;
+}
+
+.action-button.loading span,
+.action-button.loading .button-text {
+    visibility: hidden;
+}
+
+@keyframes button-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Secondary/outline variants for action buttons to keep consistency app-wide */
+.action-button.is-secondary {
+    background-color: var(--primary);
+}
+.action-button.is-secondary:hover {
+    background-color: var(--primary-hover);
+}
+.action-button.is-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--surface-border);
+}
+.action-button.is-outline:hover {
+    background-color: rgba(255,255,255,0.04);
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0; /* Remove spacing between buttons */
+}
+
+.button-group button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--surface-border);
+  background-color: var(--bg-secondary);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 0; /* Reset default radius */
+  margin-left: -1px; /* Collapse left borders */
+  position: relative;
+  z-index: 1;
+}
+
+.button-group button:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  margin-left: 0; /* Reset for first button */
+}
+
+.button-group button:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.button-group button.active {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  z-index: 2; /* Ensure active button is above others */
+}
+
+/* Edit & Delete Buttons */
+.edit-button, .delete-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Disabled state for buttons */
+.action-button:disabled,
+.header-button:disabled,
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Global focus-visible outline for interactive elements */
+button:focus-visible,
+a:focus-visible,
+.action-button:focus-visible,
+.header-button:focus-visible,
+.view-toggle:focus-visible,
+.sort-toggle:focus-visible,
+.icon-button:focus-visible,
+.toggle-container:focus-visible,
+.playlist-toggle-button:focus-visible,
+.workflow-mode-tab:focus-visible,
+.btn:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ── Button responsive: small screens ── */
+@media (max-width: 520px) {
+    .buttons-container {
+        flex-direction: column;
+    }
+
+    .buttons-container .action-button,
+    .buttons-container .header-button {
+        width: 100%;
+    }
+}
+
+/* ── Button responsive: tablet ── */
+@media (max-width: 768px) {
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* ── Button responsive: mobile ── */
+@media (max-width: 900px) {
+    /* Improve button spacing on mobile */
+    .button-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        padding: 20px 12px;
+    }
+
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* ── Touch device button improvements ── */
+@media (hover: none) and (pointer: coarse) {
+    .icon-button,
+    .action-button,
+    .header-button {
+        min-height: 48px;
+        padding: 12px;
+    }
+
+    .icon-button:hover {
+        transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .action-button:hover {
+        transform: none;
+        background-color: var(--accent);
+    }
+
+    /* Better tap feedback */
+    .icon-button:active,
+    .action-button:active,
+    .header-button:active {
+        transform: scale(0.95);
+        transition-duration: 0.1s;
+    }
+
+    .button-group button {
+        min-height: 48px;
+    }
+}

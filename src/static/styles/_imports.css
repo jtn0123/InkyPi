@@ -2,6 +2,9 @@
 @import "partials/_tokens.css";
 @import "partials/_layout.css";
 @import "partials/_navigation.css";
+@import "partials/_button.css";
+@import "partials/_form.css";
+@import "partials/_toggle.css";
 @import "partials/_components.css";
 @import "partials/_dashboard.css";
 @import "partials/_plugins.css";

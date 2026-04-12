@@ -1,0 +1,98 @@
+/* Enhanced plugins section hierarchy */
+.plugins-title {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    transition: color var(--transition-speed) ease;
+}
+
+/* Toggle Container */
+.toggle-container {
+    display: inline-block;
+    position: relative;
+    width: 50px;
+    height: 24px;
+}
+
+/* Legacy hidden checkbox implementation removed to avoid hiding controls */
+/* The project now styles the visible checkbox directly via .toggle-checkbox */
+
+/* Toggle Background */
+.toggle-label {
+    position: absolute;
+    cursor: pointer;
+    background-color: var(--divider);
+    border-radius: 15px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: 0.3s;
+}
+
+/* Toggle Knob */
+.toggle-label::before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    background-color: var(--surface);
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: 0.25s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* When Checked */
+.toggle-checkbox:checked + .toggle-label {
+    background-color: var(--primary);
+}
+
+.toggle-checkbox:checked + .toggle-label::before {
+    transform: translateX(26px);
+}
+
+/* Collapsible sections */
+.collapsible {
+    width: 100%;
+}
+
+.collapsible-header {
+    background-color: var(--bg-secondary);
+    color: var(--text);
+    border: none;
+    cursor: pointer;
+    padding: 10px;
+    width: 100%;
+    text-align: left;
+    font-size: 1rem;
+    margin: 10px 0px 5px 0px;
+}
+
+.collapsible-icon {
+    float: right;
+    opacity: 50%;
+    transition: transform 0.2s ease;
+}
+
+.collapsible-header[aria-expanded="true"] .collapsible-icon {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    padding: 0px 0px;
+    transition: max-height 0.3s ease, opacity 0.2s ease;
+}
+
+.collapsible-content.is-open {
+    max-height: 2000px;
+    opacity: 1;
+}

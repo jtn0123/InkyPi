@@ -176,6 +176,18 @@ body {
 
     /* Animation */
     --transition-speed: 0.18s;
+
+    /* Breakpoint reference (CSS custom properties cannot be used in
+       @media queries, so these serve as a single-source-of-truth
+       reference for the values used throughout _responsive.css and
+       per-component @media blocks):
+       --bp-xs:  430px   Narrowest phones
+       --bp-sm:  520px   Small phones
+       --bp-md:  640px   Progress-step threshold
+       --bp-tab: 768px   Tablet / mobile boundary
+       --bp-lg:  900px   Enhanced responsive
+       --bp-xl:  1024px  Tablet landscape
+       --bp-2xl: 1440px  Large screens */
 }
 [data-theme="dark"] {
     /* Hardware diagnostic console */
@@ -1267,18 +1279,6 @@ svg.icon-thin {
     font-weight: var(--font-medium);
 }
 
-/* Enhanced plugins section hierarchy */
-.plugins-title {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    color: var(--muted);
-    margin: 0;
-    text-align: left;
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wider);
-    transition: color var(--transition-speed) ease;
-}
-
 /* Optimized button grid with better performance and consistency */
 .button-grid {
     display: grid;
@@ -1345,81 +1345,6 @@ svg.icon-thin {
 .icon-button svg,
 .icon-button .icon-image {
     color: var(--text);
-}
-
-/* Ensure form and settings container expand */
-.settings-form {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    margin: 0px 0px 10px 0px;
-    flex-grow: 1;
-}
-
-.settings-container {
-    display: flex;
-    justify-content: center;
-    flex-direction: column;
-    padding: 0px 10px;
-}
-
-/* Style the form inputs and labels */
-.form-group {
-    display: flex;
-    align-items: center;
-    gap: 0.2rem 1rem;
-    margin: 6px 0 6px 0; /* even spacing */
-    flex-wrap: wrap;
-    flex: auto;
-}
-
-.form-group .nowrap{
-    flex-wrap: nowrap;
-}
-
-.nowrap{
-    flex-wrap: nowrap;
-}
-
-.form-group label {
-    white-space: nowrap; /* Prevent label wrapping */
-    font-weight: 600;
-    color: var(--text);
-}
-
-.form-group input[type="text"] {
-    flex-grow: 1;
-    padding: 0.5rem;
-    font-size: 1rem;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--border-radius-sm);
-    box-sizing: border-box;
-    min-width: 50px;
-    background-color: var(--input-bg);
-    color: var(--text);
-    box-shadow: var(--input-shadow);
-}
-
-/* Standardize form input heights for accessibility */
-.form-group input[type="text"],
-.form-group input[type="number"],
-.form-group input[type="email"],
-.form-group input[type="password"],
-.form-group input[type="url"],
-.form-group input[type="time"],
-.form-group select.form-input {
-    min-height: var(--form-input-height);
-    height: auto;
-}
-
-.form-group input[type="number"] {
-    min-width: 50px;
-}
-
-.form-group input[type="text"]:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Buttons container */
@@ -1526,6 +1451,224 @@ svg.icon-thin {
 }
 .action-button.is-outline:hover {
     background-color: rgba(255,255,255,0.04);
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0; /* Remove spacing between buttons */
+}
+
+.button-group button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--surface-border);
+  background-color: var(--bg-secondary);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 0; /* Reset default radius */
+  margin-left: -1px; /* Collapse left borders */
+  position: relative;
+  z-index: 1;
+}
+
+.button-group button:first-child {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+  margin-left: 0; /* Reset for first button */
+}
+
+.button-group button:last-child {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.button-group button.active {
+  background-color: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  z-index: 2; /* Ensure active button is above others */
+}
+
+/* Edit & Delete Buttons */
+.edit-button, .delete-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Disabled state for buttons */
+.action-button:disabled,
+.header-button:disabled,
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Global focus-visible outline for interactive elements */
+button:focus-visible,
+a:focus-visible,
+.action-button:focus-visible,
+.header-button:focus-visible,
+.view-toggle:focus-visible,
+.sort-toggle:focus-visible,
+.icon-button:focus-visible,
+.toggle-container:focus-visible,
+.playlist-toggle-button:focus-visible,
+.workflow-mode-tab:focus-visible,
+.btn:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ── Button responsive: small screens ── */
+@media (max-width: 520px) {
+    .buttons-container {
+        flex-direction: column;
+    }
+
+    .buttons-container .action-button,
+    .buttons-container .header-button {
+        width: 100%;
+    }
+}
+
+/* ── Button responsive: tablet ── */
+@media (max-width: 768px) {
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* ── Button responsive: mobile ── */
+@media (max-width: 900px) {
+    /* Improve button spacing on mobile */
+    .button-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 20px;
+        padding: 20px 12px;
+    }
+
+    .buttons-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+/* ── Touch device button improvements ── */
+@media (hover: none) and (pointer: coarse) {
+    .icon-button,
+    .action-button,
+    .header-button {
+        min-height: 48px;
+        padding: 12px;
+    }
+
+    .icon-button:hover {
+        transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .action-button:hover {
+        transform: none;
+        background-color: var(--accent);
+    }
+
+    /* Better tap feedback */
+    .icon-button:active,
+    .action-button:active,
+    .header-button:active {
+        transform: scale(0.95);
+        transition-duration: 0.1s;
+    }
+
+    .button-group button {
+        min-height: 48px;
+    }
+}
+
+/* Ensure form and settings container expand */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin: 0px 0px 10px 0px;
+    flex-grow: 1;
+}
+
+.settings-container {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0px 10px;
+}
+
+/* Style the form inputs and labels */
+.form-group {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem 1rem;
+    margin: 6px 0 6px 0; /* even spacing */
+    flex-wrap: wrap;
+    flex: auto;
+}
+
+.form-group .nowrap{
+    flex-wrap: nowrap;
+}
+
+.nowrap{
+    flex-wrap: nowrap;
+}
+
+.form-group label {
+    white-space: nowrap; /* Prevent label wrapping */
+    font-weight: 600;
+    color: var(--text);
+}
+
+.form-group input[type="text"] {
+    flex-grow: 1;
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    box-sizing: border-box;
+    min-width: 50px;
+    background-color: var(--input-bg);
+    color: var(--text);
+    box-shadow: var(--input-shadow);
+}
+
+/* Standardize form input heights for accessibility */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="url"],
+.form-group input[type="time"],
+.form-group select.form-input {
+    min-height: var(--form-input-height);
+    height: auto;
+}
+
+.form-group input[type="number"] {
+    min-width: 50px;
+}
+
+.form-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 /* Form styling for inline layout */
@@ -1643,54 +1786,6 @@ select.form-input option {
 .form-success::before {
     content: "\2713";
     font-size: 1rem;
-}
-
-/* Toggle Container */
-.toggle-container {
-    display: inline-block;
-    position: relative;
-    width: 50px;
-    height: 24px;
-}
-
-/* Hide Checkbox */
-/* Legacy hidden checkbox implementation removed to avoid hiding controls */
-/* The project now styles the visible checkbox directly via .toggle-checkbox */
-
-/* Toggle Background */
-.toggle-label {
-    position: absolute;
-    cursor: pointer;
-    background-color: var(--divider);
-    border-radius: 15px;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transition: 0.3s;
-}
-
-/* Toggle Knob */
-.toggle-label::before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    background-color: var(--surface);
-    border-radius: 50%;
-    top: 2px;
-    left: 2px;
-    transition: 0.25s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-}
-
-/* When Checked */
-.toggle-checkbox:checked + .toggle-label {
-    background-color: var(--primary);
-}
-
-.toggle-checkbox:checked + .toggle-label::before {
-    transform: translateX(26px);
 }
 
 /* Style the custom file upload button */
@@ -1844,6 +1939,157 @@ select.form-input option {
     box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
 }
 
+.form-help {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 8px;
+}
+
+.form-group:last-child{margin-bottom: 0;}
+
+.form-field + .form-field{margin-top: 16px;}
+.form-section + .form-section{margin-top: 20px;}
+.sections-grid.two-col{grid-template-columns: 1fr 1fr;}
+
+/* Disabled state for form controls */
+input:disabled, select:disabled, textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--bg-secondary, var(--surface));
+}
+
+.slider-value {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text);
+    min-width: 2.5em;
+    text-align: center;
+    padding: 2px 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Form responsive: tablet ── */
+@media (max-width: 768px) {
+    .form-group {
+        gap: 8px 12px;
+    }
+
+    /* Stack form elements on very small screens */
+    .form-group.nowrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* Improve form inputs on mobile */
+    .form-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        min-height: 44px;
+    }
+}
+
+/* ── Form responsive: mobile ── */
+@media (max-width: 900px) {
+    /* Improved mobile form layouts */
+    .form-group.nowrap {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .form-group.nowrap > * {
+        width: 100%;
+        flex: none;
+    }
+
+    /* Better spacing for form sections */
+    .form-section {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .sections-grid.two-col{grid-template-columns:1fr;}
+}
+
+/* ── Touch device form improvements ── */
+@media (hover: none) and (pointer: coarse) {
+    /* Improve touch targets for form elements */
+    .form-input,
+    .toggle-container {
+        min-height: 48px;
+    }
+
+    .toggle-container {
+        min-width: 48px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}
+
+/* Enhanced plugins section hierarchy */
+.plugins-title {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    color: var(--muted);
+    margin: 0;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    transition: color var(--transition-speed) ease;
+}
+
+/* Toggle Container */
+.toggle-container {
+    display: inline-block;
+    position: relative;
+    width: 50px;
+    height: 24px;
+}
+
+/* Legacy hidden checkbox implementation removed to avoid hiding controls */
+/* The project now styles the visible checkbox directly via .toggle-checkbox */
+
+/* Toggle Background */
+.toggle-label {
+    position: absolute;
+    cursor: pointer;
+    background-color: var(--divider);
+    border-radius: 15px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transition: 0.3s;
+}
+
+/* Toggle Knob */
+.toggle-label::before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    background-color: var(--surface);
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: 0.25s;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* When Checked */
+.toggle-checkbox:checked + .toggle-label {
+    background-color: var(--primary);
+}
+
+.toggle-checkbox:checked + .toggle-label::before {
+    transform: translateX(26px);
+}
+
+/* Collapsible sections */
 .collapsible {
     width: 100%;
 }
@@ -1883,113 +2129,11 @@ select.form-input option {
     opacity: 1;
 }
 
-.button-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0; /* Remove spacing between buttons */
-}
-
-.button-group button {
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--surface-border);
-  background-color: var(--bg-secondary);
-  color: var(--text);
-  cursor: pointer;
-  font-size: 14px;
-  border-radius: 0; /* Reset default radius */
-  margin-left: -1px; /* Collapse left borders */
-  position: relative;
-  z-index: 1;
-}
-
-.button-group button:first-child {
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
-  margin-left: 0; /* Reset for first button */
-}
-
-.button-group button:last-child {
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
-}
-
-.button-group button.active {
-  background-color: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
-  z-index: 2; /* Ensure active button is above others */
-}
-
-/* Edit & Delete Buttons */
-.edit-button, .delete-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.form-help {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    margin-top: 8px;
-}
-
-.form-group:last-child{margin-bottom: 0;}
-
-.form-field + .form-field{margin-top: 16px;}
-.form-section + .form-section{margin-top: 20px;}
-.sections-grid.two-col{grid-template-columns: 1fr 1fr;}
-
-/* Disabled state for buttons */
-.action-button:disabled,
-.header-button:disabled,
-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-/* Disabled state for form controls */
-input:disabled, select:disabled, textarea:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    background-color: var(--bg-secondary, var(--surface));
-}
-
-/* Global focus-visible outline for interactive elements */
-button:focus-visible,
-a:focus-visible,
-.action-button:focus-visible,
-.header-button:focus-visible,
-.view-toggle:focus-visible,
-.sort-toggle:focus-visible,
-.icon-button:focus-visible,
-.toggle-container:focus-visible,
-.playlist-toggle-button:focus-visible,
-.workflow-mode-tab:focus-visible,
-.btn:focus-visible,
-select:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-}
-
-.slider-value {
-    font-weight: 700;
-    font-size: 1.05rem;
-    color: var(--text);
-    min-width: 2.5em;
-    text-align: center;
-    padding: 2px 8px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 6px;
-    font-variant-numeric: tabular-nums;
-}
+/* Components have been split into per-component partials:
+   - _button.css  (buttons, button groups, disabled states, focus-visible)
+   - _form.css    (form inputs, labels, validation, file uploads, color pickers)
+   - _toggle.css  (toggles, collapsibles, plugins-title)
+   See _imports.css for the full manifest. */
 
 .dashboard-hero {
   display: grid;
@@ -5574,15 +5718,6 @@ body.modal-open {
     .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
-    .buttons-container {
-        flex-direction: column;
-    }
-
-    .buttons-container .action-button,
-    .buttons-container .header-button {
-        width: 100%;
-    }
-
     .playlist-toolbar {
         flex-wrap: wrap;
         gap: 6px;
@@ -5629,15 +5764,6 @@ body.modal-open {
         font-size: 14px;
     }
 
-    .buttons-container {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .form-group {
-        gap: 8px 12px;
-    }
-
     .workflow-layout,
     .settings-console-layout,
     .diagnostics-strip {
@@ -5659,23 +5785,11 @@ body.modal-open {
         flex-direction: column;
     }
 
-    /* Stack form elements on very small screens */
-    .form-group.nowrap {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     /* Better modal sizing on small screens */
     .modal-content {
         margin: 5% auto;
         max-height: 90vh;
         overflow-y: auto;
-    }
-
-    /* Improve form inputs on mobile */
-    .form-input {
-        font-size: 16px; /* Prevent zoom on iOS */
-        min-height: 44px;
     }
 
     /* Responsive icon sizing for mobile */
@@ -5766,13 +5880,6 @@ body.modal-open {
         margin: 0 auto;
     }
 
-    /* Improve button spacing on mobile */
-    .button-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 20px;
-        padding: 20px 12px;
-    }
-
     /* Better modal sizing */
     .modal-content {
         margin: 10% auto;
@@ -5780,33 +5887,10 @@ body.modal-open {
         max-width: 500px;
     }
 
-    /* Improved mobile form layouts */
-    .form-group.nowrap {
-        flex-direction: column;
-        gap: 8px;
-        align-items: stretch;
-    }
-
-    .form-group.nowrap > * {
-        width: 100%;
-        flex: none;
-    }
-
     /* Stack form controls vertically on mobile */
     .header-actions {
         flex-wrap: wrap;
         gap: 8px;
-    }
-
-    .buttons-container {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    /* Better spacing for form sections */
-    .form-section {
-        padding: 16px;
-        margin-bottom: 16px;
     }
 
     /* Improved logs interface on mobile */
@@ -5831,44 +5915,10 @@ body.modal-open {
     .custom-title-input {
         order: 2;
     }
-
-    .sections-grid.two-col{grid-template-columns:1fr;}
 }
 
 /* ── Touch device improvements ── */
 @media (hover: none) and (pointer: coarse) {
-    .icon-button,
-    .action-button,
-    .header-button {
-        min-height: 48px;
-        padding: 12px;
-    }
-
-    .icon-button:hover {
-        transform: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    }
-
-    .action-button:hover {
-        transform: none;
-        background-color: var(--accent);
-    }
-
-    /* Better tap feedback */
-    .icon-button:active,
-    .action-button:active,
-    .header-button:active {
-        transform: scale(0.95);
-        transition-duration: 0.1s;
-    }
-
-    /* Improve touch targets for form elements */
-    .form-input,
-    .toggle-container,
-    .button-group button {
-        min-height: 48px;
-    }
-
     /* Larger touch targets for small interactive elements */
     .view-toggle,
     .sort-toggle,
@@ -5877,14 +5927,6 @@ body.modal-open {
     .toggle-password-btn {
         min-width: 44px;
         min-height: 44px;
-    }
-
-    .toggle-container {
-        min-width: 48px;
-        min-height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     /* Toast positioning for mobile */
@@ -6440,7 +6482,7 @@ body.modal-open {
 }
 
 /* ── Short laptop viewports (JTN-572 / JTN-599) ──
-   On common laptop screens shorter than ~860px (1280×800, 1366×768, 1280×768),
+   On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
    the Save button at the bottom of /settings and /settings/api-keys sits below
    the fold, and there is no visible scroll affordance to reveal it. Pin the
    buttons container to the bottom of the viewport so the primary action is

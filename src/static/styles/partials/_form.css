@@ -1,0 +1,433 @@
+/* Ensure form and settings container expand */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin: 0px 0px 10px 0px;
+    flex-grow: 1;
+}
+
+.settings-container {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    padding: 0px 10px;
+}
+
+/* Style the form inputs and labels */
+.form-group {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem 1rem;
+    margin: 6px 0 6px 0; /* even spacing */
+    flex-wrap: wrap;
+    flex: auto;
+}
+
+.form-group .nowrap{
+    flex-wrap: nowrap;
+}
+
+.nowrap{
+    flex-wrap: nowrap;
+}
+
+.form-group label {
+    white-space: nowrap; /* Prevent label wrapping */
+    font-weight: 600;
+    color: var(--text);
+}
+
+.form-group input[type="text"] {
+    flex-grow: 1;
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    box-sizing: border-box;
+    min-width: 50px;
+    background-color: var(--input-bg);
+    color: var(--text);
+    box-shadow: var(--input-shadow);
+}
+
+/* Standardize form input heights for accessibility */
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="url"],
+.form-group input[type="time"],
+.form-group select.form-input {
+    min-height: var(--form-input-height);
+    height: auto;
+}
+
+.form-group input[type="number"] {
+    min-width: 50px;
+}
+
+.form-group input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Form styling for inline layout */
+.form-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between the label and input */
+    width: 100%;
+}
+
+/* Label styling */
+.form-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap; /* Prevent the label from wrapping */
+}
+
+/* Input field styling */
+.form-input {
+    flex: auto;
+    padding: 0.4rem;
+    font-size: 1rem;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    box-sizing: border-box;
+    background-color: var(--input-bg);
+    color: var(--text);
+    min-height: var(--form-input-height);
+    display: flex;
+    align-items: center;
+    box-shadow: var(--input-shadow);
+}
+
+/* Unified styling for dropdowns to match the rest of the UI */
+select.form-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-color: var(--input-bg);
+    color: var(--text);
+    border: 1px solid var(--surface-border);
+    padding-right: 2rem; /* room for chevron */
+    height: 36px;
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 12px 12px;
+    /* Chevron icon (uses a neutral stroke for both themes) */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239aa3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+/* Hide legacy arrow in old browsers */
+select.form-input::-ms-expand { display: none; }
+
+/* Options list should follow theme colors */
+select.form-input option {
+    background-color: var(--surface);
+    color: var(--text);
+}
+
+/* Dark theme: nudge chevron contrast slightly */
+[data-theme="dark"] select.form-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23b3b9c4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Enhanced form validation states */
+.form-field {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.form-field.has-error .form-input {
+    border-color: var(--error);
+    box-shadow: 0 0 0 2px rgba(229, 62, 62, 0.2);
+}
+
+.form-field.has-error .form-label {
+    color: var(--error);
+}
+
+.form-error {
+    color: var(--error);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.form-error::before {
+    content: "\26A0";
+    font-size: 1rem;
+}
+
+.form-field.has-success .form-input {
+    border-color: var(--success);
+    box-shadow: 0 0 0 2px rgba(56, 161, 105, 0.2);
+}
+
+.form-success {
+    color: var(--success);
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.form-success::before {
+    content: "\2713";
+    font-size: 1rem;
+}
+
+/* Style the custom file upload button */
+.file-upload-label {
+    display: inline-block;
+    background-color: var(--panel-bg);
+    color: var(--text); /* Text color matching the input */
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    text-align: center;
+    border: 1px solid var(--divider);
+}
+
+.file-upload-label:hover {
+    background-color: var(--panel-border);
+}
+
+.file-upload-label:active {
+    background-color: var(--divider);
+}
+
+/* Hide the default file input */
+.file-upload-input {
+    display: none;
+}
+
+/* File name display styling */
+.file-name {
+    font-size: 1rem;
+    color: var(--text);
+    word-wrap: break-word;
+}
+
+.image-grid {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.image-option {
+    text-align: center;
+    border: 2px solid transparent;
+    padding: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: border-color var(--transition-speed) ease;
+    background: transparent;
+    font: inherit;
+    display: inline-block;
+}
+
+.image-option img {
+    width: auto;
+    height: auto; /* Ensures aspect ratio is maintained */
+    max-width: 100px; /* Optional: Limits the max width of images */
+}
+
+.image-option.selected {
+    border-color: var(--primary);
+}
+
+.color-picker {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+    background-color: var(--surface);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+    border-radius: 6px;
+}
+
+.color-picker-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-preview {
+    display: inline-block;
+    width: 48px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--surface-border);
+    vertical-align: middle;
+    background: var(--preview-color);
+    transition: background 0.15s ease;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.color-combined-preview {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 28px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.remove-btn {
+    background-color: transparent;
+    border: none;
+    color: var(--error);
+    font-weight: 600; /* Matching the font-weight of other buttons */
+    cursor: pointer;
+    margin-left: 10px;
+    font-size: 1rem; /* Consistent font size */
+    transition: color var(--transition-speed) ease;
+}
+
+.remove-btn:hover {
+    color: var(--danger-hover);
+}
+
+.remove-btn:focus {
+    outline: none;
+    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5); /* Adding a focus effect similar to inputs */
+}
+
+/* Time input styling */
+.time-input {
+    flex: 1;
+    padding: 0.4rem;
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.time-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
+}
+
+.form-help {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-top: 8px;
+}
+
+.form-group:last-child{margin-bottom: 0;}
+
+.form-field + .form-field{margin-top: 16px;}
+.form-section + .form-section{margin-top: 20px;}
+.sections-grid.two-col{grid-template-columns: 1fr 1fr;}
+
+/* Disabled state for form controls */
+input:disabled, select:disabled, textarea:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: var(--bg-secondary, var(--surface));
+}
+
+.slider-value {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text);
+    min-width: 2.5em;
+    text-align: center;
+    padding: 2px 8px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Form responsive: tablet ── */
+@media (max-width: 768px) {
+    .form-group {
+        gap: 8px 12px;
+    }
+
+    /* Stack form elements on very small screens */
+    .form-group.nowrap {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    /* Improve form inputs on mobile */
+    .form-input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        min-height: 44px;
+    }
+}
+
+/* ── Form responsive: mobile ── */
+@media (max-width: 900px) {
+    /* Improved mobile form layouts */
+    .form-group.nowrap {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+    }
+
+    .form-group.nowrap > * {
+        width: 100%;
+        flex: none;
+    }
+
+    /* Better spacing for form sections */
+    .form-section {
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .sections-grid.two-col{grid-template-columns:1fr;}
+}
+
+/* ── Touch device form improvements ── */
+@media (hover: none) and (pointer: coarse) {
+    /* Improve touch targets for form elements */
+    .form-input,
+    .toggle-container {
+        min-height: 48px;
+    }
+
+    .toggle-container {
+        min-width: 48px;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+}

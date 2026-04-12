@@ -205,15 +205,6 @@
     .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
-    .buttons-container {
-        flex-direction: column;
-    }
-
-    .buttons-container .action-button,
-    .buttons-container .header-button {
-        width: 100%;
-    }
-
     .playlist-toolbar {
         flex-wrap: wrap;
         gap: 6px;
@@ -260,15 +251,6 @@
         font-size: 14px;
     }
 
-    .buttons-container {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .form-group {
-        gap: 8px 12px;
-    }
-
     .workflow-layout,
     .settings-console-layout,
     .diagnostics-strip {
@@ -290,23 +272,11 @@
         flex-direction: column;
     }
 
-    /* Stack form elements on very small screens */
-    .form-group.nowrap {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
     /* Better modal sizing on small screens */
     .modal-content {
         margin: 5% auto;
         max-height: 90vh;
         overflow-y: auto;
-    }
-
-    /* Improve form inputs on mobile */
-    .form-input {
-        font-size: 16px; /* Prevent zoom on iOS */
-        min-height: 44px;
     }
 
     /* Responsive icon sizing for mobile */
@@ -397,13 +367,6 @@
         margin: 0 auto;
     }
 
-    /* Improve button spacing on mobile */
-    .button-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 20px;
-        padding: 20px 12px;
-    }
-
     /* Better modal sizing */
     .modal-content {
         margin: 10% auto;
@@ -411,33 +374,10 @@
         max-width: 500px;
     }
 
-    /* Improved mobile form layouts */
-    .form-group.nowrap {
-        flex-direction: column;
-        gap: 8px;
-        align-items: stretch;
-    }
-
-    .form-group.nowrap > * {
-        width: 100%;
-        flex: none;
-    }
-
     /* Stack form controls vertically on mobile */
     .header-actions {
         flex-wrap: wrap;
         gap: 8px;
-    }
-
-    .buttons-container {
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    /* Better spacing for form sections */
-    .form-section {
-        padding: 16px;
-        margin-bottom: 16px;
     }
 
     /* Improved logs interface on mobile */
@@ -462,44 +402,10 @@
     .custom-title-input {
         order: 2;
     }
-
-    .sections-grid.two-col{grid-template-columns:1fr;}
 }
 
 /* ── Touch device improvements ── */
 @media (hover: none) and (pointer: coarse) {
-    .icon-button,
-    .action-button,
-    .header-button {
-        min-height: 48px;
-        padding: 12px;
-    }
-
-    .icon-button:hover {
-        transform: none;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-    }
-
-    .action-button:hover {
-        transform: none;
-        background-color: var(--accent);
-    }
-
-    /* Better tap feedback */
-    .icon-button:active,
-    .action-button:active,
-    .header-button:active {
-        transform: scale(0.95);
-        transition-duration: 0.1s;
-    }
-
-    /* Improve touch targets for form elements */
-    .form-input,
-    .toggle-container,
-    .button-group button {
-        min-height: 48px;
-    }
-
     /* Larger touch targets for small interactive elements */
     .view-toggle,
     .sort-toggle,
@@ -508,14 +414,6 @@
     .toggle-password-btn {
         min-width: 44px;
         min-height: 44px;
-    }
-
-    .toggle-container {
-        min-width: 48px;
-        min-height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
     }
 
     /* Toast positioning for mobile */
@@ -1071,7 +969,7 @@
 }
 
 /* ── Short laptop viewports (JTN-572 / JTN-599) ──
-   On common laptop screens shorter than ~860px (1280×800, 1366×768, 1280×768),
+   On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
    the Save button at the bottom of /settings and /settings/api-keys sits below
    the fold, and there is no visible scroll affordance to reveal it. Pin the
    buttons container to the bottom of the viewport so the primary action is
