@@ -1,6 +1,27 @@
 # CHANGELOG
 
 
+## v0.43.8 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Name the failing field in form validation toasts (JTN-378)
+  ([#357](https://github.com/jtn0123/InkyPi/pull/357),
+  [`0026cb5`](https://github.com/jtn0123/InkyPi/commit/0026cb540f8e2ccf4c0302f8d2e75e1eccb5fe54))
+
+Replace the generic "N field(s) need fixing before saving" toast with a label-specific message like
+  "Prompt is required". The shared FormValidator helper now exposes validateAllInputsDetailed,
+  getInputLabel, buildValidationMessage, and focusFirstInvalid. Label lookup prefers data-label,
+  then aria-label, then label[for=id] text, then a wrapping label, then a titlecased name, then
+  "This field". Selector also now includes textarea[required] which was previously missed, so AI
+  Text (and other required textareas) are validated too.
+
+plugin_page.js's Save Settings and Add to Playlist paths route through the new helpers so every
+  plugin benefits, not just AI Image.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.7 (2026-04-12)
 
 ### Bug Fixes
