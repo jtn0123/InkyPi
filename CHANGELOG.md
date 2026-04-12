@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.43.10 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Surface isolation endpoint errors in the UI (JTN-385)
+  ([#364](https://github.com/jtn0123/InkyPi/pull/364),
+  [`9089b5a`](https://github.com/jtn0123/InkyPi/commit/9089b5a5487c36ea4ee82b4f11c3069ddc1fd4ff))
+
+The backend already validates unknown plugin IDs and returns 422, but the frontend isolatePlugin()
+  and unIsolatePlugin() functions were fire-and-forget — they never checked the response status.
+  After the POST/DELETE, the code immediately called refreshIsolation() (a GET), which returned
+  {"isolated_plugins": [], "success": true}, making it appear the operation succeeded.
+
+Add proper error handling: check resp.ok, parse the error message, and show it via
+  showResponseModal() consistent with the rest of the settings page.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- **snapshots**: Upload actual PNGs as artifacts on snapshot failure (JTN-612)
+  ([#362](https://github.com/jtn0123/InkyPi/pull/362),
+  [`3264771`](https://github.com/jtn0123/InkyPi/commit/3264771b1fe49945bc0f45752f16a140a6835d5a))
+
+When a snapshot test detects a digest mismatch, the actual PNG is now saved to
+  tests/snapshots/actual/<plugin>/<case>.png so CI can upload it as a GitHub Actions artifact for
+  visual inspection. The AssertionError message includes a hint pointing reviewers to the artifact.
+
+- snapshot_helper: save actual PNG on mismatch, enrich error message - ci.yml: add upload-artifact
+  step (if: failure()) in browser-smoke job - .gitignore: exclude tests/snapshots/actual/ - New
+  test: verify actual PNG is written on mismatch and not on match
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.9 (2026-04-12)
 
 ### Bug Fixes
