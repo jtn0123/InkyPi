@@ -84,6 +84,10 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
     assert b"Home Weather" in resp.data
     assert b"Default" in resp.data
     assert b'data-page-shell="dashboard"' in resp.data
+    # JTN-638: the currently-displayed plugin chip must be labeled so
+    # first-time users understand what the chip refers to.
+    assert b"Showing:" in resp.data
+    assert b'title="Currently displaying:' in resp.data
 
 
 def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):

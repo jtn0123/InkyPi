@@ -38,7 +38,7 @@
                 <span class="status-chip">Playlist: {{ refresh_info.playlist }}</span>
                 {% endif %}
                 {% if refresh_info.plugin_id %}
-                <span class="status-chip">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}</span>
+                <span class="status-chip" title="Currently displaying: {{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}">Showing: {{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}</span>
                 {% endif %}
             </div>
         </div>
