@@ -358,6 +358,8 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .title-stack {
@@ -873,6 +875,10 @@ main[data-page-shell="workflow"] .frame {
     line-height: 1.2;
     letter-spacing: var(--tracking-tight);
     color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* App icon standardization */
