@@ -65,6 +65,13 @@ class TestButton:
         html = render("""{{ button('Act', attrs={'aria-describedby': 'help1'}) }}""")
         assert 'aria-describedby="help1"' in html
 
+    def test_attrs_none_and_false_skipped(self, render):
+        html = render(
+            """{{ button('Act', attrs={'data-x': None, 'data-y': false}) }}"""
+        )
+        assert "data-x" not in html
+        assert "data-y" not in html
+
 
 # -- form_field macro --
 

@@ -3,7 +3,7 @@
 -#}
 
 {% macro button(text, type="button", variant="primary", icon=None, disabled=False, attrs={}) -%}
-<button type="{{ type }}" class="action-button{% if variant != 'primary' %} {{ variant }}{% endif %}"{% if disabled %} disabled{% endif %}{% for key, val in attrs.items() %} {{ key }}="{{ val }}"{% endfor %}>
+<button type="{{ type }}" class="action-button{% if variant != 'primary' %} {{ variant }}{% endif %}"{% if disabled %} disabled{% endif %}{% for key, val in attrs.items() %}{% if val is not none and val is not sameas false %} {{ key }}="{{ val }}"{% endif %}{% endfor %}>
     {%- if icon %}<span class="button-icon" aria-hidden="true">{{ icon }}</span> {% endif -%}
     {{ text }}
 </button>
