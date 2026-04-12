@@ -78,17 +78,17 @@ def test_history_template_display_buttons_have_data_attrs(client, device_config_
 
 
 def test_history_template_boot_provides_redisplay_url(client):
-    """JTN-305: inline boot script must pass redisplayUrl to the page controller."""
+    """JTN-305: boot data must expose the redisplay URL for the JS controller."""
     resp = client.get("/history")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
 
     assert (
-        "redisplayUrl" in body
-    ), "Boot script must set redisplayUrl so the JS can POST to the correct endpoint"
-    assert (
         "/history/redisplay" in body
     ), "redisplayUrl must resolve to /history/redisplay"
+    assert (
+        "redisplayUrl" in body
+    ), "Boot script must reference redisplayUrl to pass to the page controller"
 
 
 def test_history_redisplay_endpoint_accepts_post(client, device_config_dev):
