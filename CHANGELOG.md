@@ -1,6 +1,51 @@
 # CHANGELOG
 
 
+## v0.48.1 (2026-04-12)
+
+### Bug Fixes
+
+- **a11y**: Toggle aria-expanded on Style collapsible (JTN-623)
+  ([#389](https://github.com/jtn0123/InkyPi/pull/389),
+  [`de67e2c`](https://github.com/jtn0123/InkyPi/commit/de67e2ccd3e4e1d7f78ddd7195d5c721ee977629))
+
+The Style accordion on plugin pages (and any `[data-collapsible-toggle]` button) could fall out of
+  sync with screen readers: aria-expanded stayed "false" after clicking, and the chevron never
+  flipped direction.
+
+Two fixes:
+
+1. Move the click handler into a document-level delegated listener in ui_helpers.js so every
+  collapsible button reliably toggles aria-expanded, even if a page-specific binding is missed or
+  runs before the button exists. Removed the now-redundant per-button bindings in plugin_page.js and
+  settings_page.js.
+
+2. Let CSS own the chevron direction. The JS used to flip textContent between ▼ and ▲ while
+  _toggle.css also rotated the icon 180deg via `[aria-expanded="true"]` — the two cancelled out and
+  the chevron appeared unchanged. Dropped the textContent swap; the static ▼ character now rotates
+  in CSS based on aria-expanded.
+
+Updated test_collapsible_icon_direction.py to cover the new contract: aria-expanded must flip, CSS
+  must own the chevron rotation, and a delegated click handler must exist.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Add confirmation dialog to Reboot/Shutdown buttons (JTN-621)
+  ([#388](https://github.com/jtn0123/InkyPi/pull/388),
+  [`f391829`](https://github.com/jtn0123/InkyPi/commit/f391829d66630b6faf4f9b5b0aabd50ae399b0de))
+
+An accidental tap on the Reboot or Shutdown button in Settings -> Updates immediately severed the UI
+  on a Pi Zero 2 W, with no physical recovery path until a power cycle. Both actions now open a
+  confirmation modal that clearly states the UI will be unavailable and that physical access is
+  required to recover if anything goes wrong.
+
+The click handlers for #rebootBtn and #shutdownBtn now open the respective modal instead of invoking
+  handleShutdown directly. The modal's confirm button is what actually fires the action, matching
+  the Clear All History pattern.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.48.0 (2026-04-12)
 
 ### Bug Fixes
