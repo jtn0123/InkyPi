@@ -39,7 +39,9 @@ def compare(
     for name, base_val in sorted(baseline.items()):
         cur_val = current.get(name)
         if cur_val is None:
-            # Benchmark was removed — not a regression
+            label = f"  FAIL  {name}: missing in current run (present in baseline)"
+            print(label)
+            failures.append(label)
             continue
         if base_val == 0:
             continue
