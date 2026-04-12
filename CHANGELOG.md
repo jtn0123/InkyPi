@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.49.15 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Use app-level toast for Update Preview validation errors (JTN-648)
+  ([`ecc5e06`](https://github.com/jtn0123/InkyPi/commit/ecc5e06a444b1b731646745bbba5868efffcbb0d))
+
+Empty required fields on Image URL and RSS Feed plugin pages showed the browser's native HTML5
+  tooltip instead of the labelled app toast that JTN-378 introduced for Save Settings / Add to
+  Playlist. Add `novalidate` to the settings form so the browser never surfaces its own bubble, and
+  route the form's implicit Enter-key submit through the same validateAllInputsDetailed /
+  buildValidationMessage / focusFirstInvalid helpers the Update Preview click path already uses.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **deps**: Sync uv.lock inkypi version bump
+  ([`e4962db`](https://github.com/jtn0123/InkyPi/commit/e4962dbcc738a2068cc4777d734e1c93bd7779ec))
+
+Pick up the 0.49.6 -> 0.49.11 version drift that accumulated on main so the "Lockfile drift check"
+  CI gate passes. No dependency changes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.14 (2026-04-12)
 
 ### Bug Fixes
