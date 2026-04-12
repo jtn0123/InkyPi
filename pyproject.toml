@@ -52,7 +52,7 @@ dict_synonyms = ""
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:tool.semantic_release.version"]
-version = "0.46.1"
+version = "0.46.2"
 branch = "main"
 tag_format = "v{version}"
 upload_to_pypi = false

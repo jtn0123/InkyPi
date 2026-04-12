@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.46.2 (2026-04-12)
+
+### Bug Fixes
+
+- Show visible feedback for plugin progress buttons (JTN-347, JTN-348, JTN-331, JTN-332)
+  ([#377](https://github.com/jtn0123/InkyPi/pull/377),
+  [`4e611be`](https://github.com/jtn0123/InkyPi/commit/4e611beb5f251fa7cab84a927ee6750d38da3eeb))
+
+progress.stop() in plugin_form.js set style.display='none' on the progress block, but
+  showLastProgress() in plugin_page.js only removed the HTML hidden attribute — it never cleared the
+  inline display:none. The block stayed invisible even when unhidden, producing a silent no-op on
+  Clock, To-Do List, Calendar, and Screenshot plugin pages.
+
+Fix: clear inline style.display in showLastProgress and stop using style.display='none' in
+  progress.stop() (rely on hidden attribute instead).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **config**: Extract paths and refresh_info modules (JTN-494)
+  ([#376](https://github.com/jtn0123/InkyPi/pull/376),
+  [`ba13405`](https://github.com/jtn0123/InkyPi/commit/ba13405768ca4c3f81e189d9d2801284081c2b56))
+
+Extract path constants and runtime resolution into utils/paths.py and refresh-info loading into
+  utils/refresh_info.py, reducing Config from a god-object to a thin facade that delegates to
+  focused modules.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.46.1 (2026-04-12)
 
 ### Bug Fixes
