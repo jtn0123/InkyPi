@@ -356,6 +356,34 @@
 
     <button type="button" class="action-button settings-logs-toggle" id="settingsLogsToggle">Show Logs</button>
 
+    <!-- Reboot confirmation modal (JTN-621) -->
+    <div id="rebootConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rebootConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeRebootConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="rebootConfirmTitle">Reboot Device?</h2>
+            <div class="separator"></div>
+            <p>This will interrupt the display and make the web UI unavailable for approximately 30 seconds. If the device fails to come back online, physical access will be required to recover.</p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmRebootBtn">Reboot</button>
+                <button type="button" class="action-button" id="cancelRebootBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shutdown confirmation modal (JTN-621) -->
+    <div id="shutdownConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shutdownConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeShutdownConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="shutdownConfirmTitle">Shut Down Device?</h2>
+            <div class="separator"></div>
+            <p>This will power off the device. The web UI will remain unavailable until the device is manually restarted. <strong>Physical access is required to turn it back on.</strong></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmShutdownBtn">Shut Down</button>
+                <button type="button" class="action-button" id="cancelShutdownBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
     </main>
