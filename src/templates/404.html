@@ -14,9 +14,9 @@
                     </div>
                 </div>
                 <nav class="header-actions" role="navigation" aria-label="Site navigation">
-                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" aria-label="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" aria-label="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" aria-label="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}<span class="sr-only">History</span></a>
+                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Playlists</span></a>
+                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}<span class="sr-only">Settings</span></a>
                 </nav>
             </div>
         </header>
