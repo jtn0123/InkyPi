@@ -34,6 +34,7 @@ from pathlib import Path
 from PIL import Image
 
 _SNAPSHOTS_ROOT = Path(__file__).parent
+_ACTUAL_ROOT = _SNAPSHOTS_ROOT / "actual"
 
 UPDATE_MODE = os.getenv("SNAPSHOT_UPDATE", "").strip().lower() in ("1", "true", "yes")
 
@@ -102,11 +103,20 @@ def assert_image_snapshot(
     expected_digest = digest_path.read_text().strip()
     actual_digest = _image_sha256(image)
 
-    assert actual_digest == expected_digest, (
-        f"Snapshot mismatch for {plugin_name}/{case_name}!\n"
-        f"  Expected : {expected_digest}\n"
-        f"  Got      : {actual_digest}\n"
-        f"  Baseline : {png_path}\n"
-        "If this change is intentional, run `python scripts/update_snapshots.py` "
-        "to update the stored baseline."
-    )
+    if actual_digest != expected_digest:
+        # Save the actual image for CI artifact upload / local inspection.
+        actual_png = _ACTUAL_ROOT / plugin_name / f"{case_name}.png"
+        actual_png.parent.mkdir(parents=True, exist_ok=True)
+        image.save(actual_png, format="PNG")
+
+        raise AssertionError(
+            f"Snapshot mismatch for {plugin_name}/{case_name}!\n"
+            f"  Expected : {expected_digest}\n"
+            f"  Got      : {actual_digest}\n"
+            f"  Baseline : {png_path}\n"
+            f"  Actual   : {actual_png}\n"
+            "In CI the actual PNG is uploaded as the 'snapshot-failures' "
+            "GitHub Actions artifact.\n"
+            "If this change is intentional, run `python scripts/update_snapshots.py` "
+            "to update the stored baseline."
+        )

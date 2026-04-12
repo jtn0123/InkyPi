@@ -624,6 +624,13 @@ jobs:
           name: browser-smoke-failures
           path: runtime/mock_display_output/browser_smoke_failures
           if-no-files-found: ignore
+      - name: Upload snapshot failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snapshot-failures
+          path: tests/snapshots/actual/
+          if-no-files-found: ignore
 
   install-matrix:
     # JTN-530: end-to-end install.sh matrix against every supported Pi OS base.
