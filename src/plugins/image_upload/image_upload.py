@@ -36,6 +36,15 @@ def _resolve_background_color(
 
 
 class ImageUpload(BasePlugin):
+    def generate_settings_template(self):
+        # JTN-632: Disable the legacy "Style" collapsible. Its hardcoded
+        # `backgroundOption` radios collide with the schema-driven Background
+        # Fill radio group and cause two options to render as `checked`,
+        # leaving the user's Background Fill selection indeterminate.
+        template_params = super().generate_settings_template()
+        template_params["style_settings"] = False
+        return template_params
+
     def build_settings_schema(self):
         return schema(
             section(
