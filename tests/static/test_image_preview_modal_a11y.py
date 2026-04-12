@@ -96,10 +96,27 @@ def test_plugin_page_rendered_modal_has_aria_labelledby(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert (
-        'aria-labelledby="imagePreviewTitle"' in html
-    ), "Rendered plugin page must have aria-labelledby='imagePreviewTitle' on #imagePreviewModal"
+    # The modal() macro (JTN-503) emits aria-labelledby="<id>Title", so when
+    # called with id='imagePreviewModal' the title id becomes
+    # 'imagePreviewModalTitle'. The original hand-written modal used
+    # 'imagePreviewTitle'. Accept either for template-refactor resilience.
+    import re
 
-    assert (
-        'id="imagePreviewTitle"' in html
-    ), "Rendered plugin page must contain an element with id='imagePreviewTitle'"
+    m = re.search(
+        r'id=[\'"]imagePreviewModal[\'"][^>]*aria-labelledby=[\'"]([^\'"]+)[\'"]',
+        html,
+    )
+    assert m is not None, (
+        "Rendered plugin page must have aria-labelledby on #imagePreviewModal "
+        "(checked with either quote style)"
+    )
+    labelled_by_id = m.group(1)
+    assert labelled_by_id in {"imagePreviewTitle", "imagePreviewModalTitle"}, (
+        "Rendered plugin page must reference 'imagePreviewTitle' or "
+        f"'imagePreviewModalTitle' for aria-labelledby; got '{labelled_by_id}'"
+    )
+
+    assert f'id="{labelled_by_id}"' in html or f"id='{labelled_by_id}'" in html, (
+        f"Rendered plugin page must contain an element with id='{labelled_by_id}' "
+        "(the aria-labelledby target)"
+    )
