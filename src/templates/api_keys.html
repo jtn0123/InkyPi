@@ -77,7 +77,7 @@
                 {% endif %}
             </div>
             <div class="add-buttons-grid">
-                <button type="button" id="addApiKeyBtn" class="btn-add"><span>+</span> Add API Key</button>
+                <button type="button" id="addApiKeyBtn" class="btn-add" data-api-action="add-row"><span>+</span> Add API Key</button>
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_WEATHER_MAP_SECRET', []) | join(', ') }}">OPEN_WEATHER_MAP_SECRET</button>
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_AI_SECRET', []) | join(', ') }}">OPEN_AI_SECRET</button>
                 <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>

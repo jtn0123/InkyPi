@@ -474,7 +474,9 @@
         const actionEl = event.target.closest("[data-api-action]");
         if (!actionEl) return;
         const action = actionEl.dataset.apiAction;
-        if (action === "delete-key") {
+        if (action === "add-row") {
+          addRow();
+        } else if (action === "delete-key") {
           deleteKey(actionEl.dataset.keyName);
         } else if (action === "delete-row") {
           deleteRow(actionEl);
