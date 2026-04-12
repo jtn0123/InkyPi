@@ -30,8 +30,15 @@ logger = logging.getLogger(__name__)
 _CACHE_1_YEAR = 31_536_000
 _CACHE_1_DAY = 86_400
 _CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-_CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz"})
-_RATE_EXEMPT = frozenset({"/healthz", "/readyz"})
+#: Endpoints that MUST skip CSRF validation because the caller is a
+#: browser-initiated automatic request with no session cookie:
+#:   * /healthz, /readyz — monitoring probes
+#:   * /api/csp-report — CSP violation reports sent by the browser itself
+#:     (JTN-628). Browsers never attach a CSRF token to these requests, so
+#:     the endpoint has its own rate-limiting and size-limiting defenses
+#:     baked into the blueprint handler.
+_CSRF_EXEMPT_PATHS = frozenset({"/healthz", "/readyz", "/api/csp-report"})
+_RATE_EXEMPT = frozenset({"/healthz", "/readyz", "/api/csp-report"})
 _MUTATE_WINDOW = 60  # seconds
 _MUTATE_MAX = 60  # requests per IP per window
 
