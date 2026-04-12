@@ -408,3 +408,72 @@ def test_playlist_page_no_wrap_label_for_normal_range(client):
     idx = body.find("09:00 - 17:00")
     # Look within the next 200 chars for the label — it must not appear.
     assert "(next day)" not in body[idx : idx + 200]
+
+
+def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_dev):
+    """JTN-620: Playlists page must not display raw {plugin_id}_saved_settings keys.
+
+    Internal ``data-*`` attributes and element ``id``s may still reference
+    the raw key because the JS layer needs it for API calls against the
+    filesystem settings file — but it must never appear in visible text or
+    in ``aria-label`` attributes read by screen readers.
+    """
+    import re
+
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.plugins = []
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "weather_saved_settings",
+            "plugin_settings": {},
+            "refresh": {"interval": 600},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # No aria-label may expose the raw key.
+    aria_labels = re.findall(r'aria-label="([^"]*)"', body)
+    leaked_arias = [a for a in aria_labels if "weather_saved_settings" in a]
+    assert not leaked_arias, f"aria-labels leak raw key: {leaked_arias}"
+
+    # Visible text inside <span class="plugin-instance"> must not be the raw key.
+    visible_spans = re.findall(
+        r'<span class="plugin-instance">([^<]*)',
+        body,
+    )
+    assert visible_spans, "expected plugin-instance spans in rendered playlist"
+    for span_text in visible_spans:
+        assert "weather_saved_settings" not in span_text
+
+    # A humanised label should be present somewhere for the user.
+    assert "Weather" in body
+
+
+def test_playlist_page_preserves_user_instance_names(client, device_config_dev):
+    """User-renamed instances are preserved as visible labels."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.plugins = []
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "Kitchen Weather",
+            "plugin_settings": {},
+            "refresh": {"interval": 600},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    assert b"Kitchen Weather" in resp.data

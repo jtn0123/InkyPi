@@ -201,3 +201,90 @@ def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
     assert resp.status_code == 200
     assert b"Display a plugin to see details here." in resp.data
     assert b"Last display info unavailable." not in resp.data
+
+
+# ---------------------------------------------------------------------------
+# JTN-618 / JTN-619 / JTN-620 — friendly plugin-instance display names
+# ---------------------------------------------------------------------------
+
+
+def test_home_hides_auto_generated_instance_suffix(client, device_config_dev):
+    """JTN-618: The NOW SHOWING panel must not expose raw {plugin_id}_saved_settings keys."""
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="weather_saved_settings",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    # The auto-generated internal key must not leak into the rendered HTML.
+    assert b"weather_saved_settings" not in resp.data
+    # Now showing block still renders.
+    assert b"Now showing:" in resp.data
+
+
+def test_home_preserves_user_supplied_instance_name(client, device_config_dev):
+    """A user-renamed instance should still render in the parenthesised suffix."""
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Morning Weather",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert b"Morning Weather" in resp.data
+
+
+def test_refresh_info_endpoint_annotates_labels(client, device_config_dev):
+    """JTN-618: /refresh-info must expose a friendly label and auto flag to JS."""
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="weather_saved_settings",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/refresh-info")
+    assert resp.status_code == 200
+    payload = resp.get_json()
+    assert payload["plugin_id"] == "weather"
+    assert payload["plugin_instance_is_auto"] is True
+    # Friendly label should not expose the raw key.
+    assert "saved_settings" not in payload["plugin_instance_label"]
+    assert payload["plugin_display_name"]
+
+
+def test_next_up_endpoint_annotates_labels(client, device_config_dev):
+    """JTN-618: /next-up must also annotate labels for the dashboard."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Default", "00:00", "24:00")
+    pl = pm.get_playlist("Default")
+    pl.add_plugin(
+        {
+            "plugin_id": "weather",
+            "name": "weather_saved_settings",
+            "plugin_settings": {},
+            "refresh": {"interval": 600},
+        }
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/next-up")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    if data:
+        assert data.get("plugin_instance_is_auto") is True
+        assert "saved_settings" not in data.get("plugin_instance_label", "")

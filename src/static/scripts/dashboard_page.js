@@ -131,10 +131,17 @@
         return;
       }
       setHidden(block, false);
-      plugin.textContent = data.plugin_id || "";
-      instance.textContent = data.plugin_instance || "";
+      plugin.textContent = data.plugin_display_name || data.plugin_id || "";
+      // Only surface the instance name in the "(...)" suffix when it is a
+      // user-chosen label. The server sets plugin_instance_is_auto=true for
+      // auto-generated internal keys like "weather_saved_settings", which
+      // should never leak into the UI (JTN-618).
+      const showInstance = Boolean(
+        data.plugin_instance && !data.plugin_instance_is_auto,
+      );
+      instance.textContent = showInstance ? data.plugin_instance : "";
       playlist.textContent = data.playlist || "";
-      setHidden(instance, !data.plugin_instance);
+      setHidden(instance, !showInstance);
       setHidden(playlist, !data.playlist);
     }
 

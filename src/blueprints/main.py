@@ -15,6 +15,11 @@ from flask import (
     send_from_directory,
 )
 
+from utils.display_names import (
+    friendly_instance_label,
+    instance_suffix_label,
+    is_auto_instance_name,
+)
 from utils.http_utils import json_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.rate_limiter import CooldownLimiter
@@ -180,6 +185,42 @@ def get_current_image():
     return response
 
 
+def _plugin_display_name_map():
+    """Return a {plugin_id: display_name} mapping for the current device config."""
+    try:
+        device_config = current_app.config["DEVICE_CONFIG"]
+        return {
+            p["id"]: p.get("display_name") or p["id"]
+            for p in device_config.get_plugins()
+        }
+    except Exception:
+        return {}
+
+
+def _annotate_instance_labels(payload):
+    """Attach friendly plugin/instance labels to a refresh-info-like dict.
+
+    Adds ``plugin_display_name``, ``plugin_instance_label``, and
+    ``plugin_instance_is_auto`` so the dashboard JS can render a friendly
+    label without leaking the raw ``{plugin_id}_saved_settings`` key.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    plugin_id = payload.get("plugin_id")
+    instance_name = payload.get("plugin_instance")
+    if plugin_id:
+        display_map = _plugin_display_name_map()
+        display_name = display_map.get(plugin_id) or plugin_id
+        payload["plugin_display_name"] = display_name
+        payload["plugin_instance_label"] = friendly_instance_label(
+            instance_name, plugin_id, display_name
+        )
+        payload["plugin_instance_is_auto"] = is_auto_instance_name(
+            instance_name, plugin_id
+        )
+    return payload
+
+
 @main_bp.route("/refresh-info", methods=["GET"])
 def refresh_info():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -187,6 +228,7 @@ def refresh_info():
         info = device_config.get_refresh_info().to_dict()
     except Exception:
         info = {}
+    _annotate_instance_labels(info)
     return jsonify(info)
 
 
@@ -207,13 +249,13 @@ def next_up():
         )
         if not inst:
             return jsonify({})
-        return jsonify(
-            {
-                "playlist": playlist.name,
-                "plugin_id": inst.plugin_id,
-                "plugin_instance": inst.name,
-            }
-        )
+        payload = {
+            "playlist": playlist.name,
+            "plugin_id": inst.plugin_id,
+            "plugin_instance": inst.name,
+        }
+        _annotate_instance_labels(payload)
+        return jsonify(payload)
     except Exception:
         return jsonify({})
 
@@ -474,3 +516,33 @@ def display_next():
 def refresh_alias():
     """Backward-compatible alias for manual display advance."""
     return display_next()
+
+
+# ---------------------------------------------------------------------------
+# Jinja template filters for friendly plugin-instance display names.
+# ---------------------------------------------------------------------------
+
+
+@main_bp.app_template_filter("friendly_instance_label")
+def _jinja_friendly_instance_label(instance_name, plugin_id=None):
+    """Jinja filter: return a friendly label for a plugin instance.
+
+    Usage: ``{{ inst.name | friendly_instance_label(inst.plugin_id) }}``.
+    Falls back to the plugin's ``display_name`` when the instance name is
+    auto-generated.
+    """
+    display_name = _plugin_display_name_map().get(plugin_id) if plugin_id else None
+    return friendly_instance_label(instance_name, plugin_id, display_name)
+
+
+@main_bp.app_template_filter("instance_suffix_label")
+def _jinja_instance_suffix_label(instance_name, plugin_id=None):
+    """Jinja filter: return a parenthesised-suffix label, or empty string."""
+    label = instance_suffix_label(instance_name, plugin_id)
+    return label or ""
+
+
+@main_bp.app_template_filter("is_auto_instance_name")
+def _jinja_is_auto_instance_name(instance_name, plugin_id=None):
+    """Jinja filter: True when the instance name is the auto-generated key."""
+    return is_auto_instance_name(instance_name, plugin_id)

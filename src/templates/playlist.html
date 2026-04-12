@@ -89,11 +89,13 @@
                     {% if playlist.plugins %}
                     <div class="plugin-list">
                         {% for plugin_instance in playlist.plugins %}
-                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}">
+                        {% set pi_label = plugin_instance.name | friendly_instance_label(plugin_instance.plugin_id) %}
+                        {% set pi_suffix = plugin_instance.name | instance_suffix_label(plugin_instance.plugin_id) %}
+                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                             <span class="drag-handle" aria-hidden="true">{{ icon('dots-six-vertical', 'drag-handle-icon') | safe }}</span>
                             <div class="plugin-info" id="{{plugin_instance.name}}">
                                 <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
-                                <span class="plugin-instance">{{ plugin_instance.name }}</span>
+                                <span class="plugin-instance">{{ pi_label }}{% if pi_suffix and pi_suffix != pi_label %} <span class="plugin-instance-suffix">({{ pi_suffix }})</span>{% endif %}</span>
 
                                 <!-- Thumbnail preview - only show if image has been generated -->
                                 {% if plugin_instance.latest_refresh_time %}
@@ -101,11 +103,12 @@
                                      data-thumbnail-playlist="{{ playlist.name }}"
                                      data-thumbnail-plugin="{{ plugin_instance.plugin_id }}"
                                      data-thumbnail-display-name="{{ (plugins.get(plugin_instance.plugin_id, {}).display_name or plugin_instance.plugin_id) }}"
-                                     data-thumbnail-instance="{{ plugin_instance.name }}">
+                                     data-thumbnail-instance="{{ plugin_instance.name }}"
+                                     data-thumbnail-instance-label="{{ pi_label }}">
                                     <div class="img-skeleton" aria-hidden="true"></div>
                                     <img
                                         src="{{ url_for('plugin.plugin_instance_image', plugin_id=plugin_instance.plugin_id, instance_name=plugin_instance.name) }}"
-                                        alt="{{ plugin_instance.name }} preview"
+                                        alt="{{ pi_label }} preview"
                                         class="plugin-thumbnail"
                                         title="Click to view full size"
                                         loading="lazy"
@@ -128,21 +131,22 @@
                                     </span>
                                 {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" aria-label="Edit plugin {{ plugin_instance.name }}">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" aria-label="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                 </a>
                                 <button class="edit-button refresh-settings-btn" type="button"
-                                        aria-label="Edit refresh settings for {{ plugin_instance.name }}"
+                                        aria-label="Edit refresh settings for {{ pi_label }}"
                                         data-playlist="{{ playlist.name }}"
                                         data-plugin-id="{{ plugin_instance.plugin_id }}"
                                         data-instance="{{ plugin_instance.name }}"
+                                        data-instance-label="{{ pi_label }}"
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
                                 </button>
-                                <button class="edit-button plugin-display-btn" type="button" aria-label="Display {{ plugin_instance.name }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
+                                <button class="edit-button plugin-display-btn" type="button" aria-label="Display {{ pi_label }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                 </button>
-                                <button class="delete-button delete-instance-btn" type="button" aria-label="Delete plugin instance {{ plugin_instance.name }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}">
+                                <button class="delete-button delete-instance-btn" type="button" aria-label="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('trash', 'action-icon') | safe }}
                                 </button>
                             </div>

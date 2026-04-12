@@ -68,8 +68,9 @@
                             <h3>Now showing:</h3>
                             <div>
                                 <strong id="nsPlugin">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) if refresh_info.plugin_id else '' }}</strong>
-                                {% if refresh_info.plugin_instance %}
-                                <span>(<span id="nsInstance">{{ refresh_info.plugin_instance }}</span>)</span>
+                                {% set ns_suffix = refresh_info.plugin_instance | instance_suffix_label(refresh_info.plugin_id) %}
+                                {% if ns_suffix %}
+                                <span>(<span id="nsInstance">{{ ns_suffix }}</span>)</span>
                                 {% else %}
                                 <span id="nsInstance" hidden></span>
                                 {% endif %}
@@ -84,8 +85,9 @@
                             <h3>Next up:</h3>
                             <div>
                                 <strong id="nuPlugin">{{ plugin_names.get(next_up.plugin_id, next_up.plugin_id) if next_up and next_up.plugin_id else '' }}</strong>
-                                {% if next_up and next_up.plugin_instance %}
-                                <span>(<span id="nuInstance">{{ next_up.plugin_instance }}</span>)</span>
+                                {% set nu_suffix = (next_up.plugin_instance | instance_suffix_label(next_up.plugin_id)) if next_up else '' %}
+                                {% if nu_suffix %}
+                                <span>(<span id="nuInstance">{{ nu_suffix }}</span>)</span>
                                 {% else %}
                                 <span id="nuInstance" hidden></span>
                                 {% endif %}
