@@ -77,6 +77,7 @@
         const modalIds = [
             'deleteInstanceModal',
             'deletePlaylistModal',
+            'displayNextConfirmModal',
             'thumbnailPreviewModal',
             'refreshSettingsModal',
             'deviceCycleModal',
@@ -95,6 +96,9 @@
                 return;
             case 'deletePlaylistModal':
                 closeDeletePlaylistModal();
+                return;
+            case 'displayNextConfirmModal':
+                closeDisplayNextConfirmModal();
                 return;
             case 'thumbnailPreviewModal':
                 closeThumbnailPreview();
@@ -594,7 +598,10 @@
         try{
             const resp = await fetch(C.display_next_url, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
             const j = await handleJsonResponse(resp);
-            if (resp.ok && j && j.success){ setTimeout(() => { location.reload(); }, 500); }
+            if (resp.ok && j && j.success){
+                showResponseModal('success', 'Display updated — refreshing…');
+                setTimeout(() => { location.reload(); }, 500);
+            }
         } catch(e){ showResponseModal('failure', 'Failed to trigger display'); }
     }
 
@@ -686,8 +693,9 @@
         });
         document.querySelectorAll('.run-next-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const name = e.currentTarget.getAttribute('data-playlist');
-                displayNextInPlaylist(name);
+                const el = e.currentTarget;
+                const name = el.getAttribute('data-playlist');
+                openDisplayNextConfirmModal(name, el);
             });
         });
         document.querySelectorAll('.delete-playlist-btn').forEach(btn => {
@@ -758,6 +766,7 @@
         // Cancel buttons on delete confirm modals
         document.getElementById('cancelDeletePlaylistBtn')?.addEventListener('click', closeDeletePlaylistModal);
         document.getElementById('cancelDeleteInstanceBtn')?.addEventListener('click', closeDeleteInstanceModal);
+        document.getElementById('cancelDisplayNextBtn')?.addEventListener('click', closeDisplayNextConfirmModal);
 
         // Device cadence editor
         const editCadence = document.getElementById('editDeviceCycleBtn');
@@ -842,6 +851,7 @@
             if (event.target?.id === 'deviceCycleModal') closeDeviceCycleModal();
             if (event.target?.id === 'deletePlaylistModal') closeDeletePlaylistModal();
             if (event.target?.id === 'deleteInstanceModal') closeDeleteInstanceModal();
+            if (event.target?.id === 'displayNextConfirmModal') closeDisplayNextConfirmModal();
         });
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
@@ -968,8 +978,28 @@
     }
     function closeDeleteInstanceModal(){ setModalOpen('deleteInstanceModal', false); }
 
+    function openDisplayNextConfirmModal(name, triggerEl){
+        const el = document.getElementById('displayNextConfirmModal');
+        const txt = document.getElementById('displayNextConfirmText');
+        const btn = document.getElementById('confirmDisplayNextBtn');
+        if (!el || !txt || !btn) {
+            // Fallback: if the modal isn't present for any reason, fire the action directly.
+            displayNextInPlaylist(name);
+            return;
+        }
+        txt.textContent = `Advance '${name}' to the next plugin now?`;
+        setModalOpen('displayNextConfirmModal', true, triggerEl);
+        btn.onclick = async function(){
+            closeDisplayNextConfirmModal();
+            await displayNextInPlaylist(name);
+        };
+    }
+    function closeDisplayNextConfirmModal(){ setModalOpen('displayNextConfirmModal', false); }
+
     window.openDeletePlaylistModal = openDeletePlaylistModal;
     window.closeDeletePlaylistModal = closeDeletePlaylistModal;
     window.openDeleteInstanceModal = openDeleteInstanceModal;
     window.closeDeleteInstanceModal = closeDeleteInstanceModal;
+    window.openDisplayNextConfirmModal = openDisplayNextConfirmModal;
+    window.closeDisplayNextConfirmModal = closeDisplayNextConfirmModal;
 })();
