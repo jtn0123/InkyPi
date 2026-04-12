@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.43.7 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Make sticky Save button selector match real DOM (JTN-572)
+  ([#351](https://github.com/jtn0123/InkyPi/pull/351),
+  [`08f6777`](https://github.com/jtn0123/InkyPi/commit/08f67778f1d62d090c7e45dc83cd772c87ade5be))
+
+The JTN-599 short-viewport sticky rule used `.settings-panel > .buttons-container` (child
+  combinator), but the settings DOM nests buttons-container inside .settings-console-main, so the
+  selector matched zero elements and the Save button still disappeared below the fold. Switch to a
+  descendant combinator so the sticky rule actually engages on /settings, and add a regression test
+  guarding against the broken `>` selector creeping back.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.6 (2026-04-11)
 
 ### Bug Fixes
