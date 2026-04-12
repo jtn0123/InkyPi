@@ -19,6 +19,55 @@ def test_ai_text_generate_settings_template(monkeypatch, device_config_dev):
     assert "settings_schema" in template
 
 
+def test_ai_text_model_labels_show_input_and_output_prices(device_config_dev):
+    """Regression for JTN-635: model labels must show both input AND output prices."""
+    import re
+
+    from plugins.ai_text.ai_text import AIText
+
+    plugin = AIText({"id": "ai_text"})
+    schema_dict = plugin.build_settings_schema()
+
+    # Find the textModel field recursively
+    def _find_field(node, name):
+        if isinstance(node, dict):
+            if node.get("name") == name:
+                return node
+            for v in node.values():
+                found = _find_field(v, name)
+                if found is not None:
+                    return found
+        elif isinstance(node, list):
+            for v in node:
+                found = _find_field(v, name)
+                if found is not None:
+                    return found
+        return None
+
+    text_model_field = _find_field(schema_dict, "textModel")
+    assert text_model_field is not None, "textModel field missing from schema"
+
+    options_by_value = text_model_field.get("options_by_value") or {}
+    assert "openai" in options_by_value
+    assert "google" in options_by_value
+
+    # Each label must include an input AND output price marker.
+    label_re = re.compile(r"\$\d+(?:\.\d+)?\s*in\s*/\s*\$\d+(?:\.\d+)?\s*out", re.I)
+
+    all_options = []
+    for provider_opts in options_by_value.values():
+        all_options.extend(provider_opts)
+
+    assert all_options, "Expected at least one model option"
+    for opt in all_options:
+        label = opt.get("label", "")
+        assert label_re.search(label), (
+            f"Model label {label!r} must show both input and output prices "
+            "(e.g. '$X in / $Y out per 1M')"
+        )
+        assert "in" in label.lower() and "out" in label.lower()
+
+
 def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatch):
     import os
 

@@ -47,24 +47,37 @@ class AIText(BasePlugin):
                         default="gpt-5-nano",
                         options_source="provider",
                         options_source_default="openai",
+                        # Pricing reference (update as providers publish new rates):
+                        # OpenAI:  https://openai.com/api/pricing/
+                        # Google:  https://ai.google.dev/gemini-api/docs/pricing
+                        # Format:  "<name> \u00b7 $<in> in / $<out> out per 1M"
                         options_by_value={
                             "openai": [
-                                option("gpt-5.4", "GPT-5.4 \u00b7 $2.50/1M in"),
-                                option("gpt-5-mini", "GPT-5 mini \u00b7 ~$0.30/1M in"),
-                                option("gpt-5-nano", "GPT-5 nano \u00b7 $0.05/1M in"),
+                                option(
+                                    "gpt-5.4",
+                                    "GPT-5.4 \u00b7 $2.50 in / $10.00 out per 1M",
+                                ),
+                                option(
+                                    "gpt-5-mini",
+                                    "GPT-5 mini \u00b7 $0.30 in / $1.20 out per 1M",
+                                ),
+                                option(
+                                    "gpt-5-nano",
+                                    "GPT-5 nano \u00b7 $0.05 in / $0.20 out per 1M",
+                                ),
                             ],
                             "google": [
                                 option(
                                     "gemini-3.1-pro-preview",
-                                    "Gemini 3.1 Pro \u00b7 ~$2.00/1M in",
+                                    "Gemini 3.1 Pro \u00b7 $2.00 in / $8.00 out per 1M",
                                 ),
                                 option(
                                     "gemini-3-flash-preview",
-                                    "Gemini 3 Flash \u00b7 $0.50/1M in",
+                                    "Gemini 3 Flash \u00b7 $0.50 in / $2.00 out per 1M",
                                 ),
                                 option(
                                     "gemini-3.1-flash-lite-preview",
-                                    "Gemini 3.1 Flash-Lite \u00b7 $0.25/1M in",
+                                    "Gemini 3.1 Flash-Lite \u00b7 $0.25 in / $1.00 out per 1M",
                                 ),
                             ],
                         },
@@ -79,7 +92,8 @@ class AIText(BasePlugin):
                     rows=4,
                 ),
                 callout(
-                    "Prices shown are approximate per 1M input tokens. "
+                    "Prices shown are approximate per 1M input / output tokens. "
+                    "Output tokens are typically 3\u20134\u00d7 the input rate. "
                     "A typical response costs fractions of a cent."
                 ),
             )
