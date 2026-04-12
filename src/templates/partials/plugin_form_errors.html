@@ -1,0 +1,20 @@
+{#
+  Inline validation feedback for the plugin settings form.
+
+  Rendered by the ``/save_plugin_settings`` route when the request includes
+  the ``HX-Request: true`` header (JTN-506).  On success the caller returns
+  an empty fragment plus an ``HX-Trigger`` header so the existing toast JS
+  handler still fires — only the error state ships HTML here.
+#}
+{% if error %}
+<div class="validation-message error"
+     role="alert"
+     data-plugin-form-error
+     {% if field %}data-plugin-form-error-field="{{ field }}"{% endif %}>
+    {{ error }}
+</div>
+{% else %}
+<div class="validation-message success" role="status">
+    {{ message or "Saved." }}
+</div>
+{% endif %}
