@@ -158,9 +158,9 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
         # bytes that slipped past decoding.
         safe_query = urlencode(list(request.args.items(multi=True)), doseq=True)
         # Hard-coded scheme literal — the whole point of this handler
-        # is to upgrade to https. NOSONAR silences S5332 which flags
-        # any ``http://``/``https://`` literal as a potential cleartext
-        # transmission.
+        # is to upgrade to https. The inline suppression below silences
+        # S5332 which flags any ``http://``/``https://`` literal as a
+        # potential cleartext transmission.
         safe_url = urlunsplit(
             ("https", safe_authority, safe_path, safe_query, "")
         )  # NOSONAR
