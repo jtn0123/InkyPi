@@ -39,13 +39,19 @@ def test_api_keys_breadcrumb(client):
 
 
 def test_plugin_breadcrumb(client):
-    """GET /plugin/<id> contains breadcrumb with Home and the plugin display name."""
+    """GET /plugin/<id> contains breadcrumb with Home, Plugins, and the plugin display name."""
     # "clock" is a built-in plugin type whose plugin-info.json defines display_name="Clock"
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     html = resp.data.decode()
     assert "Home" in html
     assert "Clock" in html
+    # JTN-637: intermediate "Plugins" level links back to the home page plugin list
+    assert ">Plugins</a>" in html
+    assert 'href="/#plugins"' in html
+    # Leaf item (plugin display name) should carry aria-current and not be a link
+    assert 'aria-current="page"' in html
+    assert "<span>Clock</span>" in html
 
 
 def test_breadcrumb_last_item_not_linked(client):
