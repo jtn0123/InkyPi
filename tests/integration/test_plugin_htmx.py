@@ -114,6 +114,39 @@ def test_save_plugin_settings_htmx_error_never_leaks_exception_text(
     assert "internal error" in body.lower()
 
 
+def test_is_htmx_request_returns_false_outside_request_context():
+    """_is_htmx_request handles the no-request-context case (JTN-506)."""
+    from blueprints.plugin import _is_htmx_request
+
+    # Called from a plain Python context, not inside a Flask request — hits the
+    # RuntimeError branch that's otherwise only reachable from background tasks.
+    assert _is_htmx_request() is False
+
+
+def test_save_plugin_settings_htmx_internal_error_has_fallback_content_type(
+    client, flask_app, monkeypatch
+):
+    """Internal error response sets text/html content-type (JTN-506)."""
+    dc = flask_app.config["DEVICE_CONFIG"]
+    monkeypatch.setattr(
+        dc,
+        "update_atomic",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("db down")),
+    )
+    resp = client.post(
+        "/save_plugin_settings",
+        data={
+            "plugin_id": "ai_text",
+            "title": "T",
+            "textModel": "gpt-4o",
+            "textPrompt": "p",
+        },
+        headers={"HX-Request": "true"},
+    )
+    assert resp.status_code == 500
+    assert "text/html" in resp.headers.get("Content-Type", "")
+
+
 def test_plugin_page_renders_htmx_save_button(client):
     """The plugin page ships hx-* attributes on the Save Settings button."""
     resp = client.get("/plugin/ai_text")
