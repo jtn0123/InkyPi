@@ -1,6 +1,6 @@
 [project]
 name = "inkypi"
-version = "0.46.3"
+version = "0.49.5"
 description = "InkyPi — e-ink dashboard for Raspberry Pi"
 requires-python = ">=3.11,<3.14"
 # Runtime dependencies mirror install/requirements.in during the uv-lock migration
@@ -103,10 +103,22 @@ runner = "python -m pytest tests/ -x --tb=no -q"
 dict_synonyms = ""
 
 [tool.semantic_release]
-version_toml = ["pyproject.toml:tool.semantic_release.version"]
+# Keep BOTH the PEP-621 [project].version and the semantic-release anchor in
+# sync on every release. Listing them together means python-semantic-release
+# rewrites both TOML keys when bumping, so packaging metadata (pip, uv,
+# importlib.metadata) and the VERSION file stay aligned. See JTN-624.
+version_toml = [
+  "pyproject.toml:project.version",
+  "pyproject.toml:tool.semantic_release.version",
+]
 version = "0.49.5"
 branch = "main"
 tag_format = "v{version}"
 upload_to_pypi = false
+# Regenerate VERSION from the canonical pyproject.toml value on each release.
+# Using NEW_VERSION (env var exported by python-semantic-release to
+# build_command) avoids relying on shell {version} expansion, which PSR does
+# NOT perform — the previous `echo '{version}'` wrote the literal placeholder
+# into VERSION on every release.
 assets = ["VERSION"]
-build_command = "echo '{version}' > VERSION"
+build_command = "printf '%s\\n' \"$NEW_VERSION\" > VERSION"
