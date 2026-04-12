@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## v0.49.9 (2026-04-12)
+
+### Bug Fixes
+
+- **ai_text**: Show input AND output token prices in model labels (JTN-635)
+  ([#400](https://github.com/jtn0123/InkyPi/pull/400),
+  [`bfe3b2d`](https://github.com/jtn0123/InkyPi/commit/bfe3b2d6192f9ad2e1597060ebf0466716d76f91))
+
+Model dropdown labels only displayed input token pricing (e.g. "$2.50/1M in"), which is misleading
+  because output tokens are typically 3-4x the input rate for LLMs. Users evaluating cost were
+  under-estimating actual spend.
+
+Updated labels to the compact form "$X in / $Y out per 1M" for all OpenAI and Google models, added a
+  pricing reference comment pointing at provider pricing pages, and expanded the callout to note
+  that output tokens cost more than input. Added a regression test that parses the schema and
+  asserts every model label exposes both prices.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.8 (2026-04-12)
 
 ### Bug Fixes
