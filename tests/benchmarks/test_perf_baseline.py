@@ -3,8 +3,9 @@
 These benchmarks are deterministic, hermetic, and fast (each <1s). They run in CI
 on every PR via the dedicated benchmark step (see .github/workflows/ci.yml).
 
-For now this just *records* the numbers — auto-comparison against a stored
-baseline (and a regression gate) will be added in a follow-up. See JTN-293.
+Results are compared against a stored baseline (tests/benchmarks/baseline.json)
+and fail CI when any benchmark regresses beyond the configured threshold
+(default +15%). See docs/benchmarking.md for the full workflow.
 
 Add a new benchmark only if it:
   * Has no network dependency

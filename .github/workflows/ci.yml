@@ -50,11 +50,14 @@ jobs:
       - name: Run perf benchmarks
         env:
           SKIP_BROWSER: '1'
+          BENCHMARK_THRESHOLD_PCT: ${{ vars.BENCHMARK_THRESHOLD_PCT || '15' }}
         run: |
-          # Records baseline timings for the InkyPi hot paths. For now this
-          # only prints the numbers; auto-comparison against a stored baseline
-          # (and a regression gate) is a JTN-293 follow-up.
-          python -m pytest tests/benchmarks/ --benchmark-only --benchmark-columns=min,mean,median,stddev,ops -q
+          python -m pytest tests/benchmarks/ --benchmark-only \
+            --benchmark-columns=min,mean,median,stddev,ops \
+            --benchmark-json=/tmp/bench-current.json -q
+          python scripts/benchmark_compare.py \
+            --baseline tests/benchmarks/baseline.json \
+            --current /tmp/bench-current.json
 
   shellcheck:
     name: Shell script validation

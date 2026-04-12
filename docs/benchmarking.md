@@ -37,13 +37,58 @@ Use the export script (to be added) or query the DB directly. A generated summar
 - Best-effort writes with exceptions swallowed to avoid impacting refresh cycles.
 - Sampling control via `benchmark_sample_rate` for production.
 
-### pytest-benchmark plugin render tests
+### pytest-benchmark CI tests
 
-`tests/benchmarks/test_plugin_render.py` contains three micro-benchmarks (`test_bench_clock_render`, `test_bench_weather_render`, `test_bench_html_render`) that measure the plugin render pipeline end-to-end with all network I/O mocked. Run them with `pytest tests/benchmarks/test_plugin_render.py --benchmark-only`.
+`tests/benchmarks/` contains micro-benchmarks for hot paths (cache lookups, image
+processing, config reads, plugin render pipelines). All are deterministic, hermetic,
+and complete in under 1 second each.
+
+#### Running benchmarks locally
+
+```bash
+# Run and display results
+SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only -q
+
+# Run and save JSON for comparison
+SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
+  --benchmark-json=/tmp/bench-current.json -q
+```
+
+#### CI regression gate
+
+Every PR runs benchmarks and compares against the stored baseline at
+`tests/benchmarks/baseline.json`. If any benchmark's median time exceeds the
+baseline by more than the configured threshold, CI fails.
+
+- **Threshold**: defaults to +15%. Override via the `BENCHMARK_THRESHOLD_PCT`
+  GitHub Actions variable or environment variable.
+- **Comparison script**: `scripts/benchmark_compare.py`
+
+The gate runs as part of the `quality-checks` job in `.github/workflows/ci.yml`.
+
+#### Updating the baseline
+
+When a legitimate performance change lands (new feature, algorithm change), update
+the baseline:
+
+```bash
+SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
+  --benchmark-json=tests/benchmarks/baseline.json -q
+git add tests/benchmarks/baseline.json
+git commit -m "chore: update benchmark baseline"
+```
+
+#### Adding a new benchmark
+
+Add benchmarks only if they:
+- Have no network dependency
+- Have no wall-clock dependency
+- Run in well under one second
+- Are representative of a real hot path
+
+After adding a new benchmark, regenerate the baseline as described above.
 
 ### Roadmap (next)
 
 - Add `/api/benchmarks/*` endpoints and simple dashboard.
 - SSE progress stream and lightweight UI indicator.
-
-
