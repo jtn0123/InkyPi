@@ -861,3 +861,46 @@ def test_htmx_partial_is_not_full_page(client, device_config_dev):
 
     assert "<html" not in body, "HTMX partial must not include <html> tag"
     assert "history-grid-container" in body, "Partial must contain the grid container"
+
+
+def test_history_pagination_previous_disabled_has_disabled_class(
+    client, device_config_dev
+):
+    """JTN-636: On page 1, 'Previous' must render with .pagination-disabled
+    styling so it is visually distinguishable from the active 'Next' link."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(15):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_jtn636_{i:03d}.png")
+        )
+
+    resp = client.get("/history?page=1&per_page=10")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Page 1 should show Previous as a disabled <span> with the disabled class.
+    assert "pagination-disabled" in body
+    # The pagination-disabled control should be aria-disabled for a11y
+    assert 'aria-disabled="true"' in body
+    # Inline opacity hack from before the fix must not be used
+    assert 'style="opacity: 0.4; pointer-events: none;"' not in body
+
+
+def test_history_pagination_next_disabled_on_last_page(client, device_config_dev):
+    """JTN-636: On the last page, 'Next' must also use .pagination-disabled."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(15):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_jtn636b_{i:03d}.png")
+        )
+
+    resp = client.get("/history?page=2&per_page=10")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "pagination-disabled" in body
