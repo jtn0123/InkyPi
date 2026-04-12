@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.46.3 (2026-04-12)
+
+### Bug Fixes
+
+- Restore API Keys page button actions (JTN-325, JTN-324, JTN-323)
+  ([#379](https://github.com/jtn0123/InkyPi/pull/379),
+  [`81f1431`](https://github.com/jtn0123/InkyPi/commit/81f14316dad0a5bf209e4c8359804696209e2dfd))
+
+The inline <script> boot block that initialised the API Keys page JS was silently blocked by CSP
+  `script-src 'self'` in production, making all buttons (Delete, Add, preset chips) no-ops.
+
+Move the boot config to data-* attributes on the .api-keys-frame container and have api_keys_page.js
+  self-initialise from the DOM, eliminating the need for any inline JavaScript.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.46.2 (2026-04-12)
 
 ### Bug Fixes
