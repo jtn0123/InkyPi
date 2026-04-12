@@ -978,9 +978,8 @@
     }
 
     function bindButtons() {
-      for (const button of document.querySelectorAll("[data-collapsible-toggle]")) {
-        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
-      }
+      // Collapsible toggle is bound via delegation in ui_helpers.js so every
+      // `[data-collapsible-toggle]` button updates aria-expanded consistently.
 
       // Dirty-state: snapshot initial form values and disable Save until something changes
       const saveBtn = document.getElementById("saveSettingsBtn");
