@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.43.11 (2026-04-12)
+
+### Bug Fixes
+
+- **api-keys**: Wire + Add API Key button into event delegation (JTN-323)
+  ([#365](https://github.com/jtn0123/InkyPi/pull/365),
+  [`8e39fa5`](https://github.com/jtn0123/InkyPi/commit/8e39fa55e4d985d412965c0042c26743b136a650))
+
+The button relied solely on a direct addEventListener in init(), making it fragile to script-load
+  timing. Add data-api-action="add-row" to the button and handle it in the delegation handler,
+  consistent with the preset chips and delete buttons.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.10 (2026-04-12)
 
 ### Bug Fixes
