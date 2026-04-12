@@ -10,8 +10,17 @@ from typing import Any
 
 from dotenv import load_dotenv, set_key, unset_key
 
-from model import PlaylistManager, RefreshInfo
+from model import PlaylistManager
 from utils.config_schema import validate_device_config
+from utils.paths import (
+    BASE_DIR as _PATHS_BASE_DIR,
+    CURRENT_IMAGE_FILE as _DEFAULT_CURRENT_IMAGE,
+    HISTORY_IMAGE_DIR as _DEFAULT_HISTORY_DIR,
+    PLUGIN_IMAGE_DIR as _DEFAULT_PLUGIN_DIR,
+    PROCESSED_IMAGE_FILE as _DEFAULT_PROCESSED_IMAGE,
+    resolve_runtime_paths,
+)
+from utils.refresh_info import RefreshInfoRepository
 
 logger = logging.getLogger(__name__)
 
@@ -68,25 +77,19 @@ def _summarize_playlist(pl: Any) -> dict:
 
 
 class Config:
-    # Base path for the project directory
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # Base path for the project directory — canonical source is utils.paths
+    BASE_DIR = _PATHS_BASE_DIR
 
     # File paths relative to the script's directory (default; can be overridden)
     config_file = os.path.join(BASE_DIR, "config", _DEVICE_JSON)
 
-    # File path for storing the current image being displayed
-    current_image_file = os.path.join(BASE_DIR, "static", "images", "current_image.png")
-
-    # File path for storing the processed image actually sent to the device
-    processed_image_file = os.path.join(
-        BASE_DIR, "static", "images", "processed_image.png"
-    )
-
-    # Directory path for storing plugin instance images
-    plugin_image_dir = os.path.join(BASE_DIR, "static", "images", "plugins")
-
-    # Directory path for storing historical processed images
-    history_image_dir = os.path.join(BASE_DIR, "static", "images", "history")
+    # Image paths — canonical defaults live in utils.paths; kept as class
+    # attributes for backward compatibility (worker.py sets them on the class
+    # before constructing a child-process Config).
+    current_image_file = _DEFAULT_CURRENT_IMAGE
+    processed_image_file = _DEFAULT_PROCESSED_IMAGE
+    plugin_image_dir = _DEFAULT_PLUGIN_DIR
+    history_image_dir = _DEFAULT_HISTORY_DIR
 
     def __getstate__(self):
         """Support pickling by excluding the unpicklable RLock.
@@ -137,21 +140,21 @@ class Config:
         self.refresh_info = self.load_refresh_info()
 
     def _resolve_runtime_paths(self):
-        runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip()
+        runtime_dir = (os.getenv("INKYPI_RUNTIME_DIR") or "").strip() or None
         if not runtime_dir:
+            # No runtime override — use class-level defaults (may have been
+            # overridden by worker.py before construction).
             self.current_image_file = type(self).current_image_file
             self.processed_image_file = type(self).processed_image_file
             self.plugin_image_dir = type(self).plugin_image_dir
             self.history_image_dir = type(self).history_image_dir
             return
 
-        runtime_images_dir = os.path.join(runtime_dir, "images")
-        self.current_image_file = os.path.join(runtime_images_dir, "current_image.png")
-        self.processed_image_file = os.path.join(
-            runtime_images_dir, "processed_image.png"
-        )
-        self.plugin_image_dir = os.path.join(runtime_images_dir, "plugins")
-        self.history_image_dir = os.path.join(runtime_images_dir, "history")
+        paths = resolve_runtime_paths(runtime_dir)
+        self.current_image_file = paths["current_image_file"]
+        self.processed_image_file = paths["processed_image_file"]
+        self.plugin_image_dir = paths["plugin_image_dir"]
+        self.history_image_dir = paths["history_image_dir"]
 
     def _determine_config_path(self):
         """Determine which device config file to load.
@@ -532,16 +535,13 @@ class Config:
         return playlist_manager
 
     def load_refresh_info(self):
-        """Loads the refresh information from the config."""
+        """Loads the refresh information from the config.
+
+        Delegates to :class:`~utils.refresh_info.RefreshInfoRepository`.
+        """
         data = self.get_config("refresh_info", {}) or {}
-        try:
-            required = {"refresh_type", "plugin_id", "refresh_time", "image_hash"}
-            if not isinstance(data, dict) or not required.issubset(data.keys()):
-                raise ValueError("refresh_info missing required keys")
-            return RefreshInfo.from_dict(data)
-        except (KeyError, TypeError, ValueError) as e:
-            logger.warning("Invalid refresh_info in config, using defaults: %s", e)
-            return RefreshInfo("Manual Update", "", None, None)
+        self._refresh_info_repo = RefreshInfoRepository(data)
+        return self._refresh_info_repo.get()
 
     def get_playlist_manager(self):
         """Returns the playlist manager."""
