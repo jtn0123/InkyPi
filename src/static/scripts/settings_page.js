@@ -179,34 +179,48 @@
         showResponseModal("success", "No changes to save.");
         return;
       }
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+      // JTN-505: FormState owns the disabled/aria-busy/spinner lifecycle.
+      const fs = (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
+      if (fs) fs.clearErrors();
       const formData = new FormData(form);
       await appendGeoData(formData);
 
-      try {
-        const response = await fetch(config.saveSettingsUrl, {
-          method: "POST",
-          body: formData,
-        });
-        const result = await response.json();
-        if (response.ok) {
-          _formSnapshot = getFormSnapshot(form);
-          if (saveBtn) saveBtn.disabled = true;
-          showResponseModal("success", `Success! ${result.message}`);
-        } else {
-          showResponseModal("failure", `Error! ${result.error}`);
-          restoreFormFromSnapshot(form, _formSnapshot);
+      const doSubmit = async () => {
+        try {
+          const response = await fetch(config.saveSettingsUrl, {
+            method: "POST",
+            body: formData,
+          });
+          const result = await response.json();
+          if (response.ok) {
+            _formSnapshot = getFormSnapshot(form);
+            if (saveBtn) saveBtn.disabled = true;
+            showResponseModal("success", `Success! ${result.message}`);
+          } else {
+            // Surface field-level errors inline when the server returns them.
+            if (fs && result && result.field_errors && typeof result.field_errors === "object") {
+              fs.setFieldErrors(result.field_errors);
+            }
+            showResponseModal("failure", `Error! ${result.error}`);
+            restoreFormFromSnapshot(form, _formSnapshot);
+          }
+        } catch (error) {
+          console.error("Settings save failed:", error);
+          showResponseModal(
+            "failure",
+            "An error occurred while processing your request. Please try again."
+          );
+          checkDirty();
         }
-      } catch (error) {
-        console.error("Settings save failed:", error);
-        showResponseModal(
-          "failure",
-          "An error occurred while processing your request. Please try again."
-        );
-        checkDirty();
-      } finally {
-        if (saveBtn?.textContent === "Saving\u2026") {
-          saveBtn.textContent = "Save";
+      };
+
+      if (fs) {
+        await fs.run(doSubmit);
+      } else {
+        // Fallback path for environments without FormState (should not occur).
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+        try { await doSubmit(); } finally {
+          if (saveBtn?.textContent === "Saving\u2026") saveBtn.textContent = "Save";
         }
       }
     }

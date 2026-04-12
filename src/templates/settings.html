@@ -48,7 +48,7 @@
         </nav>
         <div class="settings-console-main">
         <!-- Settings Content -->
-        <form class="settings-form">
+        <form class="settings-form" data-form-state aria-busy="false">
             <div id="settings-container">
                 <section class="settings-console-panel active" data-settings-panel="device">
                 <!-- Basics -->
@@ -300,7 +300,7 @@
         <!-- Buttons -->
         <div class="buttons-container">
             <span id="settings-form-status" class="validation-message" role="status" aria-live="polite"></span>
-            <button type="button" id="saveSettingsBtn" class="action-button" aria-describedby="settings-form-status">Save</button>
+            <button type="button" id="saveSettingsBtn" class="action-button" data-form-state-submit aria-describedby="settings-form-status"><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
         </div>
         </div>
         </div>
