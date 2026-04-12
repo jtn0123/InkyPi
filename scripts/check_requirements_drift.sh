@@ -1,154 +1,97 @@
 #!/usr/bin/env bash
-# check_requirements_drift.sh — verify pip-compile lockfiles are in sync.
+# check_requirements_drift.sh — verify uv-exported lockfile is in sync.
 #
-# Compares the pip-compile region of install/requirements.txt against a fresh
-# pip-compile run.  The manually-appended Linux-only block at the bottom of
-# requirements.txt (everything from the sentinel comment onwards) is excluded
-# from the comparison because pip-compile cannot resolve linux-only packages
-# when running on a non-Linux host.
+# JTN-616: migrated from pip-compile to `uv lock` + `uv export`. The universal
+# lockfile produced by uv resolves all supported platforms in a single file,
+# which eliminates the previous pain points around:
+#   - Python version mismatches (3.13 vs 3.12)
+#   - sys_platform-gated packages (cysystemd, gpiod)
+#   - Multi-arch wheel hash coverage (arm64/armv7l/aarch64)
+#
+# Source of truth: pyproject.toml + uv.lock.
+# install/requirements.txt is regenerated from uv.lock via `uv export`.
+#
+# This script:
+#   1. Ensures uv.lock is up to date with pyproject.toml (`uv lock --check`).
+#   2. Regenerates install/requirements.txt into a temp file and diffs against
+#      the committed copy.
 #
 # Usage:
-#   scripts/check_requirements_drift.sh [--check-dev]
+#   scripts/check_requirements_drift.sh
 #
 # Exits 0 when in sync, 1 when drift is detected.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REQ_IN="${REPO_ROOT}/install/requirements.in"
 REQ_TXT="${REPO_ROOT}/install/requirements.txt"
-REQ_DEV_IN="${REPO_ROOT}/install/requirements-dev.in"
-REQ_DEV_TXT="${REPO_ROOT}/install/requirements-dev.txt"
 
-# Sentinel that marks the start of the manually-maintained Linux-only block.
-# Everything from this line onwards is excluded from the pip-compile comparison.
-LINUX_BLOCK_SENTINEL="# ============================================================"
+cd "${REPO_ROOT}"
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "ERROR: uv is not installed. Install with:  pip install uv" >&2
+    exit 1
+fi
 
 DRIFT_FOUND=0
 
-pip_compile_check() {
-    local in_file="$1"
-    local committed_txt="$2"
-    local label="$3"
-    local strip_linux_block="${4:-false}"
+echo "==> Checking uv.lock is in sync with pyproject.toml ..."
+if ! uv lock --check >/dev/null 2>&1; then
+    echo "ERROR: uv.lock is out of sync with pyproject.toml."
+    echo "Run:  uv lock"
+    DRIFT_FOUND=1
+else
+    echo "    OK — uv.lock is up to date."
+fi
 
-    echo "==> Checking ${label} ..."
+echo "==> Checking install/requirements.txt matches uv export ..."
+tmp_export="$(mktemp /tmp/requirements-check-XXXXXX.txt)"
+trap 'rm -f "${tmp_export}"' EXIT
 
-    local tmp_compiled
-    tmp_compiled="$(mktemp /tmp/requirements-check-XXXXXX.txt)"
-    local tmp_committed
-    tmp_committed="$(mktemp /tmp/requirements-committed-XXXXXX.txt)"
+uv export \
+    --format requirements.txt \
+    --no-dev \
+    --no-emit-project \
+    --output-file "${tmp_export}" \
+    --quiet
 
-    # Generate fresh lockfile into temp file
-    pip-compile \
-        --generate-hashes \
-        --no-strip-extras \
-        --allow-unsafe \
-        --quiet \
-        "${in_file}" \
-        -o "${tmp_compiled}"
-
-    # Normalise paths in the auto-generated header of the fresh output so that
-    # absolute local paths match the relative paths recorded in the committed file.
-    # The header line looks like:
-    #   #    pip-compile ... --output-file=/tmp/xxx /abs/path/to/install/requirements.in
-    # We replace both the temp output file path and the absolute input path with
-    # the relative equivalents that pip-compile writes when run from the repo root.
-    local rel_in
-    rel_in="${in_file#"${REPO_ROOT}"/}"
-    local rel_out
-    rel_out="${committed_txt#"${REPO_ROOT}"/}"
-
-    python3 - <<PY "${tmp_compiled}" "${tmp_compiled}.norm" "${tmp_compiled}" "${rel_out}" "${in_file}" "${rel_in}"
+# Normalise the auto-generated header of the fresh export so that the temp
+# output path in the header matches the relative committed path.
+python3 - <<'PY' "${tmp_export}" "install/requirements.txt"
 import sys
-src, dst, tmp_compiled, rel_out, abs_in, rel_in = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
+src, rel_out = sys.argv[1], sys.argv[2]
 with open(src) as f:
     content = f.read()
-# Replace absolute temp output path with relative committed path in header
-content = content.replace("--output-file=" + tmp_compiled, "--output-file=" + rel_out)
-# Replace absolute input path with relative path (header + via comments)
-content = content.replace(abs_in, rel_in)
-with open(dst, "w") as f:
-    f.write(content)
-PY
-    mv "${tmp_compiled}.norm" "${tmp_compiled}"
-
-    # Prepare the committed file for comparison
-    if [ "${strip_linux_block}" = "true" ]; then
-        # Strip everything from the Linux-only sentinel onwards
-        python3 - <<PY "${committed_txt}" "${tmp_committed}" "${LINUX_BLOCK_SENTINEL}"
-import sys
-
-in_path, out_path, sentinel = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(in_path) as f:
-    lines = f.readlines()
-
-out_lines = []
-for line in lines:
-    if line.startswith(sentinel):
+lines = content.splitlines(keepends=True)
+# Replace the command comment line with the canonical form that references the
+# committed output path. Line 2 (index 1) is the command comment per uv's
+# deterministic header layout.
+for i, line in enumerate(lines):
+    if line.startswith("#    uv export ") and "--output-file" in line:
+        lines[i] = (
+            "#    uv export --format requirements.txt --no-dev "
+            "--no-emit-project --output-file " + rel_out + "\n"
+        )
         break
-    out_lines.append(line)
-
-# Strip trailing blank lines so the diff is clean
-while out_lines and out_lines[-1].strip() == "":
-    out_lines.pop()
-
-with open(out_path, "w") as f:
-    f.writelines(out_lines)
-PY
-    else
-        cp "${committed_txt}" "${tmp_committed}"
-    fi
-
-    # Normalise fresh output the same way (strip trailing blank lines)
-    python3 - <<PY "${tmp_compiled}"
-import sys
-
-path = sys.argv[1]
-with open(path) as f:
-    lines = f.readlines()
-
-while lines and lines[-1].strip() == "":
-    lines.pop()
-
-with open(path, "w") as f:
+with open(src, "w") as f:
     f.writelines(lines)
 PY
 
-    if diff -u "${tmp_committed}" "${tmp_compiled}"; then
-        echo "    OK — ${label} is up to date."
-    else
-        echo ""
-        echo "ERROR: ${label} is out of sync with ${in_file}."
-        echo "Run the following command to regenerate it and commit the result:"
-        echo ""
-        echo "  pip-compile --generate-hashes --no-strip-extras --allow-unsafe \\"
-        echo "      ${in_file} -o ${committed_txt}"
-        echo ""
-        DRIFT_FOUND=1
-    fi
-
-    rm -f "${tmp_compiled}" "${tmp_committed}"
-}
-
-# Always check requirements.in → requirements.txt (strip Linux block)
-pip_compile_check \
-    "${REQ_IN}" \
-    "${REQ_TXT}" \
-    "install/requirements.txt" \
-    "true"
-
-# Check requirements-dev.in → requirements-dev.txt (no Linux block)
-if [ -f "${REQ_DEV_IN}" ] && [ -f "${REQ_DEV_TXT}" ]; then
-    pip_compile_check \
-        "${REQ_DEV_IN}" \
-        "${REQ_DEV_TXT}" \
-        "install/requirements-dev.txt" \
-        "false"
+if diff -u "${REQ_TXT}" "${tmp_export}"; then
+    echo "    OK — install/requirements.txt is up to date."
+else
+    echo ""
+    echo "ERROR: install/requirements.txt is out of sync with uv.lock."
+    echo "Run the following command to regenerate it and commit the result:"
+    echo ""
+    echo "  uv export --format requirements.txt --no-dev --no-emit-project \\"
+    echo "      --output-file install/requirements.txt"
+    echo ""
+    DRIFT_FOUND=1
 fi
 
 if [ "${DRIFT_FOUND}" -ne 0 ]; then
-    echo "One or more lockfiles are out of sync. See diff output above."
+    echo "Lockfile drift detected. See diff output above."
     exit 1
 fi
 
