@@ -24,7 +24,7 @@ from utils.form_utils import (
     sanitize_response_value,
     validate_plugin_required_fields,
 )
-from utils.http_utils import APIError, json_error
+from utils.http_utils import APIError, json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
@@ -270,7 +270,7 @@ def delete_plugin_instance():
         logger.exception("EXCEPTION CAUGHT: %s", e)
         return json_error(_ERR_INTERNAL, status=500)
 
-    return jsonify({"success": True, "message": "Deleted plugin instance."})
+    return json_success(message="Deleted plugin instance.")
 
 
 @plugin_bp.route("/update_plugin_instance/<string:instance_name>", methods=["PUT"])
@@ -370,12 +370,7 @@ def update_plugin_instance(instance_name: str):
     except Exception:
         return json_error(_ERR_INTERNAL, status=500)
 
-    return jsonify(
-        {
-            "success": True,
-            "message": f"Updated plugin instance {instance_name}.",
-        }
-    )
+    return json_success(message=f"Updated plugin instance {instance_name}.")
 
 
 @plugin_bp.route("/display_plugin_instance", methods=["POST"])
@@ -410,7 +405,7 @@ def display_plugin_instance():
     except Exception:
         return json_error(_ERR_INTERNAL, status=500)
 
-    return jsonify({"success": True, "message": _MSG_DISPLAY_UPDATED}), 200
+    return json_success(message=_MSG_DISPLAY_UPDATED)
 
 
 @plugin_bp.route(
@@ -434,11 +429,8 @@ def force_retry_plugin_instance(plugin_id: str, instance_name: str):
             f"Plugin instance '{sanitize_response_value(instance_name)}' not found",
             status=404,
         )
-    return jsonify(
-        {
-            "success": True,
-            "message": f"Circuit-breaker reset for '{sanitize_response_value(instance_name)}'.",
-        }
+    return json_success(
+        message=f"Circuit-breaker reset for '{sanitize_response_value(instance_name)}'.",
     )
 
 
@@ -533,10 +525,7 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
             "preprocess_ms": preprocess_ms,
             "steps": tracker.get_steps(),
         }
-    return (
-        jsonify({"success": True, "message": _MSG_DISPLAY_UPDATED, "metrics": metrics}),
-        200,
-    )
+    return json_success(message=_MSG_DISPLAY_UPDATED, metrics=metrics)
 
 
 def _push_update_now_fallback(
@@ -709,16 +698,7 @@ def update_now():
             metrics = refresh_task.manual_update(
                 ManualRefresh(plugin_id, plugin_settings)
             )
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": _MSG_DISPLAY_UPDATED,
-                        "metrics": metrics,
-                    }
-                ),
-                200,
-            )
+            return json_success(message=_MSG_DISPLAY_UPDATED, metrics=metrics)
         else:
             logger.info("Refresh task not running, updating display directly")
             return _update_now_direct(
@@ -827,15 +807,9 @@ def _save_plugin_settings_common(
     device_config.update_atomic(_do_save_settings)
     config_dir = os.path.dirname(device_config.config_file)
     _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
-    return (
-        jsonify(
-            {
-                "success": True,
-                "message": "Settings saved. Add to Playlist to schedule this instance.",
-                "instance_name": instance_name,
-            }
-        ),
-        200,
+    return json_success(
+        message="Settings saved. Add to Playlist to schedule this instance.",
+        instance_name=instance_name,
     )
 
 

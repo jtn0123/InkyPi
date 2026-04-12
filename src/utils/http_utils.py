@@ -1,3 +1,44 @@
+"""HTTP helpers and canonical JSON response envelope (JTN-500).
+
+Canonical JSON envelope
+-----------------------
+All JSON API routes should return responses built via :func:`json_success` or
+:func:`json_error` so clients can rely on a single stable shape.
+
+Success envelope::
+
+    {
+        "success": true,
+        "message": "<optional human-readable summary>",
+        "request_id": "<uuid, when inside a request context>",
+        ...payload fields (e.g. "data", "items", "metrics")...
+    }
+
+Error envelope::
+
+    {
+        "success": false,
+        "error": "<human-readable message>",
+        "code": "<optional app error code>",
+        "details": { ... optional structured detail ... },
+        "request_id": "<uuid, when inside a request context>"
+    }
+
+Rules of thumb
+~~~~~~~~~~~~~~
+* Prefer ``json_success(message=..., data=..., meta=...)`` over
+  ``jsonify({"success": True, ...})`` so ``request_id`` and future envelope
+  fields are added automatically.
+* For errors, raise :class:`APIError` or return ``json_error(...)``.  Do not
+  return ``jsonify({"success": False, "error": "..."})`` directly — that shape
+  skips ``request_id`` and bypasses the central error logging path.
+* Pagination envelopes should place page data under ``items`` and cursor
+  information under ``next_cursor``/``meta``.
+* Pure data read endpoints (e.g. ``/api/version/info``) MAY return a raw JSON
+  object without the ``success`` key for backwards compatibility, but any new
+  endpoint should use the canonical envelope.
+"""
+
 from __future__ import annotations
 
 import logging

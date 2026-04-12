@@ -2,10 +2,10 @@
 
 from zoneinfo import available_timezones
 
-from flask import current_app, jsonify, render_template, request
+from flask import current_app, render_template, request
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import calculate_seconds
 
 
@@ -18,7 +18,7 @@ def plugin_isolation():
     registered_ids = {plugin["id"] for plugin in device_config.get_plugins()}
 
     if request.method == "GET":
-        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+        return json_success(isolated_plugins=sorted(set(isolated)))
 
     body = request.get_json(silent=True)
     if not isinstance(body, dict):
@@ -46,12 +46,12 @@ def plugin_isolation():
             device_config.update_value(
                 "isolated_plugins", sorted(set(isolated)), write=True
             )
-        return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+        return json_success(isolated_plugins=sorted(set(isolated)))
 
     # DELETE
     isolated = [p for p in isolated if p != normalized_plugin_id]
     device_config.update_value("isolated_plugins", sorted(set(isolated)), write=True)
-    return jsonify({"success": True, "isolated_plugins": sorted(set(isolated))})
+    return json_success(isolated_plugins=sorted(set(isolated)))
 
 
 @_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
@@ -75,7 +75,7 @@ def safe_reset():
         keep["log_system_stats"] = False
         keep["isolated_plugins"] = []
         device_config.update_config(keep)
-        return jsonify({"success": True, "message": "Safe reset applied."})
+        return json_success(message="Safe reset applied.")
     except Exception as e:
         return json_internal_error("safe reset", details={"error": str(e)})
 
@@ -150,7 +150,7 @@ def export_settings():
             data["env_keys"] = keys
 
         # JSON response for now; a file download route can be added if needed
-        return jsonify({"success": True, "data": data})
+        return json_success(data=data)
     except Exception as e:
         _mod.logger.exception("Error exporting settings")
         return json_internal_error(
@@ -204,7 +204,7 @@ def import_settings():
                 except Exception:
                     _mod.logger.exception("Failed setting env key during import: %s", k)
 
-        return jsonify({"success": True, "message": "Import completed"})
+        return json_success(message="Import completed")
     except Exception as e:
         _mod.logger.exception("Error importing settings")
         return json_internal_error(
@@ -299,10 +299,10 @@ def save_api_keys():
                 continue
             device_config.set_env_key(key, value)
             updated.append(key)
-        response = {"success": True, "message": "API keys saved.", "updated": updated}
+        extra: dict = {"updated": updated}
         if skipped_placeholder:
-            response["skipped_placeholder"] = skipped_placeholder
-        return jsonify(response)
+            extra["skipped_placeholder"] = skipped_placeholder
+        return json_success(message="API keys saved.", **extra)
     except Exception:
         _mod.logger.exception("Error saving API keys")
         return json_internal_error(
@@ -329,7 +329,7 @@ def delete_api_key():
         return json_error("Invalid key name", status=400)
     try:
         device_config.unset_env_key(key)
-        return jsonify({"success": True, "message": f"Deleted {key}."})
+        return json_success(message=f"Deleted {key}.")
     except Exception:
         _mod.logger.exception("Error deleting API key")
         return json_internal_error(
@@ -530,7 +530,7 @@ def save_settings():
             "saving device settings",
             details={"hint": "Check numeric values and config file permissions."},
         )
-    return jsonify({"success": True, "message": "Saved settings."})
+    return json_success(message="Saved settings.")
 
 
 # Legacy route aliases used by older UI/tests.

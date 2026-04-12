@@ -2,10 +2,10 @@
 
 import sqlite3
 
-from flask import jsonify, request
+from flask import request
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 from utils.messages import BENCHMARKS_API_DISABLED_ERROR
 
 
@@ -32,29 +32,26 @@ def benchmarks_summary():
         gen = [int(r["generate_ms"]) for r in rows if r["generate_ms"] is not None]
         pre = [int(r["preprocess_ms"]) for r in rows if r["preprocess_ms"] is not None]
         dsp = [int(r["display_ms"]) for r in rows if r["display_ms"] is not None]
-        return jsonify(
-            {
-                "success": True,
-                "count": len(rows),
-                "summary": {
-                    "request_ms": {
-                        "p50": _mod._pct(req, 0.5),
-                        "p95": _mod._pct(req, 0.95),
-                    },
-                    "generate_ms": {
-                        "p50": _mod._pct(gen, 0.5),
-                        "p95": _mod._pct(gen, 0.95),
-                    },
-                    "preprocess_ms": {
-                        "p50": _mod._pct(pre, 0.5),
-                        "p95": _mod._pct(pre, 0.95),
-                    },
-                    "display_ms": {
-                        "p50": _mod._pct(dsp, 0.5),
-                        "p95": _mod._pct(dsp, 0.95),
-                    },
+        return json_success(
+            count=len(rows),
+            summary={
+                "request_ms": {
+                    "p50": _mod._pct(req, 0.5),
+                    "p95": _mod._pct(req, 0.95),
                 },
-            }
+                "generate_ms": {
+                    "p50": _mod._pct(gen, 0.5),
+                    "p95": _mod._pct(gen, 0.95),
+                },
+                "preprocess_ms": {
+                    "p50": _mod._pct(pre, 0.5),
+                    "p95": _mod._pct(pre, 0.95),
+                },
+                "display_ms": {
+                    "p50": _mod._pct(dsp, 0.5),
+                    "p95": _mod._pct(dsp, 0.95),
+                },
+            },
         )
     except Exception as e:
         return json_internal_error("benchmarks summary", details={"error": str(e)})
@@ -100,12 +97,9 @@ def benchmarks_refreshes():
                 (since, limit),
             ).fetchall()
         next_cursor = str(rows[-1]["id"]) if rows else None
-        return jsonify(
-            {
-                "success": True,
-                "items": [dict(r) for r in rows],
-                "next_cursor": next_cursor,
-            }
+        return json_success(
+            items=[dict(r) for r in rows],
+            next_cursor=next_cursor,
         )
     except Exception as e:
         return json_internal_error("benchmarks refreshes", details={"error": str(e)})
@@ -160,7 +154,7 @@ def benchmarks_plugins():
             }
             for r in rows
         ]
-        return jsonify({"success": True, "items": items})
+        return json_success(items=items)
     except Exception as e:
         return json_internal_error("benchmarks plugins", details={"error": str(e)})
     finally:
@@ -194,7 +188,7 @@ def benchmarks_stages():
             """,
             (refresh_id,),
         ).fetchall()
-        return jsonify({"success": True, "items": [dict(r) for r in rows]})
+        return json_success(items=[dict(r) for r in rows])
     except Exception as e:
         return json_internal_error("benchmarks stages", details={"error": str(e)})
     finally:

@@ -6,7 +6,7 @@ from flask import current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error
+from utils.http_utils import json_error, json_internal_error, json_success
 
 
 @_mod.settings_bp.route("/settings/update", methods=["POST"])  # start update
@@ -37,10 +37,7 @@ def start_update():
             target_tag = raw.strip()
 
         if target_tag and not _mod._TAG_RE.fullmatch(target_tag):
-            return (
-                jsonify({"success": False, "error": "Invalid target version format"}),
-                400,
-            )
+            return json_error("Invalid target version format", status=400)
 
         script_path = _mod._get_update_script_path()
         # NOTE: the systemd unit name is now generated *inside*
@@ -59,17 +56,13 @@ def start_update():
         # the state mutation here to avoid re-entering the non-reentrant lock.
         with _mod._update_lock:
             if _mod._UPDATE_STATE.get("running"):
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Update already in progress.",
-                            "running": True,
-                            "unit": _mod._UPDATE_STATE.get("unit"),
-                        }
-                    ),
-                    409,
-                )
+                # NOTE: ``running`` and ``unit`` are kept at the top level for
+                # backward compatibility with existing clients and tests.
+                response, _ = json_error("Update already in progress.", status=409)
+                payload = response.get_json()
+                payload["running"] = True
+                payload["unit"] = _mod._UPDATE_STATE.get("unit")
+                return jsonify(payload), 409
             # Flip the state while still holding the lock (inlined to avoid
             # re-acquiring the non-reentrant lock inside _set_update_state).
             new_unit = f"{unit}.service" if use_systemd else None
@@ -95,13 +88,10 @@ def start_update():
         else:
             _mod._start_update_fallback_thread(script_path, target_tag=target_tag)
 
-        return jsonify(
-            {
-                "success": True,
-                "running": True,
-                "unit": _mod._UPDATE_STATE.get("unit"),
-                "message": "Update started. Watch the Logs panel for progress.",
-            }
+        return json_success(
+            message="Update started. Watch the Logs panel for progress.",
+            running=True,
+            unit=_mod._UPDATE_STATE.get("unit"),
         )
     except Exception as e:
         _mod.logger.exception("/settings/update error")
