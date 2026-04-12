@@ -38,7 +38,10 @@
                 <span class="status-chip">Playlist: {{ refresh_info.playlist }}</span>
                 {% endif %}
                 {% if refresh_info.plugin_id %}
-                <span class="status-chip">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}</span>
+                {% set _current_plugin_name = plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) %}
+                <span class="status-chip" data-chip="current-plugin"
+                      title="Currently displayed plugin: {{ _current_plugin_name }}"
+                      aria-label="Currently displayed plugin: {{ _current_plugin_name }}">Current: {{ _current_plugin_name }}</span>
                 {% endif %}
             </div>
         </div>

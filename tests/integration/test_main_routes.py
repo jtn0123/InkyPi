@@ -201,3 +201,33 @@ def test_dashboard_shows_generic_message_when_no_preview_and_no_plugin_id(
     assert resp.status_code == 200
     assert b"Display a plugin to see details here." in resp.data
     assert b"Last display info unavailable." not in resp.data
+
+
+def test_home_current_plugin_chip_has_label_and_tooltip(client, device_config_dev):
+    """JTN-638: Dashboard current-plugin chip must have a visible label + title/aria-label.
+
+    Without the label, users see a bare "WEATHER" chip with no context indicating it
+    refers to the currently displayed plugin.
+    """
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="weather",
+        refresh_time="2025-01-01T00:00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Home Weather",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # The chip must carry the current-plugin marker and have both a title and aria-label
+    assert 'data-chip="current-plugin"' in html
+    # The chip should render a visible "Current:" label prefix, matching the
+    # "Playlist: ..." chip style for consistency
+    assert "Current: " in html
+    # Tooltip + screen-reader label must describe what the chip represents
+    assert 'title="Currently displayed plugin:' in html
+    assert 'aria-label="Currently displayed plugin:' in html
