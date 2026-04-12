@@ -42,7 +42,7 @@
        href="{{ url_for('history.history_page', page=page - 1, per_page=per_page) }}"
        hx-get="{{ url_for('history.history_page', page=page - 1, per_page=per_page) }}"
        hx-target="#history-grid-container"
-       hx-swap="outerHTML"
+       hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Previous</a>
     {% else %}
     <span class="btn" style="opacity: 0.4; pointer-events: none;">Previous</span>
@@ -53,7 +53,7 @@
        href="{{ url_for('history.history_page', page=page + 1, per_page=per_page) }}"
        hx-get="{{ url_for('history.history_page', page=page + 1, per_page=per_page) }}"
        hx-target="#history-grid-container"
-       hx-swap="outerHTML"
+       hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Next</a>
     {% else %}
     <span class="btn" style="opacity: 0.4; pointer-events: none;">Next</span>
