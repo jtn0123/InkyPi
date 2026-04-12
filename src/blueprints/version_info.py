@@ -34,12 +34,34 @@ _PROCESS_START_DATETIME: datetime = datetime.now(UTC)
 
 
 def _read_app_version() -> str:
-    """Read the application version from the VERSION file at the repo root."""
+    """Return the installed application version (JTN-624).
+
+    Reads ``VERSION`` at the repo root first, falling back to
+    ``[project].version`` in ``pyproject.toml`` when ``VERSION`` is missing,
+    empty, or still contains the unexpanded ``{version}`` placeholder that a
+    broken release pipeline can leave behind. Returns ``"unknown"`` only if
+    both sources fail.
+    """
+    repo_root = Path(__file__).parent.parent.parent
     try:
-        version_path = Path(__file__).parent.parent.parent / "VERSION"
-        return version_path.read_text().strip()
+        value = (repo_root / "VERSION").read_text().strip()
+        if value and value != "{version}" and value != "0.1.0":
+            return value
     except Exception:
-        return "unknown"
+        pass
+
+    try:
+        import tomllib
+
+        with (repo_root / "pyproject.toml").open("rb") as f:
+            data = tomllib.load(f)
+        version = data.get("project", {}).get("version")
+        if isinstance(version, str) and version:
+            return version
+    except Exception:
+        pass
+
+    return "unknown"
 
 
 def _run_git(*args: str) -> str:
