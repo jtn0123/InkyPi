@@ -1,6 +1,39 @@
 # CHANGELOG
 
 
+## v0.49.0 (2026-04-12)
+
+### Features
+
+- **plugin**: Use HTMX for plugin settings form submission (JTN-506)
+  ([#383](https://github.com/jtn0123/InkyPi/pull/383),
+  [`c6ad4a8`](https://github.com/jtn0123/InkyPi/commit/c6ad4a84eeed03ec08b721a336e95221702ad39f))
+
+* feat(plugin): use HTMX for plugin settings form submission (JTN-506)
+
+The base template already loads HTMX on every page, but nothing on the plugin page was using it —
+  the settings form was posting via fetch() and rendering errors through a toast modal. Phase 1 of
+  JTN-506 migrates the "Save Settings" button to an HTMX-driven flow so validation errors swap
+  inline and successes fire an HX-Trigger-backed toast, while legacy JSON clients still see JSON
+  (gated on the HX-Request header).
+
+Progressive enhancement: the form now carries action/method so it stays valid HTML, and an error
+  container (#plugin-form-errors) hosts the swap target. update_now, update_instance, and
+  add_to_playlist keep using the existing sendForm path; those are deferred to follow-up PRs.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(plugin): add coverage for _is_htmx_request RuntimeError + error Content-Type (JTN-506)
+
+Push SonarCloud new_coverage past the 80% gate. Covers two previously unexercised branches: -
+  `_is_htmx_request()` called outside a Flask request context - Internal error response sets
+  `text/html` content-type (sep from body check)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.48.1 (2026-04-12)
 
 ### Bug Fixes
