@@ -141,15 +141,19 @@ def test_show_last_progress_btn_present_on_calendar_page(client):
 
 
 def test_show_last_progress_no_data_shows_modal(client):
-    """JTN-312: When localStorage has no data, showLastProgress must call
-    showResponseModal with a user-visible message, not silently fail."""
+    """JTN-312 / JTN-634: When localStorage has no data, showLastProgress
+    must surface a user-visible empty-state message. Originally (JTN-312)
+    this went through showResponseModal; JTN-634 moved the message inside
+    the progress block itself so Weather / AI Image users whose first click
+    happens before any Update Now still get clearly anchored feedback."""
     resp = client.get("/static/scripts/plugin_page.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 
-    assert "No recent progress to show" in js, (
-        "showLastProgress must display 'No recent progress to show' via "
-        "showResponseModal when localStorage has no data (JTN-312)"
+    assert "No progress data yet" in js, (
+        "showLastProgress must render 'No progress data yet' empty-state "
+        "text when localStorage has no snapshot so Weather / AI Image users "
+        "get visible feedback on first click (JTN-634)"
     )
 
 
@@ -237,3 +241,63 @@ def test_request_progress_block_present_on_plugin_page(client, plugin_id):
     assert (
         'id="requestProgress"' in body
     ), f"{plugin_id} plugin page must render requestProgress block"
+
+
+# ---------------------------------------------------------------------------
+# JTN-634: "Show last progress" visible feedback on Weather and AI Image
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "plugin_id",
+    ["weather", "ai_image"],
+    ids=["JTN-634-weather", "JTN-634-ai_image"],
+)
+def test_show_last_progress_btn_present_on_weather_and_ai_image(client, plugin_id):
+    """JTN-634: Weather and AI Image plugin pages must render the
+    showLastProgressBtn so users get visible feedback — these plugins were
+    not covered by the PR #377 regression suite and still silently no-oped
+    when localStorage was empty (common because their required fields fail
+    client-side validation before sendForm ever saves a snapshot)."""
+    resp = client.get(f"/plugin/{plugin_id}")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert (
+        'id="showLastProgressBtn"' in body
+    ), f"{plugin_id} plugin page must render showLastProgressBtn (JTN-634)"
+    assert (
+        'id="requestProgress"' in body
+    ), f"{plugin_id} plugin page must render requestProgress block (JTN-634)"
+
+
+def test_show_last_progress_no_data_reveals_progress_block(client):
+    """JTN-634: When localStorage has no snapshot, showLastProgress must
+    reveal the requestProgress block with an empty-state message — not only
+    emit a toast. Anchoring feedback to the button's visual target is what
+    Weather / AI Image users expected (previously the toast-only fallback
+    was reported as 'no feedback')."""
+    resp = client.get("/static/scripts/plugin_page.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    fn_start = js.find("function showLastProgress()")
+    assert fn_start != -1, "showLastProgress function not found"
+    # Generous window so the empty-state branch is included.
+    fn_body = js[fn_start : fn_start + 3000]
+
+    # No-data branch must set the progress block visible (not just toast).
+    assert "setHidden(progress, false)" in fn_body, (
+        "showLastProgress must unhide the progress block in the no-data "
+        "branch so users see visible feedback anchored to the button "
+        "(JTN-634)"
+    )
+    assert "No progress data yet" in fn_body, (
+        "showLastProgress must render an empty-state message in the "
+        "progress block when no snapshot is available (JTN-634)"
+    )
+    # Empty state should clear the bar so it doesn't imply a completed run.
+    assert 'bar.style.width = "0%"' in fn_body, (
+        "Empty-state branch should reset the progress bar to 0% rather "
+        "than leaving a stale fill (JTN-634)"
+    )

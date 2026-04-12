@@ -114,16 +114,37 @@
             }
           }
         }
-        if (!data) {
-          showResponseModal("failure", "No recent progress to show");
-          return;
-        }
         const progress = document.getElementById("requestProgress");
         const textEl = document.getElementById("requestProgressText");
         const clockEl = document.getElementById("requestProgressClock");
         const elapsedEl = document.getElementById("requestProgressElapsed");
         const list = document.getElementById("requestProgressList");
         const bar = document.getElementById("requestProgressBar");
+        // JTN-634: Previously, the no-data path surfaced a toast only, which
+        // users (especially on Weather / AI Image where validation often
+        // blocks the first Update Now attempt before any snapshot is saved)
+        // reported as "no feedback". Show an empty-state inside the progress
+        // block itself so the click always produces a clearly visible result
+        // anchored to the "Last progress" button.
+        if (!data) {
+          if (list) {
+            list.innerHTML = "";
+            const li = document.createElement("li");
+            li.className = "progress-empty-state";
+            li.textContent =
+              "No progress data yet — run Update Now to see progress here.";
+            list.appendChild(li);
+          }
+          if (textEl) textEl.textContent = "No progress data yet";
+          if (clockEl) clockEl.textContent = "—";
+          if (elapsedEl) elapsedEl.textContent = "—";
+          if (bar) { bar.style.width = "0%"; bar.setAttribute("aria-valuenow", 0); }
+          if (progress) {
+            setHidden(progress, false);
+            progress.style.display = "";
+          }
+          return;
+        }
         if (list) {
           list.innerHTML = "";
           data.lines.forEach((rawLine) => {
