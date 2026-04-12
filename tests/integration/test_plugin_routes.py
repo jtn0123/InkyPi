@@ -199,7 +199,157 @@ def test_update_now_plugin_not_found(client):
     assert "Plugin 'nonexistent' not found" in resp.get_json().get("error", "")
 
 
+def test_update_now_async_returns_202_with_job_id(client):
+    """POST /update_now with X-Async returns 202 Accepted with a job_id."""
+    resp = client.post(
+        "/update_now",
+        data={"plugin_id": "clock"},
+        headers={"X-Async": "true"},
+    )
+    assert resp.status_code == 202
+    data = resp.get_json()
+    assert "job_id" in data
+    assert isinstance(data["job_id"], str)
+    assert len(data["job_id"]) == 32
+
+
+def test_update_now_sync_still_works(client):
+    """POST /update_now without X-Async keeps the legacy synchronous path."""
+    resp = client.post("/update_now", data={"plugin_id": "clock"})
+    # Should be 200 (sync path), not 202
+    assert resp.status_code == 200
+
+
+def test_update_now_missing_plugin_id_returns_422(client):
+    """POST /update_now without plugin_id still returns 422."""
+    resp = client.post("/update_now", data={})
+    assert resp.status_code == 422
+
+
+def test_job_status_unknown_id(client):
+    """GET /api/job/<unknown> returns status 'unknown'."""
+    resp = client.get("/api/job/does_not_exist_at_all_1234")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["status"] == "unknown"
+
+
+def test_update_now_async_poll_completes(client, flask_app, monkeypatch):
+    """Full 202 -> poll -> done flow for async update_now."""
+    import time
+
+    from PIL import Image
+
+    import plugins.clock.clock as clock_mod
+    from refresh_task.job_queue import get_job_queue
+
+    def fake_generate(self, settings, device_config):
+        return Image.new("RGB", device_config.get_resolution(), "white")
+
+    monkeypatch.setattr(clock_mod.Clock, "generate_image", fake_generate, raising=True)
+
+    display_manager = flask_app.config["DISPLAY_MANAGER"]
+    monkeypatch.setattr(
+        display_manager,
+        "display_image",
+        lambda image, image_settings=None, history_meta=None: None,
+        raising=True,
+    )
+
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    refresh_task.running = False
+
+    resp = client.post(
+        "/update_now",
+        data={"plugin_id": "clock"},
+        headers={"X-Async": "true"},
+    )
+    assert resp.status_code == 202
+    job_id = resp.get_json()["job_id"]
+
+    # Poll until done — must finish before monkeypatch cleanup
+    for _ in range(50):
+        poll = client.get(f"/api/job/{job_id}")
+        data = poll.get_json()
+        if data["status"] in ("done", "error"):
+            break
+        time.sleep(0.1)
+
+    assert data["status"] == "done"
+    assert data["result"]["success"] is True
+
+    # Wait for background thread to fully exit before monkeypatch restores
+    queue = get_job_queue()
+    for _ in range(20):
+        if queue.pending_jobs == 0:
+            break
+        time.sleep(0.05)
+
+
+def test_update_now_async_poll_error(client, flask_app, monkeypatch):
+    """Async update_now job that raises shows status 'error' when polled."""
+    import time
+
+    from refresh_task.job_queue import get_job_queue
+
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    refresh_task.running = False
+
+    # Use a plugin that doesn't exist — guaranteed to raise without monkeypatch timing issues
+    resp = client.post(
+        "/update_now",
+        data={"plugin_id": "nonexistent_plugin_xyz"},
+        headers={"X-Async": "true"},
+    )
+    assert resp.status_code == 202
+    job_id = resp.get_json()["job_id"]
+
+    for _ in range(50):
+        poll = client.get(f"/api/job/{job_id}")
+        data = poll.get_json()
+        if data["status"] in ("done", "error"):
+            break
+        time.sleep(0.1)
+
+    assert data["status"] == "error"
+    assert "not found" in data["error"]
+
+    # Ensure background thread finishes before test cleanup
+    queue = get_job_queue()
+    for _ in range(20):
+        if queue.pending_jobs == 0:
+            break
+        time.sleep(0.05)
+
+
+def test_update_now_async_plugin_not_found(client, flask_app):
+    """Plugin not found is reported via the job error status."""
+    import time
+
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    refresh_task.running = False
+
+    resp = client.post(
+        "/update_now",
+        data={"plugin_id": "nonexistent"},
+        headers={"X-Async": "true"},
+    )
+    assert resp.status_code == 202
+    job_id = resp.get_json()["job_id"]
+
+    for _ in range(50):
+        poll = client.get(f"/api/job/{job_id}")
+        data = poll.get_json()
+        if data["status"] in ("done", "error"):
+            break
+        time.sleep(0.1)
+
+    assert data["status"] == "error"
+    assert "not found" in data["error"]
+
+
 def test_update_now_exception_handling(client, flask_app, monkeypatch):
+    """Sync path: exceptions yield 500."""
     import blueprints.plugin as plugin_mod
 
     monkeypatch.setattr(

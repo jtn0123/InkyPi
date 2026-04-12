@@ -16,6 +16,7 @@ from flask import (
 
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
+from refresh_task.job_queue import get_job_queue
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
@@ -593,8 +594,90 @@ def _push_update_now_fallback_from_current_exception(
     )
 
 
+@plugin_bp.route("/api/job/<job_id>", methods=["GET"])
+def job_status(job_id: str):
+    """Poll the status of an asynchronous render job."""
+    queue = get_job_queue()
+    info = queue.get_status(job_id)
+    return jsonify(info), 200
+
+
+def _run_update_now(app, plugin_id, plugin_settings):
+    """Execute plugin render in a background thread (job-queue worker).
+
+    Needs the Flask *app* so we can push an application context — the worker
+    thread has none by default.
+    """
+    with app.app_context():
+        device_config = app.config[_CONFIG_KEY]
+        refresh_task = app.config["REFRESH_TASK"]
+        display_manager = app.config["DISPLAY_MANAGER"]
+
+        if refresh_task.running:
+            metrics = refresh_task.manual_update(
+                ManualRefresh(plugin_id, plugin_settings)
+            )
+            return {
+                "success": True,
+                "message": _MSG_DISPLAY_UPDATED,
+                "metrics": metrics,
+            }
+
+        logger.info("Refresh task not running, updating display directly")
+        plugin_config = device_config.get_plugin(plugin_id)
+        if not plugin_config:
+            raise RuntimeError(f"Plugin '{plugin_id}' not found")
+
+        plugin = get_plugin_instance(plugin_config)
+        with track_progress() as tracker:
+            _t_req_start = perf_counter()
+            _t_gen_start = perf_counter()
+            image = plugin.generate_image(plugin_settings, device_config)
+            generate_ms = int((perf_counter() - _t_gen_start) * 1000)
+            history_meta = {
+                "refresh_type": "Manual Update",
+                "plugin_id": plugin_id,
+                "playlist": None,
+                "plugin_instance": None,
+            }
+            _safe_display_image(
+                display_manager,
+                image,
+                plugin_config.get("image_settings", []),
+                history_meta,
+            )
+            try:
+                ri = device_config.get_refresh_info()
+                display_ms = getattr(ri, "display_ms", None)
+                preprocess_ms = getattr(ri, "preprocess_ms", None)
+            except Exception:
+                display_ms = preprocess_ms = None
+            request_ms = int((perf_counter() - _t_req_start) * 1000)
+            return {
+                "success": True,
+                "message": _MSG_DISPLAY_UPDATED,
+                "metrics": {
+                    "request_ms": request_ms,
+                    "display_ms": display_ms,
+                    "generate_ms": generate_ms,
+                    "preprocess_ms": preprocess_ms,
+                    "steps": tracker.get_steps(),
+                },
+            }
+
+
 @plugin_bp.route("/update_now", methods=["POST"])
 def update_now():
+    """Render a plugin image and push it to the display.
+
+    When the client sends ``X-Async: true`` (or ``?async=1``), the render is
+    enqueued on a background thread and the response is **202 Accepted** with
+    ``{"job_id": "…"}``.  The caller then polls ``GET /api/job/<job_id>``
+    until status is ``done`` or ``error``.
+
+    Without the async flag the request behaves synchronously (legacy mode) so
+    existing callers and tests are unaffected.
+    """
     device_config = current_app.config[_CONFIG_KEY]
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
@@ -611,6 +694,17 @@ def update_now():
                 details={"field": _PLUGIN_ID},
             )
 
+        want_async = request.headers.get(
+            "X-Async", ""
+        ).lower() == "true" or request.args.get("async", "").lower() in ("1", "true")
+
+        if want_async:
+            queue = get_job_queue()
+            app = current_app._get_current_object()  # real app, not proxy
+            job_id = queue.enqueue(_run_update_now, app, plugin_id, plugin_settings)
+            return jsonify({"job_id": job_id}), 202
+
+        # --- Synchronous (legacy) path ---
         if refresh_task.running:
             metrics = refresh_task.manual_update(
                 ManualRefresh(plugin_id, plugin_settings)

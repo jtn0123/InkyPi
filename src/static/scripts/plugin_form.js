@@ -65,24 +65,79 @@
     const timeoutId = setTimeout(() => controller.abort(), 90000);
     try {
       progress.setStep('Sending…', 30);
-      const response = await fetch(url, { method, body: formData, signal: controller.signal });
-      progress.setStep('Waiting (device)…', 60);
-      result = await response.json();
-      if (response.ok){
-        // metrics display
-        const m = result && result.metrics || null;
-        if (m && Array.isArray(m.steps) && m.steps.length){ let pct = 60; const inc = 30 / m.steps.length; for (const step of m.steps){ pct += inc; progress.setStep(`${step.name} ${step.elapsed_ms} ms`, pct); await new Promise(r => setTimeout(r, 50)); } }
-        const parts = []; const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
-        if (m){ add('Request', m.request_ms); add('Generate', m.generate_ms); add('Preprocess', m.preprocess_ms); add('Display', m.display_ms); }
-        if (parts.length){ progress.setStep(parts.join(' • '), 90); }
-        if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
-        success = true;
-        // Call the success callback to refresh images
-        if (typeof onAfterSuccess === 'function') {
-          try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); }
+      // Request async processing for update_now so the browser doesn't block
+      const headers = {};
+      if (action === 'update_now' || url === urls.update_now) { headers['X-Async'] = 'true'; }
+      const response = await fetch(url, { method, body: formData, signal: controller.signal, headers });
+
+      // -- Async job-queue flow for update_now (202 Accepted) --
+      if (response.status === 202) {
+        const accepted = await response.json();
+        const jobId = accepted.job_id;
+        progress.setStep('Rendering (background)…', 40);
+
+        // Poll /api/job/<id> until done or error
+        const POLL_INTERVAL_MS = 1000;
+        const MAX_POLLS = 90; // 90s total
+        let polls = 0;
+        let jobDone = false;
+        while (polls < MAX_POLLS) {
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+          polls++;
+          if (controller.signal.aborted) break;
+          try {
+            const pollResp = await fetch('/api/job/' + jobId, { signal: controller.signal });
+            const jobInfo = await pollResp.json();
+            if (jobInfo.status === 'running') {
+              progress.setStep('Rendering (background)…', 40 + Math.min(polls, 50));
+            } else if (jobInfo.status === 'done') {
+              result = jobInfo.result || { success: true, message: 'Display updated' };
+              // metrics display
+              const m = result && result.metrics || null;
+              if (m && Array.isArray(m.steps) && m.steps.length){ let pct = 60; const inc = 30 / m.steps.length; for (const step of m.steps){ pct += inc; progress.setStep(`${step.name} ${step.elapsed_ms} ms`, pct); await new Promise(r => setTimeout(r, 50)); } }
+              const parts = []; const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
+              if (m){ add('Request', m.request_ms); add('Generate', m.generate_ms); add('Preprocess', m.preprocess_ms); add('Display', m.display_ms); }
+              if (parts.length){ progress.setStep(parts.join(' • '), 90); }
+              if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
+              success = true;
+              if (typeof onAfterSuccess === 'function') { try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); } }
+              jobDone = true;
+              break;
+            } else if (jobInfo.status === 'error') {
+              result = { error: jobInfo.error || 'Plugin render failed' };
+              if (window.showResponseModal) window.showResponseModal('failure', `Error! ${result.error}`);
+              jobDone = true;
+              break;
+            }
+            // status === 'pending' — keep polling
+          } catch (pollErr) {
+            if (pollErr.name === 'AbortError') break;
+            console.warn('Poll error:', pollErr);
+          }
+        }
+        if (!jobDone && !controller.signal.aborted) {
+          if (window.showResponseModal) window.showResponseModal('failure', 'Request timed out. The plugin may still be processing \u2014 check back in a moment.');
         }
       } else {
-        if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
+        // -- Synchronous response (non-update_now routes) --
+        progress.setStep('Waiting (device)…', 60);
+        result = await response.json();
+        if (response.ok){
+          // metrics display
+          const m = result && result.metrics || null;
+          if (m && Array.isArray(m.steps) && m.steps.length){ let pct = 60; const inc = 30 / m.steps.length; for (const step of m.steps){ pct += inc; progress.setStep(`${step.name} ${step.elapsed_ms} ms`, pct); await new Promise(r => setTimeout(r, 50)); } }
+          const parts = []; const add = (label, val) => { if (val !== null && val !== undefined) parts.push(`${label} ${val} ms`); };
+          if (m){ add('Request', m.request_ms); add('Generate', m.generate_ms); add('Preprocess', m.preprocess_ms); add('Display', m.display_ms); }
+          if (parts.length){ progress.setStep(parts.join(' • '), 90); }
+          if (window.showResponseModal) window.showResponseModal('success', `Success! ${result.message}`);
+          success = true;
+          // Call the success callback to refresh images
+          if (typeof onAfterSuccess === 'function') {
+            try { onAfterSuccess(); } catch(e){ console.error('onAfterSuccess callback error:', e); }
+          }
+        } else {
+          if (window.showResponseModal) window.showResponseModal('failure', `Error!  ${result.error}`);
+        }
       }
     } catch (e){
       console.error('Error in plugin form submission:', e);
