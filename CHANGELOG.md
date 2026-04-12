@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.49.10 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Show empty-state in progress block on Weather and AI Image (JTN-634)
+  ([#403](https://github.com/jtn0123/InkyPi/pull/403),
+  [`9be4e5a`](https://github.com/jtn0123/InkyPi/commit/9be4e5a936e712e73d7f665e609345530f27d1ff))
+
+PR #377 (JTN-347/348/331/332) made the Last progress button work on Clock, To-Do, Calendar, and
+  Screenshot by clearing the inline display:none left by progress.stop(). Weather and AI Image still
+  appeared to "show no feedback" because their required settings fields (latitude / longitude /
+  textPrompt) frequently fail client-side validation, so the very first Update Now click
+  short-circuits in handleAction before sendForm runs and no progress snapshot is ever persisted. A
+  later click of Last progress then hit the no-data branch, which surfaced only a transient toast —
+  easy to miss and not anchored to the button.
+
+Move the empty-state message inside the requestProgress block itself: the button now always reveals
+  a clearly visible panel, either with real snapshot data or with "No progress data yet — run Update
+  Now to see progress here." The progress bar is reset to 0% in the empty state so the UI doesn't
+  imply a completed run. Adds regression tests that confirm the button and block render on
+  /plugin/weather and /plugin/ai_image and that the no-data branch unhides the progress block.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.9 (2026-04-12)
 
 ### Bug Fixes
