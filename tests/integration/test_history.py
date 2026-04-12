@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 from PIL import Image
 
@@ -709,6 +710,22 @@ def test_history_action_buttons_have_aria_labels(client, device_config_dev):
     assert 'aria-label="Download image from ' in body
     assert 'aria-label="Delete image from ' in body
     assert 'aria-label="Preview image from ' in body
+
+    assert f'aria-label="Display image from {fname}"' not in body
+    assert f'aria-label="Download image from {fname}"' not in body
+    assert f'aria-label="Delete image from {fname}"' not in body
+    assert f'aria-label="Preview image from {fname}"' not in body
+
+    labels = re.findall(r'aria-label="([^"]+)"', body)
+    action_prefixes = (
+        "Display image from ",
+        "Download image from ",
+        "Delete image from ",
+        "Preview image from ",
+    )
+    for label in labels:
+        if label.startswith(action_prefixes):
+            assert fname not in label
 
 
 # ---------------------------------------------------------------------------
