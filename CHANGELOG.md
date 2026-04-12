@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.49.5 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Surface DRAFT state when Add to Playlist is clicked (JTN-633)
+  ([#398](https://github.com/jtn0123/InkyPi/pull/398),
+  [`c3986b2`](https://github.com/jtn0123/InkyPi/commit/c3986b2474ee16422d0b6d20420137e2700a0648))
+
+* fix(plugin): surface DRAFT state when Add to Playlist is clicked (JTN-633)
+
+Add a defensive direct click listener on the DRAFT-state Add-to-Playlist button so it can never
+  silently no-op. If the scheduling modal is missing the user now sees a clear toast/response modal
+  telling them to refresh. Also clarify the inline help text to explain that current settings are
+  captured when the playlist entry is saved.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: skip new Playwright test module when browser unavailable (JTN-633)
+
+Register test_plugin_draft_add_to_playlist.py in UI_BROWSER_TESTS so pytest_ignore_collect skips it
+  on the CI pytest runners that don't install Playwright Chromium, matching the existing
+  test_plugin_add_to_playlist_ui.py treatment.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.4 (2026-04-12)
 
 ### Bug Fixes
