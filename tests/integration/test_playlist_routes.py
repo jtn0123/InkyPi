@@ -438,3 +438,42 @@ def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
     chunk = body[idx : idx + 600]
     assert "All day" in chunk
     assert "00:00 - 24:00" not in chunk
+
+
+def test_playlist_form_uses_native_time_input(client):
+    """JTN-647: start/end time fields must be <input type="time"> (not a 15-min <select>).
+
+    This lets users schedule arbitrary HH:MM values (e.g. 09:05) instead of the
+    legacy quarter-hour-only dropdown options.
+    """
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Native time input renders for both start and end, not a <select>.
+    assert 'type="time"' in body
+    assert 'id="start_time"' in body
+    assert 'id="end_time"' in body
+    # The legacy <select> dropdowns should be gone.
+    assert '<select id="start_time"' not in body
+    assert '<select id="end_time"' not in body
+
+
+def test_create_playlist_accepts_non_quarter_hour_times(client):
+    """JTN-647: backend accepts arbitrary HH:MM values like 09:05 or 07:10."""
+    payload = {
+        "playlist_name": "OddHours",
+        "start_time": "09:05",
+        "end_time": "07:10",  # wraps past midnight; still a valid distinct time
+    }
+    resp = client.post("/create_playlist", json=payload)
+    assert resp.status_code == 200
+
+    # Update to another non-quarter-hour value.
+    upd = {
+        "new_name": "OddHours",
+        "start_time": "06:37",
+        "end_time": "22:13",
+    }
+    resp = client.put("/update_playlist/OddHours", json=upd)
+    assert resp.status_code == 200

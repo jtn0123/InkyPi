@@ -487,8 +487,8 @@
         document.getElementById("modalTitle").textContent = "Update Playlist";
         document.getElementById("playlist_name").value = playlistName;
         document.getElementById("editingPlaylistName").value = playlistName;
-        document.getElementById("start_time").value = startTime;
-        document.getElementById("end_time").value = endTime;
+        document.getElementById("start_time").value = _normaliseTimeForInput(startTime);
+        document.getElementById("end_time").value = _normaliseTimeForInput(endTime);
         const cycleInput = document.getElementById('cycle_minutes');
         if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
         if (modal) modal.dataset.mode = "edit";
@@ -617,20 +617,11 @@
         } catch(e){ showResponseModal('failure', 'Failed to trigger display'); }
     }
 
-    function populateTimeOptions() {
-        let startSelect = document.getElementById("start_time");
-        let endSelect = document.getElementById("end_time");
-        startSelect.innerHTML = "";
-        endSelect.innerHTML = "";
-        for (let hour = 0; hour < 24; hour++) {
-            for (let minutes of [0, 15, 30, 45]) {
-                let time = hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
-                startSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                endSelect.innerHTML += `<option value="${time}">${time}</option>`;
-            }
-        }
-        startSelect.innerHTML += `<option value="24:00">24:00</option>`;
-        endSelect.innerHTML += `<option value="24:00">24:00</option>`;
+    // Normalise a stored HH:MM (or "24:00") value to a form accepted by <input type="time">.
+    function _normaliseTimeForInput(value) {
+        if (!value) return value;
+        if (value === "24:00") return "23:59";
+        return value;
     }
 
     function initDeviceClock(){
@@ -673,7 +664,6 @@
     }
 
     function init(){
-        populateTimeOptions();
         document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
