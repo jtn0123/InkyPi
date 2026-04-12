@@ -46,7 +46,9 @@
                         {% if ph_icon %}{{ icon(ph_icon, 'app-icon') | safe }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
                         <div class="title-stack">
                             <h1 class="app-title">{{ plugin.display_name }}</h1>
-                            <span class="app-subtitle">{{ plugin.id }}</span>
+                            {% if request.args.get('debug') %}
+                            <span class="app-subtitle" data-debug-slug>{{ plugin.id }}</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -77,9 +79,11 @@
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}
-            {{ status_chip('Instance', 'success') }}
+            {{ status_chip('Instance', 'success', title='This plugin has saved settings stored as an instance.', describedby='instance-chip-help') }}
+            <span id="instance-chip-help" class="sr-only">This plugin has saved settings stored as an instance.</span>
             {% else %}
-            {{ status_chip('Draft', 'warning') }}
+            {{ status_chip('Draft', 'warning', title='This plugin has not been saved yet. Use the save action below to activate it.', describedby='draft-chip-help') }}
+            <span id="draft-chip-help" class="sr-only">This plugin has not been saved yet. Use the save action below to activate it.</span>
             {% endif %}
         </div>
 

@@ -405,6 +405,57 @@ def test_plugin_page_update_instance_url_encodes_instance_name_with_spaces(clien
     assert "update_plugin_instance/My Instance" not in body
 
 
+def test_plugin_page_hides_raw_slug_subtitle(client):
+    """JTN-622: Raw plugin slug must not be rendered as a visible subtitle.
+
+    End users have no reason to see the internal filesystem slug
+    (ai_image, clock, weather, etc.). The <span class="app-subtitle">
+    containing the slug should be absent from the default page render.
+    """
+    for plugin_id in ("ai_image", "clock", "weather"):
+        resp = client.get(f"/plugin/{plugin_id}")
+        assert resp.status_code == 200
+        body = resp.data.decode("utf-8")
+        # The app-subtitle span must not be present by default.
+        assert (
+            'class="app-subtitle"' not in body
+        ), f"/plugin/{plugin_id} still renders app-subtitle span with raw slug"
+        # Also ensure the slug doesn't appear as the inner text of any
+        # element with data-debug-slug attribute (which only renders in debug mode).
+        assert "data-debug-slug" not in body
+
+
+def test_plugin_page_shows_slug_subtitle_in_debug_mode(client):
+    """JTN-622: Raw slug subtitle is available behind ?debug=1 for diagnostics."""
+    resp = client.get("/plugin/ai_image?debug=1")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+    assert 'class="app-subtitle"' in body
+    assert "data-debug-slug" in body
+
+
+def test_plugin_page_draft_badge_has_explanation(client):
+    """JTN-644: The Draft badge must expose an explanation via title and/or aria-describedby."""
+    # A plugin page with no plugin_instance query param renders the Draft chip.
+    resp = client.get("/plugin/clock")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    # Locate the Draft chip
+    import re
+
+    match = re.search(r'<span class="status-chip warning"[^>]*>Draft</span>', body)
+    assert match, "Draft status chip not found on /plugin/clock"
+    chip_html = match.group(0)
+    assert "title=" in chip_html, f"Draft chip missing title attribute: {chip_html}"
+    assert (
+        "aria-describedby=" in chip_html
+    ), f"Draft chip missing aria-describedby: {chip_html}"
+    # And the hidden describedby element must exist.
+    assert 'id="draft-chip-help"' in body
+    assert "save action" in body or "Save Settings" in body
+
+
 def test_wizard_ids_not_duplicated_in_static_html(client):
     """JTN-220: wizardPrev and wizardNext must each appear at most once in rendered HTML.
 
