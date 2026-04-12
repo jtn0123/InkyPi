@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.49.8 (2026-04-12)
+
+### Bug Fixes
+
+- **image_upload,image_folder**: Pre-select Background Fill radio in draft (JTN-632)
+  ([#402](https://github.com/jtn0123/InkyPi/pull/402),
+  [`fce6102`](https://github.com/jtn0123/InkyPi/commit/fce610288cc10f4e7f1907f7dd85d94c7685b3dc))
+
+The Background Fill radio group rendered two inputs both marked `checked` on /plugin/image_upload
+  and /plugin/image_folder because the legacy Style collapsible in plugin.html hardcodes a second
+  `<input ... name="backgroundOption" value="color" checked>`. The schema-driven Blur radio was
+  correctly checked, but the hidden Style radio added a competing checked state, so browsers treated
+  the group as indeterminate and users could save without picking a background fill option.
+
+Both plugins already expose their own schema-driven Background Fill field and do not consume any of
+  the Style collapsible fields (Frame, Margins, Text Color, etc.), so disabling `style_settings` is
+  safe and removes the name collision. With Style off, the schema's `default="blur"` pre-selects
+  exactly one radio in DRAFT mode, matching the `generate_image` fallback.
+
+Tests: - Schema assertion that `backgroundOption.default == "blur"` for both plugins. - Integration
+  regression: GET /plugin/image_upload and /plugin/image_folder in DRAFT mode, parse all
+  `name="backgroundOption"` inputs, assert exactly one is `checked` and that its value is `blur`.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.7 (2026-04-12)
 
 ### Bug Fixes
