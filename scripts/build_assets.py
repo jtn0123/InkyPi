@@ -50,6 +50,7 @@ JS_MANIFEST: list[str] = [
     "client_errors.js",
     "form_validator.js",
     "response_modal.js",
+    "form_state.js",
     "dark_mode.js",
     "ui_helpers.js",
 ]

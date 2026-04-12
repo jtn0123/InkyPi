@@ -8,6 +8,7 @@ from flask import (
     abort,
     current_app,
     jsonify,
+    make_response,
     render_template,
     request,
     send_file,
@@ -713,12 +714,17 @@ def update_now():
 def save_plugin_settings():
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
+    htmx = _is_htmx_request()
 
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
+            if htmx:
+                return _render_plugin_form_error(
+                    _ERR_PLUGIN_ID_REQUIRED, status=422, field=_PLUGIN_ID
+                )
             return json_error(
                 _ERR_PLUGIN_ID_REQUIRED,
                 status=422,
@@ -733,6 +739,8 @@ def save_plugin_settings():
         )
     except Exception as e:
         logger.exception("Error saving plugin settings: %s", e)
+        if htmx:
+            return _render_plugin_form_error(_ERR_INTERNAL, status=500)
         return json_error(_ERR_INTERNAL, status=500)
 
 
@@ -753,27 +761,78 @@ def save_plugin_settings_alias(plugin_id: str):
         )
     except Exception:
         logger.exception("Error saving plugin settings (alias)")
+        if _is_htmx_request():
+            return _render_plugin_form_error(_ERR_INTERNAL, status=500)
         return json_error(_ERR_INTERNAL, status=500)
+
+
+def _is_htmx_request() -> bool:
+    """Return True when the current request originated from HTMX (JTN-506)."""
+    try:
+        return request.headers.get("HX-Request", "").lower() == "true"
+    except RuntimeError:
+        # Outside an active request context
+        return False
+
+
+def _render_plugin_form_error(
+    message: str, status: int = 400, field: str | None = None
+):
+    """Return an HTML error partial for the plugin settings form (JTN-506).
+
+    HTMX swaps error content into ``#plugin-form-errors``; Flask clients that
+    still speak JSON never see this branch because it's gated on the
+    ``HX-Request`` header in the caller.
+    """
+    html = render_template(
+        "partials/plugin_form_errors.html",
+        error=message,
+        field=field,
+    )
+    resp = make_response(html, status)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    return resp
+
+
+def _render_plugin_form_success(message: str):
+    """Return an HTMX success partial; fires ``pluginSettingsSaved`` toast event."""
+    html = render_template(
+        "partials/plugin_form_errors.html",
+        error=None,
+        message=message,
+    )
+    resp = make_response(html, 200)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    # HX-Trigger lets the existing toast JS fire without a duplicate modal path
+    resp.headers["HX-Trigger"] = json.dumps(
+        {"pluginSettingsSaved": {"message": message}}
+    )
+    return resp
 
 
 def _save_plugin_settings_common(
     plugin_id, plugin_settings, device_config, playlist_manager
 ):
+    htmx = _is_htmx_request()
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return json_error(
-            f"Plugin '{sanitize_response_value(plugin_id)}' not found",
-            status=404,
-        )
+        msg = f"Plugin '{sanitize_response_value(plugin_id)}' not found"
+        if htmx:
+            return _render_plugin_form_error(msg, status=404)
+        return json_error(msg, status=404)
 
     # Validate required fields and plugin-specific settings
     try:
         plugin = get_plugin_instance(plugin_config)
         validation_error = validate_plugin_required_fields(plugin, plugin_settings)
         if validation_error:
+            if htmx:
+                return _render_plugin_form_error(validation_error, status=400)
             return json_error(validation_error, status=400)
         settings_error = plugin.validate_settings(plugin_settings)
         if settings_error:
+            if htmx:
+                return _render_plugin_form_error(settings_error, status=400)
             return json_error(settings_error, status=400)
     except Exception:
         logger.debug("Could not validate plugin schema for %s", plugin_id)
@@ -807,8 +866,11 @@ def _save_plugin_settings_common(
     device_config.update_atomic(_do_save_settings)
     config_dir = os.path.dirname(device_config.config_file)
     _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
+    success_message = "Settings saved. Add to Playlist to schedule this instance."
+    if htmx:
+        return _render_plugin_form_success(success_message)
     return json_success(
-        message="Settings saved. Add to Playlist to schedule this instance.",
+        message=success_message,
         instance_name=instance_name,
     )
 

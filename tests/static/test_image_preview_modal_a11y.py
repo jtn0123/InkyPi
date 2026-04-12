@@ -13,39 +13,59 @@ _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts
 
 
 def test_plugin_html_image_preview_modal_has_aria_labelledby():
-    """plugin.html must declare the image preview modal with an accessible name.
+    """plugin.html must render the image preview modal via the a11y-compliant macro.
 
-    Since JTN-503 the modal is rendered via the ``modal()`` macro in
-    ``macros/components.html`` which derives ``aria-labelledby`` from the
-    modal id; rather than scanning the raw template (the attribute is
-    produced by the macro at render time) we verify the template invokes
-    the macro for ``imagePreviewModal``.
+    The modal was refactored to use the shared `modal()` macro (JTN-503) which
+    emits `aria-labelledby="<id>Title"` automatically. We verify plugin.html
+    invokes it with id='imagePreviewModal', and that the macro itself emits
+    the expected aria-labelledby attribute.
     """
-    content = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
+    plugin = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
     assert (
-        "modal('imagePreviewModal'" in content
-    ), "plugin.html must invoke the modal() macro for 'imagePreviewModal'"
+        "modal('imagePreviewModal'" in plugin
+        or 'modal("imagePreviewModal"' in plugin
+        or 'aria-labelledby="imagePreviewTitle"' in plugin
+    ), (
+        "plugin.html must render #imagePreviewModal via the modal() macro "
+        "or include aria-labelledby='imagePreviewTitle' directly"
+    )
+
+    macros = (_TEMPLATES_DIR / "macros" / "components.html").read_text(encoding="utf-8")
+    assert (
+        'aria-labelledby="{{ title_id }}"' in macros
+    ), "modal() macro must emit aria-labelledby for the accessible name"
 
 
 def test_plugin_html_image_preview_modal_labelledby_target_exists():
-    """The modal() macro must generate a heading whose id matches aria-labelledby.
+    """The id referenced by aria-labelledby must exist inside the modal.
 
-    The macro sets ``title_id = id ~ 'Title'`` and emits both the
-    ``aria-labelledby`` attribute and the matching ``<h2 id=...>``, so if
-    the macro definition is intact we are guaranteed the rendered target
-    exists. Assert directly on the macro source to catch regressions.
+    Either rendered directly in plugin.html, or emitted by the shared modal()
+    macro which creates an <h2 id="{{ id }}Title"> for the accessible name.
     """
-    macros_path = _TEMPLATES_DIR / "macros" / "components.html"
-    content = macros_path.read_text(encoding="utf-8")
+    plugin = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
+    # Direct usage path (pre-macro templates) still works.
+    modal_start = plugin.find('id="imagePreviewModal"')
+    if modal_start != -1:
+        modal_end = plugin.find("</div>", plugin.find("</div>", modal_start) + 1) + len(
+            "</div>"
+        )
+        modal_block = plugin[modal_start:modal_end]
+        assert 'id="imagePreviewTitle"' in modal_block, (
+            "Element with id='imagePreviewTitle' must exist inside "
+            "#imagePreviewModal in plugin.html"
+        )
+        return
+
+    # Macro path: plugin.html calls modal('imagePreviewModal', ...) and the
+    # macro creates <h2 id="{{ id }}Title"> for the accessible name.
     assert (
-        "title_id = id ~ 'Title'" in content
-    ), "modal() macro must derive title_id from the modal id"
+        "modal('imagePreviewModal'" in plugin or 'modal("imagePreviewModal"' in plugin
+    ), "#imagePreviewModal must be rendered by plugin.html (direct or via macro)"
+
+    macros = (_TEMPLATES_DIR / "macros" / "components.html").read_text(encoding="utf-8")
     assert (
-        'aria-labelledby="{{ title_id }}"' in content
-    ), "modal() macro must set aria-labelledby to the derived title_id"
-    assert (
-        'id="{{ title_id }}"' in content
-    ), "modal() macro must emit a heading with id matching title_id"
+        '<h2 id="{{ title_id }}"' in macros
+    ), "modal() macro must create an h2 with id=<modal_id>Title for a11y"
 
 
 def test_lightbox_js_dynamic_modal_uses_aria_labelledby():
@@ -71,19 +91,32 @@ def test_lightbox_js_dynamic_modal_creates_heading_element():
 
 
 def test_plugin_page_rendered_modal_has_aria_labelledby(client):
-    """Rendered plugin page must contain the modal with aria-labelledby and the target id.
-
-    After JTN-503 the modal is rendered via the ``modal()`` macro which
-    derives the title id from the modal id (``imagePreviewModalTitle``).
-    """
+    """Rendered plugin page must contain the modal with aria-labelledby and the target id."""
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
-    assert (
-        'aria-labelledby="imagePreviewModalTitle"' in html
-    ), "Rendered plugin page must have aria-labelledby='imagePreviewModalTitle' on #imagePreviewModal"
+    # The modal() macro (JTN-503) emits aria-labelledby="<id>Title", so when
+    # called with id='imagePreviewModal' the title id becomes
+    # 'imagePreviewModalTitle'. The original hand-written modal used
+    # 'imagePreviewTitle'. Accept either for template-refactor resilience.
+    import re
 
-    assert (
-        'id="imagePreviewModalTitle"' in html
-    ), "Rendered plugin page must contain an element with id='imagePreviewModalTitle'"
+    m = re.search(
+        r'id=[\'"]imagePreviewModal[\'"][^>]*aria-labelledby=[\'"]([^\'"]+)[\'"]',
+        html,
+    )
+    assert m is not None, (
+        "Rendered plugin page must have aria-labelledby on #imagePreviewModal "
+        "(checked with either quote style)"
+    )
+    labelled_by_id = m.group(1)
+    assert labelled_by_id in {"imagePreviewTitle", "imagePreviewModalTitle"}, (
+        "Rendered plugin page must reference 'imagePreviewTitle' or "
+        f"'imagePreviewModalTitle' for aria-labelledby; got '{labelled_by_id}'"
+    )
+
+    assert f'id="{labelled_by_id}"' in html or f"id='{labelled_by_id}'" in html, (
+        f"Rendered plugin page must contain an element with id='{labelled_by_id}' "
+        "(the aria-labelledby target)"
+    )

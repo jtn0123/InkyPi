@@ -165,13 +165,45 @@ def _apply_dev_env(args):
 
 
 def _read_version() -> str:
-    """Read the application version from the VERSION file at the repo root."""
+    """Return the installed application version.
+
+    Resolution order (JTN-624):
+
+    1. ``VERSION`` file at the repo root (canonical; written by the release
+       pipeline and distributed in install tarballs).
+    2. ``[project].version`` from ``pyproject.toml`` as a fallback when
+       ``VERSION`` is missing, empty, or still contains the unexpanded
+       ``{version}`` placeholder that a broken release can leave behind.
+    3. ``"unknown"`` if both sources fail.
+    """
+    repo_root = os.path.join(os.path.dirname(__file__), "..")
+
     try:
-        version_path = os.path.join(os.path.dirname(__file__), "..", "VERSION")
+        version_path = os.path.join(repo_root, "VERSION")
         with open(version_path) as f:
-            return f.read().strip()
+            value = f.read().strip()
+        if value and value != "{version}" and value != "0.1.0":
+            return value
     except Exception:
-        return "unknown"
+        pass
+
+    # Fallback: read [project].version from pyproject.toml. This keeps the UI
+    # accurate even if a release shipped a broken VERSION file (e.g. the
+    # python-semantic-release `echo '{version}'` regression fixed by this
+    # change).
+    try:
+        import tomllib
+
+        pyproject_path = os.path.join(repo_root, "pyproject.toml")
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        version = data.get("project", {}).get("version")
+        if isinstance(version, str) and version:
+            return version
+    except Exception:
+        pass
+
+    return "unknown"
 
 
 def main(argv: list[str] | None = None):

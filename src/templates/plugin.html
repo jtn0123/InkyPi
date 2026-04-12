@@ -46,7 +46,9 @@
                         {% if ph_icon %}{{ icon(ph_icon, 'app-icon') | safe }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
                         <div class="title-stack">
                             <h1 class="app-title">{{ plugin.display_name }}</h1>
-                            <span class="app-subtitle">{{ plugin.id }}</span>
+                            {% if request.args.get('debug') %}
+                            <span class="app-subtitle" data-debug-slug>{{ plugin.id }}</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -59,7 +61,7 @@
                             <span class="api-key-text">API</span>
                         </div>
                         {% else %}
-                        <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" title="{{ api_key.service }} API Key required - Click to configure">
+                        <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" data-api-keys-link title="{{ api_key.service }} API Key required - Click to configure">
                             <span class="api-key-icon">⚠</span>
                             <span class="api-key-text">API Required</span>
                         </a>
@@ -77,9 +79,11 @@
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}
-            {{ status_chip('Instance', 'success') }}
+            {{ status_chip('Instance', 'success', title='This plugin has saved settings stored as an instance.', describedby='instance-chip-help') }}
+            <span id="instance-chip-help" class="sr-only">This plugin has saved settings stored as an instance.</span>
             {% else %}
-            {{ status_chip('Draft', 'warning') }}
+            {{ status_chip('Draft', 'warning', title='This plugin has not been saved yet. Use the save action below to activate it.', describedby='draft-chip-help') }}
+            <span id="draft-chip-help" class="sr-only">This plugin has not been saved yet. Use the save action below to activate it.</span>
             {% endif %}
         </div>
 
@@ -91,7 +95,7 @@
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="workflow-layout" data-workflow-layout>
         <section class="workflow-main-panel" data-workflow-panel="configure">
-        <form id="settingsForm" class="settings-form workflow-settings-form" aria-label="Plugin settings for {{ plugin.display_name }}">
+        <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}">
             <div class="settings-container">
                 <div class="workflow-section-header">
                     <h2>Configuration</h2>
@@ -249,17 +253,27 @@
 
         <div class="workflow-action-panel">
             <span id="plugin-form-status" class="validation-message" role="status" aria-live="polite"></span>
+            <!-- HTMX swap target for inline validation feedback (JTN-506) -->
+            <div id="plugin-form-errors" class="plugin-form-errors" aria-live="polite"></div>
             <label class="workflow-device-toggle" for="toggleDeviceFrame">
                 <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
             </label>
             {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
             <div class="workflow-action-group">
                 <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
-                <button type="button" data-plugin-action="save_settings" class="action-button is-secondary" aria-describedby="save-settings-help">Save Settings</button>
+                <button type="button"
+                        id="savePluginSettingsBtn"
+                        class="action-button is-secondary"
+                        aria-describedby="save-settings-help"
+                        hx-post="{{ url_for('plugin.save_plugin_settings') }}"
+                        hx-include="#settingsForm"
+                        hx-target="#plugin-form-errors"
+                        hx-swap="innerHTML"
+                        hx-disabled-elt="this">Save Settings</button>
                 {% if plugin_instance %}
                     <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
                 {% else %}
-                    <button type="button" data-open-modal="scheduleModal" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
+                    <button type="button" data-open-modal="scheduleModal" data-plugin-draft="true" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
                 {% endif %}
             </div>
             <div class="form-help workflow-help">
@@ -269,8 +283,8 @@
                 <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
                 <p>Use <strong>Update Instance</strong> to save and refresh the displayed image.</p>
                 {% else %}
-                <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist</div>
-                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.</p>
+                <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist. Current settings will be saved when you add it.</div>
+                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically — current settings will be captured when you save the playlist entry.</p>
                 {% endif %}
             </div>
         </div>
@@ -332,6 +346,22 @@
     {% call modal('imagePreviewModal', 'Image preview') %}
         <img id="imagePreviewImg" alt="Large preview" class="lightbox-preview-image"/>
     {% endcall %}
+
+    <!-- Unsaved changes confirmation for API Keys navigation (JTN-629) -->
+    {% if api_key and api_key.required and not api_key.present %}
+    <div id="apiKeysLeaveConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="apiKeysLeaveConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeApiKeysLeaveConfirmBtn" class="close-button" data-close-modal="apiKeysLeaveConfirmModal" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="apiKeysLeaveConfirmTitle">Leave page? Unsaved changes will be lost</h2>
+            <div class="separator"></div>
+            <p>You have unsaved changes on this plugin. Navigating to API Keys will discard them. Save your settings first if you want to keep them.</p>
+            <div class="buttons-container">
+                <a href="{{ url_for('settings.api_keys_page') }}" class="action-button warn" id="confirmApiKeysLeaveBtn">Leave and discard changes</a>
+                <button type="button" class="action-button" id="cancelApiKeysLeaveBtn" data-close-modal="apiKeysLeaveConfirmModal">Stay on page</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
     <div id="requestProgress" class="progress-block" hidden>
         <div class="progress-header">
             <span id="requestProgressText">Preparing…</span>

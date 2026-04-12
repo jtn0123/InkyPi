@@ -179,39 +179,84 @@
         showResponseModal("success", "No changes to save.");
         return;
       }
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+      // JTN-505: FormState owns the disabled/aria-busy/spinner lifecycle.
+      const fs = (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
+      if (fs) fs.clearErrors();
       const formData = new FormData(form);
       await appendGeoData(formData);
 
-      try {
-        const response = await fetch(config.saveSettingsUrl, {
-          method: "POST",
-          body: formData,
-        });
-        const result = await response.json();
-        if (response.ok) {
-          _formSnapshot = getFormSnapshot(form);
-          if (saveBtn) saveBtn.disabled = true;
-          showResponseModal("success", `Success! ${result.message}`);
-        } else {
-          showResponseModal("failure", `Error! ${result.error}`);
-          restoreFormFromSnapshot(form, _formSnapshot);
+      const doSubmit = async () => {
+        try {
+          const response = await fetch(config.saveSettingsUrl, {
+            method: "POST",
+            body: formData,
+          });
+          const result = await response.json();
+          if (response.ok) {
+            _formSnapshot = getFormSnapshot(form);
+            if (saveBtn) saveBtn.disabled = true;
+            showResponseModal("success", `Success! ${result.message}`);
+          } else {
+            // Surface field-level errors inline when the server returns them.
+            if (fs && result && result.field_errors && typeof result.field_errors === "object") {
+              fs.setFieldErrors(result.field_errors);
+            }
+            showResponseModal("failure", `Error! ${result.error}`);
+            restoreFormFromSnapshot(form, _formSnapshot);
+          }
+        } catch (error) {
+          console.error("Settings save failed:", error);
+          showResponseModal(
+            "failure",
+            "An error occurred while processing your request. Please try again."
+          );
+          checkDirty();
         }
-      } catch (error) {
-        console.error("Settings save failed:", error);
-        showResponseModal(
-          "failure",
-          "An error occurred while processing your request. Please try again."
-        );
-        checkDirty();
-      } finally {
-        if (saveBtn?.textContent === "Saving\u2026") {
-          saveBtn.textContent = "Save";
+      };
+
+      if (fs) {
+        await fs.run(doSubmit);
+      } else {
+        // Fallback path for environments without FormState (should not occur).
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
+        try { await doSubmit(); } finally {
+          if (saveBtn?.textContent === "Saving\u2026") saveBtn.textContent = "Save";
         }
       }
     }
 
+    function setDeviceActionModalOpen(modalId, open) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.hidden = !open;
+      modal.style.display = open ? "block" : "none";
+    }
+
+    function openRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", true);
+    }
+
+    function closeRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", false);
+    }
+
+    function openShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", true);
+    }
+
+    function closeShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", false);
+    }
+
     async function handleShutdown(reboot) {
+      // JTN-621: callers must gate this behind a confirmation modal. The
+      // modal ensures an accidental tap on a touch screen doesn't make the
+      // device unreachable without physical access to recover.
+      if (reboot) {
+        closeRebootConfirm();
+      } else {
+        closeShutdownConfirm();
+      }
       showResponseModal(
         "success",
         reboot
@@ -722,6 +767,128 @@
       }
     }
 
+    function formatPercent(val) {
+      if (val === null || val === undefined || Number.isNaN(Number(val))) {
+        return "\u2014";
+      }
+      return Number(val).toFixed(1) + "%";
+    }
+
+    function formatUptime(seconds) {
+      if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
+        return "\u2014";
+      }
+      const total = Math.floor(Number(seconds));
+      const days = Math.floor(total / 86400);
+      const hours = Math.floor((total % 86400) / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      if (days > 0) return days + "d " + hours + "h " + mins + "m";
+      if (hours > 0) return hours + "h " + mins + "m";
+      return mins + "m";
+    }
+
+    const SYSTEM_HEALTH_ROWS = [
+      { key: "cpu_percent", label: "CPU", formatter: formatPercent },
+      { key: "memory_percent", label: "Memory", formatter: formatPercent },
+      { key: "disk_percent", label: "Disk", formatter: formatPercent },
+      { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
+    ];
+
+    function buildSystemHealthTable(systemData) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Metric</th><th>Value</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      for (const spec of SYSTEM_HEALTH_ROWS) {
+        const row = document.createElement("tr");
+        const labelCell = document.createElement("td");
+        labelCell.textContent = spec.label;
+        const valueCell = document.createElement("td");
+        valueCell.textContent = spec.formatter(systemData ? systemData[spec.key] : null);
+        row.appendChild(labelCell);
+        row.appendChild(valueCell);
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function buildPluginHealthTable(items) {
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Plugin</th><th>Status</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      const entries = Array.isArray(items)
+        ? items.map(function (it) {
+            return [it.plugin_id || "\u2014", it.status || it.state || "\u2014"];
+          })
+        : Object.entries(items || {}).map(function (pair) {
+            const [pid, info] = pair;
+            let status = "\u2014";
+            if (info && typeof info === "object") {
+              status = info.status || info.state || (info.ok === false ? "error" : "ok");
+            } else if (typeof info === "string") {
+              status = info;
+            }
+            return [pid, status];
+          });
+      if (entries.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 2;
+        cell.textContent = "No plugin health data";
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      } else {
+        entries.forEach(function (pair) {
+          const row = document.createElement("tr");
+          const pidCell = document.createElement("td");
+          pidCell.textContent = pair[0];
+          const statusCell = document.createElement("td");
+          statusCell.textContent = pair[1];
+          row.appendChild(pidCell);
+          row.appendChild(statusCell);
+          tbody.appendChild(row);
+        });
+      }
+      table.appendChild(tbody);
+      return table;
+    }
+
+    function buildIsolationTable(isolationData) {
+      const list = Array.isArray(isolationData?.isolated_plugins)
+        ? isolationData.isolated_plugins
+        : [];
+      if (list.length === 0) {
+        const msg = document.createElement("div");
+        msg.className = "bench-empty";
+        msg.textContent = "No plugins isolated";
+        return msg;
+      }
+      const table = document.createElement("table");
+      table.className = "bench-table";
+      const thead = document.createElement("thead");
+      thead.innerHTML = "<tr><th>Plugin</th><th>Isolated</th></tr>";
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      list.forEach(function (pluginId) {
+        const row = document.createElement("tr");
+        const pidCell = document.createElement("td");
+        pidCell.textContent = pluginId;
+        const statusCell = document.createElement("td");
+        statusCell.textContent = "Yes";
+        row.appendChild(pidCell);
+        row.appendChild(statusCell);
+        tbody.appendChild(row);
+      });
+      table.appendChild(tbody);
+      return table;
+    }
+
     async function refreshHealth() {
       ui.setPanelLoading?.("healthSummary", true);
       try {
@@ -731,14 +898,19 @@
         ]);
         const plugins = await pluginsResp.json();
         const system = await systemResp.json();
-        const output = [
-          "System Health",
-          JSON.stringify(system, null, 2),
-          "",
-          "Plugin Health",
-          JSON.stringify(plugins.items || {}, null, 2),
-        ];
-        document.getElementById("healthSummary").textContent = output.join("\n");
+
+        const panel = document.getElementById("healthSummary");
+        panel.textContent = "";
+
+        const heading1 = document.createElement("strong");
+        heading1.textContent = "System Health";
+        panel.appendChild(heading1);
+        panel.appendChild(buildSystemHealthTable(system || {}));
+
+        const heading2 = document.createElement("strong");
+        heading2.textContent = "Plugin Health";
+        panel.appendChild(heading2);
+        panel.appendChild(buildPluginHealthTable(plugins.items || {}));
       } catch (e) {
         console.warn("Failed to load health data:", e);
         document.getElementById("healthSummary").textContent =
@@ -753,11 +925,9 @@
       try {
         const resp = await fetch("/settings/isolation", { cache: "no-store" });
         const data = await resp.json();
-        document.getElementById("isolationSummary").textContent = JSON.stringify(
-          data,
-          null,
-          2
-        );
+        const panel = document.getElementById("isolationSummary");
+        panel.textContent = "";
+        panel.appendChild(buildIsolationTable(data || {}));
       } catch (e) {
         console.warn("Failed to load isolation list:", e);
         document.getElementById("isolationSummary").textContent =
@@ -978,9 +1148,8 @@
     }
 
     function bindButtons() {
-      for (const button of document.querySelectorAll("[data-collapsible-toggle]")) {
-        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
-      }
+      // Collapsible toggle is bound via delegation in ui_helpers.js so every
+      // `[data-collapsible-toggle]` button updates aria-expanded consistently.
 
       // Dirty-state: snapshot initial form values and disable Save until something changes
       const saveBtn = document.getElementById("saveSettingsBtn");
@@ -1009,8 +1178,16 @@
       document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
       document.getElementById("checkUpdatesBtn")?.addEventListener("click", checkForUpdates);
       document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
-      document.getElementById("rebootBtn")?.addEventListener("click", () => handleShutdown(true));
-      document.getElementById("shutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      // JTN-621: Reboot/Shutdown are gated behind a confirmation modal so
+      // an accidental touch doesn't make the device unreachable.
+      document.getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm);
+      document.getElementById("shutdownBtn")?.addEventListener("click", openShutdownConfirm);
+      document.getElementById("confirmRebootBtn")?.addEventListener("click", () => handleShutdown(true));
+      document.getElementById("cancelRebootBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("closeRebootConfirmModalBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("confirmShutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      document.getElementById("cancelShutdownBtn")?.addEventListener("click", closeShutdownConfirm);
+      document.getElementById("closeShutdownConfirmModalBtn")?.addEventListener("click", closeShutdownConfirm);
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);
       });

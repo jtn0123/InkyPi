@@ -4,17 +4,22 @@
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle %}
-        <div class="app-header">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
-                    <a href="/" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" title="Home" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
                     {{ theme_toggle() }}
                     <div class="title-container">
                         <h1 class="app-title">Page Not Found</h1>
                     </div>
                 </div>
+                <nav class="header-actions" role="navigation" aria-label="Site navigation">
+                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" title="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}<span class="sr-only">History</span></a>
+                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" title="Playlists">{{ icon('squares-four', 'icon-image') | safe }}<span class="sr-only">Playlists</span></a>
+                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" title="Settings">{{ icon('gear-six', 'icon-image') | safe }}<span class="sr-only">Settings</span></a>
+                </nav>
             </div>
-        </div>
+        </header>
         <div class="separator"></div>
         <div class="page-intro" style="text-align: center; padding: 4rem 1rem;">
             <h2 style="font-size: 4rem; margin-bottom: 0.5rem; opacity: 0.3;">404</h2>

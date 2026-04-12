@@ -15,7 +15,7 @@
                 <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
                 <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
                 {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
-                <div class="history-sub">
+                <div class="history-sub history-source">
                     <span>Source:</span>
                     <span>
                         {{ img.meta.refresh_type or "Manual" }}
@@ -27,6 +27,11 @@
                         {%- set hist_instance_suffix = img.meta.plugin_instance | instance_suffix_label(img.meta.plugin_id) %}
                         {%- if hist_instance_suffix and hist_instance_suffix != img.meta.plugin_id %} &bull; {{ hist_instance_suffix }}{% endif %}
                     </span>
+                </div>
+                {% else %}
+                <div class="history-sub history-source history-source-unknown" title="No provenance metadata was recorded for this entry. Older history entries predate source tracking.">
+                    <span>Source:</span>
+                    <span>Unknown</span>
                 </div>
                 {% endif %}
             </div>
@@ -49,7 +54,7 @@
        hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Previous</a>
     {% else %}
-    <span class="btn" style="opacity: 0.4; pointer-events: none;">Previous</span>
+    <span class="btn pagination-disabled" aria-disabled="true">Previous</span>
     {% endif %}
     <span class="pagination-info">Page {{ page }} of {{ total_pages }}</span>
     {% if page < total_pages %}
@@ -60,7 +65,7 @@
        hx-swap="outerHTML show:#history-grid-container:top"
        hx-push-url="true">Next</a>
     {% else %}
-    <span class="btn" style="opacity: 0.4; pointer-events: none;">Next</span>
+    <span class="btn pagination-disabled" aria-disabled="true">Next</span>
     {% endif %}
 </nav>
 {% endif %}

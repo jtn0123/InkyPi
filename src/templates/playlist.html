@@ -52,7 +52,7 @@
                 {% if playlist_config.active_playlist %}
                 <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
                 {% endif %}
-                <span class="status-chip">Device cadence: {{ device_cycle_minutes }} min</span>
+                <span class="status-chip">Refresh interval: {{ device_cycle_minutes }} min</span>
             </div>
         </div>
 
@@ -72,7 +72,8 @@
                             {% if playlist.name == playlist_config.active_playlist %}
                             <span class="status-chip success">Active</span>
                             {% endif %}
-                            <span class="playlist-summary-copy">{{ playlist.start_time }} - {{ playlist.end_time }}{% if playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
+                            {% set _is_all_day = playlist.start_time == '00:00' and playlist.end_time in ('24:00', '23:59') %}
+                            <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }} - {{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
                         </div>
                         </div>
                         <div class="playlist-toolbar">
@@ -173,7 +174,7 @@
             <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="modalTitle">New Playlist</h2>
             <div class="separator"></div>
-            <form id="scheduleForm" class="settings-form">
+            <form id="scheduleForm" class="settings-form" data-form-state aria-busy="false">
                 <input type="hidden" id="editingPlaylistName" value="">  <!-- Track existing playlist -->
 
                 <div class="form-group">
@@ -183,18 +184,19 @@
                 </div>
                 <div class="form-group">
                     <label for="start_time" class="form-label">Display from </label>
-                    <select id="start_time" name="start_time" class="form-input" aria-required="true"></select>
+                    <input type="time" id="start_time" name="start_time" class="form-input" step="60" value="09:00" aria-required="true" required>
                     <label for="end_time" class="form-label"> to </label>
-                    <select id="end_time" name="end_time" class="form-input" aria-required="true"></select>
+                    <input type="time" id="end_time" name="end_time" class="form-input" step="60" value="17:00" aria-required="true" required>
                 </div>
                 <div class="form-group">
                     <label for="cycle_minutes" class="form-label">Cycle override (minutes)</label>
-                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" class="form-input" aria-label="Cycle override in minutes">
+                    <input type="number" id="cycle_minutes" name="cycle_minutes" min="1" max="1440" class="form-input" aria-label="Cycle override in minutes" aria-invalid="false" aria-describedby="cycle-minutes-error">
+                    <span id="cycle-minutes-error" class="validation-message" role="alert"></span>
                     <small class="form-help">Leave blank to use device default</small>
                 </div>
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveButton">Save</button>
+                <button type="button" class="action-button" id="saveButton" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
                 <button type="button" class="action-button warn hidden" id="deleteButton">Delete</button>
             </div>
         </div>
@@ -206,12 +208,12 @@
             <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <h2 id="refreshSettingsTitle">Refresh Settings</h2>
             <div class="separator"></div>
-            <form id="refreshSettingsForm" class="settings-form">
+            <form id="refreshSettingsForm" class="settings-form" data-form-state aria-busy="false">
                 {% set prefix = "modal" %}
                 {% include 'refresh_settings_form.html' %}
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveRefreshSettingsBtn">Save</button>
+                <button type="button" class="action-button" id="saveRefreshSettingsBtn" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
             </div>
         </div>
     </div>
@@ -224,6 +226,18 @@
             <div class="buttons-container">
                 <button type="button" class="action-button warn" id="confirmDeletePlaylistBtn">Delete</button>
                 <button type="button" class="action-button is-secondary" id="cancelDeletePlaylistBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Display Next Confirm Modal -->
+    <div id="displayNextConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="displayNextConfirmTitle" hidden>
+        <div class="modal-content modal-sheet">
+            <h2 id="displayNextConfirmTitle" class="sr-only">Confirm display next plugin</h2>
+            <p id="displayNextConfirmText"></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button" id="confirmDisplayNextBtn">Display Next</button>
+                <button type="button" class="action-button is-secondary" id="cancelDisplayNextBtn">Cancel</button>
             </div>
         </div>
     </div>

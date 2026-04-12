@@ -56,27 +56,30 @@
             </div>
         </div>
         {% if metrics and (metrics.request_ms is not none or metrics.generate_ms is not none or metrics.preprocess_ms is not none or metrics.display_ms is not none) %}
-        <div class="metric-strip compact">
+        <p id="history-metric-strip-desc" class="sr-only">
+            Latencies from the most recent refresh. Values are per-stage durations in milliseconds.
+        </p>
+        <div class="metric-strip compact" role="group" aria-label="Latest refresh latency" aria-describedby="history-metric-strip-desc">
             {% if metrics.request_ms is not none %}
-            <div class="metric-pill">
+            <div class="metric-pill" title="Time spent fetching upstream data during the last refresh" aria-label="Request latency: {{ metrics.request_ms }} milliseconds (time fetching upstream data on last refresh)">
                 <span class="metric-pill-label">Request</span>
                 <span class="metric-pill-value">{{ metrics.request_ms }} ms</span>
             </div>
             {% endif %}
             {% if metrics.generate_ms is not none %}
-            <div class="metric-pill">
+            <div class="metric-pill" title="Time spent rendering the plugin image during the last refresh" aria-label="Generate latency: {{ metrics.generate_ms }} milliseconds (plugin render time on last refresh)">
                 <span class="metric-pill-label">Generate</span>
                 <span class="metric-pill-value">{{ metrics.generate_ms }} ms</span>
             </div>
             {% endif %}
             {% if metrics.preprocess_ms is not none %}
-            <div class="metric-pill">
+            <div class="metric-pill" title="Time spent preprocessing the image (resize, dither) during the last refresh" aria-label="Preprocess latency: {{ metrics.preprocess_ms }} milliseconds (resize and dither on last refresh)">
                 <span class="metric-pill-label">Preprocess</span>
                 <span class="metric-pill-value">{{ metrics.preprocess_ms }} ms</span>
             </div>
             {% endif %}
             {% if metrics.display_ms is not none %}
-            <div class="metric-pill">
+            <div class="metric-pill" title="Time spent pushing pixels to the e-ink panel during the last refresh" aria-label="Display latency: {{ metrics.display_ms }} milliseconds (pushing pixels to the panel on last refresh)">
                 <span class="metric-pill-label">Display</span>
                 <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
             </div>
@@ -87,13 +90,15 @@
 
         {% include 'partials/history_grid.html' %}
         {% if total > 0 %}
-        <div class="danger-zone history-danger-zone">
-            <div>
-                <h3>Reset cache</h3>
-                <p>Remove all saved history images from this device when you want to reclaim local storage quickly.</p>
+        <hr class="danger-zone-divider" aria-hidden="true">
+        <section class="danger-zone history-danger-zone" role="region" aria-labelledby="historyDangerZoneTitle">
+            <div class="danger-zone-body">
+                <span class="danger-zone-label">Danger zone</span>
+                <h3 id="historyDangerZoneTitle">Reset cache</h3>
+                <p>Remove all saved history images from this device when you want to reclaim local storage quickly. This action cannot be undone.</p>
             </div>
             <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
-        </div>
+        </section>
         {% endif %}
     </div>
 

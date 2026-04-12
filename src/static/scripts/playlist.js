@@ -77,6 +77,7 @@
         const modalIds = [
             'deleteInstanceModal',
             'deletePlaylistModal',
+            'displayNextConfirmModal',
             'thumbnailPreviewModal',
             'refreshSettingsModal',
             'deviceCycleModal',
@@ -95,6 +96,9 @@
                 return;
             case 'deletePlaylistModal':
                 closeDeletePlaylistModal();
+                return;
+            case 'displayNextConfirmModal':
+                closeDisplayNextConfirmModal();
                 return;
             case 'thumbnailPreviewModal':
                 closeThumbnailPreview();
@@ -495,8 +499,8 @@
         document.getElementById("modalTitle").textContent = "Update Playlist";
         document.getElementById("playlist_name").value = playlistName;
         document.getElementById("editingPlaylistName").value = playlistName;
-        document.getElementById("start_time").value = startTime;
-        document.getElementById("end_time").value = endTime;
+        document.getElementById("start_time").value = _normaliseTimeForInput(startTime);
+        document.getElementById("end_time").value = _normaliseTimeForInput(endTime);
         const cycleInput = document.getElementById('cycle_minutes');
         if (cycleInput){ cycleInput.value = cycleMinutes || ''; }
         if (modal) modal.dataset.mode = "edit";
@@ -550,38 +554,57 @@
         return name;
     }
 
+    function _scheduleFormState() {
+        const form = document.getElementById('scheduleForm');
+        return (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
+    }
+
     async function createPlaylist() {
+        const fs = _scheduleFormState();
+        if (fs) fs.clearErrors();
         let playlistName = _validatePlaylistName();
         if (!playlistName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
-        try {
-            const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
-            const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){
-                closeModal();
-                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
-                location.reload();
-            }
-        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        const submit = async () => {
+            try {
+                const response = await fetch(C.create_playlist_url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ playlist_name: playlistName, start_time: startTime, end_time: endTime }) });
+                const result = await handleJsonResponse(response);
+                if (response.ok && result && result.success){
+                    closeModal();
+                    if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                    location.reload();
+                } else if (fs && result && result.field_errors) {
+                    fs.setFieldErrors(result.field_errors);
+                }
+            } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        };
+        if (fs) await fs.run(submit); else await submit();
     }
 
     async function updatePlaylist() {
+        const fs = _scheduleFormState();
+        if (fs) fs.clearErrors();
         let oldName = document.getElementById("editingPlaylistName").value;
         let newName = _validatePlaylistName();
         if (!newName) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         let cycleMinutes = document.getElementById('cycle_minutes').value;
-        try {
-            const response = await fetch(C.update_playlist_base_url + encodeURIComponent(oldName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
-            const result = await handleJsonResponse(response);
-            if (response.ok && result && result.success){
-                closeModal();
-                if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
-                location.reload();
-            }
-        } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        const submit = async () => {
+            try {
+                const response = await fetch(C.update_playlist_base_url + encodeURIComponent(oldName), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ new_name: newName, start_time: startTime, end_time: endTime, cycle_minutes: cycleMinutes || null }) });
+                const result = await handleJsonResponse(response);
+                if (response.ok && result && result.success){
+                    closeModal();
+                    if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
+                    location.reload();
+                } else if (fs && result && result.field_errors) {
+                    fs.setFieldErrors(result.field_errors);
+                }
+            } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
+        };
+        if (fs) await fs.run(submit); else await submit();
     }
 
     async function deletePlaylist() {
@@ -602,24 +625,18 @@
         try{
             const resp = await fetch(C.display_next_url, { method:'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ playlist_name: name }) });
             const j = await handleJsonResponse(resp);
-            if (resp.ok && j && j.success){ setTimeout(() => { location.reload(); }, 500); }
+            if (resp.ok && j && j.success){
+                showResponseModal('success', 'Display updated — refreshing…');
+                setTimeout(() => { location.reload(); }, 500);
+            }
         } catch(e){ showResponseModal('failure', 'Failed to trigger display'); }
     }
 
-    function populateTimeOptions() {
-        let startSelect = document.getElementById("start_time");
-        let endSelect = document.getElementById("end_time");
-        startSelect.innerHTML = "";
-        endSelect.innerHTML = "";
-        for (let hour = 0; hour < 24; hour++) {
-            for (let minutes of [0, 15, 30, 45]) {
-                let time = hour.toString().padStart(2, '0') + ":" + minutes.toString().padStart(2, '0');
-                startSelect.innerHTML += `<option value="${time}">${time}</option>`;
-                endSelect.innerHTML += `<option value="${time}">${time}</option>`;
-            }
-        }
-        startSelect.innerHTML += `<option value="24:00">24:00</option>`;
-        endSelect.innerHTML += `<option value="24:00">24:00</option>`;
+    // Normalise a stored HH:MM (or "24:00") value to a form accepted by <input type="time">.
+    function _normaliseTimeForInput(value) {
+        if (!value) return value;
+        if (value === "24:00") return "23:59";
+        return value;
     }
 
     function initDeviceClock(){
@@ -662,7 +679,6 @@
     }
 
     function init(){
-        populateTimeOptions();
         document.querySelectorAll('.playlist-item .plugin-list').forEach(enableDrag);
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
@@ -694,8 +710,9 @@
         });
         document.querySelectorAll('.run-next-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const name = e.currentTarget.getAttribute('data-playlist');
-                displayNextInPlaylist(name);
+                const el = e.currentTarget;
+                const name = el.getAttribute('data-playlist');
+                openDisplayNextConfirmModal(name, el);
             });
         });
         document.querySelectorAll('.delete-playlist-btn').forEach(btn => {
@@ -773,6 +790,7 @@
         // Cancel buttons on delete confirm modals
         document.getElementById('cancelDeletePlaylistBtn')?.addEventListener('click', closeDeletePlaylistModal);
         document.getElementById('cancelDeleteInstanceBtn')?.addEventListener('click', closeDeleteInstanceModal);
+        document.getElementById('cancelDisplayNextBtn')?.addEventListener('click', closeDisplayNextConfirmModal);
 
         // Device cadence editor
         const editCadence = document.getElementById('editDeviceCycleBtn');
@@ -857,6 +875,7 @@
             if (event.target?.id === 'deviceCycleModal') closeDeviceCycleModal();
             if (event.target?.id === 'deletePlaylistModal') closeDeletePlaylistModal();
             if (event.target?.id === 'deleteInstanceModal') closeDeleteInstanceModal();
+            if (event.target?.id === 'displayNextConfirmModal') closeDisplayNextConfirmModal();
         });
         document.addEventListener('keydown', (event) => {
             if (event.key !== 'Escape') return;
@@ -984,8 +1003,28 @@
     }
     function closeDeleteInstanceModal(){ setModalOpen('deleteInstanceModal', false); }
 
+    function openDisplayNextConfirmModal(name, triggerEl){
+        const el = document.getElementById('displayNextConfirmModal');
+        const txt = document.getElementById('displayNextConfirmText');
+        const btn = document.getElementById('confirmDisplayNextBtn');
+        if (!el || !txt || !btn) {
+            // Fallback: if the modal isn't present for any reason, fire the action directly.
+            displayNextInPlaylist(name);
+            return;
+        }
+        txt.textContent = `Advance '${name}' to the next plugin now?`;
+        setModalOpen('displayNextConfirmModal', true, triggerEl);
+        btn.onclick = async function(){
+            closeDisplayNextConfirmModal();
+            await displayNextInPlaylist(name);
+        };
+    }
+    function closeDisplayNextConfirmModal(){ setModalOpen('displayNextConfirmModal', false); }
+
     window.openDeletePlaylistModal = openDeletePlaylistModal;
     window.closeDeletePlaylistModal = closeDeletePlaylistModal;
     window.openDeleteInstanceModal = openDeleteInstanceModal;
     window.closeDeleteInstanceModal = closeDeleteInstanceModal;
+    window.openDisplayNextConfirmModal = openDisplayNextConfirmModal;
+    window.closeDisplayNextConfirmModal = closeDisplayNextConfirmModal;
 })();

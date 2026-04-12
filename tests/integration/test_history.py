@@ -565,8 +565,8 @@ def test_history_manual_metadata_rendered(client, device_config_dev):
     assert "weather" in text
 
 
-def test_history_no_sidecar_no_source(client, device_config_dev):
-    """Entries without JSON sidecars should not show a Source line."""
+def test_history_no_sidecar_shows_unknown_source(client, device_config_dev):
+    """Entries without JSON sidecars show a consistent "Source: Unknown" line (JTN-631)."""
     d = device_config_dev.history_image_dir
     os.makedirs(d, exist_ok=True)
     fname = "display_20250101_040000.png"
@@ -577,7 +577,10 @@ def test_history_no_sidecar_no_source(client, device_config_dev):
     assert resp.status_code == 200
     text = resp.get_data(as_text=True)
     assert "display_20250101_040000" in text
-    assert "Source:" not in text
+    # Every entry now shows a Source line for consistency
+    assert "Source:" in text
+    assert "Unknown" in text
+    assert "history-source-unknown" in text
 
 
 def test_history_metadata_deduplicates_instance(client, device_config_dev):
@@ -862,7 +865,6 @@ def test_htmx_partial_is_not_full_page(client, device_config_dev):
     assert "<html" not in body, "HTMX partial must not include <html> tag"
     assert "history-grid-container" in body, "Partial must contain the grid container"
 
-
 def test_history_source_hides_auto_generated_instance_key(client, device_config_dev):
     """JTN-619: History source row must not expose {plugin_id}_saved_settings."""
     d = device_config_dev.history_image_dir
@@ -910,3 +912,97 @@ def test_history_source_preserves_user_instance_name(client, device_config_dev):
     assert resp.status_code == 200
     text = resp.get_data(as_text=True)
     assert "Morning Weather" in text
+
+
+def test_history_pagination_previous_disabled_has_disabled_class(
+    client, device_config_dev
+):
+    """JTN-636: On page 1, 'Previous' must render with .pagination-disabled
+    styling so it is visually distinguishable from the active 'Next' link."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(15):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_jtn636_{i:03d}.png")
+        )
+
+    resp = client.get("/history?page=1&per_page=10")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Page 1 should show Previous as a disabled <span> with the disabled class.
+    assert "pagination-disabled" in body
+    # The pagination-disabled control should be aria-disabled for a11y
+    assert 'aria-disabled="true"' in body
+    # Inline opacity hack from before the fix must not be used
+    assert 'style="opacity: 0.4; pointer-events: none;"' not in body
+
+
+def test_history_pagination_next_disabled_on_last_page(client, device_config_dev):
+    """JTN-636: On the last page, 'Next' must also use .pagination-disabled."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    for f in os.listdir(d):
+        os.remove(os.path.join(d, f))
+    for i in range(15):
+        Image.new("RGB", (10, 10), "white").save(
+            os.path.join(d, f"display_jtn636b_{i:03d}.png")
+        )
+
+    resp = client.get("/history?page=2&per_page=10")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "pagination-disabled" in body
+
+
+# ---------------------------------------------------------------------------
+# JTN-626 — metric chips expose context via tooltip / aria-label
+# ---------------------------------------------------------------------------
+
+
+def test_history_metric_pills_have_context_tooltip(client, device_config_dev):
+    """Metric chips (Generate, Request, etc.) must have a title and aria-label
+    so users can tell what the "2622 ms" number actually measures."""
+    # Force a refresh_info with a generate_ms value so the pill is rendered.
+    device_config = device_config_dev
+    ri = device_config.get_refresh_info()
+    ri.generate_ms = 2622
+    ri.request_ms = 100
+    ri.preprocess_ms = 50
+    ri.display_ms = 800
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # Region exposes an aria-label and a hidden describedby paragraph
+    assert 'aria-label="Latest refresh latency"' in body
+    assert 'id="history-metric-strip-desc"' in body
+    # Each pill has a tooltip and explanatory aria-label
+    assert "Time spent rendering the plugin image" in body
+    assert "Generate latency: 2622 milliseconds" in body
+    assert "Request latency: 100 milliseconds" in body
+
+
+# ---------------------------------------------------------------------------
+# JTN-649 — danger zone has clear visual separation + label
+# ---------------------------------------------------------------------------
+
+
+def test_history_danger_zone_has_visual_separation(client, device_config_dev):
+    """Reset-cache section should render as a distinct danger zone with a
+    divider, a "Danger zone" label, and a region landmark (JTN-649)."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, "display_jtn649_01.png"))
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "danger-zone-divider" in body
+    assert "danger-zone-label" in body
+    assert "Danger zone" in body
+    # Section landmark wraps the reset-cache controls
+    assert 'role="region"' in body
+    assert 'aria-labelledby="historyDangerZoneTitle"' in body

@@ -114,16 +114,37 @@
             }
           }
         }
-        if (!data) {
-          showResponseModal("failure", "No recent progress to show");
-          return;
-        }
         const progress = document.getElementById("requestProgress");
         const textEl = document.getElementById("requestProgressText");
         const clockEl = document.getElementById("requestProgressClock");
         const elapsedEl = document.getElementById("requestProgressElapsed");
         const list = document.getElementById("requestProgressList");
         const bar = document.getElementById("requestProgressBar");
+        // JTN-634: Previously, the no-data path surfaced a toast only, which
+        // users (especially on Weather / AI Image where validation often
+        // blocks the first Update Now attempt before any snapshot is saved)
+        // reported as "no feedback". Show an empty-state inside the progress
+        // block itself so the click always produces a clearly visible result
+        // anchored to the "Last progress" button.
+        if (!data) {
+          if (list) {
+            list.innerHTML = "";
+            const li = document.createElement("li");
+            li.className = "progress-empty-state";
+            li.textContent =
+              "No progress data yet — run Update Now to see progress here.";
+            list.appendChild(li);
+          }
+          if (textEl) textEl.textContent = "No progress data yet";
+          if (clockEl) clockEl.textContent = "—";
+          if (elapsedEl) elapsedEl.textContent = "—";
+          if (bar) { bar.style.width = "0%"; bar.setAttribute("aria-valuenow", 0); }
+          if (progress) {
+            setHidden(progress, false);
+            progress.style.display = "";
+          }
+          return;
+        }
         if (list) {
           list.innerHTML = "";
           data.lines.forEach((rawLine) => {
@@ -574,6 +595,70 @@
       }, 100);
     }
 
+    // JTN-629: Capture a snapshot of the settings form on load so we can
+    // detect unsaved changes. `formDirty` compares each input value to its
+    // initial value. Files/passwords are omitted — just string values from
+    // inputs/textareas/selects are enough to catch the common case (a typed
+    // prompt in AI Image) without false positives from checkbox serialization.
+    function getSettingsFormSnapshot() {
+      const form = document.getElementById("settingsForm");
+      if (!form) return null;
+      const snapshot = {};
+      form.querySelectorAll("input, textarea, select").forEach((el) => {
+        if (!el.name && !el.id) return;
+        const key = el.name || el.id;
+        if (el.type === "file") return;
+        if (el.type === "checkbox" || el.type === "radio") {
+          snapshot[`${key}:${el.value}`] = el.checked ? "1" : "0";
+        } else {
+          snapshot[key] = el.value == null ? "" : String(el.value);
+        }
+      });
+      return snapshot;
+    }
+
+    let _settingsFormSnapshot = null;
+
+    function isSettingsFormDirty() {
+      const current = getSettingsFormSnapshot();
+      if (!_settingsFormSnapshot || !current) return false;
+      const keys = new Set([
+        ...Object.keys(_settingsFormSnapshot),
+        ...Object.keys(current),
+      ]);
+      for (const key of keys) {
+        if (_settingsFormSnapshot[key] !== current[key]) return true;
+      }
+      return false;
+    }
+
+    function initApiKeysLeaveGuard() {
+      const link = document.querySelector("[data-api-keys-link]");
+      const modal = document.getElementById("apiKeysLeaveConfirmModal");
+      if (!link || !modal) return;
+      // Snapshot AFTER the rest of init runs so schema-populated defaults are
+      // captured as the baseline, not flagged as "dirty" on first click.
+      setTimeout(() => {
+        _settingsFormSnapshot = getSettingsFormSnapshot();
+      }, 0);
+      link.addEventListener("click", (event) => {
+        if (!isSettingsFormDirty()) return; // fall through to normal navigation
+        event.preventDefault();
+        const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
+        if (confirmBtn && link.href) confirmBtn.href = link.href;
+        openModal("apiKeysLeaveConfirmModal", link);
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (modal.hidden) return;
+        event.preventDefault();
+        closeModal("apiKeysLeaveConfirmModal");
+      });
+      globalThis.addEventListener("click", (event) => {
+        if (event.target === modal) closeModal("apiKeysLeaveConfirmModal");
+      });
+    }
+
     function bindModalClose() {
       globalThis.addEventListener("click", (event) => {
         if (actionInFlight) return;
@@ -639,12 +724,35 @@
         const opener = event.target.closest("[data-open-modal]");
         if (opener) openModal(opener.dataset.openModal, opener);
       });
+      // JTN-633: the DRAFT-state "Add to Playlist" button relies on the delegated
+      // opener above to surface the scheduling modal. Attach a direct listener
+      // as a belt-and-suspenders safeguard so the click can never silently
+      // no-op — if the modal target ever goes missing, the user gets a clear
+      // response modal instead of nothing happening.
+      document.querySelectorAll('[data-plugin-draft="true"][data-open-modal]').forEach((button) => {
+        button.addEventListener("click", (event) => {
+          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+          const target = document.getElementById(button.dataset.openModal);
+          if (!target) {
+            event.preventDefault();
+            showResponseModal(
+              "failure",
+              "Unable to open the Add to Playlist dialog. Please refresh the page and try again."
+            );
+            return;
+          }
+          // Ensure the modal opens even if the delegated handler above is
+          // removed or an earlier listener called stopPropagation.
+          if (!target.classList.contains("is-open")) {
+            openModal(button.dataset.openModal, button);
+          }
+        });
+      });
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });
-      document.querySelectorAll("[data-collapsible-toggle]").forEach((button) => {
-        button.addEventListener("click", () => ui.toggleCollapsible?.(button));
-      });
+      // Collapsible toggle is bound via delegation in ui_helpers.js so every
+      // `[data-collapsible-toggle]` button updates aria-expanded consistently.
       document.querySelectorAll("[data-frame-option]").forEach((option) => {
         option.addEventListener("click", () => selectedFrame(option));
         option.addEventListener("keydown", (event) => {
@@ -708,6 +816,7 @@
       initStatusBar();
       initPreviewInteractions();
       initApiIndicator();
+      initApiKeysLeaveGuard();
       initColorPreviews();
       bindModalClose();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {

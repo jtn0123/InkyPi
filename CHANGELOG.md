@@ -1,6 +1,555 @@
 # CHANGELOG
 
 
+## v0.49.13 (2026-04-12)
+
+### Bug Fixes
+
+- **playlist**: Add confirmation + success toast to Display Next (JTN-630)
+  ([`b076fc3`](https://github.com/jtn0123/InkyPi/commit/b076fc3113ffc514e494384aa02aa177b208b6c6))
+
+On a Pi Zero 2 W, the per-playlist "Display Next" button used to fire immediately with no
+  confirmation and no visible success feedback, leaving the user unsure whether the command was
+  sent. Now:
+
+- Click opens a confirmation modal that names the playlist being advanced. - Confirming fires the
+  existing request and surfaces a success toast ("Display updated — refreshing…") before the page
+  reloads. - Cancel/backdrop-click/Escape all close the modal; a11y attributes and wiring follow the
+  Delete Playlist / Delete Instance modal pattern.
+
+Tests: - tests/static/test_display_next_confirmation.py — 8 new assertions covering the modal
+  markup, a11y attrs, click-handler rewire, success toast, cancel button, and escape/backdrop
+  registration. - tests/integration/test_playlist_empty_state.py — updated to match on
+  `.run-next-btn` instead of the literal "Display Next" string, since the confirm modal now renders
+  as page chrome even for empty playlists.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **a11y**: Guard Style accordion chevron flip (JTN-643)
+  ([#413](https://github.com/jtn0123/InkyPi/pull/413),
+  [`1768b29`](https://github.com/jtn0123/InkyPi/commit/1768b29c746f5542d08f6158ce0a0df3f762200a))
+
+PR #389 (JTN-623) already fixed the "Style ▼ stays ▼" behaviour on plugin pages by letting CSS
+  rotate `.collapsible-icon` 180deg off `[aria-expanded="true"]`. The existing coverage asserted the
+  CSS rule is bundled and that JS toggles aria-expanded, but nothing exercised the live browser path
+  on a plugin page or pinned down the hidden prerequisite — `transform` only applies if the chevron
+  span is a non-inline box.
+
+Add two regression guards so the "stuck ▼" symptom cannot silently return: - Static test:
+  `.collapsible-icon` must keep `float: right` (or declare an explicit non-inline `display:`) so the
+  rotate transform actually renders. Dropping the float without a replacement would visually revert
+  the fix while aria-expanded still flipped. - E2E test: on `/plugin/weather`, clicking the Style
+  header flips `aria-expanded` to `true` AND computes `transform: matrix(-1,0,0,-1,0,0)` on the
+  chevron, and clears both on a second click.
+
+Closes JTN-643.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.12 (2026-04-12)
+
+### Bug Fixes
+
+- **history**: Polish pass — source fallback, metric tooltip, danger zone
+  ([#409](https://github.com/jtn0123/InkyPi/pull/409),
+  [`8a53afc`](https://github.com/jtn0123/InkyPi/commit/8a53afc71b61f4c7d50a2275dc25d07a831afddd))
+
+JTN-626: Metric chips (Request / Generate / Preprocess / Display) now carry both a title tooltip and
+  a descriptive aria-label so users can tell what "2622 ms" actually measures. The strip is labelled
+  as a region with a screen-reader-only describedby paragraph.
+
+JTN-631: Every history entry now renders a Source line for consistency.
+
+Entries without sidecar provenance show "Source: Unknown" in a muted italic style with a tooltip
+  explaining older entries predate source tracking.
+
+JTN-649: The reset-cache section is now a proper danger zone: a horizontal divider separates it from
+  the grid, a red "Danger zone" pill label sits above the heading, the heading uses the error color,
+  padding and border are beefed up, and on narrow viewports it stacks vertically with a full-width
+  Clear All button. The section is exposed as a region landmark for assistive tech.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.11 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Restore main nav on 404 page (JTN-641)
+  ([#399](https://github.com/jtn0123/InkyPi/pull/399),
+  [`ab28051`](https://github.com/jtn0123/InkyPi/commit/ab280516a6c4b331e548f63e4882c3529cb37885))
+
+* fix(ui): restore main nav on 404 page (JTN-641)
+
+Users hitting a broken URL saw only Home and theme toggle, with no path to History, Playlists, or
+  Settings. Add the standard site navigation <nav> block to the 404 template so every broken URL
+  remains a discovery entry point, matching the header used on inky/playlist/settings pages.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* a11y: address Sonar S7927 on 404 nav links (JTN-641)
+
+SonarCloud flagged the three icon-only nav links (History/Playlists/ Settings) because their
+  accessible name came from aria-label only, not from visible content. Replace aria-label with a
+  visually-hidden span inside the link so the accessible name is derived from
+  (screen-reader-visible) content, and add title attributes for sighted hover tooltips. No visual
+  regression.
+
+* chore(deps): sync uv.lock to pyproject 0.49.6
+
+Resolves Lockfile drift check — pyproject was bumped to 0.49.6 on main but uv.lock still pinned
+  0.49.5.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.10 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Show empty-state in progress block on Weather and AI Image (JTN-634)
+  ([#403](https://github.com/jtn0123/InkyPi/pull/403),
+  [`9be4e5a`](https://github.com/jtn0123/InkyPi/commit/9be4e5a936e712e73d7f665e609345530f27d1ff))
+
+PR #377 (JTN-347/348/331/332) made the Last progress button work on Clock, To-Do, Calendar, and
+  Screenshot by clearing the inline display:none left by progress.stop(). Weather and AI Image still
+  appeared to "show no feedback" because their required settings fields (latitude / longitude /
+  textPrompt) frequently fail client-side validation, so the very first Update Now click
+  short-circuits in handleAction before sendForm runs and no progress snapshot is ever persisted. A
+  later click of Last progress then hit the no-data branch, which surfaced only a transient toast —
+  easy to miss and not anchored to the button.
+
+Move the empty-state message inside the requestProgress block itself: the button now always reveals
+  a clearly visible panel, either with real snapshot data or with "No progress data yet — run Update
+  Now to see progress here." The progress bar is reset to 0% in the empty state so the UI doesn't
+  imply a completed run. Adds regression tests that confirm the button and block render on
+  /plugin/weather and /plugin/ai_image and that the no-data branch unhides the progress block.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.9 (2026-04-12)
+
+### Bug Fixes
+
+- **ai_text**: Show input AND output token prices in model labels (JTN-635)
+  ([#400](https://github.com/jtn0123/InkyPi/pull/400),
+  [`bfe3b2d`](https://github.com/jtn0123/InkyPi/commit/bfe3b2d6192f9ad2e1597060ebf0466716d76f91))
+
+Model dropdown labels only displayed input token pricing (e.g. "$2.50/1M in"), which is misleading
+  because output tokens are typically 3-4x the input rate for LLMs. Users evaluating cost were
+  under-estimating actual spend.
+
+Updated labels to the compact form "$X in / $Y out per 1M" for all OpenAI and Google models, added a
+  pricing reference comment pointing at provider pricing pages, and expanded the callout to note
+  that output tokens cost more than input. Added a regression test that parses the schema and
+  asserts every model label exposes both prices.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.8 (2026-04-12)
+
+### Bug Fixes
+
+- **image_upload,image_folder**: Pre-select Background Fill radio in draft (JTN-632)
+  ([#402](https://github.com/jtn0123/InkyPi/pull/402),
+  [`fce6102`](https://github.com/jtn0123/InkyPi/commit/fce610288cc10f4e7f1907f7dd85d94c7685b3dc))
+
+The Background Fill radio group rendered two inputs both marked `checked` on /plugin/image_upload
+  and /plugin/image_folder because the legacy Style collapsible in plugin.html hardcodes a second
+  `<input ... name="backgroundOption" value="color" checked>`. The schema-driven Blur radio was
+  correctly checked, but the hidden Style radio added a competing checked state, so browsers treated
+  the group as indeterminate and users could save without picking a background fill option.
+
+Both plugins already expose their own schema-driven Background Fill field and do not consume any of
+  the Style collapsible fields (Frame, Margins, Text Color, etc.), so disabling `style_settings` is
+  safe and removes the name collision. With Style off, the schema's `default="blur"` pre-selects
+  exactly one radio in DRAFT mode, matching the `generate_image` fallback.
+
+Tests: - Schema assertion that `backgroundOption.default == "blur"` for both plugins. - Integration
+  regression: GET /plugin/image_upload and /plugin/image_folder in DRAFT mode, parse all
+  `name="backgroundOption"` inputs, assert exactly one is `checked` and that its value is `blur`.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.7 (2026-04-12)
+
+### Bug Fixes
+
+- **playlist**: Use native time input for arbitrary HH:MM schedules (JTN-647)
+  ([#401](https://github.com/jtn0123/InkyPi/pull/401),
+  [`41e974c`](https://github.com/jtn0123/InkyPi/commit/41e974c0a16c829f3f3f1c130799052d8cc78522))
+
+Replace the 15-minute-increment <select> dropdowns for playlist start/end time with <input
+  type="time" step="60">. Users can now schedule times like 09:05 or 07:10, which the backend
+  already accepts. The edit modal normalises the legacy "24:00" sentinel to "23:59" so native time
+  inputs can display it.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.6 (2026-04-12)
+
+### Bug Fixes
+
+- **release**: Stop shipping literal {version} placeholder in VERSION (JTN-624)
+  ([#391](https://github.com/jtn0123/InkyPi/pull/391),
+  [`20dc553`](https://github.com/jtn0123/InkyPi/commit/20dc55369a6fa4d8b43a4f7057115146a8a9a7f9))
+
+* fix(release): stop shipping literal {version} placeholder in VERSION (JTN-624)
+
+The Settings -> Updates tab was reporting `INSTALLED: 0.1.0` while the latest release was 0.47.0.
+  Root causes:
+
+1. `pyproject.toml` had `build_command = "echo '{version}' > VERSION"`, but python-semantic-release
+  does NOT expand `{version}` inside shell build commands — it passes the literal string through.
+  Every release since #349 therefore wrote the seven characters `{version}` to VERSION. Switch to
+  `printf '%s\n' "$NEW_VERSION" > VERSION` so the release pipeline uses the env var PSR actually
+  exports. 2. `version_toml` only pointed at `tool.semantic_release.version`, so the canonical
+  PEP-621 `[project].version` was never bumped and has been drifting since the uv-lock migration
+  (JTN-616). Add `project.version` to `version_toml` so every release rewrites both keys. 3.
+  `_read_version()` / `_read_app_version()` surfaced the literal `{version}` string (or `0.1.0`) to
+  the UI verbatim. Add a pyproject.toml fallback and treat `{version}`, `0.1.0`, and empty strings
+  as "no usable VERSION file" so the UI still shows a real version even if a future release
+  regresses VERSION again.
+
+Also bump VERSION and `[project].version` to 0.47.0 so the checked-in state matches the latest tag.
+
+Regression tests:
+
+- `test_version_file_on_disk_is_not_placeholder` — fails CI if VERSION ever contains `{version}`,
+  `0.1.0`, or a non-semver string. -
+  `test_pyproject_project_version_matches_semantic_release_version` — fails CI if the two
+  version_toml targets drift. - `test_read_version_placeholder_falls_back_to_pyproject` — covers the
+  runtime fallback path so a broken VERSION doesn't break the UI.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(deps): regenerate uv.lock after version bump (JTN-624)
+
+The [project].version bump in pyproject.toml shifted the lockfile's project version metadata.
+  Regenerate with `uv lock` to clear the advisory Lockfile drift check.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.5 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Surface DRAFT state when Add to Playlist is clicked (JTN-633)
+  ([#398](https://github.com/jtn0123/InkyPi/pull/398),
+  [`c3986b2`](https://github.com/jtn0123/InkyPi/commit/c3986b2474ee16422d0b6d20420137e2700a0648))
+
+* fix(plugin): surface DRAFT state when Add to Playlist is clicked (JTN-633)
+
+Add a defensive direct click listener on the DRAFT-state Add-to-Playlist button so it can never
+  silently no-op. If the scheduling modal is missing the user now sees a clear toast/response modal
+  telling them to refresh. Also clarify the inline help text to explain that current settings are
+  captured when the playlist entry is saved.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: skip new Playwright test module when browser unavailable (JTN-633)
+
+Register test_plugin_draft_add_to_playlist.py in UI_BROWSER_TESTS so pytest_ignore_collect skips it
+  on the CI pytest runners that don't install Playwright Chromium, matching the existing
+  test_plugin_add_to_playlist_ui.py treatment.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.4 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Warn on API Required navigation when form has unsaved changes (JTN-629)
+  ([#397](https://github.com/jtn0123/InkyPi/pull/397),
+  [`0db65fb`](https://github.com/jtn0123/InkyPi/commit/0db65fb9216ff33941a7c67b16b538d28cc5ce13))
+
+On plugin pages that require an API key (AI Image, GitHub, etc.), the "API Required" chip in the
+  header was a plain <a> link that immediately navigated to /settings/api-keys. A user who had typed
+  a long prompt and tapped the chip lost all of it without warning.
+
+The chip is now intercepted by plugin_page.js. On first page load the settings form is snapshotted;
+  on chip click, we compare the current form state to the snapshot. If the form is dirty, a
+  confirmation modal opens warning about discarding unsaved changes — matching the Reboot/Shutdown
+  modal UX introduced in JTN-621. If the form is clean, navigation proceeds normally. The confirm
+  button is still an <a href> to the API keys page so no-JS fallback keeps working.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.3 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Small polish pass — pagination, jargon, 24:00, colons (JTN-636, JTN-640, JTN-639, JTN-645)
+  ([#396](https://github.com/jtn0123/InkyPi/pull/396),
+  [`c165085`](https://github.com/jtn0123/InkyPi/commit/c165085eb55597f9168da1b555b66347ae45fc30))
+
+- JTN-636: Disabled Previous/Next pagination controls now use a dedicated .pagination-disabled class
+  (reduced opacity, cursor:default, pointer-events: none, aria-disabled=true) instead of an inline
+  style, so page 1 Previous is visually distinguishable from the active Next link. - JTN-640:
+  Playlists header chip now reads "Refresh interval" instead of the internal jargon "Device
+  cadence". - JTN-639: Playlists whose range spans the full day (00:00 to 24:00/23:59) now render as
+  "All day" instead of the non-standard "24:00" end time. - JTN-645: Image Processing slider labels
+  (Saturation, Contrast, Sharpness, Brightness, Inky Driver Saturation) no longer end with trailing
+  colons, matching the rest of the settings form.
+
+Adds regression assertions in tests/integration/test_history.py, test_playlist_routes.py, and
+  test_settings_routes.py.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.2 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Hide raw slug subtitle and explain DRAFT badge (JTN-622, JTN-644)
+  ([#395](https://github.com/jtn0123/InkyPi/pull/395),
+  [`52b5b38`](https://github.com/jtn0123/InkyPi/commit/52b5b38b8a38987783ff3d28c74eea25cba64093))
+
+- Remove the visible plugin.id subtitle from the plugin page header by default. The raw filesystem
+  slug (ai_image, clock, weather, ...) is an internal identifier and has no meaning to end users.
+  Kept behind ?debug=1 for diagnostics. - Add title and aria-describedby to the Draft status chip so
+  users (and screen readers) learn what the badge means and how to clear it. - Extend the
+  status_chip macro to accept optional title / describedby args. - Add integration tests covering
+  both fixes.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.1 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Render System Health and Isolation Summary as tables (JTN-646)
+  ([#394](https://github.com/jtn0123/InkyPi/pull/394),
+  [`0d7b5fb`](https://github.com/jtn0123/InkyPi/commit/0d7b5fbe2f1daebf14d1fea47c8cfe88bdb3af7d))
+
+Extends JTN-384 to the remaining Diagnostics panels. System Health, Plugin Health, and Isolation
+  Summary no longer dump raw JSON.stringify output; instead they render as labeled .bench-table
+  tables with human-friendly units (percent, uptime) and a "No plugins isolated" empty state.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.0 (2026-04-12)
+
+### Features
+
+- **plugin**: Use HTMX for plugin settings form submission (JTN-506)
+  ([#383](https://github.com/jtn0123/InkyPi/pull/383),
+  [`c6ad4a8`](https://github.com/jtn0123/InkyPi/commit/c6ad4a84eeed03ec08b721a336e95221702ad39f))
+
+* feat(plugin): use HTMX for plugin settings form submission (JTN-506)
+
+The base template already loads HTMX on every page, but nothing on the plugin page was using it —
+  the settings form was posting via fetch() and rendering errors through a toast modal. Phase 1 of
+  JTN-506 migrates the "Save Settings" button to an HTMX-driven flow so validation errors swap
+  inline and successes fire an HX-Trigger-backed toast, while legacy JSON clients still see JSON
+  (gated on the HX-Request header).
+
+Progressive enhancement: the form now carries action/method so it stays valid HTML, and an error
+  container (#plugin-form-errors) hosts the swap target. update_now, update_instance, and
+  add_to_playlist keep using the existing sendForm path; those are deferred to follow-up PRs.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(plugin): add coverage for _is_htmx_request RuntimeError + error Content-Type (JTN-506)
+
+Push SonarCloud new_coverage past the 80% gate. Covers two previously unexercised branches: -
+  `_is_htmx_request()` called outside a Flask request context - Internal error response sets
+  `text/html` content-type (sep from body check)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.48.1 (2026-04-12)
+
+### Bug Fixes
+
+- **a11y**: Toggle aria-expanded on Style collapsible (JTN-623)
+  ([#389](https://github.com/jtn0123/InkyPi/pull/389),
+  [`de67e2c`](https://github.com/jtn0123/InkyPi/commit/de67e2ccd3e4e1d7f78ddd7195d5c721ee977629))
+
+The Style accordion on plugin pages (and any `[data-collapsible-toggle]` button) could fall out of
+  sync with screen readers: aria-expanded stayed "false" after clicking, and the chevron never
+  flipped direction.
+
+Two fixes:
+
+1. Move the click handler into a document-level delegated listener in ui_helpers.js so every
+  collapsible button reliably toggles aria-expanded, even if a page-specific binding is missed or
+  runs before the button exists. Removed the now-redundant per-button bindings in plugin_page.js and
+  settings_page.js.
+
+2. Let CSS own the chevron direction. The JS used to flip textContent between ▼ and ▲ while
+  _toggle.css also rotated the icon 180deg via `[aria-expanded="true"]` — the two cancelled out and
+  the chevron appeared unchanged. Dropped the textContent swap; the static ▼ character now rotates
+  in CSS based on aria-expanded.
+
+Updated test_collapsible_icon_direction.py to cover the new contract: aria-expanded must flip, CSS
+  must own the chevron rotation, and a delegated click handler must exist.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Add confirmation dialog to Reboot/Shutdown buttons (JTN-621)
+  ([#388](https://github.com/jtn0123/InkyPi/pull/388),
+  [`f391829`](https://github.com/jtn0123/InkyPi/commit/f391829d66630b6faf4f9b5b0aabd50ae399b0de))
+
+An accidental tap on the Reboot or Shutdown button in Settings -> Updates immediately severed the UI
+  on a Pi Zero 2 W, with no physical recovery path until a power cycle. Both actions now open a
+  confirmation modal that clearly states the UI will be unavailable and that physical access is
+  required to recover if anything goes wrong.
+
+The click handlers for #rebootBtn and #shutdownBtn now open the respective modal instead of invoking
+  handleShutdown directly. The modal's confirm button is what actually fires the action, matching
+  the Clear All History pattern.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.48.0 (2026-04-12)
+
+### Bug Fixes
+
+- **security**: Exempt /api/csp-report from CSRF and return 400 on malformed JSON (JTN-628)
+  ([#387](https://github.com/jtn0123/InkyPi/pull/387),
+  [`500627b`](https://github.com/jtn0123/InkyPi/commit/500627b8711ece5f78fb4c007e52f26624828339))
+
+Browsers never attach a CSRF token or session cookie to automatic CSP violation reports, so POST
+  /api/csp-report was being rejected by the global CSRF middleware with HTTP 403. All violation
+  reports were silently discarded, and the dev console filled with 403s.
+
+Changes: - Add /api/csp-report to _CSRF_EXEMPT_PATHS and _RATE_EXEMPT so the endpoint's own 20/min
+  per-IP sliding-window limiter is authoritative. - Return HTTP 400 (application/json) on malformed
+  JSON bodies instead of swallowing them as 204 — surfaces parser bugs and matches RFC expectations.
+  The response never echoes the request body. - Cap the accepted body at 16 KiB; oversized payloads
+  are discarded silently (204) so the limiter can't be fingerprinted. - Extend tests: integration
+  cases proving POST without CSRF succeeds, malformed JSON yields 400, oversized bodies are dropped,
+  and application/reports+json (Reporting API v2) is accepted.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Add /settings/diagnostics route to prevent 404 (JTN-627)
+  ([#386](https://github.com/jtn0123/InkyPi/pull/386),
+  [`4de5857`](https://github.com/jtn0123/InkyPi/commit/4de585728113ab9bc4b92db4a042996c353299a4))
+
+Users who bookmark or follow direct links to /settings/diagnostics previously received a 404.
+  Diagnostics is an accordion embedded in the main /settings page rather than a standalone sub-page,
+  so add a small redirect route that points visitors at the accordion anchor instead.
+
+- Add GET /settings/diagnostics -> 302 /settings#diagnostics - Add id="diagnostics" anchor target
+  next to the Diagnostics accordion so the fragment actually resolves to the right section - Cover
+  with integration tests asserting 302 target, no 404, and that following the redirect renders the
+  settings page with the anchor
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- **ui**: Unify loading/error states with FormState manager (JTN-505)
+  ([#382](https://github.com/jtn0123/InkyPi/pull/382),
+  [`7c686ec`](https://github.com/jtn0123/InkyPi/commit/7c686ec2c10cd03c5eaf31d72596cb89d0b94fd2))
+
+* feat(ui): unify loading/error states with FormState manager (JTN-505)
+
+Adds src/static/scripts/form_state.js — a framework-free manager that wires any <form
+  data-form-state> element with a uniform submit lifecycle:
+
+- Disables the submit button and shows its .btn-spinner while in flight - Flips aria-busy="true" on
+  the form during the request - setFieldError / setFieldErrors render inline next to fields via
+  existing aria-describedby validation-message regions; first invalid field receives focus -
+  clearErrors resets all inline validation-messages and aria-invalid flags at the start of every
+  submit
+
+Settings form and playlist schedule/refresh forms now opt in through data-form-state +
+  data-form-state-submit attributes. settings_page.js handleAction and playlist.js
+  createPlaylist/updatePlaylist route their save requests through FormState.run() so duplicate
+  submissions are no longer possible, and server-side field_errors (when present) surface inline
+  instead of only in a dismissible toast.
+
+form_state.js is added to the build_assets.py bundle manifest and to base.html so it loads on every
+  page.
+
+Plugin form (plugin.html / plugin_form.js) is intentionally untouched — that path is being migrated
+  to HTMX in JTN-506.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(a11y): update image preview modal tests for modal() macro
+
+Plugin.html was refactored in JTN-503 to render #imagePreviewModal via the shared modal() macro,
+  which emits aria-labelledby and the <h2> title element at render time. The existing text-based
+  tests were asserting against the raw plugin.html source and no longer matched. Tests now accept
+  either path (direct literal or macro invocation) and also verify the macro itself emits the
+  required aria-labelledby + h2 id.
+
+* test(a11y): accept macro-generated title id and quote style
+
+The modal() macro emits aria-labelledby="<id>Title", so invoking it as modal('imagePreviewModal',
+  ...) renders id='imagePreviewModalTitle' (not the original hand-written 'imagePreviewTitle').
+  Update the rendered-page assertion to accept either id and either quote style, preserving a11y
+  coverage without coupling to a specific naming convention.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **api**: Standardize JSON response envelope across blueprints (JTN-500)
+  ([#384](https://github.com/jtn0123/InkyPi/pull/384),
+  [`2122e21`](https://github.com/jtn0123/InkyPi/commit/2122e21b357d0454fcf8d4714ca945fbd041b22e))
+
+Migrates success-shaped ``jsonify({"success": True, ...})`` calls and the remaining raw-error
+  payloads in blueprints to the central ``json_success`` / ``json_error`` helpers so every JSON
+  response carries the canonical envelope (``success``, ``message`` / ``error``, ``request_id``,
+  ...).
+
+- Document the canonical envelope in ``src/utils/http_utils.py`` - Migrate ``main.py``,
+  ``plugin.py``, ``stats.py``, and the ``settings/_*`` blueprints to ``json_success`` /
+  ``json_error`` - Add ``tests/contracts/test_json_envelope.py`` covering success, error, and
+  ``X-Request-Id`` round-trip envelopes for a representative set of routes - Keep legacy top-level
+  ``running``/``unit`` fields on the 409 duplicate-update response for backward compatibility with
+  existing clients/tests
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **plugin_registry**: Use sys.executable for pyenv compatibility (JTN-625)
+  ([#385](https://github.com/jtn0123/InkyPi/pull/385),
+  [`8c7c146`](https://github.com/jtn0123/InkyPi/commit/8c7c14675d71b96ddeb4321f23c5ce7bd8e45976))
+
+The two shell-based tests (test_venv_shell_sets_pythonpath and test_plugin_import_with_pythonpath)
+  invoked a bare `python` via bash, which failed on macOS local dev when a pyenv shim pointed at an
+  unavailable interpreter ("pyenv: python: command not found"). The tests were only meant to
+  exercise PYTHONPATH propagation, not PATH resolution for `python`.
+
+Switch the in-shell interpreter invocation to the currently-running sys.executable (shell-escaped
+  via shlex.quote). Behavior under test is unchanged; the tests now run regardless of whether
+  `python` is on PATH.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.47.0 (2026-04-12)
 
 ### Bug Fixes

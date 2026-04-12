@@ -48,7 +48,7 @@
         </nav>
         <div class="settings-console-main">
         <!-- Settings Content -->
-        <form class="settings-form">
+        <form class="settings-form" data-form-state aria-busy="false">
             <div id="settings-container">
                 <section class="settings-console-panel active" data-settings-panel="device">
                 <!-- Basics -->
@@ -203,6 +203,7 @@
 
                 <!-- Diagnostics -->
                 <div class="collapsible" id="section-observability">
+                    <span id="diagnostics" class="anchor-target" aria-hidden="true"></span>
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
                         Diagnostics <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
                     </button>
@@ -258,28 +259,28 @@
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
-                            <label for="saturation" class="form-label form-label-min-width">Saturation:</label>
+                            <label for="saturation" class="form-label form-label-min-width">Saturation</label>
                             <span id="saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
                             <input type="range" id="saturation" name="saturation" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
                         </div>
                         <div class="form-group">
-                            <label for="contrast" class="form-label form-label-min-width">Contrast:</label>
+                            <label for="contrast" class="form-label form-label-min-width">Contrast</label>
                             <span id="contrast-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
                             <input type="range" id="contrast" name="contrast" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
                          </div>
                         <div class="form-group">
-                            <label for="sharpness" class="form-label form-label-min-width">Sharpness:</label>
+                            <label for="sharpness" class="form-label form-label-min-width">Sharpness</label>
                             <span id="sharpness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
                             <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
                         </div>
                         <div class="form-group">
-                            <label for="brightness" class="form-label form-label-min-width">Brightness:</label>
+                            <label for="brightness" class="form-label form-label-min-width">Brightness</label>
                             <span id="brightness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
                             <input type="range" id="brightness" name="brightness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
                         </div>
                         {% if device_settings.get('display_type', 'inky') == 'inky' %}
                         <div class="form-group">
-                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation:</label>
+                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation</label>
                             <span id="inky_saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
                             <input
                                 type="range"
@@ -300,7 +301,7 @@
         <!-- Buttons -->
         <div class="buttons-container">
             <span id="settings-form-status" class="validation-message" role="status" aria-live="polite"></span>
-            <button type="button" id="saveSettingsBtn" class="action-button" aria-describedby="settings-form-status">Save</button>
+            <button type="button" id="saveSettingsBtn" class="action-button" data-form-state-submit aria-describedby="settings-form-status"><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
         </div>
         </div>
         </div>
@@ -355,6 +356,34 @@
     </div>
 
     <button type="button" class="action-button settings-logs-toggle" id="settingsLogsToggle">Show Logs</button>
+
+    <!-- Reboot confirmation modal (JTN-621) -->
+    <div id="rebootConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rebootConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeRebootConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="rebootConfirmTitle">Reboot Device?</h2>
+            <div class="separator"></div>
+            <p>This will interrupt the display and make the web UI unavailable for approximately 30 seconds. If the device fails to come back online, physical access will be required to recover.</p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmRebootBtn">Reboot</button>
+                <button type="button" class="action-button" id="cancelRebootBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shutdown confirmation modal (JTN-621) -->
+    <div id="shutdownConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shutdownConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeShutdownConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="shutdownConfirmTitle">Shut Down Device?</h2>
+            <div class="separator"></div>
+            <p>This will power off the device. The web UI will remain unavailable until the device is manually restarted. <strong>Physical access is required to turn it back on.</strong></p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmShutdownBtn">Shut Down</button>
+                <button type="button" class="action-button" id="cancelShutdownBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}

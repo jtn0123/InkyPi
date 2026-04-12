@@ -409,7 +409,6 @@ def test_playlist_page_no_wrap_label_for_normal_range(client):
     # Look within the next 200 chars for the label — it must not appear.
     assert "(next day)" not in body[idx : idx + 200]
 
-
 def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_dev):
     """JTN-620: Playlists page must not display raw {plugin_id}_saved_settings keys.
 
@@ -457,6 +456,36 @@ def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_
     assert "Weather" in body
 
 
+def test_playlist_header_chip_uses_plain_language_refresh_interval(client):
+    """JTN-640: Playlists header chip must say 'Refresh interval', not jargon
+    'Device cadence'."""
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Device cadence" not in body
+    assert "Refresh interval" in body
+
+
+def test_playlist_default_all_day_renders_as_all_day(client, device_config_dev):
+    """JTN-639: A playlist spanning 00:00 - 24:00 should render 'All day'
+    instead of the non-standard '24:00' end time."""
+    pm = device_config_dev.get_playlist_manager()
+    # Ensure a Default-like playlist exists with the full-day range
+    pm.add_playlist("JTN639AllDay", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Find the all-day playlist block and assert its summary copy
+    idx = body.find("JTN639AllDay")
+    assert idx != -1
+    chunk = body[idx : idx + 600]
+    assert "All day" in chunk
+    assert "00:00 - 24:00" not in chunk
+
+
 def test_playlist_page_preserves_user_instance_names(client, device_config_dev):
     """User-renamed instances are preserved as visible labels."""
     pm = device_config_dev.get_playlist_manager()
@@ -477,3 +506,42 @@ def test_playlist_page_preserves_user_instance_names(client, device_config_dev):
     resp = client.get("/playlist")
     assert resp.status_code == 200
     assert b"Kitchen Weather" in resp.data
+
+
+def test_playlist_form_uses_native_time_input(client):
+    """JTN-647: start/end time fields must be <input type="time"> (not a 15-min <select>).
+
+    This lets users schedule arbitrary HH:MM values (e.g. 09:05) instead of the
+    legacy quarter-hour-only dropdown options.
+    """
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+
+    # Native time input renders for both start and end, not a <select>.
+    assert 'type="time"' in body
+    assert 'id="start_time"' in body
+    assert 'id="end_time"' in body
+    # The legacy <select> dropdowns should be gone.
+    assert '<select id="start_time"' not in body
+    assert '<select id="end_time"' not in body
+
+
+def test_create_playlist_accepts_non_quarter_hour_times(client):
+    """JTN-647: backend accepts arbitrary HH:MM values like 09:05 or 07:10."""
+    payload = {
+        "playlist_name": "OddHours",
+        "start_time": "09:05",
+        "end_time": "07:10",  # wraps past midnight; still a valid distinct time
+    }
+    resp = client.post("/create_playlist", json=payload)
+    assert resp.status_code == 200
+
+    # Update to another non-quarter-hour value.
+    upd = {
+        "new_name": "OddHours",
+        "start_time": "06:37",
+        "end_time": "22:13",
+    }
+    resp = client.put("/update_playlist/OddHours", json=upd)
+    assert resp.status_code == 200
