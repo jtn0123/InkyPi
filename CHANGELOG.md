@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.49.7 (2026-04-12)
+
+### Bug Fixes
+
+- **playlist**: Use native time input for arbitrary HH:MM schedules (JTN-647)
+  ([#401](https://github.com/jtn0123/InkyPi/pull/401),
+  [`41e974c`](https://github.com/jtn0123/InkyPi/commit/41e974c0a16c829f3f3f1c130799052d8cc78522))
+
+Replace the 15-minute-increment <select> dropdowns for playlist start/end time with <input
+  type="time" step="60">. Users can now schedule times like 09:05 or 07:10, which the backend
+  already accepts. The edit modal normalises the legacy "24:00" sentinel to "23:59" so native time
+  inputs can display it.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.6 (2026-04-12)
 
 ### Bug Fixes
