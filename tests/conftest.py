@@ -23,6 +23,7 @@ UI_BROWSER_TESTS = {
     "test_e2e_form_workflows.py",
     "test_playlist_interactions.py",
     "test_plugin_add_to_playlist_ui.py",
+    "test_plugin_draft_add_to_playlist.py",
     "test_weather_autofill.py",
     "test_weather_image_render.py",
     "test_playlist_crud_e2e.py",
