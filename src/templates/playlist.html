@@ -52,7 +52,7 @@
                 {% if playlist_config.active_playlist %}
                 <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
                 {% endif %}
-                <span class="status-chip">Device cadence: {{ device_cycle_minutes }} min</span>
+                <span class="status-chip">Refresh interval: {{ device_cycle_minutes }} min</span>
             </div>
         </div>
 
@@ -72,7 +72,8 @@
                             {% if playlist.name == playlist_config.active_playlist %}
                             <span class="status-chip success">Active</span>
                             {% endif %}
-                            <span class="playlist-summary-copy">{{ playlist.start_time }} - {{ playlist.end_time }}{% if playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
+                            {% set _is_all_day = playlist.start_time == '00:00' and playlist.end_time in ('24:00', '23:59') %}
+                            <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }} - {{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
                         </div>
                         </div>
                         <div class="playlist-toolbar">

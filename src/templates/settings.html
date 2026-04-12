@@ -259,28 +259,28 @@
                     </button>
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group">
-                            <label for="saturation" class="form-label form-label-min-width">Saturation:</label>
+                            <label for="saturation" class="form-label form-label-min-width">Saturation</label>
                             <span id="saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
                             <input type="range" id="saturation" name="saturation" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
                         </div>
                         <div class="form-group">
-                            <label for="contrast" class="form-label form-label-min-width">Contrast:</label>
+                            <label for="contrast" class="form-label form-label-min-width">Contrast</label>
                             <span id="contrast-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
                             <input type="range" id="contrast" name="contrast" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
                          </div>
                         <div class="form-group">
-                            <label for="sharpness" class="form-label form-label-min-width">Sharpness:</label>
+                            <label for="sharpness" class="form-label form-label-min-width">Sharpness</label>
                             <span id="sharpness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
                             <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
                         </div>
                         <div class="form-group">
-                            <label for="brightness" class="form-label form-label-min-width">Brightness:</label>
+                            <label for="brightness" class="form-label form-label-min-width">Brightness</label>
                             <span id="brightness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
                             <input type="range" id="brightness" name="brightness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
                         </div>
                         {% if device_settings.get('display_type', 'inky') == 'inky' %}
                         <div class="form-group">
-                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation:</label>
+                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation</label>
                             <span id="inky_saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
                             <input
                                 type="range"
