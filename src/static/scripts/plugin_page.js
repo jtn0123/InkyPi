@@ -710,13 +710,61 @@
       setWorkflowMode("configure");
     }
 
+    // JTN-648: Replace the browser's native HTML5 validation bubble with the
+    // same app-level response-modal + field-naming flow that the click-driven
+    // "Update Preview" / "Save" / "Add to Playlist" paths use. The `required`
+    // attribute is preserved for no-JS progressive enhancement, but whenever
+    // JS is running we suppress the native bubble and show the toast so the
+    // experience is consistent across every plugin (image_url, rss, and
+    // anything else using the shared settings schema).
+    function attachAppLevelValidation(form) {
+      if (!form) return;
+      // Suppress the native bubble in the capture phase so it never renders,
+      // then defer to the shared validator for an app-level toast + focus.
+      form.addEventListener(
+        "invalid",
+        (event) => {
+          event.preventDefault();
+          if (!globalThis.FormValidator) return;
+          // Use a microtask so every invalid field in the current batch has a
+          // chance to fire before we read the form state — otherwise a
+          // multi-field summary might count only the first one.
+          if (form.dataset.validationToastPending === "1") return;
+          form.dataset.validationToastPending = "1";
+          Promise.resolve().then(() => {
+            form.dataset.validationToastPending = "";
+            const result = globalThis.FormValidator.validateAllInputsDetailed(form);
+            if (result.count > 0 && typeof showResponseModal === "function") {
+              showResponseModal(
+                "failure",
+                globalThis.FormValidator.buildValidationMessage(result)
+              );
+              globalThis.FormValidator.focusFirstInvalid(form);
+            }
+          });
+        },
+        true
+      );
+      // Enter-key submission would otherwise bypass the click handler that
+      // powers Update Preview / Save / Add to Playlist. Intercept the submit
+      // and route through the same validator the buttons use.
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (!globalThis.FormValidator) return;
+        const result = globalThis.FormValidator.validateAllInputsDetailed(form);
+        if (result.count > 0 && typeof showResponseModal === "function") {
+          showResponseModal(
+            "failure",
+            globalThis.FormValidator.buildValidationMessage(result)
+          );
+          globalThis.FormValidator.focusFirstInvalid(form);
+        }
+      });
+    }
+
     function bindControls() {
-      document.getElementById("settingsForm")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-      });
-      document.getElementById("scheduleForm")?.addEventListener("submit", (event) => {
-        event.preventDefault();
-      });
+      attachAppLevelValidation(document.getElementById("settingsForm"));
+      attachAppLevelValidation(document.getElementById("scheduleForm"));
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
