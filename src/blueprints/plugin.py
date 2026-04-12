@@ -304,6 +304,38 @@ def update_plugin_instance(instance_name: str):
                 status=404,
             )
 
+        # JTN-381: parse and validate refresh_settings if present. The frontend
+        # Refresh Settings modal posts this as a JSON-stringified form field;
+        # previously it was accepted blindly, saved into settings verbatim,
+        # and the new refresh config was never applied — reload silently
+        # reverted the user's change while the toast said "success".
+        new_refresh_config = None
+        raw_refresh = plugin_settings.pop("refresh_settings", None)
+        if raw_refresh is not None:
+            try:
+                refresh_payload = json.loads(raw_refresh)
+            except (TypeError, ValueError):
+                return json_error(
+                    "Refresh settings must be valid JSON",
+                    status=400,
+                    code="validation_error",
+                    details={"field": "refresh_settings"},
+                )
+            if not isinstance(refresh_payload, dict):
+                return json_error(
+                    "Refresh settings must be an object",
+                    status=400,
+                    code="validation_error",
+                    details={"field": "refresh_settings"},
+                )
+            from blueprints.playlist import validate_plugin_refresh_settings
+
+            new_refresh_config, refresh_err = validate_plugin_refresh_settings(
+                refresh_payload
+            )
+            if refresh_err:
+                return refresh_err
+
         # Validate required fields and plugin-specific settings
         plugin_config = device_config.get_plugin(plugin_id)
         if plugin_config:
@@ -324,6 +356,8 @@ def update_plugin_instance(instance_name: str):
 
         def _do_update_instance(cfg):
             plugin_instance.settings = plugin_settings
+            if new_refresh_config is not None:
+                plugin_instance.refresh = new_refresh_config
 
         device_config.update_atomic(_do_update_instance)
         config_dir = os.path.dirname(device_config.config_file)

@@ -122,7 +122,7 @@ def _check_playlist_overlap(new_start, new_end, playlists, exclude_name=None):
     return None
 
 
-def _validate_plugin_refresh_settings(refresh_settings):
+def validate_plugin_refresh_settings(refresh_settings):
     """Validate the refresh portion of an add_plugin request.
 
     Returns ``(refresh_config, error_response)``.  Exactly one of the two
@@ -331,9 +331,7 @@ def add_plugin():
                 f"Plugin instance '{instance_name}' already exists", status=400
             )
 
-        refresh_config, refresh_err = _validate_plugin_refresh_settings(
-            refresh_settings
-        )
+        refresh_config, refresh_err = validate_plugin_refresh_settings(refresh_settings)
         if refresh_err:
             return refresh_err
 
