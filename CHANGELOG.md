@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.49.11 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Restore main nav on 404 page (JTN-641)
+  ([#399](https://github.com/jtn0123/InkyPi/pull/399),
+  [`ab28051`](https://github.com/jtn0123/InkyPi/commit/ab280516a6c4b331e548f63e4882c3529cb37885))
+
+* fix(ui): restore main nav on 404 page (JTN-641)
+
+Users hitting a broken URL saw only Home and theme toggle, with no path to History, Playlists, or
+  Settings. Add the standard site navigation <nav> block to the 404 template so every broken URL
+  remains a discovery entry point, matching the header used on inky/playlist/settings pages.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* a11y: address Sonar S7927 on 404 nav links (JTN-641)
+
+SonarCloud flagged the three icon-only nav links (History/Playlists/ Settings) because their
+  accessible name came from aria-label only, not from visible content. Replace aria-label with a
+  visually-hidden span inside the link so the accessible name is derived from
+  (screen-reader-visible) content, and add title attributes for sighted hover tooltips. No visual
+  regression.
+
+* chore(deps): sync uv.lock to pyproject 0.49.6
+
+Resolves Lockfile drift check — pyproject was bumped to 0.49.6 on main but uv.lock still pinned
+  0.49.5.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.10 (2026-04-12)
 
 ### Bug Fixes
