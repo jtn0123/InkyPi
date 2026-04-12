@@ -639,6 +639,30 @@
         const opener = event.target.closest("[data-open-modal]");
         if (opener) openModal(opener.dataset.openModal, opener);
       });
+      // JTN-633: the DRAFT-state "Add to Playlist" button relies on the delegated
+      // opener above to surface the scheduling modal. Attach a direct listener
+      // as a belt-and-suspenders safeguard so the click can never silently
+      // no-op — if the modal target ever goes missing, the user gets a clear
+      // response modal instead of nothing happening.
+      document.querySelectorAll('[data-plugin-draft="true"][data-open-modal]').forEach((button) => {
+        button.addEventListener("click", (event) => {
+          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+          const target = document.getElementById(button.dataset.openModal);
+          if (!target) {
+            event.preventDefault();
+            showResponseModal(
+              "failure",
+              "Unable to open the Add to Playlist dialog. Please refresh the page and try again."
+            );
+            return;
+          }
+          // Ensure the modal opens even if the delegated handler above is
+          // removed or an earlier listener called stopPropagation.
+          if (!target.classList.contains("is-open")) {
+            openModal(button.dataset.openModal, button);
+          }
+        });
+      });
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });

@@ -259,7 +259,7 @@
                 {% if plugin_instance %}
                     <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
                 {% else %}
-                    <button type="button" data-open-modal="scheduleModal" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
+                    <button type="button" data-open-modal="scheduleModal" data-plugin-draft="true" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
                 {% endif %}
             </div>
             <div class="form-help workflow-help">
@@ -269,8 +269,8 @@
                 <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
                 <p>Use <strong>Update Instance</strong> to save and refresh the displayed image.</p>
                 {% else %}
-                <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist</div>
-                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically.</p>
+                <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist. Current settings will be saved when you add it.</div>
+                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically — current settings will be captured when you save the playlist entry.</p>
                 {% endif %}
             </div>
         </div>
