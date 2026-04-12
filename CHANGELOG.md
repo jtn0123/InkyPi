@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.46.0 (2026-04-12)
+
+### Features
+
+- **templates**: Add Jinja2 component-macro library (JTN-503)
+  ([#375](https://github.com/jtn0123/InkyPi/pull/375),
+  [`4a910d4`](https://github.com/jtn0123/InkyPi/commit/4a910d4122bef0f9918d0cb0067e4993f1f72aad))
+
+* feat(templates): add Jinja2 component-macro library with a11y (JTN-503)
+
+Create reusable macros (button, form_field, modal, status_chip, card) in macros/components.html with
+  built-in ARIA attributes. Adopt status_chip and modal in plugin.html as proof-of-concept. Add 24
+  unit tests asserting required a11y attributes on every macro.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(macros): guard attrs against None/false values (CR feedback)
+
+Skip rendering attrs entries where the value is None or false to prevent emitting attributes like
+  data-x="None".
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.45.2 (2026-04-12)
 
 ### Bug Fixes
