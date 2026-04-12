@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.45.0 (2026-04-12)
+
+### Bug Fixes
+
+- Restore History page button actions (JTN-330, JTN-329, JTN-328, JTN-327)
+  ([#370](https://github.com/jtn0123/InkyPi/pull/370),
+  [`0a383e2`](https://github.com/jtn0123/InkyPi/commit/0a383e2bd773bd07b21deaebf2f0a4a67786a26a))
+
+Move endpoint URLs from an inline JS object literal to data attributes on a hidden DOM element. The
+  DOMContentLoaded callback now reads from the data attributes and guards against missing globals,
+  making the boot sequence resilient to CSP script-src restrictions and load-order edge cases that
+  silently broke Display, Delete, Clear All, and pagination buttons during dogfood testing.
+
+Add 28 regression tests covering all four button flows plus the new boot-config wiring.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- **a11y**: Wire up axe-core scans in Playwright tests (JTN-507)
+  ([#368](https://github.com/jtn0123/InkyPi/pull/368),
+  [`e9f93e2`](https://github.com/jtn0123/InkyPi/commit/e9f93e2f97853b730b92c8e3a75b5f49a5f9941a))
+
+Add test_axe_a11y.py with parametrized axe-core scans for all 6 main routes. Known pre-existing
+  violations are whitelisted with TODO(JTN-xxx) tickets. Add aria-live regions for inline form error
+  announcements in plugin.html, settings.html, and response_modal.html. Register the new test file
+  in conftest A11Y_BROWSER_TESTS for proper SKIP_BROWSER gating.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **ci**: Benchmark regression gate (JTN-511) ([#367](https://github.com/jtn0123/InkyPi/pull/367),
+  [`6f65b38`](https://github.com/jtn0123/InkyPi/commit/6f65b38072b59706ce137b504436c0b3055c2a3f))
+
+* feat(ci): add benchmark regression gate with stored baseline (JTN-511)
+
+The CI benchmark step now compares current results against a committed baseline
+  (tests/benchmarks/baseline.json) and fails when any benchmark regresses beyond +15% (configurable
+  via BENCHMARK_THRESHOLD_PCT). Removes stale JTN-293 "future work" comments.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: strip baseline.json to essential stats only (JTN-511)
+
+* fix(ci): use CI-cached baseline for cross-platform accuracy (JTN-511)
+
+The benchmark gate now uses a GitHub Actions cache for the baseline instead of comparing against the
+  repo-committed local baseline. On main branch pushes the current run becomes the new baseline.
+  First run is informational only (non-blocking) until the cache is populated.
+
+* fix: fail gate when baseline benchmark is missing from current run (JTN-511)
+
+Addresses CodeRabbit feedback — a removed/skipped/renamed benchmark should not silently pass the
+  regression gate.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.44.0 (2026-04-12)
 
 ### Features
