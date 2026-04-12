@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.45.1 (2026-04-12)
+
+### Bug Fixes
+
+- **settings**: Render benchmark results as a labeled table (JTN-384)
+  ([#372](https://github.com/jtn0123/InkyPi/pull/372),
+  [`b86dde4`](https://github.com/jtn0123/InkyPi/commit/b86dde4f58a185c79744d1beb2c64edd12e9564b))
+
+Replace raw JSON.stringify output in the Diagnostics benchmark panel with formatted HTML tables.
+  Summary shows Stage/p50/p95 columns with human-readable labels (Request, Generate, Preprocess,
+  Display). Plugin averages render as a separate table. Null values display as em-dash instead of
+  literal "null". Adds bench-table CSS and 8 static tests.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.45.0 (2026-04-12)
 
 ### Bug Fixes
