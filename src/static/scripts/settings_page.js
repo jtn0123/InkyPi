@@ -225,7 +225,38 @@
       }
     }
 
+    function setDeviceActionModalOpen(modalId, open) {
+      const modal = document.getElementById(modalId);
+      if (!modal) return;
+      modal.hidden = !open;
+      modal.style.display = open ? "block" : "none";
+    }
+
+    function openRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", true);
+    }
+
+    function closeRebootConfirm() {
+      setDeviceActionModalOpen("rebootConfirmModal", false);
+    }
+
+    function openShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", true);
+    }
+
+    function closeShutdownConfirm() {
+      setDeviceActionModalOpen("shutdownConfirmModal", false);
+    }
+
     async function handleShutdown(reboot) {
+      // JTN-621: callers must gate this behind a confirmation modal. The
+      // modal ensures an accidental tap on a touch screen doesn't make the
+      // device unreachable without physical access to recover.
+      if (reboot) {
+        closeRebootConfirm();
+      } else {
+        closeShutdownConfirm();
+      }
       showResponseModal(
         "success",
         reboot
@@ -1022,8 +1053,16 @@
       document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
       document.getElementById("checkUpdatesBtn")?.addEventListener("click", checkForUpdates);
       document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
-      document.getElementById("rebootBtn")?.addEventListener("click", () => handleShutdown(true));
-      document.getElementById("shutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      // JTN-621: Reboot/Shutdown are gated behind a confirmation modal so
+      // an accidental touch doesn't make the device unreachable.
+      document.getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm);
+      document.getElementById("shutdownBtn")?.addEventListener("click", openShutdownConfirm);
+      document.getElementById("confirmRebootBtn")?.addEventListener("click", () => handleShutdown(true));
+      document.getElementById("cancelRebootBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("closeRebootConfirmModalBtn")?.addEventListener("click", closeRebootConfirm);
+      document.getElementById("confirmShutdownBtn")?.addEventListener("click", () => handleShutdown(false));
+      document.getElementById("cancelShutdownBtn")?.addEventListener("click", closeShutdownConfirm);
+      document.getElementById("closeShutdownConfirmModalBtn")?.addEventListener("click", closeShutdownConfirm);
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);
       });
