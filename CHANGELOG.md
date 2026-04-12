@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.46.1 (2026-04-12)
+
+### Bug Fixes
+
+- **release**: Keep VERSION in sync with semantic-release
+  ([#349](https://github.com/jtn0123/InkyPi/pull/349),
+  [`a894af0`](https://github.com/jtn0123/InkyPi/commit/a894af06841ea4bd49e79a3c84d9445729d388b2))
+
+Add VERSION to semantic_release assets so the build_command output ("echo '{version}' > VERSION") is
+  committed alongside the version bump. Previously build_command wrote the file but it was never
+  staged, leaving VERSION stuck at 0.1.0.
+
+Also make SBOM tag selection deterministic: instead of reading the stale VERSION file, discover the
+  release tag via `git tag --points-at HEAD` piped through `sort -V | tail -n1`.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.46.0 (2026-04-12)
 
 ### Features
