@@ -7,7 +7,12 @@
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     {% from 'macros/api_key_card.html' import api_key_card %}
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
-    <div class="frame api-keys-frame">
+    <div class="frame api-keys-frame"
+         data-delete-managed-url="{{ url_for('settings.delete_api_key') }}"
+         data-mode="{{ api_keys_mode | default('managed') }}"
+         data-save-generic-url="{{ url_for('apikeys.save_apikeys') }}"
+         data-save-managed-url="{{ url_for('settings.save_api_keys') }}"
+    >
         {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
         {% if api_keys_mode == 'managed' %}
             {% set key_summary.provider_count = 6 %}
@@ -103,15 +108,4 @@
 
     {% include 'response_modal.html' %}
     </main>
-    <script>
-        window.__INKYPI_API_KEYS_BOOT__ = {
-            deleteManagedUrl: {{ url_for('settings.delete_api_key') | tojson }},
-            mode: {{ api_keys_mode | default('managed') | tojson }},
-            saveGenericUrl: {{ url_for('apikeys.save_apikeys') | tojson }},
-            saveManagedUrl: {{ url_for('settings.save_api_keys') | tojson }},
-        };
-        document.addEventListener('DOMContentLoaded', () => {
-            window.InkyPiApiKeysPage.create(window.__INKYPI_API_KEYS_BOOT__).init();
-        });
-    </script>
 {% endblock %}

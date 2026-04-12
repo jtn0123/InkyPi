@@ -500,4 +500,25 @@
   }
 
   globalThis.InkyPiApiKeysPage = { create: createApiKeysPage };
+
+  // Self-initialise from data-* attributes on the page container so no
+  // inline <script> is needed (CSP blocks inline JS in production).
+  // The deferred script attribute ensures the DOM is ready when this runs.
+  function autoInit() {
+    const frame = document.querySelector(".api-keys-frame");
+    if (!frame) return;
+    const config = {
+      deleteManagedUrl: frame.dataset.deleteManagedUrl || "",
+      mode: frame.dataset.mode || "managed",
+      saveGenericUrl: frame.dataset.saveGenericUrl || "",
+      saveManagedUrl: frame.dataset.saveManagedUrl || "",
+    };
+    createApiKeysPage(config).init();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", autoInit);
+  } else {
+    autoInit();
+  }
 })();
