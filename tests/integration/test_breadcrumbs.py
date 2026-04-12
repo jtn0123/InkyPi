@@ -48,6 +48,37 @@ def test_plugin_breadcrumb(client):
     assert "Clock" in html
 
 
+def test_plugin_breadcrumb_includes_plugins_level(client):
+    """Plugin breadcrumb has intermediate 'Plugins' level linking back to the list (JTN-637)."""
+    resp = client.get("/plugin/clock")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert '<nav aria-label="Breadcrumb"' in html
+    # Intermediate "Plugins" entry should be present and linked to the home page anchor
+    assert "Plugins" in html
+    assert "#plugins-grid" in html
+
+
+def test_home_page_has_plugins_grid_anchor(client):
+    """Home page plugin grid section has id='plugins-grid' anchor target (JTN-637)."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert 'id="plugins-grid"' in html
+
+
+def test_home_page_showing_chip_has_label(client):
+    """Home page 'now showing' chip has a 'Showing:' label prefix and a tooltip (JTN-638)."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    # Either the chip is present with a label, or (if no plugin is currently showing)
+    # the chip block is absent entirely — both are acceptable. If present, it must
+    # carry context, not appear as a bare plugin name.
+    if 'title="Currently displayed plugin"' in html:
+        assert "Showing:" in html
+
+
 def test_breadcrumb_last_item_not_linked(client):
     """The last breadcrumb item has aria-current="page" and is a <span>, not an <a>."""
     resp = client.get("/settings")
