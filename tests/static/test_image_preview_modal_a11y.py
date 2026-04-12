@@ -13,27 +13,39 @@ _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts
 
 
 def test_plugin_html_image_preview_modal_has_aria_labelledby():
-    """plugin.html must have aria-labelledby on #imagePreviewModal."""
+    """plugin.html must declare the image preview modal with an accessible name.
+
+    Since JTN-503 the modal is rendered via the ``modal()`` macro in
+    ``macros/components.html`` which derives ``aria-labelledby`` from the
+    modal id; rather than scanning the raw template (the attribute is
+    produced by the macro at render time) we verify the template invokes
+    the macro for ``imagePreviewModal``.
+    """
     content = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
     assert (
-        'aria-labelledby="imagePreviewTitle"' in content
-    ), "#imagePreviewModal in plugin.html must have aria-labelledby='imagePreviewTitle'"
+        "modal('imagePreviewModal'" in content
+    ), "plugin.html must invoke the modal() macro for 'imagePreviewModal'"
 
 
 def test_plugin_html_image_preview_modal_labelledby_target_exists():
-    """The id referenced by aria-labelledby must exist inside the modal in plugin.html."""
-    content = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
-    # Find the modal block
-    modal_start = content.find('id="imagePreviewModal"')
-    assert modal_start != -1, "#imagePreviewModal not found in plugin.html"
-    # Find the end of the modal div (closing tag after modal-content)
-    modal_end = content.find("</div>", content.find("</div>", modal_start) + 1) + len(
-        "</div>"
-    )
-    modal_block = content[modal_start:modal_end]
+    """The modal() macro must generate a heading whose id matches aria-labelledby.
+
+    The macro sets ``title_id = id ~ 'Title'`` and emits both the
+    ``aria-labelledby`` attribute and the matching ``<h2 id=...>``, so if
+    the macro definition is intact we are guaranteed the rendered target
+    exists. Assert directly on the macro source to catch regressions.
+    """
+    macros_path = _TEMPLATES_DIR / "macros" / "components.html"
+    content = macros_path.read_text(encoding="utf-8")
     assert (
-        'id="imagePreviewTitle"' in modal_block
-    ), "Element with id='imagePreviewTitle' must exist inside #imagePreviewModal in plugin.html"
+        "title_id = id ~ 'Title'" in content
+    ), "modal() macro must derive title_id from the modal id"
+    assert (
+        'aria-labelledby="{{ title_id }}"' in content
+    ), "modal() macro must set aria-labelledby to the derived title_id"
+    assert (
+        'id="{{ title_id }}"' in content
+    ), "modal() macro must emit a heading with id matching title_id"
 
 
 def test_lightbox_js_dynamic_modal_uses_aria_labelledby():
@@ -59,15 +71,19 @@ def test_lightbox_js_dynamic_modal_creates_heading_element():
 
 
 def test_plugin_page_rendered_modal_has_aria_labelledby(client):
-    """Rendered plugin page must contain the modal with aria-labelledby and the target id."""
+    """Rendered plugin page must contain the modal with aria-labelledby and the target id.
+
+    After JTN-503 the modal is rendered via the ``modal()`` macro which
+    derives the title id from the modal id (``imagePreviewModalTitle``).
+    """
     resp = client.get("/plugin/clock")
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
 
     assert (
-        'aria-labelledby="imagePreviewTitle"' in html
-    ), "Rendered plugin page must have aria-labelledby='imagePreviewTitle' on #imagePreviewModal"
+        'aria-labelledby="imagePreviewModalTitle"' in html
+    ), "Rendered plugin page must have aria-labelledby='imagePreviewModalTitle' on #imagePreviewModal"
 
     assert (
-        'id="imagePreviewTitle"' in html
-    ), "Rendered plugin page must contain an element with id='imagePreviewTitle'"
+        'id="imagePreviewModalTitle"' in html
+    ), "Rendered plugin page must contain an element with id='imagePreviewModalTitle'"
