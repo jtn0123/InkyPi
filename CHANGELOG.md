@@ -1,6 +1,111 @@
 # CHANGELOG
 
 
+## v0.47.0 (2026-04-12)
+
+### Bug Fixes
+
+- **ui**: Prevent dashboard header title clipping on narrow viewports (JTN-340)
+  ([#381](https://github.com/jtn0123/InkyPi/pull/381),
+  [`ef7a092`](https://github.com/jtn0123/InkyPi/commit/ef7a09278ec64126cad6c80473b6d47d7f794be8))
+
+At widths below ~430px the `.app-title` in the dashboard header could render clipped on the right
+  because it had no overflow handling and `.title-container` used the default `min-width: auto` on a
+  flex child, preventing the title from shrinking below its intrinsic content width.
+
+- `.app-title`: add `min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, and `white-space:
+  nowrap` so long device names truncate cleanly instead of overflowing the header. -
+  `.title-container`: add `min-width: 0` and `flex: 1 1 auto` so the title is allowed to shrink and
+  trigger ellipsis truncation. - `inky.html`: expose the full device name via `title="{{ config.name
+  }}"` on the `<h1>` so hover tooltips and screen readers still surface the complete name even when
+  visually truncated. - Add `tests/static/test_mobile_header.py` asserting the CSS rules and
+  template attribute remain in place as a regression guard.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- **deps**: Migrate dependency locking to uv lock (JTN-616)
+  ([#380](https://github.com/jtn0123/InkyPi/pull/380),
+  [`0364094`](https://github.com/jtn0123/InkyPi/commit/0364094f2dfabcaa2bce14620bf38a6855a0521e))
+
+Replace pip-compile with `uv lock` + `uv export` to eliminate chronic lockfile-drift CI failures.
+  The universal cross-platform lockfile resolves every supported platform (Linux
+  x86_64/aarch64/armv7l/armv6l + macOS arm64/x86_64) from a single resolution, which fixes all three
+  root causes of the historical drift:
+
+- Python version coupling (3.13 vs 3.12) - sys_platform-gated packages (cysystemd, inky, gpiod, ...)
+  - Multi-arch wheel hash coverage (gpiod arm64/armhf/aarch64)
+
+Changes: - pyproject.toml: add [project.dependencies] mirroring install/requirements.in plus
+  [tool.uv] required-environments for universal resolution - uv.lock: new universal lockfile
+  committed - install/requirements.txt: regenerated via `uv export` (hash-pinned, markers
+  preserved). install.sh continues to use --require-hashes so JTN-516 supply-chain integrity is
+  preserved - scripts/check_requirements_drift.sh: swap pip-compile for `uv lock --check` + `uv
+  export` diff - .github/workflows/ci.yml: lockfile-drift job installs uv instead of pip-tools. Kept
+  advisory (continue-on-error: true) for this PR; follow-up will promote to required once stable on
+  main - docs/dependency_locking.md: document the new workflow and rationale
+
+Phase 3 (retiring install/requirements.in and migrating install/requirements-dev.txt) is deferred
+  per the ticket spec.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **refresh_task**: Decouple subprocess worker from Config via RefreshContext (JTN-495)
+  ([#378](https://github.com/jtn0123/InkyPi/pull/378),
+  [`3f08eb8`](https://github.com/jtn0123/InkyPi/commit/3f08eb891c6b7050109da01a1b408eaa375afd77))
+
+Introduce a pickle-safe RefreshContext dataclass that snapshots the minimal Config fields needed by
+  the subprocess worker. The subprocess now receives RefreshContext instead of the full Config
+  object, eliminating the fragile pickle-and-reconstruct dance in _restore_child_config. Legacy
+  Config objects are still accepted for backwards compatibility.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **snapshots**: Expand baselines to clock, todo_list, image_upload, image_folder (JTN-611)
+  ([#373](https://github.com/jtn0123/InkyPi/pull/373),
+  [`231e51d`](https://github.com/jtn0123/InkyPi/commit/231e51d83ba114f7fa5fb91184f48b8da3e951ed))
+
+* test(snapshots): expand baselines to clock, image_upload, image_folder (JTN-611)
+
+Add snapshot tests for four more deterministic plugins: - clock: Digital and Word faces with frozen
+  datetime (PIL-only, no browser) - todo_list: two-list disc style (browser-gated) - image_upload:
+  color-padded fixture PNG (PIL-only) - image_folder: crop-to-fit fixture PNG (PIL-only)
+
+PIL-only tests run in every CI job; browser-gated tests run only when REQUIRE_BROWSER_SMOKE=1 is
+  set. Baselines committed alongside the tests.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(snapshots): add missing todo_list/two_lists_disc baseline
+
+The browser smoke CI job failed because the snapshot baseline for the todo_list plugin was never
+  generated. Generate it so the assertion in test_snapshot_todo_list can find the expected digest.
+
+* fix(snapshots): use CI-generated hash for todo_list baseline
+
+The todo_list snapshot was generated on macOS but CI runs on Ubuntu, producing a different pixel
+  hash due to font-rendering differences. Update the sha256 digest to match the CI (Ubuntu +
+  Playwright Chromium) rendering, consistent with how other browser-based baselines were
+  established.
+
+* test(a11y): update image-preview modal tests for JTN-503 macro refactor
+
+The plugin.html image preview modal is now rendered via the modal() macro introduced in JTN-503
+  (#375). The macro derives the heading id from the modal id (imagePreviewModal ->
+  imagePreviewModalTitle), replacing the previous hard-coded imagePreviewTitle. Update the three
+  tests that asserted the old literal id and replace the raw-template checks with assertions on the
+  macro definition itself so the harness survives future templating changes.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.46.3 (2026-04-12)
 
 ### Bug Fixes
