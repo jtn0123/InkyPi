@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v0.43.9 (2026-04-12)
+
+### Bug Fixes
+
+- **api-keys**: Add id/name/aria-label to row inputs (JTN-383)
+  ([#361](https://github.com/jtn0123/InkyPi/pull/361),
+  [`c87957a`](https://github.com/jtn0123/InkyPi/commit/c87957a25997e4ba05419c43dd94410f1110b188))
+
+JS-built rows in api_keys_page.js addRow() had no id, name, or aria-label on their inputs, so screen
+  readers could not distinguish rows and browser autofill could not target them. Server-rendered
+  rows had aria-label but no id/name. Both paths are now consistent:
+
+- addRow() assigns a unique `apikey-name-new-N` / `apikey-value-new-N` id+name pair and sets an
+  initial aria-label on the key input. - updateRowAriaLabels() keeps the value input and delete
+  button's aria-labels in sync with the current key name via an input listener. - Server-rendered
+  rows get `apikey-name-{loop.index0}` / `apikey-value-{loop.index0}` id+name pairs.
+
+JTN-382 (password masking) already shipped — this change intentionally does not touch the masking
+  behavior.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **playlist**: Validate refresh_settings on update_plugin_instance (JTN-381)
+  ([#359](https://github.com/jtn0123/InkyPi/pull/359),
+  [`fc10e53`](https://github.com/jtn0123/InkyPi/commit/fc10e531572a341f1ad9a049be68b76190e58786))
+
+/update_plugin_instance previously accepted the frontend's JSON-stringified `refresh_settings` form
+  field, stored it verbatim in plugin_instance.settings, returned 200 success, and never touched
+  plugin_instance.refresh. Out-of-range intervals (e.g. 5000) silently reverted on reload while the
+  modal showed a green success toast.
+
+- Rename the existing `_validate_plugin_refresh_settings` helper in playlist.py to drop the leading
+  underscore so it can be reused. - In update_plugin_instance, pop `refresh_settings` out of the
+  form dict, JSON-parse it with a 400 on malformed input, route it through the shared validator, and
+  persist the validated refresh config inside the same atomic update that writes plugin_settings. -
+  Range (1–999) and unit (minute/hour/day) checks are identical to the add_plugin path, so the
+  behavior stays consistent.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.8 (2026-04-12)
 
 ### Bug Fixes
