@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v0.49.2 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Hide raw slug subtitle and explain DRAFT badge (JTN-622, JTN-644)
+  ([#395](https://github.com/jtn0123/InkyPi/pull/395),
+  [`52b5b38`](https://github.com/jtn0123/InkyPi/commit/52b5b38b8a38987783ff3d28c74eea25cba64093))
+
+- Remove the visible plugin.id subtitle from the plugin page header by default. The raw filesystem
+  slug (ai_image, clock, weather, ...) is an internal identifier and has no meaning to end users.
+  Kept behind ?debug=1 for diagnostics. - Add title and aria-describedby to the Draft status chip so
+  users (and screen readers) learn what the badge means and how to clear it. - Extend the
+  status_chip macro to accept optional title / describedby args. - Add integration tests covering
+  both fixes.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.1 (2026-04-12)
 
 ### Bug Fixes
