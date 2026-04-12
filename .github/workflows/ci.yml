@@ -47,6 +47,12 @@ jobs:
             --fail-on='GPL-3.0;AGPL-3.0;GPL-3.0-or-later;AGPL-3.0-or-later;GPL v3;AGPL v3;GPL-3.0-only;AGPL-3.0-only' \
             --format=plain \
             --ignore-packages recurring-ical-events
+      - name: Restore benchmark baseline cache
+        id: bench-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/bench-baseline.json
+          key: benchmark-baseline-${{ runner.os }}-py3.12
       - name: Run perf benchmarks
         env:
           SKIP_BROWSER: '1'
@@ -55,9 +61,23 @@ jobs:
           python -m pytest tests/benchmarks/ --benchmark-only \
             --benchmark-columns=min,mean,median,stddev,ops \
             --benchmark-json=/tmp/bench-current.json -q
-          python scripts/benchmark_compare.py \
-            --baseline tests/benchmarks/baseline.json \
-            --current /tmp/bench-current.json
+          # Compare against CI-cached baseline if available, otherwise
+          # fall back to the repo-committed baseline.
+          if [ -f /tmp/bench-baseline.json ]; then
+            python scripts/benchmark_compare.py \
+              --baseline /tmp/bench-baseline.json \
+              --current /tmp/bench-current.json
+          else
+            echo "No CI baseline cache found — recording initial baseline."
+            echo "Comparing against repo baseline (cross-platform, informational only):"
+            python scripts/benchmark_compare.py \
+              --baseline tests/benchmarks/baseline.json \
+              --current /tmp/bench-current.json || true
+          fi
+          # On main branch pushes, update the cached baseline for future PRs
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            cp /tmp/bench-current.json /tmp/bench-baseline.json
+          fi
 
   shellcheck:
     name: Shell script validation

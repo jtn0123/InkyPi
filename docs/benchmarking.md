@@ -56,15 +56,20 @@ SKIP_BROWSER=1 PYTHONPATH=src pytest tests/benchmarks/ --benchmark-only \
 
 #### CI regression gate
 
-Every PR runs benchmarks and compares against the stored baseline at
-`tests/benchmarks/baseline.json`. If any benchmark's median time exceeds the
-baseline by more than the configured threshold, CI fails.
+Every PR runs benchmarks and compares against a cached CI baseline. If any
+benchmark's median time exceeds the baseline by more than the configured
+threshold, CI fails.
 
+- **CI baseline**: cached per-OS via GitHub Actions cache. On pushes to `main`,
+  the current run becomes the new baseline for future PRs. On the very first
+  run (no cache), the comparison is informational only (non-blocking).
+- **Repo baseline** (`tests/benchmarks/baseline.json`): committed for local
+  development use and as a fallback when no CI cache exists.
 - **Threshold**: defaults to +15%. Override via the `BENCHMARK_THRESHOLD_PCT`
   GitHub Actions variable or environment variable.
 - **Comparison script**: `scripts/benchmark_compare.py`
 
-The gate runs as part of the `quality-checks` job in `.github/workflows/ci.yml`.
+The gate runs as part of the `lint` job in `.github/workflows/ci.yml`.
 
 #### Updating the baseline
 
