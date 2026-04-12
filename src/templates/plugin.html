@@ -91,7 +91,7 @@
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="workflow-layout" data-workflow-layout>
         <section class="workflow-main-panel" data-workflow-panel="configure">
-        <form id="settingsForm" class="settings-form workflow-settings-form" aria-label="Plugin settings for {{ plugin.display_name }}">
+        <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}">
             <div class="settings-container">
                 <div class="workflow-section-header">
                     <h2>Configuration</h2>
@@ -249,13 +249,23 @@
 
         <div class="workflow-action-panel">
             <span id="plugin-form-status" class="validation-message" role="status" aria-live="polite"></span>
+            <!-- HTMX swap target for inline validation feedback (JTN-506) -->
+            <div id="plugin-form-errors" class="plugin-form-errors" aria-live="polite"></div>
             <label class="workflow-device-toggle" for="toggleDeviceFrame">
                 <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
             </label>
             {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
             <div class="workflow-action-group">
                 <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
-                <button type="button" data-plugin-action="save_settings" class="action-button is-secondary" aria-describedby="save-settings-help">Save Settings</button>
+                <button type="button"
+                        id="savePluginSettingsBtn"
+                        class="action-button is-secondary"
+                        aria-describedby="save-settings-help"
+                        hx-post="{{ url_for('plugin.save_plugin_settings') }}"
+                        hx-include="#settingsForm"
+                        hx-target="#plugin-form-errors"
+                        hx-swap="innerHTML"
+                        hx-disabled-elt="this">Save Settings</button>
                 {% if plugin_instance %}
                     <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
                 {% else %}

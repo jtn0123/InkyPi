@@ -55,9 +55,11 @@
       url = urls.add_to_playlist; const scheduleFormData = new FormData(scheduleForm); const scheduleData = {}; for (const [k, v] of scheduleFormData.entries()) scheduleData[k] = v; formData.append('refresh_settings', JSON.stringify(scheduleData));
     } else if (action === 'update_instance'){
       url = urls.update_instance; method = 'PUT'; clearFormOnSubmit = false;
-    } else if (action === 'save_settings'){
-      url = urls.save_settings; clearFormOnSubmit = false;
     }
+    // NOTE: action === 'save_settings' is handled declaratively via HTMX on the
+    // Save Settings button (JTN-506). It is intentionally no longer routed
+    // through sendForm so validation errors can swap inline instead of firing
+    // a toast.
 
     if (loadingIndicator) loadingIndicator.style.display = 'block';
     progress.start();
@@ -160,6 +162,21 @@
     }
     return { success, result };
   }
+
+  // JTN-506: listen for HX-Trigger events from the HTMX-powered save path
+  // and fire the existing response modal so user feedback is consistent with
+  // the other plugin actions (update_now, update_instance, add_to_playlist).
+  document.addEventListener('pluginSettingsSaved', (event) => {
+    try {
+      const detail = event && event.detail ? event.detail : {};
+      const msg = detail.message || 'Settings saved.';
+      if (window.showResponseModal) {
+        window.showResponseModal('success', `Success! ${msg}`);
+      }
+    } catch (e) {
+      console.warn('pluginSettingsSaved handler error:', e);
+    }
+  });
 
   // Public API
   window.PluginForm = {
