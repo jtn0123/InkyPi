@@ -36,6 +36,7 @@ UI_BROWSER_TESTS = {
     "test_cross_page_navigation_e2e.py",
 }
 A11Y_BROWSER_TESTS = {
+    "test_axe_a11y.py",
     "test_more_a11y.py",
     "test_playlist_a11y.py",
 }
