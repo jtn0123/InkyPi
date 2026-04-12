@@ -360,16 +360,25 @@ def _validate_settings_form(form_data):
             code="validation_error",
             details={"field": "unit"},
         )
-    if not interval or not interval.isnumeric():
+    if not interval or not interval.strip():
         return json_error(
             "Refresh interval is required",
             status=422,
             code="validation_error",
             details={"field": "interval"},
         )
-    if int(interval) <= 0:
+    try:
+        interval_int = int(interval)
+    except (ValueError, TypeError):
         return json_error(
-            "Plugin Cycle Interval must be greater than zero",
+            "Refresh interval must be a number",
+            status=422,
+            code="validation_error",
+            details={"field": "interval"},
+        )
+    if interval_int < 1:
+        return json_error(
+            "Refresh interval must be at least 1",
             status=422,
             code="validation_error",
             details={"field": "interval"},
