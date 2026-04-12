@@ -204,6 +204,62 @@ def test_redirect_omits_trailing_question_mark_when_no_query(monkeypatch):
     assert resp.location == "https://localhost/"
 
 
+def test_redirect_reencodes_path_and_query(monkeypatch):
+    """The redirect URL must be rebuilt via ``urlunsplit`` from validated
+    components — not by string-concatenating ``request.full_path``.
+
+    This is the fix pattern required to close CodeQL ``py/url-redirection``
+    alert #52: validate-then-reuse leaves the taint path intact, so the
+    Location header is re-assembled from (hardcoded https scheme,
+    allow-listed host, re-quoted path, re-urlencoded query).
+    """
+    mod = _reload_inkypi(
+        monkeypatch,
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = mod.app
+
+    client = app.test_client()
+    # A path with a space (URL-decoded by Werkzeug) must come back
+    # percent-encoded in the Location header.
+    resp = client.get("/hello%20world", headers={"Host": "localhost"})
+    assert resp.status_code == 301
+    assert resp.location == "https://localhost/hello%20world"
+
+
+def test_redirect_drops_fragment_and_normalises_query(monkeypatch):
+    """Fragments never travel over HTTP so the rebuilt URL must have none,
+    and multi-value query strings must round-trip deterministically."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = mod.app
+
+    client = app.test_client()
+    resp = client.get("/x?a=1&a=2&b=3", headers={"Host": "localhost"})
+    assert resp.status_code == 301
+    assert resp.location == "https://localhost/x?a=1&a=2&b=3"
+
+
+def test_redirect_never_uses_spoofed_host_even_in_path(monkeypatch):
+    """Even if an attacker embeds a hostname-like string in the path, the
+    Location header still points at the allow-listed host."""
+    mod = _reload_inkypi(
+        monkeypatch,
+        env={"INKYPI_FORCE_HTTPS": "1", "INKYPI_ENV": "production"},
+    )
+    app = mod.app
+
+    client = app.test_client()
+    resp = client.get("/@evil.com/path", headers={"Host": "localhost"})
+    assert resp.status_code == 301
+    # The scheme://authority prefix must be the allow-listed host.
+    assert resp.location is not None
+    assert resp.location.startswith("https://localhost/")
+    assert "evil.com" not in resp.location.split("/", 3)[2]
+
+
 def test_allowed_host_ignores_port_suffix(monkeypatch):
     """``localhost:5000`` should count as the allow-listed ``localhost``."""
     mod = _reload_inkypi(

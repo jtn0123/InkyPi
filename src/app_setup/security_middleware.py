@@ -14,6 +14,7 @@ import logging
 import os
 import secrets
 from time import perf_counter
+from urllib.parse import quote, urlencode, urlunsplit
 
 from flask import Flask, abort, g, make_response, redirect, request, session
 
@@ -121,10 +122,18 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
         # CodeQL py/url-redirection alert #52). ``request.url`` is
         # built from the client-supplied ``Host`` header, so using it
         # directly in a ``Location`` header lets an attacker point the
-        # redirect at an arbitrary domain. Instead we:
+        # redirect at an arbitrary domain. Per the repo pattern for this
+        # CodeQL rule, "validate then reuse" leaves the alert open — the
+        # target URL must be rebuilt from individually validated and
+        # freshly serialised components. We therefore:
         #   1. Validate the request host against an allow-list.
-        #   2. Rebuild the redirect target from the allow-listed host
-        #      value (not the raw header) plus the request path.
+        #   2. Rebuild the authority from the matching allow-list entry
+        #      (not the raw header).
+        #   3. Re-percent-encode the path via ``quote`` and re-serialise
+        #      the query string via ``urlencode`` so no attacker-chosen
+        #      bytes flow through verbatim.
+        #   4. Assemble the final URL with ``urlunsplit`` using a hard-
+        #      coded ``https`` scheme literal.
         allowed_hosts = _load_allowed_hosts()
         raw_host = request.host or ""
         host_name, _sep, host_port = raw_host.partition(":")
@@ -139,16 +148,23 @@ def setup_https_redirect(app: Flask, *, dev_mode: bool) -> None:
         # the port (if present) is digits-only; still, guard it.
         if host_port and host_port.isdigit():
             safe_authority = f"{host_name}:{host_port}"
-        # Preserve path + query string. ``full_path`` always ends with
-        # a ``?`` even when there are no query args, so strip it.
-        path_and_query = request.full_path
-        if path_and_query.endswith("?"):
-            path_and_query = path_and_query[:-1]
-        # NOSONAR — the https:// literal is intentional: we are
-        # upgrading the request to https. SonarCloud rule S5332 is a
-        # false positive here.
-        url = f"https://{safe_authority}{path_and_query}"  # NOSONAR
-        return redirect(url, code=301)
+        # Re-encode path and query from validated request components.
+        # ``request.path`` is already URL-decoded by Werkzeug; re-quote
+        # it (keeping ``/``) so the Location header is well-formed and
+        # no attacker-controlled bytes pass through untouched.
+        safe_path = quote(request.path or "/", safe="/")
+        # ``request.args`` is a MultiDict; ``urlencode(..., doseq=True)``
+        # deterministically re-serialises it, dropping any malformed
+        # bytes that slipped past decoding.
+        safe_query = urlencode(list(request.args.items(multi=True)), doseq=True)
+        # Hard-coded scheme literal — the whole point of this handler
+        # is to upgrade to https. NOSONAR silences S5332 which flags
+        # any ``http://``/``https://`` literal as a potential cleartext
+        # transmission.
+        safe_url = urlunsplit(
+            ("https", safe_authority, safe_path, safe_query, "")
+        )  # NOSONAR
+        return redirect(safe_url, code=301)
 
 
 # ---------------------------------------------------------------------------
