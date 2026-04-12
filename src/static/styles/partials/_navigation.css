@@ -16,6 +16,10 @@
     line-height: 1.2;
     letter-spacing: var(--tracking-tight);
     color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* App icon standardization */
