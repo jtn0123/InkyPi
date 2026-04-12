@@ -48,11 +48,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(cat VERSION)
-          TAG="v${VERSION}"
+          TAG=$(
+            git tag --points-at HEAD \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$' \
+            | sort -V \
+            | tail -n1 \
+            || true
+          )
+          if [ -z "${TAG}" ]; then
+            echo "No new release tag on this run, skipping SBOM upload"
+            exit 0
+          fi
+
           SBOM_FILE="inkypi-${TAG}-bom.json"
           cp artifacts/security/sbom.json "${SBOM_FILE}"
-          # Only upload if the release exists (semantic-release may not bump on every push)
+          # Only upload when semantic-release created the tag in this run and the
+          # matching GitHub release exists.
           if gh release view "${TAG}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
             gh release upload "${TAG}" "${SBOM_FILE}" \
               --repo "${{ github.repository }}" \

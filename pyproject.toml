@@ -56,4 +56,5 @@ version = "0.45.2"
 branch = "main"
 tag_format = "v{version}"
 upload_to_pypi = false
+assets = ["VERSION"]
 build_command = "echo '{version}' > VERSION"
