@@ -507,3 +507,27 @@ class TestHelpers:
         from blueprints.settings import _benchmarks_enabled
 
         assert _benchmarks_enabled() is False
+
+
+# ---------------------------------------------------------------------------
+# /settings/diagnostics redirect (JTN-627)
+# ---------------------------------------------------------------------------
+
+
+class TestDiagnosticsRedirect:
+    """``/settings/diagnostics`` must not 404; it redirects to the accordion anchor."""
+
+    def test_diagnostics_redirects_to_settings_anchor(self, client):
+        resp = client.get("/settings/diagnostics", follow_redirects=False)
+        assert resp.status_code == 302
+        assert resp.headers["Location"].endswith("/settings#diagnostics")
+
+    def test_diagnostics_follow_redirect_renders_settings(self, client):
+        resp = client.get("/settings/diagnostics", follow_redirects=True)
+        assert resp.status_code == 200
+        # Diagnostics anchor target must be present so the fragment resolves.
+        assert b'id="diagnostics"' in resp.data
+
+    def test_diagnostics_direct_not_404(self, client):
+        resp = client.get("/settings/diagnostics")
+        assert resp.status_code != 404
