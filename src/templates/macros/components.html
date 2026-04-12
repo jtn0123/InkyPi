@@ -40,8 +40,8 @@
 </div>
 {%- endmacro %}
 
-{% macro status_chip(text, variant="info") -%}
-<span class="status-chip {{ variant }}">{{ text }}</span>
+{% macro status_chip(text, variant="info", title=None, describedby=None) -%}
+<span class="status-chip {{ variant }}"{% if title %} title="{{ title }}"{% endif %}{% if describedby %} aria-describedby="{{ describedby }}"{% endif %}>{{ text }}</span>
 {%- endmacro %}
 
 {% macro card(title) -%}
