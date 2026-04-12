@@ -65,7 +65,9 @@ def _parse_report(body: bytes) -> dict:
         return {}
     try:
         data = json.loads(body)
-    except (ValueError, UnicodeDecodeError) as exc:
+    except ValueError as exc:
+        # Note: UnicodeDecodeError is a subclass of ValueError and is
+        # covered here too (non-UTF-8 bytes raise it from json.loads).
         raise _MalformedReport(str(exc)) from exc
 
     # Legacy format: {"csp-report": {...}}
