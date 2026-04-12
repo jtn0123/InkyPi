@@ -1,6 +1,31 @@
 # CHANGELOG
 
 
+## v0.49.12 (2026-04-12)
+
+### Bug Fixes
+
+- **history**: Polish pass — source fallback, metric tooltip, danger zone
+  ([#409](https://github.com/jtn0123/InkyPi/pull/409),
+  [`8a53afc`](https://github.com/jtn0123/InkyPi/commit/8a53afc71b61f4c7d50a2275dc25d07a831afddd))
+
+JTN-626: Metric chips (Request / Generate / Preprocess / Display) now carry both a title tooltip and
+  a descriptive aria-label so users can tell what "2622 ms" actually measures. The strip is labelled
+  as a region with a screen-reader-only describedby paragraph.
+
+JTN-631: Every history entry now renders a Source line for consistency.
+
+Entries without sidecar provenance show "Source: Unknown" in a muted italic style with a tooltip
+  explaining older entries predate source tracking.
+
+JTN-649: The reset-cache section is now a proper danger zone: a horizontal divider separates it from
+  the grid, a red "Danger zone" pill label sits above the heading, the heading uses the error color,
+  padding and border are beefed up, and on narrow viewports it stacks vertically with a full-width
+  Clear All button. The section is exposed as a region landmark for assistive tech.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.11 (2026-04-12)
 
 ### Bug Fixes
