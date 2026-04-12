@@ -1,6 +1,152 @@
 # CHANGELOG
 
 
+## v0.49.15 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Use app-level toast for Update Preview validation errors (JTN-648)
+  ([`ecc5e06`](https://github.com/jtn0123/InkyPi/commit/ecc5e06a444b1b731646745bbba5868efffcbb0d))
+
+Empty required fields on Image URL and RSS Feed plugin pages showed the browser's native HTML5
+  tooltip instead of the labelled app toast that JTN-378 introduced for Save Settings / Add to
+  Playlist. Add `novalidate` to the settings form so the browser never surfaces its own bubble, and
+  route the form's implicit Enter-key submit through the same validateAllInputsDetailed /
+  buildValidationMessage / focusFirstInvalid helpers the Update Preview click path already uses.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **deps**: Sync uv.lock inkypi version bump
+  ([`e4962db`](https://github.com/jtn0123/InkyPi/commit/e4962dbcc738a2068cc4777d734e1c93bd7779ec))
+
+Pick up the 0.49.6 -> 0.49.11 version drift that accumulated on main so the "Lockfile drift check"
+  CI gate passes. No dependency changes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.14 (2026-04-12)
+
+### Bug Fixes
+
+- Sync uv lockfile
+  ([`7faaea3`](https://github.com/jtn0123/InkyPi/commit/7faaea3b39da206a4c00ccca498dee801cb9a47e))
+
+- **csp**: Drop redundant UnicodeDecodeError in except clause (JTN-653)
+  ([`4addf70`](https://github.com/jtn0123/InkyPi/commit/4addf7040846bc2536693e3256d757db5c5e0c75))
+
+SonarCloud python:S5713 on src/blueprints/csp_report.py:68 flagged the `except (ValueError,
+  UnicodeDecodeError)` tuple as redundant because UnicodeDecodeError is a subclass of ValueError and
+  is therefore already caught by the base branch.
+
+Drop UnicodeDecodeError from the tuple and leave a comment noting that non-UTF-8 payloads are still
+  covered via inheritance. No behavior change; all 18 CSP-report tests (including malformed-JSON
+  coverage) still pass.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Clarify Sonar suppression comment
+  ([`b82d0c0`](https://github.com/jtn0123/InkyPi/commit/b82d0c03f7fd2357b767c935a4ad5ed4e5d90dc7))
+
+- **security**: Rebuild redirect URL to close CodeQL open-redirect alert (JTN-317)
+  ([`5afe67f`](https://github.com/jtn0123/InkyPi/commit/5afe67f765b20f7e1c35d329443f8a09b07a99e7))
+
+Validate-then-reuse of request.full_path left CodeQL py/url-redirection alert #52 open even after
+  the host allow-list was added in PR #317: the taint flow from the untrusted Host header into
+  redirect() was still present because the final URL was built by f-string concatenation with
+  request.full_path.
+
+Rebuild the redirect target from individually validated components using urlunsplit: hard-coded
+  "https" scheme literal + allow-listed authority + re-quoted path + re-urlencoded query. This
+  breaks the taint flow and matches the repo's established fix pattern for this rule.
+
+Add regression tests covering: * path re-quoting (spaces survive as %20) * multi-value query
+  round-trip * spoofed "@evil.com/path" in the request path cannot shift the authority in the
+  Location header.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **lockfile**: Sync uv.lock with project version
+  ([`d74bb9e`](https://github.com/jtn0123/InkyPi/commit/d74bb9e9c68b1b55f8ebcc821287b6e38d9b3af5))
+
+
+## v0.49.13 (2026-04-12)
+
+### Bug Fixes
+
+- **playlist**: Add confirmation + success toast to Display Next (JTN-630)
+  ([`b076fc3`](https://github.com/jtn0123/InkyPi/commit/b076fc3113ffc514e494384aa02aa177b208b6c6))
+
+On a Pi Zero 2 W, the per-playlist "Display Next" button used to fire immediately with no
+  confirmation and no visible success feedback, leaving the user unsure whether the command was
+  sent. Now:
+
+- Click opens a confirmation modal that names the playlist being advanced. - Confirming fires the
+  existing request and surfaces a success toast ("Display updated — refreshing…") before the page
+  reloads. - Cancel/backdrop-click/Escape all close the modal; a11y attributes and wiring follow the
+  Delete Playlist / Delete Instance modal pattern.
+
+Tests: - tests/static/test_display_next_confirmation.py — 8 new assertions covering the modal
+  markup, a11y attrs, click-handler rewire, success toast, cancel button, and escape/backdrop
+  registration. - tests/integration/test_playlist_empty_state.py — updated to match on
+  `.run-next-btn` instead of the literal "Display Next" string, since the confirm modal now renders
+  as page chrome even for empty playlists.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **a11y**: Guard Style accordion chevron flip (JTN-643)
+  ([#413](https://github.com/jtn0123/InkyPi/pull/413),
+  [`1768b29`](https://github.com/jtn0123/InkyPi/commit/1768b29c746f5542d08f6158ce0a0df3f762200a))
+
+PR #389 (JTN-623) already fixed the "Style ▼ stays ▼" behaviour on plugin pages by letting CSS
+  rotate `.collapsible-icon` 180deg off `[aria-expanded="true"]`. The existing coverage asserted the
+  CSS rule is bundled and that JS toggles aria-expanded, but nothing exercised the live browser path
+  on a plugin page or pinned down the hidden prerequisite — `transform` only applies if the chevron
+  span is a non-inline box.
+
+Add two regression guards so the "stuck ▼" symptom cannot silently return: - Static test:
+  `.collapsible-icon` must keep `float: right` (or declare an explicit non-inline `display:`) so the
+  rotate transform actually renders. Dropping the float without a replacement would visually revert
+  the fix while aria-expanded still flipped. - E2E test: on `/plugin/weather`, clicking the Style
+  header flips `aria-expanded` to `true` AND computes `transform: matrix(-1,0,0,-1,0,0)` on the
+  chevron, and clears both on a second click.
+
+Closes JTN-643.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.12 (2026-04-12)
+
+### Bug Fixes
+
+- **history**: Polish pass — source fallback, metric tooltip, danger zone
+  ([#409](https://github.com/jtn0123/InkyPi/pull/409),
+  [`8a53afc`](https://github.com/jtn0123/InkyPi/commit/8a53afc71b61f4c7d50a2275dc25d07a831afddd))
+
+JTN-626: Metric chips (Request / Generate / Preprocess / Display) now carry both a title tooltip and
+  a descriptive aria-label so users can tell what "2622 ms" actually measures. The strip is labelled
+  as a region with a screen-reader-only describedby paragraph.
+
+JTN-631: Every history entry now renders a Source line for consistency.
+
+Entries without sidecar provenance show "Source: Unknown" in a muted italic style with a tooltip
+  explaining older entries predate source tracking.
+
+JTN-649: The reset-cache section is now a proper danger zone: a horizontal divider separates it from
+  the grid, a red "Danger zone" pill label sits above the heading, the heading uses the error color,
+  padding and border are beefed up, and on narrow viewports it stacks vertically with a full-width
+  Clear All button. The section is exposed as a region landmark for assistive tech.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.11 (2026-04-12)
 
 ### Bug Fixes
