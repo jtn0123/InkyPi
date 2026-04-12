@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v0.44.0 (2026-04-12)
+
+### Features
+
+- **api**: Add async job queue for non-blocking plugin renders (JTN-497)
+  ([#371](https://github.com/jtn0123/InkyPi/pull/371),
+  [`0f98521`](https://github.com/jtn0123/InkyPi/commit/0f98521931fb00461151398f1ea27e737e4e1685))
+
+Plugin renders now run in a ThreadPoolExecutor-backed job queue when the client sends X-Async: true.
+  POST /update_now returns 202 with a job_id; the frontend polls GET /api/job/<id> until done/error.
+  The sync path is preserved for backward compatibility. Config.write_config was already
+  mutex-protected via _config_lock.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.43.11 (2026-04-12)
 
 ### Bug Fixes
