@@ -1,6 +1,54 @@
 # CHANGELOG
 
 
+## v0.49.13 (2026-04-12)
+
+### Bug Fixes
+
+- **playlist**: Add confirmation + success toast to Display Next (JTN-630)
+  ([`b076fc3`](https://github.com/jtn0123/InkyPi/commit/b076fc3113ffc514e494384aa02aa177b208b6c6))
+
+On a Pi Zero 2 W, the per-playlist "Display Next" button used to fire immediately with no
+  confirmation and no visible success feedback, leaving the user unsure whether the command was
+  sent. Now:
+
+- Click opens a confirmation modal that names the playlist being advanced. - Confirming fires the
+  existing request and surfaces a success toast ("Display updated — refreshing…") before the page
+  reloads. - Cancel/backdrop-click/Escape all close the modal; a11y attributes and wiring follow the
+  Delete Playlist / Delete Instance modal pattern.
+
+Tests: - tests/static/test_display_next_confirmation.py — 8 new assertions covering the modal
+  markup, a11y attrs, click-handler rewire, success toast, cancel button, and escape/backdrop
+  registration. - tests/integration/test_playlist_empty_state.py — updated to match on
+  `.run-next-btn` instead of the literal "Display Next" string, since the confirm modal now renders
+  as page chrome even for empty playlists.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **a11y**: Guard Style accordion chevron flip (JTN-643)
+  ([#413](https://github.com/jtn0123/InkyPi/pull/413),
+  [`1768b29`](https://github.com/jtn0123/InkyPi/commit/1768b29c746f5542d08f6158ce0a0df3f762200a))
+
+PR #389 (JTN-623) already fixed the "Style ▼ stays ▼" behaviour on plugin pages by letting CSS
+  rotate `.collapsible-icon` 180deg off `[aria-expanded="true"]`. The existing coverage asserted the
+  CSS rule is bundled and that JS toggles aria-expanded, but nothing exercised the live browser path
+  on a plugin page or pinned down the hidden prerequisite — `transform` only applies if the chevron
+  span is a non-inline box.
+
+Add two regression guards so the "stuck ▼" symptom cannot silently return: - Static test:
+  `.collapsible-icon` must keep `float: right` (or declare an explicit non-inline `display:`) so the
+  rotate transform actually renders. Dropping the float without a replacement would visually revert
+  the fix while aria-expanded still flipped. - E2E test: on `/plugin/weather`, clicking the Style
+  header flips `aria-expanded` to `true` AND computes `transform: matrix(-1,0,0,-1,0,0)` on the
+  chevron, and clears both on a second click.
+
+Closes JTN-643.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.12 (2026-04-12)
 
 ### Bug Fixes
