@@ -125,3 +125,59 @@ def test_generate_image_invalid_background_color_falls_back(
         device_config_dev,
     )
     assert img is not None
+
+
+def test_image_folder_background_option_has_default_blur_in_schema():
+    """JTN-632: The Background Fill radio_segment must declare a default so
+    that DRAFT renders pre-select one option (Blur). Without a default,
+    neither radio is checked and users can save in an indeterminate state."""
+    from plugins.image_folder.image_folder import ImageFolder
+
+    sch = ImageFolder({"id": "image_folder"}).build_settings_schema()
+
+    def _find_field(obj, name):
+        if isinstance(obj, dict):
+            if obj.get("name") == name:
+                return obj
+            for v in obj.values():
+                found = _find_field(v, name)
+                if found is not None:
+                    return found
+        elif isinstance(obj, list):
+            for item in obj:
+                found = _find_field(item, name)
+                if found is not None:
+                    return found
+        return None
+
+    bg = _find_field(sch, "backgroundOption")
+    assert bg is not None
+    assert bg.get("default") == "blur", (
+        "image_folder backgroundOption must default to 'blur' so the radio "
+        "group has a pre-selected option in DRAFT mode (JTN-632)"
+    )
+
+
+def test_image_folder_draft_page_preselects_blur_radio(client):
+    """JTN-632: Rendering /plugin/image_folder with no saved instance
+    (DRAFT mode) must pre-check exactly one Background Fill radio option."""
+    import re
+
+    resp = client.get("/plugin/image_folder")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    radios = re.findall(
+        r'<input[^>]*name="backgroundOption"[^>]*>',
+        body,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    assert len(radios) >= 2, "expected at least two backgroundOption radios"
+    checked_radios = [r for r in radios if re.search(r"\bchecked\b", r)]
+    assert len(checked_radios) == 1, (
+        f"expected exactly one backgroundOption radio to be pre-checked in "
+        f"DRAFT mode, found {len(checked_radios)} (JTN-632)"
+    )
+    assert re.search(
+        r'value="blur"', checked_radios[0]
+    ), "the pre-checked backgroundOption radio must be 'blur' (JTN-632)"

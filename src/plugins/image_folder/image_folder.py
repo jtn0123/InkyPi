@@ -47,6 +47,15 @@ def list_files_in_folder(folder_path):
 
 
 class ImageFolder(BasePlugin):
+    def generate_settings_template(self):
+        # JTN-632: Disable the legacy "Style" collapsible. Its hardcoded
+        # `backgroundOption` radios collide with the schema-driven Background
+        # Fill radio group and cause two options to render as `checked`,
+        # leaving the user's Background Fill selection indeterminate.
+        template_params = super().generate_settings_template()
+        template_params["style_settings"] = False
+        return template_params
+
     def validate_settings(self, settings: dict) -> str | None:
         """Reject missing/unreadable/empty folder paths at save time.
 
