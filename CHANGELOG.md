@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.49.6 (2026-04-12)
+
+### Bug Fixes
+
+- **release**: Stop shipping literal {version} placeholder in VERSION (JTN-624)
+  ([#391](https://github.com/jtn0123/InkyPi/pull/391),
+  [`20dc553`](https://github.com/jtn0123/InkyPi/commit/20dc55369a6fa4d8b43a4f7057115146a8a9a7f9))
+
+* fix(release): stop shipping literal {version} placeholder in VERSION (JTN-624)
+
+The Settings -> Updates tab was reporting `INSTALLED: 0.1.0` while the latest release was 0.47.0.
+  Root causes:
+
+1. `pyproject.toml` had `build_command = "echo '{version}' > VERSION"`, but python-semantic-release
+  does NOT expand `{version}` inside shell build commands — it passes the literal string through.
+  Every release since #349 therefore wrote the seven characters `{version}` to VERSION. Switch to
+  `printf '%s\n' "$NEW_VERSION" > VERSION` so the release pipeline uses the env var PSR actually
+  exports. 2. `version_toml` only pointed at `tool.semantic_release.version`, so the canonical
+  PEP-621 `[project].version` was never bumped and has been drifting since the uv-lock migration
+  (JTN-616). Add `project.version` to `version_toml` so every release rewrites both keys. 3.
+  `_read_version()` / `_read_app_version()` surfaced the literal `{version}` string (or `0.1.0`) to
+  the UI verbatim. Add a pyproject.toml fallback and treat `{version}`, `0.1.0`, and empty strings
+  as "no usable VERSION file" so the UI still shows a real version even if a future release
+  regresses VERSION again.
+
+Also bump VERSION and `[project].version` to 0.47.0 so the checked-in state matches the latest tag.
+
+Regression tests:
+
+- `test_version_file_on_disk_is_not_placeholder` — fails CI if VERSION ever contains `{version}`,
+  `0.1.0`, or a non-semver string. -
+  `test_pyproject_project_version_matches_semantic_release_version` — fails CI if the two
+  version_toml targets drift. - `test_read_version_placeholder_falls_back_to_pyproject` — covers the
+  runtime fallback path so a broken VERSION doesn't break the UI.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(deps): regenerate uv.lock after version bump (JTN-624)
+
+The [project].version bump in pyproject.toml shifted the lockfile's project version metadata.
+  Regenerate with `uv lock` to clear the advisory Lockfile drift check.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.5 (2026-04-12)
 
 ### Bug Fixes
