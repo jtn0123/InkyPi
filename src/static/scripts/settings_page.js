@@ -457,8 +457,16 @@
       const badge = document.getElementById("updateBadge");
       const latestEl = document.getElementById("latestVersion");
       const updateBtn = document.getElementById("startUpdateBtn");
+      const checkBtn = document.getElementById("checkUpdatesBtn");
       const notesContainer = document.getElementById("releaseNotesContainer");
       const notesBody = document.getElementById("releaseNotesBody");
+
+      // Show spinner + disable button while checking (JTN-352)
+      if (checkBtn) {
+        checkBtn.disabled = true;
+        const sp = checkBtn.querySelector(".btn-spinner");
+        if (sp) sp.style.display = "inline-block";
+      }
       if (badge) { badge.textContent = "Checking..."; badge.className = "status-chip"; }
       try {
         const controller = new AbortController();
@@ -466,7 +474,7 @@
         const resp = await fetch(config.versionUrl, { cache: "no-store", signal: controller.signal });
         clearTimeout(timeoutId);
         const data = await resp.json();
-        if (latestEl) latestEl.textContent = data.latest || "—";
+        if (latestEl) latestEl.textContent = data.latest || "\u2014";
         if (data.update_available) {
           if (badge) { badge.textContent = "Update available"; badge.className = "status-chip warning"; }
           if (updateBtn) updateBtn.disabled = false;
@@ -486,6 +494,13 @@
       } catch (e) {
         console.warn("Version check failed:", e);
         if (badge) { badge.textContent = "Check failed"; badge.className = "status-chip"; }
+      } finally {
+        // Re-enable button and hide spinner (JTN-352)
+        if (checkBtn) {
+          checkBtn.disabled = false;
+          const sp = checkBtn.querySelector(".btn-spinner");
+          if (sp) sp.style.display = "none";
+        }
       }
     }
 
