@@ -6,6 +6,8 @@ from zoneinfo import ZoneInfo
 
 from astral import moon
 
+from utils.logging_utils import redact_secrets
+
 logger = logging.getLogger(__name__)
 
 
@@ -91,11 +93,13 @@ def get_wind_arrow(wind_deg: float) -> str:
 def parse_timezone(weatherdata):
     """Parse timezone from weather data"""
     if "timezone" in weatherdata:
-        # lgtm[py/clear-text-logging-sensitive-data] — logs the IANA timezone
-        # string (e.g. "America/Los_Angeles") from a public weather API response.
-        # CodeQL taints `weatherdata` because callers pass api_key to fetch it,
-        # but the timezone field never contains credentials.
-        logger.info(f"Using timezone from weather data: {weatherdata['timezone']}")
+        # CodeQL taints `weatherdata` because callers pass api_key to fetch it.
+        # Wrap with redact_secrets() so any credential-like substring is masked
+        # before reaching log handlers.
+        logger.info(
+            "Using timezone from weather data: %s",
+            redact_secrets(weatherdata["timezone"]),
+        )
         return ZoneInfo(weatherdata["timezone"])
     else:
         logger.error("Failed to retrieve Timezone from weather data")

@@ -2,6 +2,7 @@ import logging
 import os
 
 from utils.http_client import get_http_session
+from utils.logging_utils import redact_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,12 @@ def get_weather_data(api_key, units, lat, long, timeout=20):
     url = WEATHER_URL.format(lat=lat, long=long, units=units, api_key=api_key)
     response = get_http_session().get(url, timeout=timeout)
     if not 200 <= response.status_code < 300:
-        # lgtm[py/clear-text-logging-sensitive-data] — logs the OpenWeatherMap
-        # error response body (JSON like {"cod":401,"message":"Invalid API key"}),
-        # not the api_key itself. The api_key is only embedded in `url` which is
-        # never logged. CodeQL taints `response` because the enclosing function
-        # accepts api_key, but the response body never contains it.
-        logger.error("Failed to retrieve weather data: %s", response.content)
+        # CodeQL taints `response` because the enclosing function accepts
+        # api_key; wrap with redact_secrets() to mask any accidental key
+        # leakage in the error body before logging.
+        logger.error(
+            "Failed to retrieve weather data: %s", redact_secrets(response.content)
+        )
         raise RuntimeError("Failed to retrieve weather data.")
 
     return response.json()
@@ -47,9 +48,9 @@ def get_air_quality(api_key, lat, long, timeout=20):
     response = get_http_session().get(url, timeout=timeout)
 
     if not 200 <= response.status_code < 300:
-        # lgtm[py/clear-text-logging-sensitive-data] — logs OWM air-pollution
-        # error body, not api_key. See get_weather_data() for full rationale.
-        logger.error("Failed to get air quality data: %s", response.content)
+        logger.error(
+            "Failed to get air quality data: %s", redact_secrets(response.content)
+        )
         raise RuntimeError("Failed to retrieve air quality data.")
 
     return response.json()
@@ -60,9 +61,7 @@ def get_location(api_key, lat, long, timeout=20):
     response = get_http_session().get(url, timeout=timeout)
 
     if not 200 <= response.status_code < 300:
-        # lgtm[py/clear-text-logging-sensitive-data] — logs OWM geocoding error
-        # body (e.g. invalid coordinates), not api_key. See get_weather_data().
-        logger.error(f"Failed to get location: {response.content}")
+        logger.error("Failed to get location: %s", redact_secrets(response.content))
         raise RuntimeError("Failed to retrieve location.")
 
     location_list = response.json()
