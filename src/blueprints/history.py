@@ -17,6 +17,7 @@ from flask import (
 )
 from werkzeug.exceptions import BadRequest
 
+from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.image_serving import maybe_serve_webp
 from utils.security_utils import validate_file_path
@@ -29,8 +30,38 @@ history_bp = Blueprint("history", __name__)
 # Sonar S1192 — duplicate string constants
 _CONFIG_KEY = "DEVICE_CONFIG"
 _ERR_INVALID_FILENAME = "invalid filename"
+_ERR_FILE_NOT_FOUND = "File not found"
+_ERR_INVALID_JSON = "Invalid JSON payload"
+_ERR_BODY_NOT_OBJECT = "Request body must be a JSON object"
+_ERR_FILENAME_REQUIRED = "filename is required"
 _EXT_PNG = ".png"
 _EXT_JSON = ".json"
+
+# Helper return codes used in place of pre-built error responses so that
+# taint-tracking (CodeQL py/reflective-xss) sees only module-level constant
+# strings reaching ``json_error`` at call sites, never a value derived from
+# the request body.
+_ERRCODE_INVALID_JSON = "invalid_json"
+_ERRCODE_BODY_NOT_OBJECT = "body_not_object"
+_ERRCODE_FILENAME_REQUIRED = "filename_required"
+_ERRCODE_INVALID_FILENAME = "invalid_filename"
+_ERRCODE_FILE_NOT_FOUND = "file_not_found"
+
+
+def _filename_error_response(code: str):
+    """Map helper error codes to standard ``json_error`` responses.
+
+    All messages are module-level constants — no request data is interpolated.
+    """
+    if code == _ERRCODE_INVALID_JSON:
+        return json_error(_ERR_INVALID_JSON, status=400)
+    if code == _ERRCODE_BODY_NOT_OBJECT:
+        return json_error(_ERR_BODY_NOT_OBJECT, status=400)
+    if code == _ERRCODE_FILENAME_REQUIRED:
+        return json_error(_ERR_FILENAME_REQUIRED, status=400)
+    if code == _ERRCODE_FILE_NOT_FOUND:
+        return json_error(_ERR_FILE_NOT_FOUND, status=404)
+    return json_error(_ERR_INVALID_FILENAME, status=400)
 
 
 def _timestamp_from_history_filename(filename: str) -> float:
@@ -202,34 +233,44 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
 def _validate_and_resolve_history_file(history_dir, filename):
     """Validate and resolve a history filename to a safe absolute path.
 
-    Returns ``(safe_path, None)`` on success, or ``(None, error_response)`` when
-    the filename is invalid or the resolved file does not exist.  Callers should
-    check the second element before using the first.
+    Returns ``(safe_path, None)`` on success, or ``(None, err_code)`` where
+    ``err_code`` is one of the ``_ERRCODE_*`` sentinels. Callers convert the
+    code to a response via :func:`_filename_error_response` so that only
+    module-level constant strings flow into ``json_error`` (CodeQL
+    py/reflective-xss).
     """
     try:
         safe_path = _resolve_history_path(history_dir, filename)
     except ValueError:
-        return None, json_error(_ERR_INVALID_FILENAME, status=400)
+        logger.warning(
+            "history: invalid filename rejected filename=%s",
+            sanitize_log_field(filename),
+        )
+        return None, _ERRCODE_INVALID_FILENAME
     if not os.path.isfile(safe_path):
-        return None, json_error("File not found", status=404)
+        logger.warning(
+            "history: file not found filename=%s",
+            sanitize_log_field(filename),
+        )
+        return None, _ERRCODE_FILE_NOT_FOUND
     return safe_path, None
 
 
 def _parse_filename_from_request():
     """Parse and validate a ``filename`` field from a JSON POST body.
 
-    Returns ``(filename, None)`` on success, or ``(None, error_response)``
-    when the payload is malformed or the filename is missing/empty.
+    Returns ``(filename, None)`` on success, or ``(None, err_code)`` where
+    ``err_code`` is one of the ``_ERRCODE_*`` sentinels.
     """
     try:
         data = request.get_json(force=True)
     except BadRequest:
-        return None, json_error("Invalid JSON payload", status=400)
+        return None, _ERRCODE_INVALID_JSON
     if not isinstance(data, dict):
-        return None, json_error("Request body must be a JSON object", status=400)
+        return None, _ERRCODE_BODY_NOT_OBJECT
     filename = data.get("filename")
     if not isinstance(filename, str) or not filename.strip():
-        return None, json_error("filename is required", status=400)
+        return None, _ERRCODE_FILENAME_REQUIRED
     return filename, None
 
 
@@ -350,13 +391,13 @@ def history_redisplay():
     history_dir = device_config.history_image_dir
 
     try:
-        filename, err = _parse_filename_from_request()
-        if err is not None:
-            return err
+        filename, err_code = _parse_filename_from_request()
+        if err_code is not None:
+            return _filename_error_response(err_code)
 
-        safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
-        if err is not None:
-            return err
+        safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
+        if err_code is not None:
+            return _filename_error_response(err_code)
 
         display_manager.display_preprocessed_image(safe_path)
         return json_success("Display updated")
@@ -373,13 +414,13 @@ def history_delete():
     device_config = current_app.config[_CONFIG_KEY]
     history_dir = device_config.history_image_dir
     try:
-        filename, err = _parse_filename_from_request()
-        if err is not None:
-            return err
+        filename, err_code = _parse_filename_from_request()
+        if err_code is not None:
+            return _filename_error_response(err_code)
 
-        safe_path, err = _validate_and_resolve_history_file(history_dir, filename)
-        if err is not None:
-            return err
+        safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
+        if err_code is not None:
+            return _filename_error_response(err_code)
 
         _base, ext = os.path.splitext(safe_path)
         if not ext.lower().endswith((_EXT_PNG, _EXT_JSON)):
