@@ -530,9 +530,7 @@ def create_playlist():
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if playlist:
-            return json_error(
-                f"Playlist with name '{playlist_name}' already exists", status=400
-            )
+            return json_error("A playlist with that name already exists", status=400)
 
         # Prevent overlapping time windows
         try:
@@ -637,7 +635,7 @@ def update_playlist(playlist_name):
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
+        return json_error("Playlist does not exist", status=400)
 
     # Prevent overlapping (exclude the playlist being updated)
     try:
@@ -675,8 +673,8 @@ def update_playlist(playlist_name):
         )
 
     if warning:
-        return json_success(f"Updated playlist '{playlist_name}'!", warning=warning)
-    return json_success(f"Updated playlist '{playlist_name}'!")
+        return json_success("Updated playlist!", warning=warning)
+    return json_success("Updated playlist!")
 
 
 @playlist_bp.route("/delete_playlist/<string:playlist_name>", methods=["DELETE"])
@@ -689,13 +687,13 @@ def delete_playlist(playlist_name):
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return json_error(f"Playlist '{playlist_name}' does not exist", status=400)
+        return json_error("Playlist does not exist", status=400)
 
     device_config.update_atomic(
         lambda cfg: playlist_manager.delete_playlist(playlist_name)
     )
 
-    return json_success(f"Deleted playlist '{playlist_name}'!")
+    return json_success("Deleted playlist!")
 
 
 @playlist_bp.route("/update_device_cycle", methods=["PUT"])
@@ -739,7 +737,7 @@ def reorder_plugins():
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error(f"Playlist '{playlist_name}' not found", status=400)
+            return json_error("Playlist not found", status=400)
 
         reorder_result: list[bool] = []
 
@@ -775,7 +773,7 @@ def display_next_in_playlist():
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error(f"Playlist '{playlist_name}' not found", status=400)
+            return json_error("Playlist not found", status=400)
 
         # Determine current time and next eligible
         current_dt = _safe_now_device_tz(device_config)
@@ -817,7 +815,7 @@ def playlist_eta(playlist_name: str):
 
     pl = playlist_manager.get_playlist(playlist_name)
     if not pl:
-        return json_error(f"Playlist '{playlist_name}' not found", status=404)
+        return json_error("Playlist not found", status=404)
 
     # Cache key is playlist name; invalidate once per minute
     now = _safe_now_device_tz(device_config)
