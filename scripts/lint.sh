@@ -43,36 +43,59 @@ fi
 # below is CI-blocking. See docs/typing.md.
 count_mypy_errors() {
     # Parse "Found N errors" / "Success: ..." lines from captured output.
+    # Returns "?" when mypy exited non-zero without a recognizable summary
+    # (config error, import failure, crash) so callers don't misreport "0".
     local output="$1"
+    local exit_code="${2:-0}"
     local n
-    n=$(printf '%s\n' "$output" | grep -Eo 'Found [0-9]+ error' | grep -Eo '[0-9]+' | tail -1)
+    n=$(printf '%s\n' "$output" | sed -nE 's/.*Found ([0-9]+) errors?.*/\1/p' | tail -1)
     if [ -z "$n" ]; then
-        n=0
+        if printf '%s\n' "$output" | grep -q '^Success:'; then
+            n=0
+        elif [ "$exit_code" -ne 0 ]; then
+            # Non-zero exit, no summary — treat as a failed run with unknown count
+            n="?"
+        else
+            n=0
+        fi
     fi
     echo "$n"
 }
 
-echo "Running mypy type checker (advisory — src/ only)..."
-MYPY_SRC_OUTPUT="$(mypy src 2>&1)"
-MYPY_SRC_EXIT=$?
-echo "$MYPY_SRC_OUTPUT"
-MYPY_SRC_COUNT=$(count_mypy_errors "$MYPY_SRC_OUTPUT")
-if [ $MYPY_SRC_EXIT -ne 0 ]; then
-    echo "⚠️  mypy src/: advisory only — ${MYPY_SRC_COUNT} issue(s) found"
-else
-    echo "✅ mypy src/ advisory type check passed"
-fi
+# Run mypy on a directory as an advisory (non-blocking) check.
+# Sets globals MYPY_<UPPER_LABEL>_EXIT and MYPY_<UPPER_LABEL>_COUNT so the
+# outer script can reference them in the summary block below.
+run_advisory_mypy() {
+    local dir_path="$1"
+    local label="$2"
+    local var_key="$3"   # e.g. SRC or TESTS — used to build global var names
+    local output
+    local exit_code
+    local count
 
-echo "Running mypy type checker (advisory — tests/ only)..."
-MYPY_TESTS_OUTPUT="$(mypy tests 2>&1)"
-MYPY_TESTS_EXIT=$?
-echo "$MYPY_TESTS_OUTPUT"
-MYPY_TESTS_COUNT=$(count_mypy_errors "$MYPY_TESTS_OUTPUT")
-if [ $MYPY_TESTS_EXIT -ne 0 ]; then
-    echo "⚠️  mypy tests/: advisory only — ${MYPY_TESTS_COUNT} issue(s) found"
-else
-    echo "✅ mypy tests/ advisory type check passed"
-fi
+    echo "Running mypy type checker (advisory — ${label} only)..."
+    output="$(mypy "$dir_path" 2>&1)"
+    exit_code=$?
+    echo "$output"
+    count=$(count_mypy_errors "$output" "$exit_code")
+
+    if [ "$exit_code" -ne 0 ]; then
+        if [ "$count" = "?" ]; then
+            echo "⚠️  mypy ${label}: failed (see output above)"
+        else
+            echo "⚠️  mypy ${label}: advisory only — ${count} issue(s) found"
+        fi
+    else
+        echo "✅ mypy ${label} advisory type check passed"
+    fi
+
+    # Write through to globals for the final summary.
+    printf -v "MYPY_${var_key}_EXIT" '%s' "$exit_code"
+    printf -v "MYPY_${var_key}_COUNT" '%s' "$count"
+}
+
+run_advisory_mypy src "src/" SRC
+run_advisory_mypy tests "tests/" TESTS
 
 echo "Running mypy strict check (blocking — strict subset only)..."
 # Strict subset: curated low-churn helpers that are enforced at --strict.
@@ -143,8 +166,20 @@ else
     echo ""
     echo "✅ All checks passed!"
 fi
-[ $MYPY_SRC_EXIT -ne 0 ] && echo "⚠️  mypy src/: advisory only — ${MYPY_SRC_COUNT} issue(s) remain (non-blocking)"
-[ $MYPY_TESTS_EXIT -ne 0 ] && echo "⚠️  mypy tests/: advisory only — ${MYPY_TESTS_COUNT} issue(s) remain (non-blocking)"
+if [ $MYPY_SRC_EXIT -ne 0 ]; then
+    if [ "$MYPY_SRC_COUNT" = "?" ]; then
+        echo "⚠️  mypy src/: failed without summary (non-blocking — see output above)"
+    else
+        echo "⚠️  mypy src/: advisory only — ${MYPY_SRC_COUNT} issue(s) remain (non-blocking)"
+    fi
+fi
+if [ $MYPY_TESTS_EXIT -ne 0 ]; then
+    if [ "$MYPY_TESTS_COUNT" = "?" ]; then
+        echo "⚠️  mypy tests/: failed without summary (non-blocking — see output above)"
+    else
+        echo "⚠️  mypy tests/: advisory only — ${MYPY_TESTS_COUNT} issue(s) remain (non-blocking)"
+    fi
+fi
 
 if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     exit 1
