@@ -1,5 +1,6 @@
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,12 @@ class RefreshInfo:
 
     def __init__(
         self,
-        refresh_type,
-        plugin_id,
-        refresh_time,
-        image_hash,
-        playlist=None,
-        plugin_instance=None,
+        refresh_type: str | None,
+        plugin_id: str | None,
+        refresh_time: str | None,
+        image_hash: int | None,
+        playlist: str | None = None,
+        plugin_instance: str | None = None,
         # Optional performance metrics
         request_ms: int | None = None,
         display_ms: int | None = None,
@@ -41,8 +42,8 @@ class RefreshInfo:
         # Optional benchmark correlation id
         benchmark_id: str | None = None,
         # Optional plugin-specific metadata
-        plugin_meta: dict | None = None,
-    ):
+        plugin_meta: dict[str, Any] | None = None,
+    ) -> None:
         """Initialize RefreshInfo instance."""
         self.refresh_time = refresh_time
         self.image_hash = image_hash
@@ -61,15 +62,15 @@ class RefreshInfo:
         # Optional plugin-specific metadata (e.g., WPOTD date/description)
         self.plugin_meta = plugin_meta
 
-    def get_refresh_datetime(self):
+    def get_refresh_datetime(self) -> datetime | None:
         """Returns the refresh time as a datetime object or None if not set."""
         latest_refresh = None
         if self.refresh_time:
             latest_refresh = datetime.fromisoformat(self.refresh_time)
         return latest_refresh
 
-    def to_dict(self):
-        refresh_dict = {
+    def to_dict(self) -> dict[str, Any]:
+        refresh_dict: dict[str, Any] = {
             "refresh_time": self.refresh_time,
             "image_hash": self.image_hash,
             "refresh_type": self.refresh_type,
@@ -98,7 +99,7 @@ class RefreshInfo:
         return refresh_dict
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> "RefreshInfo":
         return cls(
             refresh_time=data.get("refresh_time"),
             image_hash=data.get("image_hash"),
