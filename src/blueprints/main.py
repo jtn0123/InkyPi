@@ -277,11 +277,11 @@ def save_plugin_order():
         return json_error("Order must not contain duplicate plugin IDs", status=400)
     invalid_ids = [pid for pid in order if pid not in registered_ids]
     if invalid_ids:
-        return json_error(f"Unknown plugin IDs: {', '.join(invalid_ids)}", status=400)
+        return json_error("Order contains unknown plugin IDs", status=400)
     missing_ids = registered_ids.difference(order)
     if missing_ids:
         return json_error(
-            f"Order must include every plugin ID exactly once; missing: {', '.join(sorted(missing_ids))}",
+            "Order must include every plugin ID exactly once",
             status=400,
         )
     device_config.set_plugin_order(order)

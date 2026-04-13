@@ -90,7 +90,9 @@ def test_plugin_order_unknown_id_returns_400(client):
     )
     assert resp.status_code == 400
     body = resp.get_json()
-    assert "Unknown plugin IDs" in body["error"]
+    assert "unknown plugin ids" in body["error"].lower()
+    # Payload value must not be reflected (py/reflective-xss hardening).
+    assert "nonexistent_plugin_id_xyz" not in body["error"]
 
 
 def test_plugin_order_non_string_entries_returns_400(client):
