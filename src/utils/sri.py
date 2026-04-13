@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from typing import cast
 
 from flask import Flask
 
@@ -26,7 +27,9 @@ _CDN_MANIFEST_PATH = _STATIC_ROOT / "cdn_manifest.json"
 
 # Per-process caches — avoids recomputing hashes on every request.
 _sri_cache: dict[str, str] = {}
-_cdn_manifest_cache: dict[str, dict] | None = None
+CDNManifestEntry = dict[str, str]
+CDNManifest = dict[str, CDNManifestEntry]
+_cdn_manifest_cache: CDNManifest | None = None
 _cdn_manifest_loaded: bool = False
 
 
@@ -77,7 +80,7 @@ def sri_for(static_rel_path: str) -> str:
     return result
 
 
-def _load_cdn_manifest() -> dict[str, dict]:
+def _load_cdn_manifest() -> CDNManifest:
     """Return the CDN manifest dict, loading from disk on first call."""
     global _cdn_manifest_cache, _cdn_manifest_loaded
     if _cdn_manifest_loaded:
@@ -85,9 +88,8 @@ def _load_cdn_manifest() -> dict[str, dict]:
     _cdn_manifest_loaded = True
     if _CDN_MANIFEST_PATH.is_file():
         try:
-            _cdn_manifest_cache = json.loads(
-                _CDN_MANIFEST_PATH.read_text(encoding="utf-8")
-            )
+            raw_manifest = json.loads(_CDN_MANIFEST_PATH.read_text(encoding="utf-8"))
+            _cdn_manifest_cache = cast(CDNManifest, raw_manifest)
             logger.debug("Loaded CDN manifest from %s", _CDN_MANIFEST_PATH)
         except Exception as exc:
             logger.warning("Failed to parse CDN manifest: %s", exc)
@@ -107,7 +109,8 @@ def cdn_sri(key: str) -> str:
     """
     manifest = _load_cdn_manifest()
     entry = manifest.get(key, {})
-    return entry.get("integrity", "")
+    integrity = entry.get("integrity", "")
+    return integrity if isinstance(integrity, str) else ""
 
 
 # ---------------------------------------------------------------------------

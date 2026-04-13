@@ -34,7 +34,10 @@ logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 60
 
-_cache: dict[tuple[str, int], tuple[float, dict]] = {}
+RefreshStatsRecord = dict[str, Any]
+RefreshStatsResult = dict[str, Any]
+
+_cache: dict[tuple[str, int], tuple[float, RefreshStatsResult]] = {}
 
 
 def _now() -> float:
@@ -50,13 +53,13 @@ def _percentile(sorted_values: list[float], pct: float) -> int:
     return int(sorted_values[idx])
 
 
-def _load_sidecars(history_dir: str, since: float) -> list[dict[str, Any]]:
+def _load_sidecars(history_dir: str, since: float) -> list[RefreshStatsRecord]:
     """Read all JSON sidecar files from *history_dir* whose timestamp >= *since*.
 
     Only reads files that end with ``.json``.  Malformed or unreadable files are
     silently skipped.
     """
-    records: list[dict[str, Any]] = []
+    records: list[RefreshStatsRecord] = []
     try:
         names = os.listdir(history_dir)
     except OSError:
@@ -94,7 +97,7 @@ def _load_sidecars(history_dir: str, since: float) -> list[dict[str, Any]]:
     return records
 
 
-def _compute_window(records: list[dict[str, Any]]) -> dict:
+def _compute_window(records: list[RefreshStatsRecord]) -> RefreshStatsResult:
     """Build the stats dict for a pre-filtered list of sidecar records."""
     total = len(records)
     success = sum(1 for r in records if r.get("status") == "success")
@@ -133,7 +136,7 @@ def _compute_window(records: list[dict[str, Any]]) -> dict:
     }
 
 
-def compute_stats(history_dir: str, window_seconds: int) -> dict:
+def compute_stats(history_dir: str, window_seconds: int) -> RefreshStatsResult:
     """Return refresh aggregates for the last *window_seconds* seconds.
 
     Results are cached for 60 seconds per (history_dir, window_seconds) pair.
