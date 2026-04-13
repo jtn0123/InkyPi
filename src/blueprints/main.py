@@ -339,7 +339,10 @@ def display_next():
                 refresh_task.manual_update(
                     PlaylistRefresh(playlist, plugin_instance, force=True)
                 )
-            except Exception:
+            except RuntimeError:
+                # refresh_task.manual_update raises RuntimeError when the
+                # manual-update queue is full; treat as a client-side 400.
+                # Other exceptions fall through to the outer 500 handler.
                 logger.exception("manual_update failed")
                 return json_error("Plugin update failed", status=400)
         else:
