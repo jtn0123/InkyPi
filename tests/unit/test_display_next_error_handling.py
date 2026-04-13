@@ -58,7 +58,10 @@ class TestGenerateImageRuntimeError:
         assert resp.status_code == 400
         body = resp.get_json()
         assert body["success"] is False
-        assert "API key missing for clock plugin" in body["error"]
+        # Generic message only — raw exception detail must not leak
+        # (CodeQL py/stack-trace-exposure).
+        assert body["error"] == "Plugin image generation failed"
+        assert "API key missing for clock plugin" not in resp.get_data(as_text=True)
 
     @pytest.mark.integration
     def test_generate_image_runtime_error_does_not_trigger_cooldown(
@@ -150,5 +153,7 @@ class TestManualUpdateFailure:
         assert resp.status_code == 400
         body = resp.get_json()
         assert body["success"] is False
-        assert "Plugin update failed" in body["error"]
-        assert "background task crashed" in body["error"]
+        # Generic message only — raw exception detail must not leak
+        # (CodeQL py/stack-trace-exposure).
+        assert body["error"] == "Plugin update failed"
+        assert "background task crashed" not in resp.get_data(as_text=True)

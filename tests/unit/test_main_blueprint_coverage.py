@@ -199,7 +199,7 @@ def test_display_next_after_successful_request_respects_cooldown(
 
 
 def test_display_next_exception(client, flask_app, device_config_dev):
-    """Plugin generation error via manual_update returns 400 with message."""
+    """Plugin generation error via manual_update returns 400 without leaking exception text."""
     mock_playlist = MagicMock()
     mock_plugin_inst = MagicMock()
     mock_plugin_inst.plugin_id = "test_plugin"
@@ -211,18 +211,65 @@ def test_display_next_exception(client, flask_app, device_config_dev):
     mock_playlist.name = "Test Playlist"
     mock_playlist.get_next_eligible_plugin.return_value = mock_plugin_inst
 
+    secret_detail = "SECRET_STACKTRACE_DETAIL_abc123"
     with patch.object(device_config_dev, "get_playlist_manager", return_value=mock_pm):
         refresh_task = flask_app.config["REFRESH_TASK"]
         refresh_task.running = True
-        refresh_task.manual_update = MagicMock(
-            side_effect=RuntimeError("generation failed")
-        )
+        refresh_task.manual_update = MagicMock(side_effect=RuntimeError(secret_detail))
 
         resp = client.post("/display-next")
     assert resp.status_code == 400
     body = resp.get_json()
-    assert "Plugin update failed" in body["error"]
-    assert "generation failed" in body["error"]
+    # Generic message only; raw exception detail must not leak to the client
+    # (CodeQL py/stack-trace-exposure regression).
+    assert body["error"] == "Plugin update failed"
+    assert secret_detail not in resp.get_data(as_text=True)
+
+
+def test_display_next_direct_generate_error_no_leak(
+    client, flask_app, device_config_dev
+):
+    """Direct (non-refresh_task) path must not leak RuntimeError text.
+
+    Regression for CodeQL py/stack-trace-exposure (src/blueprints/main.py:360).
+    """
+    mock_playlist = MagicMock()
+    mock_plugin_inst = MagicMock()
+    mock_plugin_inst.plugin_id = "test_plugin"
+    mock_plugin_inst.name = "Test"
+    mock_plugin_inst.settings = {}
+
+    mock_pm = MagicMock()
+    mock_pm.determine_active_playlist.return_value = mock_playlist
+    mock_playlist.name = "Test Playlist"
+    mock_playlist.get_next_eligible_plugin.return_value = mock_plugin_inst
+
+    secret_detail = "LEAKY_RUNTIME_DETAIL_xyz789"
+
+    mock_plugin = MagicMock()
+    mock_plugin.generate_image.side_effect = RuntimeError(secret_detail)
+
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    refresh_task.running = False
+
+    with (
+        patch.object(device_config_dev, "get_playlist_manager", return_value=mock_pm),
+        patch.object(
+            device_config_dev,
+            "get_plugin",
+            return_value={"id": "test_plugin", "image_settings": []},
+        ),
+        patch(
+            "plugins.plugin_registry.get_plugin_instance",
+            return_value=mock_plugin,
+        ),
+    ):
+        resp = client.post("/display-next")
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["error"] == "Plugin image generation failed"
+    assert secret_detail not in resp.get_data(as_text=True)
 
 
 # ---- /api/plugin_order ----

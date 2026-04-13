@@ -339,9 +339,9 @@ def display_next():
                 refresh_task.manual_update(
                     PlaylistRefresh(playlist, plugin_instance, force=True)
                 )
-            except Exception as exc:
+            except Exception:
                 logger.exception("manual_update failed")
-                return json_error(f"Plugin update failed: {exc}", status=400)
+                return json_error("Plugin update failed", status=400)
         else:
             # Direct path similar to update_now
             from time import perf_counter
@@ -356,8 +356,9 @@ def display_next():
             _t_gen_start = perf_counter()
             try:
                 image = plugin.generate_image(plugin_instance.settings, device_config)
-            except RuntimeError as exc:
-                return json_error(str(exc), status=400)
+            except RuntimeError:
+                logger.exception("generate_image failed in display_next")
+                return json_error("Plugin image generation failed", status=400)
             generate_ms = int((perf_counter() - _t_gen_start) * 1000)
             try:
                 save_stage_event(
