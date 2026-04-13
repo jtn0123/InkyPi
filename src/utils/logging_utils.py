@@ -81,6 +81,17 @@ def _redact(text: str) -> str:
     return text
 
 
+def redact_secrets(value: object) -> str:
+    """Return a string form of *value* with known secret patterns masked.
+
+    Public sanitizer for call sites that need to log values potentially
+    derived from user-supplied settings (e.g. ``template_params`` dicts that
+    CodeQL flags as sensitive sources). Non-string inputs are coerced with
+    ``str()`` before redaction.
+    """
+    return _redact(value if isinstance(value, str) else str(value))
+
+
 def _redact_value(value: object) -> object:
     """Redact *value* if it is a string; leave all other types untouched."""
     if isinstance(value, str):

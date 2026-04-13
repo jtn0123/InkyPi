@@ -10,6 +10,7 @@ from PIL import Image
 from utils.app_utils import get_fonts, resolve_path
 from utils.image_loader import AdaptiveImageLoader
 from utils.image_utils import take_screenshot_html
+from utils.logging_utils import redact_secrets
 from utils.progress import (
     complete_step,
     fail_step,
@@ -180,11 +181,11 @@ class BasePlugin:
                 try:
                     css_files.append(os.path.join(self.render_dir, fname))
                 except Exception as e:
-                    # lgtm[py/clear-text-logging-sensitive-data] — logs a CSS
-                    # filename and exception text. CodeQL taints `template_params`
-                    # upstream as potentially sensitive, but `fname` is a static
-                    # asset path and `e` is an os.path.join error string.
-                    logger.warning("Failed to add extra CSS file %s: %s", fname, e)
+                    logger.warning(
+                        "Failed to add extra CSS file %s: %s",
+                        redact_secrets(fname),
+                        redact_secrets(e),
+                    )
         return css_files
 
     def _build_inline_css(self, css_files, template_params):
@@ -195,11 +196,11 @@ class BasePlugin:
                 with open(css_path, encoding="utf-8") as f:
                     inline_css.append(f.read())
             except Exception as e:
-                # lgtm[py/clear-text-logging-sensitive-data] — logs an on-disk
-                # CSS file path and the OSError text. No credentials or user
-                # input flow into either argument.
-                logger.warning("Failed to read CSS file %s: %s", css_path, e)
-                raise RuntimeError(f"Unable to read CSS file {css_path}") from e
+                safe_path = redact_secrets(css_path)
+                safe_err = redact_secrets(e)
+                logger.warning("Failed to read CSS file %s: %s", safe_path, safe_err)
+                raise RuntimeError(f"Unable to read CSS file {safe_path}") from e
+        extra_css: object = None
         try:
             extra_css = (template_params.get("plugin_settings", {}) or {}).get(
                 "extra_css"
@@ -207,11 +208,11 @@ class BasePlugin:
             if isinstance(extra_css, str) and extra_css.strip():
                 inline_css.append(extra_css)
         except Exception as e:
-            # lgtm[py/clear-text-logging-sensitive-data] — logs the user-provided
-            # extra_css string (CSS rules from plugin settings, not credentials)
-            # and the exception text when settings parsing fails. extra_css is
-            # plugin styling input, not a secret.
-            logger.warning("Failed to process extra CSS string %r: %s", extra_css, e)
+            safe_extra_css = redact_secrets(extra_css)
+            safe_err = redact_secrets(e)
+            logger.warning(
+                "Failed to process extra CSS string %r: %s", safe_extra_css, safe_err
+            )
             raise RuntimeError("Unable to process extra CSS string") from e
         return inline_css
 

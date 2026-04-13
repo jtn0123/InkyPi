@@ -297,3 +297,86 @@ def test_render_image_with_screenshot_timeout(monkeypatch):
 
     assert out is not None
     assert captured_timeout[0] == 5000
+
+
+# ---- CSS helper exception-path tests (JTN-326) ----
+def test_build_inline_css_missing_file_raises_and_logs_redacted(caplog):
+    """_build_inline_css wraps missing CSS path in RuntimeError and logs a redacted message."""
+    import logging
+
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    p = BasePlugin({"id": "clock"})
+
+    missing = "/nonexistent/__inkypi_test__/style.css"
+    with caplog.at_level(logging.WARNING, logger="plugins.base_plugin.base_plugin"):
+        try:
+            p._build_inline_css([missing], {"plugin_settings": {}})
+        except RuntimeError as exc:
+            assert "Unable to read CSS file" in str(exc)
+        else:
+            raise AssertionError("expected RuntimeError")
+
+    assert any("Failed to read CSS file" in r.getMessage() for r in caplog.records)
+
+
+def test_build_inline_css_extra_css_non_string_is_tolerated():
+    """extra_css that is not a string is ignored (no exception, no log)."""
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    p = BasePlugin({"id": "clock"})
+
+    # extra_css as a dict/list is simply skipped by the isinstance() guard.
+    out = p._build_inline_css([], {"plugin_settings": {"extra_css": {"bad": 1}}})
+    assert out == []
+
+
+def test_build_css_files_accepts_extra_css_files_list():
+    """_build_css_files happily appends valid filenames from the extra list."""
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    p = BasePlugin({"id": "clock"})
+
+    files = p._build_css_files("plugin.css", ["extra1.css", "extra2.css"])
+    assert any(f.endswith("extra1.css") for f in files)
+    assert any(f.endswith("extra2.css") for f in files)
+
+
+def test_build_css_files_bad_fname_is_logged_and_skipped(caplog):
+    """Non-string fname causes os.path.join to raise; warning is logged with redaction."""
+    import logging
+
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    p = BasePlugin({"id": "clock"})
+
+    with caplog.at_level(logging.WARNING, logger="plugins.base_plugin.base_plugin"):
+        # 42 is not a str/bytes — os.path.join raises TypeError
+        files = p._build_css_files(None, [42])
+
+    # Base plugin.css is still present; bad entry was skipped.
+    assert any(f.endswith("plugin.css") for f in files)
+    assert any("Failed to add extra CSS file" in r.getMessage() for r in caplog.records)
+
+
+def test_build_inline_css_extra_css_lookup_failure_raises_and_logs(caplog):
+    """A plugin_settings value that is truthy but not a Mapping raises AttributeError."""
+    import logging
+
+    from plugins.base_plugin.base_plugin import BasePlugin
+
+    p = BasePlugin({"id": "clock"})
+
+    with caplog.at_level(logging.WARNING, logger="plugins.base_plugin.base_plugin"):
+        try:
+            # plugin_settings=[1] is truthy, so `... or {}` short-circuits to [1],
+            # and list has no .get() — raises AttributeError inside the try block.
+            p._build_inline_css([], {"plugin_settings": [1]})
+        except RuntimeError as exc:
+            assert "Unable to process extra CSS string" in str(exc)
+        else:
+            raise AssertionError("expected RuntimeError")
+
+    assert any(
+        "Failed to process extra CSS string" in r.getMessage() for r in caplog.records
+    )
