@@ -128,18 +128,22 @@ class PlaylistManager:
     DEFAULT_PLAYLIST_START = "00:00"
     DEFAULT_PLAYLIST_END = "24:00"
 
-    def __init__(self, playlists=None, active_playlist=None):
+    def __init__(
+        self,
+        playlists: list["Playlist"] | None = None,
+        active_playlist: str | None = None,
+    ) -> None:
         """Initialize PlaylistManager with a list of playlists."""
         if playlists is None:
             playlists = []
-        self.playlists = playlists
+        self.playlists: list[Playlist] = playlists
         self.active_playlist = active_playlist
 
-    def get_playlist_names(self):
+    def get_playlist_names(self) -> list[str]:
         """Returns a list of all playlist names."""
         return [p.name for p in self.playlists]
 
-    def add_default_playlist(self):
+    def add_default_playlist(self) -> bool:
         """Add a default playlist to the manager, called when no playlists exist."""
         self.playlists.append(
             Playlist(
@@ -151,7 +155,7 @@ class PlaylistManager:
         )
         return True
 
-    def find_plugin(self, plugin_id, instance):
+    def find_plugin(self, plugin_id: str, instance: str) -> "PluginInstance | None":
         """Searches playlists to find a plugin with the given ID and instance."""
         for playlist in self.playlists:
             plugin = playlist.find_plugin(plugin_id, instance)
@@ -159,7 +163,9 @@ class PlaylistManager:
                 return plugin
         return None
 
-    def determine_active_playlist(self, current_datetime):
+    def determine_active_playlist(
+        self, current_datetime: datetime
+    ) -> "Playlist | None":
         """Determine the active playlist based on the current time."""
         current_time = current_datetime.strftime(
             "%H:%M"
@@ -174,11 +180,13 @@ class PlaylistManager:
         active_playlists.sort(key=lambda p: p.get_priority())
         return active_playlists[0]
 
-    def get_playlist(self, playlist_name):
+    def get_playlist(self, playlist_name: str) -> "Playlist | None":
         """Returns the playlist with the specified name."""
         return next((p for p in self.playlists if p.name == playlist_name), None)
 
-    def add_plugin_to_playlist(self, playlist_name, plugin_data):
+    def add_plugin_to_playlist(
+        self, playlist_name: str, plugin_data: dict[str, Any]
+    ) -> bool:
         """Adds a plugin to a playlist by the specified name. Returns true if successfully added,
         False if playlist doesn't exist"""
         playlist = self.get_playlist(playlist_name)
@@ -191,7 +199,12 @@ class PlaylistManager:
             )
         return False
 
-    def add_playlist(self, name, start_time=None, end_time=None):
+    def add_playlist(
+        self,
+        name: str,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> bool:
         """Creates and adds a new playlist with the given start and end times."""
         if not start_time:
             start_time = PlaylistManager.DEFAULT_PLAYLIST_START
@@ -200,7 +213,9 @@ class PlaylistManager:
         self.playlists.append(Playlist(name, start_time, end_time))
         return True
 
-    def update_playlist(self, old_name, new_name, start_time, end_time):
+    def update_playlist(
+        self, old_name: str, new_name: str, start_time: str, end_time: str
+    ) -> bool:
         """Updates an existing playlist's name, start time, and end time."""
         playlist = self.get_playlist(old_name)
         if playlist:
@@ -211,25 +226,29 @@ class PlaylistManager:
         logger.warning("Playlist '%s' not found.", _sanitize_log_value(old_name))
         return False
 
-    def delete_playlist(self, name):
+    def delete_playlist(self, name: str) -> None:
         """Deletes the playlist with the specified name."""
         self.playlists = [p for p in self.playlists if p.name != name]
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "playlists": [p.to_dict() for p in self.playlists],
             "active_playlist": self.active_playlist,
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> "PlaylistManager":
         return cls(
             playlists=[Playlist.from_dict(p) for p in data.get("playlists", [])],
             active_playlist=data.get("active_playlist"),
         )
 
     @staticmethod
-    def should_refresh(latest_refresh, interval_seconds, current_time):
+    def should_refresh(
+        latest_refresh: datetime | None,
+        interval_seconds: float,
+        current_time: datetime,
+    ) -> bool:
         """Determines whether a refresh should occur on the interval and latest refresh time."""
         if not latest_refresh:
             return True  # No previous refresh, so it's time to refresh
