@@ -63,12 +63,38 @@ repo-wide.
 4. **Update the table above** with the module path and Linear issue reference.
 5. Open a PR — CI will enforce strictness from that point forward.
 
-## Advisory whole-codebase check
+## Advisory checks: split `src/` vs `tests/`
 
-`scripts/lint.sh` also runs `mypy src tests` (non-strict) over the entire
-codebase.  Failures there are printed with a `⚠️` warning but do **not** block
-the lint step.  This keeps visibility into type drift without blocking PRs on
-pre-existing issues.
+`scripts/lint.sh` runs the advisory (non-strict) mypy pass as **two separate
+invocations** instead of one:
+
+1. `mypy src/` — production code
+2. `mypy tests/` — test suite
+
+Both are non-blocking — failures are printed with a `⚠️` warning and the
+error counts are reported separately. The strict subset above is the only
+mypy check that blocks CI.
+
+### Why the split?
+
+The test suite carries far more advisory typing noise than `src/` (fixtures,
+monkeypatching, duck-typed stubs). When both were combined into a single
+`mypy src tests` run, a small regression in production code was invisible —
+drowned out by thousands of test-only errors. Splitting the counts makes
+**`src/` type drift legible so we can ratchet it downward** and eventually
+promote more modules into the strict subset.
+
+### What to do if the `src/` count goes up
+
+1. Run `mypy src/` locally and look at the diff in errors vs `main`.
+2. If your PR introduced the new errors, fix them before merging — even
+   though the check is advisory, rising `src/` counts block our ability to
+   grow the strict subset.
+3. If the increase is unrelated to your change (e.g. a dependency bump),
+   open a follow-up issue and call it out in the PR description.
+
+Increases in the `tests/` count are lower priority but still worth a glance —
+prefer fixing them opportunistically in the same area you're already editing.
 
 ## Coding guidelines for typed modules
 
