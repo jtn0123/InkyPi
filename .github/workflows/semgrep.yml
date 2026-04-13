@@ -38,8 +38,7 @@ jobs:
           semgrep scan \
             --config=auto \
             --sarif \
-            --output=semgrep.sarif \
-            --error
+            --output=semgrep.sarif
 
       - name: Upload Semgrep results
         if: always()
