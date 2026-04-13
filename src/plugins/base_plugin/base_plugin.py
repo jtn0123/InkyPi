@@ -200,6 +200,7 @@ class BasePlugin:
                 safe_err = redact_secrets(e)
                 logger.warning("Failed to read CSS file %s: %s", safe_path, safe_err)
                 raise RuntimeError(f"Unable to read CSS file {safe_path}") from e
+        extra_css: object = None
         try:
             extra_css = (template_params.get("plugin_settings", {}) or {}).get(
                 "extra_css"
