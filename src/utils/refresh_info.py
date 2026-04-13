@@ -5,10 +5,13 @@ main config god-object.
 """
 
 import logging
+from typing import Any, cast
 
 from model import RefreshInfo
 
 logger = logging.getLogger(__name__)
+
+RefreshInfoDict = dict[str, Any]
 
 
 class RefreshInfoRepository:
@@ -18,7 +21,7 @@ class RefreshInfoRepository:
     sub-key) and exposes the resulting model object.
     """
 
-    def __init__(self, raw_data: dict | None = None):
+    def __init__(self, raw_data: RefreshInfoDict | None = None):
         self.refresh_info = self._load(raw_data)
 
     # ------------------------------------------------------------------
@@ -33,16 +36,16 @@ class RefreshInfoRepository:
         """Replace the current :class:`RefreshInfo`."""
         self.refresh_info = refresh_info
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> RefreshInfoDict:
         """Serialise the current state for inclusion in the config file."""
-        return self.refresh_info.to_dict()
+        return cast(RefreshInfoDict, self.refresh_info.to_dict())
 
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _load(data: dict | None) -> RefreshInfo:
+    def _load(data: RefreshInfoDict | None) -> RefreshInfo:
         """Parse *data* into a :class:`RefreshInfo`, falling back to defaults."""
         data = data if isinstance(data, dict) else {}
         try:

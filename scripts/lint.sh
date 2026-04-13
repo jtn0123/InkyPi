@@ -56,6 +56,9 @@ mypy --strict \
     src/utils/messages.py \
     src/utils/output_validator.py \
     src/utils/paths.py \
+    src/utils/refresh_info.py \
+    src/utils/refresh_stats.py \
+    src/utils/sri.py \
     src/utils/time_utils.py
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then

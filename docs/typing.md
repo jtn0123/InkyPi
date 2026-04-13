@@ -23,6 +23,9 @@ ongoing feature work.
 | `src/utils/messages.py` | Quality guards PR |
 | `src/utils/output_validator.py` | Quality guards PR |
 | `src/utils/paths.py` | Quality guards PR |
+| `src/utils/refresh_info.py` | Quality guards follow-up PR |
+| `src/utils/refresh_stats.py` | Quality guards follow-up PR |
+| `src/utils/sri.py` | Quality guards follow-up PR |
 | `src/utils/time_utils.py` | Quality guards PR |
 
 `src/utils/http_cache.py` was deliberately deferred from the initial strict
