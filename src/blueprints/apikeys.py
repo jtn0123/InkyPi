@@ -76,16 +76,14 @@ def _validate_api_key_entry(entry, existing_values: dict):
         return (
             None,
             None,
-            json_error(
-                f"keepExisting for key {key or raw_key!r} must be a boolean", status=400
-            ),
+            json_error("keepExisting must be a boolean", status=400),
         )
 
     if not key:
         return "", "", None
 
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
-        return None, None, json_error(f"Invalid key format: {key}", status=400)
+        return None, None, json_error("Invalid key format", status=400)
 
     if keep_existing:
         value = existing_values.get(key) or ""
@@ -95,7 +93,7 @@ def _validate_api_key_entry(entry, existing_values: dict):
             return (
                 None,
                 None,
-                json_error(f"Value for key {key} must be a string", status=400),
+                json_error("Entry value must be a string", status=400),
             )
         value = raw_value.strip()
 
@@ -103,7 +101,7 @@ def _validate_api_key_entry(entry, existing_values: dict):
         return (
             None,
             None,
-            json_error(f"Invalid characters in value for key: {key}", status=400),
+            json_error("Invalid characters in value", status=400),
         )
 
     return key, value, None
