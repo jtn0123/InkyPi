@@ -711,8 +711,23 @@
     }
 
     function bindControls() {
+      // JTN-648: route Enter-key implicit submit through the app-level
+      // validator so empty required fields surface the same labelled toast
+      // ("<Field> is required") as the Update Preview click path. The form
+      // carries `novalidate` so native HTML5 bubbles never appear.
       document.getElementById("settingsForm")?.addEventListener("submit", (event) => {
         event.preventDefault();
+        const settingsForm = event.currentTarget;
+        if (settingsForm && globalThis.FormValidator) {
+          const result = globalThis.FormValidator.validateAllInputsDetailed(settingsForm);
+          if (result.count > 0) {
+            showResponseModal(
+              "failure",
+              globalThis.FormValidator.buildValidationMessage(result)
+            );
+            globalThis.FormValidator.focusFirstInvalid(settingsForm);
+          }
+        }
       });
       document.getElementById("scheduleForm")?.addEventListener("submit", (event) => {
         event.preventDefault();

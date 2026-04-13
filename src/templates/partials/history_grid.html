@@ -15,7 +15,7 @@
                 <div class="history-name" title="{{ img.filename }}">{{ img.filename }}</div>
                 <div class="history-sub">{{ img.mtime_str }} • {{ img.size_str }}</div>
                 {% if img.meta and (img.meta.refresh_type or img.meta.plugin_id) %}
-                <div class="history-sub">
+                <div class="history-sub history-source">
                     <span>Source:</span>
                     <span>
                         {{ img.meta.refresh_type or "Manual" }}
@@ -23,6 +23,11 @@
                         {%- if img.meta.playlist %} &bull; {{ img.meta.playlist }}{% endif %}
                         {%- if img.meta.plugin_instance and img.meta.plugin_instance != img.meta.plugin_id %} &bull; {{ img.meta.plugin_instance }}{% endif %}
                     </span>
+                </div>
+                {% else %}
+                <div class="history-sub history-source history-source-unknown" title="No provenance metadata was recorded for this entry. Older history entries predate source tracking.">
+                    <span>Source:</span>
+                    <span>Unknown</span>
                 </div>
                 {% endif %}
             </div>

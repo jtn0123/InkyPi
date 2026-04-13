@@ -13,8 +13,10 @@ def test_playlist_display_next_hidden_when_empty(client, device_config_dev):
 
     # The playlist card should exist
     assert 'data-playlist-name="Empty"' in html
-    # But no Display Next button should appear (no plugins)
-    assert "Display Next" not in html
+    # But no Display Next button should appear (no plugins).
+    # Note: the shared confirmation modal still renders in the page chrome,
+    # so we assert specifically that no .run-next-btn is emitted.
+    assert "run-next-btn" not in html
 
 
 def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev):
@@ -37,7 +39,8 @@ def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev)
     html = resp.data.decode()
 
     assert 'data-playlist-name="WithPlugins"' in html
-    assert "Display Next" in html
+    assert "run-next-btn" in html
+    assert 'data-playlist="WithPlugins"' in html
 
 
 def test_playlist_display_next_mixed(client, device_config_dev):
@@ -64,6 +67,8 @@ def test_playlist_display_next_mixed(client, device_config_dev):
     assert 'data-playlist-name="HasItems"' in html
     assert 'data-playlist-name="NoItems"' in html
 
-    # Display Next should appear exactly once (only for HasItems)
-    assert html.count("Display Next") == 1
+    # The per-card Display Next button should appear exactly once (only
+    # for HasItems). The shared display-next confirmation modal is part
+    # of the page chrome and is asserted separately.
+    assert html.count("run-next-btn") == 1
     assert 'data-playlist="HasItems"' in html

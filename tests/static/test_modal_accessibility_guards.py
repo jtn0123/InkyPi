@@ -49,3 +49,21 @@ def test_plugin_page_open_modal_focuses_first_focusable():
 
     assert "focusable.focus()" in content
     assert "_lastModalTrigger" in content
+
+
+def test_settings_page_reboot_shutdown_modals_handle_escape():
+    """JTN-652: /settings reboot + shutdown confirm modals close on Escape."""
+    content = _read_script("settings_page.js")
+
+    assert 'event.key !== "Escape"' in content
+    assert "rebootConfirmModal" in content
+    assert "shutdownConfirmModal" in content
+
+
+def test_settings_page_device_action_modals_manage_focus():
+    """JTN-652: /settings confirm modals move focus in on open and restore
+    focus to the trigger on close."""
+    content = _read_script("settings_page.js")
+
+    assert "focusable.focus()" in content
+    assert "_lastDeviceActionTrigger" in content
