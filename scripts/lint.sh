@@ -46,14 +46,22 @@ else
 fi
 
 echo "Running mypy strict check (blocking — strict subset only)..."
-# Strict subset: src/utils/http_utils.py and src/utils/security_utils.py
+# Strict subset: curated low-churn helpers that are enforced at --strict.
 # See docs/typing.md for how to add more modules to this list.
-mypy --strict src/utils/http_utils.py src/utils/security_utils.py
+mypy --strict \
+    src/utils/http_utils.py \
+    src/utils/security_utils.py \
+    src/utils/client_endpoint.py \
+    src/utils/display_names.py \
+    src/utils/messages.py \
+    src/utils/output_validator.py \
+    src/utils/paths.py \
+    src/utils/time_utils.py
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then
-    echo "❌ mypy strict: http_utils + security_utils failed (exit code: $MYPY_STRICT_EXIT)"
+    echo "❌ mypy strict helper subset failed (exit code: $MYPY_STRICT_EXIT)"
 else
-    echo "✅ mypy strict: http_utils + security_utils clean"
+    echo "✅ mypy strict helper subset clean"
 fi
 
 # Shell scripts under install/ and scripts/ — must pass shellcheck.
@@ -86,7 +94,7 @@ else
 fi
 
 # Report summary — whole-codebase mypy is advisory only; the strict subset
-# (http_utils + security_utils) is blocking.  Ruff, Black, and shellcheck are blocking.
+# (typed helper subset) is blocking. Ruff, Black, and shellcheck are blocking.
 if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     echo ""
     echo "❌ Some checks failed:"
@@ -107,4 +115,3 @@ if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] 
 fi
 
 exit 0
-

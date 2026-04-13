@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from PIL import Image
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,13 +34,13 @@ class OutputDimensionMismatch(Exception):
 
 
 def validate_image_dimensions(
-    image,
+    image: Image.Image,
     expected_width: int,
     expected_height: int,
     plugin_id: str = "<unknown>",
     *,
     auto_rotate: bool = True,
-) -> object:
+) -> Image.Image:
     """Validate that *image* matches the expected display resolution.
 
     Parameters

@@ -136,8 +136,8 @@ def test_parse_data_points_datetime_with_dtend():
         }
     )
     start, end, all_day = p.parse_data_points(event, tz)
-    assert start.endswith("-05:00") or start.endswith("-04:00")  # timezone adjusted
-    assert end.endswith("-05:00") or end.endswith("-04:00")
+    assert start.endswith(("-05:00", "-04:00"))  # timezone adjusted
+    assert end.endswith(("-05:00", "-04:00"))
     assert all_day is False
 
 

@@ -252,7 +252,7 @@ def parse_open_meteo_forecast(daily_data, tz, is_day, lat, plugin_dir):
 
     forecast = []
 
-    for i in range(0, len(times)):
+    for i in range(len(times)):
         dt = datetime.fromisoformat(times[i])
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=tz)

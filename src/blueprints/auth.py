@@ -55,7 +55,7 @@ def _safe_next_url(raw: str | None) -> str:
     if any(ord(c) < 0x20 or ord(c) == 0x7F for c in raw):
         return "/"
     # Reject protocol-relative ('//evil.com') and backslash-authority tricks.
-    if not raw.startswith("/") or raw.startswith("//") or raw.startswith("/\\"):
+    if not raw.startswith("/") or raw.startswith(("//", "/\\")):
         return "/"
     # Parse with a dummy scheme+host so urlsplit routes the value through the
     # standard URL parser; we only consume the path+query components below.

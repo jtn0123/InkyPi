@@ -1,5 +1,5 @@
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from config import Config
@@ -20,7 +20,7 @@ def calculate_seconds(interval: int, unit: str) -> int:
     return seconds
 
 
-def get_timezone(tz_name: str | None):
+def get_timezone(tz_name: str | None) -> tzinfo:
     """Return a tzinfo for the provided timezone name using zoneinfo.
 
     Falls back to UTC if the timezone string is invalid or missing.
@@ -100,8 +100,6 @@ def get_next_occurrence(cron_expr: str, now: datetime | None = None) -> datetime
     dow = parse_cron_field(dow_f, 0, 6)
 
     candidate = now.replace(second=0, microsecond=0)
-    from datetime import timedelta
-
     for _ in range(60 * 24 * 366):  # up to 1 year search
         candidate += timedelta(minutes=1)
         if candidate.minute not in minutes:
