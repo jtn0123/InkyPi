@@ -132,12 +132,13 @@
                                     </span>
                                 {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" aria-label="Edit plugin {{ pi_label }}">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                     <span class="action-button-label">Edit</span>
+                                    <span class="sr-only"> plugin {{ pi_label }}</span>
                                 </a>
                                 <button class="edit-button refresh-settings-btn" type="button"
-                                        aria-label="Edit refresh settings for {{ pi_label }}"
+                                        title="Edit refresh settings for {{ pi_label }}"
                                         data-playlist="{{ playlist.name }}"
                                         data-plugin-id="{{ plugin_instance.plugin_id }}"
                                         data-instance="{{ plugin_instance.name }}"
@@ -145,14 +146,17 @@
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
                                     <span class="action-button-label">Refresh settings</span>
+                                    <span class="sr-only"> for {{ pi_label }}</span>
                                 </button>
-                                <button class="edit-button plugin-display-btn" type="button" aria-label="Display {{ pi_label }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                <button class="edit-button plugin-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                     <span class="action-button-label">Display</span>
+                                    <span class="sr-only"> {{ pi_label }} now</span>
                                 </button>
-                                <button class="delete-button delete-instance-btn" type="button" aria-label="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('trash', 'action-icon') | safe }}
                                     <span class="action-button-label">Delete</span>
+                                    <span class="sr-only"> plugin instance {{ pi_label }}</span>
                                 </button>
                             </div>
                         </div>
