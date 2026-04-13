@@ -141,6 +141,39 @@ def _list_history_images(
     return result, total
 
 
+def _remove_sidecar_by_name(history_dir: str, expected_name: str) -> None:
+    """Delete an entry in *history_dir* whose basename equals *expected_name*.
+
+    The value ultimately passed to :func:`os.remove` is constructed from
+    :func:`os.listdir`, not from caller-supplied input, which keeps the
+    operation safe even if the caller's ``expected_name`` were tainted.  A
+    final :func:`os.path.realpath` containment check defends against any
+    symlinked entry that points outside the history directory.
+    """
+    try:
+        entries = os.listdir(history_dir)
+    except OSError:
+        return
+    real_history_dir = os.path.realpath(history_dir)
+    for entry in entries:
+        if entry != expected_name:
+            continue
+        full = os.path.join(history_dir, entry)
+        try:
+            real_full = os.path.realpath(full)
+        except OSError:
+            return
+        try:
+            common = os.path.commonpath([real_history_dir, real_full])
+        except ValueError:
+            return
+        if common != real_history_dir:
+            return
+        if os.path.isfile(real_full):
+            os.remove(real_full)
+        return
+
+
 def _resolve_history_path(history_dir: str, filename: str) -> str:
     """Resolve a requested filename under history_dir and enforce containment.
 
@@ -357,21 +390,16 @@ def history_delete():
             )
 
         os.remove(safe_path)
-        # Remove matching sidecar on png/json deletions.  Pass the candidate
-        # sidecar path *directly* through ``validate_file_path`` so that
-        # CodeQL recognises the sanitiser and rejects any resolved location
-        # that escapes the history directory.
+        # Remove the matching sidecar, if present.  Rather than constructing a
+        # new path from user-derived data, enumerate the history directory and
+        # pick the entry whose basename matches the expected sidecar name.
+        # This way the value passed to ``os.remove`` originates from
+        # ``os.listdir`` (which is not user-controlled) and CodeQL cannot
+        # taint-track it back to the request body.
+        expected_stem = os.path.splitext(os.path.basename(safe_path))[0]
         sidecar_ext = _EXT_JSON if ext.lower() == _EXT_PNG else _EXT_PNG
-        candidate_sidecar = os.path.join(
-            os.path.dirname(safe_path),
-            os.path.basename(os.path.splitext(safe_path)[0]) + sidecar_ext,
-        )
-        try:
-            sidecar_safe = validate_file_path(candidate_sidecar, history_dir)
-        except ValueError:
-            sidecar_safe = None
-        if sidecar_safe is not None and os.path.isfile(sidecar_safe):
-            os.remove(sidecar_safe)
+        expected_sidecar_name = expected_stem + sidecar_ext
+        _remove_sidecar_by_name(history_dir, expected_sidecar_name)
         return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")
