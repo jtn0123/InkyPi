@@ -83,6 +83,8 @@ select = [
   "SIM",    # flake8-simplify
   "C4",     # flake8-comprehensions
   "PERF",   # perflint
+  "PIE",    # flake8-pie
+  "RSE",    # flake8-raise
 ]
 ignore = [
   "E501",   # line length handled by Black

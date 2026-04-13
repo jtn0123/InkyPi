@@ -18,10 +18,18 @@ ongoing feature work.
 |---|---|
 | `src/utils/http_utils.py` | JTN-525 |
 | `src/utils/security_utils.py` | JTN-525 |
+| `src/utils/client_endpoint.py` | Quality guards PR |
+| `src/utils/display_names.py` | Quality guards PR |
+| `src/utils/messages.py` | Quality guards PR |
+| `src/utils/output_validator.py` | Quality guards PR |
+| `src/utils/paths.py` | Quality guards PR |
+| `src/utils/time_utils.py` | Quality guards PR |
 
 `src/utils/http_cache.py` was deliberately deferred from the initial strict
-set because it was recently refactored (JTN-493) and is still settling.  It
-will be added in a follow-up once it stabilizes.
+set because it was recently refactored (JTN-493) and is still settling. It
+will be added in a follow-up once it stabilizes. This PR extends the strict
+subset with a low-churn helper cluster instead of broadening strict mode
+repo-wide.
 
 ## How to add a module to the strict subset
 
@@ -41,7 +49,10 @@ will be added in a follow-up once it stabilizes.
 3. **Add the file to the blocking check in `scripts/lint.sh`:**
 
    ```bash
-   mypy --strict src/utils/http_utils.py src/utils/security_utils.py src/utils/your_module.py
+   mypy --strict \
+     src/utils/http_utils.py \
+     src/utils/security_utils.py \
+     src/utils/your_module.py
    ```
 4. **Update the table above** with the module path and Linear issue reference.
 5. Open a PR — CI will enforce strictness from that point forward.

@@ -309,7 +309,6 @@ def test_api_logs_rate_limiting_disabled(monkeypatch):
 
     # This would normally work but we can't easily test the full flow without mocking more
     # The rate limit check happens before the main logic
-    pass
 
 
 def test_api_logs_exception_handling(client, monkeypatch):

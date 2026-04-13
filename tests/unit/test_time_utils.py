@@ -28,7 +28,7 @@ def test_calculate_seconds_default_value_for_unrecognized_unit():
 
 def test_parse_cron_field_wildcard():
     result = parse_cron_field("*", 0, 59)
-    assert result == set(range(0, 60))
+    assert result == set(range(60))
 
 
 def test_parse_cron_field_single_value():

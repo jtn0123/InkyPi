@@ -355,7 +355,7 @@ def test_read_version_missing_both_sources_returns_unknown(monkeypatch):
 
     def _patched_open(path, *args, **kwargs):
         name = str(path)
-        if name.endswith("VERSION") or name.endswith("pyproject.toml"):
+        if name.endswith(("VERSION", "pyproject.toml")):
             raise FileNotFoundError("No such file")
         return _real_open(path, *args, **kwargs)
 

@@ -9,6 +9,7 @@ parsed dict or an error response that the caller can return directly.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from flask import Response, request
 
@@ -18,7 +19,7 @@ from utils.rate_limit import TokenBucket
 
 def parse_client_report(
     rate_limiter: TokenBucket, body_max: int
-) -> tuple[dict | None, Response | tuple[Response, int] | None]:
+) -> tuple[dict[str, Any] | None, Response | tuple[Response, int] | None]:
     """Validate body size, rate-limit, and parse JSON.
 
     Returns ``(data, None)`` on success or ``(None, error_response)`` on

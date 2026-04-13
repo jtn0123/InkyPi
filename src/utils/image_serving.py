@@ -119,7 +119,7 @@ def _safe_join(root: str, filename: str) -> str:
     """
     joined = safe_join(root, filename)
     if joined is None or not os.path.isfile(joined):
-        raise NotFound()
+        raise NotFound
     return joined
 
 

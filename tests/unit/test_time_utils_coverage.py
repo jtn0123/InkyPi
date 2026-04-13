@@ -62,7 +62,7 @@ def test_now_device_tz_falls_back_on_exception():
 
 def test_parse_cron_field_wildcard():
     result = parse_cron_field("*", 0, 59)
-    assert result == set(range(0, 60))
+    assert result == set(range(60))
 
 
 def test_parse_cron_field_range():

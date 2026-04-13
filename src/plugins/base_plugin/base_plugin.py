@@ -125,7 +125,7 @@ class BasePlugin:
                 b64 = base64.b64encode(f.read()).decode("ascii")
             # Best-effort mime by extension
             mime = "image/png"
-            if path.endswith(".jpg") or path.endswith(".jpeg"):
+            if path.endswith((".jpg", ".jpeg")):
                 mime = "image/jpeg"
             elif path.endswith(".gif"):
                 mime = "image/gif"

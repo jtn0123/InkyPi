@@ -100,7 +100,7 @@ def test_is_connected_true_false(monkeypatch):
 
     # False case: create_connection raises OSError
     def _raise(*_a, **_k):
-        raise OSError()
+        raise OSError
 
     monkeypatch.setattr(socket, "create_connection", _raise)
     assert app_utils.is_connected() is False

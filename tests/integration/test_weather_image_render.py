@@ -155,7 +155,7 @@ def test_weather_template_loads_images(client, device_config_dev, monkeypatch):
         loaded = 0
         for img in imgs:
             src = img.get_attribute("src") or ""
-            if src.startswith("file://") or src.startswith("data:"):
+            if src.startswith(("file://", "data:")):
                 # Wait for load and check naturalWidth
                 page.evaluate(
                     "img => new Promise(r => { if (img.complete) r(); else img.onload = () => r(); })",

@@ -64,7 +64,7 @@ def test_ts_is_iso8601_utc():
     data = json.loads(JsonFormatter().format(record))
     ts = data["ts"]
     assert "T" in ts
-    assert ts.endswith("+00:00") or ts.endswith("Z"), f"Expected UTC ts, got: {ts}"
+    assert ts.endswith(("+00:00", "Z")), f"Expected UTC ts, got: {ts}"
 
 
 def test_pid_is_integer():
