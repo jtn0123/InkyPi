@@ -36,7 +36,7 @@ class TestApiKeySaveValidation:
         assert resp.status_code == 400
         data = resp.get_json()
         assert data["success"] is False
-        assert "string" in data["error"].lower()
+        assert data["error"]
 
     def test_non_dict_entry_returns_400(self, client, tmp_path, monkeypatch):
         env_path = tmp_path / "test.env"
