@@ -6,9 +6,9 @@
 <div class="history-grid">
     {% for img in images %}
     <div class="history-card">
-        <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" aria-label="Preview {{ img.filename }}">
+        <a class="history-thumb" href="{{ url_for('history.history_image', filename=img.filename) }}" aria-label="Preview image from {{ img.mtime_str }}">
             <div class="img-skeleton" aria-hidden="true"></div>
-            <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename) }}" alt="{{ img.filename }}" loading="lazy" decoding="async">
+            <img class="history-image" src="{{ url_for('history.history_image', filename=img.filename) }}" alt="History from {{ img.mtime_str }}" loading="lazy" decoding="async">
         </a>
         <div class="history-card-body">
             <div class="history-meta">
@@ -32,9 +32,9 @@
                 {% endif %}
             </div>
             <div class="history-actions">
-                <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}" aria-label="Display {{ img.filename }}">Display</button>
-                <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download aria-label="Download {{ img.filename }}">Download</a>
-                <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}" aria-label="Delete {{ img.filename }}">Delete</button>
+                <button id="btn-{{ img.filename }}" class="btn btn-primary" type="button" data-history-action="display" data-filename="{{ img.filename }}" aria-label="Display image from {{ img.mtime_str }}">Display</button>
+                <a class="btn" href="{{ url_for('history.history_image', filename=img.filename) }}" download aria-label="Download image from {{ img.mtime_str }}">Download</a>
+                <button class="btn btn-danger" type="button" data-history-action="delete" data-filename="{{ img.filename }}" aria-label="Delete image from {{ img.mtime_str }}">Delete</button>
             </div>
         </div>
     </div>
