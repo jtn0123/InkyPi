@@ -22,7 +22,6 @@ from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
     sanitize_log_field,
-    sanitize_response_value,
     validate_plugin_required_fields,
 )
 from utils.http_utils import APIError, json_error, json_success
@@ -42,6 +41,10 @@ _ERR_INTERNAL = "An internal error occurred"
 _ERR_NOT_FOUND = "Not Found"
 _MSG_DISPLAY_UPDATED = "Display updated"
 _ERR_PLUGIN_ID_REQUIRED = "plugin_id is required"
+_ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
+_ERR_PLUGIN_NOT_FOUND = "Plugin not found"
+_ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
+_MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
 
 
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
@@ -87,8 +90,13 @@ def plugin_page(plugin_id: str):
                 plugin_id, plugin_instance_name
             )
             if not plugin_instance:
+                logger.warning(
+                    "Plugin instance lookup failed: plugin_id=%s instance=%s",
+                    sanitize_log_field(plugin_id),
+                    sanitize_log_field(plugin_instance_name),
+                )
                 return json_error(
-                    f"Plugin instance: {sanitize_response_value(plugin_instance_name)} does not exist",
+                    _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                     status=404,
                 )
             template_params["plugin_settings"] = plugin_instance.settings
@@ -301,8 +309,13 @@ def update_plugin_instance(instance_name: str):
             )
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
+            logger.warning(
+                "update_instance: plugin instance not found plugin_id=%s instance=%s",
+                sanitize_log_field(plugin_id),
+                sanitize_log_field(instance_name),
+            )
             return json_error(
-                f"Plugin instance: {sanitize_response_value(instance_name)} does not exist",
+                _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                 status=404,
             )
 
@@ -391,12 +404,23 @@ def display_plugin_instance():
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error(f"Playlist {playlist_name} not found", status=400)
+            logger.warning(
+                "display_plugin_instance: playlist not found name=%s",
+                sanitize_log_field(playlist_name),
+            )
+            return json_error(_ERR_PLAYLIST_NOT_FOUND, status=400)
 
         plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
         if not plugin_instance:
+            logger.warning(
+                "display_plugin_instance: plugin instance not found "
+                "playlist=%s plugin_id=%s instance=%s",
+                sanitize_log_field(playlist_name),
+                sanitize_log_field(plugin_id),
+                sanitize_log_field(plugin_instance_name),
+            )
             return json_error(
-                f"Plugin instance '{sanitize_response_value(plugin_instance_name)}' not found",
+                _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                 status=400,
             )
 
@@ -426,12 +450,22 @@ def force_retry_plugin_instance(plugin_id: str, instance_name: str):
         return json_error("Circuit-breaker reset not supported", status=501)
     found = refresh_task.reset_circuit_breaker(plugin_id, instance_name)
     if not found:
+        logger.warning(
+            "force_retry: plugin instance not found plugin_id=%s instance=%s",
+            sanitize_log_field(plugin_id),
+            sanitize_log_field(instance_name),
+        )
         return json_error(
-            f"Plugin instance '{sanitize_response_value(instance_name)}' not found",
+            _ERR_PLUGIN_INSTANCE_NOT_FOUND,
             status=404,
         )
+    logger.info(
+        "Circuit-breaker reset for plugin_id=%s instance=%s",
+        sanitize_log_field(plugin_id),
+        sanitize_log_field(instance_name),
+    )
     return json_success(
-        message=f"Circuit-breaker reset for '{sanitize_response_value(instance_name)}'.",
+        message=_MSG_CIRCUIT_BREAKER_RESET,
     )
 
 
@@ -461,9 +495,11 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
     """
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        return json_error(
-            f"Plugin '{sanitize_response_value(plugin_id)}' not found", status=404
+        logger.warning(
+            "_update_now_direct: plugin not found plugin_id=%s",
+            sanitize_log_field(plugin_id),
         )
+        return json_error(_ERR_PLUGIN_NOT_FOUND, status=404)
 
     plugin = get_plugin_instance(plugin_config)
     with track_progress() as tracker:
@@ -473,9 +509,10 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
             image = plugin.generate_image(plugin_settings, device_config)
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
-            # failure (bad config, upstream API returned empty, etc.).  The
-            # message is explicitly authored by the plugin as user-facing copy
-            # and is safe to surface — plugins should never put secrets there.
+            # failure (bad config, upstream API returned empty, etc.).  Do not
+            # echo the exception text to the client — CodeQL
+            # py/stack-trace-exposure, and plugin messages can occasionally
+            # embed tainted fragments.  Log the details server-side (JTN-326).
             logger.exception(
                 "Plugin %s failed to generate preview",
                 sanitize_log_field(plugin_id),
@@ -484,7 +521,7 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
                 plugin_id, plugin_config, device_config, display_manager, e
             )
             return json_error(
-                sanitize_response_value(str(e)),
+                _ERR_INTERNAL,
                 status=400,
                 code="plugin_error",
             )
@@ -816,10 +853,13 @@ def _save_plugin_settings_common(
     htmx = _is_htmx_request()
     plugin_config = device_config.get_plugin(plugin_id)
     if not plugin_config:
-        msg = f"Plugin '{sanitize_response_value(plugin_id)}' not found"
+        logger.warning(
+            "_save_plugin_settings_common: plugin not found plugin_id=%s",
+            sanitize_log_field(plugin_id),
+        )
         if htmx:
-            return _render_plugin_form_error(msg, status=404)
-        return json_error(msg, status=404)
+            return _render_plugin_form_error(_ERR_PLUGIN_NOT_FOUND, status=404)
+        return json_error(_ERR_PLUGIN_NOT_FOUND, status=404)
 
     # Validate required fields and plugin-specific settings
     try:
