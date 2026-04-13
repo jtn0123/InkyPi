@@ -18,6 +18,7 @@ import logging
 from flask import Blueprint, Response
 
 from utils.client_endpoint import parse_client_report, strip_newlines
+from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
 
@@ -59,8 +60,16 @@ def receive_client_log() -> tuple[Response, int] | Response:
 
     level = data.get("level", "")
     if level not in _ACCEPTED_LEVELS:
+        # Log the rejected value (sanitized) for debugging but do not echo
+        # it back to the client — that would be a reflective-xss sink
+        # (CodeQL py/reflective-xss). Response carries a generic message.
+        logger.warning(
+            "client log rejected: invalid level %s (accepted: %s)",
+            sanitize_log_field(level),
+            sorted(_ACCEPTED_LEVELS),
+        )
         return json_error(
-            f"Invalid level '{level}': must be one of {sorted(_ACCEPTED_LEVELS)}",
+            f"Invalid level: must be one of {sorted(_ACCEPTED_LEVELS)}",
             status=400,
         )
 
