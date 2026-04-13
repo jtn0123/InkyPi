@@ -3,7 +3,7 @@ name: Semgrep
 on:
   pull_request:
   push:
-    branches: [ main ]
+    branches: [main]
   schedule:
     - cron: '0 8 * * 1'
 
@@ -23,15 +23,15 @@ jobs:
       security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
 
       - name: Install Semgrep
-        run: python -m pip install --upgrade pip semgrep
+        run: python -m pip install --upgrade pip "semgrep==1.159.0"
 
       - name: Run Semgrep
         run: |
@@ -40,9 +40,19 @@ jobs:
             --sarif \
             --output=semgrep.sarif
 
-      - name: Upload Semgrep results
+      - name: Check Semgrep output
+        id: semgrep_output
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        run: |
+          if [ -f semgrep.sarif ]; then
+            echo "sarif_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sarif_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload Semgrep results
+        if: always() && steps.semgrep_output.outputs.sarif_exists == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false)
+        uses: github/codeql-action/upload-sarif@5c8a8a642e79153f5d047b10ec1cba1d1cc65699 # v3.35.1
         with:
           sarif_file: semgrep.sarif
           category: semgrep
