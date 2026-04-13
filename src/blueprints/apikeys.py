@@ -200,7 +200,7 @@ def save_apikeys():
         for entry in entries:
             key, value, err = _validate_api_key_entry(entry, existing_values)
             if err is not None:
-                return err
+                return json_error("Invalid API key entry", status=400)
             if not key:
                 continue
             valid_entries.append((key, value))
