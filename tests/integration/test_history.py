@@ -1032,3 +1032,117 @@ def test_history_danger_zone_has_visual_separation(client, device_config_dev):
     # Section landmark wraps the reset-cache controls
     assert 'role="region"' in body
     assert 'aria-labelledby="historyDangerZoneTitle"' in body
+
+
+# ---------------------------------------------------------------------------
+# Path-injection hardening (JTN-326) — CodeQL py/path-injection
+# ---------------------------------------------------------------------------
+
+
+def _sample_png_name(d):
+    """Create a sample PNG in *d* and return its basename."""
+    os.makedirs(d, exist_ok=True)
+    name = "display_20260101_120000.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+    return name
+
+
+def test_resolve_history_path_rejects_dotdot_traversal(device_config_dev):
+    from blueprints.history import _resolve_history_path
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid filename"):
+        _resolve_history_path(d, "../../etc/passwd")
+
+
+def test_resolve_history_path_rejects_absolute_path(device_config_dev):
+    from blueprints.history import _resolve_history_path
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid filename"):
+        _resolve_history_path(d, "/etc/passwd")
+
+
+def test_resolve_history_path_rejects_null_byte(device_config_dev):
+    from blueprints.history import _resolve_history_path
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid filename"):
+        _resolve_history_path(d, "good.png\x00evil")
+
+
+def test_resolve_history_path_rejects_symlink_escape(device_config_dev, tmp_path):
+    """A symlink inside the history directory pointing outside must be rejected."""
+    from blueprints.history import _resolve_history_path
+
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"not really a png")
+    link_name = "evil_link.png"
+    link_path = os.path.join(d, link_name)
+    try:
+        os.symlink(str(outside), link_path)
+    except (OSError, NotImplementedError):
+        import pytest
+
+        pytest.skip("symlink creation not supported on this platform")
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid filename"):
+        _resolve_history_path(d, link_name)
+
+
+def test_resolve_history_path_accepts_valid_basename(device_config_dev):
+    from blueprints.history import _resolve_history_path
+
+    d = device_config_dev.history_image_dir
+    name = _sample_png_name(d)
+    resolved = _resolve_history_path(d, name)
+    assert os.path.isfile(resolved)
+    assert os.path.realpath(resolved).startswith(os.path.realpath(d))
+
+
+def test_history_delete_rejects_traversal(client, device_config_dev):
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    resp = client.post("/history/delete", json={"filename": "../../etc/passwd"})
+    assert resp.status_code == 400
+    assert "invalid filename" in resp.get_json().get("error", "").lower()
+
+
+def test_history_delete_rejects_absolute_path(client, device_config_dev):
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    resp = client.post("/history/delete", json={"filename": "/etc/passwd"})
+    assert resp.status_code == 400
+
+
+def test_history_redisplay_rejects_traversal(client, device_config_dev):
+    resp = client.post("/history/redisplay", json={"filename": "../../etc/passwd"})
+    assert resp.status_code == 400
+
+
+def test_history_delete_removes_sidecar(client, device_config_dev):
+    """Deleting a .png also removes its .json sidecar via re-validated path."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    name = "display_20260202_010203.png"
+    sidecar_name = "display_20260202_010203.json"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, name))
+    with open(os.path.join(d, sidecar_name), "w", encoding="utf-8") as fh:
+        json.dump({"plugin_id": "x"}, fh)
+
+    resp = client.post("/history/delete", json={"filename": name})
+    assert resp.status_code == 200
+    assert not os.path.exists(os.path.join(d, name))
+    assert not os.path.exists(os.path.join(d, sidecar_name))
