@@ -130,9 +130,11 @@ def test_clock_update_preview_runtime_error_returns_400_and_logs(
     assert resp.status_code == 400
     body = resp.json or {}
     assert body.get("success") is False
-    # Plugin-authored message (plugins raise RuntimeError with user-visible copy)
-    # must be surfaced.  This is the contract: silent success -> visible error.
-    assert plugin_authored_message in body.get("error", "")
+    # JTN-326: the plugin RuntimeError message is NO LONGER reflected back to
+    # the client (py/stack-trace-exposure).  The response carries a generic
+    # message and the real cause is logged server-side.
+    assert plugin_authored_message not in body.get("error", "")
+    assert body.get("error") == "An internal error occurred"
     assert body.get("code") == "plugin_error"
 
     # logger.exception (JTN-318): stacktrace must be captured, and any record

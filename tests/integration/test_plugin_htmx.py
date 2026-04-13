@@ -53,7 +53,10 @@ def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_missing(cli
     body = resp.get_data(as_text=True)
     assert "validation-message error" in body
     assert "data-plugin-form-error" in body
-    assert "not_real_plugin" in body
+    # JTN-326: generic error — plugin_id is NOT reflected in the response body
+    # (py/reflective-xss).
+    assert "not_real_plugin" not in body
+    assert "Plugin not found" in body
 
 
 def test_save_plugin_settings_htmx_returns_error_partial_when_plugin_id_missing(client):

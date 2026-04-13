@@ -22,7 +22,11 @@ def test_update_now_surfaces_plugin_error_json(client, monkeypatch):
     assert resp.status_code == 400
     data = resp.get_json()
     assert isinstance(data, dict)
-    assert data["error"] == "boom"
+    # JTN-326: plugin RuntimeError text must NOT be echoed back
+    # (py/stack-trace-exposure).  Response is now a generic message.
+    assert "boom" not in data["error"]
+    assert data["error"] == "An internal error occurred"
+    assert data.get("code") == "plugin_error"
 
 
 def test_save_plugin_settings_error_json(client, flask_app, monkeypatch):

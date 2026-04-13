@@ -8,11 +8,14 @@ def test_plugin_page_not_found(client):
 
 
 def test_plugin_page_sanitizes_missing_instance_name(client):
+    """JTN-326: response body must not reflect user input — py/reflective-xss."""
     resp = client.get("/plugin/ai_text?instance=%3Cscript%3Ealert(1)%3C%2Fscript%3E")
     assert resp.status_code == 404
     error = resp.get_json().get("error", "")
     assert "<script>" not in error
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
+    assert "&lt;script&gt;" not in error
+    assert "alert(1)" not in error
+    assert error == "Plugin instance not found"
 
 
 # Skip this test - the exception handling is already covered by existing tests
@@ -89,10 +92,15 @@ def test_update_plugin_instance_missing_instance_name(client):
 def test_update_plugin_instance_plugin_not_found(client):
     resp = client.put("/update_plugin_instance/test", data={"plugin_id": "nonexistent"})
     assert resp.status_code == 404
-    assert "Plugin instance: test does not exist" in resp.get_json().get("error", "")
+    assert "Plugin instance not found" in resp.get_json().get("error", "")
 
 
-def test_update_plugin_instance_sanitizes_missing_instance_name(client):
+def test_update_plugin_instance_does_not_reflect_instance_name(client):
+    """JTN-326: tainted URL path must not be echoed in the response body.
+
+    Regression test for py/reflective-xss CodeQL alert — error message is
+    now fully generic and the user-supplied instance name is only logged.
+    """
     resp = client.put(
         "/update_plugin_instance/%3Cscript%3Ealert(1)%3E",
         data={"plugin_id": "ai_text"},
@@ -100,7 +108,9 @@ def test_update_plugin_instance_sanitizes_missing_instance_name(client):
     assert resp.status_code == 404
     error = resp.get_json().get("error", "")
     assert "<script>" not in error
-    assert "&lt;script&gt;alert(1)&gt;" in error
+    assert "&lt;script&gt;" not in error
+    assert "alert(1)" not in error
+    assert error == "Plugin instance not found"
 
 
 def test_update_plugin_instance_api_error_handling(client, flask_app, monkeypatch):
@@ -144,7 +154,7 @@ def test_display_plugin_instance_playlist_not_found(client):
         },
     )
     assert resp.status_code == 400
-    assert "Playlist NonExistent not found" in resp.get_json().get("error", "")
+    assert resp.get_json().get("error", "") == "Playlist not found"
 
 
 def test_display_plugin_instance_plugin_not_found(client):
@@ -157,10 +167,11 @@ def test_display_plugin_instance_plugin_not_found(client):
         },
     )
     assert resp.status_code == 400
-    assert "Plugin instance 'nonexistent' not found" in resp.get_json().get("error", "")
+    assert "Plugin instance not found" in resp.get_json().get("error", "")
 
 
-def test_display_plugin_instance_sanitizes_missing_instance_name(client):
+def test_display_plugin_instance_does_not_reflect_instance_name(client):
+    """JTN-326: tainted body must not be echoed — py/reflective-xss regression."""
     resp = client.post(
         "/display_plugin_instance",
         json={
@@ -172,7 +183,27 @@ def test_display_plugin_instance_sanitizes_missing_instance_name(client):
     assert resp.status_code == 400
     error = resp.get_json().get("error", "")
     assert "<script>" not in error
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in error
+    assert "&lt;script&gt;" not in error
+    assert "alert(1)" not in error
+    assert error == "Plugin instance not found"
+
+
+def test_display_plugin_instance_does_not_reflect_playlist_name(client):
+    """JTN-326: tainted playlist_name must not be echoed — py/reflective-xss."""
+    resp = client.post(
+        "/display_plugin_instance",
+        json={
+            "playlist_name": "<img src=x onerror=alert(1)>",
+            "plugin_id": "ai_text",
+            "plugin_instance": "test",
+        },
+    )
+    assert resp.status_code == 400
+    error = resp.get_json().get("error", "")
+    assert "<img" not in error
+    assert "onerror" not in error
+    assert "alert(1)" not in error
+    assert error == "Playlist not found"
 
 
 def test_display_plugin_instance_exception_handling(client, flask_app, monkeypatch):
@@ -196,7 +227,21 @@ def test_display_plugin_instance_exception_handling(client, flask_app, monkeypat
 def test_update_now_plugin_not_found(client):
     resp = client.post("/update_now", data={"plugin_id": "nonexistent"})
     assert resp.status_code == 404
-    assert "Plugin 'nonexistent' not found" in resp.get_json().get("error", "")
+    error = resp.get_json().get("error", "")
+    assert error == "Plugin not found"
+    # JTN-326: plugin_id must NOT be reflected in the response body.
+    assert "nonexistent" not in error
+
+
+def test_update_now_does_not_reflect_plugin_id(client):
+    """JTN-326: tainted plugin_id form value must not be reflected."""
+    resp = client.post("/update_now", data={"plugin_id": "<script>alert(1)</script>"})
+    assert resp.status_code == 404
+    error = resp.get_json().get("error", "")
+    assert "<script>" not in error
+    assert "&lt;script&gt;" not in error
+    assert "alert(1)" not in error
+    assert error == "Plugin not found"
 
 
 def test_update_now_async_returns_202_with_job_id(client):
@@ -383,13 +428,37 @@ def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch)
 def test_save_plugin_settings_rejects_unknown_plugin_id(client):
     resp = client.post("/save_plugin_settings", data={"plugin_id": "not_real_plugin"})
     assert resp.status_code == 404
-    assert resp.get_json()["error"] == "Plugin 'not_real_plugin' not found"
+    error = resp.get_json()["error"]
+    assert error == "Plugin not found"
+    # JTN-326: plugin_id must NOT be reflected.
+    assert "not_real_plugin" not in error
 
 
 def test_save_plugin_settings_alias_rejects_unknown_plugin_id(client):
     resp = client.post("/plugin/not_real_plugin/save", data={"title": "Test"})
     assert resp.status_code == 404
-    assert resp.get_json()["error"] == "Plugin 'not_real_plugin' not found"
+    error = resp.get_json()["error"]
+    assert error == "Plugin not found"
+    # JTN-326: URL path plugin_id must NOT be reflected.
+    assert "not_real_plugin" not in error
+
+
+def test_save_plugin_settings_alias_does_not_reflect_url_plugin_id(client):
+    """JTN-326: URL-path plugin_id (py/reflective-xss alert line 756) scrubbed.
+
+    The Flask route converter accepts an arbitrary non-slash string, so a
+    tainted plugin_id reaches the handler unchanged.  Verify that the 404
+    response body does NOT contain any part of the user-supplied id.
+    """
+    tainted = "xss_marker_abc123"
+    resp = client.post(
+        f"/plugin/{tainted}/save",
+        data={"title": "Test"},
+    )
+    assert resp.status_code == 404
+    error = resp.get_json()["error"]
+    assert tainted not in error
+    assert error == "Plugin not found"
 
 
 def test_delete_plugin_instance_missing(client):
@@ -671,12 +740,18 @@ def test_plugin_page_instance_url_plus_encoding_decoded_correctly(
 def test_plugin_page_instance_nonexistent_returns_friendly_404(
     client, device_config_dev
 ):
-    """GET /plugin/<id>?instance=<missing> returns 404 with a descriptive message (JTN-221)."""
+    """GET /plugin/<id>?instance=<missing> returns 404 (JTN-221 / JTN-326).
+
+    Message is now generic — instance name is only logged server-side to
+    avoid reflecting user input (py/reflective-xss).
+    """
     resp = client.get("/plugin/weather?instance=nonexistent instance")
     assert resp.status_code == 404
     body = resp.get_json()
     assert body is not None
-    assert "nonexistent instance" in body.get("error", "")
+    error = body.get("error", "")
+    assert error == "Plugin instance not found"
+    assert "nonexistent" not in error
 
 
 def test_plugin_page_without_instance_param_still_works(client):

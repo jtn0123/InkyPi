@@ -84,7 +84,9 @@ def test_ai_text_generate_image_missing_text_model(client, flask_app, monkeypatc
     body = resp.get_json()
     assert body["success"] is False
     assert body["code"] == "plugin_error"
-    assert "Text Model" in body["error"]
+    # JTN-326: plugin RuntimeError text is no longer surfaced by /update_now
+    # (py/stack-trace-exposure).  Response is a generic message.
+    assert body["error"] == "An internal error occurred"
 
 
 def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypatch):
@@ -103,7 +105,8 @@ def test_ai_text_generate_image_missing_text_prompt(client, flask_app, monkeypat
     body = resp.get_json()
     assert body["success"] is False
     assert body["code"] == "plugin_error"
-    assert "Text Prompt" in body["error"]
+    # JTN-326: generic message only — the RuntimeError detail is logged.
+    assert body["error"] == "An internal error occurred"
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")
@@ -127,7 +130,8 @@ def test_ai_text_generate_image_openai_error(
     body = resp.get_json()
     assert body["success"] is False
     assert body["code"] == "plugin_error"
-    assert "API request failure" in body["error"]
+    # JTN-326: generic message only — upstream failure text is logged.
+    assert body["error"] == "An internal error occurred"
 
 
 @pytest.mark.parametrize(
@@ -203,7 +207,8 @@ def test_ai_text_generate_image_missing_key(client, flask_app, monkeypatch):
     body = resp.get_json()
     assert body["success"] is False
     assert body["code"] == "plugin_error"
-    assert body["error"] == "OpenAI API Key not configured."
+    # JTN-326: RuntimeError text is no longer echoed (py/stack-trace-exposure).
+    assert body["error"] == "An internal error occurred"
 
 
 @patch("plugins.ai_text.ai_text.OpenAI")

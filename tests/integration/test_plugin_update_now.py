@@ -58,7 +58,10 @@ def test_update_now_ai_image_missing_key(client):
     assert resp.status_code == 400
     body = resp.get_json()
     assert body["code"] == "plugin_error"
-    assert "API Key not configured" in body["error"]
+    # JTN-326: plugin RuntimeError text is no longer echoed — the response is
+    # a generic message (py/stack-trace-exposure).  The actual reason is logged.
+    assert "API Key" not in body["error"]
+    assert body["error"] == "An internal error occurred"
 
 
 def test_update_now_apod_missing_key(client):
@@ -66,12 +69,19 @@ def test_update_now_apod_missing_key(client):
     assert resp.status_code == 400
     body = resp.get_json()
     assert body["code"] == "plugin_error"
-    assert body["error"] == "NASA API Key not configured."
+    # JTN-326: generic error — exception text is no longer exposed.
+    assert body["error"] == "An internal error occurred"
+    assert "NASA" not in body["error"]
 
 
-def test_update_now_returns_error_message_for_missing_key(client):
-    """Verify that /update_now surfaces the actual plugin error message."""
+def test_update_now_returns_generic_error_for_missing_key(client):
+    """JTN-326: /update_now must return a generic error, not the plugin
+    exception text (py/stack-trace-exposure, plugin.py:705)."""
     resp = client.post("/update_now", data={"plugin_id": "apod"})
     assert resp.status_code == 400
     body = resp.get_json()
-    assert body["error"] == "NASA API Key not configured."
+    assert body["error"] == "An internal error occurred"
+    assert body["code"] == "plugin_error"
+    # No fragment of the underlying RuntimeError leaks to the client.
+    assert "API Key" not in body["error"]
+    assert "NASA" not in body["error"]
