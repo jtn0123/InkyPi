@@ -795,11 +795,10 @@ def update_now():
                 ManualRefresh(plugin_id, plugin_settings)
             )
             return json_success(message=_MSG_DISPLAY_UPDATED, metrics=metrics)
-        else:
-            logger.info("Refresh task not running, updating display directly")
-            return _update_now_direct(
-                plugin_id, plugin_settings, device_config, display_manager
-            )
+        logger.info("Refresh task not running, updating display directly")
+        return _update_now_direct(
+            plugin_id, plugin_settings, device_config, display_manager
+        )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
         return json_error(_ERR_INTERNAL, status=500, code="internal_error")

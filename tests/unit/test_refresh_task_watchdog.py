@@ -95,8 +95,7 @@ def _make_refresh_task(module, *, with_sd_notify: bool = True):
 
     display_manager = MagicMock()
 
-    task = module.RefreshTask(device_config, display_manager)
-    return task
+    return module.RefreshTask(device_config, display_manager)
 
 
 # ---------------------------------------------------------------------------

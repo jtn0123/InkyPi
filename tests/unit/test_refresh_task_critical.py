@@ -184,8 +184,7 @@ class TestExecuteRefreshAttemptWorker:
 class TestRefreshTaskStop:
     def _make_task(self, device_config_dev):
         dm = MagicMock()
-        task = RefreshTask(device_config_dev, dm)
-        return task
+        return RefreshTask(device_config_dev, dm)
 
     def test_stop_rejects_pending_requests(self, device_config_dev):
         task = self._make_task(device_config_dev)

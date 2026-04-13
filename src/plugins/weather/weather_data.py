@@ -101,9 +101,8 @@ def parse_timezone(weatherdata):
             redact_secrets(weatherdata["timezone"]),
         )
         return ZoneInfo(weatherdata["timezone"])
-    else:
-        logger.error("Failed to retrieve Timezone from weather data")
-        raise RuntimeError("Timezone not found in weather data.")
+    logger.error("Failed to retrieve Timezone from weather data")
+    raise RuntimeError("Timezone not found in weather data.")
 
 
 _WEATHER_CODE_TO_ICON = {
@@ -186,12 +185,11 @@ def _choose_phase_name(phase: float) -> str:
             return name
     if 0.0 < phase < 0.25:
         return "waxingcrescent"
-    elif 0.25 < phase < 0.5:
+    if 0.25 < phase < 0.5:
         return "waxinggibbous"
-    elif 0.5 < phase < 0.75:
+    if 0.5 < phase < 0.75:
         return "waninggibbous"
-    else:
-        return "waningcrescent"
+    return "waningcrescent"
 
 
 def parse_forecast(daily_forecast, tz, current_suffix, lat, plugin_dir):

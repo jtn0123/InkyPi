@@ -227,8 +227,7 @@ class TestRefreshTaskHooks:
         from refresh_task.task import RefreshTask
 
         dm = DisplayManager(device_config_dev)
-        task = RefreshTask(device_config_dev, dm)
-        return task
+        return RefreshTask(device_config_dev, dm)
 
     def test_refresh_task_has_event_bus(self, device_config_dev, monkeypatch):
         task = self._make_task(device_config_dev, monkeypatch)

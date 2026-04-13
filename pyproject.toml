@@ -85,6 +85,8 @@ select = [
   "PERF",   # perflint
   "PIE",    # flake8-pie
   "RSE",    # flake8-raise
+  "DTZ",    # flake8-datetimez
+  "RET",    # flake8-return
 ]
 ignore = [
   "E501",   # line length handled by Black
@@ -97,6 +99,13 @@ ignore = [
 [tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests intentionally construct naive datetimes for fixture-style assertions and
+# deterministic clock stubs. Mirroring production's tz-aware datetime everywhere
+# would bloat the suite without exercising new behavior. Enforce DTZ in src/
+# and scripts/ only.
+"tests/**" = ["DTZ001", "DTZ002", "DTZ003", "DTZ005", "DTZ006", "DTZ007", "DTZ011"]
 
 [tool.mutmut]
 paths_to_mutate = "src/app_setup/,src/blueprints/,src/utils/,src/refresh_task/"

@@ -24,8 +24,7 @@ from refresh_task import RefreshTask
 
 def _make_task(device_config_dev):
     dm = MagicMock()
-    task = RefreshTask(device_config_dev, dm)
-    return task
+    return RefreshTask(device_config_dev, dm)
 
 
 def _make_plugin_instance(plugin_id="weather", name="my_weather"):

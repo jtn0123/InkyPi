@@ -34,7 +34,6 @@ class YearProgress(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "year_progress.html", "year_progress.css", template_params
         )
-        return image

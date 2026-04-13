@@ -28,8 +28,7 @@ def _snapshot_sandbox(tmp_path, monkeypatch):
 
 def _make_image(color: tuple[int, int, int] = (255, 0, 0)) -> Image.Image:
     """Create a small solid-colour test image."""
-    img = Image.new("RGB", (10, 10), color)
-    return img
+    return Image.new("RGB", (10, 10), color)
 
 
 class TestSnapshotMismatchSavesActual:

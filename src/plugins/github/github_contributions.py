@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from utils.http_client import get_http_session
 
@@ -105,7 +105,8 @@ def parse_contributions(data, colors):
     seen_months = set()
     for i, week in enumerate(weeks):
         first_day = week["contributionDays"][0]["date"]
-        dt = datetime.strptime(first_day, "%Y-%m-%d")
+        # Only month/year labels are extracted; tz is irrelevant for formatting.
+        dt = datetime.strptime(first_day, "%Y-%m-%d")  # noqa: DTZ007
         month_year = f"{dt.strftime('%b')}-{dt.year}"
         if month_year not in seen_months:
             month_positions.append({"name": dt.strftime("%b"), "index": i})
@@ -126,7 +127,7 @@ def calculate_metrics(data):
 
     total = sum(day["contributionCount"] for day in days)
     streak, longest_streak, current_streak = 0, 0, 0
-    today = date.today()
+    today = datetime.now(tz=UTC).date()
     yesterday = today - timedelta(days=1)
     in_current_streak = False
 

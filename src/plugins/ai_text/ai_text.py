@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from openai import OpenAI
 
@@ -159,11 +159,9 @@ class AIText(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "ai_text.html", "ai_text.css", image_template_params
         )
-
-        return image
 
     @staticmethod
     def fetch_text_prompt(ai_client, model, text_prompt):
@@ -180,7 +178,7 @@ class AIText(BasePlugin):
             "IMPORTANT: If the response naturally requires a newline for formatting, provide "
             "the '\\n' newline character explicitly for every new line. For regular sentences "
             "or paragraphs do not provide the new line character."
-            f"For context, today is {datetime.today().strftime('%Y-%m-%d')}"
+            f"For context, today is {datetime.now(tz=UTC).strftime('%Y-%m-%d')}"
         )
         user_content = text_prompt
 
@@ -215,7 +213,7 @@ class AIText(BasePlugin):
             "IMPORTANT: If the response naturally requires a newline for formatting, provide "
             "the '\\n' newline character explicitly for every new line. For regular sentences "
             "or paragraphs do not provide the new line character."
-            f"For context, today is {datetime.today().strftime('%Y-%m-%d')}"
+            f"For context, today is {datetime.now(tz=UTC).strftime('%Y-%m-%d')}"
         )
 
         response = client.models.generate_content(

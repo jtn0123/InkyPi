@@ -7,7 +7,7 @@ For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from random import randint
 
@@ -46,7 +46,7 @@ class Apod(BasePlugin):
             parsed = date.fromisoformat(custom_date_str)
         except ValueError:
             return f"Invalid date format: {custom_date_str!r} (expected YYYY-MM-DD)"
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
         if parsed < _APOD_MIN_DATE:
             return (
                 f"Date must be on or after {_APOD_MIN_DATE.isoformat()} "
@@ -57,7 +57,7 @@ class Apod(BasePlugin):
         return None
 
     def build_settings_schema(self):
-        today = datetime.today().strftime("%Y-%m-%d")
+        today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         return schema(
             section(
                 "Source",
@@ -117,8 +117,8 @@ class Apod(BasePlugin):
         params = {"api_key": api_key}
 
         if settings.get("randomizeApod") == "true":
-            start = datetime(2015, 1, 1)
-            end = datetime.today()
+            start = datetime(2015, 1, 1, tzinfo=UTC)
+            end = datetime.now(tz=UTC)
             delta_days = (end - start).days
             random_date = start + timedelta(days=randint(0, delta_days))
             params["date"] = random_date.strftime("%Y-%m-%d")

@@ -69,9 +69,7 @@ def get_location(api_key, lat, long, timeout=20):
         logger.warning("Geocoding returned empty result for lat=%s, long=%s", lat, long)
         return "Unknown Location"
     location_data = location_list[0]
-    location_str = f"{location_data.get('name')}, {location_data.get('state', location_data.get('country'))}"
-
-    return location_str
+    return f"{location_data.get('name')}, {location_data.get('state', location_data.get('country'))}"
 
 
 def get_open_meteo_data(lat, long, units, forecast_days, timeout=20):

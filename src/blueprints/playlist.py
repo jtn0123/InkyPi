@@ -195,7 +195,8 @@ def validate_plugin_refresh_settings(refresh_settings):
             )
         refresh_time = refresh_time.strip()
         try:
-            datetime.strptime(refresh_time, "%H:%M")
+            # Format-only validation; the parsed datetime is discarded. No tz needed.
+            datetime.strptime(refresh_time, "%H:%M")  # noqa: DTZ007
         except ValueError:
             return None, json_error(
                 "Refresh time must be in HH:MM format",
@@ -916,14 +917,13 @@ def format_relative_time(iso_date_string):
     # Determine relative time string
     if diff_seconds < 120:
         return "just now"
-    elif diff_minutes < 60:
+    if diff_minutes < 60:
         return f"{int(diff_minutes)} minutes ago"
     # Use rolling windows to avoid midnight boundary flakiness across TZs
-    elif diff_seconds < 60 * 60 * 24:
+    if diff_seconds < 60 * 60 * 24:
         return "today at " + dt_local.strftime(time_format).lstrip("0")
-    elif diff_seconds < 60 * 60 * 48:
+    if diff_seconds < 60 * 60 * 48:
         return "yesterday at " + dt_local.strftime(time_format).lstrip("0")
-    else:
-        return dt_local.strftime(month_day_format).replace(
-            " 0", " "
-        )  # Removes leading zero in day
+    return dt_local.strftime(month_day_format).replace(
+        " 0", " "
+    )  # Removes leading zero in day

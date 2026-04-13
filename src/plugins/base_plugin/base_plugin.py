@@ -151,7 +151,6 @@ class BasePlugin:
         Plugins can override this instead of shipping a bespoke settings.html
         when their UI can be expressed with the shared field system.
         """
-        return None
 
     def generate_settings_template(self):
         template_params = {"style_settings": True}

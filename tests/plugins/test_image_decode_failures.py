@@ -26,8 +26,7 @@ def test_apod_decode_failure(device_config_dev, monkeypatch):
         call_count[0] += 1
         if call_count[0] == 1:
             return R()  # First call returns JSON
-        else:
-            return R2()  # Second call returns invalid image
+        return R2()  # Second call returns invalid image
 
     monkeypatch.setattr("requests.get", mock_http_get)
 

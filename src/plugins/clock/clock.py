@@ -135,9 +135,7 @@ class Clock(BasePlugin):
             (w / 2, h / 2), time_str, font=fnt, anchor="mm", fill=primary_color + (255,)
         )
 
-        combined = Image.alpha_composite(image, text)
-
-        return combined
+        return Image.alpha_composite(image, text)
 
     def draw_conic_clock(
         self,
@@ -271,9 +269,7 @@ class Clock(BasePlugin):
             width=max(int(dim * 0.007), 1),
         )
 
-        combined = Image.alpha_composite(bg, canvas)
-
-        return combined
+        return Image.alpha_composite(bg, canvas)
 
     def draw_word_clock(
         self, dimensions, time, primary_color=(0, 0, 0), secondary_color=(255, 255, 255)
@@ -334,8 +330,7 @@ class Clock(BasePlugin):
                     (x_pos, y_pos), letter, anchor="mm", fill=fill, font=fnt
                 )
 
-        combined = Image.alpha_composite(bg, canvas)
-        return combined
+        return Image.alpha_composite(bg, canvas)
 
     @staticmethod
     def format_time(hour, minute, zero_pad=False):

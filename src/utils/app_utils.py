@@ -65,8 +65,7 @@ def get_wifi_name():
         iwgetid_bin = shutil.which("iwgetid") or "/sbin/iwgetid"
         if not os.path.isabs(iwgetid_bin):
             return None
-        output = subprocess.check_output([iwgetid_bin, "-r"]).decode("utf-8").strip()
-        return output
+        return subprocess.check_output([iwgetid_bin, "-r"]).decode("utf-8").strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
@@ -111,7 +110,7 @@ def get_font(font_name, font_size=50, font_weight="normal", strict=False):
 
 
 def get_fonts():
-    fonts_list = [
+    return [
         {
             "font_family": font_family,
             "url": resolve_path(os.path.join("static", "fonts", variant["file"])),
@@ -121,7 +120,6 @@ def get_fonts():
         for font_family, variants in FONT_FAMILIES.items()
         for variant in variants
     ]
-    return fonts_list
 
 
 def get_font_path(font_name):

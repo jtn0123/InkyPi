@@ -37,6 +37,11 @@ def test_determine_date_invalid_custom_date_falls_back(monkeypatch):
             return datetime(2024, 1, 2)
 
         @staticmethod
+        def now(tz=None):
+            # Mirror today(); tests pin the date, tz is ignored.
+            return datetime(2024, 1, 2)
+
+        @staticmethod
         def strptime(value, fmt):
             return datetime.strptime(value, fmt)
 

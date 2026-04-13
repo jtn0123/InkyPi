@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 
 from .abstract_display import AbstractDisplay
 
@@ -33,7 +33,7 @@ class MockDisplay(AbstractDisplay):
     def display_image(self, image, image_settings=None):
         if image_settings is None:
             image_settings = []
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
         filepath = os.path.join(self.output_dir, f"display_{timestamp}.png")
         image.save(filepath, "PNG")
 

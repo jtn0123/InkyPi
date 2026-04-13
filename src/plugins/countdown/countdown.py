@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Countdown(BasePlugin):
     def build_settings_schema(self):
-        tomorrow = (datetime.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow = (datetime.now(tz=UTC) + timedelta(days=1)).strftime("%Y-%m-%d")
         return schema(
             section(
                 "Countdown",
@@ -44,8 +44,10 @@ class Countdown(BasePlugin):
         tz = get_timezone(tz_name)
         current_time = datetime.now(tz)
 
-        countdown_date = datetime.strptime(countdown_date_str, "%Y-%m-%d")
-        countdown_date = countdown_date.replace(tzinfo=tz)
+        # Input is YYYY-MM-DD (no tz); we attach device tz immediately after parsing.
+        countdown_date = datetime.strptime(  # noqa: DTZ007
+            countdown_date_str, "%Y-%m-%d"
+        ).replace(tzinfo=tz)
 
         day_count = (countdown_date.date() - current_time.date()).days
         label = "Days Left" if day_count > 0 else "Days Passed"
@@ -58,7 +60,6 @@ class Countdown(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "countdown.html", "countdown.css", template_params
         )
-        return image

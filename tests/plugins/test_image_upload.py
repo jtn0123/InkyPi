@@ -292,7 +292,7 @@ def test_image_upload_generate_image_vertical_orientation(
     def mock_get_config(key, default=None):
         if key == "orientation":
             return "vertical"
-        elif key == "resolution":
+        if key == "resolution":
             return (400, 300)  # width, height
         return default
 

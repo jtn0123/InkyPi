@@ -161,8 +161,7 @@ def _make_image(colour: tuple[int, int, int]):
         from PIL import Image
     except ImportError:
         sys.exit("ERROR: Pillow is required. Install it with: pip install Pillow")
-    img = Image.new("RGB", (_IMG_WIDTH, _IMG_HEIGHT), colour)
-    return img
+    return Image.new("RGB", (_IMG_WIDTH, _IMG_HEIGHT), colour)
 
 
 def _ts_filename(dt: datetime) -> str:

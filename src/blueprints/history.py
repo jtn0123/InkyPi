@@ -71,10 +71,12 @@ def _timestamp_from_history_filename(filename: str) -> float:
     if len(parts) < 3:
         return 0.0
     try:
-        dt = datetime.strptime(f"{parts[-2]}_{parts[-1]}", "%Y%m%d_%H%M%S")
+        dt = datetime.strptime(f"{parts[-2]}_{parts[-1]}", "%Y%m%d_%H%M%S").replace(
+            tzinfo=UTC
+        )
     except ValueError:
         return 0.0
-    return dt.replace(tzinfo=UTC).timestamp()
+    return dt.timestamp()
 
 
 def _format_size(num_bytes: int) -> str:
@@ -156,7 +158,7 @@ def _list_history_images(
             )
             dt = datetime.fromtimestamp(mtime, tz=now.tzinfo)
         except Exception:
-            dt = datetime.fromtimestamp(mtime)
+            dt = datetime.fromtimestamp(mtime, tz=UTC)
         result.append(
             {
                 "filename": f,

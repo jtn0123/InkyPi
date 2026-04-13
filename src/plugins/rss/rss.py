@@ -112,8 +112,7 @@ class Rss(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(dimensions, "rss.html", "rss.css", template_params)
-        return image
+        return self.render_image(dimensions, "rss.html", "rss.css", template_params)
 
     @staticmethod
     def _sanitize_text(raw):

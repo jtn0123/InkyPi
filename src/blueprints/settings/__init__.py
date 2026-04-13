@@ -8,7 +8,7 @@ import subprocess
 import threading
 import time
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from flask import (
     Blueprint,
@@ -157,7 +157,7 @@ class DevModeLogHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            timestamp = datetime.fromtimestamp(record.created).strftime(
+            timestamp = datetime.fromtimestamp(record.created, tz=UTC).strftime(
                 LOG_TIMESTAMP_FORMAT
             )
             log_line = f"{timestamp} [{record.levelname}] {record.name}: {msg}"
@@ -233,7 +233,9 @@ def _read_log_lines(hours: int) -> list[str]:
 
         for record in reader:
             try:
-                ts = datetime.fromtimestamp(record.get_realtime_usec() / 1_000_000)
+                ts = datetime.fromtimestamp(
+                    record.get_realtime_usec() / 1_000_000, tz=UTC
+                )
                 formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
             except Exception:
                 formatted_ts = "??? ?? ??:??:??"
@@ -291,7 +293,7 @@ def _read_units_log_lines(hours: int, units: list[str]) -> list[str]:
                 if unit_name not in units:
                     continue
                 ts_usec = record.get_realtime_usec()
-                ts = datetime.fromtimestamp(ts_usec / 1_000_000)
+                ts = datetime.fromtimestamp(ts_usec / 1_000_000, tz=UTC)
                 formatted_ts = ts.strftime(LOG_TIMESTAMP_FORMAT)
                 line = _format_journal_line(formatted_ts, data)
                 merged.append((ts.timestamp(), line))

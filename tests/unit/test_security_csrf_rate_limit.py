@@ -35,9 +35,9 @@ def csrf_app():
         from flask import request
 
         if request.method in _CSRF_SAFE_METHODS:
-            return
+            return None
         if request.path in _CSRF_EXEMPT_PATHS:
-            return
+            return None
         token = session.get("_csrf_token")
         if not token:
             _generate_csrf_token()
@@ -58,6 +58,7 @@ def csrf_app():
         )
         if not request_token or not secrets.compare_digest(request_token, token):
             return json_error("CSRF token missing or invalid", status=403)
+        return None
 
     # --- Rate limiting ---
     _MUTATE_REQUESTS = defaultdict(deque)
@@ -71,9 +72,9 @@ def csrf_app():
         from flask import request
 
         if request.method in _CSRF_SAFE_METHODS:
-            return
+            return None
         if request.path in _CSRF_EXEMPT_PATHS:
-            return
+            return None
         addr = request.remote_addr or "unknown"
         now = _time.monotonic()
         dq = _MUTATE_REQUESTS[addr]
@@ -82,6 +83,7 @@ def csrf_app():
         if len(dq) >= _MUTATE_MAX:
             return json_error("Rate limit exceeded — try again shortly", status=429)
         dq.append(now)
+        return None
 
     @app.route("/test-post", methods=["POST"])
     def test_post():

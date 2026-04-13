@@ -144,8 +144,7 @@ def mock_screenshot(monkeypatch):
     def _fake_screenshot(*args, **kwargs):
         dims = args[1] if len(args) > 1 else kwargs.get("dimensions", (800, 480))
         width, height = dims
-        img = Image.new("RGB", (width, height), "white")
-        return img
+        return Image.new("RGB", (width, height), "white")
 
     import plugins.base_plugin.base_plugin as base_plugin
     import utils.image_utils as image_utils
