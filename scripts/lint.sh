@@ -114,7 +114,8 @@ mypy --strict \
     src/refresh_task/context.py \
     src/refresh_task/worker.py \
     src/utils/sri.py \
-    src/utils/time_utils.py
+    src/utils/time_utils.py \
+    src/model.py
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then
     echo "❌ mypy strict helper subset failed (exit code: $MYPY_STRICT_EXIT)"

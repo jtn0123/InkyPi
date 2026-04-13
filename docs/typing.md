@@ -30,6 +30,7 @@ ongoing feature work.
 | `src/refresh_task/worker.py` | Refresh guards PR |
 | `src/utils/sri.py` | Quality guards follow-up PR |
 | `src/utils/time_utils.py` | Quality guards PR |
+| `src/model.py` | JTN-663 |
 
 `src/utils/http_cache.py` was deliberately deferred from the initial strict
 set because it was recently refactored (JTN-493) and is still settling. It
