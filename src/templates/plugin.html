@@ -75,7 +75,7 @@
         </div>
 
         <div class="separator"></div>
-        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': plugin.display_name}]) }}
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins', 'url': url_for('main.main_page') + '#plugins-grid'}, {'label': plugin.display_name}]) }}
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}
