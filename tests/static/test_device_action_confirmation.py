@@ -133,3 +133,66 @@ def test_settings_js_on_disk_has_confirm_handlers():
     assert "openShutdownConfirm" in js
     assert "closeRebootConfirm" in js
     assert "closeShutdownConfirm" in js
+
+
+# ---------------------------------------------------------------------------
+# JTN-652 — confirmation modals follow the same a11y pattern as the rest of
+# the app: Escape closes, focus moves into the modal on open, focus returns
+# to the trigger on close, and body.modal-open is kept in sync.
+# ---------------------------------------------------------------------------
+
+
+def test_reboot_shutdown_modals_handle_escape(client):
+    """JTN-652: Escape key closes whichever confirm modal is open."""
+    js = _read_settings_js(client)
+    assert 'event.key !== "Escape"' in js
+    # Both modals must be referenced by the escape handler.
+    assert 'isDeviceActionModalOpen("rebootConfirmModal")' in js
+    assert 'isDeviceActionModalOpen("shutdownConfirmModal")' in js
+
+
+def test_reboot_shutdown_modals_move_focus_on_open(client):
+    """JTN-652: opening the confirm modal moves focus inside it."""
+    js = _read_settings_js(client)
+    # setDeviceActionModalOpen should query for focusable elements and focus them.
+    assert "focusable.focus()" in js
+    # Trigger must be captured so focus can be restored on close.
+    assert "_lastDeviceActionTrigger" in js
+
+
+def test_reboot_shutdown_modals_restore_focus_on_close(client):
+    """JTN-652: closing the modal restores focus to the trigger."""
+    js = _read_settings_js(client)
+    # The close branch inside setDeviceActionModalOpen calls .focus() on the
+    # remembered trigger.
+    assert "_lastDeviceActionTrigger.focus()" in js
+
+
+def test_reboot_shutdown_modals_toggle_is_open_class(client):
+    """JTN-652: modal must get the .is-open class so body.modal-open tracks it
+    and the shared CSS backdrop fires (matches scheduleModal / playlist modals).
+    """
+    js = _read_settings_js(client)
+    assert 'classList.toggle("is-open"' in js
+    # syncModalOpenState is how InkyPiUI keeps body.modal-open up to date.
+    assert "syncModalOpenState" in js
+
+
+def test_reboot_shutdown_modals_use_flex_display(client):
+    """JTN-652: modal display must be 'flex' (for centering) rather than
+    'block', matching the rest of the app's modals."""
+    js = _read_settings_js(client)
+    # The new helper picks "flex" when opening and "none" when closing.
+    assert '"flex" : "none"' in js
+    # Old anti-pattern must be gone.
+    assert '"block" : "none"' not in js
+
+
+def test_reboot_shutdown_modals_close_on_backdrop_click(client):
+    """JTN-652: clicking the modal backdrop closes the modal (parity with
+    scheduleModal / playlist modals)."""
+    js = _read_settings_js(client)
+    # The backdrop click handler compares event.target to the modal container
+    # and calls the corresponding close helper.
+    assert "event.target === rebootModal" in js
+    assert "event.target === shutdownModal" in js
