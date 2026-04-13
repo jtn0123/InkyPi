@@ -395,9 +395,17 @@ def _validate_settings_form(form_data):
             code="validation_error",
             details={"field": "interval"},
         )
-    if not form_data.get("timezoneName"):
+    timezone_name = form_data.get("timezoneName")
+    if not timezone_name:
         return json_error(
             "Time Zone is required",
+            status=422,
+            code="validation_error",
+            details={"field": "timezoneName"},
+        )
+    if timezone_name not in available_timezones():
+        return json_error(
+            "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
             status=422,
             code="validation_error",
             details={"field": "timezoneName"},
