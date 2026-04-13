@@ -1,6 +1,55 @@
 # CHANGELOG
 
 
+## v0.49.18 (2026-04-13)
+
+### Bug Fixes
+
+- **plugin**: Validate WPOTD custom date range at save time (JTN-651)
+  ([#415](https://github.com/jtn0123/InkyPi/pull/415),
+  [`72b5325`](https://github.com/jtn0123/InkyPi/commit/72b5325093682945c1333271d1bc1b20564fa2ca))
+
+* fix(plugin): validate WPOTD custom date range at save time (JTN-651)
+
+The Wikipedia POTD plugin mirrored JTN-379's pre-fix APOD behavior: `customDate` had no `min`/`max`
+  attributes and no server-side `validate_settings` hook, so obviously out-of-range dates
+  (1900-01-01, 2099-12-31) were persisted with a success toast and only failed later when Wikipedia
+  returned no `Template:POTD/<date>`.
+
+Reject dates outside [2007-01-01, today] at save time and advertise the same window via `min`/`max`
+  on the date field.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(deps): refresh uv lock metadata
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Validate timezone against IANA zones (JTN-650)
+  ([#414](https://github.com/jtn0123/InkyPi/pull/414),
+  [`efa956a`](https://github.com/jtn0123/InkyPi/commit/efa956aebc887fbaf31ba520de247dd8855843d9))
+
+* fix(settings): validate timezone against IANA zones on save (JTN-650)
+
+The Time Zone field on Settings → Device → Time & Locale previously only checked for presence. Any
+  non-empty string (e.g. "NotATimezone") would persist to device.json, producing a misleading
+  success toast and silently breaking downstream ZoneInfo lookups.
+
+Now we validate timezoneName against zoneinfo.available_timezones() — the same set used to populate
+  the input's datalist — and return a 422 validation_error with field=timezoneName when it fails, so
+  the existing inline-field-error UI surfaces the issue next to the input.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: sync uv lockfile
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.17 (2026-04-13)
 
 ### Bug Fixes
