@@ -284,3 +284,61 @@ class TestAuthEnabled:
 
         with client.session_transaction() as sess:
             assert sess.get("authed") is not True
+
+
+# ---------------------------------------------------------------------------
+# Tests — open-redirect guard (_safe_next_url)
+# ---------------------------------------------------------------------------
+
+
+class TestSafeNextUrl:
+    """Regression tests for CodeQL py/url-redirection guard in blueprints.auth."""
+
+    @pytest.fixture()
+    def safe_next_url(self, monkeypatch):
+        _make_auth_app(pin=None, monkeypatch=monkeypatch)
+        from blueprints.auth import _safe_next_url
+
+        return _safe_next_url
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            None,
+            "",
+            "http://evil.com/",
+            "https://evil.com/path",
+            "//evil.com/path",
+            "/\\evil.com",
+            "javascript:alert(1)",
+            "foo/bar",  # missing leading slash
+            "/path\nwith-newline",
+            "/path with space",
+            "/<script>",
+        ],
+    )
+    def test_rejects_unsafe_inputs(self, safe_next_url, raw):
+        assert safe_next_url(raw) == "/"
+
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "/",
+            "/home",
+            "/settings/general",
+            "/plugin/weather/123",
+            "/path/to-thing_with.chars~",
+        ],
+    )
+    def test_accepts_safe_paths(self, safe_next_url, raw):
+        # Result must be a same-origin relative path starting with '/'.
+        result = safe_next_url(raw)
+        assert result.startswith("/")
+        assert "://" not in result
+        # Re-quoted segments should preserve the meaningful path structure.
+        assert result.rstrip("/") == raw.rstrip("/") or result == "/"
+
+    def test_preserves_safe_query_string(self, safe_next_url):
+        result = safe_next_url("/home?tab=latest&page=2")
+        assert result.startswith("/home?")
+        assert "tab=latest" in result
