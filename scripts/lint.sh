@@ -58,6 +58,9 @@ mypy --strict \
     src/utils/paths.py \
     src/utils/refresh_info.py \
     src/utils/refresh_stats.py \
+    src/refresh_task/actions.py \
+    src/refresh_task/context.py \
+    src/refresh_task/worker.py \
     src/utils/sri.py \
     src/utils/time_utils.py
 MYPY_STRICT_EXIT=$?

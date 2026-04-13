@@ -25,6 +25,9 @@ ongoing feature work.
 | `src/utils/paths.py` | Quality guards PR |
 | `src/utils/refresh_info.py` | Quality guards follow-up PR |
 | `src/utils/refresh_stats.py` | Quality guards follow-up PR |
+| `src/refresh_task/actions.py` | Refresh guards PR |
+| `src/refresh_task/context.py` | Refresh guards PR |
+| `src/refresh_task/worker.py` | Refresh guards PR |
 | `src/utils/sri.py` | Quality guards follow-up PR |
 | `src/utils/time_utils.py` | Quality guards PR |
 

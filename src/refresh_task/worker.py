@@ -5,13 +5,53 @@ import logging
 import multiprocessing
 import sys
 import traceback
+from collections.abc import Callable, Mapping
+from datetime import datetime
+from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
 from plugins.plugin_registry import get_plugin_instance
+from refresh_task.actions import PluginLike, RefreshAction
+from refresh_task.context import RefreshContext, SupportsRefreshConfig
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from config import Config
 
-def _get_mp_context():
+
+class LegacyConfigLike(Protocol):
+    """Legacy pickled config shape accepted by the worker."""
+
+    config_file: str
+    current_image_file: str
+    processed_image_file: str
+    plugin_image_dir: str
+    history_image_dir: str
+
+
+class WorkerSuccessPayload(TypedDict):
+    ok: bool
+    image_bytes: bytes
+    plugin_meta: object
+
+
+class WorkerErrorPayload(TypedDict):
+    ok: bool
+    error_type: str
+    error_message: str
+    traceback: str
+
+
+WorkerPayload = WorkerSuccessPayload | WorkerErrorPayload
+
+
+class ResultQueueLike(Protocol):
+    """Queue interface shared by queue.Queue and multiprocessing.Queue."""
+
+    def put(self, item: WorkerPayload) -> object: ...
+
+
+def _get_mp_context() -> multiprocessing.context.BaseContext:
     """Return the best available multiprocessing start context for this platform.
 
     Prefers ``forkserver`` on Linux (lower memory overhead on constrained
@@ -34,7 +74,9 @@ def _get_mp_context():
     return multiprocessing.get_context()
 
 
-def _restore_child_config(device_config):
+def _restore_child_config(
+    device_config: RefreshContext | LegacyConfigLike,
+) -> "Config | SupportsRefreshConfig":
     """Re-initialise the Config singleton inside a subprocess from a serialised snapshot.
 
     Accepts either a :class:`RefreshContext` dataclass (preferred) or a
@@ -50,8 +92,6 @@ def _restore_child_config(device_config):
     Returns:
         A new :class:`Config` instance initialised from the snapshot paths.
     """
-    from refresh_task.context import RefreshContext
-
     if isinstance(device_config, RefreshContext):
         return device_config.restore_child_config()
 
@@ -94,12 +134,12 @@ def _remote_exception(error_type: str, error_message: str) -> BaseException:
 
 
 def _execute_refresh_attempt_worker(
-    result_queue,
-    plugin_config: dict,
-    refresh_action,
-    refresh_context,
-    current_dt,
-):
+    result_queue: ResultQueueLike,
+    plugin_config: Mapping[str, object],
+    refresh_action: RefreshAction,
+    refresh_context: RefreshContext | LegacyConfigLike,
+    current_dt: datetime,
+) -> None:
     """Entry point for a plugin execution subprocess.
 
     Intended to be the ``target`` of a ``multiprocessing.Process``.
@@ -119,11 +159,16 @@ def _execute_refresh_attempt_worker(
     """
     try:
         child_config = _restore_child_config(refresh_context)
-        plugin = get_plugin_instance(plugin_config)
+        plugin_loader = cast(
+            Callable[[Mapping[str, object]], PluginLike],
+            get_plugin_instance,
+        )
+        plugin = plugin_loader(plugin_config)
         image = refresh_action.execute(plugin, child_config, current_dt)
         plugin_meta = None
         if hasattr(plugin, "get_latest_metadata"):
-            plugin_meta = plugin.get_latest_metadata()
+            metadata_getter = cast(Callable[[], object], plugin.get_latest_metadata)
+            plugin_meta = metadata_getter()
         if image is None:
             raise RuntimeError("Plugin returned None image")
         image_bytes = io.BytesIO()
