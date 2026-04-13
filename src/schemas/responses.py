@@ -1,0 +1,213 @@
+"""TypedDict response shapes for high-traffic JSON endpoints.
+
+These describe the canonical successful JSON responses the UI consumes.
+They are used by:
+
+* ``tests/contract/test_response_shapes.py`` to assert routes keep returning
+  the documented shape (prevents silent drift breaking the UI).
+* ``mypy`` as optional producer-side annotations.
+
+Design notes
+------------
+* ``total=False`` is used when every field is optional in practice (e.g. the
+  ``/next-up`` endpoint returns ``{}`` when no plugin is scheduled).
+* Envelope fields (``success``, ``request_id``, ``message``) are included as
+  optional when the endpoint wraps its payload with ``json_success``; see
+  ``utils.http_utils.json_success``.
+"""
+
+from __future__ import annotations
+
+from typing import Any, TypedDict
+
+# ---------------------------------------------------------------------------
+# GET /api/version/info
+# ---------------------------------------------------------------------------
+
+
+class VersionInfoResponse(TypedDict):
+    """Response body for ``GET /api/version/info`` (``blueprints.version_info``)."""
+
+    version: str
+    git_sha: str
+    git_branch: str
+    build_time: str
+    python_version: str
+
+
+# ---------------------------------------------------------------------------
+# GET /api/uptime
+# ---------------------------------------------------------------------------
+
+
+class UptimeResponse(TypedDict):
+    """Response body for ``GET /api/uptime``.
+
+    ``system_uptime_seconds`` is ``None`` off-Linux; ``process_uptime_seconds``
+    is a float (time.monotonic delta).
+    """
+
+    process_uptime_seconds: float
+    system_uptime_seconds: int | None
+    process_started_at: str
+
+
+# ---------------------------------------------------------------------------
+# GET /refresh-info
+# ---------------------------------------------------------------------------
+
+
+class RefreshInfoResponse(TypedDict, total=False):
+    """Response body for ``GET /refresh-info``.
+
+    All fields are optional because the route falls back to ``{}`` when no
+    refresh has ever succeeded (see ``blueprints.main.refresh_info``).
+    """
+
+    refresh_time: str | None
+    image_hash: int | str | None
+    refresh_type: str | None
+    plugin_id: str | None
+    playlist: str
+    plugin_instance: str
+    plugin_instance_label: str
+    request_ms: int
+    display_ms: int
+    generate_ms: int
+    preprocess_ms: int
+    used_cached: bool
+    benchmark_id: str
+    plugin_meta: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# GET /next-up
+# ---------------------------------------------------------------------------
+
+
+class NextUpResponse(TypedDict, total=False):
+    """Response body for ``GET /next-up``.
+
+    When nothing is scheduled the route returns an empty ``{}``. When a plugin
+    is scheduled, ``playlist``, ``plugin_id`` and ``plugin_instance`` are all
+    populated together.
+    """
+
+    playlist: str
+    plugin_id: str
+    plugin_instance: str
+    plugin_instance_label: str
+
+
+# ---------------------------------------------------------------------------
+# GET /api/stats
+# ---------------------------------------------------------------------------
+
+
+class TopFailingEntry(TypedDict):
+    """One entry of ``RefreshStatsWindow.top_failing``."""
+
+    plugin: str
+    count: int
+
+
+class RefreshStatsWindow(TypedDict):
+    """Single-window payload from ``utils.refresh_stats.compute_stats``."""
+
+    total: int
+    success: int
+    failure: int
+    success_rate: float
+    p50_duration_ms: int
+    p95_duration_ms: int
+    top_failing: list[TopFailingEntry]
+
+
+class RefreshStatsResponse(TypedDict):
+    """Response body for ``GET /api/stats``."""
+
+    last_1h: RefreshStatsWindow
+    last_24h: RefreshStatsWindow
+    last_7d: RefreshStatsWindow
+
+
+# ---------------------------------------------------------------------------
+# GET /api/health/system
+# ---------------------------------------------------------------------------
+
+
+class HealthSystemResponse(TypedDict, total=False):
+    """Response body for ``GET /api/health/system`` (wraps ``json_success``)."""
+
+    success: bool
+    request_id: str
+    cpu_percent: float | None
+    memory_percent: float | None
+    disk_percent: float | None
+    uptime_seconds: int | None
+
+
+# ---------------------------------------------------------------------------
+# GET /api/health/plugins
+# ---------------------------------------------------------------------------
+
+
+class HealthPluginsResponse(TypedDict, total=False):
+    """Response body for ``GET /api/health/plugins`` (wraps ``json_success``).
+
+    ``items`` maps plugin_id -> arbitrary health snapshot dict.
+    """
+
+    success: bool
+    request_id: str
+    items: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# GET /settings/isolation
+# ---------------------------------------------------------------------------
+
+
+class IsolationResponse(TypedDict, total=False):
+    """Response body for ``GET /settings/isolation`` (wraps ``json_success``)."""
+
+    success: bool
+    request_id: str
+    isolated_plugins: list[str]
+
+
+# ---------------------------------------------------------------------------
+# GET /history/storage
+# ---------------------------------------------------------------------------
+
+
+class HistoryStorageResponse(TypedDict):
+    """Response body for ``GET /history/storage``.
+
+    ``pct_free`` is ``None`` only when ``total_gb`` is 0 (should never happen
+    on a real filesystem).
+    """
+
+    free_gb: float
+    total_gb: float
+    used_gb: float
+    pct_free: float | None
+
+
+# ---------------------------------------------------------------------------
+# GET /api/benchmarks/summary
+# ---------------------------------------------------------------------------
+
+
+class BenchmarksSummaryResponse(TypedDict, total=False):
+    """Response body for ``GET /api/benchmarks/summary`` (wraps ``json_success``).
+
+    Only present when the benchmarks feature flag is enabled — otherwise the
+    route returns a 404 error envelope. ``summary`` maps stage name to
+    ``{"p50": int, "p95": int}``.
+    """
+
+    success: bool
+    request_id: str
+    count: int
+    summary: dict[str, dict[str, int]]
