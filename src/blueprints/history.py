@@ -172,19 +172,19 @@ def _list_history_images(
     return result, total
 
 
-def _remove_sidecar_by_name(history_dir: str, expected_name: str) -> None:
-    """Delete an entry in *history_dir* whose basename equals *expected_name*.
+def _resolve_history_entry_path(history_dir: str, expected_name: str) -> str | None:
+    """Return the real path for *expected_name* if it exists in *history_dir*.
 
-    The value ultimately passed to :func:`os.remove` is constructed from
-    :func:`os.listdir`, not from caller-supplied input, which keeps the
-    operation safe even if the caller's ``expected_name`` were tainted.  A
-    final :func:`os.path.realpath` containment check defends against any
-    symlinked entry that points outside the history directory.
+    The lookup only considers entries that come from ``os.listdir`` and then
+    performs a containment check against the resolved history directory.  That
+    keeps downstream filesystem operations from reconstructing paths directly
+    from request data.
     """
     try:
         entries = os.listdir(history_dir)
     except OSError:
-        return
+        return None
+
     real_history_dir = os.path.realpath(history_dir)
     for entry in entries:
         if entry != expected_name:
@@ -193,16 +193,30 @@ def _remove_sidecar_by_name(history_dir: str, expected_name: str) -> None:
         try:
             real_full = os.path.realpath(full)
         except OSError:
-            return
+            return None
         try:
             common = os.path.commonpath([real_history_dir, real_full])
         except ValueError:
-            return
+            return None
         if common != real_history_dir:
-            return
+            return None
         if os.path.isfile(real_full):
-            os.remove(real_full)
+            return real_full
+        return None
+    return None
+
+
+def _remove_history_entry_by_name(history_dir: str, expected_name: str) -> None:
+    """Delete a history entry by basename after resolving it safely."""
+    real_full = _resolve_history_entry_path(history_dir, expected_name)
+    if real_full is None:
         return
+    os.remove(real_full)
+
+
+def _remove_sidecar_by_name(history_dir: str, expected_name: str) -> None:
+    """Delete an entry in *history_dir* whose basename equals *expected_name*."""
+    _remove_history_entry_by_name(history_dir, expected_name)
 
 
 def _resolve_history_path(history_dir: str, filename: str) -> str:
@@ -245,14 +259,15 @@ def _validate_and_resolve_history_file(history_dir, filename):
     py/reflective-xss).
     """
     try:
-        safe_path = _resolve_history_path(history_dir, filename)
+        _resolve_history_path(history_dir, filename)
     except ValueError:
         logger.warning(
             "history: invalid filename rejected filename=%s",
             sanitize_log_field(filename),
         )
         return None, _ERRCODE_INVALID_FILENAME
-    if not os.path.isfile(safe_path):
+    safe_path = _resolve_history_entry_path(history_dir, filename)
+    if safe_path is None:
         logger.warning(
             "history: file not found filename=%s",
             sanitize_log_field(filename),
@@ -400,11 +415,11 @@ def history_redisplay():
         if err_code is not None:
             return _filename_error_response(err_code)
 
-        safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
+        _safe_path, err_code = _validate_and_resolve_history_file(history_dir, filename)
         if err_code is not None:
             return _filename_error_response(err_code)
 
-        display_manager.display_preprocessed_image(safe_path)
+        display_manager.display_preprocessed_image(_safe_path)
         return json_success("Display updated")
     except Exception:
         logger.exception("Error redisplaying history image")
@@ -445,6 +460,7 @@ def history_delete():
         expected_stem = os.path.splitext(os.path.basename(safe_path))[0]
         sidecar_ext = _EXT_JSON if ext.lower() == _EXT_PNG else _EXT_PNG
         expected_sidecar_name = expected_stem + sidecar_ext
+        _remove_history_entry_by_name(history_dir, os.path.basename(safe_path))
         _remove_sidecar_by_name(history_dir, expected_sidecar_name)
         return json_success("Deleted")
     except Exception:
