@@ -223,6 +223,11 @@ def _resolve_history_path(history_dir: str, filename: str) -> str:
     # silently drops the base on POSIX, which would mask traversal intent.
     if os.path.isabs(filename):
         raise ValueError(_ERR_INVALID_FILENAME)
+    # Accept only plain filenames (no directory components).
+    if os.path.basename(filename) != filename:
+        raise ValueError(_ERR_INVALID_FILENAME)
+    if filename in {".", ".."}:
+        raise ValueError(_ERR_INVALID_FILENAME)
     candidate = os.path.join(history_dir, filename)
     try:
         return validate_file_path(candidate, history_dir)
