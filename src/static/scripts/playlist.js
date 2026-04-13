@@ -823,13 +823,18 @@
             const loadThumb = async (img) => {
                 if (img.getAttribute('data-loaded') === '1') return;
                 const url = img.getAttribute('data-src');
-                if (!url) return;
+                // Strictly allow only site-relative thumbnail paths under /static/
+                // with a whitelisted character set. Rejects anything DOM-sourced
+                // that could flow into the img.src sink (js/xss-through-dom).
+                if (!url || !/^\/static\/[A-Za-z0-9._\-/]+(\?[A-Za-z0-9._\-=&%]*)?$/.test(url)) {
+                    img.style.display = 'none';
+                    const sk0 = img.previousElementSibling; if (sk0) sk0.style.display = 'none';
+                    img.setAttribute('data-loaded', '1');
+                    return;
+                }
                 try {
                     const resp = await fetch(url, { method: 'HEAD' });
                     if (resp.ok) {
-                        // lgtm[js/xss-through-dom] — assigning to img.src can never
-                        // execute JavaScript. The browser fetches the URL as an image;
-                        // even javascript:/data: URIs in <img src> do not run script.
                         img.src = url;
                         img.style.display = '';
                         img.setAttribute('data-loaded', '1');
