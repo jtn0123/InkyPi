@@ -865,6 +865,7 @@ def test_htmx_partial_is_not_full_page(client, device_config_dev):
     assert "<html" not in body, "HTMX partial must not include <html> tag"
     assert "history-grid-container" in body, "Partial must contain the grid container"
 
+
 def test_history_source_hides_auto_generated_instance_key(client, device_config_dev):
     """JTN-619: History source row must not expose {plugin_id}_saved_settings."""
     d = device_config_dev.history_image_dir

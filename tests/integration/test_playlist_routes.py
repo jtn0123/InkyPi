@@ -409,6 +409,7 @@ def test_playlist_page_no_wrap_label_for_normal_range(client):
     # Look within the next 200 chars for the label — it must not appear.
     assert "(next day)" not in body[idx : idx + 200]
 
+
 def test_playlist_page_hides_auto_generated_instance_keys(client, device_config_dev):
     """JTN-620: Playlists page must not display raw {plugin_id}_saved_settings keys.
 
