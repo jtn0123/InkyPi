@@ -36,6 +36,13 @@ from utils.http_client import get_http_session
 
 logger = logging.getLogger(__name__)
 
+# Wikipedia's ``Template:POTD/YYYY-MM-DD`` series on en.wikipedia runs
+# continuously from 2007-01-01. Earlier years have gaps, and requesting a
+# future date returns no template. We reject values outside this window at
+# save time rather than letting the bad config persist until
+# ``generate_image`` runs and fails against the upstream API (JTN-651).
+_WPOTD_MIN_DATE = date(2007, 1, 1)
+
 
 class Wpotd(BasePlugin):
     HEADERS = {"User-Agent": "InkyPi/0.0 (https://github.com/fatihak/InkyPi/)"}
@@ -43,7 +50,38 @@ class Wpotd(BasePlugin):
         "INKYPI_WIKIPEDIA_API_URL", "https://en.wikipedia.org/w/api.php"
     )
 
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject out-of-range custom dates at save time (JTN-651).
+
+        The frontend ``<input type="date">`` enforces ``min``/``max``, but a
+        direct POST can still bypass it. Without server-side validation a bad
+        date persists with a success toast and only fails later when the
+        plugin tries to fetch a non-existent ``Template:POTD/<date>`` from
+        Wikipedia.
+        """
+        if settings.get("randomizeWpotd") == "true":
+            # Random mode picks its own date — ignore customDate.
+            return None
+        custom_date_str = (settings.get("customDate") or "").strip()
+        if not custom_date_str:
+            # No custom date set — ``generate_image`` falls back to today.
+            return None
+        try:
+            parsed = date.fromisoformat(custom_date_str)
+        except ValueError:
+            return f"Invalid date format: {custom_date_str!r} (expected YYYY-MM-DD)"
+        today = date.today()
+        if parsed < _WPOTD_MIN_DATE:
+            return (
+                f"Date must be on or after {_WPOTD_MIN_DATE.isoformat()} "
+                "(Wikipedia POTD archive start)."
+            )
+        if parsed > today:
+            return f"Date must be on or before today ({today.isoformat()})."
+        return None
+
     def build_settings_schema(self):
+        today = datetime.today().strftime("%Y-%m-%d")
         return schema(
             section(
                 "Source",
@@ -62,6 +100,13 @@ class Wpotd(BasePlugin):
                     "customDate",
                     "date",
                     label="Date",
+                    default=today,
+                    min=_WPOTD_MIN_DATE.isoformat(),
+                    max=today,
+                    hint=(
+                        f"Wikipedia POTD archive runs from {_WPOTD_MIN_DATE.isoformat()} "
+                        "to today."
+                    ),
                     visible_if={"field": "randomizeWpotd", "equals": "false"},
                 ),
                 field(
