@@ -309,3 +309,24 @@ def test_plugin_order_missing_items(client, device_config_dev):
     resp = client.post("/api/plugin_order", json={"order": [plugins[0]["id"]]})
     assert resp.status_code == 400
     assert "include every plugin id exactly once" in resp.get_json()["error"].lower()
+
+
+def test_plugin_order_unknown_ids_not_reflected(client):
+    """Regression test for CodeQL py/reflective-xss at main.py:280.
+
+    User-supplied plugin IDs must not be echoed back in the error response,
+    even via JSON content type, so that a stray browser content-type sniff
+    cannot execute injected markup.
+    """
+    xss_payloads = [
+        "<script>alert(1)</script>",
+        '"><img src=x onerror=alert(1)>',
+        "<svg/onload=alert(1)>",
+        "javascript:alert(1)",
+    ]
+    for payload in xss_payloads:
+        resp = client.post("/api/plugin_order", json={"order": [payload]})
+        assert resp.status_code == 400
+        body_text = resp.get_data(as_text=True)
+        assert payload not in body_text, f"Payload reflected: {payload!r}"
+        assert resp.headers.get("Content-Type", "").startswith("application/json")
