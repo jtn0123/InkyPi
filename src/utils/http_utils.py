@@ -159,6 +159,28 @@ def json_success(
         return body, status
 
 
+def reissue_json_error(
+    error_response: tuple[FlaskResponse | dict[str, Any], int],
+    fallback_message: str,
+) -> tuple[FlaskResponse | dict[str, Any], int]:
+    """Rebuild an error response using a server-controlled message.
+
+    This preserves only the HTTP status and never reuses upstream payload
+    fields. The returned message is always server-controlled.
+    """
+    _, status = error_response
+    try:
+        safe_status = int(status)
+    except (TypeError, ValueError):
+        safe_status = 400
+    if safe_status < 400 or safe_status > 599:
+        safe_status = 400
+    return json_error(
+        fallback_message,
+        status=safe_status,
+    )
+
+
 def json_internal_error(
     context: str,
     *,

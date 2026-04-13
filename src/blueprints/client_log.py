@@ -19,7 +19,7 @@ from flask import Blueprint, Response
 
 from utils.client_endpoint import parse_client_report, strip_newlines
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error
+from utils.http_utils import json_error, reissue_json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ def receive_client_log() -> tuple[Response, int] | Response:
     """
     data, error = parse_client_report(_rate_limiter, _BODY_MAX)
     if error is not None:
-        return error
+        return reissue_json_error(error, "Invalid client log report")
 
     level = data.get("level", "")
     if level not in _ACCEPTED_LEVELS:

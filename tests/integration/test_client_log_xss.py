@@ -58,7 +58,8 @@ def test_invalid_level_not_reflected(client, payload: str) -> None:
     assert payload not in body
     # Response must declare JSON content-type (defence-in-depth).
     assert resp.content_type.startswith("application/json")
-    # The generic error message is still present for UX.
+    # The level validation message remains specific, but the tainted payload
+    # itself must never be reflected.
     parsed = json.loads(body)
     assert "Invalid level" in parsed.get("error", "")
 

@@ -368,7 +368,7 @@ def test_create_playlist_missing_name(client):
         "/create_playlist", json={"start_time": "06:00", "end_time": "09:00"}
     )
     assert resp.status_code == 400
-    assert "Playlist name is required" in resp.get_json().get("error", "")
+    assert resp.get_json().get("error") == "Invalid playlist request"
 
 
 def test_create_playlist_missing_times(client):
