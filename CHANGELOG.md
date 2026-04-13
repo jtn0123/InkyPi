@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v0.49.19 (2026-04-13)
+
+### Bug Fixes
+
+- **auth**: Close open-redirect by rebuilding next URL from validated parts (JTN-654)
+  ([#418](https://github.com/jtn0123/InkyPi/pull/418),
+  [`1e40f3f`](https://github.com/jtn0123/InkyPi/commit/1e40f3f708347a31baa1575e6adb9b39617e61d4))
+
+* fix(auth): close open-redirect by rebuilding next URL from validated parts (JTN-654)
+
+CodeQL py/url-redirection (#55, #56) flagged `src/blueprints/auth.py:69` and `:96` because
+  `_safe_next_url` previously returned the raw request string after a structural check — a
+  validate-then-reuse pattern that CodeQL's taint tracker does not follow through.
+
+Rewrite `_safe_next_url` so the returned value is reconstructed from validated structural
+  components: reject control chars / protocol-relative / backslash-authority up front, run the value
+  through `urlsplit`, then rebuild the path from `quote()`'d segments whose decoded form matches a
+  strict allow-list regex. Optional query string is independently validated before being appended.
+  The returned string has no taint-tracked data flow from the raw request attribute.
+
+Add 17 parameterized regression tests covering unsafe inputs, safe paths, and safe query-string
+  preservation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: sync uv.lock after rebase onto main
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.18 (2026-04-13)
 
 ### Bug Fixes
