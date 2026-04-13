@@ -19,7 +19,7 @@ from flask import Blueprint, Response
 
 from utils.client_endpoint import parse_client_report, strip_newlines
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error
+from utils.http_utils import json_error, reissue_json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)
@@ -47,19 +47,6 @@ def _cap(value: object, max_len: int) -> str:
     return str(value)[:max_len]
 
 
-def _reissue_json_error(error_response, fallback_message: str):
-    """Rebuild an error response with a server-controlled envelope."""
-    response, status = error_response
-    payload = response.get_json(silent=True) or {}
-    message = payload.get("error") or fallback_message
-    return json_error(
-        message,
-        status=status,
-        code=payload.get("code"),
-        details=payload.get("details"),
-    )
-
-
 @client_log_bp.route("/api/client-log", methods=["POST"])
 def receive_client_log() -> tuple[Response, int] | Response:
     """Accept a browser console.warn/error report and emit it as a WARNING log entry.
@@ -69,7 +56,7 @@ def receive_client_log() -> tuple[Response, int] | Response:
     """
     data, error = parse_client_report(_rate_limiter, _BODY_MAX)
     if error is not None:
-        return _reissue_json_error(error, "Invalid client log report")
+        return reissue_json_error(error, "Invalid client log report")
 
     level = data.get("level", "")
     if level not in _ACCEPTED_LEVELS:

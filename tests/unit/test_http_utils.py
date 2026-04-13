@@ -119,6 +119,7 @@ from src.utils.http_utils import (  # noqa: E402
     json_error,
     json_internal_error,
     json_success,
+    reissue_json_error,
     wants_json,
 )
 
@@ -180,6 +181,25 @@ class TestJsonError:
             data = response.get_json()
             assert data.get("error") == "oops"
             assert data.get("request_id") == "abc-123"
+
+    def test_reissue_json_error_uses_fallback_message(self, app):
+        """reissue_json_error should ignore upstream error text."""
+        with app.test_request_context("/"):
+            upstream, status = json_error(
+                "tainted upstream text",
+                status=422,
+                code="validation_error",
+                details={"field": "level"},
+            )
+            response, returned_status = reissue_json_error(
+                (upstream, status), "safe fallback message"
+            )
+
+            assert returned_status == 422
+            data = response.get_json()
+            assert data["error"] == "safe fallback message"
+            assert data["code"] == "validation_error"
+            assert data["details"] == {"field": "level"}
 
 
 def test_http_get_timeout_tuple_from_env(monkeypatch):

@@ -736,16 +736,13 @@ class TestPlaylistNameValidation:
         """Playlist name exceeding 64 characters should be rejected."""
         resp = _create_playlist(client, "A" * 65, "08:00", "12:00")
         assert resp.status_code == 400
-        assert "64" in resp.get_json()["error"]
+        assert resp.get_json()["error"] == "Invalid playlist request"
 
     def test_create_playlist_name_special_chars(self, client):
         """Playlist names containing script tags or path traversal should be rejected."""
         resp = _create_playlist(client, "<script>alert(1)</script>", "08:00", "12:00")
         assert resp.status_code == 400
-        assert (
-            "letters" in resp.get_json()["error"].lower()
-            or "alphanumeric" in resp.get_json()["error"].lower()
-        )
+        assert resp.get_json()["error"] == "Invalid playlist request"
 
         resp = _create_playlist(client, "../etc/passwd", "08:00", "12:00")
         assert resp.status_code == 400
