@@ -145,59 +145,60 @@ def image(plugin_id: str, filename: str):
         or "\x00" in filename
         or os.path.isabs(filename)
         or os.path.isabs(plugin_id)
+        or plugin_id in (".", "..")
     ):
         abort(404)
 
-    # Validate the plugin directory is inside PLUGINS_DIR via realpath +
-    # commonpath containment (handles .. and symlink escape).  The value
-    # passed forward is derived from os.listdir() rather than user input so
-    # CodeQL's py/path-injection taint flow stops here.
-    try:
-        real_plugin_dir = validate_file_path(
-            os.path.join(PLUGINS_DIR, plugin_id), PLUGINS_DIR
-        )
-    except ValueError:
+    # Resolve every path segment by scanning a server-owned directory with
+    # os.listdir() and matching against the user-supplied string.  The
+    # eventual path passed to send_from_directory is built entirely from
+    # os.listdir() output, not from request input, which keeps CodeQL's
+    # py/path-injection taint flow from reaching the filesystem call.
+    segments = [s for s in filename.replace("\\", "/").split("/") if s]
+    if not segments or any(s in (".", "..") for s in segments):
+        abort(404)
+
+    def _match_listdir(directory: str, wanted: str) -> str | None:
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            return None
+        for entry in entries:
+            if entry == wanted:
+                return entry  # returned value is from os.listdir, not user input
+        return None
+
+    # Resolve plugin_id against PLUGINS_DIR contents.
+    plugin_dirname = _match_listdir(PLUGINS_DIR, plugin_id)
+    if plugin_dirname is None:
         logger.warning(
-            "plugin.image: rejected plugin_id outside PLUGINS_DIR plugin_id=%s",
+            "plugin.image: unknown plugin_id=%s",
             sanitize_log_field(plugin_id),
         )
         abort(404)
 
-    if not os.path.isdir(real_plugin_dir):
-        abort(404)
-
-    # Walk the requested filename one segment at a time, matching each
-    # segment against the real directory listing.  The resulting path is
-    # rebuilt from os.listdir() output so the value handed to
-    # send_from_directory does not carry a py/path-injection taint flow.
-    segments = [s for s in filename.replace("\\", "/").split("/") if s]
-    if not segments or any(s in ("", ".", "..") for s in segments):
-        abort(404)
-
+    # Build the directory path from the listdir-derived name.
+    cursor = os.path.join(PLUGINS_DIR, plugin_dirname)
     resolved_parts: list[str] = []
-    cursor = real_plugin_dir
     for segment in segments:
-        try:
-            entries = os.listdir(cursor)
-        except OSError:
-            abort(404)
-        match = next((e for e in entries if e == segment), None)
+        match = _match_listdir(cursor, segment)
         if match is None:
             abort(404)
         resolved_parts.append(match)
         cursor = os.path.join(cursor, match)
 
-    # Final containment check against symlinked entries.
+    # Defence-in-depth: reject any symlink entry that escapes PLUGINS_DIR.
     try:
-        validate_file_path(cursor, real_plugin_dir)
+        validate_file_path(cursor, PLUGINS_DIR)
     except ValueError:
         abort(404)
 
     if not os.path.isfile(cursor):
         abort(404)
 
+    safe_dir = os.path.join(PLUGINS_DIR, plugin_dirname)
     safe_name = os.path.join(*resolved_parts)
-    resp = send_from_directory(real_plugin_dir, safe_name)
+    resp = send_from_directory(safe_dir, safe_name)
     try:
         ttl = int(os.getenv("INKYPI_STATIC_PLUGIN_ASSET_TTL_S", "300") or "300")
     except Exception:
