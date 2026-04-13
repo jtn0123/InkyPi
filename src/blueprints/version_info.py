@@ -23,6 +23,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify
 
+from schemas.responses import UptimeResponse, VersionInfoResponse
+
 version_info_bp = Blueprint("version_info", __name__)
 
 # ---------------------------------------------------------------------------
@@ -113,15 +115,14 @@ def api_version_info():
     environments where git is not installed or the repo history is unavailable
     (e.g. Docker images built without .git).
     """
-    return jsonify(
-        {
-            "version": _APP_VERSION,
-            "git_sha": _GIT_SHA,
-            "git_branch": _GIT_BRANCH,
-            "build_time": _BUILD_TIME,
-            "python_version": _PYTHON_VERSION,
-        }
-    )
+    payload: VersionInfoResponse = {
+        "version": _APP_VERSION,
+        "git_sha": _GIT_SHA,
+        "git_branch": _GIT_BRANCH,
+        "build_time": _BUILD_TIME,
+        "python_version": _PYTHON_VERSION,
+    }
+    return jsonify(payload)
 
 
 def _system_uptime_seconds() -> int | None:
@@ -140,10 +141,9 @@ def _system_uptime_seconds() -> int | None:
 def api_uptime():
     """Return process and system uptime information."""
     process_uptime = time.monotonic() - _PROCESS_START_TIME
-    return jsonify(
-        {
-            "process_uptime_seconds": process_uptime,
-            "system_uptime_seconds": _system_uptime_seconds(),
-            "process_started_at": _PROCESS_START_DATETIME.isoformat(),
-        }
-    )
+    payload: UptimeResponse = {
+        "process_uptime_seconds": process_uptime,
+        "system_uptime_seconds": _system_uptime_seconds(),
+        "process_started_at": _PROCESS_START_DATETIME.isoformat(),
+    }
+    return jsonify(payload)

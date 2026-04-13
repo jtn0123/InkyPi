@@ -19,6 +19,7 @@ import logging
 
 from flask import Blueprint, current_app, jsonify
 
+from schemas.responses import RefreshStatsResponse
 from utils.http_utils import json_error
 from utils.refresh_stats import compute_stats
 
@@ -38,7 +39,7 @@ def refresh_stats():
     history_dir: str = getattr(device_config, "history_image_dir", "")
 
     try:
-        payload = {
+        payload: RefreshStatsResponse = {
             "last_1h": compute_stats(history_dir, _WINDOW_1H),
             "last_24h": compute_stats(history_dir, _WINDOW_24H),
             "last_7d": compute_stats(history_dir, _WINDOW_7D),
