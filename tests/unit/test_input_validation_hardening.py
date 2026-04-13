@@ -17,6 +17,8 @@ import json
 import subprocess
 from unittest.mock import MagicMock
 
+from blueprints.apikeys import API_KEY_VALIDATION_ERROR
+
 # ---------------------------------------------------------------------------
 # JTN-134: API key save endpoint input validation
 # ---------------------------------------------------------------------------
@@ -36,7 +38,7 @@ class TestApiKeySaveValidation:
         assert resp.status_code == 400
         data = resp.get_json()
         assert data["success"] is False
-        assert data["error"]
+        assert data["error"] == API_KEY_VALIDATION_ERROR
 
     def test_non_dict_entry_returns_400(self, client, tmp_path, monkeypatch):
         env_path = tmp_path / "test.env"
