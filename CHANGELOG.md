@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.49.16 (2026-04-13)
+
+### Chores
+
+- **lockfile**: Sync uv.lock after main merge
+  ([`8b85e4a`](https://github.com/jtn0123/InkyPi/commit/8b85e4af18e0f568555efc465950821fa1dd831a))
+
+
 ## v0.49.15 (2026-04-12)
 
 ### Bug Fixes
@@ -125,6 +133,23 @@ Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 ## v0.49.12 (2026-04-12)
 
 ### Bug Fixes
+
+- **a11y**: Wire Escape + focus management into settings reboot/shutdown modals (JTN-652)
+  ([`a6ef079`](https://github.com/jtn0123/InkyPi/commit/a6ef079f6862e4115ea1d613e4ca2d907a9db2b7))
+
+Sibling of JTN-461/463 in a different code path. The reboot and shutdown confirmation modals added
+  in JTN-621 skipped the modal-a11y pattern used everywhere else in the app: Escape did nothing,
+  focus never moved into the modal on open, never returned to the trigger on close, and the is-open
+  class + body.modal-open backdrop lock were never applied.
+
+This aligns the /settings device-action modals with the scheduleModal, playlist modals, image
+  lightbox, and history modals — so users can actually cancel a destructive action with the
+  keyboard.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **deps**: Refresh uv lockfile
+  ([`a6668a9`](https://github.com/jtn0123/InkyPi/commit/a6668a9d8b3d1120848a2bfe50f9fab87ec0f878))
 
 - **history**: Polish pass — source fallback, metric tooltip, danger zone
   ([#409](https://github.com/jtn0123/InkyPi/pull/409),
