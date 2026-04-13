@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v0.49.20 (2026-04-13)
+
+### Bug Fixes
+
+- **ui**: Add Plugins breadcrumb level and plugin chip context (JTN-637, JTN-638)
+  ([#406](https://github.com/jtn0123/InkyPi/pull/406),
+  [`64b8f23`](https://github.com/jtn0123/InkyPi/commit/64b8f23207cd6efb4f43109e51c75a89180a00a8))
+
+* fix(ui): add Plugins breadcrumb level and plugin chip context (JTN-637, JTN-638)
+
+- Plugin page breadcrumb now includes an intermediate "Plugins" link back to the home page plugin
+  grid (#plugins-grid anchor), so users can jump between plugins without reaching for the browser
+  back button. - Home page "now showing" chip now renders as "Showing: <plugin>" with a "Currently
+  displayed plugin" tooltip, giving first-time users context for an otherwise bare plugin-name chip.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(lockfile): sync uv.lock after rebase on main
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.19 (2026-04-13)
 
 ### Bug Fixes
