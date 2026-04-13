@@ -14,7 +14,8 @@ fi
 # Track failures
 RUFF_EXIT=0
 BLACK_EXIT=0
-MYPY_EXIT=0
+MYPY_SRC_EXIT=0
+MYPY_TESTS_EXIT=0
 MYPY_STRICT_EXIT=0
 SHELLCHECK_EXIT=0
 
@@ -36,13 +37,41 @@ else
     echo "✅ Black formatting check passed"
 fi
 
-echo "Running mypy type checker (advisory — whole codebase)..."
-mypy src tests
-MYPY_EXIT=$?
-if [ $MYPY_EXIT -ne 0 ]; then
-    echo "⚠️  mypy: advisory only (except strict subset) — $MYPY_EXIT issue(s) found"
+# Advisory mypy is split into two passes (src/ and tests/) so that
+# production-code type drift stays visible even when test-only typing
+# noise dominates. Both passes are non-blocking; only the strict subset
+# below is CI-blocking. See docs/typing.md.
+count_mypy_errors() {
+    # Parse "Found N errors" / "Success: ..." lines from captured output.
+    local output="$1"
+    local n
+    n=$(printf '%s\n' "$output" | grep -Eo 'Found [0-9]+ error' | grep -Eo '[0-9]+' | tail -1)
+    if [ -z "$n" ]; then
+        n=0
+    fi
+    echo "$n"
+}
+
+echo "Running mypy type checker (advisory — src/ only)..."
+MYPY_SRC_OUTPUT="$(mypy src 2>&1)"
+MYPY_SRC_EXIT=$?
+echo "$MYPY_SRC_OUTPUT"
+MYPY_SRC_COUNT=$(count_mypy_errors "$MYPY_SRC_OUTPUT")
+if [ $MYPY_SRC_EXIT -ne 0 ]; then
+    echo "⚠️  mypy src/: advisory only — ${MYPY_SRC_COUNT} issue(s) found"
 else
-    echo "✅ mypy advisory type check passed"
+    echo "✅ mypy src/ advisory type check passed"
+fi
+
+echo "Running mypy type checker (advisory — tests/ only)..."
+MYPY_TESTS_OUTPUT="$(mypy tests 2>&1)"
+MYPY_TESTS_EXIT=$?
+echo "$MYPY_TESTS_OUTPUT"
+MYPY_TESTS_COUNT=$(count_mypy_errors "$MYPY_TESTS_OUTPUT")
+if [ $MYPY_TESTS_EXIT -ne 0 ]; then
+    echo "⚠️  mypy tests/: advisory only — ${MYPY_TESTS_COUNT} issue(s) found"
+else
+    echo "✅ mypy tests/ advisory type check passed"
 fi
 
 echo "Running mypy strict check (blocking — strict subset only)..."
@@ -114,7 +143,8 @@ else
     echo ""
     echo "✅ All checks passed!"
 fi
-[ $MYPY_EXIT -ne 0 ] && echo "⚠️  mypy: advisory only (except strict subset) — issues remain (non-blocking)"
+[ $MYPY_SRC_EXIT -ne 0 ] && echo "⚠️  mypy src/: advisory only — ${MYPY_SRC_COUNT} issue(s) remain (non-blocking)"
+[ $MYPY_TESTS_EXIT -ne 0 ] && echo "⚠️  mypy tests/: advisory only — ${MYPY_TESTS_COUNT} issue(s) remain (non-blocking)"
 
 if [ $RUFF_EXIT -ne 0 ] || [ $BLACK_EXIT -ne 0 ] || [ $MYPY_STRICT_EXIT -ne 0 ] || [ $SHELLCHECK_EXIT -ne 0 ]; then
     exit 1
