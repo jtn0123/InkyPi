@@ -808,29 +808,19 @@
             const loadThumb = async (img) => {
                 if (img.getAttribute('data-loaded') === '1') return;
                 const url = img.getAttribute('data-src');
-                if (!url) return;
-                // Validate URL is a safe same-origin relative path before assigning
-                // to img.src. Thumbnails are always served as site-relative paths
-                // (e.g. "/static/images/..."), so we reject anything else to close
-                // the js/xss-through-dom taint flow from DOM-sourced attribute.
-                let safeUrl;
-                try {
-                    const parsed = new URL(url, window.location.origin);
-                    if (parsed.origin === window.location.origin &&
-                        (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
-                        safeUrl = parsed.pathname + parsed.search;
-                    }
-                } catch(_) { /* invalid URL — leave safeUrl undefined */ }
-                if (!safeUrl) {
+                // Strictly allow only site-relative thumbnail paths under /static/
+                // with a whitelisted character set. Rejects anything DOM-sourced
+                // that could flow into the img.src sink (js/xss-through-dom).
+                if (!url || !/^\/static\/[A-Za-z0-9._\-/]+(\?[A-Za-z0-9._\-=&%]*)?$/.test(url)) {
                     img.style.display = 'none';
                     const sk0 = img.previousElementSibling; if (sk0) sk0.style.display = 'none';
                     img.setAttribute('data-loaded', '1');
                     return;
                 }
                 try {
-                    const resp = await fetch(safeUrl, { method: 'HEAD' });
+                    const resp = await fetch(url, { method: 'HEAD' });
                     if (resp.ok) {
-                        img.src = safeUrl;
+                        img.src = url;
                         img.style.display = '';
                         img.setAttribute('data-loaded', '1');
                     } else {
