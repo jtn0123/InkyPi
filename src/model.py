@@ -510,7 +510,7 @@ class PluginInstance:
     # Only these attributes may be modified via update().  plugin_id is
     # intentionally excluded — it is an immutable identity field and must not
     # be overwritten by user-supplied data.
-    _UPDATABLE: frozenset = frozenset(
+    _UPDATABLE: frozenset[str] = frozenset(
         {
             "name",
             "settings",
@@ -523,17 +523,17 @@ class PluginInstance:
 
     def __init__(
         self,
-        plugin_id,
-        name,
-        settings,
-        refresh,
-        latest_refresh_time=None,
-        only_show_when_fresh=False,
-        snooze_until=None,
-        consecutive_failure_count=0,
-        paused=False,
+        plugin_id: str,
+        name: str,
+        settings: dict[str, Any],
+        refresh: dict[str, Any],
+        latest_refresh_time: str | None = None,
+        only_show_when_fresh: bool = False,
+        snooze_until: str | None = None,
+        consecutive_failure_count: int = 0,
+        paused: bool = False,
         disabled_reason: str | None = None,
-    ):
+    ) -> None:
         self.plugin_id = plugin_id
         self.name = name
         self.settings = settings
@@ -545,7 +545,7 @@ class PluginInstance:
         self.paused = paused
         self.disabled_reason = disabled_reason
 
-    def update(self, updated_data):
+    def update(self, updated_data: dict[str, Any]) -> None:
         """Update attributes of the class with the dictionary values.
 
         Only keys present in ``_UPDATABLE`` are applied; unknown keys are
@@ -577,7 +577,9 @@ class PluginInstance:
 
         # Check for scheduled refresh (HH:MM format)
         if "scheduled" in self.refresh:
-            scheduled_time_str = self.refresh.get("scheduled")
+            # Key presence was just checked above; indexing preserves prior
+            # behavior while giving mypy an Any (vs Any | None from .get()).
+            scheduled_time_str = self.refresh["scheduled"]
             try:
                 # Parsing HH:MM into a time-of-day; no date/tz context is needed.
                 scheduled_time = datetime.strptime(  # noqa: DTZ007
@@ -648,19 +650,19 @@ class PluginInstance:
             )
             return True
 
-    def get_image_path(self):
+    def get_image_path(self) -> str:
         """Formats the image path for this plugin instance."""
         return f"{self.plugin_id}_{self.name.replace(' ', '_')}.png"
 
-    def get_latest_refresh_dt(self):
+    def get_latest_refresh_dt(self) -> datetime | None:
         """Returns the latest refresh time as a datetime object, or None if not set."""
         latest_refresh = None
         if self.latest_refresh_time:
             latest_refresh = datetime.fromisoformat(self.latest_refresh_time)
         return latest_refresh
 
-    def to_dict(self):
-        d = {
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
             "plugin_id": self.plugin_id,
             "name": self.name,
             "plugin_settings": self.settings,
@@ -676,7 +678,7 @@ class PluginInstance:
         return d
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> "PluginInstance":
         return cls(
             plugin_id=data["plugin_id"],
             name=data["name"],
