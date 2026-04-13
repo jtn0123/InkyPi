@@ -1,6 +1,87 @@
 # CHANGELOG
 
 
+## v0.49.16 (2026-04-13)
+
+### Chores
+
+- **lockfile**: Sync uv.lock after main merge
+  ([`8b85e4a`](https://github.com/jtn0123/InkyPi/commit/8b85e4af18e0f568555efc465950821fa1dd831a))
+
+
+## v0.49.15 (2026-04-12)
+
+### Bug Fixes
+
+- **plugin**: Use app-level toast for Update Preview validation errors (JTN-648)
+  ([`ecc5e06`](https://github.com/jtn0123/InkyPi/commit/ecc5e06a444b1b731646745bbba5868efffcbb0d))
+
+Empty required fields on Image URL and RSS Feed plugin pages showed the browser's native HTML5
+  tooltip instead of the labelled app toast that JTN-378 introduced for Save Settings / Add to
+  Playlist. Add `novalidate` to the settings form so the browser never surfaces its own bubble, and
+  route the form's implicit Enter-key submit through the same validateAllInputsDetailed /
+  buildValidationMessage / focusFirstInvalid helpers the Update Preview click path already uses.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **deps**: Sync uv.lock inkypi version bump
+  ([`e4962db`](https://github.com/jtn0123/InkyPi/commit/e4962dbcc738a2068cc4777d734e1c93bd7779ec))
+
+Pick up the 0.49.6 -> 0.49.11 version drift that accumulated on main so the "Lockfile drift check"
+  CI gate passes. No dependency changes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.14 (2026-04-12)
+
+### Bug Fixes
+
+- Sync uv lockfile
+  ([`7faaea3`](https://github.com/jtn0123/InkyPi/commit/7faaea3b39da206a4c00ccca498dee801cb9a47e))
+
+- **csp**: Drop redundant UnicodeDecodeError in except clause (JTN-653)
+  ([`4addf70`](https://github.com/jtn0123/InkyPi/commit/4addf7040846bc2536693e3256d757db5c5e0c75))
+
+SonarCloud python:S5713 on src/blueprints/csp_report.py:68 flagged the `except (ValueError,
+  UnicodeDecodeError)` tuple as redundant because UnicodeDecodeError is a subclass of ValueError and
+  is therefore already caught by the base branch.
+
+Drop UnicodeDecodeError from the tuple and leave a comment noting that non-UTF-8 payloads are still
+  covered via inheritance. No behavior change; all 18 CSP-report tests (including malformed-JSON
+  coverage) still pass.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Clarify Sonar suppression comment
+  ([`b82d0c0`](https://github.com/jtn0123/InkyPi/commit/b82d0c03f7fd2357b767c935a4ad5ed4e5d90dc7))
+
+- **security**: Rebuild redirect URL to close CodeQL open-redirect alert (JTN-317)
+  ([`5afe67f`](https://github.com/jtn0123/InkyPi/commit/5afe67f765b20f7e1c35d329443f8a09b07a99e7))
+
+Validate-then-reuse of request.full_path left CodeQL py/url-redirection alert #52 open even after
+  the host allow-list was added in PR #317: the taint flow from the untrusted Host header into
+  redirect() was still present because the final URL was built by f-string concatenation with
+  request.full_path.
+
+Rebuild the redirect target from individually validated components using urlunsplit: hard-coded
+  "https" scheme literal + allow-listed authority + re-quoted path + re-urlencoded query. This
+  breaks the taint flow and matches the repo's established fix pattern for this rule.
+
+Add regression tests covering: * path re-quoting (spaces survive as %20) * multi-value query
+  round-trip * spoofed "@evil.com/path" in the request path cannot shift the authority in the
+  Location header.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Chores
+
+- **lockfile**: Sync uv.lock with project version
+  ([`d74bb9e`](https://github.com/jtn0123/InkyPi/commit/d74bb9e9c68b1b55f8ebcc821287b6e38d9b3af5))
+
+
 ## v0.49.13 (2026-04-12)
 
 ### Bug Fixes
@@ -52,6 +133,23 @@ Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 ## v0.49.12 (2026-04-12)
 
 ### Bug Fixes
+
+- **a11y**: Wire Escape + focus management into settings reboot/shutdown modals (JTN-652)
+  ([`a6ef079`](https://github.com/jtn0123/InkyPi/commit/a6ef079f6862e4115ea1d613e4ca2d907a9db2b7))
+
+Sibling of JTN-461/463 in a different code path. The reboot and shutdown confirmation modals added
+  in JTN-621 skipped the modal-a11y pattern used everywhere else in the app: Escape did nothing,
+  focus never moved into the modal on open, never returned to the trigger on close, and the is-open
+  class + body.modal-open backdrop lock were never applied.
+
+This aligns the /settings device-action modals with the scheduleModal, playlist modals, image
+  lightbox, and history modals — so users can actually cancel a destructive action with the
+  keyboard.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **deps**: Refresh uv lockfile
+  ([`a6668a9`](https://github.com/jtn0123/InkyPi/commit/a6668a9d8b3d1120848a2bfe50f9fab87ec0f878))
 
 - **history**: Polish pass — source fallback, metric tooltip, danger zone
   ([#409](https://github.com/jtn0123/InkyPi/pull/409),

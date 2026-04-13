@@ -225,27 +225,61 @@
       }
     }
 
-    function setDeviceActionModalOpen(modalId, open) {
+    // JTN-652: Track the element that triggered the most-recently opened
+    // confirmation modal so focus can be restored when the modal closes
+    // (WAI-ARIA best practice — sibling of JTN-461/463 for the plugin page
+    // scheduleModal).
+    let _lastDeviceActionTrigger = null;
+
+    function setDeviceActionModalOpen(modalId, open, triggerEl) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
+      if (open && triggerEl) _lastDeviceActionTrigger = triggerEl;
       modal.hidden = !open;
-      modal.style.display = open ? "block" : "none";
+      modal.style.display = open ? "flex" : "none";
+      modal.classList.toggle("is-open", !!open);
+      // Keep body.modal-open in sync so backdrop/scroll-lock CSS fires.
+      const ui = globalThis.InkyPiUI;
+      if (ui?.syncModalOpenState) {
+        ui.syncModalOpenState();
+      } else {
+        const anyOpen = document.querySelector(".modal.is-open");
+        document.body.classList.toggle("modal-open", !!anyOpen);
+      }
+      if (open) {
+        // JTN-652: move focus into the modal on open so keyboard + screen
+        // reader users land somewhere inside the dialog.
+        const focusable = modal.querySelector(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable) setTimeout(() => focusable.focus(), 0);
+      } else if (_lastDeviceActionTrigger) {
+        // JTN-652: restore focus to the trigger so the user is returned to
+        // the button they came from rather than being dumped on <body>.
+        try { _lastDeviceActionTrigger.focus(); } catch (_e) { /* ignore */ }
+        _lastDeviceActionTrigger = null;
+      }
     }
 
-    function openRebootConfirm() {
-      setDeviceActionModalOpen("rebootConfirmModal", true);
+    function openRebootConfirm(event) {
+      setDeviceActionModalOpen("rebootConfirmModal", true, event?.currentTarget);
     }
 
     function closeRebootConfirm() {
       setDeviceActionModalOpen("rebootConfirmModal", false);
     }
 
-    function openShutdownConfirm() {
-      setDeviceActionModalOpen("shutdownConfirmModal", true);
+    function openShutdownConfirm(event) {
+      setDeviceActionModalOpen("shutdownConfirmModal", true, event?.currentTarget);
     }
 
     function closeShutdownConfirm() {
       setDeviceActionModalOpen("shutdownConfirmModal", false);
+    }
+
+    function isDeviceActionModalOpen(modalId) {
+      const modal = document.getElementById(modalId);
+      return !!(modal && !modal.hidden);
     }
 
     async function handleShutdown(reboot) {
@@ -1188,6 +1222,27 @@
       document.getElementById("confirmShutdownBtn")?.addEventListener("click", () => handleShutdown(false));
       document.getElementById("cancelShutdownBtn")?.addEventListener("click", closeShutdownConfirm);
       document.getElementById("closeShutdownConfirmModalBtn")?.addEventListener("click", closeShutdownConfirm);
+      // JTN-652: Escape + backdrop-click dismissal for the reboot / shutdown
+      // confirmation modals — parity with every other modal in the app
+      // (scheduleModal JTN-461, playlist modals, image lightbox, history
+      // modals). Without this the only way to cancel a destructive action
+      // via keyboard was to tab to the Cancel button.
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (isDeviceActionModalOpen("rebootConfirmModal")) {
+          event.preventDefault();
+          closeRebootConfirm();
+        } else if (isDeviceActionModalOpen("shutdownConfirmModal")) {
+          event.preventDefault();
+          closeShutdownConfirm();
+        }
+      });
+      globalThis.addEventListener("click", (event) => {
+        const rebootModal = document.getElementById("rebootConfirmModal");
+        const shutdownModal = document.getElementById("shutdownConfirmModal");
+        if (event.target === rebootModal) closeRebootConfirm();
+        else if (event.target === shutdownModal) closeShutdownConfirm();
+      });
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);
       });
