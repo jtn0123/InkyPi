@@ -891,6 +891,55 @@ def test_htmx_partial_is_not_full_page(client, device_config_dev):
     assert "history-grid-container" in body, "Partial must contain the grid container"
 
 
+def test_history_source_hides_auto_generated_instance_key(client, device_config_dev):
+    """JTN-619: History source row must not expose {plugin_id}_saved_settings."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20260408_194643.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    sidecar = {
+        "refresh_type": "Playlist",
+        "plugin_id": "weather",
+        "playlist": "Default",
+        "plugin_instance": "weather_saved_settings",
+    }
+    with open(
+        os.path.join(d, "display_20260408_194643.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump(sidecar, fh)
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "Source:" in text
+    assert "weather" in text
+    # The internal key must not leak into the rendered Source cell.
+    assert "weather_saved_settings" not in text
+
+
+def test_history_source_preserves_user_instance_name(client, device_config_dev):
+    """User-chosen instance names continue to appear in the Source row."""
+    d = device_config_dev.history_image_dir
+    os.makedirs(d, exist_ok=True)
+    fname = "display_20260408_194700.png"
+    Image.new("RGB", (10, 10), "white").save(os.path.join(d, fname))
+    sidecar = {
+        "refresh_type": "Playlist",
+        "plugin_id": "weather",
+        "playlist": "Default",
+        "plugin_instance": "Morning Weather",
+    }
+    with open(
+        os.path.join(d, "display_20260408_194700.json"), "w", encoding="utf-8"
+    ) as fh:
+        json.dump(sidecar, fh)
+
+    resp = client.get("/history")
+    assert resp.status_code == 200
+    text = resp.get_data(as_text=True)
+    assert "Morning Weather" in text
+
+
 def test_history_pagination_previous_disabled_has_disabled_class(
     client, device_config_dev
 ):

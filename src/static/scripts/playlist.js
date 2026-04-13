@@ -181,12 +181,20 @@
         setPlaylistExpanded(item, willExpand);
     }
 
-    function showThumbnailPreview(playlistName, pluginId, pluginName, instanceName) {
+    function showThumbnailPreview(playlistName, pluginId, pluginName, instanceName, instanceLabel) {
         const img = document.getElementById('thumbnailPreviewImage');
         const info = document.getElementById('thumbnailPreviewInfo');
         if (!img || !info) return;
         img.src = `/plugin_instance_image/${encodeURIComponent(playlistName)}/${encodeURIComponent(pluginId)}/${encodeURIComponent(instanceName)}`;
-        info.textContent = `Plugin: ${pluginName} | Instance: ${instanceName}`;
+        const label = instanceLabel || instanceName;
+        // Only include the instance segment when it differs from the plugin
+        // display name — avoids "Plugin: Weather | Instance: Weather" for
+        // auto-generated names that collapse to the plugin label (JTN-620).
+        if (label && label !== pluginName) {
+            info.textContent = `Plugin: ${pluginName} | Instance: ${label}`;
+        } else {
+            info.textContent = `Plugin: ${pluginName}`;
+        }
         setModalOpen('thumbnailPreviewModal', true);
     }
 
@@ -716,7 +724,13 @@
         document.querySelectorAll('.delete-instance-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const t = e.currentTarget;
-                openDeleteInstanceModal(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
+                openDeleteInstanceModal(
+                    t.getAttribute('data-playlist'),
+                    t.getAttribute('data-plugin-id'),
+                    t.getAttribute('data-instance'),
+                    t,
+                    t.getAttribute('data-instance-label') || t.getAttribute('data-instance'),
+                );
             });
         });
         document.querySelectorAll('.refresh-settings-btn').forEach(btn => {
@@ -750,7 +764,8 @@
                     t.getAttribute('data-thumbnail-playlist'),
                     t.getAttribute('data-thumbnail-plugin'),
                     t.getAttribute('data-thumbnail-display-name'),
-                    t.getAttribute('data-thumbnail-instance')
+                    t.getAttribute('data-thumbnail-instance'),
+                    t.getAttribute('data-thumbnail-instance-label')
                 );
             });
             box.addEventListener('keydown', (event) => {
@@ -969,12 +984,13 @@
     }
     function closeDeletePlaylistModal(){ setModalOpen('deletePlaylistModal', false); }
 
-    function openDeleteInstanceModal(playlistName, pluginId, instanceName, triggerEl){
+    function openDeleteInstanceModal(playlistName, pluginId, instanceName, triggerEl, instanceLabel){
         const el = document.getElementById('deleteInstanceModal');
         const txt = document.getElementById('deleteInstanceText');
         const btn = document.getElementById('confirmDeleteInstanceBtn');
         if (!el || !txt || !btn) return;
-        txt.textContent = `Delete instance '${instanceName}'?`;
+        const label = instanceLabel || instanceName;
+        txt.textContent = `Delete instance '${label}'?`;
         setModalOpen('deleteInstanceModal', true, triggerEl);
         btn.onclick = async function(){
             try{

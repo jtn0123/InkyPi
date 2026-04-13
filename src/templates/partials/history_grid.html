@@ -21,7 +21,11 @@
                         {{ img.meta.refresh_type or "Manual" }}
                         {%- if img.meta.plugin_id %} &bull; {{ img.meta.plugin_id }}{% endif %}
                         {%- if img.meta.playlist %} &bull; {{ img.meta.playlist }}{% endif %}
-                        {%- if img.meta.plugin_instance and img.meta.plugin_instance != img.meta.plugin_id %} &bull; {{ img.meta.plugin_instance }}{% endif %}
+                        {# Hide the instance segment when it's the auto-generated
+                           internal key ({plugin_id}_saved_settings) or equals the
+                           plugin_id itself — see JTN-619. #}
+                        {%- set hist_instance_suffix = img.meta.plugin_instance | instance_suffix_label(img.meta.plugin_id) %}
+                        {%- if hist_instance_suffix and hist_instance_suffix != img.meta.plugin_id %} &bull; {{ hist_instance_suffix }}{% endif %}
                     </span>
                 </div>
                 {% else %}
