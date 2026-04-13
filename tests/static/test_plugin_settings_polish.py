@@ -1,5 +1,6 @@
 """Tests for plugin settings UX polish (JTN-184, JTN-174, JTN-157, JTN-158, JTN-154)."""
 
+import re
 from pathlib import Path
 
 
@@ -14,10 +15,9 @@ def test_todo_remove_last_item_guarded():
 def test_calendar_repeater_has_descriptive_placeholder():
     """Calendar URL input should have a descriptive placeholder."""
     html = Path("src/templates/widgets/calendar_repeater.html").read_text()
-    # lgtm[py/incomplete-url-substring-sanitization] — not URL sanitization;
-    # asserting that a Jinja template's static placeholder contains an example
-    # hostname for UX. No URL is parsed or trusted here.
-    assert ".ics" in html or "calendar.google.com" in html
+    assert re.search(
+        r'placeholder="https://calendar\.google\.com/…/basic\.ics"', html
+    )
 
 
 def test_calendar_repeater_has_help_text():
