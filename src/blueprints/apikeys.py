@@ -25,6 +25,8 @@ _INTERNAL_KEYS: frozenset[str] = frozenset(
     }
 )
 
+API_KEY_VALIDATION_ERROR = "Invalid API key entry"
+
 
 # Path to .env file
 def get_env_path():
@@ -200,7 +202,7 @@ def save_apikeys():
         for entry in entries:
             key, value, err = _validate_api_key_entry(entry, existing_values)
             if err is not None:
-                return err
+                return json_error(API_KEY_VALIDATION_ERROR, status=400)
             if not key:
                 continue
             valid_entries.append((key, value))
