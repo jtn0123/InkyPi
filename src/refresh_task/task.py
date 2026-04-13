@@ -847,10 +847,10 @@ class RefreshTask:
                     raise exc
                 raise RuntimeError(str(exc))
             return metrics
-        else:
-            logger.warning(
-                "Background refresh task is not running, unable to do a manual update"
-            )
+        logger.warning(
+            "Background refresh task is not running, unable to do a manual update"
+        )
+        return None
 
     @staticmethod
     def _timeout_msg(plugin_id: str, timeout_s: float) -> str:

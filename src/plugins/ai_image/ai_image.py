@@ -237,8 +237,7 @@ class AIImage(BasePlugin):
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
         with Image.open(BytesIO(image_bytes)) as opened_img:
-            img = opened_img.copy()
-        return img
+            return opened_img.copy()
 
     def fetch_image_google(self, client, prompt, model):
         """Fetch image from Google Imagen API."""

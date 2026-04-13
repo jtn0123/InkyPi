@@ -156,7 +156,7 @@ class Wpotd(BasePlugin):
             start = datetime(2015, 1, 1, tzinfo=UTC)
             delta_days = (datetime.now(tz=UTC) - start).days
             return (start + timedelta(days=randint(0, delta_days))).date()
-        elif settings.get("customDate"):
+        if settings.get("customDate"):
             try:
                 # YYYY-MM-DD date input; the parsed date is returned as-is.
                 return datetime.strptime(  # noqa: DTZ007
@@ -275,6 +275,5 @@ class Wpotd(BasePlugin):
                 image, ((max_width - new_width) // 2, (max_height - new_height) // 2)
             )
             return new_image
-        else:
-            # If the image is already within bounds, return it as is
-            return image
+        # If the image is already within bounds, return it as is
+        return image

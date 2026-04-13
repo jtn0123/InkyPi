@@ -77,8 +77,7 @@ def _redact(text: str) -> str:
     # Pattern 1: key=value — keep key + separator, replace only the value.
     text = _SECRET_PATTERNS[1].sub(r"\1\2" + _REDACTED, text)
     # Pattern 2: bare 32+ hex strings.
-    text = _SECRET_PATTERNS[2].sub(_REDACTED, text)
-    return text
+    return _SECRET_PATTERNS[2].sub(_REDACTED, text)
 
 
 def redact_secrets(value: object) -> str:

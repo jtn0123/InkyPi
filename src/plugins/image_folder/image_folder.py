@@ -36,14 +36,12 @@ def list_files_in_folder(folder_path):
         ".heif",
         ".heic",
     )
-    image_files = [
+    return [
         os.path.join(root, f)
         for root, _dirs, files in os.walk(folder_path, followlinks=False)
         for f in files
         if f.lower().endswith(image_extensions) and not f.startswith(".")
     ]
-
-    return image_files
 
 
 class ImageFolder(BasePlugin):

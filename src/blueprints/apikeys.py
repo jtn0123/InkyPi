@@ -215,8 +215,7 @@ def save_apikeys():
             return json_success(
                 f"Saved {len(valid_entries)} API key(s). Some plugins may require restart to pick up changes."
             )
-        else:
-            return json_error("Failed to write .env file", status=500)
+        return json_error("Failed to write .env file", status=500)
 
     except Exception as e:
         logger.error(f"Error saving API keys: {e}")

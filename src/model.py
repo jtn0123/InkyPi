@@ -171,9 +171,7 @@ class PlaylistManager:
 
         # Sort playlists by priority
         active_playlists.sort(key=lambda p: p.get_priority())
-        playlist = active_playlists[0]
-
-        return playlist
+        return active_playlists[0]
 
     def get_playlist(self, playlist_name):
         """Returns the playlist with the specified name."""

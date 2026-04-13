@@ -79,20 +79,20 @@ def test_apod_success_via_client(mock_get_session, client):
                     }
 
             return ApiResponse()
-        else:  # Second call is to download the image
-            from io import BytesIO
+        # Second call is to download the image
+        from io import BytesIO
 
-            from PIL import Image
+        from PIL import Image
 
-            img = Image.new("RGB", (64, 64), "black")
-            buf = BytesIO()
-            img.save(buf, format="PNG")
+        img = Image.new("RGB", (64, 64), "black")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
 
-            class ImageResponse:
-                content = buf.getvalue()
-                status_code = 200
+        class ImageResponse:
+            content = buf.getvalue()
+            status_code = 200
 
-            return ImageResponse()
+        return ImageResponse()
 
     mock_session.get.side_effect = fake_get
 

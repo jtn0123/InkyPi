@@ -172,7 +172,7 @@ def test_ai_text_generate_image_orientation(
     def mock_get_config(key, default=None):
         if key == "orientation":
             return orientation
-        elif key == "resolution":
+        if key == "resolution":
             return resolution
         return default
 

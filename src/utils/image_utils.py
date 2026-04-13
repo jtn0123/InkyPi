@@ -62,8 +62,7 @@ def process_image_from_bytes(
     try:
         opener = image_open or Image.open
         with opener(BytesIO(content)) as _img:
-            result = processor(_img)
-            return result
+            return processor(_img)
     except (OSError, ValueError, TypeError) as e:
         logger.error(f"Failed to process image from bytes: {e}")
         return None
@@ -247,9 +246,7 @@ def apply_image_enhancement(img, image_settings=None):
     img = ImageEnhance.Color(img).enhance(image_settings.get("saturation", 1.0))
 
     # Apply Sharpness
-    img = ImageEnhance.Sharpness(img).enhance(image_settings.get("sharpness", 1.0))
-
-    return img
+    return ImageEnhance.Sharpness(img).enhance(image_settings.get("sharpness", 1.0))
 
 
 def pad_image_blur(img: Image, dimensions: tuple[int, int]) -> Image:

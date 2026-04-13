@@ -159,11 +159,9 @@ class AIText(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "ai_text.html", "ai_text.css", image_template_params
         )
-
-        return image
 
     @staticmethod
     def fetch_text_prompt(ai_client, model, text_prompt):

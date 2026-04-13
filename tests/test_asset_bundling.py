@@ -57,12 +57,11 @@ else:
 argv = {["--no-minify"] if not minify else []}
 ba.main(argv)
 """
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-c", env_code],
         capture_output=True,
         text=True,
     )
-    return result
 
 
 # ---------------------------------------------------------------------------

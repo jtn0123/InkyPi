@@ -38,8 +38,7 @@ def imdiff():
 
 def _solid_image(color: tuple, size: tuple = (10, 10)) -> Image.Image:
     """Create a solid-color RGBA image."""
-    img = Image.new("RGBA", size, color)
-    return img
+    return Image.new("RGBA", size, color)
 
 
 def _save_image(img: Image.Image, path: Path) -> Path:

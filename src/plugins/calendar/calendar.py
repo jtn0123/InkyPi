@@ -236,7 +236,7 @@ class Calendar(BasePlugin):
 
         if not view:
             raise RuntimeError("View is required")
-        elif view not in [
+        if view not in [
             "timeGridDay",
             "timeGridWeek",
             "dayGrid",

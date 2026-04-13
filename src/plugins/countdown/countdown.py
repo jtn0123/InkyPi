@@ -60,7 +60,6 @@ class Countdown(BasePlugin):
             "plugin_settings": settings,
         }
 
-        image = self.render_image(
+        return self.render_image(
             dimensions, "countdown.html", "countdown.css", template_params
         )
-        return image

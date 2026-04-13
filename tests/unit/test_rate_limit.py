@@ -196,7 +196,7 @@ def rate_limit_app():
             resp = make_response(body, code)
             resp.headers["Retry-After"] = "30"
             return resp
-        elif request.path in _REFRESH_PATHS and not refresh_b.try_acquire(addr):
+        if request.path in _REFRESH_PATHS and not refresh_b.try_acquire(addr):
             body, code = json_error(
                 "Refresh rate limit exceeded — try again later", status=429
             )

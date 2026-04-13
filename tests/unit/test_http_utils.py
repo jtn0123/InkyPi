@@ -127,8 +127,7 @@ from src.utils.http_utils import (  # noqa: E402
 @pytest.fixture
 def app():
     """Create a test Flask application."""
-    app = Flask(__name__)
-    return app
+    return Flask(__name__)
 
 
 class TestAPIError:

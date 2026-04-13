@@ -123,10 +123,7 @@ class AdaptiveImageLoader:
             return self._load_from_url_lowmem(
                 url, dimensions, timeout_ms, resize, headers
             )
-        else:
-            return self._load_from_url_fast(
-                url, dimensions, timeout_ms, resize, headers
-            )
+        return self._load_from_url_fast(url, dimensions, timeout_ms, resize, headers)
 
     def from_file(self, path, dimensions, resize=True):
         """
@@ -150,8 +147,7 @@ class AdaptiveImageLoader:
         try:
             if self.is_low_resource:
                 return self._load_from_file_lowmem(path, dimensions, resize)
-            else:
-                return self._load_from_file_fast(path, dimensions, resize)
+            return self._load_from_file_fast(path, dimensions, resize)
         except (OSError, ValueError, MemoryError) as e:
             logger.error(f"Error loading image from {path}: {e}")
             return None

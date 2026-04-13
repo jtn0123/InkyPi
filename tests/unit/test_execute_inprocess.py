@@ -18,8 +18,7 @@ from refresh_task import RefreshTask
 
 def _make_task(device_config_dev):
     dm = MagicMock()
-    task = RefreshTask(device_config_dev, dm)
-    return task
+    return RefreshTask(device_config_dev, dm)
 
 
 def _fake_action(plugin_id="test_plugin"):
