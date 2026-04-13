@@ -19,6 +19,7 @@ from werkzeug.exceptions import BadRequest
 
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.image_serving import maybe_serve_webp
+from utils.security_utils import validate_file_path
 from utils.time_utils import get_timezone, now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -141,12 +142,28 @@ def _list_history_images(
 
 
 def _resolve_history_path(history_dir: str, filename: str) -> str:
-    """Resolve a requested filename under history_dir and enforce containment."""
-    base_dir = os.path.abspath(history_dir)
-    candidate = os.path.abspath(os.path.join(base_dir, filename))
-    if os.path.commonpath([base_dir, candidate]) != base_dir:
+    """Resolve a requested filename under history_dir and enforce containment.
+
+    Uses :func:`utils.security_utils.validate_file_path`, which resolves both
+    the candidate and the allowed directory via ``os.path.realpath`` and
+    rejects any path that escapes the allowed directory (including traversal
+    attempts using ``..`` or absolute paths, and symlink-based escapes).
+
+    A :class:`ValueError` is raised on rejection.  Callers that also need to
+    reject embedded NUL bytes should do so before calling this helper; we
+    defensively raise here too since ``os.path`` behaviour on NUL varies.
+    """
+    if not isinstance(filename, str) or "\x00" in filename:
         raise ValueError(_ERR_INVALID_FILENAME)
-    return candidate
+    # Reject absolute paths up-front — joining them with ``history_dir``
+    # silently drops the base on POSIX, which would mask traversal intent.
+    if os.path.isabs(filename):
+        raise ValueError(_ERR_INVALID_FILENAME)
+    candidate = os.path.join(history_dir, filename)
+    try:
+        return validate_file_path(candidate, history_dir)
+    except ValueError as exc:
+        raise ValueError(_ERR_INVALID_FILENAME) from exc
 
 
 def _validate_and_resolve_history_file(history_dir, filename):
@@ -331,7 +348,7 @@ def history_delete():
         if err is not None:
             return err
 
-        base, ext = os.path.splitext(safe_path)
+        _base, ext = os.path.splitext(safe_path)
         if not ext.lower().endswith((_EXT_PNG, _EXT_JSON)):
             return json_error(
                 "unsupported file type",
@@ -340,15 +357,20 @@ def history_delete():
             )
 
         os.remove(safe_path)
-        # Remove matching sidecar on png/json deletions.
-        if ext.lower() == _EXT_PNG:
-            sidecar = f"{base}{_EXT_JSON}"
-            if os.path.exists(sidecar):
-                os.remove(sidecar)
-        elif ext.lower() == _EXT_JSON:
-            sidecar = f"{base}{_EXT_PNG}"
-            if os.path.exists(sidecar):
-                os.remove(sidecar)
+        # Remove matching sidecar on png/json deletions.  Re-derive the
+        # sidecar filename from the *validated* primary filename (via the
+        # containment-checking helper) so CodeQL sees a re-validated path
+        # rather than one derived from raw user input.
+        primary_stem, _primary_ext = os.path.splitext(os.path.basename(filename))
+        sidecar_ext = _EXT_JSON if ext.lower() == _EXT_PNG else _EXT_PNG
+        try:
+            sidecar_safe = _resolve_history_path(
+                history_dir, f"{primary_stem}{sidecar_ext}"
+            )
+        except ValueError:
+            sidecar_safe = None
+        if sidecar_safe is not None and os.path.isfile(sidecar_safe):
+            os.remove(sidecar_safe)
         return json_success("Deleted")
     except Exception:
         logger.exception("Error deleting history image")
