@@ -1,6 +1,123 @@
 # CHANGELOG
 
 
+## v0.49.19 (2026-04-13)
+
+### Bug Fixes
+
+- **auth**: Close open-redirect by rebuilding next URL from validated parts (JTN-654)
+  ([#418](https://github.com/jtn0123/InkyPi/pull/418),
+  [`1e40f3f`](https://github.com/jtn0123/InkyPi/commit/1e40f3f708347a31baa1575e6adb9b39617e61d4))
+
+* fix(auth): close open-redirect by rebuilding next URL from validated parts (JTN-654)
+
+CodeQL py/url-redirection (#55, #56) flagged `src/blueprints/auth.py:69` and `:96` because
+  `_safe_next_url` previously returned the raw request string after a structural check — a
+  validate-then-reuse pattern that CodeQL's taint tracker does not follow through.
+
+Rewrite `_safe_next_url` so the returned value is reconstructed from validated structural
+  components: reject control chars / protocol-relative / backslash-authority up front, run the value
+  through `urlsplit`, then rebuild the path from `quote()`'d segments whose decoded form matches a
+  strict allow-list regex. Optional query string is independently validated before being appended.
+  The returned string has no taint-tracked data flow from the raw request attribute.
+
+Add 17 parameterized regression tests covering unsafe inputs, safe paths, and safe query-string
+  preservation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: sync uv.lock after rebase onto main
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.18 (2026-04-13)
+
+### Bug Fixes
+
+- **plugin**: Validate WPOTD custom date range at save time (JTN-651)
+  ([#415](https://github.com/jtn0123/InkyPi/pull/415),
+  [`72b5325`](https://github.com/jtn0123/InkyPi/commit/72b5325093682945c1333271d1bc1b20564fa2ca))
+
+* fix(plugin): validate WPOTD custom date range at save time (JTN-651)
+
+The Wikipedia POTD plugin mirrored JTN-379's pre-fix APOD behavior: `customDate` had no `min`/`max`
+  attributes and no server-side `validate_settings` hook, so obviously out-of-range dates
+  (1900-01-01, 2099-12-31) were persisted with a success toast and only failed later when Wikipedia
+  returned no `Template:POTD/<date>`.
+
+Reject dates outside [2007-01-01, today] at save time and advertise the same window via `min`/`max`
+  on the date field.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(deps): refresh uv lock metadata
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **settings**: Validate timezone against IANA zones (JTN-650)
+  ([#414](https://github.com/jtn0123/InkyPi/pull/414),
+  [`efa956a`](https://github.com/jtn0123/InkyPi/commit/efa956aebc887fbaf31ba520de247dd8855843d9))
+
+* fix(settings): validate timezone against IANA zones on save (JTN-650)
+
+The Time Zone field on Settings → Device → Time & Locale previously only checked for presence. Any
+  non-empty string (e.g. "NotATimezone") would persist to device.json, producing a misleading
+  success toast and silently breaking downstream ZoneInfo lookups.
+
+Now we validate timezoneName against zoneinfo.available_timezones() — the same set used to populate
+  the input's datalist — and return a 422 validation_error with field=timezoneName when it fails, so
+  the existing inline-field-error UI surfaces the issue next to the input.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: sync uv lockfile
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.49.17 (2026-04-13)
+
+### Bug Fixes
+
+- **a11y**: Use human-readable timestamps in history aria-labels (JTN-642)
+  ([#390](https://github.com/jtn0123/InkyPi/pull/390),
+  [`65829b2`](https://github.com/jtn0123/InkyPi/commit/65829b21a8012695c491e5d9853cf09664ea5f33))
+
+* fix(a11y): use human-readable timestamps in history aria-labels (JTN-642)
+
+History action buttons (Display / Download / Delete) and thumbnail preview links previously
+  announced the raw timestamp-based filename (e.g. "Delete display_20260408_200114.png"). Screen
+  reader users had to hear that string 20+ times per page.
+
+Swap the filename for the already-computed `img.mtime_str` (e.g. "Apr 08, 2026 08:01 PM") in each
+  aria-label and the thumbnail img alt, so announcements read "Delete image from Apr 08, 2026 08:01
+  PM". Filename is still available as the visible `history-name` text and the element `title`/`id`,
+  so nothing functional changes.
+
+Updated the existing aria-label integration test to assert the new human-readable prefix and
+  explicitly reject the old filename-based labels.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(a11y): drop redundant "image" from history thumb alt (JTN-642)
+
+Sonar S6851: img alt already implies image, so "History image from …" becomes "History from …" to
+  avoid redundancy while retaining the human-readable timestamp.
+
+* test(history): harden aria-label assertions for filenames
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.16 (2026-04-13)
 
 ### Chores
