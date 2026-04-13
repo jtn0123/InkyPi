@@ -108,6 +108,10 @@ def test_main_css_contains_workflow_and_management_shells(client):
     assert ".settings-console-layout" in css_content
     assert ".settings-side-nav" in css_content
     assert ".danger-zone" in css_content
+    # JTN-649 — history danger zone has a divider + label + unknown-source style
+    assert ".danger-zone-divider" in css_content
+    assert ".danger-zone-label" in css_content
+    assert ".history-source-unknown" in css_content
     assert ".playlist-toggle-button" in css_content
     assert ".modal-sheet" in css_content
     assert "body.modal-open" in css_content

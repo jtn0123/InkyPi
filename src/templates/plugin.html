@@ -95,7 +95,7 @@
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="workflow-layout" data-workflow-layout>
         <section class="workflow-main-panel" data-workflow-panel="configure">
-        <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}">
+        <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}" novalidate>
             <div class="settings-container">
                 <div class="workflow-section-header">
                     <h2>Configuration</h2>
