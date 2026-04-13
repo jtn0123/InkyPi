@@ -357,16 +357,17 @@ def history_delete():
             )
 
         os.remove(safe_path)
-        # Remove matching sidecar on png/json deletions.  Re-derive the
-        # sidecar filename from the *validated* primary filename (via the
-        # containment-checking helper) so CodeQL sees a re-validated path
-        # rather than one derived from raw user input.
-        primary_stem, _primary_ext = os.path.splitext(os.path.basename(filename))
+        # Remove matching sidecar on png/json deletions.  Pass the candidate
+        # sidecar path *directly* through ``validate_file_path`` so that
+        # CodeQL recognises the sanitiser and rejects any resolved location
+        # that escapes the history directory.
         sidecar_ext = _EXT_JSON if ext.lower() == _EXT_PNG else _EXT_PNG
+        candidate_sidecar = os.path.join(
+            os.path.dirname(safe_path),
+            os.path.basename(os.path.splitext(safe_path)[0]) + sidecar_ext,
+        )
         try:
-            sidecar_safe = _resolve_history_path(
-                history_dir, f"{primary_stem}{sidecar_ext}"
-            )
+            sidecar_safe = validate_file_path(candidate_sidecar, history_dir)
         except ValueError:
             sidecar_safe = None
         if sidecar_safe is not None and os.path.isfile(sidecar_safe):
