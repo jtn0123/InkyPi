@@ -184,7 +184,7 @@ class TestJsonError:
 
     def test_reissue_json_error_uses_fallback_message(self, app):
         """reissue_json_error should ignore upstream error text."""
-        with app.test_request_context("/"):
+        with app.app_context():
             upstream, status = json_error(
                 "tainted upstream text",
                 status=422,
@@ -198,8 +198,8 @@ class TestJsonError:
             assert returned_status == 422
             data = response.get_json()
             assert data["error"] == "safe fallback message"
-            assert data["code"] == "validation_error"
-            assert data["details"] == {"field": "level"}
+            assert "code" not in data
+            assert "details" not in data
 
 
 def test_http_get_timeout_tuple_from_env(monkeypatch):
