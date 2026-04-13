@@ -120,5 +120,9 @@ upload_to_pypi = false
 # build_command) avoids relying on shell {version} expansion, which PSR does
 # NOT perform — the previous `echo '{version}'` wrote the literal placeholder
 # into VERSION on every release.
-assets = ["VERSION"]
-build_command = "printf '%s\\n' \"$NEW_VERSION\" > VERSION"
+assets = ["VERSION", "uv.lock"]
+# Regenerate VERSION from the canonical pyproject.toml value AND refresh uv.lock
+# so the inkypi package version in the lockfile tracks the release bump.
+# Without `uv lock`, the lockfile drifts from pyproject.toml and the "Lockfile
+# drift" CI check fails on every new PR (see JTN-655).
+build_command = "printf '%s\\n' \"$NEW_VERSION\" > VERSION && uv lock"
