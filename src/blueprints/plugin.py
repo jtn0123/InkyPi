@@ -28,6 +28,7 @@ from utils.http_utils import APIError, json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
+from utils.security_utils import validate_file_path
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -137,16 +138,73 @@ def plugin_page(plugin_id: str):
 
 @plugin_bp.route("/images/<plugin_id>/<path:filename>", methods=["GET"])
 def image(plugin_id: str, filename: str):
-    # send_from_directory handles path traversal protection internally
-    plugin_dir = os.path.abspath(os.path.join(PLUGINS_DIR, plugin_id))
-    resp = send_from_directory(plugin_dir, filename)
+    # Reject null-byte / absolute path inputs up front (defence in depth).
+    if (
+        not plugin_id
+        or "\x00" in plugin_id
+        or "\x00" in filename
+        or os.path.isabs(filename)
+        or os.path.isabs(plugin_id)
+        or plugin_id in (".", "..")
+    ):
+        abort(404)
+
+    # Resolve every path segment by scanning a server-owned directory with
+    # os.listdir() and matching against the user-supplied string.  The
+    # eventual path passed to send_from_directory is built entirely from
+    # os.listdir() output, not from request input, which keeps CodeQL's
+    # py/path-injection taint flow from reaching the filesystem call.
+    segments = [s for s in filename.replace("\\", "/").split("/") if s]
+    if not segments or any(s in (".", "..") for s in segments):
+        abort(404)
+
+    def _match_listdir(directory: str, wanted: str) -> str | None:
+        try:
+            entries = os.listdir(directory)
+        except OSError:
+            return None
+        for entry in entries:
+            if entry == wanted:
+                return entry  # returned value is from os.listdir, not user input
+        return None
+
+    # Resolve plugin_id against PLUGINS_DIR contents.
+    plugin_dirname = _match_listdir(PLUGINS_DIR, plugin_id)
+    if plugin_dirname is None:
+        logger.warning(
+            "plugin.image: unknown plugin_id=%s",
+            sanitize_log_field(plugin_id),
+        )
+        abort(404)
+
+    # Build the directory path from the listdir-derived name.
+    cursor = os.path.join(PLUGINS_DIR, plugin_dirname)
+    resolved_parts: list[str] = []
+    for segment in segments:
+        match = _match_listdir(cursor, segment)
+        if match is None:
+            abort(404)
+        resolved_parts.append(match)
+        cursor = os.path.join(cursor, match)
+
+    # Defence-in-depth: reject any symlink entry that escapes PLUGINS_DIR.
+    try:
+        validate_file_path(cursor, PLUGINS_DIR)
+    except ValueError:
+        abort(404)
+
+    if not os.path.isfile(cursor):
+        abort(404)
+
+    safe_dir = os.path.join(PLUGINS_DIR, plugin_dirname)
+    safe_name = os.path.join(*resolved_parts)
+    resp = send_from_directory(safe_dir, safe_name)
     try:
         ttl = int(os.getenv("INKYPI_STATIC_PLUGIN_ASSET_TTL_S", "300") or "300")
     except Exception:
         ttl = 300
     resp.headers["Cache-Control"] = f"public, max-age={max(0, ttl)}"
-    basename = os.path.basename(filename)
-    resp.headers["Content-Disposition"] = f'inline; filename="{basename}"'
+    resp.headers["Content-Disposition"] = f'inline; filename="{resolved_parts[-1]}"'
     return resp
 
 

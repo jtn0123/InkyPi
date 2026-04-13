@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 from flask import Blueprint, current_app, jsonify, request
 
+from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ plugin_io_bp = Blueprint("plugin_io", __name__)
 
 _CONFIG_KEY = "DEVICE_CONFIG"
 _EXPORT_VERSION = 1
+_ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 
 
 # ---------------------------------------------------------------------------
@@ -100,9 +102,11 @@ def export_plugins():
                 break
 
         if not match:
-            return json_error(
-                f"Plugin instance '{instance_name}' not found", status=404
+            logger.warning(
+                "export_plugin_instances: instance not found name=%s",
+                sanitize_log_field(instance_name),
             )
+            return json_error(_ERR_PLUGIN_INSTANCE_NOT_FOUND, status=404)
 
         instances = [
             {

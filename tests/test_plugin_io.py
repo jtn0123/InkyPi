@@ -358,3 +358,37 @@ class TestImportMultipart:
 
         pm = device_config_dev.get_playlist_manager()
         assert pm.find_plugin("clock", "File Import") is not None
+
+
+# ---------------------------------------------------------------------------
+# Security – py/reflective-xss regression (JTN-326)
+# ---------------------------------------------------------------------------
+
+
+class TestExportXSSRegression:
+    """The 404 response for a missing instance must not echo user input."""
+
+    def test_xss_payload_in_instance_name_not_reflected(
+        self, client, device_config_dev
+    ):
+        payload = "<script>alert('xss')</script>"
+        resp = client.get("/api/plugins/export", query_string={"instance": payload})
+        assert resp.status_code == 404
+        body = resp.get_data(as_text=True)
+        # The raw tag and its HTML-escaped form must both be absent.
+        assert "<script>" not in body
+        assert "alert(" not in body
+        assert "&lt;script&gt;" not in body
+        # Response should use the generic message from plugin_io.py.
+        assert "Plugin instance not found" in body
+
+    def test_html_entities_in_instance_name_not_reflected(
+        self, client, device_config_dev
+    ):
+        resp = client.get(
+            "/api/plugins/export", query_string={"instance": '"><img src=x>'}
+        )
+        assert resp.status_code == 404
+        body = resp.get_data(as_text=True)
+        assert "<img" not in body
+        assert "src=x" not in body
