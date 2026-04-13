@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.49.17 (2026-04-13)
+
+### Bug Fixes
+
+- **a11y**: Use human-readable timestamps in history aria-labels (JTN-642)
+  ([#390](https://github.com/jtn0123/InkyPi/pull/390),
+  [`65829b2`](https://github.com/jtn0123/InkyPi/commit/65829b21a8012695c491e5d9853cf09664ea5f33))
+
+* fix(a11y): use human-readable timestamps in history aria-labels (JTN-642)
+
+History action buttons (Display / Download / Delete) and thumbnail preview links previously
+  announced the raw timestamp-based filename (e.g. "Delete display_20260408_200114.png"). Screen
+  reader users had to hear that string 20+ times per page.
+
+Swap the filename for the already-computed `img.mtime_str` (e.g. "Apr 08, 2026 08:01 PM") in each
+  aria-label and the thumbnail img alt, so announcements read "Delete image from Apr 08, 2026 08:01
+  PM". Filename is still available as the visible `history-name` text and the element `title`/`id`,
+  so nothing functional changes.
+
+Updated the existing aria-label integration test to assert the new human-readable prefix and
+  explicitly reject the old filename-based labels.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(a11y): drop redundant "image" from history thumb alt (JTN-642)
+
+Sonar S6851: img alt already implies image, so "History image from …" becomes "History from …" to
+  avoid redundancy while retaining the human-readable timestamp.
+
+* test(history): harden aria-label assertions for filenames
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.16 (2026-04-13)
 
 ### Chores
