@@ -10,6 +10,24 @@ was fragile, especially under ``forkserver`` / ``spawn`` start methods.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from config import Config
+
+
+class SupportsRefreshConfig(Protocol):
+    """Config interface needed to snapshot and restore refresh state."""
+
+    config_file: str
+    current_image_file: str
+    processed_image_file: str
+    plugin_image_dir: str
+    history_image_dir: str
+
+    def get_resolution(self) -> tuple[int, int]: ...
+
+    def get_config(self, key: str, default: object = ...) -> object: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +57,7 @@ class RefreshContext:
     timezone: str
 
     @classmethod
-    def from_config(cls, device_config) -> RefreshContext:
+    def from_config(cls, device_config: SupportsRefreshConfig) -> RefreshContext:
         """Build a ``RefreshContext`` from a live :class:`Config` instance.
 
         This is the canonical factory used at the application boundary
@@ -60,7 +78,8 @@ class RefreshContext:
 
         tz = "UTC"
         try:
-            tz = device_config.get_config("timezone", default="UTC") or "UTC"
+            raw_tz = device_config.get_config("timezone", default="UTC")
+            tz = str(raw_tz or "UTC")
         except Exception:
             pass
 
@@ -76,7 +95,7 @@ class RefreshContext:
             timezone=str(tz),
         )
 
-    def restore_child_config(self):
+    def restore_child_config(self) -> Config:
         """Rebuild the ``Config`` singleton inside a subprocess from this snapshot.
 
         Sets the class-level path attributes on ``Config`` before
