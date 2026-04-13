@@ -33,6 +33,20 @@ _CODE_VALIDATION = "validation_error"
 _MSG_INVALID_TIME_FORMAT = "Invalid start/end time format"
 _MSG_SAME_TIME = "Start time and End time cannot be the same"
 _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
+_MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
+
+
+def _reissue_json_error(error_response, fallback_message: str):
+    """Rebuild an error response with a server-controlled envelope."""
+    response, status = error_response
+    payload = response.get_json(silent=True) or {}
+    message = payload.get("error") or fallback_message
+    return json_error(
+        message,
+        status=status,
+        code=payload.get("code"),
+        details=payload.get("details"),
+    )
 
 
 def _validate_playlist_name(name):
@@ -516,11 +530,11 @@ def create_playlist():
 
     data, err = _parse_playlist_request_data()
     if err:
-        return err
+        return _reissue_json_error(err, _MSG_INVALID_PLAYLIST_REQUEST)
 
     playlist_name, name_err = _validate_playlist_name(data.get("playlist_name"))
     if name_err:
-        return name_err
+        return _reissue_json_error(name_err, _MSG_INVALID_PLAYLIST_REQUEST)
     start_min, end_min, time_err = _validate_playlist_times(
         data.get("start_time"), data.get("end_time")
     )
@@ -624,7 +638,7 @@ def update_playlist(playlist_name):
     new_name_raw = data.get("new_name")
     new_name, name_err = _validate_playlist_name(new_name_raw)
     if name_err:
-        return name_err
+        return _reissue_json_error(name_err, _MSG_INVALID_PLAYLIST_REQUEST)
     start_time = data.get("start_time")
     end_time = data.get("end_time")
     if not start_time or not end_time:
