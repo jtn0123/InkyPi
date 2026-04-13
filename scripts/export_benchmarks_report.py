@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sqlite3
-from datetime import datetime
+from datetime import UTC, datetime
 
 
 def main():
@@ -40,7 +40,9 @@ def main():
     report_path = os.path.join(base_dir, "docs", "benchmarks_report.md")
     with open(report_path, "w", encoding="utf-8") as fh:
         fh.write("## InkyPi Benchmarks Report\n\n")
-        fh.write(f"Generated: {datetime.utcnow().isoformat()}Z\n\n")
+        fh.write(
+            f"Generated: {datetime.now(tz=UTC).replace(tzinfo=None).isoformat()}Z\n\n"
+        )
         fh.write("### Recent refreshes (latest 50)\n\n")
         fh.write(
             "| ts | plugin | instance | playlist | cached | req(ms) | gen(ms) | pre(ms) | disp(ms) | cpu% | mem% |\n"
@@ -48,7 +50,10 @@ def main():
         fh.write("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|\n")
         for r in rows:
             _rid, ts, plugin, inst, pl, cached, req, gen, pre, disp, cpu, mem = r
-            iso = datetime.utcfromtimestamp(ts).isoformat() + "Z"
+            iso = (
+                datetime.fromtimestamp(ts, tz=UTC).replace(tzinfo=None).isoformat()
+                + "Z"
+            )
             fh.write(
                 f"| {iso} | {plugin or ''} | {inst or ''} | {pl or ''} | {cached or 0} | {req or ''} | {gen or ''} | {pre or ''} | {disp or ''} | {cpu or ''} | {mem or ''} |\n"
             )
@@ -63,7 +68,10 @@ def main():
             LIMIT 50
             """)
         for ts, rid, stage, dur, extra in cur.fetchall():
-            iso = datetime.utcfromtimestamp(ts).isoformat() + "Z"
+            iso = (
+                datetime.fromtimestamp(ts, tz=UTC).replace(tzinfo=None).isoformat()
+                + "Z"
+            )
             fh.write(f"| {iso} | {rid} | {stage} | {dur or ''} | {extra or ''} |\n")
 
     conn.close()

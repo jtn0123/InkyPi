@@ -580,7 +580,10 @@ class PluginInstance:
         if "scheduled" in self.refresh:
             scheduled_time_str = self.refresh.get("scheduled")
             try:
-                scheduled_time = datetime.strptime(scheduled_time_str, "%H:%M").time()
+                # Parsing HH:MM into a time-of-day; no date/tz context is needed.
+                scheduled_time = datetime.strptime(  # noqa: DTZ007
+                    scheduled_time_str, "%H:%M"
+                ).time()
             except (ValueError, TypeError):
                 logger.warning(
                     "Malformed scheduled time '%s' for plugin '%s'; skipping scheduled check",

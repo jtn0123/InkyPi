@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from PIL import Image
 
@@ -38,7 +38,7 @@ class Newspaper(BasePlugin):
             raise RuntimeError("Invalid newspaper selection.")
 
         # Get today's date
-        today = datetime.today()
+        today = datetime.now(tz=UTC)
 
         # check the next day, then today, then prior day
         days = [today + timedelta(days=diff) for diff in [1, 0, -1, -2]]

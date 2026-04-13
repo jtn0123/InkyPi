@@ -101,9 +101,9 @@ def _load_settings(config_path: str | None) -> dict:
 
 
 def _default_output_path(plugin_id: str) -> str:
-    from datetime import datetime
+    from datetime import UTC, datetime
 
-    ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+    ts = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
     return f"dry-run-{plugin_id}-{ts}.png"
 
 

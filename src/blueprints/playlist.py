@@ -195,7 +195,8 @@ def validate_plugin_refresh_settings(refresh_settings):
             )
         refresh_time = refresh_time.strip()
         try:
-            datetime.strptime(refresh_time, "%H:%M")
+            # Format-only validation; the parsed datetime is discarded. No tz needed.
+            datetime.strptime(refresh_time, "%H:%M")  # noqa: DTZ007
         except ValueError:
             return None, json_error(
                 "Refresh time must be in HH:MM format",

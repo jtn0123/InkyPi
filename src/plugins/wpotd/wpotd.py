@@ -23,7 +23,7 @@ Flow:
 
 import logging
 import os
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from io import BytesIO
 from random import randint
 from typing import Any
@@ -70,7 +70,7 @@ class Wpotd(BasePlugin):
             parsed = date.fromisoformat(custom_date_str)
         except ValueError:
             return f"Invalid date format: {custom_date_str!r} (expected YYYY-MM-DD)"
-        today = date.today()
+        today = datetime.now(tz=UTC).date()
         if parsed < _WPOTD_MIN_DATE:
             return (
                 f"Date must be on or after {_WPOTD_MIN_DATE.isoformat()} "
@@ -81,7 +81,7 @@ class Wpotd(BasePlugin):
         return None
 
     def build_settings_schema(self):
-        today = datetime.today().strftime("%Y-%m-%d")
+        today = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         return schema(
             section(
                 "Source",
@@ -153,20 +153,23 @@ class Wpotd(BasePlugin):
 
     def _determine_date(self, settings: dict[str, Any]) -> date:
         if settings.get("randomizeWpotd") == "true":
-            start = datetime(2015, 1, 1)
-            delta_days = (datetime.today() - start).days
+            start = datetime(2015, 1, 1, tzinfo=UTC)
+            delta_days = (datetime.now(tz=UTC) - start).days
             return (start + timedelta(days=randint(0, delta_days))).date()
         elif settings.get("customDate"):
             try:
-                return datetime.strptime(settings["customDate"], "%Y-%m-%d").date()
+                # YYYY-MM-DD date input; the parsed date is returned as-is.
+                return datetime.strptime(  # noqa: DTZ007
+                    settings["customDate"], "%Y-%m-%d"
+                ).date()
             except ValueError:
                 logger.warning(
                     "Invalid customDate %r for WPOTD, defaulting to today",
                     settings["customDate"],
                 )
-                return datetime.today().date()
+                return datetime.now(tz=UTC).date()
         else:
-            return datetime.today().date()
+            return datetime.now(tz=UTC).date()
 
     def _download_image(self, url: str) -> Image.Image:
         if url.lower().endswith(".svg"):
