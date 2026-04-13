@@ -809,13 +809,28 @@
                 if (img.getAttribute('data-loaded') === '1') return;
                 const url = img.getAttribute('data-src');
                 if (!url) return;
+                // Validate URL is a safe same-origin relative path before assigning
+                // to img.src. Thumbnails are always served as site-relative paths
+                // (e.g. "/static/images/..."), so we reject anything else to close
+                // the js/xss-through-dom taint flow from DOM-sourced attribute.
+                let safeUrl;
                 try {
-                    const resp = await fetch(url, { method: 'HEAD' });
+                    const parsed = new URL(url, window.location.origin);
+                    if (parsed.origin === window.location.origin &&
+                        (parsed.protocol === 'http:' || parsed.protocol === 'https:')) {
+                        safeUrl = parsed.pathname + parsed.search;
+                    }
+                } catch(_) { /* invalid URL — leave safeUrl undefined */ }
+                if (!safeUrl) {
+                    img.style.display = 'none';
+                    const sk0 = img.previousElementSibling; if (sk0) sk0.style.display = 'none';
+                    img.setAttribute('data-loaded', '1');
+                    return;
+                }
+                try {
+                    const resp = await fetch(safeUrl, { method: 'HEAD' });
                     if (resp.ok) {
-                        // lgtm[js/xss-through-dom] — assigning to img.src can never
-                        // execute JavaScript. The browser fetches the URL as an image;
-                        // even javascript:/data: URIs in <img src> do not run script.
-                        img.src = url;
+                        img.src = safeUrl;
                         img.style.display = '';
                         img.setAttribute('data-loaded', '1');
                     } else {
