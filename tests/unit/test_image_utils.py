@@ -198,6 +198,8 @@ def test_resize_image_zero_desired_height():
 
 def test_get_image_returns_correct_size(monkeypatch):
     """get_image returns an image with the correct dimensions."""
+    import socket
+
     buf = BytesIO()
     Image.new("RGB", (5, 5), "white").save(buf, format="PNG")
     png_bytes = buf.getvalue()
@@ -206,8 +208,15 @@ def test_get_image_returns_correct_size(monkeypatch):
         status_code = 200
         content = png_bytes
 
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))
+        ],
+    )
     monkeypatch.setattr("utils.image_utils.http_get", lambda url, **kwargs: Resp())
-    img = image_utils.get_image("http://example/img.png")
+    img = image_utils.get_image("http://example.com/img.png")
     assert img is not None
     assert img.size == (5, 5)
 

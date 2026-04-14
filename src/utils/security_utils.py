@@ -25,6 +25,26 @@ def validate_url(url: str) -> str:
         If the URL is empty, uses a disallowed scheme, targets localhost,
         or resolves to a private/reserved IP address.
     """
+    url_out, _ips = validate_url_with_ips(url)
+    return url_out
+
+
+def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
+    """Validate *url* and return ``(url, resolved_ips)``.
+
+    The returned IP tuple is the exact set of addresses the URL's hostname
+    resolved to at validation time.  Callers should pin DNS to these IPs for
+    the subsequent HTTP fetch (see :func:`utils.http_utils.pinned_dns`) to
+    mitigate DNS-rebinding SSRF where an attacker-controlled DNS server flips
+    the answer to a private IP between validation and the actual request
+    (JTN-656).
+
+    Raises
+    ------
+    ValueError
+        If the URL is empty, uses a disallowed scheme, targets localhost,
+        or resolves to a private/reserved IP address.
+    """
     if not url:
         raise ValueError("URL must not be empty")
 
@@ -44,6 +64,8 @@ def validate_url(url: str) -> str:
     try:
         addr = ipaddress.ip_address(hostname)
         _reject_private_ip(addr, hostname)
+        # Literal IP — no DNS required; the "resolved" set is the literal.
+        return url, (hostname,)
     except ValueError:
         # hostname is not a literal IP — fall through to DNS resolution
         pass
@@ -54,12 +76,18 @@ def validate_url(url: str) -> str:
     except socket.gaierror as exc:
         raise ValueError("Cannot resolve hostname") from exc
 
+    resolved: list[str] = []
     for info in addr_infos:
-        ip_str = info[4][0]
+        ip_str = str(info[4][0])
         addr = ipaddress.ip_address(ip_str)
         _reject_private_ip(addr, hostname)
+        if ip_str not in resolved:
+            resolved.append(ip_str)
 
-    return url
+    if not resolved:
+        raise ValueError("Cannot resolve hostname")
+
+    return url, tuple(resolved)
 
 
 def _reject_private_ip(

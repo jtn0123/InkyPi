@@ -12,6 +12,8 @@ def _png_bytes(size=(5, 5), color="white"):
 
 
 def test_get_image_timeout_fallback_success(monkeypatch):
+    import socket
+
     import utils.image_utils as image_utils
 
     calls = {"n": 0}
@@ -28,8 +30,15 @@ def test_get_image_timeout_fallback_success(monkeypatch):
             raise TypeError("timeout arg not supported")
         return Resp()
 
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda *a, **kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))
+        ],
+    )
     monkeypatch.setattr("utils.image_utils.http_get", fake_get)
-    img = image_utils.get_image("http://example/img.png")
+    img = image_utils.get_image("http://example.com/img.png")
     assert img is not None
     assert img.size == (5, 5)
 
