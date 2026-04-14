@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
+
+import defusedxml.ElementTree as ET
 
 THRESHOLDS: dict[str, tuple[float, float]] = {
     "refresh_task/task.py": (0.65, 0.50),
