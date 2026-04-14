@@ -13,11 +13,6 @@
 #                               is assumed.
 # =============================================================================
 
-# Formatting stuff
-bold=$(tput bold)
-normal=$(tput sgr0)
-red=$(tput setaf 1)
-
 SOURCE=${BASH_SOURCE[0]}
 while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
   DIR=$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )
@@ -57,6 +52,12 @@ PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 # as per the WS naming convention.
 WS_TYPE=""
 WS_REQUIREMENTS_FILE="$SCRIPT_DIR/ws-requirements.txt"
+
+# JTN-669/674: Source shared helpers (formatting, stop_service, zramswap,
+# earlyoom, get_os_version, build_css_bundle, fetch_wheelhouse, cleanup_wheelhouse)
+# so install.sh and update.sh share a single source of truth.
+# shellcheck source=install/_common.sh
+source "$SCRIPT_DIR/_common.sh"
 
 # Parse the arguments, looking for the -W option.
 parse_arguments() {
@@ -147,7 +148,7 @@ enable_interfaces(){
         echo "dtoverlay for spi0-2cs already specified"
     fi
   else
-    # TODO - check if really need the dtparam set for INKY as this seems to be 
+    # TODO - check if really need the dtparam set for INKY as this seems to be
     # only for the older screens (as per INKY docs)
     echo "Enabling single CS line for SPI interface in config.txt"
     if ! grep -E -q '^[[:space:]]*dtoverlay=spi0-0cs' "$config_txt"; then
@@ -155,53 +156,13 @@ enable_interfaces(){
     else
         echo "dtoverlay for spi0-0cs already specified"
     fi
-  fi 
-}
-
-show_loader() {
-  local pid=$!
-  local message="$1"
-  local delay=0.1
-  local spinstr="|/-\\"
-  printf "%s [%s] " "$message" "${spinstr:0:1}"
-  while kill -0 "$pid" 2>/dev/null; do
-    local temp=${spinstr#?}
-    printf "\r%s [%s] " "$message" "${temp:0:1}"
-    spinstr=${temp}${spinstr%"${temp}"}
-    sleep "${delay}"
-  done
-  if wait "$pid"; then
-    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$message"
-  else
-    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$message"
   fi
 }
-
-echo_success() {
-  echo -e "$1 [\e[32m\xE2\x9C\x94\e[0m]"
-}
-
-echo_override() {
-  echo -e "\r$1"
-}
-
-echo_header() {
-  echo -e "${bold}$1${normal}"
-}
-
-echo_error() {
-  echo -e "${red}$1${normal} [\e[31m\xE2\x9C\x98\e[0m]\n"
-}
-
-echo_blue() {
-  echo -e "\e[38;2;65;105;225m$1\e[0m"
-}
-
 
 install_debian_dependencies() {
   if [ -f "$APT_REQUIREMENTS_FILE" ]; then
     sudo apt-get update > /dev/null &
-    show_loader "Fetch available system dependencies updates. " 
+    show_loader "Fetch available system dependencies updates. "
 
     xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null &
     show_loader "Installing system dependencies. "
@@ -209,25 +170,6 @@ install_debian_dependencies() {
     echo "ERROR: System dependencies file $APT_REQUIREMENTS_FILE not found!"
     exit 1
   fi
-}
-
-setup_zramswap_service() {
-  # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls zram-swap),
-  # skip zram-tools — they fight over /dev/zram0 and cause mkswap to fail.
-  if grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
-    echo "zram swap already active (likely from preinstalled zram-swap package) — skipping zram-tools install."
-    return 0
-  fi
-  echo "Enabling and starting zramswap service."
-  sudo apt-get install -y zram-tools > /dev/null
-  echo -e "ALGO=zstd\nPERCENT=60" | sudo tee /etc/default/zramswap > /dev/null
-  sudo systemctl enable --now zramswap
-}
-
-setup_earlyoom_service() {
-  echo "Enabling and starting earlyoom service."
-  sudo apt-get install -y earlyoom > /dev/null
-  sudo systemctl enable --now earlyoom
 }
 
 maybe_disable_dphys_swapfile() {
@@ -266,13 +208,6 @@ configure_journal_size() {
     echo_success "Journal size limit configured."
   fi
 }
-
-# JTN-669: fetch_wheelhouse / cleanup_wheelhouse live in _common.sh so that
-# update.sh can also use the pre-built wheelhouse (JTN-604). Sourcing here
-# brings WHEELHOUSE_DIR, WHEELHOUSE_REPO, fetch_wheelhouse, and
-# cleanup_wheelhouse into scope — no logic change.
-# shellcheck source=install/_common.sh
-source "$SCRIPT_DIR/_common.sh"
 
 create_venv(){
   echo "Creating python virtual environment. "
@@ -411,7 +346,7 @@ update_config() {
       if grep -q '"display_type":' "$DEVICE_JSON"; then
           # Update existing display_type value
           sed -i "s/\"display_type\": \".*\"/\"display_type\": \"$WS_TYPE\"/" "$DEVICE_JSON"
-          echo "Updated display_type to: $WS_TYPE" 
+          echo "Updated display_type to: $WS_TYPE"
       else
           # Append display_type safely, ensuring proper comma placement
           if grep -q '}$' "$DEVICE_JSON"; then
@@ -424,21 +359,6 @@ update_config() {
   else
       echo "Config not updated as WS_TYPE flag is not set"
   fi
-}
-
-stop_service() {
-    echo "Checking if $SERVICE_FILE is running"
-    if /usr/bin/systemctl is-active --quiet "$SERVICE_FILE"
-    then
-      /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
-      show_loader "Stopping $APPNAME service"
-    else
-      echo_success "\t$SERVICE_FILE not running"
-    fi
-    # JTN-600: DISABLE (not just stop) during install so systemd cannot
-    # restart the half-installed service and thrash the Pi. install_app_service
-    # re-enables it at the end of the install.
-    /usr/bin/systemctl disable "$SERVICE_FILE" 2>/dev/null || true
 }
 
 start_service() {
@@ -477,11 +397,6 @@ get_ip_address() {
   local ip_address
   ip_address=$(hostname -I | awk '{print $1}')
   echo "$ip_address"
-}
-
-# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie
-get_os_version() {
-  lsb_release -sr
 }
 
 ask_for_reboot() {
@@ -589,17 +504,8 @@ if ! bash "$SCRIPT_DIR/update_vendors.sh"; then
   exit 1
 fi
 
-echo "Building minified CSS bundle"
-if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
-  echo_error "ERROR: CSS build failed. The web UI will not render correctly."
-  exit 1
-fi
-CSS_OUTPUT="$SCRIPT_DIR/../src/static/styles/main.css"
-if [ ! -f "$CSS_OUTPUT" ]; then
-  echo_error "ERROR: CSS bundle was not generated at $CSS_OUTPUT."
-  exit 1
-fi
-echo_success "CSS bundle built."
+# JTN-674: use shared build_css_bundle from _common.sh
+build_css_bundle
 
 # JTN-607: All install steps succeeded — remove the install-in-progress
 # lockfile so the service is allowed to start. If install.sh exits early due

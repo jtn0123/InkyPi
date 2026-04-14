@@ -31,73 +31,11 @@ SERVICE_FILE_TARGET="/etc/systemd/system/$SERVICE_FILE"
 APT_REQUIREMENTS_FILE="$SCRIPT_DIR/debian-requirements.txt"
 PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
-echo_success() {
-  echo -e "$1 [\e[32m\xE2\x9C\x94\e[0m]"
-}
-
-echo_error() {
-  echo -e "$1 [\e[31m\xE2\x9C\x98\e[0m]\n"
-}
-
-show_loader() {
-  local pid=$!
-  local message="$1"
-  local delay=0.1
-  local spinstr="|/-\\"
-  printf "%s [%s] " "$message" "${spinstr:0:1}"
-  while kill -0 "$pid" 2>/dev/null; do
-    local temp=${spinstr#?}
-    printf "\r%s [%s] " "$message" "${temp:0:1}"
-    spinstr=${temp}${spinstr%"${temp}"}
-    sleep "${delay}"
-  done
-  if wait "$pid"; then
-    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$message"
-  else
-    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$message"
-  fi
-}
-
-# JTN-669: source shared wheelhouse helpers (fetch_wheelhouse / cleanup_wheelhouse)
-# so updates use the same pre-built binary wheels as fresh installs (JTN-604).
+# JTN-669/674: Source shared helpers (formatting, stop_service, zramswap,
+# earlyoom, get_os_version, build_css_bundle, fetch_wheelhouse, cleanup_wheelhouse)
+# so install.sh and update.sh share a single source of truth.
 # shellcheck source=install/_common.sh
 source "$SCRIPT_DIR/_common.sh"
-
-setup_zramswap_service() {
-  # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls zram-swap),
-  # skip zram-tools — they fight over /dev/zram0 and cause mkswap to fail.
-  if grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
-    echo "zram swap already active (likely from preinstalled zram-swap package) — skipping zram-tools install."
-    return 0
-  fi
-  echo "Enabling and starting zramswap service."
-  sudo apt-get install -y zram-tools > /dev/null
-  echo -e "ALGO=zstd\nPERCENT=60" | sudo tee /etc/default/zramswap > /dev/null
-  sudo systemctl enable --now zramswap
-}
-
-setup_earlyoom_service() {
-  echo "Enabling and starting earlyoom service."
-  sudo apt-get install -y earlyoom > /dev/null
-  sudo systemctl enable --now earlyoom
-}
-
-# JTN-666: Stop and DISABLE (not just stop) the service before touching the
-# venv or app files. This mirrors install.sh:539-552 (JTN-600). systemd cannot
-# restart a half-installed service during the update, preventing the load-14
-# thrash observed on Pi Zero 2 W.
-stop_service() {
-  echo "Checking if $SERVICE_FILE is running"
-  if /usr/bin/systemctl is-active --quiet "$SERVICE_FILE"; then
-    /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
-    show_loader "Stopping $APPNAME service"
-  else
-    echo_success "\t$SERVICE_FILE not running"
-  fi
-  # DISABLE (not just stop) during update so systemd cannot restart the
-  # half-installed service. update_app_service re-enables it at the end.
-  /usr/bin/systemctl disable "$SERVICE_FILE" 2>/dev/null || true
-}
 
 update_app_service() {
   echo "Updating $APPNAME systemd service."
@@ -119,12 +57,6 @@ update_cli() {
   cp -a "$SCRIPT_DIR/cli/." "$INSTALL_PATH/cli/"
   sudo chmod +x "$INSTALL_PATH/cli/"*
 }
-
-# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie
-get_os_version() {
-  lsb_release -sr
-}
-
 
 # Ensure script is run with sudo
 if [ "$EUID" -ne 0 ]; then
@@ -244,17 +176,8 @@ if ! bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null; then
   exit 1
 fi
 
-echo "Building minified CSS bundle"
-if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
-  echo_error "ERROR: CSS build failed. The web UI will not render correctly."
-  exit 1
-fi
-CSS_OUTPUT="$SCRIPT_DIR/../src/static/styles/main.css"
-if [ ! -f "$CSS_OUTPUT" ]; then
-  echo_error "ERROR: CSS bundle was not generated at $CSS_OUTPUT."
-  exit 1
-fi
-echo_success "CSS bundle built."
+# JTN-674: use shared build_css_bundle from _common.sh
+build_css_bundle
 
 update_cli
 update_app_service
