@@ -3,24 +3,148 @@
 # =============================================================================
 # _common.sh — shared helpers sourced by install.sh and update.sh
 #
-# JTN-669: Extracted from install.sh so update.sh can also use the pre-built
-# wheelhouse (JTN-604), avoiding source-compilation of numpy/Pillow/cffi/etc.
-# on every update on low-RAM boards like the Pi Zero 2 W.
+# JTN-669: Extracted fetch_wheelhouse/cleanup_wheelhouse so update.sh can use
+# pre-built wheels (JTN-604), avoiding source-compilation on every update.
+#
+# JTN-674: Extended to cover all remaining duplicated logic so install.sh and
+# update.sh share a single source of truth:
+#   - Formatting helpers (echo_success / echo_error / echo_header / echo_blue /
+#     echo_override / show_loader)
+#   - get_os_version
+#   - setup_zramswap_service / setup_earlyoom_service
+#   - stop_service
+#   - build_css_bundle
 # =============================================================================
 
-# JTN-604: Fetch a pre-built wheelhouse bundle from the GitHub release for
-# the current VERSION so pip can install every dependency without compiling
-# wheels on-device. First-boot install on a Pi Zero 2 W drops from ~15 min
-# to ~2-3 min and peak memory pressure drops by ~200 MB (no native builds).
+# ---------------------------------------------------------------------------
+# Terminal formatting (requires tput; safe to call in non-interactive shells)
+# ---------------------------------------------------------------------------
+bold=$(tput bold 2>/dev/null || true)
+normal=$(tput sgr0 2>/dev/null || true)
+red=$(tput setaf 1 2>/dev/null || true)
+
+echo_success() {
+  echo -e "$1 [\e[32m\xE2\x9C\x94\e[0m]"
+}
+
+echo_override() {
+  echo -e "\r$1"
+}
+
+echo_header() {
+  echo -e "${bold}$1${normal}"
+}
+
+echo_error() {
+  echo -e "${red}$1${normal} [\e[31m\xE2\x9C\x98\e[0m]\n"
+}
+
+echo_blue() {
+  echo -e "\e[38;2;65;105;225m$1\e[0m"
+}
+
+show_loader() {
+  local pid=$!
+  local message="$1"
+  local delay=0.1
+  local spinstr="|/-\\"
+  printf "%s [%s] " "$message" "${spinstr:0:1}"
+  while kill -0 "$pid" 2>/dev/null; do
+    local temp=${spinstr#?}
+    printf "\r%s [%s] " "$message" "${temp:0:1}"
+    spinstr=${temp}${spinstr%"${temp}"}
+    sleep "${delay}"
+  done
+  if wait "$pid"; then
+    printf "\r%s [\e[32m\xE2\x9C\x94\e[0m]\n" "$message"
+  else
+    printf "\r%s [\e[31m\xE2\x9C\x98\e[0m]\n" "$message"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# OS helpers
+# ---------------------------------------------------------------------------
+
+# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie
+get_os_version() {
+  lsb_release -sr
+}
+
+# ---------------------------------------------------------------------------
+# Service helpers
+# ---------------------------------------------------------------------------
+
+# Stop and DISABLE (not just stop) the service so systemd cannot restart a
+# half-installed service during install/update. The caller is responsible for
+# re-enabling and starting the service once all steps succeed.
 #
-# The function is deliberately noisy-but-graceful: on ANY failure (missing
-# tarball, 404, checksum mismatch, network glitch, non-matching arch) it
-# cleans up and returns non-zero so the caller falls back to normal pip
-# install. Users can opt out entirely via INKYPI_SKIP_WHEELHOUSE=1.
+# Requires SERVICE_FILE and APPNAME to be set by the sourcing script.
+stop_service() {
+  echo "Checking if $SERVICE_FILE is running"
+  if /usr/bin/systemctl is-active --quiet "$SERVICE_FILE"; then
+    /usr/bin/systemctl stop "$SERVICE_FILE" > /dev/null &
+    show_loader "Stopping $APPNAME service"
+  else
+    echo_success "\t$SERVICE_FILE not running"
+  fi
+  # DISABLE (not just stop) during install/update so systemd cannot restart the
+  # half-installed service. The caller re-enables it at the end of the script.
+  /usr/bin/systemctl disable "$SERVICE_FILE" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------------------
+# Memory-pressure helpers
+# ---------------------------------------------------------------------------
+
+setup_zramswap_service() {
+  # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls
+  # zram-swap), skip zram-tools — they fight over /dev/zram0 and cause mkswap
+  # to fail.
+  if grep -q "^/dev/zram" /proc/swaps 2>/dev/null; then
+    echo "zram swap already active (likely from preinstalled zram-swap package) — skipping zram-tools install."
+    return 0
+  fi
+  echo "Enabling and starting zramswap service."
+  sudo apt-get install -y zram-tools > /dev/null
+  echo -e "ALGO=zstd\nPERCENT=60" | sudo tee /etc/default/zramswap > /dev/null
+  sudo systemctl enable --now zramswap
+}
+
+setup_earlyoom_service() {
+  echo "Enabling and starting earlyoom service."
+  sudo apt-get install -y earlyoom > /dev/null
+  sudo systemctl enable --now earlyoom
+}
+
+# ---------------------------------------------------------------------------
+# CSS build helper
 #
-# Sets WHEELHOUSE_DIR on success; caller passes it to pip via --find-links.
+# Requires VENV_PATH and SCRIPT_DIR to be set by the sourcing script.
+# ---------------------------------------------------------------------------
+
+build_css_bundle() {
+  echo "Building minified CSS bundle"
+  if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
+    echo_error "ERROR: CSS build failed. The web UI will not render correctly."
+    exit 1
+  fi
+  local css_output="$SCRIPT_DIR/../src/static/styles/main.css"
+  if [ ! -f "$css_output" ]; then
+    echo_error "ERROR: CSS bundle was not generated at $css_output."
+    exit 1
+  fi
+  echo_success "CSS bundle built."
+}
+
+# ---------------------------------------------------------------------------
+# Wheelhouse helpers (JTN-604 / JTN-669)
 #
-# Requires SCRIPT_DIR and WHEELHOUSE_REPO to be set by the sourcing script.
+# fetch_wheelhouse / cleanup_wheelhouse — extracted in PR #450.
+# Require SCRIPT_DIR and WHEELHOUSE_REPO to be set (WHEELHOUSE_REPO defaults
+# below). Sets WHEELHOUSE_DIR on success so callers can pass --find-links.
+# ---------------------------------------------------------------------------
+
 WHEELHOUSE_DIR=""
 WHEELHOUSE_REPO="${INKYPI_WHEELHOUSE_REPO:-jtn0123/InkyPi}"
 

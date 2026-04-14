@@ -217,6 +217,11 @@ class TestInstallScript:
     @pytest.fixture(autouse=True)
     def _load(self):
         self.content = _read("install.sh")
+        # JTN-674: shared helpers (stop_service, setup_zramswap_service,
+        # get_os_version, echo_*, show_loader) live in _common.sh and are
+        # sourced by install.sh.  Tests that verify these shared functions
+        # should use self.combined so they keep passing after the refactor.
+        self.combined = self.content + "\n" + _read("_common.sh")
 
     def test_install_enables_spi(self):
         assert "dtparam=spi=" in self.content
@@ -242,16 +247,17 @@ class TestInstallScript:
         # JTN-569: Pi OS Trixie preinstalls zram-swap which configures /dev/zram0 at
         # boot. Installing zram-tools on top fights over /dev/zram0 and makes
         # `systemctl start zramswap` exit 1. The guard must run before apt-get.
+        # JTN-674: setup_zramswap_service() now lives in _common.sh — check combined.
         guard = 'grep -q "^/dev/zram" /proc/swaps'
         apt_install = "apt-get install -y zram-tools"
-        assert guard in self.content
-        assert "skipping zram-tools install" in self.content
-        assert "return 0" in self.content
+        assert guard in self.combined
+        assert "skipping zram-tools install" in self.combined
+        assert "return 0" in self.combined
 
-        fn_start = self.content.index("setup_zramswap_service() {")
-        guard_pos = self.content.index(guard, fn_start)
-        return_pos = self.content.index("return 0", fn_start)
-        apt_pos = self.content.index(apt_install, fn_start)
+        fn_start = self.combined.index("setup_zramswap_service() {")
+        guard_pos = self.combined.index(guard, fn_start)
+        return_pos = self.combined.index("return 0", fn_start)
+        apt_pos = self.combined.index(apt_install, fn_start)
         assert guard_pos < return_pos < apt_pos
 
     def test_install_enables_zramswap_on_bookworm_and_trixie(self):
@@ -320,22 +326,24 @@ class TestInstallScript:
     def test_install_os_version_comment_lists_correct_codenames(self):
         # The comment near get_os_version should list 11/12/13 with correct
         # codenames — including the 'Trixie' typo fix from JTN-528.
-        assert "11=Bullseye" in self.content
-        assert "12=Bookworm" in self.content
-        assert "13=Trixie" in self.content
-        assert "Trixe" not in self.content  # typo guard
+        # JTN-674: get_os_version() now lives in _common.sh — check combined.
+        assert "11=Bullseye" in self.combined
+        assert "12=Bookworm" in self.combined
+        assert "13=Trixie" in self.combined
+        assert "Trixe" not in self.combined  # typo guard
 
     def test_zramswap_regex_matches_codename_comment_parity(self):
         # JTN-531: The codename comment near get_os_version() and the version
         # regex in the zramswap branch must list the same integer keys.
         # If someone adds 14=Forky to one without updating the other this test
         # will catch it.
+        # JTN-674: get_os_version() now lives in _common.sh — check combined.
 
         # Parse "# Get OS release number, e.g. 11=Bullseye, 12=Bookworm, 13=Trixie"
         # Capture every "<digit(s)>=<Codename>" pair from the comment line
         # immediately above the get_os_version() function definition.
         comment_versions = set()
-        lines = self.content.splitlines()
+        lines = self.combined.splitlines()
         for i, line in enumerate(lines):
             if "get_os_version" in line and line.strip().startswith("get_os_version"):
                 # Search backwards for the nearest preceding comment line with
@@ -347,8 +355,9 @@ class TestInstallScript:
 
         # Parse the regex alternation in the zramswap if-branch:
         # [[ "$os_version" =~ ^(11|12|13)$ ]]
+        # JTN-674: the regex lives in install.sh main body; check combined.
         regex_versions = set()
-        for line in self.content.splitlines():
+        for line in self.combined.splitlines():
             m = re.search(r"\^\(([0-9|]+)\)\$", line)
             if m:
                 for part in m.group(1).split("|"):
@@ -357,7 +366,7 @@ class TestInstallScript:
 
         assert (
             comment_versions
-        ), "Could not parse any version numbers from the get_os_version comment in install.sh"
+        ), "Could not parse any version numbers from the get_os_version comment in _common.sh"
         assert (
             regex_versions
         ), "Could not parse any version numbers from the zramswap regex in install.sh"
@@ -447,9 +456,10 @@ class TestInstallScript:
         # JTN-600: stop_service() must DISABLE (not just stop) the service so
         # systemd cannot auto-restart the half-installed service during the ~15 min
         # install window and cause a memory-thrash cascade on the Pi Zero 2 W.
-        fn_start = self.content.index("stop_service() {")
-        fn_end = self.content.index("\n}", fn_start)
-        fn_body = self.content[fn_start:fn_end]
+        # JTN-674: stop_service() now lives in _common.sh — check combined.
+        fn_start = self.combined.index("stop_service() {")
+        fn_end = self.combined.index("\n}", fn_start)
+        fn_body = self.combined[fn_start:fn_end]
         assert 'systemctl disable "$SERVICE_FILE"' in fn_body, (
             "stop_service() must call 'systemctl disable \"$SERVICE_FILE\"' to "
             "prevent systemd from restarting the half-installed service"
@@ -518,6 +528,8 @@ class TestInstallScript:
         # has succeeded, remove the lockfile so the service is allowed to
         # start. The removal must come AFTER install_app_service and the CSS
         # build so a failure in any earlier step leaves the lockfile in place.
+        # JTN-674: CSS build is now called via build_css_bundle (shared helper
+        # in _common.sh). The call site is still in install.sh's main body.
         main_start = self.content.index('parse_arguments "$@"')
         main_body = self.content[main_start:]
 
@@ -526,15 +538,17 @@ class TestInstallScript:
         ), "install.sh must remove the lockfile on success (JTN-607)"
 
         # Ordering: rm must come after install_app_service and after the CSS
-        # build so an earlier failure leaves the lockfile in place.
+        # build call so an earlier failure leaves the lockfile in place.
         rm_pos = main_body.index('rm -f "$LOCKFILE"')
         install_app_pos = main_body.index("install_app_service")
-        css_pos = main_body.index("CSS bundle built")
+        # JTN-674: CSS build is invoked via build_css_bundle; the inline
+        # "CSS bundle built" message now lives in _common.sh's function body.
+        css_pos = main_body.index("build_css_bundle")
         assert (
             install_app_pos < rm_pos
         ), 'rm -f "$LOCKFILE" must come after install_app_service (JTN-607)'
         assert css_pos < rm_pos, (
-            'rm -f "$LOCKFILE" must come after the CSS bundle build step '
+            'rm -f "$LOCKFILE" must come after the build_css_bundle call '
             "so a CSS build failure leaves the lockfile in place (JTN-607)"
         )
 
@@ -559,9 +573,10 @@ class TestInstallScript:
     def test_stop_service_disable_tolerates_already_disabled(self):
         # JTN-600: The disable call must not fail if the service is already
         # disabled (e.g. fresh install). Must use '|| true' or '2>/dev/null'.
-        fn_start = self.content.index("stop_service() {")
-        fn_end = self.content.index("\n}", fn_start)
-        fn_body = self.content[fn_start:fn_end]
+        # JTN-674: stop_service() now lives in _common.sh — check combined.
+        fn_start = self.combined.index("stop_service() {")
+        fn_end = self.combined.index("\n}", fn_start)
+        fn_body = self.combined[fn_start:fn_end]
         # Find the disable line and confirm it has an error-tolerant fallback.
         disable_lines = [
             line.strip() for line in fn_body.splitlines() if "systemctl disable" in line
@@ -1306,6 +1321,11 @@ class TestUpdateScript:
     @pytest.fixture(autouse=True)
     def _load(self):
         self.content = _read("update.sh")
+        # JTN-674: shared helpers (stop_service, setup_zramswap_service,
+        # get_os_version, echo_*, show_loader) live in _common.sh and are
+        # sourced by update.sh.  Tests that verify these shared functions
+        # should use self.combined so they keep passing after the refactor.
+        self.combined = self.content + "\n" + _read("_common.sh")
 
     def test_update_rebuilds_css(self):
         assert "build_css" in self.content
@@ -1320,17 +1340,18 @@ class TestUpdateScript:
     def test_update_stop_service_before_pip(self):
         # JTN-666: stop_service() must be called before pip install to prevent
         # systemd from restart-looping the half-installed venv during update.
+        # JTN-674: stop_service() now lives in _common.sh — check combined.
         assert "stop_service" in self.content
         # stop_service() must DISABLE (not just stop) so systemd cannot auto-restart.
-        fn_start = self.content.index("stop_service() {")
-        fn_end = self.content.index("}", fn_start) + 1
-        fn_body = self.content[fn_start:fn_end]
+        fn_start = self.combined.index("stop_service() {")
+        fn_end = self.combined.index("}", fn_start) + 1
+        fn_body = self.combined[fn_start:fn_end]
         assert (
             "systemctl disable" in fn_body
         ), "stop_service() must call 'systemctl disable' to prevent auto-restart mid-update"
         # stop_service call must appear before pip install in main script body
-        main_call = self.content.index("stop_service\n", fn_end)
-        pip_pos = self.content.index("pip install", fn_end)
+        main_call = self.content.index("stop_service\n")
+        pip_pos = self.content.index("pip install")
         assert (
             main_call < pip_pos
         ), "stop_service must be called before pip install to prevent mid-update thrash"
@@ -1379,22 +1400,24 @@ class TestUpdateScript:
     def test_update_skips_zramtools_when_zram_swap_already_active(self):
         # JTN-667: setup_zramswap_service in update.sh must guard against
         # Trixie's preinstalled zram-swap to avoid /dev/zram0 conflicts.
+        # JTN-674: setup_zramswap_service() now lives in _common.sh — check combined.
         guard = 'grep -q "^/dev/zram" /proc/swaps'
         apt_install = "apt-get install -y zram-tools"
-        assert guard in self.content
-        assert "skipping zram-tools install" in self.content
-        assert "return 0" in self.content
+        assert guard in self.combined
+        assert "skipping zram-tools install" in self.combined
+        assert "return 0" in self.combined
 
-        fn_start = self.content.index("setup_zramswap_service() {")
-        guard_pos = self.content.index(guard, fn_start)
-        return_pos = self.content.index("return 0", fn_start)
-        apt_pos = self.content.index(apt_install, fn_start)
+        fn_start = self.combined.index("setup_zramswap_service() {")
+        guard_pos = self.combined.index(guard, fn_start)
+        return_pos = self.combined.index("return 0", fn_start)
+        apt_pos = self.combined.index(apt_install, fn_start)
         assert guard_pos < return_pos < apt_pos
 
     def test_update_codename_comment_has_no_trixie_typo(self):
         # JTN-667: The comment near get_os_version must spell Trixie correctly.
-        assert "13=Trixie" in self.content
-        assert "Trixe" not in self.content  # typo guard
+        # JTN-674: get_os_version() now lives in _common.sh — check combined.
+        assert "13=Trixie" in self.combined
+        assert "Trixe" not in self.combined  # typo guard
 
     def test_update_sources_common(self):
         # JTN-669: update.sh must source _common.sh to gain access to
