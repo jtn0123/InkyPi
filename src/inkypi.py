@@ -27,6 +27,7 @@ from app_setup.health import (
 )
 from app_setup.http_metrics import setup_http_metrics
 from app_setup.logging_setup import install_dev_log_handler, setup_logging
+from app_setup.schema_validator import register as register_schema_validator
 from app_setup.security_middleware import (
     _extract_csrf_token_from_request,
     _generate_csrf_token,
@@ -370,6 +371,11 @@ def create_app():
     register_error_handlers(app)
     setup_security_headers(app, dev_mode=DEV_MODE)
     setup_http_metrics(app)
+    # JTN-664: dev-only JSON response schema validator. Logs shape drift at
+    # WARNING; never mutates the response and never raises. Prod opt-in via
+    # INKYPI_STRICT_SCHEMAS=1 for CI-style strict builds.
+    if DEV_MODE or os.getenv("INKYPI_STRICT_SCHEMAS") == "1":
+        register_schema_validator(app)
     setup_signal_handlers(app)
 
     return app
