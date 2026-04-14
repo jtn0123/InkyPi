@@ -1623,6 +1623,41 @@ def test_requirements_files_exist():
     assert (INSTALL_DIR / "debian-requirements.txt").exists()
 
 
+def test_debian_requirements_includes_build_headers_for_pinned_python_deps():
+    """Regression: JTN-675.
+
+    `install/requirements.txt` pins `cffi` and `cysystemd`, which need native
+    headers when built from source (piwheels has no prebuilt wheels for
+    Python 3.13 armv7 / Trixie). Without `libffi-dev` / `libsystemd-dev` in the
+    apt preflight list, `pip install` dies with:
+
+        fatal error: ffi.h: No such file or directory
+        fatal error: systemd/sd-daemon.h: No such file or directory
+
+    Keep these two apt packages wired to their Python dependencies so we don't
+    regress this on a future requirements refresh.
+    """
+    py_reqs = (INSTALL_DIR / "requirements.txt").read_text()
+    deb_reqs = (INSTALL_DIR / "debian-requirements.txt").read_text().splitlines()
+    deb_pkgs = {
+        line.strip() for line in deb_reqs if line.strip() and not line.startswith("#")
+    }
+
+    # cffi needs libffi-dev
+    if re.search(r"(?m)^cffi(==|>=|~=|\s|$)", py_reqs):
+        assert "libffi-dev" in deb_pkgs, (
+            "install/requirements.txt pins `cffi` but install/debian-requirements.txt "
+            "is missing `libffi-dev` — source builds will fail on armv7/py3.13."
+        )
+
+    # cysystemd needs libsystemd-dev
+    if re.search(r"(?m)^cysystemd(==|>=|~=|\s|;|$)", py_reqs):
+        assert "libsystemd-dev" in deb_pkgs, (
+            "install/requirements.txt pins `cysystemd` but install/debian-requirements.txt "
+            "is missing `libsystemd-dev` — source builds will fail on armv7/py3.13."
+        )
+
+
 def test_service_exec_matches_cli_wrapper():
     service = _read("inkypi.service")
     # ExecStart references /usr/local/bin/inkypi
