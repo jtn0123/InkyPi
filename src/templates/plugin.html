@@ -260,10 +260,15 @@
             </label>
             {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
             <div class="workflow-action-group">
-                <button type="button" data-plugin-action="update_now" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
+                {# data-test-skip-click: these buttons submit the settings form; clicking them
+                   with an empty/default form triggers validation 400s that the click-sweep
+                   (JTN-698) would report as console errors. Dedicated plugin-submission
+                   tests cover the real submit path. #}
+                <button type="button" data-plugin-action="update_now" data-test-skip-click="true" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
                 <button type="button"
                         id="savePluginSettingsBtn"
                         class="action-button is-secondary"
+                        data-test-skip-click="true"
                         aria-describedby="save-settings-help"
                         hx-post="{{ url_for('plugin.save_plugin_settings') }}"
                         hx-include="#settingsForm"
@@ -271,7 +276,7 @@
                         hx-swap="innerHTML"
                         hx-disabled-elt="this">Save Settings</button>
                 {% if plugin_instance %}
-                    <button type="button" data-plugin-action="update_instance" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
+                    <button type="button" data-plugin-action="update_instance" data-test-skip-click="true" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
                 {% else %}
                     <button type="button" data-open-modal="scheduleModal" data-plugin-draft="true" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
                 {% endif %}
