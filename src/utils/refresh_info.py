@@ -5,7 +5,7 @@ main config god-object.
 """
 
 import logging
-from typing import Any, cast
+from typing import Any
 
 from model import RefreshInfo
 
@@ -38,7 +38,7 @@ class RefreshInfoRepository:
 
     def to_dict(self) -> RefreshInfoDict:
         """Serialise the current state for inclusion in the config file."""
-        return cast(RefreshInfoDict, self.refresh_info.to_dict())
+        return self.refresh_info.to_dict()
 
     # ------------------------------------------------------------------
     # Internal
