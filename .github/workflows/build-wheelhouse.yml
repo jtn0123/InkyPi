@@ -49,8 +49,10 @@ jobs:
 
       - name: Resolve tag
         id: tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
             echo "ERROR: No release tag resolved" >&2
             exit 1
