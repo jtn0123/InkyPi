@@ -170,6 +170,16 @@ if [ ! -d "$VENV_PATH" ]; then
   exit 1
 fi
 
+# JTN-668: /tmp on Pi OS Trixie is a 213 MB tmpfs — too small for numpy's
+# intermediate build artefacts (>500 MB). Redirect pip's build temp dir to
+# /var/tmp which is disk-backed and has gigabytes free.  This is set before
+# every pip invocation so it applies to pip upgrade as well as dependency
+# install.  The directory is created with root ownership (script runs as root
+# via sudo) and cleaned up after the install completes.
+PIP_BUILD_TMPDIR="/var/tmp/pip-build"
+mkdir -p "$PIP_BUILD_TMPDIR"
+export TMPDIR="$PIP_BUILD_TMPDIR"
+
 # Activate the virtual environment
 # shellcheck source=/dev/null
 source "$VENV_PATH/bin/activate"
@@ -178,7 +188,7 @@ source "$VENV_PATH/bin/activate"
 echo "Upgrading pip..."
 # JTN-665: capture failure so a broken pip/setuptools upgrade does not silently
 # proceed to requirements install and leave the venv in a partially-broken state.
-if ! "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel > /dev/null; then
+if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade pip setuptools wheel > /dev/null; then
   echo_error "ERROR: pip/setuptools upgrade failed — aborting update."
   exit 1
 fi
@@ -189,7 +199,7 @@ if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
   echo "Updating Python dependencies..."
   # JTN-665: explicit exit-code check so a compile error (e.g. metadata-generation-failed)
   # stops the update before CSS build + service restart, preventing a boot loop.
-  if ! "$VENV_PATH/bin/python" -m pip install --upgrade -r "$PIP_REQUIREMENTS_FILE"; then
+  if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null; then
     echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
     exit 1
   fi
@@ -198,6 +208,10 @@ else
   echo_error "ERROR: Requirements file $PIP_REQUIREMENTS_FILE not found!"
   exit 1
 fi
+
+# Clean up the pip build temp dir — it can be several hundred MB.
+rm -rf "$PIP_BUILD_TMPDIR"
+unset TMPDIR
 
 echo "Updating executable in ${BINPATH}/$APPNAME"
 cp "$SCRIPT_DIR/inkypi" "$BINPATH/"
