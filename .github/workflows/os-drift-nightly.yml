@@ -58,11 +58,15 @@ jobs:
     steps:
       - name: Skip leg if not selected (workflow_dispatch)
         id: skip
+        env:
+          SELECTED_CODENAME: ${{ github.event.inputs.codename }}
+          EVENT_NAME: ${{ github.event_name }}
+          MATRIX_CODENAME: ${{ matrix.codename }}
         run: |
           set -euo pipefail
-          selected='${{ github.event.inputs.codename }}'
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "${{ matrix.codename }}" ]; then
-            echo "Leg ${{ matrix.codename }} not selected; skipping."
+          selected="$SELECTED_CODENAME"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "$MATRIX_CODENAME" ]; then
+            echo "Leg $MATRIX_CODENAME not selected; skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -216,11 +220,15 @@ jobs:
 
       - name: Skip leg if not selected (workflow_dispatch)
         id: skip
+        env:
+          SELECTED_CODENAME: ${{ github.event.inputs.codename }}
+          EVENT_NAME: ${{ github.event_name }}
+          MATRIX_CODENAME: ${{ matrix.codename }}
         run: |
           set -euo pipefail
-          selected='${{ github.event.inputs.codename }}'
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "${{ matrix.codename }}" ]; then
-            echo "Leg ${{ matrix.codename }} not selected; skipping."
+          selected="$SELECTED_CODENAME"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$selected" ] && [ "$selected" != "$MATRIX_CODENAME" ]; then
+            echo "Leg $MATRIX_CODENAME not selected; skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
