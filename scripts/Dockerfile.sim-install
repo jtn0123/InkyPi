@@ -14,17 +14,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Add the Raspberry Pi OS apt repo and update the package lists in a single
-# RUN to avoid stale-cache issues.
+# Add the Raspberry Pi OS apt repo so Pi-only packages resolve.
 #
 # NOTE: [trusted=yes] is a sim-only workaround for Debian Trixie's sqv
 # rejecting the SHA1 signature used by archive.raspberrypi.com.  Real Pi OS
 # ships its own patched apt that does NOT hit this issue — do NOT copy this
 # line to production configs.
+#
+# apt-get update is intentionally omitted here — install.sh runs its own
+# apt-get update after this repo is visible, which picks up the Pi OS index.
+# Omitting a standalone update satisfies DS-0017 (apt-get update must be
+# combined with apt-get install in the same RUN layer).
 RUN echo "deb [trusted=yes] http://archive.raspberrypi.com/debian/ ${CODENAME} main" \
-    > /etc/apt/sources.list.d/raspi.list \
-    && apt-get update \
-    && rm -rf /var/lib/apt/lists/*
+    > /etc/apt/sources.list.d/raspi.list
 
 # Install a no-op raspi-config shim so install.sh's `raspi-config nonint …`
 # calls succeed without real hardware or the full raspi-config package.
@@ -35,5 +37,15 @@ RUN printf '#!/bin/sh\n# sim-only no-op raspi-config shim\nexit 0\n' \
 # Copy the local checkout into the image so we exercise the branch under test,
 # not whatever is on GitHub.
 COPY . /InkyPi
+
+# install.sh requires root to run apt-get, write to /boot/firmware, manage
+# services, and create the inkypi system user. A non-root USER would break the
+# installer. We declare USER root explicitly to satisfy the DS-0002 linter
+# requirement for an explicit USER directive before CMD.
+USER root
+
+# This image is a local sim-install container, not a long-running service.
+# HEALTHCHECK NONE suppresses the DS-0026 "missing healthcheck" alert.
+HEALTHCHECK NONE
 
 CMD ["bash", "-c", "cd /InkyPi/install && ./install.sh"]

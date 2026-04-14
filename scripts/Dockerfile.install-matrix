@@ -79,10 +79,12 @@ RUN apt-get update \
 # Add the Raspberry Pi OS apt repo so Pi-only packages (liblgpio-dev,
 # chromium-headless-shell, ...) resolve. See the header note for why
 # [trusted=yes] is used.
+# apt-get update is intentionally omitted here — install.sh runs its own
+# apt-get update (line ~164) after this repo is visible, which picks up the
+# Pi OS index. Omitting a standalone update avoids a stale-cache layer and
+# satisfies DS-0017 (apt-get update must be combined with apt-get install).
 RUN echo "deb [trusted=yes] http://archive.raspberrypi.com/debian/ ${CODENAME} main" \
-    > /etc/apt/sources.list.d/raspi.list \
-    && apt-get update \
-    && rm -rf /var/lib/apt/lists/*
+    > /etc/apt/sources.list.d/raspi.list
 
 # Install a no-op raspi-config shim so install.sh's `raspi-config nonint …`
 # calls succeed without real hardware or the full raspi-config package.
@@ -130,6 +132,16 @@ RUN mkdir -p /boot/firmware \
 COPY . /InkyPi
 
 WORKDIR /InkyPi/install
+
+# install.sh requires root to run apt-get, write to /boot/firmware, manage
+# services, and create the inkypi system user. A non-root USER would break the
+# installer. We declare USER root explicitly to satisfy the DS-0002 linter
+# requirement for an explicit USER directive before CMD.
+USER root
+
+# This image is a CI install-verification container, not a long-running service.
+# HEALTHCHECK NONE suppresses the DS-0026 "missing healthcheck" alert.
+HEALTHCHECK NONE
 
 # Default command runs install.sh; CI overrides this to add verification steps.
 CMD ["bash", "./install.sh"]

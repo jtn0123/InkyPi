@@ -30,4 +30,13 @@ ENV INKYPI_ENV=dev \
 
 EXPOSE 8080
 
+# Create a non-root user and transfer ownership so the app runs unprivileged.
+RUN useradd -m -u 1000 appuser \
+ && chown -R appuser:appuser /app
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget -qO- http://localhost:8080/ || exit 1
+
 CMD ["python", "src/inkypi.py", "--dev", "--web-only"]
