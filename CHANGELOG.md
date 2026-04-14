@@ -1,6 +1,60 @@
 # CHANGELOG
 
 
+## v0.51.0 (2026-04-14)
+
+### Features
+
+- **test**: Wire /api/client-log into Playwright tripwire (JTN-680)
+  ([#458](https://github.com/jtn0123/InkyPi/pull/458),
+  [`6c7115e`](https://github.com/jtn0123/InkyPi/commit/6c7115e2c732935c45f806cd0bb8dcfa0bdbbd5c))
+
+Layer 4 of the UI breakage detection net. Convert the existing always-on /api/client-log endpoint
+  into a test-time tripwire so any console.warn / console.error that bubbles through
+  client_log_reporter.js during a Playwright test fails the test with the message visible.
+
+Changes: - src/blueprints/client_log.py: add env-var-gated capture hook. When
+  INKYPI_TEST_CAPTURE_CLIENT_LOG is truthy, every validated report is appended to a process-wide
+  (lock-protected) list; unset -> bit-identical to pre-hook behaviour (single dict lookup +
+  short-circuited compare). - tests/integration/conftest.py: add autouse client_log_capture fixture
+  that sets the env var, resets storage, and asserts the list is empty on teardown.
+  browser_page/mobile_page inject the client-log-enabled and client-log-test-mode meta tags so the
+  reporter opts in and skips its 50% sampling during tests. -
+  src/static/scripts/client_log_reporter.js: honour the test-mode meta so the tripwire is
+  deterministic (no sampling). - tests/unit/test_client_log_capture.py: new test file proving
+  capture is off by default, on with env var, resets, invalid reports are not captured, returned
+  list is a copy, and the prod-path response body is bit-identical with capture on vs off.
+
+Parent epic: JTN-677.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui-audit**: Add Layer 1 static handler audit (JTN-678)
+  ([#457](https://github.com/jtn0123/InkyPi/pull/457),
+  [`748e30c`](https://github.com/jtn0123/InkyPi/commit/748e30c85432b3f7b50ee5f3c7df0d62c98e4909))
+
+Introduces `tests/ui_audit/` — a stdlib-only pytest that parses every template in `src/templates/`
+  and every JS file in `src/static/scripts/` and proves every clickable element has a reachable
+  handler.
+
+Three rules enforced: 1. data-X-action="value" must have a JS file that reads dataset.Xaction (or
+  uses [data-x-action]) AND the action literal must appear in some JS file (cross-file delegation is
+  common: plugin_page.js -> plugin_form.js). 2. <button type="button"> without any data-*-action,
+  hx-*, delegated marker, or id/class referenced from JS is an orphan. 3. <a href="#anchor"> must
+  resolve to an id in some template or have a JS handler.
+
+Findings: zero dead handlers today. Regression-tested by deleting history_page.js'
+  dataset.historyAction read (rule 1 trips) and renaming #historyRefreshBtn (rule 2 trips).
+
+No new deps — uses html.parser + regex. Runs in ~0.2 s.
+
+Part of epic JTN-677 (UI breakage detection net, Layer 1 of 4).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.50.3 (2026-04-14)
 
 ### Bug Fixes
