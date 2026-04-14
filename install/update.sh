@@ -45,6 +45,29 @@ update_app_service() {
     sudo systemctl enable "$SERVICE_FILE"
     echo "Starting $APPNAME service."
     sudo systemctl start "$SERVICE_FILE"
+    # JTN-684: Explicitly verify the service reached active state.
+    # systemctl start exits 0 even when the service subsequently fails
+    # (e.g. ExecStart returns non-zero), so we poll is-active with a short
+    # retry loop to give systemd a moment to settle before declaring failure.
+    local attempts=0
+    local max_attempts=3
+    local active=0
+    while [ "$attempts" -lt "$max_attempts" ]; do
+      if sudo systemctl is-active --quiet "$SERVICE_FILE"; then
+        active=1
+        break
+      fi
+      attempts=$(( attempts + 1 ))
+      [ "$attempts" -lt "$max_attempts" ] && sleep 1
+    done
+    if [ "$active" -eq 0 ]; then
+      echo_error "ERROR: $SERVICE_FILE failed to start (not active after $max_attempts attempt(s))."
+      echo "Service status:" >&2
+      sudo systemctl show -p ActiveState,SubState,Result "$SERVICE_FILE" >&2 || true
+      echo "Last 20 journal lines:" >&2
+      sudo journalctl -u "$APPNAME" -n 20 --no-pager >&2 || true
+      exit 1
+    fi
   else
     echo_error "ERROR: Service file $SERVICE_FILE_SOURCE not found!"
     exit 1

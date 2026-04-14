@@ -1596,6 +1596,48 @@ class TestUpdateScript:
                 "--no-cache" in block
             ), f"uv pip install in update.sh missing --no-cache (JTN-602 parity): {block!r}"
 
+    def test_update_app_service_checks_is_active_after_start(self):
+        # JTN-684: update_app_service() must verify the service reached active
+        # state after systemctl start. systemctl start exits 0 even when the
+        # service subsequently fails, so an explicit is-active check is required.
+        fn_start = self.content.index("update_app_service() {")
+        fn_end = self.content.index("\n}", fn_start) + 2
+        fn_body = self.content[fn_start:fn_end]
+        assert (
+            "systemctl start" in fn_body
+        ), "update_app_service must call systemctl start"
+        start_pos = fn_body.index("systemctl start")
+        assert (
+            "is-active" in fn_body
+        ), "update_app_service must check 'systemctl is-active' after start (JTN-684)"
+        is_active_pos = fn_body.index("is-active")
+        assert (
+            is_active_pos > start_pos
+        ), "'systemctl is-active' check must appear after 'systemctl start' (JTN-684)"
+
+    def test_update_app_service_exits_nonzero_on_start_failure(self):
+        # JTN-684: if the service is not active after starting, the script must
+        # exit non-zero so callers know the update failed.
+        fn_start = self.content.index("update_app_service() {")
+        fn_end = self.content.index("\n}", fn_start) + 2
+        fn_body = self.content[fn_start:fn_end]
+        assert (
+            "exit 1" in fn_body
+        ), "update_app_service must 'exit 1' when service fails to start (JTN-684)"
+
+    def test_update_app_service_dumps_journal_on_start_failure(self):
+        # JTN-684: on service-start failure, the user must see journal output
+        # instead of a misleading "Update completed" success message.
+        fn_start = self.content.index("update_app_service() {")
+        fn_end = self.content.index("\n}", fn_start) + 2
+        fn_body = self.content[fn_start:fn_end]
+        assert (
+            "journalctl" in fn_body
+        ), "update_app_service must dump journalctl output when service fails to start (JTN-684)"
+        assert (
+            "--no-pager" in fn_body
+        ), "journalctl in update_app_service must use --no-pager for non-interactive output (JTN-684)"
+
 
 # ---- uninstall.sh ----
 
