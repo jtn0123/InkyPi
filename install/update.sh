@@ -208,9 +208,9 @@ pip_extra_args=()
 uv_extra_args=()
 if fetch_wheelhouse; then
   pip_extra_args+=(--find-links "$WHEELHOUSE_DIR" --prefer-binary)
-  # uv supports --find-links; --only-binary=:all: forces binary wheels to
-  # guarantee nothing is built from sdist on the Pi (equivalent intent to
-  # pip's --prefer-binary but stricter).
+  # uv supports --find-links; --find-links pointing at the pre-built wheelhouse
+  # already ensures binary wheels are preferred. We omit --only-binary=:all:
+  # to avoid blocking packages that only exist as sdists in the wheelhouse.
   uv_extra_args+=(--find-links "$WHEELHOUSE_DIR")
 fi
 
