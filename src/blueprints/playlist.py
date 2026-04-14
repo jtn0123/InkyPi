@@ -39,6 +39,7 @@ _MSG_INVALID_TIME_FORMAT = "Invalid start/end time format"
 _MSG_SAME_TIME = "Start time and End time cannot be the same"
 _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
+_MSG_PLAYLIST_NOT_FOUND = "Playlist not found"
 
 
 def _validate_playlist_name(name, field="playlist_name"):
@@ -705,6 +706,42 @@ def _apply_cycle_override(playlist_manager, new_name, cycle_minutes_int):
         playlist.cycle_interval_seconds = cycle_minutes_int * 60
 
 
+def _validate_update_playlist_payload(data):
+    """Validate an /update_playlist request payload.
+
+    Returns ``(parsed, error_response)``; exactly one is non-None.  ``parsed``
+    is a dict with ``new_name``, ``start_time``, ``end_time``, ``start_min``,
+    ``end_min``, ``cycle_minutes_int``.
+    """
+    new_name, name_err = _validate_playlist_name(data.get("new_name"), field="new_name")
+    if name_err:
+        return None, name_err
+    start_time = data.get("start_time")
+    end_time = data.get("end_time")
+    if not start_time or not end_time:
+        missing_field = "start_time" if not start_time else "end_time"
+        return None, json_error(
+            "Missing required fields",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": missing_field},
+        )
+    start_min, end_min, time_err = _validate_playlist_times(start_time, end_time)
+    if time_err:
+        return None, time_err
+    cycle_minutes_int, cycle_err = _validate_cycle_minutes(data.get("cycle_minutes"))
+    if cycle_err:
+        return None, cycle_err
+    return {
+        "new_name": new_name,
+        "start_time": start_time,
+        "end_time": end_time,
+        "start_min": start_min,
+        "end_min": end_min,
+        "cycle_minutes_int": cycle_minutes_int,
+    }, None
+
+
 @playlist_bp.route("/update_playlist/<string:playlist_name>", methods=["PUT"])
 def update_playlist(playlist_name):
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -714,23 +751,15 @@ def update_playlist(playlist_name):
     if not isinstance(data, dict):
         return json_error("Invalid JSON data", status=400)
 
-    new_name_raw = data.get("new_name")
-    new_name, name_err = _validate_playlist_name(new_name_raw, field="new_name")
-    if name_err:
-        return name_err
-    start_time = data.get("start_time")
-    end_time = data.get("end_time")
-    if not start_time or not end_time:
-        missing_field = "start_time" if not start_time else "end_time"
-        return json_error(
-            "Missing required fields",
-            status=400,
-            code=_CODE_VALIDATION,
-            details={"field": missing_field},
-        )
-    start_min, end_min, time_err = _validate_playlist_times(start_time, end_time)
-    if time_err:
-        return time_err
+    parsed, err = _validate_update_playlist_payload(data)
+    if err:
+        return err
+    new_name = parsed["new_name"]
+    start_time = parsed["start_time"]
+    end_time = parsed["end_time"]
+    start_min = parsed["start_min"]
+    end_min = parsed["end_min"]
+    cycle_minutes_int = parsed["cycle_minutes_int"]
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -750,10 +779,6 @@ def update_playlist(playlist_name):
             return overlap_err
     except Exception:
         pass
-
-    cycle_minutes_int, cycle_err = _validate_cycle_minutes(data.get("cycle_minutes"))
-    if cycle_err:
-        return cycle_err
 
     upd_result: list[bool] = []
 
@@ -874,7 +899,7 @@ def reorder_plugins():
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
             return json_error(
-                "Playlist not found",
+                _MSG_PLAYLIST_NOT_FOUND,
                 status=400,
                 code=_CODE_VALIDATION,
                 details={"field": "playlist_name"},
@@ -920,7 +945,7 @@ def display_next_in_playlist():
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
             return json_error(
-                "Playlist not found",
+                _MSG_PLAYLIST_NOT_FOUND,
                 status=400,
                 code=_CODE_VALIDATION,
                 details={"field": "playlist_name"},
@@ -972,7 +997,7 @@ def playlist_eta(playlist_name: str):
     pl = playlist_manager.get_playlist(playlist_name)
     if not pl:
         return json_error(
-            "Playlist not found",
+            _MSG_PLAYLIST_NOT_FOUND,
             status=404,
             code=_CODE_VALIDATION,
             details={"field": "playlist_name"},
