@@ -38,6 +38,7 @@ UI_BROWSER_TESTS = {
     "test_click_sweep.py",
     "test_jtn_681_clock_face_picker.py",
     "test_toggle_reflection.py",
+    "test_layout_overlap.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
