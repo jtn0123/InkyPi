@@ -54,6 +54,28 @@ echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version"
 echo "Current version: $CURRENT_VERSION"
 
 # ---------------------------------------------------------------------------
+# JTN-673: Ensure the origin remote has a full branch refspec before fetching.
+# Older installers pinned origin to a single-tag refspec such as
+#   +refs/tags/v0.28.1:refs/tags/v0.28.1
+# which causes `git fetch origin` to download only that one tag.  As a
+# result, `git branch -r` is empty, and `git checkout refs/tags/<new_tag>`
+# still works but leaves HEAD detached with no remote-tracking branches —
+# meaning the next do_update.sh run cannot re-resolve the latest semver tag
+# from `git tag --sort=-v:refname` after a fresh fetch of only the old tag.
+# More visibly: if any code path falls back to `git checkout main` it will
+# fail with "'origin/main' is not a commit".
+#
+# Fix: if the full branch glob is not already in the fetch refspec list, wipe
+# and re-add it so subsequent fetches download all branches.
+# ---------------------------------------------------------------------------
+if ! git -C "$REPO_DIR" config --get-all remote.origin.fetch 2>/dev/null \
+    | grep -qF '+refs/heads/*:refs/remotes/origin/*'; then
+  echo "Widening narrow git fetch refspec to include all branches..."
+  git -C "$REPO_DIR" config --unset-all remote.origin.fetch || true
+  git -C "$REPO_DIR" config --add remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+fi
+
+# ---------------------------------------------------------------------------
 # Fetch latest from origin
 # ---------------------------------------------------------------------------
 echo "Fetching latest from origin..."
