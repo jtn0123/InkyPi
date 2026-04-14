@@ -1,6 +1,760 @@
 # CHANGELOG
 
 
+## v0.50.0 (2026-04-14)
+
+### Bug Fixes
+
+- **install**: Make update.sh fail loudly on pip/apt errors (JTN-665)
+  ([#446](https://github.com/jtn0123/InkyPi/pull/446),
+  [`d80e72f`](https://github.com/jtn0123/InkyPi/commit/d80e72f4c4abbc6b2b8cd7d62b7a81c3744648a9))
+
+Replace silent `&& echo_success` patterns in update.sh with explicit `if !` guards that print an
+  error and exit 1 on failure, matching the hardened style already used in install.sh. Covers
+  apt-get install, pip upgrade, pip install -r requirements.txt, and update_vendors.sh so a compile
+  error (e.g. metadata-generation-failed) can no longer silently fall through to the service restart
+  and trigger a boot loop.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **install**: Set TMPDIR to disk-backed /var/tmp before pip in update.sh (JTN-668)
+  ([#447](https://github.com/jtn0123/InkyPi/pull/447),
+  [`065796c`](https://github.com/jtn0123/InkyPi/commit/065796cb15844e82eba76908cb79704fcf897f0c))
+
+/tmp on Pi OS Trixie is a 213 MB tmpfs — not enough room for numpy's intermediate build artefacts
+  (>500 MB). pip defaults to TMPDIR which defaults to /tmp, so numpy compilation fails with "No
+  space left on device".
+
+Fix: export TMPDIR=/var/tmp/pip-build before every pip call in update.sh. /var/tmp is disk-backed
+  and has gigabytes free on the affected Pi. The directory is created at runtime and cleaned up on
+  success.
+
+Also align the zramswap OS-version guard with install.sh — update.sh was checking only for Bookworm
+  (12); now checks Bullseye/Bookworm/Trixie (11/12/13).
+
+Add --retries 5 --timeout 60 --no-cache-dir to pip invocations for parity with install.sh (Pi Zero 2
+  W flaky Wi-Fi + SD card space).
+
+Part of epic JTN-529 (install path hardening).
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **install**: Share wheelhouse helpers via _common.sh so update.sh uses pre-built wheels (JTN-669)
+  ([#450](https://github.com/jtn0123/InkyPi/pull/450),
+  [`a43ae20`](https://github.com/jtn0123/InkyPi/commit/a43ae20dc61fe8dc10e194534b5f9ec13b51dfc7))
+
+* fix(install): share wheelhouse helpers via _common.sh so update.sh uses pre-built wheels (JTN-669)
+
+- Extract fetch_wheelhouse / cleanup_wheelhouse from install.sh into install/_common.sh; both
+  install.sh and update.sh now source it. - update.sh calls fetch_wheelhouse before pip upgrade and
+  passes --find-links / --prefer-binary when the bundle is available, cutting update time on Pi Zero
+  2 W from ~15 min / OOM risk to ~2-3 min. - Adds --retries 5 --timeout 60 --no-cache-dir to
+  update.sh pip calls for parity with install.sh (JTN-534 / JTN-602). - Updates
+  TestInstallWheelhouseFetch to check install.sh sources _common.sh; adds
+  TestCommonWheelhouseFunctions for _common.sh; adds wheelhouse assertions to TestUpdateScript.
+
+Closes JTN-669. Part of epic JTN-529 (install path hardening).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting to test_install_scripts.py
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **install**: Widen narrow git fetch refspec in do_update.sh (JTN-673)
+  ([#452](https://github.com/jtn0123/InkyPi/pull/452),
+  [`533d8d9`](https://github.com/jtn0123/InkyPi/commit/533d8d9487ae6b2ee20b669b7ca161a90ce23da4))
+
+Older installers could pin remote.origin.fetch to a single-tag refspec (e.g.
+  +refs/tags/v0.28.1:refs/tags/v0.28.1), causing `git fetch origin` to skip all branches. Before
+  fetching, check whether the full branch glob is present; if not, wipe and re-add it so subsequent
+  fetches pull all remote-tracking branches and tags correctly.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **release**: Regenerate uv.lock + keep lockfile in sync on release (JTN-655)
+  ([#419](https://github.com/jtn0123/InkyPi/pull/419),
+  [`3053b81`](https://github.com/jtn0123/InkyPi/commit/3053b81c26a62e448b7b792667a7de1d7afb4ed1))
+
+- Regenerate uv.lock to match pyproject.toml 0.49.19 to unblock the Lockfile drift CI check that was
+  failing on every new PR. - Extend semantic-release build_command to run `uv lock` alongside the
+  VERSION write, and add uv.lock to `assets` so the refreshed lockfile is included in the release
+  commit. This is the durable fix the JTN-655 description called out as item (2).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close plugin_io xss + plugin path-injection (JTN-326)
+  ([#431](https://github.com/jtn0123/InkyPi/pull/431),
+  [`6e3011a`](https://github.com/jtn0123/InkyPi/commit/6e3011a2e28b5f4fc1d052a58f7e3a39688031c6))
+
+* fix(security): close plugin_io xss + plugin path-injection (JTN-326)
+
+Addresses two CodeQL alerts in the blueprint layer:
+
+- py/reflective-xss at src/blueprints/plugin_io.py:103 — the 404 for a missing export instance
+  interpolated the user-supplied instance name directly into the JSON error body. Return a generic
+  "Plugin instance not found" message and log the tainted value server-side via sanitize_log_field,
+  matching the PR #425/#426 pattern.
+
+- py/path-injection at src/blueprints/plugin.py:142 — the /images/<id>/<path> route passed
+  user-controlled plugin_id and filename straight through to send_from_directory. Follow the PR #424
+  pattern: validate the plugin directory with utils.security_utils.validate_file_path (realpath +
+  commonpath containment), then resolve each filename segment against os.listdir() so the value
+  passed to send_from_directory is rebuilt from trusted filesystem data rather than raw URL input.
+  Null-byte and absolute-path inputs are rejected up front.
+
+Regression tests: - tests/test_plugin_io.py: XSS payload in ?instance= is not echoed, raw or
+  HTML-escaped. - tests/integration/test_plugin_images_route.py: nested subpaths still serve, while
+  traversal, unknown plugin, unknown file, and absolute/dot segments return 404/308 without escaping
+  the plugin directory.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(security): derive plugin image path from os.listdir (JTN-326)
+
+Iteration on CodeQL taint-flow recognition: even with validate_file_path in place, CodeQL still
+  reported py/path-injection on the image route because real_plugin_dir was traced back to the
+  user-supplied plugin_id. Mirror the pattern used in history.py's sidecar cleanup (PR #424, commit
+  3): resolve plugin_id and every filename segment by scanning a server-owned directory via
+  os.listdir() and keeping the listdir-derived name for the final filesystem call.
+  send_from_directory now only ever sees values that originated from os.listdir(), not from the URL.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/path-injection in history blueprint (JTN-326)
+  ([#424](https://github.com/jtn0123/InkyPi/pull/424),
+  [`277dd77`](https://github.com/jtn0123/InkyPi/commit/277dd7718f4af3f10663ca423ea5b23136db1414))
+
+* fix(security): validate user-supplied paths in history blueprint (JTN-326)
+
+Route user-supplied filenames through utils.security_utils.validate_file_path so that CodeQL sees an
+  os.path.realpath-based containment check in addition to the existing commonpath guard. This closes
+  py/path-injection alerts on src/blueprints/history.py (lines 163, 342, 346, 347, 350, 351)
+  reported by CodeQL. The helper resolves both the candidate and the allowed directory with
+  realpath, rejecting .. traversal, absolute paths, and symlink escapes.
+
+The delete sidecar path is now re-derived from the validated primary filename and run back through
+  the same helper, so the secondary remove() call no longer consumes a path taint-traced from raw
+  user input. Null-byte filenames and absolute paths are rejected up-front for defence in depth.
+
+Adds integration tests covering .., absolute paths, null bytes, symlink escape, valid basenames, and
+  sidecar removal on delete.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(security): sanitize sidecar path through validate_file_path directly (JTN-326)
+
+CodeQL did not recognise _resolve_history_path as a py/path-injection sanitiser; call
+  validate_file_path directly on the candidate sidecar path so the sanitiser flows are picked up.
+
+* fix(security): isolate sidecar remove() from user input via listdir match (JTN-326)
+
+CodeQL's py/path-injection analysis still followed the taint flow through validate_file_path() for
+  the sidecar removal. Rewrite the sidecar cleanup so the argument to os.remove() is constructed
+  from os.listdir() output (not user-controlled) while still performing a realpath+commonpath
+  containment check as defence-in-depth.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/reflective-xss at main.py:280 (JTN-326)
+  ([#428](https://github.com/jtn0123/InkyPi/pull/428),
+  [`f57278a`](https://github.com/jtn0123/InkyPi/commit/f57278afffbfcebed4a9addff7e201ed201af055))
+
+* fix(security): close py/reflective-xss at main.py:280 (JTN-326)
+
+Remove reflection of user-supplied plugin IDs in /api/plugin_order error responses. Replace f-string
+  interpolation of `invalid_ids` and `missing_ids` with generic messages. Although `json_error`
+  returns application/json (minimising practical XSS risk), removing the reflection closes the
+  CodeQL alert at its root and hardens against future content-type handling regressions — matching
+  the pattern used in PRs #425/#426 for sibling blueprints.
+
+Regression test: POST various XSS payloads as plugin IDs and assert they do not appear in the
+  response body.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: update stale plugin_order error-message assertion (JTN-326)
+
+Sibling test in test_blueprint_coverage.py still asserted the old interpolated error message. Update
+  to match the new generic wording and add a negative assertion that the tainted value is not
+  reflected.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/reflective-xss in apikeys blueprint (JTN-326)
+  ([#429](https://github.com/jtn0123/InkyPi/pull/429),
+  [`b67d7da`](https://github.com/jtn0123/InkyPi/commit/b67d7dae5cb5809a8cf7b6e471645792a5c9e3df))
+
+Replace f-string interpolation of user-controlled entry ``key``/``value`` in
+  ``_validate_api_key_entry`` error messages with generic strings so attacker-controlled input is
+  never echoed back in JSON error bodies.
+
+Adds ``tests/integration/test_apikeys_xss.py`` which POSTs XSS payloads to ``/api-keys/save``
+  (invalid key format, non-string value, control chars, bad keepExisting) and asserts the raw
+  payload does not appear in the response body.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/reflective-xss in client_log blueprint (JTN-326)
+  ([#427](https://github.com/jtn0123/InkyPi/pull/427),
+  [`04fb615`](https://github.com/jtn0123/InkyPi/commit/04fb6155589a79fa7336a0ecf8fda580d7c40a3b))
+
+The invalid-level branch of POST /api/client-log echoed the rejected ``level`` value back inside an
+  f-string error message. CodeQL flagged this as reflective-xss (alerts on
+  src/blueprints/client_log.py lines 58 and 62). Even though json_error emits application/json —
+  which browsers do not render as HTML — removing the reflection closes the alert and hardens
+  against future content-type handling changes.
+
+Fix mirrors PR #425/#426 precedent: - Response body carries a generic "Invalid level: must be one of
+  [...]" message with no taint. - Raw value is routed to logger.warning via sanitize_log_field so
+  debugging information is preserved server-side.
+
+Adds tests/integration/test_client_log_xss.py which posts six XSS payloads (<script>, img onerror,
+  svg onload, javascript:, quote-break variants) and asserts the raw payload never appears in the
+  JSON response body, the response is application/json, and the sanitized value is logged.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/reflective-xss in history blueprint (JTN-326)
+  ([#430](https://github.com/jtn0123/InkyPi/pull/430),
+  [`9a81ee1`](https://github.com/jtn0123/InkyPi/commit/9a81ee1072ae6000f94a51cd0bdc6893216048f1))
+
+Closes CodeQL py/reflective-xss alerts in `src/blueprints/history.py` at lines 355, 359, 378, 382.
+  These `return err` sites propagated a response object that was conditionally produced from the
+  request body, so CodeQL's taint tracker tied the response back to user input even though the
+  messages themselves were already module-level constants.
+
+Refactor the two internal helpers (`_parse_filename_from_request`,
+  `_validate_and_resolve_history_file`) to return plain string error-code sentinels instead of
+  pre-built `json_error` responses. Callers map the code to a response via a new
+  `_filename_error_response` helper whose every branch calls `json_error(...)` with a module-level
+  constant string only. This mirrors the precedent from PRs #422/#425/#426: generic messages in the
+  response body + tainted values logged server side via `sanitize_log_field`.
+
+Add `tests/integration/test_history_xss.py` covering `/history/redisplay`, `/history/delete`, and
+  `/history/image/<path>` with common XSS payloads (<script>, img onerror, svg onload, iframe
+  srcdoc); asserts raw payload never reflects and responses carry application/json.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close py/reflective-xss in playlist blueprint (JTN-326)
+  ([#425](https://github.com/jtn0123/InkyPi/pull/425),
+  [`8f64e3f`](https://github.com/jtn0123/InkyPi/commit/8f64e3f461e6def62c992406aa57b4e915e2d1c7))
+
+Replace f-string interpolation of user-controlled playlist names in error and success messages with
+  generic messages. CodeQL flagged the tainted values flowing from request JSON / URL path
+  parameters into response bodies via jsonify. Even though json_error/json_success emit
+  application/json (which browsers do not render as HTML), removing the reflection closes the alerts
+  and hardens against future content-type handling changes.
+
+Sites closed (all in src/blueprints/playlist.py): - create_playlist duplicate-name error (was line
+  533) - update_playlist not-found error (was line 640) - update_playlist success message (was lines
+  678-679) - delete_playlist not-found error + success (was lines 692, 698) - reorder_plugins
+  not-found error (was line 742) - display_next_in_playlist not-found error (was line 778) -
+  playlist_eta not-found error (was line 820)
+
+Adds tests/integration/test_playlist_xss.py which POSTs/PUTs/DELETEs/GETs crafted payloads
+  (<script>, img onerror, svg onload, javascript:) to each affected route and asserts the raw
+  payload is not echoed in the response body and that handler-produced responses carry
+  application/json.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Close reflected-xss + stack-trace exposure in plugin blueprint (JTN-326)
+  ([#426](https://github.com/jtn0123/InkyPi/pull/426),
+  [`a64d66d`](https://github.com/jtn0123/InkyPi/commit/a64d66d8a0ae678d018d5ab5f2b1bd7151b67608))
+
+Addresses CodeQL alerts in src/blueprints/plugin.py:
+
+- py/reflective-xss at lines 90, 304, 394, 398, 429, 756 — error messages previously interpolated
+  user-controlled values (instance names, playlist names, URL path plugin_id) into the JSON body via
+  sanitize_response_value(). Replace every site with a fully generic message and log the tainted
+  value server-side via sanitize_log_field. - py/stack-trace-exposure at line 705 —
+  _update_now_direct returned sanitize_response_value(str(e)) for plugin RuntimeErrors, echoing
+  exception text to the client. Return a generic "An internal error occurred" message instead;
+  logger.exception already captures the full traceback for operators.
+
+This follows the same pattern as PR #422 (main blueprint). Regression tests assert that XSS payloads
+  sent to each affected endpoint are not echoed in response bodies and that deliberate plugin
+  RuntimeError exceptions return the generic message without leaking RuntimeError text.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Redact secrets in weather plugin logs (JTN-326)
+  ([#423](https://github.com/jtn0123/InkyPi/pull/423),
+  [`c3a2946`](https://github.com/jtn0123/InkyPi/commit/c3a29469d9719e3bef4eb479137f6d413e125e96))
+
+Wrap tainted log arguments in src/plugins/weather/weather_api.py (error response bodies at lines
+  39/52/65) and src/plugins/weather/weather_data.py (timezone field at line 98) with the existing
+  redact_secrets() helper from utils.logging_utils so any credential-shaped substring is masked
+  before it reaches log handlers. Removes the prior lgtm[] suppression comments in favor of a real
+  root-cause fix, closing CodeQL py/clear-text-logging-sensitive-data at those sites.
+
+Adds tests/plugins/test_weather_redaction.py covering all four call sites: asserts the fake API key
+  is absent from caplog output and that the ***REDACTED*** sentinel appears.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Redact sensitive data in base_plugin logs (JTN-326)
+  ([#421](https://github.com/jtn0123/InkyPi/pull/421),
+  [`d8b508f`](https://github.com/jtn0123/InkyPi/commit/d8b508f07ff6eb4a4585220c0ed90ba1eb9e99f1))
+
+* fix(security): redact sensitive fields before logging in base_plugin (JTN-326)
+
+Addresses CodeQL py/clear-text-logging-sensitive-data alerts #16/#17 at
+  src/plugins/base_plugin/base_plugin.py:201 and :214. Both call sites logged values derived from
+  template_params (plugin settings), which CodeQL taints as potentially sensitive. Previous # lgtm
+  suppressions were ignored by CodeQL.
+
+Fix: route the logged values through a new public redact_secrets() helper in utils.logging_utils,
+  which reuses the existing secret-pattern sanitizer already used by SecretRedactionFilter. The
+  helper serves as an explicit sanitizer barrier for CodeQL and masks any api_key=, Bearer <token>,
+  or 32+ hex secrets that happen to flow through CSS path or extra_css error paths. Also applied to
+  the _build_css_files warning at line 187 which shares the same taint.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: sync uv.lock with pyproject version bump
+
+* test: cover base_plugin CSS exception paths; fix UnboundLocalError
+
+Adds unit tests for the three redact_secrets() call sites in base_plugin (addresses Sonar new-code
+  coverage gate) and fixes an UnboundLocalError where extra_css could be referenced in the except
+  block before its assignment succeeded.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **security**: Suppress stack-trace exposure in main.py (JTN-326)
+  ([#422](https://github.com/jtn0123/InkyPi/pull/422),
+  [`cbaea8c`](https://github.com/jtn0123/InkyPi/commit/cbaea8c46d5b6c87c62882afbac9459342ee992d))
+
+* fix(security): stop leaking exception detail from main blueprint error handlers (JTN-326)
+
+CodeQL py/stack-trace-exposure flagged two sinks in src/blueprints/main.py where raw exception text
+  was formatted into JSON error responses returned to the client (lines 344 and 360, plus the
+  /refresh alias that reaches the same code via display_next at line 476).
+
+Replace both with generic messages and rely on logger.exception() for server-side diagnostics.
+  Update the two existing tests that asserted the leaky text, and add one regression test explicitly
+  guarding that a secret RuntimeError message does not appear anywhere in the response body.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore: sync uv.lock with pyproject.toml version bump
+
+Lockfile-drift CI check requires uv.lock's inkypi entry to match pyproject version 0.49.20.
+  Pre-existing drift on main; regenerated via `uv lock`.
+
+* refactor(main): narrow manual_update catch to RuntimeError
+
+Addresses CodeRabbit review on #422. refresh_task.manual_update only raises RuntimeError when its
+  queue is full; catching bare Exception here would mask unexpected failures as a 400 when they
+  should fall through to the outer 500 handler.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **ui**: Close js/xss-through-dom on playlist.js (JTN-326)
+  ([#420](https://github.com/jtn0123/InkyPi/pull/420),
+  [`154310f`](https://github.com/jtn0123/InkyPi/commit/154310f5b7e2e9c59a3049722cc74e190197a03c))
+
+* fix(ui): validate thumbnail URL before img.src assignment (JTN-326)
+
+Closes CodeQL js/xss-through-dom alert on playlist.js:818. The previous `lgtm[...]` comment did not
+  suppress the CodeQL alert. Instead of suppressing, rebuild a safe same-origin path from the
+  DOM-sourced data-src attribute and reject anything else, giving CodeQL a recognizable sanitizer
+  boundary.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(lockfile): sync uv.lock with pyproject.toml v0.49.20
+
+* fix(ui): use strict regex allowlist for thumbnail URL (JTN-326)
+
+Replaces the URL-parse approach with a hard regex allowlist that CodeQL recognizes as a sanitizer
+  barrier. Only matches site-relative paths under /static/ with a whitelisted character set, closing
+  the js/xss-through-dom taint flow from img data-src to img.src.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **ui**: Hide raw plugin-instance keys in UI (JTN-618, JTN-619, JTN-620)
+  ([#393](https://github.com/jtn0123/InkyPi/pull/393),
+  [`a0f123b`](https://github.com/jtn0123/InkyPi/commit/a0f123bdb69a8cb81c51d46e14f4037a1595b69e))
+
+* fix(ui): hide raw plugin-instance keys across dashboard, playlists, history (JTN-618, JTN-619,
+  JTN-620)
+
+Introduce a display-name layer for plugin instances so internal settings keys like
+  `weather_saved_settings` no longer leak into user-facing UI surfaces:
+
+- NOW SHOWING / Next up on the dashboard (JTN-618) - History "Source" metadata row (JTN-619) -
+  Playlists list — visible labels, aria-labels, delete confirmation, thumbnail caption (JTN-620)
+
+A new `utils.display_names` module centralises the fallback chain: 1. user-renamed instance name
+  (unchanged) 2. plugin's `display_name` from plugin-info.json 3. humanised plugin id (e.g.
+  `image_folder` -> "Image Folder") 4. raw instance name as last resort
+
+Templates use new Jinja filters (`friendly_instance_label`, `instance_suffix_label`); the
+  `/refresh-info` and `/next-up` endpoints annotate responses with `plugin_display_name`,
+  `plugin_instance_label`, and `plugin_instance_is_auto` for the dashboard JS. Data attributes and
+  element ids continue to carry the raw settings key because the JS layer needs it to make API calls
+  against the filesystem settings file — but the raw key is no longer visible text or screen-reader
+  content.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* a11y(playlist): add sr-only text to icon buttons to match aria-labels
+
+Sonar S7927 flagged four icon-only buttons/links whose accessible name (aria-label) has no visible
+  text counterpart. Add a hidden <span class="sr-only"> containing the same label so the accessible
+  name is part of the visible label per WCAG 2.5.3.
+
+* fix(playlist): show visible labels for plugin actions
+
+* style: apply black formatting to test files
+
+Fix CI lint failure by running black on the two test files modified during the main merge.
+
+* fix(a11y): keep visible labels in accessible name for playlist actions
+
+SonarCloud S7927: the accessible name must contain the visible label text. Replace aria-label (which
+  overrides visible text entirely) with visually-hidden sr-only spans so the accessible name becomes
+  "<visible label> <additional context>", e.g. "Edit plugin <name>". Keep the longer descriptive
+  text as a title attribute for pointer hover tooltips.
+
+* chore: sync uv.lock with pyproject.toml after main merge
+
+Bump inkypi version in lockfile to 0.49.16 to match pyproject.toml pulled in during the main merge.
+
+* chore: sync uv.lock with pyproject.toml
+
+Bump inkypi lockfile version to 0.49.19 after second main merge.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **update**: Stop + disable inkypi.service before venv update (JTN-666)
+  ([#449](https://github.com/jtn0123/InkyPi/pull/449),
+  [`850e5d5`](https://github.com/jtn0123/InkyPi/commit/850e5d5e78a9bcb441e01231321566625e77d5c5))
+
+update.sh never stopped the service before pip install, causing systemd to restart-loop the
+  half-installed venv every 60s during updates. On a 512 MB Pi Zero 2 W this caused load-14 thrash
+  and required physical power-cycling.
+
+- Port stop_service() + show_loader() from install.sh (JTN-600 parity) - Call stop_service before
+  apt/pip work; update_app_service re-enables at end - Add /var/lib/inkypi/.install-in-progress
+  lockfile (JTN-607 parity) so even a manual `systemctl start` cannot bite mid-update; removed only
+  on success - Fix zramswap OS-version guard to cover Bullseye/Bookworm/Trixie (11/12/13) - Guard
+  setup_zramswap_service against Trixie's preinstalled zram-swap - Fix Trixie typo in get_os_version
+  comment (Trixe -> Trixie) - Add tests covering all new invariants
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Chores
+
+- **deps-dev**: Bump pytest from 8.4.2 to 9.0.3 in /install
+  ([#443](https://github.com/jtn0123/InkyPi/pull/443),
+  [`785ead4`](https://github.com/jtn0123/InkyPi/commit/785ead49d5903d5212f577b30093bee06f6dd12c))
+
+Bumps [pytest](https://github.com/pytest-dev/pytest) from 8.4.2 to 9.0.3. - [Release
+  notes](https://github.com/pytest-dev/pytest/releases) -
+  [Changelog](https://github.com/pytest-dev/pytest/blob/main/CHANGELOG.rst) -
+  [Commits](https://github.com/pytest-dev/pytest/compare/8.4.2...9.0.3)
+
+--- updated-dependencies: - dependency-name: pytest dependency-version: 9.0.3
+
+dependency-type: direct:development ...
+
+Signed-off-by: dependabot[bot] <support@github.com>
+
+Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+
+- **lint**: Enable ruff DTZ and RET rule families
+  ([#442](https://github.com/jtn0123/InkyPi/pull/442),
+  [`3912dc1`](https://github.com/jtn0123/InkyPi/commit/3912dc1fae4f9aca82e6ab9534330b1016ca5f9e))
+
+* chore(lint): enable ruff DTZ rule family and fix violations
+
+Enable flake8-datetimez (DTZ) in ruff to catch timezone-naive datetime usage — a real bug class for
+  the scheduler and history subsystems.
+
+Production fixes (src/, scripts/): 21 violations replaced naive
+  datetime.now()/today()/utcnow()/fromtimestamp() calls with tz-aware datetime.now(tz=UTC) (or
+  device tz where one was already plumbed) and paired strptime() calls with an immediate
+  .replace(tzinfo=...) or with a narrow # noqa where the parsed value is used only as a pure format
+  validator (scheduled HH:MM times, YYYY-MM-DD date inputs).
+
+Tests: DTZ is ignored under tests/** via per-file-ignores. The test suite leans heavily on naive
+  fixture datetimes for deterministic clock stubs; enforcing tz-awareness there would bloat fixtures
+  without exercising new behavior. Production paths still get full coverage.
+
+One test (tests/unit/test_wpotd_unit.py) patched datetime with a stub that only implemented
+  today()/strptime(); added a now() shim so the frozen-date fixture keeps working after
+  wpotd._determine_date() switched to datetime.now(tz=UTC).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(lint): enable ruff RET rule family and fix violations
+
+Enable flake8-return (RET) in ruff to clean up return-statement smells.
+
+Breakdown: - 30 violations auto-fixed via ``ruff --fix`` (safe fixes): RET505
+  (superfluous-else-return), RET501 (unnecessary-return-none), RET502 (implicit-return-value),
+  RET506 (superfluous-else-raise). - 31 violations auto-fixed via ``ruff --fix --unsafe-fixes``: all
+  RET504 (unnecessary-assign-before-return) plus three RET503 sites where a branch fell off the end
+  of a function that otherwise returned a value.
+
+Potentially-real return-path bugs surfaced: -
+  ``src/refresh_task/task.py::RefreshTask.manual_update``: the ``else`` branch logged a warning but
+  fell off the function implicitly returning ``None``. The caller expected ``RefreshResult | None``
+  so the behavior is preserved after the fix, but the previous code was ambiguous about whether
+  ``None`` was intentional. Now it's explicit. - ``tests/unit/test_security_csrf_rate_limit.py``:
+  two Flask ``before_request`` handlers used bare ``return`` (implicit None) on the happy path and a
+  value on error paths; made both explicit so the handler's return contract is unambiguous.
+
+No runtime behavior changes — all fixes are semantic-preserving.
+
+* chore(lint): drop redundant trailing return in build_settings_schema
+
+SonarCloud python:S3626 flagged the bare `return` left behind by the RET autofix on
+  `BasePlugin.build_settings_schema`. The function has no return type annotation and just falls
+  through to implicit None, so dropping the statement entirely keeps the existing semantics while
+  clearing the alert.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **quality**: Expand strict helper subset ([#438](https://github.com/jtn0123/InkyPi/pull/438),
+  [`3714061`](https://github.com/jtn0123/InkyPi/commit/3714061a0ded42d6de284264af8f3b1de6151f1b))
+
+- **quality**: Tighten helper typing and ruff rules
+  ([#437](https://github.com/jtn0123/InkyPi/pull/437),
+  [`cfe5e1c`](https://github.com/jtn0123/InkyPi/commit/cfe5e1c20fe3392a8a9c3c3b8772de7bfa13aa42))
+
+- **quality**: Tighten refresh task typing ([#439](https://github.com/jtn0123/InkyPi/pull/439),
+  [`4bbf1ad`](https://github.com/jtn0123/InkyPi/commit/4bbf1adce858f7b7762cf00c7559da0db973f7e2))
+
+- **security**: Add dependency review, Semgrep, and Trivy
+  ([#436](https://github.com/jtn0123/InkyPi/pull/436),
+  [`26fd4d0`](https://github.com/jtn0123/InkyPi/commit/26fd4d056bf24a841a1960c5768ff7556a551b93))
+
+* chore(security): add dependency review and code scanning workflows
+
+* fix(ci): unblock security workflow checks
+
+* fix(ci): address workflow review feedback
+
+- **typing**: Split advisory mypy into src and tests passes
+  ([#440](https://github.com/jtn0123/InkyPi/pull/440),
+  [`b7769c1`](https://github.com/jtn0123/InkyPi/commit/b7769c1172ef2503f30690de586df9f0f930f8ca))
+
+* chore(typing): split advisory mypy into src and tests passes
+
+Split the advisory whole-codebase mypy invocation into two labeled runs (src/ and tests/) with
+  separate error counts so that production-code type drift stays visible and we can continue
+  ratcheting the strict subset. Both remain non-blocking; the strict subset is unchanged.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor(lint): harden mypy error counting and dedup advisory runs
+
+- count_mypy_errors now accepts exit code; distinguishes failed-without-summary from "0 errors"
+  (addresses CodeRabbit major feedback) - extract run_advisory_mypy helper to remove duplication
+  between src/ and tests/ advisory blocks (addresses CodeRabbit nitpick)
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **typing**: Strictify src/model.py ([#445](https://github.com/jtn0123/InkyPi/pull/445),
+  [`a6599e9`](https://github.com/jtn0123/InkyPi/commit/a6599e913c6735cff7ea265c1737f18d06f409ef))
+
+* chore(typing): add src/model.py to blocking strict subset
+
+Adds src/model.py to the CI-blocking --strict mypy subset. This commit only wires up the
+  configuration and documentation — class-level type fixes land in subsequent commits. With 54
+  errors in src/model.py, scripts/lint.sh will fail until the per-class commits land.
+
+Refs JTN-663.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* chore(typing): strictify RefreshInfo in src/model.py
+
+Adds type annotations to RefreshInfo.__init__, to_dict, from_dict, and get_refresh_datetime.
+  Tightens the plugin_meta parameter to dict[str, Any] to close the generic type-arg complaint. No
+  behavior change.
+
+mypy --strict error count in src/model.py: 54 -> 49.
+
+* chore(typing): strictify PluginInstance in src/model.py
+
+Adds type annotations to PluginInstance.__init__, update, to_dict, from_dict, get_image_path, and
+  get_latest_refresh_dt. Tightens _UPDATABLE to frozenset[str]. settings/refresh typed as dict[str,
+  Any] matching their free-form persisted shape.
+
+In should_refresh(), switches the scheduled lookup from .get("scheduled") to direct indexing since
+  the 'scheduled' in self.refresh check immediately above guarantees presence. This keeps the
+  strptime(...) argument type as Any (the dict's value type) rather than Any | None, satisfying
+  --strict without changing behavior.
+
+mypy --strict error count in src/model.py: 49 -> 39.
+
+* chore(typing): strictify PlaylistManager in src/model.py
+
+Adds type annotations to all PlaylistManager methods: __init__, get_playlist_names,
+  add_default_playlist, find_plugin, determine_active_playlist, get_playlist,
+  add_plugin_to_playlist, add_playlist, update_playlist, delete_playlist, to_dict, from_dict, and
+  the static should_refresh helper. No behavior change.
+
+Remaining "Call to untyped function" errors originate from PlaylistManager consuming not-yet-typed
+  Playlist methods and will resolve in the final Playlist commit.
+
+mypy --strict error count in src/model.py: 39 -> 30.
+
+* chore(typing): strictify Playlist in src/model.py
+
+Completes the strict-subset migration for src/model.py. Adds type annotations to all Playlist
+  methods: __init__, is_active, add_plugin, update_plugin, delete_plugin, find_plugin,
+  get_next_plugin, peek_next_plugin, get_next_eligible_plugin, peek_next_eligible_plugin,
+  reorder_plugins, get_priority, get_time_range_minutes, to_dict, and from_dict.
+
+Supporting changes: - Adds `from __future__ import annotations` so cross-class forward references
+  (Playlist -> PluginInstance, PlaylistManager -> Playlist) resolve cleanly without quoted strings
+  at each site. - to_dict(): replaces `getattr(self, "cycle_interval_seconds", None)` with a direct
+  `self.cycle_interval_seconds is not None` check so mypy can narrow the int() argument. Behavior is
+  equivalent because the attribute is unconditionally assigned in __init__. - from_dict(): drops the
+  explicit `, None` default on data.get("current_plugin_index") since the dict value type now makes
+  it redundant (SIM910). - src/utils/refresh_info.py: removes a now-redundant cast on
+  RefreshInfo.to_dict() — the return type is concrete dict[str, Any] which is structurally identical
+  to the RefreshInfoDict alias.
+
+mypy --strict error count in src/model.py: 30 -> 0. Full file is now clean under the blocking strict
+  subset.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- **release**: Install uv in release workflow so semantic-release build_command can run `uv lock`
+  ([`c99cd19`](https://github.com/jtn0123/InkyPi/commit/c99cd1934cc1627fd13c85ebb947858d165ce22f))
+
+The release workflow's build_command (`printf ... > VERSION && uv lock`) failed with `uv: command
+  not found` (exit 127), aborting the 0.50.0 release. Add astral-sh/setup-uv before semantic-release
+  so uv is on PATH.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- **schemas**: Dev-mode JSON response validator middleware
+  ([#444](https://github.com/jtn0123/InkyPi/pull/444),
+  [`f152b33`](https://github.com/jtn0123/InkyPi/commit/f152b33b81528dd9abf4208ae80835098e5ec243))
+
+* refactor(schemas): extract validate_typeddict to src/schemas/validator.py
+
+Move the hand-rolled TypedDict validator out of tests/contract/ so it can be reused by the upcoming
+  dev-mode response-schema middleware (JTN-664). Zero behavior change; contract tests still drive
+  through the same implementation.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* feat(schemas): add endpoint to TypedDict map
+
+Introduce schemas.endpoint_map.ENDPOINT_SCHEMAS, which maps Flask endpoint names
+  (blueprint.view_name) to the canonical response TypedDict declared in schemas.responses. Consumed
+  by the upcoming dev-mode response-schema validator middleware (JTN-664); endpoint names were
+  verified empirically against request.endpoint from the test client.
+
+* feat(schemas): add dev-only response-schema validator middleware
+
+Add app_setup.schema_validator.register(), an after_request hook that validates JSON bodies for
+  endpoints listed in ENDPOINT_SCHEMAS against their TypedDict. Drift is logged at WARNING with
+  endpoint + JSON path; the response is never mutated and the hook never raises.
+
+Wired in create_app() behind DEV_MODE or INKYPI_STRICT_SCHEMAS=1 so production traffic is untouched
+  by default. Closes the runtime half of JTN-664; the contract tests in tests/contract/ continue to
+  catch drift at CI time.
+
+* test(schemas): cover dev-mode schema validator middleware
+
+Add tests/unit/test_schema_validator_middleware.py exercising:
+
+* valid responses emit no WARNING from the validator logger * shape drift is logged with endpoint
+  name + offending field path, without mutating the response * production mode (DEV_MODE=False,
+  INKYPI_STRICT_SCHEMAS unset) skips registration entirely * INKYPI_STRICT_SCHEMAS=1 escape hatch
+  forces registration
+
+* fix(schemas): address review feedback on validator
+
+- Refactor _check_type into per-origin helpers to drop cognitive complexity from 29 to under the
+  SonarCloud S3776 threshold. - Drop raw mismatched values from error messages so WARNING-level
+  schema-drift logs can't echo response payloads (CodeRabbit review). - Remove dead errs_per_arm
+  accumulator in the union branch. - Drop the redundant first ENDPOINT_SCHEMAS monkeypatch in the
+  middleware tests.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **contract**: Add JSON response shape contract tests
+  ([#441](https://github.com/jtn0123/InkyPi/pull/441),
+  [`4ce4a5c`](https://github.com/jtn0123/InkyPi/commit/4ce4a5c3f0e4f36420a560b2376a4a69bd693ead))
+
+Add TypedDict response schemas in src/schemas/responses.py for 9 high-traffic JSON endpoints
+  (version info, uptime, refresh-info, next-up, stats, health, isolation, history storage) and
+  pytest contract tests in tests/contract/ that assert every response keeps its documented shape.
+
+The hand-rolled validator walks TypedDict annotations (no pydantic dependency) and catches missing
+  required keys plus wrong value types, including nested TypedDicts and list/dict generics.
+
+Annotate the version_info and stats route producers with their TypedDict payloads so mypy can catch
+  shape drift on the producing side as well.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **plugins**: Anchor apod/wpotd date tests to UTC to fix boundary flakes
+  ([#451](https://github.com/jtn0123/InkyPi/pull/451),
+  [`cb1c4dc`](https://github.com/jtn0123/InkyPi/commit/cb1c4dcf4b0eadb4717c49eaa1ba883a37eccfde))
+
+The APOD and WPOTD plugins resolve "today" via datetime.now(tz=UTC).date() (hardened in PR #442),
+  but several tests were still comparing against the local date.today(). Near UTC midnight on
+  non-UTC hosts, local and UTC dates diverge by one day, producing ~11 intermittent failures across:
+
+- tests/plugins/test_apod_validation.py - tests/plugins/test_wpotd.py (test_determine_date_today) -
+  tests/plugins/test_wpotd_validation.py
+
+Fix: introduce a _today_utc() helper in each validation test file and replace date.today() /
+  datetime.today() with datetime.now(tz=UTC).date() so tests reference the same UTC anchor the
+  plugins use. No plugin bugs found; the plugins' tz handling is correct.
+
+Verified clean under frozen UTC times 00:30, 04:30, 08:30, 12:00 and under TZ=UTC / Los_Angeles /
+  Tokyo / Kiritimati (all 62 tests pass).
+
+JTN-663
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.49.20 (2026-04-13)
 
 ### Bug Fixes
