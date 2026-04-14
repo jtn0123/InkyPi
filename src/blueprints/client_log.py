@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import threading
 
 from flask import Blueprint, Response
 
@@ -25,6 +27,46 @@ from utils.rate_limit import TokenBucket
 logger = logging.getLogger(__name__)
 
 client_log_bp = Blueprint("client_log", __name__)
+
+# ---------------------------------------------------------------------------
+# Test-only capture hook (JTN-680).
+#
+# When the environment variable ``INKYPI_TEST_CAPTURE_CLIENT_LOG`` is set to
+# ``1``/``true``/``yes`` (checked per request), every successfully-validated
+# client-log report is appended to a process-wide list below so Playwright
+# tests can assert no unexpected ``console.warn``/``console.error`` reached
+# the server during the test. A lock protects list access because the Flask
+# live_server fixture is threaded.
+#
+# The env var is consulted *only* when a request comes in; when it is unset
+# the handler behaves bit-identical to the pre-JTN-680 implementation.
+# ---------------------------------------------------------------------------
+_TEST_CAPTURE_ENV = "INKYPI_TEST_CAPTURE_CLIENT_LOG"
+_CAPTURE_TRUE_VALUES = frozenset({"1", "true", "yes"})
+
+_captured_reports: list[dict[str, object]] = []
+_captured_lock = threading.Lock()
+
+
+def _capture_enabled() -> bool:
+    raw = os.environ.get(_TEST_CAPTURE_ENV, "")
+    return raw.strip().lower() in _CAPTURE_TRUE_VALUES
+
+
+def get_captured_reports() -> list[dict[str, object]]:
+    """Return a shallow copy of the process-wide captured-report list.
+
+    Returns an empty list if capture is disabled or nothing has been posted.
+    """
+    with _captured_lock:
+        return list(_captured_reports)
+
+
+def reset_captured_reports() -> None:
+    """Clear the process-wide list of captured client-log reports."""
+    with _captured_lock:
+        _captured_reports.clear()
+
 
 # ---------------------------------------------------------------------------
 # Rate limiting — 10-token burst, refills at 1 token/s
@@ -86,6 +128,14 @@ def receive_client_log() -> tuple[Response, int] | Response:
         report["ts"] = strip_newlines(_cap(data["ts"], 64))
 
     logger.warning("client log [%s]: %s", level, json.dumps(report))
+
+    # Test-only capture hook (JTN-680). No-op in production: the env-var
+    # check is a single dict lookup + short-circuited string compare when
+    # the variable is unset, so overhead is negligible and behaviour is
+    # bit-identical to the pre-hook implementation.
+    if _capture_enabled():
+        with _captured_lock:
+            _captured_reports.append(dict(report))
 
     return Response(status=204)
 

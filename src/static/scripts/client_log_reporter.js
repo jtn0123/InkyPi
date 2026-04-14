@@ -21,10 +21,21 @@
   let failures = 0;
   let disabled = false;
 
+  // Test mode (JTN-680): when the opt-in meta also sets content="1:test"
+  // or an additional `client-log-test-mode` meta is present, skip sampling
+  // so the Playwright tripwire is deterministic.
+  const testModeMeta = document.querySelector(
+    'meta[name="client-log-test-mode"]'
+  );
+  const TEST_MODE =
+    testModeMeta?.getAttribute("content") === "1" ||
+    metaTag?.getAttribute("content") === "1:test";
+
   const originalWarn = console.warn.bind(console);
   const originalError = console.error.bind(console);
 
   function shouldSample() {
+    if (TEST_MODE) return true;
     // NOSONAR — Math.random is intentional: this is non-security log sampling.
     // Sonar rule javascript:S2245 (insecure RNG) is a false positive here.
     return Math.random() < SAMPLE_RATE; // NOSONAR
