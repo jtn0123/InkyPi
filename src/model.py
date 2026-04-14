@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +29,12 @@ class RefreshInfo:
 
     def __init__(
         self,
-        refresh_type,
-        plugin_id,
-        refresh_time,
-        image_hash,
-        playlist=None,
-        plugin_instance=None,
+        refresh_type: str | None,
+        plugin_id: str | None,
+        refresh_time: str | None,
+        image_hash: int | None,
+        playlist: str | None = None,
+        plugin_instance: str | None = None,
         # Optional performance metrics
         request_ms: int | None = None,
         display_ms: int | None = None,
@@ -41,8 +44,8 @@ class RefreshInfo:
         # Optional benchmark correlation id
         benchmark_id: str | None = None,
         # Optional plugin-specific metadata
-        plugin_meta: dict | None = None,
-    ):
+        plugin_meta: dict[str, Any] | None = None,
+    ) -> None:
         """Initialize RefreshInfo instance."""
         self.refresh_time = refresh_time
         self.image_hash = image_hash
@@ -61,15 +64,15 @@ class RefreshInfo:
         # Optional plugin-specific metadata (e.g., WPOTD date/description)
         self.plugin_meta = plugin_meta
 
-    def get_refresh_datetime(self):
+    def get_refresh_datetime(self) -> datetime | None:
         """Returns the refresh time as a datetime object or None if not set."""
         latest_refresh = None
         if self.refresh_time:
             latest_refresh = datetime.fromisoformat(self.refresh_time)
         return latest_refresh
 
-    def to_dict(self):
-        refresh_dict = {
+    def to_dict(self) -> dict[str, Any]:
+        refresh_dict: dict[str, Any] = {
             "refresh_time": self.refresh_time,
             "image_hash": self.image_hash,
             "refresh_type": self.refresh_type,
@@ -98,7 +101,7 @@ class RefreshInfo:
         return refresh_dict
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> RefreshInfo:
         return cls(
             refresh_time=data.get("refresh_time"),
             image_hash=data.get("image_hash"),
@@ -127,18 +130,22 @@ class PlaylistManager:
     DEFAULT_PLAYLIST_START = "00:00"
     DEFAULT_PLAYLIST_END = "24:00"
 
-    def __init__(self, playlists=None, active_playlist=None):
+    def __init__(
+        self,
+        playlists: list[Playlist] | None = None,
+        active_playlist: str | None = None,
+    ) -> None:
         """Initialize PlaylistManager with a list of playlists."""
         if playlists is None:
             playlists = []
-        self.playlists = playlists
+        self.playlists: list[Playlist] = playlists
         self.active_playlist = active_playlist
 
-    def get_playlist_names(self):
+    def get_playlist_names(self) -> list[str]:
         """Returns a list of all playlist names."""
         return [p.name for p in self.playlists]
 
-    def add_default_playlist(self):
+    def add_default_playlist(self) -> bool:
         """Add a default playlist to the manager, called when no playlists exist."""
         self.playlists.append(
             Playlist(
@@ -150,7 +157,7 @@ class PlaylistManager:
         )
         return True
 
-    def find_plugin(self, plugin_id, instance):
+    def find_plugin(self, plugin_id: str, instance: str) -> PluginInstance | None:
         """Searches playlists to find a plugin with the given ID and instance."""
         for playlist in self.playlists:
             plugin = playlist.find_plugin(plugin_id, instance)
@@ -158,7 +165,7 @@ class PlaylistManager:
                 return plugin
         return None
 
-    def determine_active_playlist(self, current_datetime):
+    def determine_active_playlist(self, current_datetime: datetime) -> Playlist | None:
         """Determine the active playlist based on the current time."""
         current_time = current_datetime.strftime(
             "%H:%M"
@@ -173,11 +180,13 @@ class PlaylistManager:
         active_playlists.sort(key=lambda p: p.get_priority())
         return active_playlists[0]
 
-    def get_playlist(self, playlist_name):
+    def get_playlist(self, playlist_name: str) -> Playlist | None:
         """Returns the playlist with the specified name."""
         return next((p for p in self.playlists if p.name == playlist_name), None)
 
-    def add_plugin_to_playlist(self, playlist_name, plugin_data):
+    def add_plugin_to_playlist(
+        self, playlist_name: str, plugin_data: dict[str, Any]
+    ) -> bool:
         """Adds a plugin to a playlist by the specified name. Returns true if successfully added,
         False if playlist doesn't exist"""
         playlist = self.get_playlist(playlist_name)
@@ -190,7 +199,12 @@ class PlaylistManager:
             )
         return False
 
-    def add_playlist(self, name, start_time=None, end_time=None):
+    def add_playlist(
+        self,
+        name: str,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> bool:
         """Creates and adds a new playlist with the given start and end times."""
         if not start_time:
             start_time = PlaylistManager.DEFAULT_PLAYLIST_START
@@ -199,7 +213,9 @@ class PlaylistManager:
         self.playlists.append(Playlist(name, start_time, end_time))
         return True
 
-    def update_playlist(self, old_name, new_name, start_time, end_time):
+    def update_playlist(
+        self, old_name: str, new_name: str, start_time: str, end_time: str
+    ) -> bool:
         """Updates an existing playlist's name, start time, and end time."""
         playlist = self.get_playlist(old_name)
         if playlist:
@@ -210,25 +226,29 @@ class PlaylistManager:
         logger.warning("Playlist '%s' not found.", _sanitize_log_value(old_name))
         return False
 
-    def delete_playlist(self, name):
+    def delete_playlist(self, name: str) -> None:
         """Deletes the playlist with the specified name."""
         self.playlists = [p for p in self.playlists if p.name != name]
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "playlists": [p.to_dict() for p in self.playlists],
             "active_playlist": self.active_playlist,
         }
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> PlaylistManager:
         return cls(
             playlists=[Playlist.from_dict(p) for p in data.get("playlists", [])],
             active_playlist=data.get("active_playlist"),
         )
 
     @staticmethod
-    def should_refresh(latest_refresh, interval_seconds, current_time):
+    def should_refresh(
+        latest_refresh: datetime | None,
+        interval_seconds: float,
+        current_time: datetime,
+    ) -> bool:
         """Determines whether a refresh should occur on the interval and latest refresh time."""
         if not latest_refresh:
             return True  # No previous refresh, so it's time to refresh
@@ -249,17 +269,19 @@ class Playlist:
 
     def __init__(
         self,
-        name,
-        start_time,
-        end_time,
-        plugins=None,
-        current_plugin_index=None,
-        cycle_interval_seconds=None,
-    ):
+        name: str,
+        start_time: str,
+        end_time: str,
+        plugins: list[dict[str, Any]] | None = None,
+        current_plugin_index: int | None = None,
+        cycle_interval_seconds: int | None = None,
+    ) -> None:
         self.name = name
         self.start_time = start_time
         self.end_time = end_time
-        self.plugins = [PluginInstance.from_dict(p) for p in (plugins or [])]
+        self.plugins: list[PluginInstance] = [
+            PluginInstance.from_dict(p) for p in (plugins or [])
+        ]
         self.current_plugin_index = current_plugin_index
         self.cycle_interval_seconds = cycle_interval_seconds
 
@@ -277,7 +299,7 @@ class Playlist:
             raise ValueError("Invalid time")
         return hour * 60 + minute
 
-    def is_active(self, current_time):
+    def is_active(self, current_time: str) -> bool:
         """Check if the playlist is active at the given time."""
         start = self._to_minutes(self.start_time)
         end = self._to_minutes(self.end_time)
@@ -287,7 +309,7 @@ class Playlist:
             return start <= current < end
         return current >= start or current < end
 
-    def add_plugin(self, plugin_data):
+    def add_plugin(self, plugin_data: dict[str, Any]) -> bool:
         """Add a new plugin instance to the playlist."""
         if self.find_plugin(plugin_data["plugin_id"], plugin_data["name"]):
             logger.warning(
@@ -299,7 +321,12 @@ class Playlist:
         self.plugins.append(PluginInstance.from_dict(plugin_data))
         return True
 
-    def update_plugin(self, plugin_id, instance_name, updated_data):
+    def update_plugin(
+        self,
+        plugin_id: str,
+        instance_name: str,
+        updated_data: dict[str, Any],
+    ) -> bool:
         """Updates an existing plugin instance in the playlist."""
         plugin = self.find_plugin(plugin_id, instance_name)
         if plugin:
@@ -312,7 +339,7 @@ class Playlist:
         )
         return False
 
-    def delete_plugin(self, plugin_id, name):
+    def delete_plugin(self, plugin_id: str, name: str) -> bool:
         """Remove a specific plugin instance from the playlist."""
         initial_count = len(self.plugins)
         self.plugins = [
@@ -328,14 +355,14 @@ class Playlist:
             return False
         return True
 
-    def find_plugin(self, plugin_id, name):
+    def find_plugin(self, plugin_id: str, name: str) -> PluginInstance | None:
         """Find a plugin instance by its plugin_id and name."""
         return next(
             (p for p in self.plugins if p.plugin_id == plugin_id and p.name == name),
             None,
         )
 
-    def get_next_plugin(self):
+    def get_next_plugin(self) -> PluginInstance:
         """Returns the next plugin instance in the playlist and update the current_plugin_index."""
         if not self.plugins:
             raise RuntimeError(f"Playlist '{self.name}' has no plugins configured.")
@@ -353,7 +380,7 @@ class Playlist:
 
         return self.plugins[self.current_plugin_index]
 
-    def peek_next_plugin(self):
+    def peek_next_plugin(self) -> PluginInstance | None:
         """Returns the next plugin instance without mutating the current index.
 
         If the index is unset or invalid, returns the first plugin as the next candidate.
@@ -370,7 +397,7 @@ class Playlist:
         next_index = (self.current_plugin_index + 1) % len(self.plugins)
         return self.plugins[next_index]
 
-    def get_next_eligible_plugin(self, current_time: datetime):
+    def get_next_eligible_plugin(self, current_time: datetime) -> PluginInstance | None:
         """Advance to and return the next eligible plugin based on current_time.
 
         Tries up to N plugins (size of list) to find one that is_show_eligible.
@@ -405,7 +432,9 @@ class Playlist:
         self.current_plugin_index = original_index
         return None
 
-    def peek_next_eligible_plugin(self, current_time: datetime):
+    def peek_next_eligible_plugin(
+        self, current_time: datetime
+    ) -> PluginInstance | None:
         """Return next eligible plugin without changing current_plugin_index."""
         saved = self.current_plugin_index
         try:
@@ -413,7 +442,7 @@ class Playlist:
         finally:
             self.current_plugin_index = saved
 
-    def reorder_plugins(self, ordered_pairs):
+    def reorder_plugins(self, ordered_pairs: object) -> bool:
         """Reorder plugins using a list of ordered (plugin_id, name) pairs.
 
         The ordered_pairs may be a list of tuples or dicts with keys 'plugin_id' and 'name'.
@@ -422,12 +451,12 @@ class Playlist:
         if not isinstance(ordered_pairs, list):
             return False
 
-        def _key_for(p_inst):
+        def _key_for(p_inst: PluginInstance) -> tuple[str, str]:
             return (p_inst.plugin_id, p_inst.name)
 
         mapping = {(_key_for(p)): p for p in self.plugins}
 
-        normalized_keys: list[tuple] = []
+        normalized_keys: list[tuple[Any, Any]] = []
         for item in ordered_pairs:
             if isinstance(item, dict):
                 pid = item.get("plugin_id")
@@ -454,11 +483,11 @@ class Playlist:
             self.current_plugin_index = 0
         return True
 
-    def get_priority(self):
+    def get_priority(self) -> int:
         """Determine priority of a playlist, based on the time range"""
         return self.get_time_range_minutes()
 
-    def get_time_range_minutes(self):
+    def get_time_range_minutes(self) -> int:
         """Calculate the duration in minutes between start_time and end_time.
 
         When ``start_time`` is later than ``end_time`` the range is assumed to
@@ -470,27 +499,27 @@ class Playlist:
             return end - start
         return (24 * 60 - start) + end
 
-    def to_dict(self):
-        data = {
+    def to_dict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
             "name": self.name,
             "start_time": self.start_time,
             "end_time": self.end_time,
             "plugins": [p.to_dict() for p in self.plugins],
             "current_plugin_index": self.current_plugin_index,
         }
-        if getattr(self, "cycle_interval_seconds", None) is not None:
+        if self.cycle_interval_seconds is not None:
             data["cycle_interval_seconds"] = self.cycle_interval_seconds
             data["cycle_minutes"] = int(self.cycle_interval_seconds) // 60
         return data
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> Playlist:
         return cls(
             name=data["name"],
             start_time=data["start_time"],
             end_time=data["end_time"],
             plugins=data["plugins"],
-            current_plugin_index=data.get("current_plugin_index", None),
+            current_plugin_index=data.get("current_plugin_index"),
             cycle_interval_seconds=data.get("cycle_interval_seconds"),
         )
 
@@ -509,7 +538,7 @@ class PluginInstance:
     # Only these attributes may be modified via update().  plugin_id is
     # intentionally excluded — it is an immutable identity field and must not
     # be overwritten by user-supplied data.
-    _UPDATABLE: frozenset = frozenset(
+    _UPDATABLE: frozenset[str] = frozenset(
         {
             "name",
             "settings",
@@ -522,17 +551,17 @@ class PluginInstance:
 
     def __init__(
         self,
-        plugin_id,
-        name,
-        settings,
-        refresh,
-        latest_refresh_time=None,
-        only_show_when_fresh=False,
-        snooze_until=None,
-        consecutive_failure_count=0,
-        paused=False,
+        plugin_id: str,
+        name: str,
+        settings: dict[str, Any],
+        refresh: dict[str, Any],
+        latest_refresh_time: str | None = None,
+        only_show_when_fresh: bool = False,
+        snooze_until: str | None = None,
+        consecutive_failure_count: int = 0,
+        paused: bool = False,
         disabled_reason: str | None = None,
-    ):
+    ) -> None:
         self.plugin_id = plugin_id
         self.name = name
         self.settings = settings
@@ -544,7 +573,7 @@ class PluginInstance:
         self.paused = paused
         self.disabled_reason = disabled_reason
 
-    def update(self, updated_data):
+    def update(self, updated_data: dict[str, Any]) -> None:
         """Update attributes of the class with the dictionary values.
 
         Only keys present in ``_UPDATABLE`` are applied; unknown keys are
@@ -576,7 +605,9 @@ class PluginInstance:
 
         # Check for scheduled refresh (HH:MM format)
         if "scheduled" in self.refresh:
-            scheduled_time_str = self.refresh.get("scheduled")
+            # Key presence was just checked above; indexing preserves prior
+            # behavior while giving mypy an Any (vs Any | None from .get()).
+            scheduled_time_str = self.refresh["scheduled"]
             try:
                 # Parsing HH:MM into a time-of-day; no date/tz context is needed.
                 scheduled_time = datetime.strptime(  # noqa: DTZ007
@@ -647,19 +678,19 @@ class PluginInstance:
             )
             return True
 
-    def get_image_path(self):
+    def get_image_path(self) -> str:
         """Formats the image path for this plugin instance."""
         return f"{self.plugin_id}_{self.name.replace(' ', '_')}.png"
 
-    def get_latest_refresh_dt(self):
+    def get_latest_refresh_dt(self) -> datetime | None:
         """Returns the latest refresh time as a datetime object, or None if not set."""
         latest_refresh = None
         if self.latest_refresh_time:
             latest_refresh = datetime.fromisoformat(self.latest_refresh_time)
         return latest_refresh
 
-    def to_dict(self):
-        d = {
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
             "plugin_id": self.plugin_id,
             "name": self.name,
             "plugin_settings": self.settings,
@@ -675,7 +706,7 @@ class PluginInstance:
         return d
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data: dict[str, Any]) -> PluginInstance:
         return cls(
             plugin_id=data["plugin_id"],
             name=data["name"],
