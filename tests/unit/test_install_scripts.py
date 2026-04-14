@@ -552,6 +552,62 @@ class TestInstallScript:
             "so a CSS build failure leaves the lockfile in place (JTN-607)"
         )
 
+    def test_service_enable_gated_on_css_build(self):
+        # JTN-695: systemctl enable / install_app_service must only run AFTER
+        # vendor download + CSS build both succeed. If either step fails, the
+        # service must be left untouched so `systemctl is-enabled inkypi`
+        # reflects reality (not "enabled but main.css missing").
+        main_start = self.content.index('parse_arguments "$@"')
+        main_body = self.content[main_start:]
+
+        # Use rindex for install_app_service so we locate the actual call site
+        # at the bottom of the script rather than an earlier comment/reference.
+        vendor_pos = main_body.index("update_vendors.sh")
+        css_pos = main_body.index("build_css_bundle")
+        install_app_pos = main_body.rindex("install_app_service")
+
+        assert vendor_pos < install_app_pos, (
+            "install.sh must invoke update_vendors.sh BEFORE install_app_service "
+            "so a vendor-download failure exits before the systemd unit is "
+            "enabled (JTN-695)"
+        )
+        assert css_pos < install_app_pos, (
+            "install.sh must call build_css_bundle BEFORE install_app_service "
+            "so a CSS build failure exits before the systemd unit is enabled "
+            "(JTN-695)"
+        )
+
+    def test_install_asserts_main_css_exists_before_service_enable(self):
+        # JTN-695: After build_css_bundle, install.sh must assert that
+        # src/static/styles/main.css exists AND is non-empty (`-s`) before the
+        # service is enabled. This catches silent truncation where the file
+        # exists (so `-f` passes) but is zero bytes — which would otherwise
+        # slip past build_css_bundle's existence-only check and leave the
+        # service enabled against an unusable stylesheet.
+        main_start = self.content.index('parse_arguments "$@"')
+        main_body = self.content[main_start:]
+
+        # A reference to main.css must appear in the main body, with an
+        # accompanying non-empty-file test (`-s`) on the same variable.
+        assert "main.css" in main_body, (
+            "install.sh main body must reference src/static/styles/main.css "
+            "for the post-build assertion (JTN-695)"
+        )
+        assert "-s " in main_body and '-s "$MAIN_CSS"' in main_body, (
+            "install.sh must assert the CSS bundle is non-empty via '-s' "
+            "before enabling the systemd unit (JTN-695)"
+        )
+
+        # Ordering: the main.css assertion must come AFTER build_css_bundle and
+        # BEFORE install_app_service so a zero-byte stylesheet blocks enable.
+        css_pos = main_body.index("build_css_bundle")
+        assert_pos = main_body.index("MAIN_CSS=")
+        install_app_pos = main_body.rindex("install_app_service")
+        assert css_pos < assert_pos < install_app_pos, (
+            "main.css existence/non-empty assertion must appear after "
+            "build_css_bundle and before install_app_service (JTN-695)"
+        )
+
     def test_install_lockfile_not_removed_by_error_trap(self):
         # JTN-607: On failure exit, the lockfile must be LEFT in place so the
         # user is forced to rerun install.sh (or manually rm the file) before

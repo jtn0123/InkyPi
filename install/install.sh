@@ -499,8 +499,12 @@ install_config
 if [[ -n "$WS_TYPE" ]]; then
   update_config
 fi
-install_app_service
 
+# JTN-695: Vendor download + CSS build must run BEFORE install_app_service so
+# that a failure in either step leaves the service untouched. Previously the
+# service was enabled first, and a subsequent vendor-download or CSS-build
+# failure left the unit enabled while `src/static/styles/main.css` was absent —
+# the user would boot into an unstyled web UI with no hint why.
 echo "Update JS and CSS files"
 # JTN-534: previously the exit code from update_vendors.sh was discarded — a
 # transient curl write error during vendor download silently produced a
@@ -512,6 +516,22 @@ fi
 
 # JTN-674: use shared build_css_bundle from _common.sh
 build_css_bundle
+
+# JTN-695: Explicit post-build assertion — main.css must exist AND be non-empty
+# before we enable the systemd unit. build_css_bundle already checks existence,
+# but a zero-byte file would still pass -f; guard against that too so a silent
+# truncation can't leave the service enabled against a blank stylesheet.
+MAIN_CSS="$SRC_PATH/static/styles/main.css"
+if [ ! -f "$MAIN_CSS" ] || [ ! -s "$MAIN_CSS" ]; then
+  echo_error "ERROR: CSS bundle assertion failed — $MAIN_CSS is missing or empty."
+  echo_error "Refusing to enable $APPNAME.service with an unusable stylesheet."
+  exit 1
+fi
+
+# JTN-695: Only now — after vendor download + CSS build + assertion all passed —
+# do we enable the systemd unit. A failure in any step above exits before
+# touching the service, so `systemctl is-enabled inkypi` reflects reality.
+install_app_service
 
 # JTN-607: All install steps succeeded — remove the install-in-progress
 # lockfile so the service is allowed to start. If install.sh exits early due
