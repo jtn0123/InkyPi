@@ -733,19 +733,31 @@ class TestPlaylistEta:
 
 class TestPlaylistNameValidation:
     def test_create_playlist_name_too_long(self, client):
-        """Playlist name exceeding 64 characters should be rejected."""
+        """Playlist name exceeding 64 characters should be rejected with field attribution."""
         resp = _create_playlist(client, "A" * 65, "08:00", "12:00")
         assert resp.status_code == 400
-        assert resp.get_json()["error"] == "Invalid playlist request"
+        data = resp.get_json()
+        # Validator messages are safe static strings, so they are preserved
+        # (JTN-658) alongside the field attribution for frontend highlighting.
+        assert "64 characters" in data["error"]
+        assert data["details"]["field"] == "playlist_name"
+        assert data["code"] == "validation_error"
 
     def test_create_playlist_name_special_chars(self, client):
         """Playlist names containing script tags or path traversal should be rejected."""
         resp = _create_playlist(client, "<script>alert(1)</script>", "08:00", "12:00")
         assert resp.status_code == 400
-        assert resp.get_json()["error"] == "Invalid playlist request"
+        data = resp.get_json()
+        # Never reflect the raw input back; message is a static sanitised string.
+        assert "<script>" not in data["error"]
+        assert "only contain" in data["error"]
+        assert data["details"]["field"] == "playlist_name"
 
         resp = _create_playlist(client, "../etc/passwd", "08:00", "12:00")
         assert resp.status_code == 400
+        data = resp.get_json()
+        assert "../" not in data["error"]
+        assert data["details"]["field"] == "playlist_name"
 
     def test_create_playlist_name_valid_unicode(self, client, device_config_dev):
         r"""Unicode word characters (accented letters matched by \w) should be accepted."""
@@ -758,6 +770,230 @@ class TestPlaylistNameValidation:
         resp = _create_playlist(client, "My Playlist", "08:00", "12:00")
         assert resp.status_code == 200
         assert resp.get_json()["success"] is True
+
+
+# ---------------------------------------------------------------------------
+# Field-level error attribution (JTN-658)
+# ---------------------------------------------------------------------------
+
+
+class TestValidatorFieldAttribution:
+    """Every validator in playlist.py must return ``details.field`` so the
+    frontend can highlight the offending input (JTN-658)."""
+
+    def _assert_field(self, resp, field, *, status=400):
+        assert resp.status_code == status, resp.get_json()
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data.get("code") == "validation_error", data
+        assert data.get("details", {}).get("field") == field, data
+
+    # --- playlist name (create + update) ---
+
+    def test_create_missing_name(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "", "start_time": "08:00", "end_time": "12:00"},
+        )
+        self._assert_field(resp, "playlist_name")
+
+    def test_create_whitespace_name(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "   ", "start_time": "08:00", "end_time": "12:00"},
+        )
+        self._assert_field(resp, "playlist_name")
+
+    def test_create_duplicate_name(self, client):
+        _create_playlist(client, "Dup", "06:00", "08:00")
+        resp = _create_playlist(client, "Dup", "14:00", "16:00")
+        self._assert_field(resp, "playlist_name")
+
+    def test_update_name_invalid(self, client):
+        _create_playlist(client, "ToUpd", "06:00", "10:00")
+        resp = client.put(
+            "/update_playlist/ToUpd",
+            json={"new_name": "", "start_time": "06:00", "end_time": "10:00"},
+        )
+        self._assert_field(resp, "new_name")
+
+    def test_update_nonexistent_playlist(self, client):
+        resp = client.put(
+            "/update_playlist/Nope",
+            json={"new_name": "X", "start_time": "06:00", "end_time": "10:00"},
+        )
+        self._assert_field(resp, "playlist_name")
+
+    # --- time range ---
+
+    def test_missing_start_time(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "T", "start_time": "", "end_time": "12:00"},
+        )
+        self._assert_field(resp, "start_time")
+
+    def test_missing_end_time(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "T", "start_time": "08:00", "end_time": ""},
+        )
+        self._assert_field(resp, "end_time")
+
+    def test_invalid_start_time_format(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "T", "start_time": "bogus", "end_time": "12:00"},
+        )
+        self._assert_field(resp, "start_time")
+
+    def test_invalid_end_time_format(self, client):
+        resp = client.post(
+            "/create_playlist",
+            json={"playlist_name": "T", "start_time": "08:00", "end_time": "bogus"},
+        )
+        self._assert_field(resp, "end_time")
+
+    def test_same_start_end(self, client):
+        resp = _create_playlist(client, "Same", "10:00", "10:00")
+        self._assert_field(resp, "end_time")
+
+    def test_overlapping_windows(self, client):
+        _create_playlist(client, "First", "08:00", "12:00")
+        resp = _create_playlist(client, "Second", "10:00", "14:00")
+        self._assert_field(resp, "start_time")
+
+    def test_update_missing_time(self, client):
+        _create_playlist(client, "UpdT", "06:00", "10:00")
+        resp = client.put(
+            "/update_playlist/UpdT",
+            json={"new_name": "UpdT", "start_time": "", "end_time": "10:00"},
+        )
+        self._assert_field(resp, "start_time")
+
+    # --- cycle minutes ---
+
+    def test_cycle_minutes_non_integer(self, client):
+        _create_playlist(client, "Cyc", "06:00", "10:00")
+        resp = client.put(
+            "/update_playlist/Cyc",
+            json={
+                "new_name": "Cyc",
+                "start_time": "06:00",
+                "end_time": "10:00",
+                "cycle_minutes": "abc",
+            },
+        )
+        self._assert_field(resp, "cycle_minutes")
+
+    def test_cycle_minutes_out_of_range(self, client):
+        _create_playlist(client, "Cyc2", "06:00", "10:00")
+        resp = client.put(
+            "/update_playlist/Cyc2",
+            json={
+                "new_name": "Cyc2",
+                "start_time": "06:00",
+                "end_time": "10:00",
+                "cycle_minutes": 99999,
+            },
+        )
+        self._assert_field(resp, "cycle_minutes")
+
+    # --- delete ---
+
+    def test_delete_nonexistent(self, client):
+        resp = client.delete("/delete_playlist/Ghost")
+        self._assert_field(resp, "playlist_name")
+
+    # --- device cycle ---
+
+    def test_device_cycle_out_of_range(self, client):
+        resp = client.put("/update_device_cycle", json={"minutes": 0})
+        self._assert_field(resp, "minutes")
+
+    def test_device_cycle_invalid_type(self, client):
+        resp = client.put("/update_device_cycle", json={"minutes": "abc"})
+        self._assert_field(resp, "minutes")
+
+    # --- reorder ---
+
+    def test_reorder_missing_name(self, client):
+        resp = client.post(
+            "/reorder_plugins",
+            json={"ordered": []},
+        )
+        self._assert_field(resp, "playlist_name")
+
+    def test_reorder_missing_ordered(self, client):
+        resp = client.post(
+            "/reorder_plugins",
+            json={"playlist_name": "X"},
+        )
+        self._assert_field(resp, "ordered")
+
+    def test_reorder_playlist_not_found(self, client):
+        resp = client.post(
+            "/reorder_plugins",
+            json={"playlist_name": "Ghost", "ordered": []},
+        )
+        self._assert_field(resp, "playlist_name")
+
+    # --- display next ---
+
+    def test_display_next_missing_name(self, client):
+        resp = client.post("/display_next_in_playlist", json={})
+        self._assert_field(resp, "playlist_name")
+
+    def test_display_next_not_found(self, client):
+        resp = client.post("/display_next_in_playlist", json={"playlist_name": "Ghost"})
+        self._assert_field(resp, "playlist_name")
+
+    # --- ETA ---
+
+    def test_eta_not_found(self, client):
+        resp = client.get("/playlist/eta/Ghost")
+        self._assert_field(resp, "playlist_name", status=404)
+
+    # --- add_plugin ---
+
+    def test_add_plugin_missing_refresh(self, client):
+        resp = client.post(
+            "/add_plugin",
+            data={"plugin_id": "weather"},
+        )
+        self._assert_field(resp, "refresh_settings")
+
+    def test_add_plugin_invalid_refresh_json(self, client):
+        resp = client.post(
+            "/add_plugin",
+            data={"plugin_id": "weather", "refresh_settings": "not-json"},
+        )
+        self._assert_field(resp, "refresh_settings")
+
+    def test_add_plugin_missing_instance(self, client):
+        _create_playlist(client, "APIPlaylist", "08:00", "12:00")
+        resp = client.post(
+            "/add_plugin",
+            data={
+                "plugin_id": "weather",
+                "refresh_settings": json.dumps(
+                    {
+                        "playlist": "APIPlaylist",
+                        "instance_name": "",
+                        "refreshType": "interval",
+                        "unit": "minute",
+                        "interval": "10",
+                    }
+                ),
+            },
+        )
+        self._assert_field(resp, "instance_name", status=422)
+
+    def test_add_plugin_duplicate_instance(self, client):
+        _create_playlist(client, "Dup2", "08:00", "12:00")
+        _add_plugin_to_playlist(client, "Dup2", "Same", "weather")
+        resp = _add_plugin_to_playlist(client, "Dup2", "Same", "weather")
+        self._assert_field(resp, "instance_name")
 
 
 # ---------------------------------------------------------------------------

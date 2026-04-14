@@ -559,6 +559,31 @@
         return (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
     }
 
+    /**
+     * Apply a server-side validation error (canonical JSON envelope
+     * `{ error, details: { field } }`) to the given FormState instance so the
+     * offending input gets `aria-invalid`, is focused, and scrolled into view.
+     * Falls back to `field_errors` maps for backwards compatibility, and
+     * silently no-ops when neither shape is present so callers can keep their
+     * generic toast fallback.
+     */
+    function applyFieldErrorFromResponse(fs, result) {
+        if (!fs || !result) return false;
+        if (result.field_errors && typeof result.field_errors === 'object') {
+            fs.setFieldErrors(result.field_errors);
+            return true;
+        }
+        const field = result.details && result.details.field;
+        if (field) {
+            const message = result.error || 'Invalid value';
+            fs.setFieldError(field, message);
+            return true;
+        }
+        return false;
+    }
+    // Export for tests / other modules.
+    globalThis.applyFieldErrorFromResponse = applyFieldErrorFromResponse;
+
     async function createPlaylist() {
         const fs = _scheduleFormState();
         if (fs) fs.clearErrors();
@@ -574,8 +599,8 @@
                     closeModal();
                     if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
                     location.reload();
-                } else if (fs && result && result.field_errors) {
-                    fs.setFieldErrors(result.field_errors);
+                } else if (fs && result) {
+                    applyFieldErrorFromResponse(fs, result);
                 }
             } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
         };
@@ -599,8 +624,8 @@
                     closeModal();
                     if (result.warning) { sessionStorage.setItem("storedMessage", JSON.stringify({ type: "warning", text: result.warning })); }
                     location.reload();
-                } else if (fs && result && result.field_errors) {
-                    fs.setFieldErrors(result.field_errors);
+                } else if (fs && result) {
+                    applyFieldErrorFromResponse(fs, result);
                 }
             } catch (error) { console.error("Error:", error); showResponseModal('failure', 'An error occurred while processing your request.'); }
         };
