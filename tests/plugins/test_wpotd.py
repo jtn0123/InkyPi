@@ -237,15 +237,20 @@ def test_wpotd_shrink_to_fit_disabled(device_config_dev, monkeypatch):
 
 
 def test_determine_date_today():
-    """Test _determine_date with no special settings (uses today)."""
-    from datetime import datetime
+    """Test _determine_date with no special settings (uses today).
+
+    The plugin resolves "today" via ``datetime.now(tz=UTC).date()``; the test
+    must use the same UTC anchor to avoid flakes around UTC midnight on
+    non-UTC hosts (JTN-663).
+    """
+    from datetime import UTC, datetime
 
     from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
     result = p._determine_date({})
 
-    assert result == datetime.today().date()
+    assert result == datetime.now(tz=UTC).date()
 
 
 def test_determine_date_random(monkeypatch):

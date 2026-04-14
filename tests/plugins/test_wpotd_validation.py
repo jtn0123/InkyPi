@@ -8,7 +8,18 @@ series runs from 2007-01-01 onward, so we now reject out-of-range values at
 save time and constrain the date input client-side via ``min``/``max``.
 """
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
+
+
+def _today_utc() -> date:
+    """Return today's date in UTC.
+
+    The WPOTD plugin resolves "today" via ``datetime.now(tz=UTC).date()`` so
+    tests must reference the same UTC-anchored date. Using the local
+    ``date.today()`` causes intermittent failures around UTC midnight when
+    the host timezone is not UTC (JTN-663: date-boundary flakes).
+    """
+    return datetime.now(tz=UTC).date()
 
 
 def _make_plugin():
@@ -44,16 +55,16 @@ def test_validate_settings_far_future_returns_error():
     plugin = _make_plugin()
     err = plugin.validate_settings({"customDate": "2099-12-31"})
     assert err is not None
-    today = date.today().isoformat()
+    today = _today_utc().isoformat()
     assert today in err
 
 
 def test_validate_settings_tomorrow_returns_error():
     plugin = _make_plugin()
-    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    tomorrow = (_today_utc() + timedelta(days=1)).isoformat()
     err = plugin.validate_settings({"customDate": tomorrow})
     assert err is not None
-    assert date.today().isoformat() in err
+    assert _today_utc().isoformat() in err
 
 
 def test_validate_settings_archive_start_boundary_returns_none():
@@ -63,7 +74,7 @@ def test_validate_settings_archive_start_boundary_returns_none():
 
 def test_validate_settings_today_boundary_returns_none():
     plugin = _make_plugin()
-    today = date.today().isoformat()
+    today = _today_utc().isoformat()
     assert plugin.validate_settings({"customDate": today}) is None
 
 
@@ -93,7 +104,7 @@ def test_settings_schema_advertises_min_and_max():
     assert custom_date_field is not None
     assert custom_date_field.get("type") == "date"
     assert custom_date_field.get("min") == "2007-01-01"
-    assert custom_date_field.get("max") == date.today().isoformat()
+    assert custom_date_field.get("max") == _today_utc().isoformat()
 
 
 def test_settings_template_renders_min_and_max(client):
@@ -102,7 +113,7 @@ def test_settings_template_renders_min_and_max(client):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'min="2007-01-01"' in body
-    assert f'max="{date.today().isoformat()}"' in body
+    assert f'max="{_today_utc().isoformat()}"' in body
 
 
 def test_save_plugin_settings_rejects_pre_archive_date(client):
@@ -132,7 +143,7 @@ def test_save_plugin_settings_rejects_future_date(client):
     body = resp.get_json() or {}
     assert body.get("success") is False
     msg = body.get("error") or body.get("message") or ""
-    assert date.today().isoformat() in msg
+    assert _today_utc().isoformat() in msg
 
 
 def test_save_plugin_settings_accepts_valid_date(client):
