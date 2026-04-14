@@ -132,16 +132,32 @@
 
   function initClockFacePicker(widget, config) {
     const hidden = widget.querySelector("#selected-clock-face");
-    const primary = widget.querySelector("[name='primaryColor']");
-    const secondary = widget.querySelector("[name='secondaryColor']");
     const options = Array.from(widget.querySelectorAll(".image-option"));
-    if (!hidden || !primary || !secondary || !options.length) return;
+    if (!hidden || !options.length) return;
+
+    // primaryColor/secondaryColor fields live in a sibling schema section on
+    // the plugin form, not inside the picker widget — scope the lookup to the
+    // whole schema root (or document as a last resort) so the face picker
+    // still activates when the colour fields are hoisted out of the widget.
+    const scope = widget.closest("[data-settings-schema]") ||
+      widget.closest("form") || document;
+    const primary = scope.querySelector("[name='primaryColor']");
+    const secondary = scope.querySelector("[name='secondaryColor']");
+
+    const setColor = (input, value) => {
+      if (!input || !value) return;
+      input.value = value;
+      // Keep any color-preview swatches bound to the input in sync — they
+      // listen for `input`/`change`, not direct assignment.
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
 
     const selectOption = (option) => {
       options.forEach((item) => item.classList.toggle("selected", item === option));
       hidden.value = option.dataset.faceName || "";
-      if (option.dataset.primaryColor) primary.value = option.dataset.primaryColor;
-      if (option.dataset.secondaryColor) secondary.value = option.dataset.secondaryColor;
+      setColor(primary, option.dataset.primaryColor);
+      setColor(secondary, option.dataset.secondaryColor);
     };
 
     options.forEach((option) => {
@@ -152,8 +168,8 @@
     const initial = options.find((option) => option.dataset.faceName === currentValue) || options[0];
     selectOption(initial);
 
-    if (config.primaryColor) primary.value = config.primaryColor;
-    if (config.secondaryColor) secondary.value = config.secondaryColor;
+    if (config.primaryColor) setColor(primary, config.primaryColor);
+    if (config.secondaryColor) setColor(secondary, config.secondaryColor);
   }
 
   function initNewspaperSearch(widget, config) {
