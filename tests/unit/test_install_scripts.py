@@ -1217,11 +1217,90 @@ class TestUpdateScript:
         assert "build_css" in self.content
 
     def test_update_restarts_service(self):
+        # JTN-666: update.sh now stops first then starts (not restart), because
+        # stop_service is called before any file changes and update_app_service
+        # re-enables + starts the service at the end.
         assert "systemctl" in self.content
-        assert "restart" in self.content
+        assert "systemctl start" in self.content
+
+    def test_update_stop_service_before_pip(self):
+        # JTN-666: stop_service() must be called before pip install to prevent
+        # systemd from restart-looping the half-installed venv during update.
+        assert "stop_service" in self.content
+        # stop_service() must DISABLE (not just stop) so systemd cannot auto-restart.
+        fn_start = self.content.index("stop_service() {")
+        fn_end = self.content.index("}", fn_start) + 1
+        fn_body = self.content[fn_start:fn_end]
+        assert (
+            "systemctl disable" in fn_body
+        ), "stop_service() must call 'systemctl disable' to prevent auto-restart mid-update"
+        # stop_service call must appear before pip install in main script body
+        main_call = self.content.index("stop_service\n", fn_end)
+        pip_pos = self.content.index("pip install", fn_end)
+        assert (
+            main_call < pip_pos
+        ), "stop_service must be called before pip install to prevent mid-update thrash"
+
+    def test_update_lockfile_created_before_stop_service(self):
+        # JTN-666: The install-in-progress lockfile (JTN-607 parity) must be
+        # created before stop_service is called, providing defense-in-depth so
+        # that even a manual `systemctl start` cannot start mid-update.
+        assert 'LOCKFILE_DIR="/var/lib/inkypi"' in self.content
+        assert 'LOCKFILE="$LOCKFILE_DIR/.install-in-progress"' in self.content
+        # Use the stop_service call position to find main body start
+        stop_call_pos = self.content.rindex("stop_service\n")
+        main_body = self.content[self.content.rindex("EUID", 0, stop_call_pos) :]
+        assert 'mkdir -p "$LOCKFILE_DIR"' in main_body
+        assert 'touch "$LOCKFILE"' in main_body
+        touch_pos = main_body.index('touch "$LOCKFILE"')
+        stop_pos = main_body.index("stop_service\n")
+        assert (
+            touch_pos < stop_pos
+        ), "Lockfile must be created before stop_service is called"
+
+    def test_update_lockfile_removed_on_success(self):
+        # JTN-666: The lockfile must be removed after all steps succeed so the
+        # service is allowed to start. On failure, it stays to require manual recovery.
+        assert 'rm -f "$LOCKFILE"' in self.content
+        # rm must come after update_app_service call
+        update_service_pos = self.content.rindex("update_app_service")
+        rm_pos = self.content.rindex('rm -f "$LOCKFILE"')
+        assert (
+            rm_pos > update_service_pos
+        ), "Lockfile removal must come after update_app_service to ensure service is running"
 
     def test_update_upgrades_pip_deps(self):
         assert "pip install" in self.content
+
+    def test_update_enables_zramswap_on_bullseye_bookworm_trixie(self):
+        # JTN-667: update.sh must use the same multi-release zramswap guard as
+        # install.sh — previously it only matched Bookworm (12) so Trixie (13)
+        # and Bullseye (11) users would OOM during pip install on update.
+        assert "os_version=$(get_os_version)" in self.content
+        assert '[[ "$os_version" =~ ^(11|12|13)$ ]]' in self.content
+        assert "setup_zramswap_service" in self.content
+        # The skip branch should still exist for unknown future releases.
+        assert "skipping zramswap setup" in self.content
+
+    def test_update_skips_zramtools_when_zram_swap_already_active(self):
+        # JTN-667: setup_zramswap_service in update.sh must guard against
+        # Trixie's preinstalled zram-swap to avoid /dev/zram0 conflicts.
+        guard = 'grep -q "^/dev/zram" /proc/swaps'
+        apt_install = "apt-get install -y zram-tools"
+        assert guard in self.content
+        assert "skipping zram-tools install" in self.content
+        assert "return 0" in self.content
+
+        fn_start = self.content.index("setup_zramswap_service() {")
+        guard_pos = self.content.index(guard, fn_start)
+        return_pos = self.content.index("return 0", fn_start)
+        apt_pos = self.content.index(apt_install, fn_start)
+        assert guard_pos < return_pos < apt_pos
+
+    def test_update_codename_comment_has_no_trixie_typo(self):
+        # JTN-667: The comment near get_os_version must spell Trixie correctly.
+        assert "13=Trixie" in self.content
+        assert "Trixe" not in self.content  # typo guard
 
 
 # ---- uninstall.sh ----
