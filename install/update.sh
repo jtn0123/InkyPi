@@ -41,6 +41,9 @@ update_app_service() {
   echo "Updating $APPNAME systemd service."
   if [ -f "$SERVICE_FILE_SOURCE" ]; then
     sudo cp "$SERVICE_FILE_SOURCE" "$SERVICE_FILE_TARGET"
+    # JTN-686: Also refresh inkypi-failure.service so the OnFailure= directive
+    # in inkypi.service never dangles on pre-JTN-671 installs that are updating.
+    install_failure_service_unit
     sudo systemctl daemon-reload
     sudo systemctl enable "$SERVICE_FILE"
     echo "Starting $APPNAME service."
