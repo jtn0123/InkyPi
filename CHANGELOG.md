@@ -1,6 +1,78 @@
 # CHANGELOG
 
 
+## v0.50.2 (2026-04-14)
+
+### Bug Fixes
+
+- **install**: Update.sh uses uv + --require-hashes for supply-chain parity (JTN-670)
+  ([#456](https://github.com/jtn0123/InkyPi/pull/456),
+  [`9c11b6a`](https://github.com/jtn0123/InkyPi/commit/9c11b6a560c0259f4a3bf58ef83edb96cfe24a75))
+
+* fix(install): update.sh now uses uv + --require-hashes for supply-chain parity (JTN-670)
+
+Previously update.sh used bare `pip install --upgrade` without uv or --require-hashes, eroding the
+  JTN-516 supply-chain guarantee for all existing Pis that update (only fresh installs were
+  hash-verified).
+
+Changes: - Install uv into the venv before the requirements update (JTN-605 parity) - Use `uv pip
+  install --require-hashes --no-cache` when uv is available - Fall back to `pip install
+  --require-hashes --no-cache-dir` otherwise - Both paths prefix UV_HTTP_TIMEOUT=60 / --retries 5
+  for Pi Zero 2 W flaky Wi-Fi resilience (JTN-534 parity) - uv_extra_args already wired into
+  fetch_wheelhouse --find-links path - Add 6 new tests covering uv install, --require-hashes
+  enforcement, UV_HTTP_TIMEOUT presence, and pip fallback integrity
+
+Part of epic JTN-529 (install path hardening).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(install): clarify uv_extra_args comment — no --only-binary=:all:
+
+CodeRabbit noted the comment incorrectly implied --only-binary=:all: was being used; only
+  --find-links is appended to uv_extra_args. Update the comment to accurately describe the actual
+  behavior.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **install**: Factor shared helpers into _common.sh (JTN-674)
+  ([#454](https://github.com/jtn0123/InkyPi/pull/454),
+  [`1662840`](https://github.com/jtn0123/InkyPi/commit/1662840cfeda99eb2d60c2455f7046b5ef54f87f))
+
+* refactor(install): factor shared helpers into _common.sh (JTN-674)
+
+Move duplicated logic from install.sh and update.sh into a single source of truth in
+  install/_common.sh: - Formatting helpers: echo_success, echo_error, echo_header, echo_blue,
+  echo_override, show_loader (bold/normal/red tput vars) - get_os_version - stop_service (stop +
+  disable so systemd cannot restart mid-install) - setup_zramswap_service / setup_earlyoom_service -
+  build_css_bundle (extracted from inline CSS build block)
+
+Both scripts now source _common.sh early (right after SCRIPT_DIR is set) so formatting helpers are
+  available for every subsequent function. The only code left exclusively in each script is what is
+  genuinely unique: install.sh keeps enable_interfaces, fetch_waveshare_driver, install_config,
+  ask_for_reboot, wait_for_clock; update.sh keeps update_app_service, update_cli, and the
+  pip-upgrade / venv-activation block.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(install): update test_install_scripts to look up shared helpers in _common.sh (JTN-674)
+
+Functions moved to _common.sh (stop_service, setup_zramswap_service, get_os_version, echo_*) are no
+  longer defined in install.sh/update.sh. Update affected tests to use self.combined (script content
+  + _common.sh) so assertions about shared logic keep passing after the JTN-674 refactor.
+
+Also update test_install_removes_lockfile_at_end_on_success to check for the build_css_bundle call
+  instead of the inline "CSS bundle built" string (which now lives inside the shared helper in
+  _common.sh).
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.50.1 (2026-04-14)
 
 ### Bug Fixes
