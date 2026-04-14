@@ -109,6 +109,77 @@ class TestSystemdService:
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
 
+    def test_service_start_limit_burst(self):
+        # JTN-671: Without StartLimitBurst the JTN-665 incident demonstrated
+        # that inkypi.service can restart 4,091+ times before detection (~68 h
+        # @ 60 s apart). StartLimitBurst=5 caps that to 5 attempts in
+        # StartLimitIntervalSec=1800 (30 min), after which systemd enters the
+        # "start-limit-hit" state and stops retrying silently.
+        assert "StartLimitBurst=5" in self.content, (
+            "inkypi.service must set StartLimitBurst=5 in [Unit] to bound "
+            "restart loops (JTN-671)"
+        )
+        assert "StartLimitIntervalSec=1800" in self.content, (
+            "inkypi.service must set StartLimitIntervalSec=1800 in [Unit] to "
+            "define the 30-min window for StartLimitBurst (JTN-671)"
+        )
+
+        # Both directives must live in the [Unit] section (before [Service]).
+        unit_start = self.content.index("[Unit]")
+        service_start = self.content.index("[Service]")
+        burst_pos = self.content.index("StartLimitBurst=5")
+        interval_pos = self.content.index("StartLimitIntervalSec=1800")
+        assert (
+            unit_start < burst_pos < service_start
+        ), "StartLimitBurst=5 must be inside the [Unit] section"
+        assert (
+            unit_start < interval_pos < service_start
+        ), "StartLimitIntervalSec=1800 must be inside the [Unit] section"
+
+    def test_service_on_failure_references_failure_helper(self):
+        # JTN-671: OnFailure= activates the sentinel-writer unit when the
+        # start-limit is hit, making the failure detectable without parsing
+        # journalctl (status LED, healthcheck, future webhook).
+        assert "OnFailure=inkypi-failure.service" in self.content, (
+            "inkypi.service must declare OnFailure=inkypi-failure.service in "
+            "[Unit] so the failure sentinel is written on start-limit-hit (JTN-671)"
+        )
+
+        # OnFailure= must live in [Unit], not [Service].
+        unit_start = self.content.index("[Unit]")
+        service_start = self.content.index("[Service]")
+        on_failure_pos = self.content.index("OnFailure=inkypi-failure.service")
+        assert (
+            unit_start < on_failure_pos < service_start
+        ), "OnFailure=inkypi-failure.service must be inside the [Unit] section"
+
+
+class TestSystemdFailureService:
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("inkypi-failure.service")
+
+    def test_failure_service_has_required_sections(self):
+        # JTN-671: inkypi-failure.service is a oneshot helper activated by
+        # OnFailure= in inkypi.service when the start-limit is hit.
+        for section in ["[Unit]", "[Service]"]:
+            assert (
+                section in self.content
+            ), f"inkypi-failure.service must contain a {section} section (JTN-671)"
+
+    def test_failure_service_is_oneshot(self):
+        assert (
+            "Type=oneshot" in self.content
+        ), "inkypi-failure.service must be Type=oneshot (JTN-671)"
+
+    def test_failure_service_writes_sentinel_file(self):
+        # The unit must touch /var/lib/inkypi/.start-limit-hit so the
+        # healthcheck / status LED can detect the broken service state.
+        assert "/var/lib/inkypi/.start-limit-hit" in self.content, (
+            "inkypi-failure.service must write /var/lib/inkypi/.start-limit-hit "
+            "so the failure is detectable without journalctl (JTN-671)"
+        )
+
 
 # ---- CLI wrapper ----
 
@@ -393,6 +464,17 @@ class TestInstallScript:
         assert "systemctl enable" in fn_body, (
             "install_app_service() must call 'systemctl enable' to re-enable the "
             "service after stop_service() disabled it during the install window"
+        )
+
+    def test_install_app_service_installs_failure_helper(self):
+        # JTN-671: install_app_service() must also copy inkypi-failure.service
+        # into /etc/systemd/system/ so the OnFailure= directive can resolve.
+        fn_start = self.content.index("install_app_service() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        assert "inkypi-failure.service" in fn_body, (
+            "install_app_service() must install inkypi-failure.service so the "
+            "OnFailure= directive in inkypi.service can resolve (JTN-671)"
         )
 
     def test_install_creates_lockfile_near_top(self):
@@ -1351,6 +1433,142 @@ class TestUpdateScript:
                 "--no-cache-dir" in line
             ), f"JTN-602 parity — pip install in update.sh missing --no-cache-dir: {line!r}"
 
+    def test_update_installs_uv_into_venv(self):
+        # JTN-670 / JTN-605 parity: uv must be installed into the venv so that
+        # every update uses the low-memory uv resolver (~10-20 MB peak vs pip's
+        # ~100-150 MB). This prevents OOM thrashing on Pi Zero 2 W updates.
+        uv_install_lines = [
+            line
+            for line in self.content.splitlines()
+            if re.search(r"-m pip install", line)
+            and " uv" in line
+            and not line.strip().startswith("#")
+        ]
+        assert uv_install_lines, "update.sh must have a 'pip install ... uv' call (JTN-670)"
+        for line in uv_install_lines:
+            assert (
+                "--no-cache-dir" in line
+            ), f"pip install uv in update.sh missing --no-cache-dir: {line!r}"
+
+    def test_update_uses_uv_pip_install_for_requirements(self):
+        # JTN-670 / JTN-605 parity: update.sh must prefer uv pip install when uv
+        # is available, mirroring install.sh's create_venv() pattern.
+        assert (
+            "uv pip install" in self.content
+        ), "update.sh must use 'uv pip install' for dependency install (JTN-670)"
+
+    def test_update_uses_require_hashes(self):
+        # JTN-670 / JTN-516 parity: supply-chain integrity must be enforced on
+        # every update, not just fresh installs. Both the uv path and the pip
+        # fallback must carry --require-hashes.
+        lines = self.content.splitlines()
+        # Collect joined continuation blocks that are install commands referencing
+        # requirements (contains pip/uv install and PIP_REQUIREMENTS_FILE, but not
+        # a bare variable assignment like PIP_REQUIREMENTS_FILE="...").
+        install_blocks: list[str] = []
+        current: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            current.append(stripped.rstrip("\\").strip())
+            if not stripped.endswith("\\"):
+                block = " ".join(current)
+                if (
+                    "PIP_REQUIREMENTS_FILE" in block
+                    and ("pip install" in block or "uv pip install" in block)
+                ):
+                    install_blocks.append(block)
+                current = []
+
+        assert install_blocks, (
+            "update.sh must have an install invocation referencing PIP_REQUIREMENTS_FILE"
+        )
+        for block in install_blocks:
+            assert "--require-hashes" in block, (
+                f"update.sh requirements install block missing --require-hashes "
+                f"(JTN-670/JTN-516): {block!r}"
+            )
+
+    def test_update_uv_install_has_http_timeout(self):
+        # JTN-670 / JTN-534 parity: uv pip install invocations must prefix
+        # UV_HTTP_TIMEOUT=60 to survive flaky Wi-Fi on Pi Zero 2 W.
+        # uv doesn't accept --default-timeout as a CLI flag; the env var scopes
+        # the timeout to that subprocess only and doesn't leak.
+        lines = self.content.splitlines()
+        uv_install_indices = [i for i, line in enumerate(lines) if "-m uv pip install" in line]
+        assert uv_install_indices, (
+            "update.sh must have at least one 'uv pip install' invocation (JTN-670)"
+        )
+        for idx in uv_install_indices:
+            prev = lines[idx - 1] if idx > 0 else ""
+            assert "UV_HTTP_TIMEOUT" in lines[idx] or "UV_HTTP_TIMEOUT" in prev, (
+                "uv pip install in update.sh must prefix UV_HTTP_TIMEOUT "
+                "for Wi-Fi resilience (JTN-534)"
+            )
+
+    def test_update_has_uv_pip_fallback_with_require_hashes(self):
+        # JTN-670 / JTN-605 parity: if uv is unavailable, update.sh must fall
+        # back to pip with --require-hashes preserved. The pip install and the
+        # -r <requirements> flag are on separate continuation lines, so join them.
+        assert "use_uv" in self.content, (
+            "update.sh must gate uv vs pip path on a use_uv flag (JTN-670)"
+        )
+        lines = self.content.splitlines()
+        # Collect joined continuation blocks: a block that contains `-m pip install`
+        # AND references the requirements file (via -r "$PIP_REQUIREMENTS_FILE"),
+        # but NOT via the uv installer.
+        current: list[str] = []
+        pip_fallback_blocks: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            current.append(stripped.rstrip("\\").strip())
+            if not stripped.endswith("\\"):
+                block = " ".join(current)
+                if (
+                    re.search(r"-m pip install", block)
+                    and "PIP_REQUIREMENTS_FILE" in block
+                    and "uv pip install" not in block
+                ):
+                    pip_fallback_blocks.append(block)
+                current = []
+
+        assert pip_fallback_blocks, (
+            "update.sh must retain a pip-based fallback install of PIP_REQUIREMENTS_FILE (JTN-670)"
+        )
+        for block in pip_fallback_blocks:
+            assert "--require-hashes" in block, (
+                "pip fallback in update.sh must preserve --require-hashes (JTN-670/JTN-516)"
+            )
+            assert "--no-cache-dir" in block, (
+                "pip fallback in update.sh must preserve --no-cache-dir (JTN-670/JTN-602)"
+            )
+
+    def test_update_uv_install_uses_no_cache(self):
+        # JTN-670 / JTN-602 parity: uv pip install must use --no-cache (uv's
+        # equivalent of pip's --no-cache-dir) to avoid wasting SD space on updates.
+        lines = self.content.splitlines()
+        current: list[str] = []
+        uv_req_blocks: list[str] = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            current.append(stripped.rstrip("\\").strip())
+            if not stripped.endswith("\\"):
+                block = " ".join(current)
+                if "uv pip install" in block and "PIP_REQUIREMENTS_FILE" in block:
+                    uv_req_blocks.append(block)
+                current = []
+        assert uv_req_blocks, (
+            "update.sh must have a 'uv pip install ... -r PIP_REQUIREMENTS_FILE' block"
+        )
+        for block in uv_req_blocks:
+            assert "--no-cache" in block, (
+                f"uv pip install in update.sh missing --no-cache (JTN-602 parity): {block!r}"
+            )
 
 # ---- uninstall.sh ----
 

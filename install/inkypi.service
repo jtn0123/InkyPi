@@ -2,6 +2,13 @@
 Description=InkyPi App
 After=network-online.target
 Wants=network-online.target
+# JTN-671: Bound restart thrash. After 5 failed starts within 30 min systemd
+# enters "start-limit-hit" state and stops retrying silently. Without this the
+# JTN-665 incident would have looped 4,091+ times burning CPU and wearing the
+# SD card. OnFailure fires the helper unit to write a sentinel file.
+StartLimitIntervalSec=1800
+StartLimitBurst=5
+OnFailure=inkypi-failure.service
 
 [Service]
 Type=notify
