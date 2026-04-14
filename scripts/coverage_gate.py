@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from pathlib import Path
 
 THRESHOLDS: dict[str, tuple[float, float]] = {

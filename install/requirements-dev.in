@@ -51,6 +51,9 @@ waitress>=3.0,<4
 jsonschema>=4.0,<5
 astral>=3.0,<4
 
+# Security — safe XML parsing (replaces stdlib xml.etree.ElementTree)
+defusedxml>=0.7,<1
+
 # Audit / compliance
 pip-audit>=2.0,<3
 cyclonedx-bom>=6.0,<7
