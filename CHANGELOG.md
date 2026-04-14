@@ -1,6 +1,112 @@
 # CHANGELOG
 
 
+## v0.51.8 (2026-04-14)
+
+### Bug Fixes
+
+- **install**: Copy inkypi-failure.service in update.sh (JTN-686)
+  ([#470](https://github.com/jtn0123/InkyPi/pull/470),
+  [`76f5aa0`](https://github.com/jtn0123/InkyPi/commit/76f5aa06761debb55a40798482c3ed4fb8db4ac1))
+
+Add install_failure_service_unit helper to _common.sh and call it from both install.sh and update.sh
+  so every update path copies inkypi-failure.service alongside inkypi.service, preventing the "Unit
+  inkypi-failure.service not found" OnFailure= dangle on pre-JTN-671 installs that update to
+  v0.51.1+.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **update**: Remove lockfile before systemctl start, add EXIT trap (JTN-685)
+  ([#472](https://github.com/jtn0123/InkyPi/pull/472),
+  [`a00c115`](https://github.com/jtn0123/InkyPi/commit/a00c1156b2223d252f3bf5e8072f388390578f8d))
+
+* fix(update): remove lockfile before systemctl start, add EXIT trap (JTN-685)
+
+The lockfile /var/lib/inkypi/.install-in-progress was removed AFTER update_app_service() called
+  `systemctl start`, causing ExecStartPre to see the lockfile and reject every first-boot after an
+  update.
+
+Fix: - Move `rm -f "$LOCKFILE"` to just before update_app_service() so the lockfile is gone when
+  ExecStartPre runs. - Add `trap ... EXIT` with a `_lockfile_keep` sentinel for defense-in- depth:
+  abnormal exits (SIGTERM, unhandled errors) clear the lockfile automatically; intentional failure
+  exits set _lockfile_keep=1 to preserve it and force a manual rerun. - Update
+  test_install_scripts.py: replace the now-stale assertion that rm came after update_app_service
+  with the correct JTN-685 assertion (rm must come BEFORE), and add a new test for the EXIT trap.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting to test_install_scripts.py
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- **playlist**: Reduce update_playlist complexity, dedupe string
+  ([#479](https://github.com/jtn0123/InkyPi/pull/479),
+  [`2ed09cf`](https://github.com/jtn0123/InkyPi/commit/2ed09cf9fb64a025691339fbb07f14a6bed90215))
+
+Address SonarCloud findings on the JTN-658 PR: - S3776: extract _validate_update_playlist_payload so
+  update_playlist stays under the cognitive-complexity budget. - S1192: hoist "Playlist not found"
+  into _MSG_PLAYLIST_NOT_FOUND.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Responsive mobile click-sweep (JTN-693)
+  ([#473](https://github.com/jtn0123/InkyPi/pull/473),
+  [`c07cca2`](https://github.com/jtn0123/InkyPi/commit/c07cca28b5e23722f7425376606b79d8836e1c8d))
+
+Parametrize test_click_sweep over viewport so the sweep runs at both desktop (1280×900) and mobile
+  (360×800). The mobile fixture already existed in tests/integration/conftest.py; this reuses it via
+  indirect fixture lookup rather than duplicating sweep logic.
+
+Adds _MOBILE_XFAIL_PAGES as an empty parking spot for mobile-only breaks discovered during rollout.
+  Existing _XFAIL_PAGES entries continue to apply to both viewports.
+
+No mobile-only breaks found during local runs; mobile failures exactly mirror desktop failures (and
+  those desktop failures exist on main, unrelated to this change).
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **ui**: Toggle state-reflection sweep (JTN-688)
+  ([#474](https://github.com/jtn0123/InkyPi/pull/474),
+  [`89980f4`](https://github.com/jtn0123/InkyPi/commit/89980f4f7f86d459048d286e238808986971611e))
+
+* test(ui): add toggle state-reflection sweep (JTN-688)
+
+Parallel to the existing click sweep but focused on toggle-like elements ([role=switch],
+  input[type=checkbox], [data-toggle], collapsible/playlist toggles, [aria-pressed]). For each
+  toggle: snapshot aria-checked, aria-pressed, aria-expanded, checked, classList, data-state before
+  click; click; assert at least one field changed. This closes the "handler fires but UI doesn't
+  reflect" gap that slipped JTN-681.
+
+Filters out toggles that navigate away or open modals — those are covered by the dedicated
+  click-sweep and modal-lifecycle tests.
+
+Dispatches clicks via element.click() in page context so styled sibling overlays (e.g. .toggle-label
+  covering .toggle-checkbox) don't swallow coordinate-based Playwright clicks.
+
+playlist page is xfailed pending JTN-692 (playlist-toggle-button is a visible no-op on desktop
+  because setPlaylistExpanded short-circuits for non-mobile viewports) — exactly the class of bug
+  this sweep is designed to catch.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ui): register test_toggle_reflection in UI_BROWSER_TESTS (JTN-688)
+
+Without this entry, the new integration test is collected under the jsdom/no-browser path, which
+  causes Playwright browser launches to fail on CI runners where the chromium-headless-shell binary
+  is not installed. Adding it to UI_BROWSER_TESTS triggers the playwright install step and gates the
+  test on browser availability, matching every other UI test.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.7 (2026-04-14)
 
 ### Bug Fixes
