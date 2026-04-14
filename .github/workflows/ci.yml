@@ -171,6 +171,8 @@ jobs:
           python -m pip install --upgrade pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
           pip check
+      - name: Build CSS
+        run: python scripts/build_css.py
       - name: Run tests
         env:
           INKYPI_ENV: dev
