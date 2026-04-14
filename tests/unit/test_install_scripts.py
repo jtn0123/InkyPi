@@ -1400,9 +1400,9 @@ class TestUpdateScript:
         # The trap must be set after the lockfile is created
         lockfile_pos = self.content.index('touch "$LOCKFILE"')
         trap_pos = self.content.index("trap ")
-        assert trap_pos > lockfile_pos, (
-            "EXIT trap must be set after the lockfile is created"
-        )
+        assert (
+            trap_pos > lockfile_pos
+        ), "EXIT trap must be set after the lockfile is created"
 
     def test_update_upgrades_pip_deps(self):
         assert "pip install" in self.content
