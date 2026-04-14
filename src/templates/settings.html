@@ -210,14 +210,16 @@
                     <div class="settings-container collapsible-content" hidden>
                         <div class="form-group nowrap">
                             <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh Benchmarks</button>
-                            <button type="button" id="safeResetBtn" class="action-button compact warn">Safe Reset</button>
+                            <!-- data-test-skip-click: destructive reset, excluded from test_click_sweep -->
+                            <button type="button" id="safeResetBtn" class="action-button compact warn" data-test-skip-click="true">Safe Reset</button>
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
                             <input id="isolatePluginInput" type="text" class="form-input" placeholder="e.g. weather" />
                             <div class="inline-action-row">
-                                <button type="button" id="isolatePluginBtn" class="action-button compact warn">Isolate</button>
-                                <button type="button" id="unIsolatePluginBtn" class="action-button compact">Unisolate</button>
+                                <!-- data-test-skip-click: isolate/unisolate mutate plugin state globally -->
+                                <button type="button" id="isolatePluginBtn" class="action-button compact warn" data-test-skip-click="true">Isolate</button>
+                                <button type="button" id="unIsolatePluginBtn" class="action-button compact" data-test-skip-click="true">Unisolate</button>
                                 <button type="button" id="refreshIsolationBtn" class="action-button compact">Refresh List</button>
                             </div>
                         </div>
@@ -245,8 +247,9 @@
                         <p>Lifecycle operations on the device itself.</p>
                     </div>
                     <div class="inline-action-row">
-                        <button type="button" id="rebootBtn" class="action-button is-warning">Reboot</button>
-                        <button type="button" id="shutdownBtn" class="action-button is-danger">Shutdown</button>
+                        <!-- data-test-skip-click: reboot/shutdown physically power-cycle the Pi -->
+                        <button type="button" id="rebootBtn" class="action-button is-warning" data-test-skip-click="true">Reboot</button>
+                        <button type="button" id="shutdownBtn" class="action-button is-danger" data-test-skip-click="true">Shutdown</button>
                     </div>
                 </div>
                 </section>
@@ -343,7 +346,8 @@
                     <button id="logsWrapBtn" class="header-button is-secondary" type="button" aria-pressed="true">Wrap: On</button>
                     <button id="logsRefreshBtn" class="header-button is-secondary" type="button">Refresh</button>
                     <button id="logsCopyBtn" class="header-button is-secondary" type="button">Copy</button>
-                    <button id="logsClearBtn" class="header-button is-dark" type="button">Clear</button>
+                    <!-- data-test-skip-click: clears the on-device log buffer -->
+                    <button id="logsClearBtn" class="header-button is-dark" type="button" data-test-skip-click="true">Clear</button>
                 </div>
             </div>
         </div>

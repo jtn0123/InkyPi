@@ -97,7 +97,8 @@
                 <h3 id="historyDangerZoneTitle">Reset cache</h3>
                 <p>Remove all saved history images from this device when you want to reclaim local storage quickly. This action cannot be undone.</p>
             </div>
-            <button id="historyClearBtn" class="header-button is-danger" type="button">Clear All</button>
+            {# data-test-skip-click: wipes every saved history image #}
+            <button id="historyClearBtn" class="header-button is-danger" type="button" data-test-skip-click="true">Clear All</button>
         </section>
         {% endif %}
     </div>

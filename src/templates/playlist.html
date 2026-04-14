@@ -81,7 +81,8 @@
                             <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
                             {% endif %}
                             <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" aria-label="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
-                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
+                            {# data-test-skip-click: deletes the playlist #}
+                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
                             <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
                         </div>
                     </div>
@@ -153,7 +154,8 @@
                                     <span class="action-button-label">Display</span>
                                     <span class="sr-only"> {{ pi_label }} now</span>
                                 </button>
-                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                {# data-test-skip-click: removes a plugin instance from the playlist #}
+                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
                                     {{ icon('trash', 'action-icon') | safe }}
                                     <span class="action-button-label">Delete</span>
                                     <span class="sr-only"> plugin instance {{ pi_label }}</span>

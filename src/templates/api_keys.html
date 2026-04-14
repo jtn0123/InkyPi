@@ -72,7 +72,8 @@
                     <div class="apikey-row" data-existing="true">
                         <input type="text" class="apikey-key" id="apikey-name-{{ loop.index0 }}" name="apikey-name-{{ loop.index0 }}" value="{{ entry.key }}" placeholder="KEY_NAME" readonly aria-label="{{ entry.key }} key name">
                         <input type="password" class="apikey-value" id="apikey-value-{{ loop.index0 }}" name="apikey-value-{{ loop.index0 }}" value="" placeholder="(unchanged)" readonly aria-label="{{ entry.key }} value, hidden">
-                        <button type="button" class="btn-delete" data-api-action="delete-row" title="Delete" aria-label="Delete {{ entry.key }} API key">×</button>
+                        {# data-test-skip-click: removes the API-key row from the form #}
+                        <button type="button" class="btn-delete" data-api-action="delete-row" data-test-skip-click="true" title="Delete" aria-label="Delete {{ entry.key }} API key">×</button>
                     </div>
                     {% endfor %}
                 {% else %}
