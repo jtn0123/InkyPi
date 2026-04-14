@@ -5,13 +5,26 @@ name: Build release wheelhouse
 # available, dropping first-boot install time on a Pi Zero 2 W from ~15 min
 # down to ~2-3 min (no on-device wheel compilation for numpy/Pillow/cffi/etc).
 #
-# Triggers only when a release is published (e.g. by semantic-release). The
-# workflow itself is not exercised in PR CI — install.sh carries a graceful
-# fallback so a missing bundle is a no-op.
+# JTN-683 FIX: The original `on: release: types: [published]` trigger never
+# fired because semantic-release creates releases using GITHUB_TOKEN, and
+# GitHub intentionally prevents GITHUB_TOKEN-created events from triggering
+# downstream workflow event listeners (a documented security boundary).
+#
+# Fix: added `workflow_run` trigger watching the "Release" workflow. This is
+# a first-party mechanism that explicitly allows cross-workflow chaining
+# regardless of which token the upstream workflow used. Gated on
+# `conclusion == 'success'` so we only build wheels when a real release
+# was actually cut. The release event trigger is kept for forward
+# compatibility (in case we ever switch to a PAT-based release flow).
 
 on:
   release:
     types: [published]
+  # Fires when the Release workflow completes successfully — works even when
+  # semantic-release uses GITHUB_TOKEN (which suppresses the release event).
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   # Manual trigger so maintainers can rebuild wheels for an existing tag
   # without cutting a new release.
   workflow_dispatch:
@@ -25,12 +38,68 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-wheelhouse-${{ github.event.release.tag_name || inputs.tag }}
+  group: build-wheelhouse-${{ github.event.release.tag_name || inputs.tag || github.run_id }}
   cancel-in-progress: false
 
 jobs:
+  # Guard job: for workflow_run events, skip if the upstream run did not
+  # succeed (e.g. it was cancelled or failed with no new release).
+  check-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.gate.outputs.should-run }}
+      tag: ${{ steps.gate.outputs.tag }}
+    steps:
+      - name: Evaluate trigger and resolve tag
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ inputs.tag }}
+          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          case "$EVENT_NAME" in
+            release)
+              TAG="$RELEASE_TAG"
+              ;;
+            workflow_dispatch)
+              TAG="$DISPATCH_TAG"
+              ;;
+            workflow_run)
+              if [ "$WF_CONCLUSION" != "success" ]; then
+                echo "Upstream Release workflow did not succeed (conclusion=$WF_CONCLUSION) — skipping."
+                echo "should-run=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              # Find the most recent release tag created by the Release workflow.
+              # semantic-release always creates a tag that matches vMAJOR.MINOR.PATCH.
+              TAG=$(gh release list --repo "$REPO" --limit 1 \
+                --json tagName --jq '.[0].tagName')
+              if [ -z "$TAG" ]; then
+                echo "ERROR: Could not resolve latest release tag after workflow_run" >&2
+                exit 1
+              fi
+              echo "Resolved tag from latest release: $TAG"
+              ;;
+            *)
+              echo "ERROR: Unexpected event name: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+          if [ -z "$TAG" ]; then
+            echo "ERROR: No release tag resolved" >&2
+            exit 1
+          fi
+          echo "should-run=true" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
   build-wheels:
     name: Build wheels (${{ matrix.arch }})
+    needs: check-trigger
+    if: needs.check-trigger.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -45,12 +114,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ needs.check-trigger.outputs.tag }}
 
       - name: Resolve tag
         id: tag
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          RELEASE_TAG: ${{ needs.check-trigger.outputs.tag }}
         run: |
           TAG="$RELEASE_TAG"
           if [ -z "$TAG" ]; then
@@ -126,7 +195,7 @@ jobs:
           ls -la "$TARBALL" "${TARBALL}.sha256"
 
       - name: Attach wheelhouse to release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event_name == 'workflow_run'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
