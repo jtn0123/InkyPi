@@ -25,6 +25,11 @@ jobs:
           cache: 'pip'
           cache-dependency-path: install/requirements.txt
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install semantic-release and SBOM tools
         run: pip install python-semantic-release==9.21.1 cyclonedx-bom
 
