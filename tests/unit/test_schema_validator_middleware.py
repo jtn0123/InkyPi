@@ -26,10 +26,6 @@ def dev_app_with_validator(monkeypatch):
     """
     from app_setup import schema_validator
 
-    monkeypatch.setattr(
-        schema_validator, "ENDPOINT_SCHEMAS", {"toy.toy_ok": _ToyResponse}
-    )
-
     app = Flask(__name__)
     app.config["TESTING"] = True
 
@@ -41,7 +37,8 @@ def dev_app_with_validator(monkeypatch):
     def toy_bad():
         return jsonify({"value": "not-an-int"})
 
-    # Re-patch after route registration so request.endpoint keys line up.
+    # Patch ENDPOINT_SCHEMAS to match Flask's auto-named endpoints (no
+    # blueprint prefix for plain view functions).
     monkeypatch.setattr(
         schema_validator,
         "ENDPOINT_SCHEMAS",

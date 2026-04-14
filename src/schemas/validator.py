@@ -11,6 +11,10 @@ and checks:
 ``Any`` annotations short-circuit the type check, mirroring mypy semantics.
 Kept intentionally dependency-free (no pydantic) so importing it is cheap and
 safe to do from request paths.
+
+Error messages intentionally omit the raw mismatched value. The middleware
+surfaces these at WARNING level; responses occasionally contain user-visible
+strings (plugin labels, paths) that should not be echoed into logs.
 """
 
 from __future__ import annotations
@@ -29,6 +33,45 @@ def _is_typeddict(tp: Any) -> bool:
     )
 
 
+def _check_union(value: Any, tp: Any, path: str) -> list[str]:
+    for arm in get_args(tp):
+        if not _check_type(value, arm, path):
+            return []
+    return [f"{path}: no union arm matched ({tp})"]
+
+
+def _check_list(value: Any, tp: Any, path: str) -> list[str]:
+    if not isinstance(value, list):
+        return [f"{path}: expected list, got {type(value).__name__}"]
+    (inner,) = get_args(tp) or (Any,)
+    errs: list[str] = []
+    for i, item in enumerate(value):
+        errs.extend(_check_type(item, inner, f"{path}[{i}]"))
+    return errs
+
+
+def _check_dict(value: Any, tp: Any, path: str) -> list[str]:
+    if not isinstance(value, dict):
+        return [f"{path}: expected dict, got {type(value).__name__}"]
+    args = get_args(tp)
+    if not args:
+        return []
+    _k, vt = args
+    errs: list[str] = []
+    for k, v in value.items():
+        errs.extend(_check_type(v, vt, f"{path}[{k!r}]"))
+    return errs
+
+
+def _check_plain_class(value: Any, tp: type, path: str) -> list[str]:
+    # bool is a subclass of int; keep them distinct to catch accidents.
+    if tp is int and isinstance(value, bool):
+        return [f"{path}: expected int, got bool"]
+    if not isinstance(value, tp):
+        return [f"{path}: expected {tp.__name__}, got {type(value).__name__}"]
+    return []
+
+
 def _check_type(value: Any, tp: Any, path: str) -> list[str]:
     """Return a list of error strings (empty if ``value`` matches ``tp``)."""
     # Any -> accept anything
@@ -37,38 +80,12 @@ def _check_type(value: Any, tp: Any, path: str) -> list[str]:
 
     origin = get_origin(tp)
 
-    # Union / Optional
     if origin is typing.Union or origin is types.UnionType:
-        errs_per_arm: list[list[str]] = []
-        for arm in get_args(tp):
-            errs = _check_type(value, arm, path)
-            if not errs:
-                return []
-            errs_per_arm.append(errs)
-        return [f"{path}: no union arm matched value {value!r} ({tp})"]
-
-    # list[X]
+        return _check_union(value, tp, path)
     if origin in (list, typing.List):  # noqa: UP006
-        if not isinstance(value, list):
-            return [f"{path}: expected list, got {type(value).__name__}"]
-        (inner,) = get_args(tp) or (Any,)
-        errs: list[str] = []
-        for i, item in enumerate(value):
-            errs.extend(_check_type(item, inner, f"{path}[{i}]"))
-        return errs
-
-    # dict[K, V]
+        return _check_list(value, tp, path)
     if origin in (dict, typing.Dict):  # noqa: UP006
-        if not isinstance(value, dict):
-            return [f"{path}: expected dict, got {type(value).__name__}"]
-        args = get_args(tp)
-        if not args:
-            return []
-        _k, vt = args
-        errs = []
-        for k, v in value.items():
-            errs.extend(_check_type(v, vt, f"{path}[{k!r}]"))
-        return errs
+        return _check_dict(value, tp, path)
 
     # Nested TypedDict
     if _is_typeddict(tp):
@@ -76,14 +93,7 @@ def _check_type(value: Any, tp: Any, path: str) -> list[str]:
 
     # Plain class
     if isinstance(tp, type):
-        # bool is a subclass of int; keep them distinct to catch accidents
-        if tp is int and isinstance(value, bool):
-            return [f"{path}: expected int, got bool ({value!r})"]
-        if not isinstance(value, tp):
-            return [
-                f"{path}: expected {tp.__name__}, got {type(value).__name__} ({value!r})"
-            ]
-        return []
+        return _check_plain_class(value, tp, path)
 
     # Unknown / exotic annotation — skip silently
     return []
