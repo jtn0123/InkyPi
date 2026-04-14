@@ -138,6 +138,28 @@ build_css_bundle() {
 }
 
 # ---------------------------------------------------------------------------
+# Systemd unit helpers (JTN-686)
+#
+# install_failure_service_unit — copy inkypi-failure.service to
+# /etc/systemd/system/. Called by both install.sh and update.sh so every code
+# path that refreshes the main inkypi.service unit also refreshes the
+# OnFailure= sentinel unit.  Not enabled (it is activated via OnFailure=).
+#
+# Requires SCRIPT_DIR to be set by the sourcing script.
+# ---------------------------------------------------------------------------
+
+install_failure_service_unit() {
+  local src="$SCRIPT_DIR/inkypi-failure.service"
+  local dst="/etc/systemd/system/inkypi-failure.service"
+  if [ -f "$src" ]; then
+    cp "$src" "$dst"
+  else
+    echo_error "ERROR: Failure service file $src not found!"
+    exit 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Wheelhouse helpers (JTN-604 / JTN-669)
 #
 # fetch_wheelhouse / cleanup_wheelhouse — extracted in PR #450.

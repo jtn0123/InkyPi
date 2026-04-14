@@ -313,18 +313,10 @@ install_app_service() {
     exit 1
   fi
 
-  # JTN-671: Install the failure-sentinel helper unit. OnFailure= in
-  # inkypi.service activates this when the start-limit is hit; it writes
-  # /var/lib/inkypi/.start-limit-hit so status checks can detect a broken
-  # install without parsing journalctl.
-  FAILURE_SERVICE_SOURCE="$SCRIPT_DIR/inkypi-failure.service"
-  FAILURE_SERVICE_TARGET="/etc/systemd/system/inkypi-failure.service"
-  if [ -f "$FAILURE_SERVICE_SOURCE" ]; then
-    cp "$FAILURE_SERVICE_SOURCE" "$FAILURE_SERVICE_TARGET"
-  else
-    echo_error "ERROR: Failure service file $FAILURE_SERVICE_SOURCE not found!"
-    exit 1
-  fi
+  # JTN-671/686: Install the failure-sentinel helper unit via shared helper in
+  # _common.sh so install.sh and update.sh always copy inkypi-failure.service
+  # together with inkypi.service — keeps OnFailure= from dangling after updates.
+  install_failure_service_unit
 
   sudo systemctl daemon-reload
   sudo systemctl enable $SERVICE_FILE
