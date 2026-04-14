@@ -1,6 +1,131 @@
 # CHANGELOG
 
 
+## v0.51.1 (2026-04-14)
+
+### Bug Fixes
+
+- **benchmarks**: Parameterize/validate SQL identifiers in benchmark_storage
+  ([#463](https://github.com/jtn0123/InkyPi/pull/463),
+  [`5beaf73`](https://github.com/jtn0123/InkyPi/commit/5beaf73991e634f7b141adb87d6d027d75b3eac0))
+
+* fix(benchmarks): validate SQL identifiers in benchmark_storage to prevent injection
+
+Add allow-list validation for table names and a strict regex check for column identifiers before
+  interpolating them into PRAGMA/ALTER TABLE statements, resolving code-scanning alerts #119-#122
+  (sqlalchemy-execute-raw-query / formatted-sql-query rules).
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* test(benchmarks): add tests for _validate_identifier and _ensure_optional_columns
+
+- Assert _validate_identifier raises ValueError on bad inputs (spaces, hyphens, SQL injection
+  strings, empty string, digit-leading names) - Assert _validate_identifier accepts valid
+  identifiers unchanged - Assert _ensure_optional_columns raises ValueError for unknown table names
+  - Assert _ensure_optional_columns correctly adds missing columns - Assert _ensure_optional_columns
+  is idempotent on existing columns
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **ci**: Prevent shell injection in workflows via env vars
+  ([#460](https://github.com/jtn0123/InkyPi/pull/460),
+  [`66ea219`](https://github.com/jtn0123/InkyPi/commit/66ea219ea9262aeb46bcb3a9b7b85bad6c0b941d))
+
+Move \`\${{ github.* }}\` interpolations in run: scripts into env: blocks and reference them as
+  shell variables — fixes GitHub code-scanning alerts 108, 109, 110, 111
+  (yaml.github-actions.security.run-shell-injection) in os-drift-nightly.yml (lines 61, 219),
+  build-wheelhouse.yml (line 52), and build-pi-image.yml (line 73).
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **docker**: Non-root USER, HEALTHCHECK, combined apt RUN
+  ([#462](https://github.com/jtn0123/InkyPi/pull/462),
+  [`6749e2d`](https://github.com/jtn0123/InkyPi/commit/6749e2d8412fc627a5860be2c111b8f0eee1f77e))
+
+Addresses Dockerfile security alerts DS-0002, DS-0026, DS-0017:
+
+- Dockerfile: add appuser (uid 1000), chown /app, USER appuser, and a real HEALTHCHECK for the Flask
+  server on port 8080 (alerts 112, 130) - scripts/Dockerfile.install-matrix: add explicit USER root
+  + HEALTHCHECK NONE (install.sh requires root; explicit USER satisfies DS-0002); remove standalone
+  apt-get update from raspi.list RUN — install.sh runs its own update, eliminating the stale-cache
+  layer (DS-0017, alert 131, 133, 135, 137) - scripts/Dockerfile.sim-install: same USER root +
+  HEALTHCHECK NONE pattern; same standalone apt-get update removal (DS-0017, alert 132, 134, 136)
+
+Fixes alerts: 112, 130, 131, 132, 133, 134, 135, 136, 137.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **scripts**: Use defusedxml in coverage_gate.py
+  ([#461](https://github.com/jtn0123/InkyPi/pull/461),
+  [`27caee9`](https://github.com/jtn0123/InkyPi/commit/27caee9f4e4208f69d8a5348022e679465ab7c49))
+
+* fix(scripts): use defusedxml in coverage_gate.py
+
+Replace stdlib xml.etree.ElementTree with defusedxml.ElementTree in scripts/coverage_gate.py to
+  resolve Semgrep alert #113 (python.lang.security.use-defused-xml-parse.use-defused-xml-parse). The
+  defusedxml API is drop-in compatible; no behaviour change.
+
+Add defusedxml>=0.7,<1 to install/requirements-dev.in so the dependency is explicit in the
+  source-of-truth constraints file.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* fix(lint): sort imports in coverage_gate.py (ruff I001)
+
+Move defusedxml third-party import below stdlib imports to satisfy ruff's isort rule I001.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Layer 3 click sweep + backend route smoke (JTN-679)
+  ([#459](https://github.com/jtn0123/InkyPi/pull/459),
+  [`6e2ec41`](https://github.com/jtn0123/InkyPi/commit/6e2ec4119f08885e99d3762f74a6d8d7d8f136a3))
+
+* test(ui): add Layer 3 click sweep + backend route smoke (JTN-679)
+
+Stand up the runtime half of the UI breakage detection net:
+
+* `tests/smoke/test_route_smoke.py` — walks `app.url_map.iter_rules()` and GETs every
+  unparameterized route via the `client` fixture. Asserts no 5xx, status in a controlled set
+  (200/302/400/401/403/404/405/422), and that HTML responses have a `<title>` and no `Internal
+  Server Error`/`Traceback` marker. Allowlist lives at `tests/smoke/route_allowlist.yml`.
+
+* `tests/integration/test_click_sweep.py` — Playwright sweep (gated by `SKIP_BROWSER`/`SKIP_UI`)
+  over 6 pages (home, settings, history, playlist, plugin/clock, api_keys). For each visible
+  `<button>`/`<a>`/`[data-*-action]` that isn't `data-test-skip-click="true"`, clicks it and asserts
+  no pageerror, no `console.error`, no 5xx, AND an observable change
+  (URL/DOM/network/modal/full-document reload sentinel).
+
+* Destructive controls tagged `data-test-skip-click="true"` in their templates with HTML comments
+  explaining why: settings (Safe Reset, Isolate/Unisolate, Reboot, Shutdown, Clear Logs), history
+  (Clear All, per-row Delete), playlist (Delete playlist, Delete instance), api_keys (Delete row
+  `×`, Delete stored key).
+
+Two pages currently xfail pending fixes tracked in follow-up issues: * `plugin_clock` → JTN-681
+  (clock face picker clicks show no DOM mutation) * `history` → JTN-682 (Refresh button reload not
+  detected as observable)
+
+Part of the JTN-677 epic. Reuses `browser_page`/`RuntimeCollector` from `tests/integration/`,
+  `client`/`flask_app` from `tests/conftest.py`, and the existing `SKIP_BROWSER` gating.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ui): gate click sweep on Playwright availability
+
+The Tests (pytest) CI job doesn't install Playwright Chromium — browser tests are expected to
+  auto-skip there via the `UI_BROWSER_TESTS` registry in `tests/conftest.py`. Register
+  `test_click_sweep.py` so it obeys the same gating as the other e2e browser tests.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.0 (2026-04-14)
 
 ### Features
