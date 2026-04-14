@@ -1313,6 +1313,7 @@ class TestUpdateScript:
         # JTN-667: The comment near get_os_version must spell Trixie correctly.
         assert "13=Trixie" in self.content
         assert "Trixe" not in self.content  # typo guard
+
     def test_update_sources_common(self):
         # JTN-669: update.sh must source _common.sh to gain access to
         # fetch_wheelhouse / cleanup_wheelhouse so every update can use
