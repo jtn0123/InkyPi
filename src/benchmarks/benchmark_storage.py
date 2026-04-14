@@ -130,18 +130,58 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+_ALLOWED_TABLES = frozenset({"refresh_events", "stage_events"})
+_ALLOWED_COLUMN_TYPES = frozenset({"TEXT", "INTEGER", "REAL", "BLOB", "NUMERIC"})
+_IDENTIFIER_RE = __import__("re").compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_identifier(value: str, label: str) -> str:
+    """Return *value* unchanged after confirming it is a safe SQL identifier.
+
+    SQL identifiers (table/column names) cannot be bound via parameterised
+    queries, so we validate against an explicit allow-list (tables) or a strict
+    regex (columns/types) before interpolating into the statement.  Any value
+    that fails validation raises ValueError so callers surface the bug at
+    development time rather than silently executing unsafe SQL.
+    """
+    if not _IDENTIFIER_RE.match(value):
+        raise ValueError(
+            f"Unsafe SQL identifier for {label!r}: {value!r} "
+            "(must match ^[A-Za-z_][A-Za-z0-9_]*$)"
+        )
+    return value
+
+
 def _ensure_optional_columns(
     conn: sqlite3.Connection,
     table_name: str,
     expected_columns: dict[str, str],
 ) -> None:
+    # table_name and column names are SQL identifiers that cannot be bound via
+    # query parameters.  Validate against an allow-list / strict regex before
+    # interpolating so that callers can never inject arbitrary SQL.
+    if table_name not in _ALLOWED_TABLES:
+        raise ValueError(f"Unknown benchmark table: {table_name!r}")
+    safe_table = _validate_identifier(table_name, "table_name")
+
     existing = {
-        row[1] for row in conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+        # Safe: safe_table is validated above against the allow-list.
+        row[1]
+        for row in conn.execute(
+            f"PRAGMA table_info({safe_table})"
+        ).fetchall()  # noqa: S608
     }
     for column_name, column_type in expected_columns.items():
         if column_name in existing:
             continue
-        conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+        safe_col = _validate_identifier(column_name, "column_name")
+        if column_type not in _ALLOWED_COLUMN_TYPES:
+            raise ValueError(f"Unknown column type: {column_type!r}")
+        # Safe: safe_table validated against allow-list; safe_col validated via
+        # regex; column_type validated against allow-list of SQLite type keywords.
+        conn.execute(  # noqa: S608
+            f"ALTER TABLE {safe_table} ADD COLUMN {safe_col} {column_type}"
+        )
 
 
 def save_refresh_event(device_config, refresh_event: dict[str, Any]) -> None:
