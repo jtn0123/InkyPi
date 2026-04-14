@@ -1388,21 +1388,68 @@ class TestUpdateScript:
         ), "Lockfile removal must come BEFORE update_app_service call (JTN-685)"
 
     def test_update_has_exit_trap_for_lockfile(self):
-        # JTN-685: Defense-in-depth EXIT trap so SIGTERM / unhandled exits clean
-        # up the lockfile and don't permanently block the service.  Intentional
-        # failure paths set _lockfile_keep=1 before exit so the lockfile is
-        # preserved (forcing a manual rerun) while unhandled exits clear it.
+        # JTN-704: EXIT trap unconditionally removes the lockfile on every exit
+        # (success, explicit exit N, errexit, SIGINT, SIGTERM, SIGHUP) so a
+        # failed update never leaves the service permanently blocked by a
+        # stale /var/lib/inkypi/.install-in-progress. On non-zero exit the
+        # trap also writes /var/lib/inkypi/.last-update-failure with
+        # structured metadata (timestamp, exit_code, last_command,
+        # recent_journal_lines) for UI surfacing and diagnostics.
         assert "trap " in self.content, "update.sh must set a trap for EXIT"
-        assert "_lockfile_keep" in self.content, (
-            "update.sh must use _lockfile_keep sentinel to distinguish "
-            "intentional failure exits (keep lockfile) from abnormal exits (clear it)"
+        # The new policy must not keep the lockfile on failure — the stale
+        # _lockfile_keep sentinel from the old JTN-685 implementation must be
+        # gone (or we will regress back to the JTN-704 problem).
+        assert "_lockfile_keep" not in self.content, (
+            "update.sh must NOT use _lockfile_keep sentinel under JTN-704; "
+            "the trap unconditionally clears the lockfile on every exit."
         )
-        # The trap must be set after the lockfile is created
+        # Must register an EXIT trap that references the lockfile cleanup.
+        assert "trap _inkypi_update_exit_trap EXIT" in self.content, (
+            "update.sh must register an EXIT trap that cleans the lockfile "
+            "and records failure metadata (JTN-704)"
+        )
+        # Trap body must remove the lockfile unconditionally on EXIT.
+        assert (
+            'rm -f "$LOCKFILE"' in self.content
+        ), "update.sh EXIT trap must rm the lockfile on every exit (JTN-704)"
+        # Trap body must write .last-update-failure on non-zero exit.
+        assert "FAILURE_FILE=" in self.content, (
+            "update.sh must define FAILURE_FILE for the failure-recording "
+            "trap (JTN-704)"
+        )
+        assert ".last-update-failure" in self.content, (
+            "update.sh must reference /var/lib/inkypi/.last-update-failure "
+            "so the EXIT trap can persist the reason for a failed update "
+            "(JTN-704)"
+        )
+        # Required JSON keys in the failure record for downstream parsers.
+        for key in ("timestamp", "exit_code", "last_command", "recent_journal_lines"):
+            assert (
+                f'"{key}"' in self.content
+            ), f"update.sh failure JSON must include {key!r} key (JTN-704)"
+        # Trap must also fire on SIGINT / SIGTERM / SIGHUP.
+        assert (
+            "trap 'exit 130' INT" in self.content
+        ), "update.sh must trap SIGINT so Ctrl-C still cleans the lockfile"
+        assert (
+            "trap 'exit 143' TERM" in self.content
+        ), "update.sh must trap SIGTERM so systemd-stop still cleans the lockfile"
+        # The trap must be set after the lockfile is created.
         lockfile_pos = self.content.index('touch "$LOCKFILE"')
-        trap_pos = self.content.index("trap ")
+        trap_pos = self.content.index("trap _inkypi_update_exit_trap EXIT")
         assert (
             trap_pos > lockfile_pos
-        ), "EXIT trap must be set after the lockfile is created"
+        ), "EXIT trap must be registered after the lockfile is created"
+
+    def test_update_exposes_test_failure_injection_env_var(self):
+        # JTN-704: The integration test needs a guarded env-var hook to
+        # simulate a mid-update failure without touching production paths.
+        # The hook is a no-op unless INKYPI_UPDATE_TEST_FAIL_AT is set.
+        assert "INKYPI_UPDATE_TEST_FAIL_AT" in self.content, (
+            "update.sh must expose an env-var-guarded test failure "
+            "injection hook (INKYPI_UPDATE_TEST_FAIL_AT) so the regression "
+            "test can simulate failure at a named step (JTN-704)"
+        )
 
     def test_update_upgrades_pip_deps(self):
         assert "pip install" in self.content
