@@ -76,7 +76,11 @@ fi
 apt-get update -y > /dev/null &
 if [ -f "$APT_REQUIREMENTS_FILE" ]; then
   echo "Installing system dependencies... "
-  xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null && echo_success "Installed system dependencies."
+  if ! xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null; then
+    echo_error "ERROR: apt-get install failed — aborting update."
+    exit 1
+  fi
+  echo_success "Installed system dependencies."
 else
   echo_error "ERROR: System dependencies file $APT_REQUIREMENTS_FILE not found!"
   exit 1
@@ -103,12 +107,24 @@ source "$VENV_PATH/bin/activate"
 
 # Upgrade pip
 echo "Upgrading pip..."
-$VENV_PATH/bin/python -m pip install --upgrade pip setuptools wheel > /dev/null && echo_success "Pip upgraded successfully."
+# JTN-665: capture failure so a broken pip/setuptools upgrade does not silently
+# proceed to requirements install and leave the venv in a partially-broken state.
+if ! "$VENV_PATH/bin/python" -m pip install --upgrade pip setuptools wheel > /dev/null; then
+  echo_error "ERROR: pip/setuptools upgrade failed — aborting update."
+  exit 1
+fi
+echo_success "Pip upgraded successfully."
 
 # Install or update Python dependencies
 if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
   echo "Updating Python dependencies..."
-  $VENV_PATH/bin/python -m pip install --upgrade -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null && echo_success "Dependencies updated successfully."
+  # JTN-665: explicit exit-code check so a compile error (e.g. metadata-generation-failed)
+  # stops the update before CSS build + service restart, preventing a boot loop.
+  if ! "$VENV_PATH/bin/python" -m pip install --upgrade -r "$PIP_REQUIREMENTS_FILE"; then
+    echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
+    exit 1
+  fi
+  echo_success "Dependencies updated successfully."
 else
   echo_error "ERROR: Requirements file $PIP_REQUIREMENTS_FILE not found!"
   exit 1
@@ -119,7 +135,10 @@ cp "$SCRIPT_DIR/inkypi" "$BINPATH/"
 sudo chmod +x "$BINPATH/$APPNAME"
 
 echo "Update JS and CSS files"
-bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null
+if ! bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null; then
+  echo_error "ERROR: Vendor JS/CSS download failed. Check network connectivity and re-run."
+  exit 1
+fi
 
 echo "Building minified CSS bundle"
 if ! "$VENV_PATH/bin/python" "$SCRIPT_DIR/../scripts/build_css.py" --minify; then
