@@ -205,22 +205,70 @@ echo_success "Pip upgraded successfully."
 # low-RAM boards like the Pi Zero 2 W (cuts ~15 min / OOM risk down to
 # ~2-3 min). Degrades gracefully: any failure falls back to normal pip.
 pip_extra_args=()
+uv_extra_args=()
 if fetch_wheelhouse; then
   pip_extra_args+=(--find-links "$WHEELHOUSE_DIR" --prefer-binary)
+  # uv supports --find-links; --only-binary=:all: forces binary wheels to
+  # guarantee nothing is built from sdist on the Pi (equivalent intent to
+  # pip's --prefer-binary but stricter).
+  uv_extra_args+=(--find-links "$WHEELHOUSE_DIR")
+fi
+
+# JTN-670 / JTN-605 parity: Install uv (Rust-based pip replacement) into the
+# venv so every update uses the same low-memory installer as fresh installs.
+# uv's resolver uses ~10-20 MB peak vs pip's ~100-150 MB — on a 512 MB Pi Zero
+# 2 W that difference is the swap cliff.  uv fully honors --require-hashes so
+# the JTN-516 supply-chain integrity guarantee is preserved on every update.
+#
+# We install uv via pip (into the venv) rather than curl-piping from astral.sh:
+#   (a) no extra network trust root — uses the same PyPI + hashes we already trust
+#   (b) uv is sandboxed inside the venv, not installed to /root/.local
+#   (c) if uv itself is unavailable for any reason, we cleanly fall back to pip
+use_uv=0
+if "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir uv > /dev/null 2>&1; then
+  if "$VENV_PATH/bin/python" -m uv --version > /dev/null 2>&1; then
+    use_uv=1
+    echo_success "  uv installed into venv — using uv for dependency install"
+  else
+    echo "  uv installed but not runnable — falling back to pip for dependency install"
+  fi
+else
+  echo "  uv could not be installed (unsupported arch?) — falling back to pip for dependency install"
 fi
 
 # Install or update Python dependencies
+# JTN-670: --require-hashes enforces supply-chain integrity on every update
+# (JTN-516 parity). Without this, existing Pis that update pull unverified
+# wheels even though fresh installs are hash-verified.
 if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
   echo "Updating Python dependencies..."
-  # JTN-665: explicit exit-code check so a compile error (e.g. metadata-generation-failed)
-  # stops the update before CSS build + service restart, preventing a boot loop.
-  # JTN-669: pass --find-links + --prefer-binary when wheelhouse is available.
-  if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade \
-      "${pip_extra_args[@]}" \
-      -r "$PIP_REQUIREMENTS_FILE"; then
-    cleanup_wheelhouse
-    echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
-    exit 1
+  # JTN-665: explicit exit-code check so a compile error stops the update
+  # before CSS build + service restart, preventing a boot loop.
+  # JTN-670/JTN-605: prefer uv; fall back to pip. Both enforce --require-hashes.
+  if [[ "$use_uv" -eq 1 ]]; then
+    # uv equivalents: --no-cache (not --no-cache-dir), --require-hashes supported.
+    # `--python` pins uv to the venv's interpreter so packages land in the venv.
+    # UV_HTTP_TIMEOUT scoped to this invocation for flaky Wi-Fi resilience (JTN-534).
+    if ! UV_HTTP_TIMEOUT=60 "$VENV_PATH/bin/python" -m uv pip install \
+        --python "$VENV_PATH/bin/python" \
+        --no-cache \
+        "${uv_extra_args[@]}" \
+        --require-hashes \
+        -r "$PIP_REQUIREMENTS_FILE"; then
+      cleanup_wheelhouse
+      echo_error "ERROR: uv pip install failed — aborting update (service remains stopped)."
+      exit 1
+    fi
+  else
+    # pip fallback: --require-hashes + --no-cache-dir preserve JTN-516/JTN-602 guarantees.
+    if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir \
+        "${pip_extra_args[@]}" \
+        --require-hashes \
+        -r "$PIP_REQUIREMENTS_FILE"; then
+      cleanup_wheelhouse
+      echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
+      exit 1
+    fi
   fi
   cleanup_wheelhouse
   echo_success "Dependencies updated successfully."
