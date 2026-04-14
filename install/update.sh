@@ -66,11 +66,21 @@ fi
 
 # JTN-666: Create the install-in-progress lockfile. inkypi.service's
 # ExecStartPre refuses to start while this file exists (defense-in-depth for
-# JTN-600's systemctl disable). The lockfile is removed once all update steps
-# succeed (see near end of script); on failure exit it is left in place so the
-# user must rerun update.sh (or manually rm it) before the service can start.
+# JTN-600's systemctl disable). The lockfile is removed just before
+# update_app_service() calls `systemctl start` (see below); on intentional
+# failure exit it is left in place so the user must rerun update.sh (or
+# manually rm it) before the service can start.
 mkdir -p "$LOCKFILE_DIR"
 touch "$LOCKFILE"
+
+# JTN-685: Defense-in-depth EXIT trap for abnormal exits (SIGTERM, SIGHUP,
+# unhandled errors).  Intentional failure paths (exit 1 after an error message)
+# set _lockfile_keep=1 before exiting so the lockfile is intentionally
+# preserved — forcing a manual rerun.  Signals and unexpected exits leave
+# _lockfile_keep unset, so the trap clears the lockfile and allows the service
+# to start after the interruption.
+_lockfile_keep=0
+trap '[[ "${_lockfile_keep:-0}" -eq 1 ]] || rm -f "$LOCKFILE"' EXIT
 
 # JTN-666: Stop and disable the service BEFORE touching files or venv so
 # systemd cannot restart a half-installed service and thrash the Pi.
@@ -81,12 +91,12 @@ if [ -f "$APT_REQUIREMENTS_FILE" ]; then
   echo "Installing system dependencies... "
   if ! xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null; then
     echo_error "ERROR: apt-get install failed — aborting update."
-    exit 1
+    _lockfile_keep=1; exit 1
   fi
   echo_success "Installed system dependencies."
 else
   echo_error "ERROR: System dependencies file $APT_REQUIREMENTS_FILE not found!"
-  exit 1
+  _lockfile_keep=1; exit 1
 fi
 
 # Setup zramswap on any modern Pi OS that ships zram-tools (Bullseye/Bookworm/Trixie).
@@ -104,7 +114,7 @@ setup_earlyoom_service
 # Check if virtual environment exists
 if [ ! -d "$VENV_PATH" ]; then
   echo_error "ERROR: Virtual environment not found at $VENV_PATH. Run the installation script first."
-  exit 1
+  _lockfile_keep=1; exit 1
 fi
 
 # JTN-668: /tmp on Pi OS Trixie is a 213 MB tmpfs — too small for numpy's
@@ -128,7 +138,7 @@ echo "Upgrading pip..."
 # JTN-669: --retries 5 --timeout 60 --no-cache-dir for JTN-534/JTN-602 parity.
 if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade pip setuptools wheel > /dev/null; then
   echo_error "ERROR: pip/setuptools upgrade failed — aborting update."
-  exit 1
+  _lockfile_keep=1; exit 1
 fi
 echo_success "Pip upgraded successfully."
 
@@ -189,7 +199,7 @@ if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
         -r "$PIP_REQUIREMENTS_FILE"; then
       cleanup_wheelhouse
       echo_error "ERROR: uv pip install failed — aborting update (service remains stopped)."
-      exit 1
+      _lockfile_keep=1; exit 1
     fi
   else
     # pip fallback: --require-hashes + --no-cache-dir preserve JTN-516/JTN-602 guarantees.
@@ -199,7 +209,7 @@ if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
         -r "$PIP_REQUIREMENTS_FILE"; then
       cleanup_wheelhouse
       echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
-      exit 1
+      _lockfile_keep=1; exit 1
     fi
   fi
   cleanup_wheelhouse
@@ -207,7 +217,7 @@ if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
 else
   cleanup_wheelhouse
   echo_error "ERROR: Requirements file $PIP_REQUIREMENTS_FILE not found!"
-  exit 1
+  _lockfile_keep=1; exit 1
 fi
 
 # Clean up the pip build temp dir — it can be several hundred MB.
@@ -221,20 +231,25 @@ sudo chmod +x "$BINPATH/$APPNAME"
 echo "Update JS and CSS files"
 if ! bash "$SCRIPT_DIR/update_vendors.sh" > /dev/null; then
   echo_error "ERROR: Vendor JS/CSS download failed. Check network connectivity and re-run."
-  exit 1
+  _lockfile_keep=1; exit 1
 fi
 
 # JTN-674: use shared build_css_bundle from _common.sh
+# build_css_bundle calls exit 1 internally on failure — mark as intentional so
+# the lockfile is preserved and the user is forced to rerun.
+_lockfile_keep=1
 build_css_bundle
+_lockfile_keep=0
 
 update_cli
-update_app_service
 
-# JTN-666: All update steps succeeded — remove the install-in-progress lockfile
-# so the service is allowed to start. If update.sh exits early due to a failure
-# above, this line is never reached and the lockfile stays in place, forcing the
-# user to rerun update.sh (or manually rm the file) before the service can start.
+# JTN-685: Remove the lockfile BEFORE starting the service. The ordering bug
+# was: update_app_service() called `systemctl start` while the lockfile was
+# still present, causing ExecStartPre to reject the start attempt.  All
+# dep-install work above is complete; it is now safe to release the lock.
 rm -f "$LOCKFILE"
+
+update_app_service
 
 echo "Version: $(cat "$INSTALL_PATH/VERSION" 2>/dev/null || echo 'unknown')"
 echo_success "Update completed."

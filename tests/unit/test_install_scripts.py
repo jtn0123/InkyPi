@@ -1373,16 +1373,36 @@ class TestUpdateScript:
             touch_pos < stop_pos
         ), "Lockfile must be created before stop_service is called"
 
-    def test_update_lockfile_removed_on_success(self):
-        # JTN-666: The lockfile must be removed after all steps succeed so the
-        # service is allowed to start. On failure, it stays to require manual recovery.
+    def test_update_lockfile_removed_before_service_start(self):
+        # JTN-685: The lockfile must be removed BEFORE update_app_service() is
+        # called so that ExecStartPre does not see the lockfile and reject the
+        # `systemctl start` invocation.  The old ordering (rm after start) caused
+        # the first service-start after every update to fail.
         assert 'rm -f "$LOCKFILE"' in self.content
-        # rm must come after update_app_service call
-        update_service_pos = self.content.rindex("update_app_service")
+        # rm must come BEFORE update_app_service call (last occurrence, which is
+        # the actual call site — the function definition also has the identifier)
+        update_service_call_pos = self.content.rindex("\nupdate_app_service\n")
         rm_pos = self.content.rindex('rm -f "$LOCKFILE"')
         assert (
-            rm_pos > update_service_pos
-        ), "Lockfile removal must come after update_app_service to ensure service is running"
+            rm_pos < update_service_call_pos
+        ), "Lockfile removal must come BEFORE update_app_service call (JTN-685)"
+
+    def test_update_has_exit_trap_for_lockfile(self):
+        # JTN-685: Defense-in-depth EXIT trap so SIGTERM / unhandled exits clean
+        # up the lockfile and don't permanently block the service.  Intentional
+        # failure paths set _lockfile_keep=1 before exit so the lockfile is
+        # preserved (forcing a manual rerun) while unhandled exits clear it.
+        assert "trap " in self.content, "update.sh must set a trap for EXIT"
+        assert "_lockfile_keep" in self.content, (
+            "update.sh must use _lockfile_keep sentinel to distinguish "
+            "intentional failure exits (keep lockfile) from abnormal exits (clear it)"
+        )
+        # The trap must be set after the lockfile is created
+        lockfile_pos = self.content.index('touch "$LOCKFILE"')
+        trap_pos = self.content.index("trap ")
+        assert trap_pos > lockfile_pos, (
+            "EXIT trap must be set after the lockfile is created"
+        )
 
     def test_update_upgrades_pip_deps(self):
         assert "pip install" in self.content
