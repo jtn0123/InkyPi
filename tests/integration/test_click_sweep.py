@@ -87,6 +87,19 @@ _SKIP_SELECTORS: tuple[str, ...] = (
 # in once the fixes land. Each entry MUST link to a tracking Linear issue.
 _XFAIL_PAGES: dict[str, str] = {}
 
+# Viewports to sweep. Desktop is the original coverage; mobile (360×800)
+# catches buttons/handlers that only break at narrow widths where menus
+# collapse, sidebars become drawers, and clickables may overlap or hide.
+_VIEWPORTS: tuple[tuple[str, str], ...] = (
+    ("desktop", "browser_page"),
+    ("mobile", "mobile_page"),
+)
+
+# Per-(label, viewport) xfails for mobile-only regressions. Keep empty
+# until a mobile-specific break is triaged into Linear — new entries must
+# link to a JTN issue so they get cleaned up.
+_MOBILE_XFAIL_PAGES: dict[str, str] = {}
+
 
 _ENUMERATE_JS = """
 (skipSelectors) => {
@@ -281,13 +294,28 @@ def _reset_page_state(page, base_url: str, sweep: SweepPage) -> None:
     _install_observer(page)
 
 
+@pytest.mark.parametrize(
+    "viewport,page_fixture",
+    _VIEWPORTS,
+    ids=[vp[0] for vp in _VIEWPORTS],
+)
 @pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
-def test_click_sweep(live_server, browser_page, sweep: SweepPage):
-    """Click every visible clickable on the page; assert no silent failures."""
+def test_click_sweep(
+    live_server, request, sweep: SweepPage, viewport: str, page_fixture: str
+):
+    """Click every visible clickable on the page; assert no silent failures.
+
+    Parametrized over viewport: ``desktop`` (1280×900) and ``mobile``
+    (360×800). Mobile reflows can hide or overlap controls and catch
+    handlers that only break at narrow widths.
+    """
     if sweep.label in _XFAIL_PAGES:
         pytest.xfail(_XFAIL_PAGES[sweep.label])
+    mobile_key = f"{sweep.label}:{viewport}"
+    if viewport == "mobile" and mobile_key in _MOBILE_XFAIL_PAGES:
+        pytest.xfail(_MOBILE_XFAIL_PAGES[mobile_key])
 
-    page = browser_page
+    page = request.getfixturevalue(page_fixture)
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
 
