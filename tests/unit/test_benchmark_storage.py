@@ -438,3 +438,85 @@ def test_save_stage_event_silently_fails_on_error(monkeypatch):
 
     # Should not raise
     save_stage_event(BadConfig(), refresh_id="fail", stage="test")
+
+
+# --- _validate_identifier tests ---
+
+
+def test_validate_identifier_accepts_valid_names():
+    """Valid SQL identifiers are returned unchanged."""
+    from benchmarks.benchmark_storage import _validate_identifier
+
+    assert _validate_identifier("refresh_events", "table") == "refresh_events"
+    assert _validate_identifier("column_name", "col") == "column_name"
+    assert _validate_identifier("_underscore_start", "col") == "_underscore_start"
+    assert _validate_identifier("CamelCase123", "col") == "CamelCase123"
+
+
+def test_validate_identifier_rejects_bad_input():
+    """Invalid SQL identifiers raise ValueError."""
+    import pytest
+
+    from benchmarks.benchmark_storage import _validate_identifier
+
+    bad_inputs = [
+        "drop table users",
+        "'; DROP TABLE refresh_events; --",
+        "1_starts_with_digit",
+        "has-hyphen",
+        "has space",
+        "has.dot",
+        "",
+    ]
+    for bad in bad_inputs:
+        with pytest.raises(ValueError, match="Unsafe SQL identifier"):
+            _validate_identifier(bad, "test_label")
+
+
+# --- _ensure_optional_columns tests ---
+
+
+def test_ensure_optional_columns_rejects_unknown_table(tmp_path):
+    """_ensure_optional_columns raises ValueError for unknown table names."""
+    import pytest
+
+    from benchmarks.benchmark_storage import _ensure_optional_columns
+
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    with pytest.raises(ValueError, match="Unknown benchmark table"):
+        _ensure_optional_columns(conn, "unknown_table", {"col": "TEXT"})
+    conn.close()
+
+
+def test_ensure_optional_columns_adds_missing_columns(tmp_path):
+    """Adds columns that don't yet exist in the table."""
+    from benchmarks.benchmark_storage import _ensure_optional_columns
+
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    conn.execute(
+        "CREATE TABLE refresh_events (id INTEGER PRIMARY KEY, refresh_id TEXT)"
+    )
+    conn.commit()
+
+    _ensure_optional_columns(conn, "refresh_events", {"new_col": "TEXT"})
+
+    cursor = conn.execute("PRAGMA table_info(refresh_events)")
+    columns = {row[1] for row in cursor.fetchall()}
+    conn.close()
+
+    assert "new_col" in columns
+
+
+def test_ensure_optional_columns_skips_existing_columns(tmp_path):
+    """Does not fail when column already exists."""
+    from benchmarks.benchmark_storage import _ensure_optional_columns
+
+    conn = sqlite3.connect(str(tmp_path / "test.db"))
+    conn.execute(
+        "CREATE TABLE refresh_events (id INTEGER PRIMARY KEY, existing_col TEXT)"
+    )
+    conn.commit()
+
+    # Should not raise even though existing_col already exists
+    _ensure_optional_columns(conn, "refresh_events", {"existing_col": "TEXT"})
+    conn.close()
