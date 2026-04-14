@@ -18,7 +18,8 @@
     </div>
     <div class="input-container api-key-actions">
         <input type="password" id="{{ input_id }}" name="{{ key_name }}" placeholder="{{ '(leave blank to keep current)' if masked[key_name] else placeholder }}" class="form-input" value="" autocomplete="off" spellcheck="false">
-        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}" aria-label="Delete {{ label }} key permanently" title="Permanently remove key from .env">Delete</button>{% endif %}
+        {# data-test-skip-click: permanently removes the stored API key from .env #}
+        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}" data-test-skip-click="true" aria-label="Delete {{ label }} key permanently" title="Permanently remove key from .env">Delete</button>{% endif %}
     </div>
 </div>
 {% endmacro %}

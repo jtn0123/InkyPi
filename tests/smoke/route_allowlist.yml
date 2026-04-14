@@ -1,0 +1,29 @@
+# Route smoke allowlist (tests/smoke/test_route_smoke.py)
+#
+# Routes listed here are skipped by the GET-every-unparameterized-route smoke
+# test. Each entry needs a one-line reason. Entries whose `path` contains
+# Flask path converters (e.g. `<filename>`) are already skipped automatically
+# because they require parameters. Only list paths that are parameter-free
+# yet still warrant an explicit skip (e.g. side-effecting, expensive, or
+# environment-dependent endpoints).
+skip_paths:
+  # Prometheus metrics endpoint — returns text/plain, no <title>, exercised
+  # elsewhere under tests/integration/test_observability_api.py.
+  - path: /metrics
+    reason: "text/plain exposition format, no HTML title"
+  # CSP violation report sink — expects POST only; GET would 405 (which is
+  # fine, but already covered by dedicated csp_report tests).
+  - path: /csp-report
+    reason: "POST-only endpoint; GET unrelated"
+  # Server-sent events stream — blocks on a generator and doesn't make sense
+  # to GET in a smoke probe.
+  - path: /events
+    reason: "SSE stream; never returns in smoke context"
+  - path: /events/stream
+    reason: "SSE stream; never returns in smoke context"
+  # Health probes return plain-text bodies without a <title>; /readyz
+  # returns 503 while the background RefreshTask hasn't booted in tests.
+  - path: /healthz
+    reason: "plain-text liveness probe; no HTML title"
+  - path: /readyz
+    reason: "returns 503 when RefreshTask not running (expected in tests)"

@@ -35,6 +35,7 @@ UI_BROWSER_TESTS = {
     "test_theme_toggle_e2e.py",
     "test_collapsible_sections_e2e.py",
     "test_cross_page_navigation_e2e.py",
+    "test_click_sweep.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
