@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v0.51.3 (2026-04-14)
+
+### Bug Fixes
+
+- **playlist**: Return details.field from every validator (JTN-658)
+  ([#468](https://github.com/jtn0123/InkyPi/pull/468),
+  [`c2c2451`](https://github.com/jtn0123/InkyPi/commit/c2c245188e170e8c2c27b4327272267fbb4528c4))
+
+Only `validate_plugin_refresh_settings` previously populated `details.field` in its error envelope.
+  Every other validation failure returned a generic message with no field attribution, so the
+  frontend couldn't highlight the offending input.
+
+Standardize every validator in `src/blueprints/playlist.py` to emit the canonical `{code:
+  "validation_error", details: {field: "..."}}` envelope and stop wrapping validator output through
+  `reissue_json_error` (those messages are static strings — safe to surface verbatim, and masking
+  them was the main source of "can't tell which field broke" dogfood reports).
+
+Hook the frontend up via a small `applyFieldErrorFromResponse` helper on `playlist.js` that reads
+  `details.field` and defers to the existing `FormState.setFieldError` utility (aria-invalid + focus
+  + scroll into view). Keeps `field_errors` as a fallback so partial deploys don't regress the UI.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Skip historyRefreshBtn in click sweep (JTN-682)
+  ([#465](https://github.com/jtn0123/InkyPi/pull/465),
+  [`8436fab`](https://github.com/jtn0123/InkyPi/commit/8436fabf77df13566765e7106f056ac6ada6ab9e))
+
+The Refresh button on /history calls location.reload(), which restarts the page mid-sweep and
+  destabilises subsequent clicks. Tag it with data-test-skip-click="true" so the sweep walks around
+  it, and remove history from _XFAIL_PAGES now that the page passes cleanly.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.2 (2026-04-14)
 
 ### Bug Fixes
