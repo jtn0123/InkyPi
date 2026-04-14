@@ -73,9 +73,9 @@ def test_csp_nonce_present_and_unique_per_request(monkeypatch):
         m = re.search(r"nonce-([A-Za-z0-9_=-]+)", csp)
         return m.group(1) if m else None
 
-    assert _extract_nonce(csp1) != _extract_nonce(csp2), (
-        "CSP nonce must be unique per request"
-    )
+    assert _extract_nonce(csp1) != _extract_nonce(
+        csp2
+    ), "CSP nonce must be unique per request"
 
 
 def test_csp_nonce_not_injected_when_custom_csp_set(monkeypatch):
