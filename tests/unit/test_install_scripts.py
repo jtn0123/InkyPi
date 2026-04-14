@@ -938,6 +938,135 @@ class TestCommonWheelhouseFunctions:
         assert "mktemp" in body
         assert 'rm -rf "$tmp_dir"' in body
 
+    def test_fetch_wheelhouse_verifies_integrity(self):
+        # JTN-697: After extraction, every wheel must be integrity-checked.
+        # The original "at least one .whl exists" gate let truncated bundles
+        # (zero-byte numpy wheels, corrupt zips) pass, with ImportError only
+        # surfacing on first display refresh.
+        body = self._fetch_fn_body()
+
+        # Guard 1: empty-wheel rejection must exist and appear AFTER the
+        # "at least one .whl" existence check so we actually iterate every
+        # extracted wheel rather than just checking presence.
+        assert (
+            "[ ! -s " in body or '! -s "$whl"' in body
+        ), "fetch_wheelhouse must reject empty (zero-byte) wheels"
+
+        # Guard 2: structural zip check using python -m zipfile — pip refuses
+        # to install malformed zips and we want to catch them before pip sees
+        # them so the fallback is cleaner.
+        assert (
+            "python3 -m zipfile" in body
+        ), "fetch_wheelhouse must validate each wheel is a readable zip"
+
+        # Guard 3 (preferred): per-wheel sha256 manifest verification.
+        # Accept either `sha256sum -c` or the shasum fallback.
+        assert ".manifest.sha256" in body
+        assert "sha256sum -c" in body or "shasum -a 256 -c" in body, (
+            "fetch_wheelhouse must verify wheels against the published "
+            "per-wheel sha256 manifest when available"
+        )
+
+        # The new integrity gate must precede WHEELHOUSE_DIR assignment so
+        # callers never see a populated dir on corrupt input.
+        integrity_pos = body.index("python3 -m zipfile")
+        set_pos = body.index('WHEELHOUSE_DIR="$extract_dir"')
+        assert (
+            integrity_pos < set_pos
+        ), "integrity checks must run before WHEELHOUSE_DIR is exposed"
+
+        # Failure paths must still rm -rf and return 1 so the caller falls
+        # back to source install.
+        # (Covered structurally by test_fetch_is_graceful_on_curl_failure;
+        # here we assert the new fail messages route through the same path.)
+        assert "Wheelhouse integrity check failed" in body
+        assert "manifest sha256 mismatch" in body.lower()
+
+    def test_fetch_wheelhouse_rejects_empty_wheel_integration(self, tmp_path):
+        # JTN-697 integration: craft a wheelhouse tarball containing a
+        # zero-byte .whl, then invoke fetch_wheelhouse with curl stubbed
+        # to serve it from disk. Expect non-zero exit + empty WHEELHOUSE_DIR.
+        import shutil
+        import subprocess
+        import zipfile as _zipfile
+
+        if not shutil.which("bash") or not shutil.which("tar"):
+            pytest.skip("bash/tar not available")
+
+        wheels_src = tmp_path / "wheels_src"
+        wheels_src.mkdir()
+        # Zero-byte wheel → the exact failure mode in the issue.
+        (wheels_src / "numpy-1.0.0-cp313-cp313-linux_armv7l.whl").write_bytes(b"")
+        # Also drop a valid zip so the "at least one .whl" gate passes.
+        good = wheels_src / "pillow-10.0.0-cp313-cp313-linux_armv7l.whl"
+        with _zipfile.ZipFile(good, "w") as zf:
+            zf.writestr("pillow-10.0.0.dist-info/METADATA", "Name: pillow\n")
+
+        tarball = tmp_path / "inkypi-wheels-9.9.9-linux_armv7l.tar.gz"
+        subprocess.run(
+            ["tar", "-czf", str(tarball), "-C", str(wheels_src), "."],
+            check=True,
+        )
+
+        # Stub curl: serve tarball, 404 for sha/manifest (exercises structural
+        # guard, not manifest-mismatch guard).
+        stub_dir = tmp_path / "stub_bin"
+        stub_dir.mkdir()
+        stub_curl = stub_dir / "curl"
+        stub_curl.write_text(f"""#!/usr/bin/env bash
+out=""
+url=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --output) out="$2"; shift 2 ;;
+    http*) url="$1"; shift ;;
+    *) shift ;;
+  esac
+done
+case "$url" in
+  *.tar.gz) cp {tarball} "$out" ;;
+  *) exit 22 ;;
+esac
+""")
+        stub_curl.chmod(0o755)
+
+        stub_uname = stub_dir / "uname"
+        stub_uname.write_text("""#!/usr/bin/env bash
+if [ "$1" = "-m" ]; then echo armv7l; else /usr/bin/uname "$@"; fi
+""")
+        stub_uname.chmod(0o755)
+
+        script_dir = tmp_path / "install"
+        script_dir.mkdir()
+        (tmp_path / "VERSION").write_text("9.9.9\n")
+        shutil.copy(INSTALL_DIR / "_common.sh", script_dir / "_common.sh")
+
+        harness = tmp_path / "run.sh"
+        harness.write_text(f"""#!/usr/bin/env bash
+set +e
+export PATH="{stub_dir}:$PATH"
+SCRIPT_DIR="{script_dir}"
+source "$SCRIPT_DIR/_common.sh"
+fetch_wheelhouse
+rc=$?
+echo "RC=$rc"
+echo "DIR=[$WHEELHOUSE_DIR]"
+""")
+        harness.chmod(0o755)
+
+        result = subprocess.run(
+            ["bash", str(harness)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        combined = result.stdout + result.stderr
+        assert "RC=1" in combined, f"expected rc=1, got:\n{combined}"
+        assert (
+            "DIR=[]" in combined
+        ), f"WHEELHOUSE_DIR must be empty on failure, got:\n{combined}"
+        assert "integrity check failed" in combined.lower()
+
 
 class TestInstallWheelhouseFetch:
     """JTN-604: install.sh sources _common.sh for wheelhouse helpers and
@@ -1062,6 +1191,15 @@ class TestWheelhouseBuildWorkflow:
         # verify the download.
         assert "sha256sum" in self.content
         assert ".sha256" in self.content
+
+    def test_workflow_publishes_per_wheel_manifest(self):
+        # JTN-697: In addition to the tarball-level sha256, publish a
+        # per-wheel sha256 manifest so install.sh can detect individual
+        # truncated/corrupt wheels hiding inside an otherwise-valid tarball.
+        assert ".manifest.sha256" in self.content
+        # Manifest must be produced from the built wheels and uploaded as
+        # a release asset alongside the tarball.
+        assert "sha256sum *.whl" in self.content
 
 
 class TestPiImageBuildWorkflow:
