@@ -522,6 +522,43 @@ def _pin_store() -> dict[str, tuple[str, ...]]:
     return store
 
 
+def _normalize_host(host: Any) -> str | None:
+    """Return *host* as a lowercase string, or None if not a decodable host."""
+    if isinstance(host, (bytes, bytearray)):
+        try:
+            host_str: Any = host.decode("idna")
+        except Exception:
+            host_str = host.decode("ascii", errors="replace")
+    else:
+        host_str = host
+    return host_str.lower() if isinstance(host_str, str) else None
+
+
+def _coerce_port(port: Any) -> int:
+    """Best-effort conversion of *port* to an int; returns 0 on failure."""
+    if port is None or port == "":
+        return 0
+    try:
+        return int(port)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _addrinfo_for_pinned_ip(ip: str, port_int: int) -> tuple[Any, ...] | None:
+    """Build an addrinfo tuple for *ip*, or None if *ip* is not parseable."""
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv6Address):
+        family = socket.AF_INET6
+        sockaddr: tuple[Any, ...] = (ip, port_int, 0, 0)
+    else:
+        family = socket.AF_INET
+        sockaddr = (ip, port_int)
+    return (family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", sockaddr)
+
+
 def _make_patched_getaddrinfo(original: Any) -> Any:
     """Return a getaddrinfo wrapper that consults the thread-local pin store.
 
@@ -531,39 +568,16 @@ def _make_patched_getaddrinfo(original: Any) -> Any:
 
     def _patched_getaddrinfo(host, port, *args, **kwargs):  # type: ignore[no-untyped-def]
         pins = _pin_store()
-        if not pins:
-            return original(host, port, *args, **kwargs)
-        if isinstance(host, (bytes, bytearray)):
-            try:
-                host_str = host.decode("idna")
-            except Exception:
-                host_str = host.decode("ascii", errors="replace")
-        else:
-            host_str = host
-        key = host_str.lower() if isinstance(host_str, str) else host_str
-        ips = pins.get(key) if isinstance(key, str) else None
+        key = _normalize_host(host) if pins else None
+        ips = pins.get(key) if key else None
         if not ips:
             return original(host, port, *args, **kwargs)
-        results: list[Any] = []
-        norm_port = port if port is not None else 0
-        try:
-            port_int = int(norm_port) if norm_port != "" else 0
-        except (TypeError, ValueError):
-            port_int = 0
-        for ip in ips:
-            try:
-                addr = ipaddress.ip_address(ip)
-            except ValueError:
-                continue
-            if isinstance(addr, ipaddress.IPv6Address):
-                family = socket.AF_INET6
-                sockaddr: tuple[Any, ...] = (ip, port_int, 0, 0)
-            else:
-                family = socket.AF_INET
-                sockaddr = (ip, port_int)
-            results.append(
-                (family, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", sockaddr)
-            )
+        port_int = _coerce_port(port)
+        results: list[Any] = [
+            info
+            for info in (_addrinfo_for_pinned_ip(ip, port_int) for ip in ips)
+            if info is not None
+        ]
         if not results:
             # Shouldn't happen (we vet IPs before pinning) — fall back.
             return original(host, port, *args, **kwargs)
