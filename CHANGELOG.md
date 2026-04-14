@@ -1,6 +1,51 @@
 # CHANGELOG
 
 
+## v0.51.4 (2026-04-14)
+
+### Bug Fixes
+
+- **ci**: Wire build-wheelhouse to Release workflow_run (JTN-683)
+  ([#469](https://github.com/jtn0123/InkyPi/pull/469),
+  [`17b2641`](https://github.com/jtn0123/InkyPi/commit/17b2641d5fa57a7e75441ae8cf07f270bccbce93))
+
+The `on: release: types: [published]` trigger never fired because semantic-release creates releases
+  via GITHUB_TOKEN, and GitHub blocks GITHUB_TOKEN-created events from triggering downstream
+  workflow listeners (documented security boundary).
+
+Added `workflow_run: workflows: ["Release"] types: [completed]` trigger so the wheelhouse build
+  chains off the Release workflow directly — this mechanism works regardless of which token the
+  upstream run used. A new `check-trigger` guard job evaluates the event type, skips if the upstream
+  run didn't succeed, and resolves the release tag (from the event payload for
+  `release`/`workflow_dispatch`, or from `gh release list` for `workflow_run`). The `release` event
+  trigger is kept for forward compatibility.
+
+Also updated the "Attach wheelhouse to release" step condition to include `workflow_run` events so
+  wheels are attached to the release (not uploaded as ephemeral artifacts) in the automated path.
+
+Follow-up: manually backfill wheels for v0.51.1 via workflow_dispatch after this merges.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **install**: Check systemctl is-active after start in update_app_service (JTN-684)
+  ([#471](https://github.com/jtn0123/InkyPi/pull/471),
+  [`4846440`](https://github.com/jtn0123/InkyPi/commit/4846440b7a386250042f2af4f1c5a9a3f21be9dd))
+
+Previously update_app_service() called `sudo systemctl start` without verifying the service actually
+  reached the active state. systemctl start exits 0 even when the unit's ExecStart subsequently
+  fails (e.g. bad ExecStart path, missing dep), causing update.sh to print "Update completed ✔" and
+  exit 0 while inkypi.service sat in a failed state.
+
+Add an explicit retry loop (3× 1 s) that calls `systemctl is-active --quiet` after the start. On
+  failure: dump `systemctl show` properties and the last 20 journal lines to stderr, print a clear
+  error, and exit 1. On success, the existing success path is unchanged.
+
+Three new tests in TestUpdateScript assert that update_app_service() contains an is-active check, an
+  exit 1, and a --no-pager journalctl call.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.51.3 (2026-04-14)
 
 ### Bug Fixes
