@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.51.6 (2026-04-14)
+
+### Bug Fixes
+
+- **security**: Pin DNS for plugin URL fetches to block rebinding SSRF (JTN-656)
+  ([#467](https://github.com/jtn0123/InkyPi/pull/467),
+  [`d1f23ef`](https://github.com/jtn0123/InkyPi/commit/d1f23ef64d32c811a0ef143ff1cef9c8a3ab59ce))
+
+* fix(security): pin DNS for plugin URL fetches to block rebinding SSRF
+
+`validate_url` resolved DNS once to reject private targets, but the subsequent
+  `http_get`/`session.get` call resolved DNS *again*. An attacker-controlled authoritative server
+  can flip the second answer to a private IP (127.0.0.1, 169.254.169.254 metadata, 192.168.x)
+  between the two resolutions, bypassing the SSRF guard.
+
+Fix: resolve once, pin the result.
+
+- `validate_url_with_ips` returns the validated URL **and** the IPs observed at validation time.
+  `validate_url` still returns a bare string for backward compat. - New `pinned_dns(hostname, ips)`
+  context manager in `utils.http_utils` swaps `socket.getaddrinfo` for a thread-coordinated wrapper
+  that returns only the pinned IPs for the matching hostname, then restores the previous resolver on
+  exit. Because only the socket connect step sees the IP, TLS SNI and certificate validation still
+  happen against the original hostname (HTTPS vhost + cert matching unchanged). - `safe_http_get`
+  combines validation + pinning around `http_get`. - `image_utils.get_image` /
+  `fetch_and_resize_remote_image` now validate and pin internally; plugins inherit the fix with no
+  call-site change. - `ImageAlbum` / `ImmichProvider` propagate the pinned IPs and bracket each
+  Immich API call in `pinned_dns`.
+
+Tests (`tests/unit/test_ssrf_dns_rebind.py`, 10 cases) simulate the rebind by swapping
+  `socket.getaddrinfo` between the two resolutions and assert the fetch connects to the
+  originally-vetted IP.
+
+Closes JTN-656.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor(http_utils): split getaddrinfo wrapper to cut cognitive complexity
+
+Addresses SonarCloud S3776: the inline wrapper inside `_make_patched_getaddrinfo` had cognitive
+  complexity 31. Broken into three tiny helpers — `_normalize_host`, `_coerce_port`,
+  `_addrinfo_for_pinned_ip` — each with a single responsibility. No behavior change.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.5 (2026-04-14)
 
 ### Bug Fixes
