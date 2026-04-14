@@ -94,14 +94,6 @@ _XFAIL_PAGES: dict[str, str] = {
         "awaiting L2 batch fix in JTN-681 "
         "(clock face picker clicks show no DOM mutation)"
     ),
-    # JTN-682: historyRefreshBtn calls location.reload(); the sweep's
-    # markerPresent sentinel races with reload completion. L2 should either
-    # tag the button `data-test-skip-click="true"` or switch detection to
-    # `page.expect_event('framenavigated')`.
-    "history": (
-        "awaiting L2 batch fix in JTN-682 "
-        "(Refresh button reload not detected as observable change)"
-    ),
 }
 
 
