@@ -6,25 +6,41 @@ from PIL import Image, ImageColor, ImageOps
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, option, row, schema, section
 from utils.http_client import get_http_session
+from utils.http_utils import pinned_dns
 from utils.image_utils import pad_image_blur
-from utils.security_utils import validate_url
+from utils.security_utils import validate_url_with_ips
 
 logger = logging.getLogger(__name__)
 
 
 class ImmichProvider:
-    def __init__(self, base_url: str, key: str, image_loader):
+    def __init__(
+        self,
+        base_url: str,
+        key: str,
+        image_loader,
+        pinned_ips: tuple[str, ...] | None = None,
+    ):
         self.base_url = base_url
         self.key = key
         self.headers = {"x-api-key": self.key}
         self.image_loader = image_loader
         self.session = get_http_session()
+        self.pinned_ips: tuple[str, ...] = tuple(pinned_ips or ())
+        import urllib.parse as _urlparse
+
+        self._pin_hostname = _urlparse.urlparse(base_url).hostname or ""
+
+    def _pin(self):
+        """Context manager that pins DNS to the validated IPs for this base URL."""
+        return pinned_dns(self._pin_hostname, self.pinned_ips)
 
     def get_album_id(self, album: str) -> str:
         logger.debug(f"Fetching albums from {self.base_url}")
-        r = self.session.get(
-            f"{self.base_url}/api/albums", headers=self.headers, timeout=10
-        )
+        with self._pin():
+            r = self.session.get(
+                f"{self.base_url}/api/albums", headers=self.headers, timeout=10
+            )
         r.raise_for_status()
         albums = r.json()
 
@@ -43,12 +59,13 @@ class ImmichProvider:
         logger.debug(f"Fetching assets from album {album_id}")
         while page_items:
             body = {"albumIds": [album_id], "size": 1000, "page": page}
-            r2 = self.session.post(
-                f"{self.base_url}/api/search/metadata",
-                json=body,
-                headers=self.headers,
-                timeout=10,
-            )
+            with self._pin():
+                r2 = self.session.post(
+                    f"{self.base_url}/api/search/metadata",
+                    json=body,
+                    headers=self.headers,
+                    timeout=10,
+                )
             r2.raise_for_status()
             assets_data = r2.json()
 
@@ -97,9 +114,14 @@ class ImmichProvider:
 
         # Use adaptive image loader for memory-efficient processing
         # Let loader resize when requested (when no padding will be applied)
-        img = self.image_loader.from_url(
-            asset_url, dimensions, timeout_ms=40000, resize=resize, headers=self.headers
-        )
+        with self._pin():
+            img = self.image_loader.from_url(
+                asset_url,
+                dimensions,
+                timeout_ms=40000,
+                resize=resize,
+                headers=self.headers,
+            )
 
         if not img:
             logger.error(f"Failed to load image {asset_id} from Immich")
@@ -202,7 +224,7 @@ class ImageAlbum(BasePlugin):
             raise RuntimeError("Immich URL is required.")
 
         try:
-            validate_url(url)
+            _validated_url, pinned_ips = validate_url_with_ips(url)
         except ValueError as e:
             raise RuntimeError(f"Invalid URL: {e}") from e
 
@@ -214,7 +236,7 @@ class ImageAlbum(BasePlugin):
         logger.info(f"Immich URL: {url}")
         logger.info(f"Album: {album}")
 
-        provider = ImmichProvider(url, key, self.image_loader)
+        provider = ImmichProvider(url, key, self.image_loader, pinned_ips=pinned_ips)
         img = provider.get_image(album, dimensions, resize=not use_padding)
 
         if not img:

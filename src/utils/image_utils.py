@@ -11,7 +11,8 @@ from typing import Any
 from PIL import Image
 from PIL.Image import Resampling
 
-from utils.http_utils import http_get
+from utils.http_utils import http_get, pinned_dns
+from utils.security_utils import validate_url_with_ips
 
 # ImageEnhance / ImageFilter / ImageOps are imported lazily from the
 # functions that use them (JTN-606).  Keeping them at module scope inflated
@@ -85,6 +86,9 @@ def load_image_from_path(
 def get_image(image_url, timeout_seconds: float = 10.0):
     """Fetch an image from a URL and return a PIL Image, or None on failure.
 
+    The hostname is validated and DNS-pinned for the duration of the fetch
+    to mitigate DNS-rebinding SSRF (JTN-656).
+
     Args:
         image_url: The URL of the image to fetch.
         timeout_seconds: Request timeout in seconds (default 10).
@@ -94,11 +98,22 @@ def get_image(image_url, timeout_seconds: float = 10.0):
         the response body cannot be decoded as an image.
     """
     try:
-        try:
-            response = http_get(image_url, timeout=timeout_seconds)
-        except TypeError:
-            # Fallback for tests that simulate environments without timeout support
-            response = http_get(image_url)
+        validated_url, pinned_ips = validate_url_with_ips(image_url)
+    except ValueError as exc:
+        logger.error(f"Rejected image URL {image_url}: {exc}")
+        return None
+
+    import urllib.parse as _urlparse
+
+    hostname = _urlparse.urlparse(validated_url).hostname or ""
+
+    try:
+        with pinned_dns(hostname, pinned_ips):
+            try:
+                response = http_get(validated_url, timeout=timeout_seconds)
+            except TypeError:
+                # Fallback for tests that simulate environments without timeout support
+                response = http_get(validated_url)
     except Exception as e:
         logger.error(f"Failed to fetch image from {image_url}: {str(e)}")
         return None
@@ -121,10 +136,25 @@ def fetch_and_resize_remote_image(
     dimensions: tuple[int, int],
     timeout_seconds: float = 40.0,
 ) -> Image.Image | None:
-    """Fetch a remote image and return a resized detached copy."""
+    """Fetch a remote image and return a resized detached copy.
+
+    The hostname is validated and DNS-pinned for the duration of the fetch
+    to mitigate DNS-rebinding SSRF (JTN-656).
+    """
     try:
-        response = http_get(image_url, timeout=timeout_seconds)
-        response.raise_for_status()
+        validated_url, pinned_ips = validate_url_with_ips(image_url)
+    except ValueError as exc:
+        logger.error(f"Rejected remote image URL {image_url}: {exc}")
+        return None
+
+    import urllib.parse as _urlparse
+
+    hostname = _urlparse.urlparse(validated_url).hostname or ""
+
+    try:
+        with pinned_dns(hostname, pinned_ips):
+            response = http_get(validated_url, timeout=timeout_seconds)
+            response.raise_for_status()
     except Exception as e:
         logger.error(f"Failed to fetch remote image from {image_url}: {e}")
         return None
