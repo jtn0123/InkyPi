@@ -368,7 +368,12 @@ def test_create_playlist_missing_name(client):
         "/create_playlist", json={"start_time": "06:00", "end_time": "09:00"}
     )
     assert resp.status_code == 400
-    assert resp.get_json().get("error") == "Invalid playlist request"
+    data = resp.get_json()
+    # JTN-658: validator-owned messages are preserved end-to-end (they are
+    # static strings so safe) and carry ``details.field`` for frontend
+    # highlighting.
+    assert "required" in data["error"].lower()
+    assert data["details"]["field"] == "playlist_name"
 
 
 def test_create_playlist_missing_times(client):

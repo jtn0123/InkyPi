@@ -41,20 +41,33 @@ _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
 
 
-def _validate_playlist_name(name):
-    """Validate playlist name format. Returns (cleaned_name, error_response) tuple."""
+def _validate_playlist_name(name, field="playlist_name"):
+    """Validate playlist name format. Returns (cleaned_name, error_response) tuple.
+
+    ``field`` is the form field name echoed back in ``details.field`` so the
+    frontend can highlight the offending input.
+    """
     if not name or not name.strip():
-        return None, json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
+        return None, json_error(
+            PLAYLIST_NAME_REQUIRED_ERROR,
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": field},
+        )
     name = name.strip()
     if len(name) > _PLAYLIST_NAME_MAX_LEN:
         return None, json_error(
             f"Playlist name must be {_PLAYLIST_NAME_MAX_LEN} characters or fewer",
             status=400,
+            code=_CODE_VALIDATION,
+            details={"field": field},
         )
     if not _PLAYLIST_NAME_RE.match(name):
         return None, json_error(
             "Playlist name may only contain letters, numbers, spaces, hyphens, and underscores",
             status=400,
+            code=_CODE_VALIDATION,
+            details={"field": field},
         )
     return name, None
 
@@ -124,7 +137,12 @@ def _check_playlist_overlap(new_start, new_end, playlists, exclude_name=None):
         ps = _to_minutes(pl.start_time)
         pe = _to_minutes(pl.end_time)
         if _windows_overlap(new_start, new_end, ps, pe):
-            return json_error(_MSG_TIME_OVERLAP, status=400)
+            return json_error(
+                _MSG_TIME_OVERLAP,
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "start_time"},
+            )
     return None
 
 
@@ -302,13 +320,25 @@ def add_plugin():
             return json_error(
                 "refresh_settings is required",
                 status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "refresh_settings"},
             )
         try:
             refresh_settings = json.loads(raw_refresh)
         except (json.JSONDecodeError, ValueError):
-            return json_error("Invalid JSON in refresh_settings", status=400)
+            return json_error(
+                "Invalid JSON in refresh_settings",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "refresh_settings"},
+            )
         if not isinstance(refresh_settings, dict):
-            return json_error("refresh_settings must be a JSON object", status=400)
+            return json_error(
+                "refresh_settings must be a JSON object",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "refresh_settings"},
+            )
         plugin_id = plugin_settings.pop("plugin_id", None)
         if not plugin_id or not isinstance(plugin_id, str):
             return json_error(
@@ -335,7 +365,10 @@ def add_plugin():
         existing = playlist_manager.find_plugin(plugin_id, instance_name)
         if existing:
             return json_error(
-                f"Plugin instance '{instance_name}' already exists", status=400
+                f"Plugin instance '{instance_name}' already exists",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "instance_name"},
             )
 
         refresh_config, refresh_err = validate_plugin_refresh_settings(refresh_settings)
@@ -500,19 +533,60 @@ def _validate_playlist_times(start_time, end_time):
 
     Returns (start_min, end_min, error_response).
     """
-    if not start_time or not end_time:
+    if not start_time:
+        missing_field = "start_time"
+    elif not end_time:
+        missing_field = "end_time"
+    else:
+        missing_field = None
+    if missing_field is not None:
         return (
             None,
             None,
-            json_error("Start time and End time are required", status=400),
+            json_error(
+                "Start time and End time are required",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": missing_field},
+            ),
         )
     try:
         start_min = _to_minutes(start_time)
+    except Exception:
+        return (
+            None,
+            None,
+            json_error(
+                _MSG_INVALID_TIME_FORMAT,
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "start_time"},
+            ),
+        )
+    try:
         end_min = _to_minutes(end_time)
     except Exception:
-        return None, None, json_error(_MSG_INVALID_TIME_FORMAT, status=400)
+        return (
+            None,
+            None,
+            json_error(
+                _MSG_INVALID_TIME_FORMAT,
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "end_time"},
+            ),
+        )
     if start_min == end_min:
-        return None, None, json_error(_MSG_SAME_TIME, status=400)
+        return (
+            None,
+            None,
+            json_error(
+                _MSG_SAME_TIME,
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "end_time"},
+            ),
+        )
     return start_min, end_min, None
 
 
@@ -527,7 +601,7 @@ def create_playlist():
 
     playlist_name, name_err = _validate_playlist_name(data.get("playlist_name"))
     if name_err:
-        return reissue_json_error(name_err, _MSG_INVALID_PLAYLIST_REQUEST)
+        return name_err
     start_min, end_min, time_err = _validate_playlist_times(
         data.get("start_time"), data.get("end_time")
     )
@@ -537,7 +611,12 @@ def create_playlist():
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
         if playlist:
-            return json_error("A playlist with that name already exists", status=400)
+            return json_error(
+                "A playlist with that name already exists",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
 
         # Prevent overlapping time windows
         try:
@@ -598,11 +677,18 @@ def _validate_cycle_minutes(cycle_minutes):
     try:
         cm = int(cycle_minutes)
     except (ValueError, TypeError):
-        return None, json_error("cycle_minutes must be an integer", status=400)
+        return None, json_error(
+            "cycle_minutes must be an integer",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "cycle_minutes"},
+        )
     if cm < _CYCLE_MINUTES_MIN or cm > _CYCLE_MINUTES_MAX:
         return None, json_error(
             f"cycle_minutes must be between {_CYCLE_MINUTES_MIN} and {_CYCLE_MINUTES_MAX}",
             status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "cycle_minutes"},
         )
     return cm, None
 
@@ -629,20 +715,31 @@ def update_playlist(playlist_name):
         return json_error("Invalid JSON data", status=400)
 
     new_name_raw = data.get("new_name")
-    new_name, name_err = _validate_playlist_name(new_name_raw)
+    new_name, name_err = _validate_playlist_name(new_name_raw, field="new_name")
     if name_err:
-        return reissue_json_error(name_err, _MSG_INVALID_PLAYLIST_REQUEST)
+        return name_err
     start_time = data.get("start_time")
     end_time = data.get("end_time")
     if not start_time or not end_time:
-        return json_error("Missing required fields", status=400)
+        missing_field = "start_time" if not start_time else "end_time"
+        return json_error(
+            "Missing required fields",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": missing_field},
+        )
     start_min, end_min, time_err = _validate_playlist_times(start_time, end_time)
     if time_err:
         return time_err
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return json_error("Playlist does not exist", status=400)
+        return json_error(
+            "Playlist does not exist",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
 
     # Prevent overlapping (exclude the playlist being updated)
     try:
@@ -690,11 +787,21 @@ def delete_playlist(playlist_name):
     playlist_manager = device_config.get_playlist_manager()
 
     if not playlist_name:
-        return json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
+        return json_error(
+            PLAYLIST_NAME_REQUIRED_ERROR,
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
-        return json_error("Playlist does not exist", status=400)
+        return json_error(
+            "Playlist does not exist",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
 
     device_config.update_atomic(
         lambda cfg: playlist_manager.delete_playlist(playlist_name)
@@ -712,9 +819,19 @@ def update_device_cycle():
     try:
         m = int(minutes)
         if m < 1 or m > 1440:
-            return json_error("Minutes must be between 1 and 1440", status=400)
+            return json_error(
+                "Minutes must be between 1 and 1440",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "minutes"},
+            )
     except Exception:
-        return json_error("Invalid minutes", status=400)
+        return json_error(
+            "Invalid minutes",
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "minutes"},
+        )
     try:
         device_config.update_value("plugin_cycle_interval_seconds", m * 60, write=True)
         try:
@@ -739,12 +856,29 @@ def reorder_plugins():
             return json_error("Invalid or missing JSON payload", status=400)
         playlist_name = data.get("playlist_name")
         ordered = data.get("ordered")  # list of {plugin_id, name}
-        if not playlist_name or not isinstance(ordered, list):
-            return json_error("playlist_name and ordered list are required", status=400)
+        if not playlist_name:
+            return json_error(
+                "playlist_name and ordered list are required",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
+        if not isinstance(ordered, list):
+            return json_error(
+                "playlist_name and ordered list are required",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "ordered"},
+            )
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error("Playlist not found", status=400)
+            return json_error(
+                "Playlist not found",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
 
         reorder_result: list[bool] = []
 
@@ -776,18 +910,33 @@ def display_next_in_playlist():
             return json_error("Invalid or missing JSON payload", status=400)
         playlist_name = data.get("playlist_name")
         if not playlist_name:
-            return json_error("playlist_name required", status=400)
+            return json_error(
+                "playlist_name required",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error("Playlist not found", status=400)
+            return json_error(
+                "Playlist not found",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
 
         # Determine current time and next eligible
         current_dt = _safe_now_device_tz(device_config)
 
         plugin_instance = playlist.get_next_eligible_plugin(current_dt)
         if not plugin_instance:
-            return json_error("No eligible instance in playlist", status=400)
+            return json_error(
+                "No eligible instance in playlist",
+                status=400,
+                code=_CODE_VALIDATION,
+                details={"field": "playlist_name"},
+            )
 
         refresh_task.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
@@ -822,7 +971,12 @@ def playlist_eta(playlist_name: str):
 
     pl = playlist_manager.get_playlist(playlist_name)
     if not pl:
-        return json_error("Playlist not found", status=404)
+        return json_error(
+            "Playlist not found",
+            status=404,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
 
     # Cache key is playlist name; invalidate once per minute
     now = _safe_now_device_tz(device_config)
