@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.50.3 (2026-04-14)
+
+### Bug Fixes
+
+- **css**: Untrack src/static/styles/main.css from git (JTN-672)
+  ([#455](https://github.com/jtn0123/InkyPi/pull/455),
+  [`540d3ea`](https://github.com/jtn0123/InkyPi/commit/540d3ea0e060707004b3c0f56e94cdd95fcc1f68))
+
+* fix(css): untrack src/static/styles/main.css from git (JTN-672)
+
+main.css was simultaneously tracked in the index and listed in .gitignore, causing `git checkout
+  <tag>` to abort ("please stash your changes") whenever build_css.py --minify rewrote the file
+  during an update. Running `git rm --cached` removes it from the index so the .gitignore entry
+  takes effect; install.sh and update.sh already call build_css.py --minify to regenerate it fresh
+  on every deploy.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+* ci: build CSS before running pytest (JTN-672)
+
+main.css is now gitignored and no longer tracked in the repository. Three static CSS tests read the
+  file directly and were failing in CI with 404 / FileNotFoundError because the file wasn't present.
+  Add a `python scripts/build_css.py` step before `pytest` so the generated file exists during the
+  test run.
+
+* ci: add build_css.py step to browser-smoke and flake-detection jobs (JTN-672)
+
+The browser smoke and flake detection jobs also serve main.css through the Flask test client and
+  need it present on disk. Add the same `python scripts/build_css.py` step before the test runs in
+  those two jobs so they regenerate the file after checkout.
+
+---------
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Chores
+
+- Untrack editor/agent config and add to .gitignore
+  ([`26b69e1`](https://github.com/jtn0123/InkyPi/commit/26b69e16dda00777330cf08909e2e5a21a8f59d7))
+
+Remove per-user tooling files from version control and ignore the directories so they stay out: -
+  .claude/ (Claude Code launch.json, scheduled_tasks.lock) - .vscode/ (settings.json) - .codex/
+  (environments/environment.toml) - .envrc (direnv)
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.50.2 (2026-04-14)
 
 ### Bug Fixes
