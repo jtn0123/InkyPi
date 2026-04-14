@@ -26,7 +26,7 @@
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer
             integrity="{{ sri_for('vendor/htmx.min.js') }}" crossorigin="anonymous"></script>
     {% block head %}{% endblock %}
-    <script>
+    <script nonce="{{ csp_nonce }}">
       if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
         window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
       }

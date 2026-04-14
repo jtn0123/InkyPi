@@ -327,7 +327,10 @@ def flask_app(device_config_dev, monkeypatch):
         return {"csrf_token": _generate_csrf_token}
 
     from app_setup.http_metrics import setup_http_metrics
+    from app_setup.security_middleware import setup_csp_nonce
     from utils.sri import init_sri
+
+    setup_csp_nonce(app)
 
     # Register routes
     app.register_blueprint(main_bp)
@@ -400,9 +403,13 @@ def flask_app(device_config_dev, monkeypatch):
             pass
         # Content Security Policy (Report-Only by default)
         try:
-            csp_value = (
-                os.getenv("INKYPI_CSP")
-                or "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:"
+            from flask import g as _g
+
+            _nonce = getattr(_g, "csp_nonce", "")
+            csp_value = os.getenv("INKYPI_CSP") or (
+                "default-src 'self'; img-src 'self' data: https:; "
+                "style-src 'self' 'unsafe-inline'; "
+                f"script-src 'self' 'nonce-{_nonce}'; font-src 'self' data:"
             )
             report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in (
                 "1",

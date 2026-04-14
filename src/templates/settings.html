@@ -392,7 +392,7 @@
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
     </main>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.__INKYPI_SETTINGS_BOOT__ = {
             downloadLogsUrl: {{ url_for('settings.download_logs', hours=24) | tojson }},
             exportSettingsUrl: {{ url_for('settings.export_settings') | tojson }},

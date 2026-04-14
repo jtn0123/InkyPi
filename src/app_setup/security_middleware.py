@@ -319,6 +319,36 @@ def setup_rate_limiting(app: Flask) -> None:
 
 
 # ---------------------------------------------------------------------------
+# CSP nonce
+# ---------------------------------------------------------------------------
+
+
+def setup_csp_nonce(app: Flask) -> None:
+    """Generate a per-request CSP nonce and expose it to templates.
+
+    A fresh ``secrets.token_urlsafe(16)`` value is stored on ``flask.g`` at
+    the start of every request.  The same nonce is then embedded in the
+    ``Content-Security-Policy`` (or ``-Report-Only``) header by
+    ``_apply_csp_header`` and is available to Jinja templates via the
+    ``csp_nonce`` template variable so that inline ``<script>`` blocks can
+    carry the matching ``nonce`` attribute.
+
+    Inline ``<script nonce="{{ csp_nonce }}">`` blocks are the approved CSP
+    mechanism for authorising necessary server-rendered JS snippets that
+    pass Jinja data into static scripts (JTN-687).  ``'unsafe-inline'`` is
+    intentionally NOT used.
+    """
+
+    @app.before_request
+    def _generate_csp_nonce():
+        g.csp_nonce = secrets.token_urlsafe(16)
+
+    @app.context_processor
+    def _inject_csp_nonce():
+        return {"csp_nonce": getattr(g, "csp_nonce", "")}
+
+
+# ---------------------------------------------------------------------------
 # Security headers
 # ---------------------------------------------------------------------------
 
@@ -335,10 +365,10 @@ _STATIC_ASSET_EXTS = (
     ".woff2",
     ".ttf",
 )
-_DEFAULT_CSP = (
+_DEFAULT_CSP_TEMPLATE = (
     "default-src 'self'; img-src 'self' data: https:; "
     "style-src 'self' 'unsafe-inline' https://unpkg.com; "
-    "script-src 'self'; font-src 'self' data: https:"
+    "script-src 'self' 'nonce-{nonce}'; font-src 'self' data: https:"
 )
 
 
@@ -405,7 +435,9 @@ def _apply_hsts_header(response) -> None:
 
 def _apply_csp_header(response, *, dev_mode: bool) -> None:
     """Set the Content-Security-Policy header (report-only in dev mode)."""
-    csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP
+    nonce = getattr(g, "csp_nonce", "")
+    # Honour operator-supplied CSP verbatim (no nonce injection).
+    csp_value = os.getenv("INKYPI_CSP") or _DEFAULT_CSP_TEMPLATE.format(nonce=nonce)
     if "report-uri" not in csp_value:
         csp_value = csp_value.rstrip("; ") + "; report-uri /api/csp-report"
     report_only = dev_mode or _env_bool("INKYPI_CSP_REPORT_ONLY")

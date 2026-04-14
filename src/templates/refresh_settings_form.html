@@ -21,7 +21,7 @@
 </div>
 <p id="{{ prefix }}-scheduled-help" class="form-help-text" style="display:none;" aria-live="polite">Pick a time of day for the refresh.</p>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   document.addEventListener('DOMContentLoaded', () => {
     // Interval group
     const groupInterval = document.getElementById('{{ prefix }}-group-interval');
