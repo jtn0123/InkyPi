@@ -109,6 +109,77 @@ class TestSystemdService:
         assert "RuntimeDirectory=inkypi" in self.content
         assert "WorkingDirectory=/run/inkypi" in self.content
 
+    def test_service_start_limit_burst(self):
+        # JTN-671: Without StartLimitBurst the JTN-665 incident demonstrated
+        # that inkypi.service can restart 4,091+ times before detection (~68 h
+        # @ 60 s apart). StartLimitBurst=5 caps that to 5 attempts in
+        # StartLimitIntervalSec=1800 (30 min), after which systemd enters the
+        # "start-limit-hit" state and stops retrying silently.
+        assert "StartLimitBurst=5" in self.content, (
+            "inkypi.service must set StartLimitBurst=5 in [Unit] to bound "
+            "restart loops (JTN-671)"
+        )
+        assert "StartLimitIntervalSec=1800" in self.content, (
+            "inkypi.service must set StartLimitIntervalSec=1800 in [Unit] to "
+            "define the 30-min window for StartLimitBurst (JTN-671)"
+        )
+
+        # Both directives must live in the [Unit] section (before [Service]).
+        unit_start = self.content.index("[Unit]")
+        service_start = self.content.index("[Service]")
+        burst_pos = self.content.index("StartLimitBurst=5")
+        interval_pos = self.content.index("StartLimitIntervalSec=1800")
+        assert (
+            unit_start < burst_pos < service_start
+        ), "StartLimitBurst=5 must be inside the [Unit] section"
+        assert (
+            unit_start < interval_pos < service_start
+        ), "StartLimitIntervalSec=1800 must be inside the [Unit] section"
+
+    def test_service_on_failure_references_failure_helper(self):
+        # JTN-671: OnFailure= activates the sentinel-writer unit when the
+        # start-limit is hit, making the failure detectable without parsing
+        # journalctl (status LED, healthcheck, future webhook).
+        assert "OnFailure=inkypi-failure.service" in self.content, (
+            "inkypi.service must declare OnFailure=inkypi-failure.service in "
+            "[Unit] so the failure sentinel is written on start-limit-hit (JTN-671)"
+        )
+
+        # OnFailure= must live in [Unit], not [Service].
+        unit_start = self.content.index("[Unit]")
+        service_start = self.content.index("[Service]")
+        on_failure_pos = self.content.index("OnFailure=inkypi-failure.service")
+        assert (
+            unit_start < on_failure_pos < service_start
+        ), "OnFailure=inkypi-failure.service must be inside the [Unit] section"
+
+
+class TestSystemdFailureService:
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("inkypi-failure.service")
+
+    def test_failure_service_has_required_sections(self):
+        # JTN-671: inkypi-failure.service is a oneshot helper activated by
+        # OnFailure= in inkypi.service when the start-limit is hit.
+        for section in ["[Unit]", "[Service]"]:
+            assert (
+                section in self.content
+            ), f"inkypi-failure.service must contain a {section} section (JTN-671)"
+
+    def test_failure_service_is_oneshot(self):
+        assert (
+            "Type=oneshot" in self.content
+        ), "inkypi-failure.service must be Type=oneshot (JTN-671)"
+
+    def test_failure_service_writes_sentinel_file(self):
+        # The unit must touch /var/lib/inkypi/.start-limit-hit so the
+        # healthcheck / status LED can detect the broken service state.
+        assert "/var/lib/inkypi/.start-limit-hit" in self.content, (
+            "inkypi-failure.service must write /var/lib/inkypi/.start-limit-hit "
+            "so the failure is detectable without journalctl (JTN-671)"
+        )
+
 
 # ---- CLI wrapper ----
 
@@ -393,6 +464,17 @@ class TestInstallScript:
         assert "systemctl enable" in fn_body, (
             "install_app_service() must call 'systemctl enable' to re-enable the "
             "service after stop_service() disabled it during the install window"
+        )
+
+    def test_install_app_service_installs_failure_helper(self):
+        # JTN-671: install_app_service() must also copy inkypi-failure.service
+        # into /etc/systemd/system/ so the OnFailure= directive can resolve.
+        fn_start = self.content.index("install_app_service() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        assert "inkypi-failure.service" in fn_body, (
+            "install_app_service() must install inkypi-failure.service so the "
+            "OnFailure= directive in inkypi.service can resolve (JTN-671)"
         )
 
     def test_install_creates_lockfile_near_top(self):

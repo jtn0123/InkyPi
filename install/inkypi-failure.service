@@ -1,0 +1,10 @@
+[Unit]
+Description=InkyPi failure sentinel writer
+# JTN-671: Activated by OnFailure= in inkypi.service when the start-limit is
+# hit. Writes /var/lib/inkypi/.start-limit-hit so the status LED, healthcheck,
+# and future webhooks can detect a broken install without parsing journalctl.
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/bash -c 'mkdir -p /var/lib/inkypi && touch /var/lib/inkypi/.start-limit-hit && echo "InkyPi hit systemd start-limit — manual intervention required" | systemd-cat -t inkypi-failure -p err'
