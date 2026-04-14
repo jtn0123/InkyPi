@@ -85,16 +85,7 @@ _SKIP_SELECTORS: tuple[str, ...] = (
 # Pages where the initial sweep surfaced bugs that the L2 batch-fix PR will
 # address. Marked xfail so the harness ships green today and starts locking
 # in once the fixes land. Each entry MUST link to a tracking Linear issue.
-_XFAIL_PAGES: dict[str, str] = {
-    # JTN-681: clock face picker buttons don't produce observable DOM
-    # mutations in the sweep — either initClockFacePicker isn't firing or
-    # MutationObserver misses the classList.toggle. Remove once JTN-681 is
-    # fixed in the L2 batch PR.
-    "plugin_clock": (
-        "awaiting L2 batch fix in JTN-681 "
-        "(clock face picker clicks show no DOM mutation)"
-    ),
-}
+_XFAIL_PAGES: dict[str, str] = {}
 
 
 _ENUMERATE_JS = """
