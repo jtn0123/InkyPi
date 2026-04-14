@@ -1,6 +1,123 @@
 # CHANGELOG
 
 
+## v0.51.9 (2026-04-14)
+
+### Bug Fixes
+
+- **install**: Gate service-enable on CSS build success (JTN-695)
+  ([#481](https://github.com/jtn0123/InkyPi/pull/481),
+  [`deb3f70`](https://github.com/jtn0123/InkyPi/commit/deb3f70c5bd5904dca5d95c3829566cd46010d8f))
+
+Reorder install.sh so update_vendors.sh and build_css_bundle run BEFORE install_app_service.
+  Previously a vendor-CDN timeout or CSS build error after systemctl enable left the unit enabled
+  with src/static/styles/main.css absent — the user booted into an unstyled web UI with no
+  indication why.
+
+Also add a post-build assertion that main.css exists AND is non-empty (-s) before calling
+  install_app_service, so a silent truncation can't slip past build_css_bundle's existence-only
+  check.
+
+Regression tests in tests/unit/test_install_scripts.py: - test_service_enable_gated_on_css_build:
+  asserts vendor + CSS build call sites precede install_app_service in the main body. -
+  test_install_asserts_main_css_exists_before_service_enable: asserts the -s assertion on main.css
+  lands between build_css_bundle and install_app_service.
+
+The JTN-607 lockfile behavior is unchanged — rm -f "\$LOCKFILE" still follows both the CSS build and
+  service-enable steps, so any failure in the gating path leaves the lockfile in place.
+
+Linear: https://linear.app/jtn0123/issue/JTN-695
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Documentation
+
+- **readme**: Recommend do_update.sh as primary update path (JTN-694)
+  ([#480](https://github.com/jtn0123/InkyPi/pull/480),
+  [`53614e0`](https://github.com/jtn0123/InkyPi/commit/53614e081919c04ab37c54fd38bba732bab1758f))
+
+`install/update.sh` performs no git operations — it only rebuilds deps, CSS, and the systemd unit
+  against the current checkout. Following the old README (`git pull` + `update.sh`) on a stale tree
+  produced a silent no-op that still reported "Update completed" (reproduced live on a Pi stuck on
+  v0.51.1).
+
+Rewrite the Update section to promote `sudo bash install/do_update.sh` as the recommended path for
+  version bumps (it fetches, resolves the latest semver tag, checks it out, then delegates to
+  update.sh). Keep the `git pull` + `update.sh` flow documented as the alternative for pinning to a
+  specific branch or SHA, and explicitly call out that `update.sh` alone does not advance the
+  checkout.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Interactive element overlap detector (JTN-689)
+  ([#475](https://github.com/jtn0123/InkyPi/pull/475),
+  [`2348593`](https://github.com/jtn0123/InkyPi/commit/2348593295474773a6504df9a1632edadfb58815))
+
+* test(ui): interactive element overlap detector (JTN-689)
+
+Adds tests/integration/test_layout_overlap.py — a Playwright-based integration test that walks every
+  visible interactive element on each main page and flags visually-colliding clickables (the "this
+  button is under the modal header" class of bug).
+
+For each (page, viewport) combo: - Enumerates button/a/input/[role=button]/[data-*-action]
+  candidates that pass clickability checks (visible, not pointer-events:none, not aria-hidden/inert,
+  not disabled) and have a >=2px rect. - Computes pairwise overlap as overlap_area / min(area_a,
+  area_b). - Skips ancestor/descendant pairs so icons inside buttons don't false positive. - Fails
+  with the top offending pairs listed at 0.25 threshold.
+
+Runs at 1280x900 and 360x800 across home, settings, history, playlist, plugin_clock, api_keys — same
+  page set as the click sweep. All 12 parametrized combinations pass today; no real collisions
+  found.
+
+Part of the pre-dogfooding UI/UX coverage plan (item #3, sibling to the click-sweep work in
+  JTN-681/682 and client-log tripwire JTN-680).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ci): defer test_layout_overlap.py when Playwright browsers absent
+
+Add tests/integration/test_layout_overlap.py to UI_BROWSER_TESTS so pytest_ignore_collect skips it
+  in environments without the Chromium headless shell, matching the pattern used for other
+  browser-driven tests.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **ui**: Per-plugin Update Preview smoke (JTN-691)
+  ([#477](https://github.com/jtn0123/InkyPi/pull/477),
+  [`5955e4b`](https://github.com/jtn0123/InkyPi/commit/5955e4bd8a78adde0c0e0c99c3a81c3061079ba9))
+
+* test(ui): per-plugin Update Preview smoke (JTN-691)
+
+Add a Playwright integration test that, for each plugin in a fixture dict, navigates to
+  /plugin/<id>, fills minimum-viable inputs, clicks Update Preview, and asserts the #previewImage
+  src actually changed. Inherits the client-log tripwire from conftest, so any console.warn /
+  console.error during the flow fails the test automatically.
+
+Closes the plugin-level correctness blind spot surfaced in JTN-681 (clock face picker handler
+  silently no-opped). Initial coverage: clock, year_progress, todo_list — parametrized so adding
+  plugins is a one-line dict entry in fixtures/plugin_inputs.py.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ci): skip plugin_preview_smoke when Playwright Chromium missing
+
+The new tests/integration/test_plugin_preview_smoke.py uses the browser_page fixture but wasn't
+  registered in UI_BROWSER_TESTS, so pytest_ignore_collect treated it as a non-browser test and
+  collected it even when Chromium isn't installed. CI's pytest job doesn't run `playwright install`,
+  so the tests errored at BrowserType.launch ("Executable doesn't exist ... chrome-headless-shell").
+
+Add the file to UI_BROWSER_TESTS so collection defers to _playwright_browser_available() and skips
+  cleanly, matching every other browser-dependent test in tests/integration/.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.8 (2026-04-14)
 
 ### Bug Fixes
