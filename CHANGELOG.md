@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.50.1 (2026-04-14)
+
+### Bug Fixes
+
+- **service**: Add StartLimitBurst + OnFailure sentinel to stop runaway restart loops (JTN-671)
+  ([`322b12e`](https://github.com/jtn0123/InkyPi/commit/322b12e947ba0d30ee8db94e68b1f4c6f044de4f))
+
+* fix(service): add StartLimitBurst + OnFailure sentinel to stop runaway restart loops (JTN-671)
+
+Without StartLimitBurst the JTN-665 incident drove 4,091 restart attempts (~68 h @ 60 s apart),
+  burning ~27 min CPU and accelerating SD card wear.
+
+- inkypi.service [Unit]: add StartLimitIntervalSec=1800 + StartLimitBurst=5 so systemd enters
+  "start-limit-hit" after 5 failed starts in 30 min - inkypi.service [Unit]: add
+  OnFailure=inkypi-failure.service so the failure is written to /var/lib/inkypi/.start-limit-hit for
+  healthchecks - install/inkypi-failure.service: new oneshot unit that touches the sentinel file and
+  logs via systemd-cat - install/install.sh: install_app_service() now also copies
+  inkypi-failure.service into /etc/systemd/system/ - tests: add TestSystemdFailureService +
+  test_service_start_limit_burst + test_service_on_failure_references_failure_helper +
+  test_install_app_service_installs_failure_helper
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(tests): remove accidentally-included JTN-670 test_update_* guards from JTN-671 PR
+
+The stash-pop when switching branches accidentally included JTN-670's
+  test_update_{uv,require_hashes,...} tests which assert features not yet in update.sh on main. This
+  commit strips them out — they will land with the JTN-670 PR instead. Only the 6 JTN-671-specific
+  tests remain.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.50.0 (2026-04-14)
 
 ### Bug Fixes
