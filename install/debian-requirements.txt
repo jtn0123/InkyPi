@@ -13,4 +13,6 @@ earlyoom
 swig
 liblgpio-dev
 libheif-dev
+libffi-dev
+libsystemd-dev
 jq
