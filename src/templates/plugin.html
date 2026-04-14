@@ -7,7 +7,7 @@
     <script src="{{ url_for('static', filename='scripts/plugin_schema.js') }}" defer></script>
 
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
         const pluginSettings = window.pluginSettings = {{ (plugin_settings | default({})) | tojson }};
         const pluginInstanceName = window.pluginInstanceName = {{ (plugin_instance | default('')) | tojson }};
         const hasPluginSettings = !!(pluginSettings && Object.keys(pluginSettings).length);
@@ -376,7 +376,7 @@
     </div>
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_page.js') }}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.__INKYPI_PLUGIN_BOOT__ = {
             deviceFrameUrl: {{ url_for('plugin.image', plugin_id='base_plugin', filename='frames/device_frame.png') | tojson }},
             displayInstancePayload: {

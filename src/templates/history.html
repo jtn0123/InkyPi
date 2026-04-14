@@ -139,7 +139,7 @@
          data-delete-url="{{ url_for('history.history_delete') }}"
          data-redisplay-url="{{ url_for('history.history_redisplay') }}"
          data-storage-url="{{ url_for('history.history_storage') }}"></div>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         document.addEventListener('DOMContentLoaded', () => {
             var el = document.getElementById('historyBootData');
             if (!el || !window.InkyPiHistoryPage) return;

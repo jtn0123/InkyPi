@@ -2,7 +2,7 @@
 {% block title %}InkyPi - Playlists{% endblock %}
 {% block head %}
     <script src="{{ url_for('static', filename='scripts/refresh_settings_manager.js') }}"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}">
         window.PLAYLIST_CTX = {
             create_playlist_url: {{ url_for('playlist.create_playlist') | tojson }},
             delete_playlist_base_url: {{ url_for('playlist.delete_playlist', playlist_name='') | tojson }},

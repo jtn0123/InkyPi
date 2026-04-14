@@ -31,6 +31,8 @@ from app_setup.schema_validator import register as register_schema_validator
 from app_setup.security_middleware import (
     _extract_csrf_token_from_request,
     _generate_csrf_token,
+    setup_csp_nonce,
+    setup_csp_nonce as _setup_csp_nonce,
     setup_csrf_protection,
     setup_csrf_protection as _setup_csrf_protection,
     setup_https_redirect,
@@ -61,6 +63,7 @@ __all__ = [
     "pop_hot_reload_info",
     "_register_error_handlers",
     "_register_health_endpoints",
+    "_setup_csp_nonce",
     "_setup_csrf_protection",
     "_setup_https_redirect",
     "_setup_rate_limiting",
@@ -366,6 +369,7 @@ def create_app():
         except Exception:
             pass
 
+    setup_csp_nonce(app)
     setup_csrf_protection(app)
     setup_rate_limiting(app)
     register_error_handlers(app)
