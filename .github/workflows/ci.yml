@@ -523,6 +523,8 @@ jobs:
       - name: Install Playwright Chromium
         run: |
           .venv/bin/python -m playwright install --with-deps chromium
+      - name: Build CSS
+        run: python scripts/build_css.py
       - name: Run flake detection
         env:
           INKYPI_VALIDATE_FLAKE: '1'
@@ -627,6 +629,8 @@ jobs:
       - name: Install Playwright Chromium
         run: |
           python -m playwright install --with-deps chromium
+      - name: Build CSS
+        run: python scripts/build_css.py
       - name: Run browser smoke suite
         env:
           BROWSER_SMOKE_ARTIFACT_DIR: runtime/mock_display_output/browser_smoke_failures
