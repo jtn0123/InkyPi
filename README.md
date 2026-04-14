@@ -126,20 +126,40 @@ Note:
 For more details, including instructions on how to image your microSD with Raspberry Pi OS, refer to [installation.md](./docs/installation.md). You can also checkout [this YouTube tutorial](https://youtu.be/L5PvQj1vfC4).
 
 ## Update
-To update your InkyPi with the latest code changes, follow these steps:
-1. Navigate to the project directory:
-    ```bash
-    cd InkyPi
-    ```
-2. Fetch the latest changes from the repository:
-    ```bash
-    git pull
-    ```
-3. Run the update script with sudo:
-    ```bash
-    sudo bash install/update.sh
-    ```
-This process ensures that any new updates, including code changes and additional dependencies, are properly applied without requiring a full reinstallation.
+
+**Recommended:** use `do_update.sh` to fetch the latest release tag and apply it:
+
+```bash
+cd InkyPi
+sudo bash install/do_update.sh
+```
+
+`do_update.sh` runs `git fetch origin --tags --prune`, resolves the latest
+semver tag (e.g. `v0.51.6`), checks it out, and then delegates to `update.sh`
+for dependency install, CSS build, and service restart. To pin a specific
+version, pass the tag explicitly:
+
+```bash
+sudo bash install/do_update.sh v0.51.6
+```
+
+**Alternative — update to a branch or arbitrary commit:**
+
+```bash
+cd InkyPi
+git pull               # or: git checkout <branch-or-sha>
+sudo bash install/update.sh
+```
+
+> `install/update.sh` on its own does **not** advance the git checkout — it
+> only rebuilds deps, CSS, and the systemd unit against whatever commit is
+> already checked out. Running it against a stale working tree is a silent
+> no-op that still reports "Update completed". Use `do_update.sh` for version
+> bumps, or `git pull` before `update.sh` when tracking a branch.
+
+The web UI's "Update" button also invokes `do_update.sh` when available
+(see `src/blueprints/settings/__init__.py`), so it stays in sync with the
+CLI path.
 
 ## Development
 
