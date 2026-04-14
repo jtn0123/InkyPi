@@ -1,6 +1,34 @@
 # CHANGELOG
 
 
+## v0.51.2 (2026-04-14)
+
+### Bug Fixes
+
+- **install**: Add libffi-dev and libsystemd-dev to debian-requirements (JTN-675)
+  ([#464](https://github.com/jtn0123/InkyPi/pull/464),
+  [`fcb44be`](https://github.com/jtn0123/InkyPi/commit/fcb44be7ed3cf646aee52dd9f05688bbffe8e316))
+
+`install/requirements.txt` pins `cffi` and `cysystemd`, both of which need native headers when built
+  from source. On Python 3.13 armv7 (Pi Zero 2 W / Trixie), piwheels has no prebuilt wheels, so pip
+  falls back to source builds and fails with:
+
+fatal error: ffi.h: No such file or directory fatal error: systemd/sd-daemon.h: No such file or
+  directory
+
+Add the two missing -dev packages to the apt preflight list so install.sh / update.sh succeed on a
+  fresh Pi Zero 2 W.
+
+Also add a regression test (test_install_scripts.py) that asserts the apt list keeps libffi-dev and
+  libsystemd-dev in sync with the pinned Python deps. The test fails on the old
+  debian-requirements.txt and passes with the fix.
+
+Verified on inkypi.local during v0.38.0 -> v0.49.20 update: after `apt install -y libffi-dev
+  libsystemd-dev`, both wheels built cleanly.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.1 (2026-04-14)
 
 ### Bug Fixes
