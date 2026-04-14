@@ -58,6 +58,11 @@ show_loader() {
   fi
 }
 
+# JTN-669: source shared wheelhouse helpers (fetch_wheelhouse / cleanup_wheelhouse)
+# so updates use the same pre-built binary wheels as fresh installs (JTN-604).
+# shellcheck source=install/_common.sh
+source "$SCRIPT_DIR/_common.sh"
+
 setup_zramswap_service() {
   # If the OS already provides zram swap (e.g. Pi OS Trixie preinstalls zram-swap),
   # skip zram-tools — they fight over /dev/zram0 and cause mkswap to fail.
@@ -188,23 +193,39 @@ source "$VENV_PATH/bin/activate"
 echo "Upgrading pip..."
 # JTN-665: capture failure so a broken pip/setuptools upgrade does not silently
 # proceed to requirements install and leave the venv in a partially-broken state.
+# JTN-669: --retries 5 --timeout 60 --no-cache-dir for JTN-534/JTN-602 parity.
 if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade pip setuptools wheel > /dev/null; then
   echo_error "ERROR: pip/setuptools upgrade failed — aborting update."
   exit 1
 fi
 echo_success "Pip upgraded successfully."
 
+# JTN-669: Try to fetch a pre-built wheelhouse bundle for this version.
+# Avoids source-compiling numpy/Pillow/cffi/etc. on every update on
+# low-RAM boards like the Pi Zero 2 W (cuts ~15 min / OOM risk down to
+# ~2-3 min). Degrades gracefully: any failure falls back to normal pip.
+pip_extra_args=()
+if fetch_wheelhouse; then
+  pip_extra_args+=(--find-links "$WHEELHOUSE_DIR" --prefer-binary)
+fi
+
 # Install or update Python dependencies
 if [ -f "$PIP_REQUIREMENTS_FILE" ]; then
   echo "Updating Python dependencies..."
   # JTN-665: explicit exit-code check so a compile error (e.g. metadata-generation-failed)
   # stops the update before CSS build + service restart, preventing a boot loop.
-  if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade -r "$PIP_REQUIREMENTS_FILE" -qq > /dev/null; then
+  # JTN-669: pass --find-links + --prefer-binary when wheelhouse is available.
+  if ! "$VENV_PATH/bin/python" -m pip install --retries 5 --timeout 60 --no-cache-dir --upgrade \
+      "${pip_extra_args[@]}" \
+      -r "$PIP_REQUIREMENTS_FILE"; then
+    cleanup_wheelhouse
     echo_error "ERROR: pip install failed — aborting update (service remains stopped)."
     exit 1
   fi
+  cleanup_wheelhouse
   echo_success "Dependencies updated successfully."
 else
+  cleanup_wheelhouse
   echo_error "ERROR: Requirements file $PIP_REQUIREMENTS_FILE not found!"
   exit 1
 fi

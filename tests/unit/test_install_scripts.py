@@ -740,18 +740,17 @@ class TestInstallScript:
         _ = fn_body
 
 
-# ---- Wheelhouse release asset (JTN-604) ----
+# ---- Wheelhouse release asset (JTN-604 / JTN-669) ----
 
 
-class TestInstallWheelhouseFetch:
-    """JTN-604: install.sh must prefer a pre-built wheelhouse bundle attached
-    to the current version's GitHub release, fall back gracefully on any
-    failure, and honour the INKYPI_SKIP_WHEELHOUSE opt-out.
+class TestCommonWheelhouseFunctions:
+    """JTN-669: fetch_wheelhouse / cleanup_wheelhouse now live in _common.sh
+    so both install.sh and update.sh can share them without duplication.
     """
 
     @pytest.fixture(autouse=True)
     def _load(self):
-        self.content = _read("install.sh")
+        self.content = _read("_common.sh")
 
     def _fetch_fn_body(self):
         fn_start = self.content.index("fetch_wheelhouse() {")
@@ -772,22 +771,6 @@ class TestInstallWheelhouseFetch:
     def test_fetch_wheelhouse_function_defined(self):
         assert "fetch_wheelhouse() {" in self.content
         assert "cleanup_wheelhouse() {" in self.content
-
-    def test_create_venv_calls_fetch_wheelhouse(self):
-        # fetch_wheelhouse must be invoked from inside create_venv so the
-        # bundle is downloaded before the main pip install runs.
-        fn_start = self.content.index("create_venv(){")
-        lines = self.content[fn_start:].splitlines()
-        depth = 0
-        body_lines: list[str] = []
-        for line in lines:
-            body_lines.append(line)
-            depth += line.count("{") - line.count("}")
-            if depth <= 0 and body_lines:
-                break
-        body = "\n".join(body_lines)
-        assert "fetch_wheelhouse" in body
-        assert "cleanup_wheelhouse" in body
 
     def test_respects_skip_opt_out_env_var(self):
         # INKYPI_SKIP_WHEELHOUSE=1 must short-circuit the fetch before any
@@ -851,6 +834,44 @@ class TestInstallWheelhouseFetch:
         body = self._fetch_fn_body()
         assert "*.whl" in body
 
+    def test_fetch_sets_temp_dir_and_cleans_on_failure(self):
+        body = self._fetch_fn_body()
+        # mktemp must be used so parallel invocations don't collide, and
+        # every failure path must rm -rf the temp dir.
+        assert "mktemp" in body
+        assert 'rm -rf "$tmp_dir"' in body
+
+
+class TestInstallWheelhouseFetch:
+    """JTN-604: install.sh sources _common.sh for wheelhouse helpers and
+    wires them into create_venv.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("install.sh")
+
+    def test_install_sources_common(self):
+        # JTN-669: functions live in _common.sh now; install.sh must source it.
+        assert "_common.sh" in self.content
+        assert 'source "$SCRIPT_DIR/_common.sh"' in self.content
+
+    def test_create_venv_calls_fetch_wheelhouse(self):
+        # fetch_wheelhouse must be invoked from inside create_venv so the
+        # bundle is downloaded before the main pip install runs.
+        fn_start = self.content.index("create_venv(){")
+        lines = self.content[fn_start:].splitlines()
+        depth = 0
+        body_lines: list[str] = []
+        for line in lines:
+            body_lines.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and body_lines:
+                break
+        body = "\n".join(body_lines)
+        assert "fetch_wheelhouse" in body
+        assert "cleanup_wheelhouse" in body
+
     def test_pip_install_uses_find_links_when_available(self):
         # create_venv must pass --find-links $WHEELHOUSE_DIR --prefer-binary
         # to the main pip install so local wheels take precedence.
@@ -866,15 +887,6 @@ class TestInstallWheelhouseFetch:
         assert "--find-links" in body
         assert "--prefer-binary" in body
         assert "WHEELHOUSE_DIR" in body
-
-    def test_fetch_sets_temp_dir_and_cleans_on_failure(self):
-        body = self._fetch_fn_body()
-        # mktemp must be used so parallel invocations don't collide, and
-        # every failure path must rm -rf the temp dir.
-        assert "mktemp" in body
-        # Count return 1 vs rm -rf so we know the failure paths clean up.
-        # Relax: we only require at least one paired rm -rf "$tmp_dir".
-        assert 'rm -rf "$tmp_dir"' in body
 
     def test_no_cache_dir_still_present_after_wheelhouse_change(self):
         # Regression guard for JTN-602 — the wheelhouse change must not
@@ -1301,6 +1313,43 @@ class TestUpdateScript:
         # JTN-667: The comment near get_os_version must spell Trixie correctly.
         assert "13=Trixie" in self.content
         assert "Trixe" not in self.content  # typo guard
+
+    def test_update_sources_common(self):
+        # JTN-669: update.sh must source _common.sh to gain access to
+        # fetch_wheelhouse / cleanup_wheelhouse so every update can use
+        # pre-built wheels instead of source-compiling on the Pi.
+        assert "_common.sh" in self.content
+        assert 'source "$SCRIPT_DIR/_common.sh"' in self.content
+
+    def test_update_calls_fetch_wheelhouse(self):
+        # JTN-669: fetch_wheelhouse must be called before the pip upgrade
+        # so the pre-built bundle is available when pip resolves packages.
+        assert "fetch_wheelhouse" in self.content
+
+    def test_update_calls_cleanup_wheelhouse(self):
+        # The temp wheelhouse dir must always be cleaned up after install.
+        assert "cleanup_wheelhouse" in self.content
+
+    def test_update_pip_uses_find_links_when_available(self):
+        # When the wheelhouse is available, pip must be pointed at it via
+        # --find-links so binary wheels are preferred over source builds.
+        assert "--find-links" in self.content
+        assert "--prefer-binary" in self.content
+        assert "WHEELHOUSE_DIR" in self.content
+
+    def test_update_pip_uses_no_cache_dir(self):
+        # JTN-602 parity: --no-cache-dir saves ~200 MB on the SD card.
+        # The pip install line in update.sh must carry the flag.
+        pip_lines = [
+            line
+            for line in self.content.splitlines()
+            if re.search(r"-m pip install", line) and not line.strip().startswith("#")
+        ]
+        assert pip_lines, "no pip install calls found in update.sh"
+        for line in pip_lines:
+            assert (
+                "--no-cache-dir" in line
+            ), f"JTN-602 parity — pip install in update.sh missing --no-cache-dir: {line!r}"
 
 
 # ---- uninstall.sh ----
