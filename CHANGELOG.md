@@ -1,6 +1,41 @@
 # CHANGELOG
 
 
+## v0.51.7 (2026-04-14)
+
+### Bug Fixes
+
+- **clock**: Activate face picker handler when color fields are outside widget (JTN-681)
+  ([#466](https://github.com/jtn0123/InkyPi/pull/466),
+  [`f9a75f2`](https://github.com/jtn0123/InkyPi/commit/f9a75f2355e6b50808d4b8ff51f86ed0800d9591))
+
+* fix(clock): activate face picker handler when color fields are outside widget (JTN-681)
+
+`initClockFacePicker` was scoped to the widget wrapper when looking up `primaryColor` /
+  `secondaryColor` inputs, but those fields live in a sibling schema section on the plugin form. The
+  early-return guard fired, so no click handler was ever attached and the initial `.selected` class
+  was never applied.
+
+Fix: scope the colour-field lookup to the settings-schema root and drop the color inputs from the
+  required-input guard. Also dispatch `input`/`change` events when syncing colour values so any
+  bound preview swatches stay in sync.
+
+Remove `plugin_clock` from `_XFAIL_PAGES` in the Layer-3 click sweep and add a dedicated regression
+  test that asserts both the initial selection state and the post-click class/value sync.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(jtn-681): gate new clock face picker test on Playwright availability
+
+The test uses the `browser_page` fixture which requires Chromium. Add it to `UI_BROWSER_TESTS` so
+  it's collected only when Playwright browsers are available (or SKIP_BROWSER / SKIP_UI aren't set),
+  matching how the existing click sweep test is gated.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.6 (2026-04-14)
 
 ### Bug Fixes
