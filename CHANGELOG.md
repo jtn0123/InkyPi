@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## v0.51.5 (2026-04-14)
+
+### Bug Fixes
+
+- **security**: Nonce-based CSP eliminates inline script violations (JTN-687)
+  ([#476](https://github.com/jtn0123/InkyPi/pull/476),
+  [`caf71f4`](https://github.com/jtn0123/InkyPi/commit/caf71f4f798f3ad8407e16626ccd94a0b24719a5))
+
+* fix(security): nonce-based CSP to allow inline scripts (JTN-687)
+
+Replace the monolithic script-src 'self' with a per-request nonce so inline <script> blocks that
+  pass Jinja data into static page scripts are explicitly allowed without using 'unsafe-inline'.
+
+- Generate secrets.token_urlsafe(16) per request in new setup_csp_nonce(); stored on
+  flask.g.csp_nonce and injected into every Jinja template via a context_processor. -
+  _DEFAULT_CSP_TEMPLATE: script-src now includes 'nonce-{nonce}'. Custom INKYPI_CSP overrides remain
+  verbatim (operator's responsibility). - All inline <script> blocks in base.html, inky.html,
+  plugin.html, settings.html, history.html, playlist.html and refresh_settings_form.html gain
+  nonce="{{ csp_nonce }}". - tests/conftest.py wires setup_csp_nonce() and mirrors the nonce in the
+  test-app's CSP after_request hook. - Two new unit tests assert nonce presence and per-request
+  uniqueness.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting to test_security_headers_csp_hsts.py
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.4 (2026-04-14)
 
 ### Bug Fixes
