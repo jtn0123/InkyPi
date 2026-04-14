@@ -1,0 +1,17 @@
+# UI audit allowlist. Each entry silences one finding from
+# tests/ui_audit/test_handler_audit.py.
+#
+# Schema:
+#   entries:
+#     - rule: missing-handler | orphan-button | dead-anchor
+#       template: repo-relative template path
+#       line: integer line number reported by the audit
+#       value: offending attribute value (action name, id, or href)
+#       reason: one-liner explaining why this is OK (REQUIRED)
+#
+# Keep this list small — empty is the goal. If something legitimately has no
+# JS handler (e.g. a form-submit button, a skip-link to a heading, a
+# third-party widget bootstrap), add it here with a reason instead of
+# loosening the audit rules.
+
+entries: []
