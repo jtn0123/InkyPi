@@ -210,10 +210,12 @@ fetch_wheelhouse() {
   local tarball="inkypi-wheels-${version}-${arch}.tar.gz"
   local url="https://github.com/${WHEELHOUSE_REPO}/releases/download/v${version}/${tarball}"
   local sha_url="${url}.sha256"
-  local tmp_dir tmp_tarball tmp_sha
+  local manifest_url="https://github.com/${WHEELHOUSE_REPO}/releases/download/v${version}/${tarball}.manifest.sha256"
+  local tmp_dir tmp_tarball tmp_sha tmp_manifest
   tmp_dir=$(mktemp -d -t inkypi-wheels.XXXXXX) || return 1
   tmp_tarball="${tmp_dir}/${tarball}"
   tmp_sha="${tmp_dir}/${tarball}.sha256"
+  tmp_manifest="${tmp_dir}/${tarball}.manifest.sha256"
 
   echo "  Fetching pre-built wheelhouse for ${arch} (v${version})..."
   if ! curl --fail --silent --show-error --location \
@@ -258,6 +260,66 @@ fetch_wheelhouse() {
     echo "  Wheelhouse tarball contained no wheel files — falling back."
     rm -rf "$tmp_dir"
     return 1
+  fi
+
+  # JTN-697: Integrity-verify every extracted wheel. A tarball can decompress
+  # cleanly and pass the outer sha256 check yet still contain a zero-byte
+  # numpy-*.whl (e.g. if the producer truncated mid-write). pip happily
+  # "installs" those and the ImportError only surfaces on first refresh.
+  #
+  # Two layers:
+  #   1. If a per-wheel sha256 manifest was published (preferred), verify
+  #      every wheel's hash against the manifest. Any mismatch → fall back.
+  #   2. Structural fallback for older releases without a manifest: reject
+  #      empty files and anything that isn't a readable zip archive.
+  local sha256_cmd=""
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256_cmd="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then
+    sha256_cmd="shasum -a 256"
+  fi
+
+  local have_manifest=0
+  if curl --fail --silent --show-error --location \
+        --retry 2 --connect-timeout 10 --max-time 30 \
+        --output "$tmp_manifest" "$manifest_url" 2>/dev/null; then
+    if [ -s "$tmp_manifest" ] && [ -n "$sha256_cmd" ]; then
+      have_manifest=1
+    fi
+  fi
+
+  local whl
+  while IFS= read -r -d '' whl; do
+    # Guard 1: wheel must be non-empty. A truncated tarball can leave a
+    # 0-byte placeholder even after tar reports success.
+    if [ ! -s "$whl" ]; then
+      echo "  Wheelhouse integrity check failed: empty wheel $(basename "$whl") — falling back."
+      rm -rf "$tmp_dir"
+      return 1
+    fi
+    # Guard 2: wheel must be a readable zip (pip won't install otherwise).
+    # We deliberately use python -m zipfile rather than unzip because the
+    # install base always has python available but unzip is not guaranteed.
+    if command -v python3 >/dev/null 2>&1; then
+      if ! python3 -m zipfile -l "$whl" >/dev/null 2>&1; then
+        echo "  Wheelhouse integrity check failed: $(basename "$whl") is not a valid zip — falling back."
+        rm -rf "$tmp_dir"
+        return 1
+      fi
+    fi
+  done < <(find "$extract_dir" -name '*.whl' -type f -print0)
+
+  # Guard 3 (preferred): verify each wheel against the published manifest.
+  # Manifest format is `sha256sum` output: "<hash>  <basename>\n" per wheel.
+  if [ "$have_manifest" = "1" ]; then
+    # Run sha256sum -c from the extract dir so the basenames in the manifest
+    # line up with the extracted files. --quiet suppresses per-line OK output
+    # but still emits mismatches, and the exit code is non-zero on any fail.
+    if ! ( cd "$extract_dir" && $sha256_cmd -c "$tmp_manifest" --quiet >/dev/null 2>&1 ); then
+      echo "  Wheelhouse manifest sha256 mismatch — falling back to source install."
+      rm -rf "$tmp_dir"
+      return 1
+    fi
   fi
 
   WHEELHOUSE_DIR="$extract_dir"
