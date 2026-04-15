@@ -1,6 +1,90 @@
 # CHANGELOG
 
 
+## v0.60.0 (2026-04-15)
+
+### Features
+
+- **update**: Add rollback path using prev_version breadcrumb (JTN-708)
+  ([#493](https://github.com/jtn0123/InkyPi/pull/493),
+  [`58a0ade`](https://github.com/jtn0123/InkyPi/commit/58a0adeee78895854887d13a870a4f92b8ff5ec5))
+
+* feat(update): add rollback path using prev_version breadcrumb (JTN-708)
+
+Completes the failed-update recovery loop: do_update.sh writes /var/lib/inkypi/prev_version before
+  checkout (JTN-673), update.sh records failures to .last-update-failure (JTN-704), and the UI
+  surfaces them (JTN-710). This change adds the revert action so a stuck user can roll back from the
+  web UI instead of SSHing in.
+
+- install/rollback.sh: reads prev_version, validates semver (same bash regex as do_update.sh and
+  _TAG_RE), fetches the tag if missing, checks it out, then execs update.sh so the JTN-704 EXIT trap
+  records any rollback failure to .last-update-failure just like a forward update. -
+  src/blueprints/settings: adds _start_rollback_via_systemd + trusted-root validator mirroring
+  JTN-319 hardening for _start_update_via_systemd, a dedicated inkypi-rollback-<epoch> unit prefix,
+  and a POST /settings/update/rollback route gated on BOTH .last-update-failure AND a validated
+  prev_version (409 otherwise). /settings/update_status now also returns prev_version for UI button
+  gating. - UI: rollback button lives inside the existing #updateFailureBanner (JTN-710), hidden
+  unless the status response reports both breadcrumbs; confirm-modal follows the reboot/shutdown
+  pattern. - Tests: new test_rollback_script.py (bash structural checks), extended
+  test_install_scripts.py::TestRollbackScript, and test_updates_rollback_route.py covering gating,
+  TOCTOU, happy path (202), systemd argv shape, trusted-root validation, and prev_version surfacing.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(update): raise rollback coverage + dedupe S1192 literals
+
+SonarCloud feedback on PR #493: - Bring _updates.py new-code coverage from 69% to ~90% by adding: *
+  TestGetRollbackScriptPath — covers the real helper (not just mocks): repo-relative lookup,
+  PROJECT_DIR/src symlink resolution, missing-file fallback returning None. *
+  TestStartRollbackViaSystemdFullPath — exercises _start_rollback_via_systemd end-to-end (Popen is
+  the only mock), including the PROJECT_DIR '..' traversal rejection path. *
+  TestRollbackRouteErrorPaths — the inner systemd-run exception branch that clears _UPDATE_STATE and
+  returns 500 instead of wedging the UI. - Extract _DEFAULT_PROJECT_DIR and _BASH_INTERPRETER module
+  constants, used by the new rollback code (S1192: literals duplicated 3-4x across Popen call
+  sites). The JTN-319-hardened _start_update_via_systemd intentionally keeps its literals verbatim
+  so CodeQL's regex-sanitiser recognition still fires — no change there.
+
+* refactor(settings): extract shared poll-until-done loop (JTN-708)
+
+SonarCloud PR-493 feedback: settings_page.js had 35% duplication on new code because startRollback's
+  polling loop + button-disable wrapper duplicated startUpdate verbatim.
+
+Extract pollUpdateStatusUntilDone (the setInterval body) and runUpdateAction (the POST +
+  disable/enable wrapper) so both paths share a single implementation. Behavior unchanged — the only
+  differences between Update and Rollback are the URL, UI copy, and log label, which runUpdateAction
+  takes as parameters.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: Api key add/edit/delete round-trip (JTN-722)
+  ([#495](https://github.com/jtn0123/InkyPi/pull/495),
+  [`d977bd1`](https://github.com/jtn0123/InkyPi/commit/d977bd1a90ca9bc608d00ca7c3b9208f46848043))
+
+* test(journey): API key add/edit/delete round-trip (JTN-722)
+
+Adds the first journey test under epic JTN-719: a Playwright-driven lifecycle covering add -> reload
+  -> edit -> reload -> delete -> reload with persistence assertions after every reload. Catches the
+  class of bug where the POST returns 200 but the value never makes it to .env, where editing
+  silently creates a duplicate row, or where delete is a soft delete that resurrects on next page
+  load.
+
+- New tests/integration/journeys/ tree for the JTN-719 suite - Registers a journey pytest marker so
+  ``pytest -m journey`` selects it - Uses fake placeholder credentials only (sk-test-fake-*) — never
+  real - Existing-row inputs are readonly in generic mode, so the edit step POSTs the new value to
+  /api-keys/save (the UI's own save path) and then verifies the row still renders and the .env
+  reflects the change - Teardown rewrites .env without the test key even on assertion failure
+
+* test(journey): check raw .env for duplicate-key regression
+
+Addresses CodeRabbit major comment: _read_env_keys() returns a dict via dotenv_values() which
+  silently collapses duplicate KEY= lines, so the "no duplicate row" assertion was a false negative.
+  Read the raw .env file and count lines starting with "{key_name}=" instead.
+
+
 ## v0.59.0 (2026-04-15)
 
 ### Bug Fixes
