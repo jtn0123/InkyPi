@@ -883,6 +883,13 @@
       return Number(val).toFixed(1) + "%";
     }
 
+    function formatDiskFree(val) {
+      if (val === null || val === undefined || Number.isNaN(Number(val))) {
+        return "\u2014";
+      }
+      return Number(val).toFixed(1) + " GB free";
+    }
+
     function formatUptime(seconds) {
       if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
         return "\u2014";
@@ -899,7 +906,7 @@
     const SYSTEM_HEALTH_ROWS = [
       { key: "cpu_percent", label: "CPU", formatter: formatPercent },
       { key: "memory_percent", label: "Memory", formatter: formatPercent },
-      { key: "disk_percent", label: "Disk", formatter: formatPercent },
+      { key: "disk_free_gb", label: "Disk", formatter: formatDiskFree },
       { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
     ];
 

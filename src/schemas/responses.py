@@ -144,6 +144,8 @@ class HealthSystemResponse(TypedDict, total=False):
     cpu_percent: float | None
     memory_percent: float | None
     disk_percent: float | None
+    disk_free_gb: float | None
+    disk_total_gb: float | None
     uptime_seconds: int | None
 
 

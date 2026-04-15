@@ -120,7 +120,17 @@ class TestHealthSystem:
         assert isinstance(data["cpu_percent"], int | float)
         assert isinstance(data["memory_percent"], int | float)
         assert isinstance(data["disk_percent"], int | float)
+        assert isinstance(data["disk_free_gb"], int | float)
+        assert isinstance(data["disk_total_gb"], int | float)
         assert isinstance(data["uptime_seconds"], int)
+
+    def test_disk_free_gb_is_plausible(self, client):
+        """disk_free_gb must be non-negative and less than or equal to disk_total_gb."""
+        resp = client.get("/api/health/system")
+        data = resp.get_json()
+        assert data["disk_free_gb"] >= 0
+        assert data["disk_total_gb"] > 0
+        assert data["disk_free_gb"] <= data["disk_total_gb"]
 
     def test_psutil_unavailable(self, client, monkeypatch):
         """All metrics are None when psutil import fails."""
@@ -141,6 +151,8 @@ class TestHealthSystem:
         assert data["cpu_percent"] is None
         assert data["memory_percent"] is None
         assert data["disk_percent"] is None
+        assert data["disk_free_gb"] is None
+        assert data["disk_total_gb"] is None
         assert data["uptime_seconds"] is None
 
 
