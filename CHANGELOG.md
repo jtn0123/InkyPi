@@ -1,6 +1,119 @@
 # CHANGELOG
 
 
+## v0.59.0 (2026-04-15)
+
+### Bug Fixes
+
+- **ux**: Show disk free GB in system health table instead of bare percent (JTN-585)
+  ([#505](https://github.com/jtn0123/InkyPi/pull/505),
+  [`c8692ee`](https://github.com/jtn0123/InkyPi/commit/c8692eeac52237976e4a64d6b1a7cca3f37f4fa2))
+
+- Add disk_free_gb and disk_total_gb to /api/health/system response - Swap the Disk row in
+  buildSystemHealthTable from disk_percent→disk_free_gb with a new formatDiskFree formatter that
+  renders "X.X GB free" - Bump bench-table font-size from 0.92em to var(--text-sm) (14px) and header
+  font-size to var(--text-2xs) for better readability - Update HealthSystemResponse TypedDict and
+  openapi.json to include new fields - Add unit tests confirming disk_free_gb is plausible and
+  psutil-unavailable path - Extend test_diagnostics_tables.py to assert "GB free" qualifier is
+  rendered
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- **ui**: Add floating debug console, rename from 'Error log' (JTN-587)
+  ([#503](https://github.com/jtn0123/InkyPi/pull/503),
+  [`404a311`](https://github.com/jtn0123/InkyPi/commit/404a3118ba638a644dc04903873543c03ad1cfc0))
+
+Introduce a floating bottom-left debug-console button and panel that captures client-side JS errors.
+  The feature is labelled "Debug console" throughout (button title, aria-label, panel heading) to
+  avoid confusion with the server-side "Error Logs" page. Raw callback-name entries like
+  `useWebSocket.onerror` are filtered out as they carry no user-facing value.
+
+- Add `debug_console.js` with isUsefulMessage filter and ARIA semantics - Add `.debug-console-*` CSS
+  classes to `_layout.css` - Wire script into `base.html` (deferred, alongside other client
+  reporters) - Allowlist `debug_console.js` in `.gitignore` (scripts allowlist pattern) - Add
+  `tests/static/test_debug_console.py` with 8 assertions (label, CSS, template inclusion, no old
+  'Error log' text in rendered pages)
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: Per-plugin preview->save round-trip (JTN-723)
+  ([#498](https://github.com/jtn0123/InkyPi/pull/498),
+  [`e59b7ed`](https://github.com/jtn0123/InkyPi/commit/e59b7ed7fccfe299cfac4a2eb75be06fcb79091a))
+
+* test(journey): per-plugin preview->save round-trip (JTN-723)
+
+Adds a Playwright journey that extends the JTN-691 preview smoke into the full configure -> preview
+  -> save -> navigate-away -> return -> assert-persisted cycle. Parametrized over 4 offline-capable
+  plugins (clock, todo_list, countdown, year_progress) so each plugin is an independent test id -- a
+  weather regression cannot mask a clock regression.
+
+Step-by-step assertions, each with its own failure site: - Form accepts the typed values (catches
+  input-binding regressions). - Update Preview flips #previewImage src (inherits JTN-681 coverage).
+  - Save fires the pluginSettingsSaved HX-Trigger CustomEvent. - After navigate-away + return, every
+  submitted field re-hydrates with the submitted value (the round-trip assertion that motivates
+  JTN-723). - Second Update Preview re-renders cleanly (deterministic-input stability).
+
+These tests explicitly click buttons marked data-test-skip-click="true" by JTN-698 -- that attribute
+  is advisory for the click-sweep, not a hard skip for targeted tests. Teardown removes the
+  <plugin>_saved_settings instance the save path writes onto the Default playlist so the journey
+  does not leak state into sibling tests.
+
+Also: - Extends tests/integration/fixtures/plugin_inputs.py with a countdown entry (title + date) to
+  cover the text+date input pair. - Registers the pytest journey marker in pytest.ini (epic
+  JTN-719).
+
+Epic: JTN-719
+
+Closes: JTN-723
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: register journey test in UI_BROWSER_TESTS skip set (JTN-723)
+
+The journey file needs the same Playwright-availability gate used by its sibling preview-smoke test
+  (JTN-691). Without this entry the pytest job in CI -- which deliberately does not install Chromium
+  -- errors out at fixture setup instead of gracefully ignoring the test module.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **journey**: Playlist round-trip with reorder + delete (JTN-721)
+  ([#496](https://github.com/jtn0123/InkyPi/pull/496),
+  [`a614a16`](https://github.com/jtn0123/InkyPi/commit/a614a16602508d4afef8f3cce24c42ba2261391e))
+
+* test(journey): playlist round-trip with reorder + delete (JTN-721)
+
+Adds the second journey test under epic JTN-719: creates a uniquely-named playlist, seeds 3 plugin
+  instances, exercises the keyboard reorder path (ArrowUp moves the 3rd item to the top), deletes
+  the new middle item via the UI confirm modal, then reloads the page and asserts the remaining two
+  instances are in the expected post-reorder/post-delete order. Persistence through reload is the
+  critical correctness check — it catches silent "save was a no-op" regressions.
+
+Also registers the `journey` marker in pytest.ini so the new category doesn't trigger
+  PytestUnknownMarkWarning. Bootstraps the `journeys/` package with an empty `__init__.py` (sibling
+  batch-4 tests will share it).
+
+Gated by SKIP_BROWSER=1 / SKIP_UI=1. Teardown DELETEs the test playlist via the Flask client.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ci): gate JTN-721 journey test on SKIP_BROWSER
+
+Add `test_playlist_roundtrip.py` to the `UI_BROWSER_TESTS` allowlist so `pytest_ignore_collect`
+  excludes it in the main Tests job (which does not install Playwright Chromium). The module-level
+  `pytest.mark.skipif` only kicks in post-collection, which is too late — `browser_page` tries to
+  launch Chromium during fixture setup and fails with the install banner.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.58.0 (2026-04-15)
 
 ### Features
