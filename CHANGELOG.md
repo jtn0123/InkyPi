@@ -1,6 +1,114 @@
 # CHANGELOG
 
 
+## v0.51.10 (2026-04-15)
+
+### Bug Fixes
+
+- **install**: Verify wheelhouse integrity after extraction (JTN-697)
+  ([#482](https://github.com/jtn0123/InkyPi/pull/482),
+  [`0fbc3bb`](https://github.com/jtn0123/InkyPi/commit/0fbc3bb0d6d31fd78ae139177b71cb0269fd5f29))
+
+fetch_wheelhouse previously only checked that at least one .whl existed after extracting the
+  tarball. A truncated-but-decompressing tarball can leave a zero-byte numpy-*.whl behind; pip
+  "installs" it and the ImportError only surfaces on first display refresh.
+
+Add a two-layer integrity gate after extraction:
+
+1. Per-wheel sha256 manifest (preferred). build-wheelhouse.yml now emits <tarball>.manifest.sha256
+  alongside the tarball — one sha256sum line per wheel with basenames only. fetch_wheelhouse
+  downloads the manifest when available and runs `sha256sum -c` (or shasum -a 256 -c) against every
+  extracted wheel. Any mismatch falls back to source install.
+
+2. Structural fallback (for releases predating the manifest). Every extracted wheel must be
+  non-empty and must pass `python -m zipfile -l` so pip never sees a malformed archive.
+
+Any failure path keeps the existing rm -rf + return 1 contract so the caller transparently falls
+  back to source install.
+
+Tests: - test_fetch_wheelhouse_verifies_integrity — structural assertions on _common.sh (empty
+  guard, zipfile check, manifest verification, ordering against WHEELHOUSE_DIR assignment). -
+  test_fetch_wheelhouse_rejects_empty_wheel_integration — end-to-end: builds a tarball containing a
+  0-byte wheel, stubs curl/uname, sources _common.sh, asserts fetch_wheelhouse exits 1 with
+  WHEELHOUSE_DIR empty. - test_workflow_publishes_per_wheel_manifest — guards the new manifest
+  output in build-wheelhouse.yml.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **update**: Trap-cleanup lockfile + record failure cause (JTN-704)
+  ([#484](https://github.com/jtn0123/InkyPi/pull/484),
+  [`3d080bb`](https://github.com/jtn0123/InkyPi/commit/3d080bb51eadcf76b93cb87c584231f2deb3de83))
+
+Previously, `install/update.sh` only removed `/var/lib/inkypi/.install-in-progress` on the success
+  path. Any non-zero exit (OOM, pip failure, CSS build failure, network hiccup, signal) orphaned the
+  lockfile, which `inkypi.service`'s ExecStartPre refuses to accept, leaving the service permanently
+  disabled until the user `rm`'d it by hand. Worse, the *reason* for the failure was only in the
+  journal — nothing the UI could surface.
+
+This inverts the policy:
+
+* EXIT trap now *unconditionally* removes the lockfile on every exit (success, explicit `exit N`,
+  errexit, SIGINT, SIGTERM, SIGHUP). * On non-zero exit the trap writes
+  `/var/lib/inkypi/.last-update-failure` with a JSON record containing `timestamp`, `exit_code`,
+  `last_command`, and `recent_journal_lines` for UI / diagnostics consumption. JSON is written
+  atomically (tmpfile + mv) so partial writes are impossible. * On success exit the trap clears any
+  stale failure record so downstream consumers see a clean signal. * The old `_lockfile_keep`
+  sentinel is removed — all `exit 1` paths now funnel through the same trap. * `_current_step` is
+  updated before each top-level phase so the failure record pinpoints which step failed.
+
+Test hooks are behind env vars that production callers never set:
+
+* `INKYPI_UPDATE_TEST_FAIL_AT=<step>`: `exit 97` at the named step. *
+  `INKYPI_UPDATE_TEST_EXIT_AFTER_TRAP=1`: `exit 0` right after trap install, exercising the
+  success-path trap branch. * `INKYPI_LOCKFILE_DIR=<path>`: redirect state writes to a tempdir.
+
+Tests:
+
+* `tests/integration/test_update_failure_recovery.py` — drives `update.sh` with the env hooks and
+  asserts (a) lockfile cleared on failure, (b) `.last-update-failure` is valid JSON with the
+  required keys + correct exit_code / last_command, (c) success path writes nothing and clears stale
+  failure records. * `tests/unit/test_install_scripts.py` — `test_update_has_exit_trap_for_lockfile`
+  updated for the new unconditional-cleanup policy; new
+  `test_update_exposes_test_failure_injection_env_var` structural check.
+
+Closes JTN-704.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Form round-trip persistence (JTN-690) ([#478](https://github.com/jtn0123/InkyPi/pull/478),
+  [`e47c0b7`](https://github.com/jtn0123/InkyPi/commit/e47c0b78fdcb91c13d6eb445d2b02223343dbd31))
+
+* test(ui): form round-trip persistence (JTN-690)
+
+Adds a Playwright integration test that catches "POST returns 200 but didn't actually save" bugs — a
+  class invisible to the existing handler audit, click-sweep, client-log tripwire, and axe-a11y
+  layers.
+
+For each covered form the test: 1. Navigates to /settings and captures a baseline. 2. Fills
+  known-good values across text, select, slider, and checkbox inputs. 3. Submits. 4. Navigates away
+  to '/' and back to force a full template re-render from disk (not in-memory client state). 5.
+  Asserts the submitted values are re-populated. 6. Restores the baseline in teardown via
+  try/finally so the test is idempotent on failure.
+
+A second test specifically exercises the unchecked-checkbox round-trip (HTML forms omit unchecked
+  checkboxes from the POST body — a common source of "toggle-off didn't stick" bugs).
+
+Slice 4 of the pre-dogfooding UI/UX coverage plan.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(tests): skip test_form_roundtrip when playwright browser missing (JTN-690)
+
+Add test_form_roundtrip.py to UI_BROWSER_TESTS so CI runners without chromium installed skip it
+  instead of erroring at browser_page fixture setup. Matches prior fixes in PRs #475/#477.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.9 (2026-04-14)
 
 ### Bug Fixes
