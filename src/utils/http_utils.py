@@ -62,7 +62,30 @@ if TYPE_CHECKING:  # pragma: no cover — type hints only
     import requests
     from urllib3.util.retry import Retry
 
+from utils.form_utils import sanitize_response_value
+
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_details(details: dict[str, Any]) -> dict[str, Any]:
+    """Recursively HTML-escape all string leaf values in *details*.
+
+    Non-string scalars (int, bool, float, None) pass through unchanged.
+    Nested dicts are traversed recursively.  Lists are sanitized element-wise.
+    This is defense-in-depth: any user-derived string reaching the JSON error
+    envelope will have angle brackets and ampersands escaped before serialisation.
+    """
+
+    def _sanitize(value: Any) -> Any:
+        if isinstance(value, str):
+            return sanitize_response_value(value)
+        if isinstance(value, dict):
+            return {k: _sanitize(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_sanitize(item) for item in value]
+        return value
+
+    return {k: _sanitize(v) for k, v in details.items()}
 
 
 class APIError(Exception):
@@ -136,7 +159,7 @@ def json_error(
     if code is not None:
         payload["code"] = code
     if details is not None:
-        payload["details"] = details
+        payload["details"] = _sanitize_details(details)
     rid = _get_or_set_request_id()
     if rid is not None:
         payload["request_id"] = rid

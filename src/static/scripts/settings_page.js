@@ -361,6 +361,47 @@
       setDeviceActionModalOpen("shutdownConfirmModal", false);
     }
 
+    // JTN-589: What's New modal — shows release notes for the current version.
+    let _lastWhatsNewTrigger = null;
+
+    function openWhatsNew(event) {
+      const modal = document.getElementById("whatsNewModal");
+      if (!modal) return;
+      _lastWhatsNewTrigger = event?.currentTarget || null;
+      modal.hidden = false;
+      modal.style.display = "flex";
+      modal.classList.add("is-open");
+      const ui = globalThis.InkyPiUI;
+      if (ui?.syncModalOpenState) {
+        ui.syncModalOpenState();
+      } else {
+        document.body.classList.add("modal-open");
+      }
+      const focusable = modal.querySelector(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable) setTimeout(() => focusable.focus(), 0);
+    }
+
+    function closeWhatsNew() {
+      const modal = document.getElementById("whatsNewModal");
+      if (!modal) return;
+      modal.hidden = true;
+      modal.style.display = "none";
+      modal.classList.remove("is-open");
+      const ui = globalThis.InkyPiUI;
+      if (ui?.syncModalOpenState) {
+        ui.syncModalOpenState();
+      } else {
+        const anyOpen = document.querySelector(".modal.is-open");
+        document.body.classList.toggle("modal-open", !!anyOpen);
+      }
+      if (_lastWhatsNewTrigger) {
+        try { _lastWhatsNewTrigger.focus(); } catch (_e) { /* ignore */ }
+        _lastWhatsNewTrigger = null;
+      }
+    }
+
     function isDeviceActionModalOpen(modalId) {
       const modal = document.getElementById(modalId);
       return !!(modal && !modal.hidden);
@@ -623,6 +664,8 @@
       const checkBtn = document.getElementById("checkUpdatesBtn");
       const notesContainer = document.getElementById("releaseNotesContainer");
       const notesBody = document.getElementById("releaseNotesBody");
+      const whatsNewBtn = document.getElementById("whatsNewBtn");
+      const whatsNewBody = document.getElementById("whatsNewBody");
 
       // Show spinner + disable button while checking (JTN-352)
       if (checkBtn) {
@@ -653,6 +696,13 @@
           notesContainer.hidden = false;
         } else if (notesContainer) {
           notesContainer.hidden = true;
+        }
+        // JTN-589: Show "What's New" button when release notes are available
+        if (data.release_notes && whatsNewBtn && whatsNewBody) {
+          whatsNewBody.textContent = data.release_notes;
+          whatsNewBtn.hidden = false;
+        } else if (whatsNewBtn) {
+          whatsNewBtn.hidden = true;
         }
       } catch (e) {
         console.warn("Version check failed:", e);
@@ -954,6 +1004,13 @@
       return Number(val).toFixed(1) + "%";
     }
 
+    function formatDiskFree(val) {
+      if (val === null || val === undefined || Number.isNaN(Number(val))) {
+        return "\u2014";
+      }
+      return Number(val).toFixed(1) + " GB free";
+    }
+
     function formatUptime(seconds) {
       if (seconds === null || seconds === undefined || Number.isNaN(Number(seconds))) {
         return "\u2014";
@@ -970,7 +1027,7 @@
     const SYSTEM_HEALTH_ROWS = [
       { key: "cpu_percent", label: "CPU", formatter: formatPercent },
       { key: "memory_percent", label: "Memory", formatter: formatPercent },
-      { key: "disk_percent", label: "Disk", formatter: formatPercent },
+      { key: "disk_free_gb", label: "Disk", formatter: formatDiskFree },
       { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
     ];
 
@@ -1358,6 +1415,9 @@
       document.getElementById("refreshIsolationBtn")?.addEventListener("click", refreshIsolation);
       document.getElementById("checkUpdatesBtn")?.addEventListener("click", checkForUpdates);
       document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
+      // JTN-589: What's New modal
+      document.getElementById("whatsNewBtn")?.addEventListener("click", openWhatsNew);
+      document.getElementById("closeWhatsNewModalBtn")?.addEventListener("click", closeWhatsNew);
       // JTN-621: Reboot/Shutdown are gated behind a confirmation modal so
       // an accidental touch doesn't make the device unreachable.
       document.getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm);
@@ -1380,7 +1440,11 @@
       // via keyboard was to tab to the Cancel button.
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
-        if (isDeviceActionModalOpen("rebootConfirmModal")) {
+        const whatsNewModal = document.getElementById("whatsNewModal");
+        if (whatsNewModal && !whatsNewModal.hidden) {
+          event.preventDefault();
+          closeWhatsNew();
+        } else if (isDeviceActionModalOpen("rebootConfirmModal")) {
           event.preventDefault();
           closeRebootConfirm();
         } else if (isDeviceActionModalOpen("shutdownConfirmModal")) {
@@ -1392,10 +1456,12 @@
         }
       });
       globalThis.addEventListener("click", (event) => {
+        const whatsNewModal = document.getElementById("whatsNewModal");
         const rebootModal = document.getElementById("rebootConfirmModal");
         const shutdownModal = document.getElementById("shutdownConfirmModal");
         const rollbackModal = document.getElementById("rollbackConfirmModal");
-        if (event.target === rebootModal) closeRebootConfirm();
+        if (event.target === whatsNewModal) closeWhatsNew();
+        else if (event.target === rebootModal) closeRebootConfirm();
         else if (event.target === shutdownModal) closeShutdownConfirm();
         else if (event.target === rollbackModal) closeRollbackConfirm();
       });

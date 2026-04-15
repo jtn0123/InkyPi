@@ -1,6 +1,316 @@
 # CHANGELOG
 
 
+## v0.59.0 (2026-04-15)
+
+### Bug Fixes
+
+- **ux**: Show disk free GB in system health table instead of bare percent (JTN-585)
+  ([#505](https://github.com/jtn0123/InkyPi/pull/505),
+  [`c8692ee`](https://github.com/jtn0123/InkyPi/commit/c8692eeac52237976e4a64d6b1a7cca3f37f4fa2))
+
+- Add disk_free_gb and disk_total_gb to /api/health/system response - Swap the Disk row in
+  buildSystemHealthTable from disk_percent→disk_free_gb with a new formatDiskFree formatter that
+  renders "X.X GB free" - Bump bench-table font-size from 0.92em to var(--text-sm) (14px) and header
+  font-size to var(--text-2xs) for better readability - Update HealthSystemResponse TypedDict and
+  openapi.json to include new fields - Add unit tests confirming disk_free_gb is plausible and
+  psutil-unavailable path - Extend test_diagnostics_tables.py to assert "GB free" qualifier is
+  rendered
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Features
+
+- **ui**: Add floating debug console, rename from 'Error log' (JTN-587)
+  ([#503](https://github.com/jtn0123/InkyPi/pull/503),
+  [`404a311`](https://github.com/jtn0123/InkyPi/commit/404a3118ba638a644dc04903873543c03ad1cfc0))
+
+Introduce a floating bottom-left debug-console button and panel that captures client-side JS errors.
+  The feature is labelled "Debug console" throughout (button title, aria-label, panel heading) to
+  avoid confusion with the server-side "Error Logs" page. Raw callback-name entries like
+  `useWebSocket.onerror` are filtered out as they carry no user-facing value.
+
+- Add `debug_console.js` with isUsefulMessage filter and ARIA semantics - Add `.debug-console-*` CSS
+  classes to `_layout.css` - Wire script into `base.html` (deferred, alongside other client
+  reporters) - Allowlist `debug_console.js` in `.gitignore` (scripts allowlist pattern) - Add
+  `tests/static/test_debug_console.py` with 8 assertions (label, CSS, template inclusion, no old
+  'Error log' text in rendered pages)
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: Per-plugin preview->save round-trip (JTN-723)
+  ([#498](https://github.com/jtn0123/InkyPi/pull/498),
+  [`e59b7ed`](https://github.com/jtn0123/InkyPi/commit/e59b7ed7fccfe299cfac4a2eb75be06fcb79091a))
+
+* test(journey): per-plugin preview->save round-trip (JTN-723)
+
+Adds a Playwright journey that extends the JTN-691 preview smoke into the full configure -> preview
+  -> save -> navigate-away -> return -> assert-persisted cycle. Parametrized over 4 offline-capable
+  plugins (clock, todo_list, countdown, year_progress) so each plugin is an independent test id -- a
+  weather regression cannot mask a clock regression.
+
+Step-by-step assertions, each with its own failure site: - Form accepts the typed values (catches
+  input-binding regressions). - Update Preview flips #previewImage src (inherits JTN-681 coverage).
+  - Save fires the pluginSettingsSaved HX-Trigger CustomEvent. - After navigate-away + return, every
+  submitted field re-hydrates with the submitted value (the round-trip assertion that motivates
+  JTN-723). - Second Update Preview re-renders cleanly (deterministic-input stability).
+
+These tests explicitly click buttons marked data-test-skip-click="true" by JTN-698 -- that attribute
+  is advisory for the click-sweep, not a hard skip for targeted tests. Teardown removes the
+  <plugin>_saved_settings instance the save path writes onto the Default playlist so the journey
+  does not leak state into sibling tests.
+
+Also: - Extends tests/integration/fixtures/plugin_inputs.py with a countdown entry (title + date) to
+  cover the text+date input pair. - Registers the pytest journey marker in pytest.ini (epic
+  JTN-719).
+
+Epic: JTN-719
+
+Closes: JTN-723
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test: register journey test in UI_BROWSER_TESTS skip set (JTN-723)
+
+The journey file needs the same Playwright-availability gate used by its sibling preview-smoke test
+  (JTN-691). Without this entry the pytest job in CI -- which deliberately does not install Chromium
+  -- errors out at fixture setup instead of gracefully ignoring the test module.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **journey**: Playlist round-trip with reorder + delete (JTN-721)
+  ([#496](https://github.com/jtn0123/InkyPi/pull/496),
+  [`a614a16`](https://github.com/jtn0123/InkyPi/commit/a614a16602508d4afef8f3cce24c42ba2261391e))
+
+* test(journey): playlist round-trip with reorder + delete (JTN-721)
+
+Adds the second journey test under epic JTN-719: creates a uniquely-named playlist, seeds 3 plugin
+  instances, exercises the keyboard reorder path (ArrowUp moves the 3rd item to the top), deletes
+  the new middle item via the UI confirm modal, then reloads the page and asserts the remaining two
+  instances are in the expected post-reorder/post-delete order. Persistence through reload is the
+  critical correctness check — it catches silent "save was a no-op" regressions.
+
+Also registers the `journey` marker in pytest.ini so the new category doesn't trigger
+  PytestUnknownMarkWarning. Bootstraps the `journeys/` package with an empty `__init__.py` (sibling
+  batch-4 tests will share it).
+
+Gated by SKIP_BROWSER=1 / SKIP_UI=1. Teardown DELETEs the test playlist via the Flask client.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(ci): gate JTN-721 journey test on SKIP_BROWSER
+
+Add `test_playlist_roundtrip.py` to the `UI_BROWSER_TESTS` allowlist so `pytest_ignore_collect`
+  excludes it in the main Tests job (which does not install Playwright Chromium). The module-level
+  `pytest.mark.skipif` only kicks in post-collection, which is too late — `browser_page` tries to
+  launch Chromium during fixture setup and fails with the install banner.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.58.0 (2026-04-15)
+
+### Features
+
+- **a11y**: Add role="dialog" to What's New modal (JTN-589)
+  ([#501](https://github.com/jtn0123/InkyPi/pull/501),
+  [`1ac381e`](https://github.com/jtn0123/InkyPi/commit/1ac381e4d492a802197fb3880a4f54659c540749))
+
+The changelog/release-notes panel lacked role="dialog", aria-modal="true", and aria-labelledby,
+  making it invisible to screen readers and automated test tools that query [role=dialog].
+
+- Added What's New modal to settings.html with full ARIA attributes - Added "What's New" trigger
+  button in the update panel (shown only when release notes are available) - Wired openWhatsNew /
+  closeWhatsNew in settings_page.js with focus management and Escape + backdrop-click dismissal -
+  Added 9 static regression tests in tests/static/test_whats_new_dialog_role.py
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **ui**: Replace window.confirm with in-app modal on /errors Clear All (JTN-586)
+  ([#502](https://github.com/jtn0123/InkyPi/pull/502),
+  [`42ec254`](https://github.com/jtn0123/InkyPi/commit/42ec254bdbd2fd836d29f28ec048abb591467529))
+
+Build the /errors page (GET /errors, POST /errors/clear) with an in-app confirmation modal that
+  matches the History page's clear-all pattern, eliminating the native window.confirm() that blocked
+  tabs and broke agent-browser sessions. Add 15 tests covering page render, modal markup, JS source,
+  and the clear endpoint.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
+## v0.57.0 (2026-04-15)
+
+### Features
+
+- **security**: Html-escape string leaves in json_error details (JTN-657)
+  ([#500](https://github.com/jtn0123/InkyPi/pull/500),
+  [`89ce9ec`](https://github.com/jtn0123/InkyPi/commit/89ce9ec3acae2435052fe5de939985f29d328d2b))
+
+Defense-in-depth: user-derived strings entering the `details` dict of the JSON error envelope are
+  now recursively sanitized via `sanitize_response_value` (HTML-escaping angle brackets and
+  ampersands) before serialisation. This closes the gap where a future `innerHTML` slip in the
+  frontend could become stored XSS. Non-string scalars pass through unchanged; the response envelope
+  shape is unaffected.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: First-run setup end-to-end (JTN-720)
+  ([#497](https://github.com/jtn0123/InkyPi/pull/497),
+  [`41260d6`](https://github.com/jtn0123/InkyPi/commit/41260d6b76899731626b03dfe1e4692bea7dce24))
+
+* test(journey): first-run setup end-to-end (JTN-720)
+
+First journey test under epic JTN-719. Unlike the existing click-sweep tests (JTN-679/693/698),
+  which only assert handlers fire without error, this drives a complete multi-step user flow and
+  asserts the end state at every checkpoint:
+
+1. Fresh dashboard load (no playlist instances). 2. Save clock plugin settings; verify persistence
+  to Default playlist. 3. Schedule a second clock instance with an explicit refresh interval via
+  /add_plugin; verify cadence stored as seconds. 4. Trigger /update_now (refresh_task idle in tests
+  → synchronous direct render path, which writes a history entry and sidecar). 5. Verify
+  /api/diagnostics exposes the refresh_task snapshot shape (running / last_run_ts / last_error) with
+  no recorded error. 6. Confirm /history renders the new entry and the newest sidecar has
+  plugin_id=clock with a fresh refresh_time.
+
+A companion browser-level test (skipped under SKIP_UI / SKIP_BROWSER) verifies the history page DOM
+  after the same setup, catching template regressions without duplicating data-model assertions.
+
+Adds `journey` marker to pytest.ini and creates `tests/integration/journeys/` as the home for the
+  remaining 9 journeys in the epic. __init__.py is intentionally minimal so sibling journey tests
+  from Batch 4 peers (JTN-721/722/723/724) can coexist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(test): skip UI journey when Playwright chromium is unavailable
+
+CI's main pytest job doesn't install Playwright browsers, so the browser-level companion test
+  previously errored at fixture setup instead of skipping cleanly. Mirror the detection already used
+  in tests/conftest.py to skip when chromium isn't installed, keeping the API-only journey running
+  in every lane.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.56.0 (2026-04-15)
+
+### Features
+
+- **observability**: In-app status badge wired to /api/diagnostics (JTN-709)
+  ([#494](https://github.com/jtn0123/InkyPi/pull/494),
+  [`49f0b09`](https://github.com/jtn0123/InkyPi/commit/49f0b09435dd775e577c0ca13fb0805ae818bd9c))
+
+* feat(observability): in-app status badge wired to /api/diagnostics (JTN-709)
+
+Surfaces a tiny fixed-position badge on every page that polls /api/diagnostics every 30s (plus on
+  page load and on visibilitychange) and flips to warning or error when something is wrong. Hidden
+  by default when healthy — no UI noise. Click opens a popover listing active issues with links to
+  /download-logs, the pretty diagnostics payload, and the settings updates page (when
+  last_update_failure is present).
+
+Server-side: /api/diagnostics now returns a `recent_client_log_errors` summary ({count_5m,
+  warn_count_5m, last_error_ts, window_seconds}) backed by a bounded 100-entry in-memory ring buffer
+  populated from /api/client-log POSTs. In-memory only; intentionally no disk persistence.
+
+Graceful degradation: 401/403 from /api/diagnostics hides the badge and stops polling (viewer isn't
+  on the local network). Tests can opt out with `<meta name="status-badge-disabled" content="1">`.
+
+JTN-707 supplied the diagnostics contract — this consumes it without breaking any existing fields.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(lint): ruff B007 + black formatting for JTN-709 tests
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.55.1 (2026-04-15)
+
+### Bug Fixes
+
+- **install**: Pin Waveshare driver + safe device.json mutation (JTN-701)
+  ([#492](https://github.com/jtn0123/InkyPi/pull/492),
+  [`b3c9214`](https://github.com/jtn0123/InkyPi/commit/b3c9214016ba2a1975008fb693c88d76b096b9a0))
+
+Two hardening changes in install/install.sh that made the installer fragile:
+
+1. fetch_waveshare_driver was pulling drivers from the `master` branch of waveshareteam/e-Paper. A
+  silent upstream change could brick a previously-working device on the next install. Introduce
+  install/waveshare-manifest.txt pinning every supported driver to a specific upstream commit sha +
+  expected sha256, and rewrite the fetch helper to verify the hash after download (fails fast on
+  mismatch).
+
+2. update_config mutated device.json with `sed` regexes — fragile on malformed input or unusual
+  whitespace and prone to silent corruption when the ending `}` is on its own line. Replace with a
+  small Python helper (install/_device_json.py) that uses json.load/json.dump, preserves unrelated
+  keys + their ordering, and writes atomically via tempfile + fsync + os.replace.
+
+Tests added to tests/unit/test_install_scripts.py: - waveshare manifest is sha-pinned (40-char git
+  sha + 64-char sha256 per row) - install.sh references the manifest + verifies sha256 + no longer
+  hard-codes /master/ - update_config contains no sed + delegates to _device_json.py - helper
+  preserves unrelated keys / ordering when setting display_type - helper keeps existing display_type
+  position when updating - helper rejects malformed JSON, non-object root, missing file, empty
+  display_type — and leaves a malformed file untouched (atomicity) - helper source uses tempfile +
+  os.replace + os.fsync
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **observability**: Unit-test log rotation (JTN-712)
+  ([#491](https://github.com/jtn0123/InkyPi/pull/491),
+  [`3ea723b`](https://github.com/jtn0123/InkyPi/commit/3ea723b7e8d028a394e8c4e7890b747c91d90df8))
+
+Rotation is load-bearing on the Pi Zero 2 W's 16GB SD, but no test exercised RotatingFileHandler
+  wiring or behavior. Runaway logging could silently fill the disk (see JTN-671 restart-loop
+  disk-wear context) and CI would not catch it.
+
+Adds tests/unit/test_log_rotation.py with 12 tests covering: * logging.conf declares a
+  [rotating_file] section with class RotatingFileHandler and non-zero maxBytes/backupCount (proves
+  rotation is configured, not defaulted). * read_rotation_config() rejects maxBytes=0,
+  backupCount=0, and a missing section — breaking the conf fails the test. * Actual rotation
+  behavior: emitting > maxBytes creates a .1 backup, primary file stays <= maxBytes, total files
+  capped at backupCount + 1. * Stress test: ~10x maxBytes forces many rotations, oldest files are
+  dropped, backupCount limit is respected. * Ordering: newest content in primary, oldest in backup.
+  * setup_logging() attaches a RotatingFileHandler when INKYPI_LOG_FILE is set, and does not when
+  unset.
+
+Minimal product-code additions to make rotation testable: * src/config/logging.conf: new
+  [rotating_file] section with maxBytes=1MB, backupCount=5 (not wired into fileConfig so default
+  behavior is unchanged — console-only). * src/app_setup/logging_setup.py: read_rotation_config()
+  and attach_rotating_file_handler() helpers; setup_logging() attaches the handler only when
+  INKYPI_LOG_FILE env var is set. Misconfigured rotation raises loudly rather than silently falling
+  back to an unbounded file.
+
+
+## v0.55.0 (2026-04-15)
+
+### Features
+
+- **dev**: Watch-mode CSS + asset rebuild script (JTN-713)
+  ([#490](https://github.com/jtn0123/InkyPi/pull/490),
+  [`1fb126e`](https://github.com/jtn0123/InkyPi/commit/1fb126e971f6f082949c9fb9e15d723da8474ca7))
+
+Add scripts/dev_watch.sh + scripts/_dev_watch_dispatch.py, a thin watchmedo-driven wrapper that
+  auto-runs build_css.py / build_assets.py when partials change. Debounces IDE save bursts (200 ms
+  window), logs one line per rebuild in the documented format, and exits cleanly on Ctrl+C. watchdog
+  is declared in requirements-dev.in as an optional dev convenience. Documented alongside
+  ./scripts/dev.sh in docs/development.md.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.54.0 (2026-04-15)
 
 ### Features

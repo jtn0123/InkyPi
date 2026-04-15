@@ -23,7 +23,7 @@
       "get": {
         "tags": ["Health"],
         "summary": "System health metrics",
-        "description": "Returns CPU, memory, and disk usage percentages plus uptime in seconds. Fields are null when psutil is not installed.",
+        "description": "Returns CPU, memory, and disk usage percentages, disk free/total GB, and uptime in seconds. Fields are null when psutil is not installed.",
         "operationId": "healthSystem",
         "responses": {
           "200": {
@@ -38,6 +38,8 @@
                   "cpu_percent": 12.4,
                   "memory_percent": 48.2,
                   "disk_percent": 31.0,
+                  "disk_free_gb": 9.8,
+                  "disk_total_gb": 31.3,
                   "uptime_seconds": 86400
                 }
               }
@@ -517,6 +519,18 @@
             "format": "float",
             "nullable": true,
             "description": "Disk usage percentage for root filesystem"
+          },
+          "disk_free_gb": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "description": "Free disk space in GB for root filesystem"
+          },
+          "disk_total_gb": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "description": "Total disk capacity in GB for root filesystem"
           },
           "uptime_seconds": {
             "type": "integer",

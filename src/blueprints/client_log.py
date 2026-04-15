@@ -25,6 +25,8 @@ import json
 import logging
 import os
 import threading
+import time
+from collections import deque
 from typing import Any
 
 from flask import Blueprint, Response
@@ -76,6 +78,73 @@ def reset_captured_reports() -> None:
     """Clear the process-wide list of captured client-log reports."""
     with _captured_lock:
         _captured_reports.clear()
+
+
+# ---------------------------------------------------------------------------
+# Recent-error ring buffer (JTN-709).
+#
+# The /api/diagnostics endpoint exposes a "recent_client_log_errors" summary so
+# the in-app status badge can flip to warning/error when the browser reports
+# problems. We keep a small bounded deque of ``(timestamp, level)`` pairs —
+# enough to answer "how many errors in the last 5 minutes?" without growing
+# unboundedly on a broken page. In-memory only; disk persistence would leak
+# across restarts for no added UX value.
+# ---------------------------------------------------------------------------
+_RECENT_BUFFER_MAX = 100
+_recent_errors: deque[tuple[float, str]] = deque(maxlen=_RECENT_BUFFER_MAX)
+_recent_lock = threading.Lock()
+
+
+def _record_recent(level: str) -> None:
+    """Append ``(now, level)`` to the recent-errors ring buffer."""
+    with _recent_lock:
+        _recent_errors.append((time.time(), level))
+
+
+def get_recent_error_summary(
+    now: float | None = None, *, window_seconds: int = 300
+) -> dict[str, Any]:
+    """Return a summary of recent client-log entries for diagnostics.
+
+    Shape::
+
+        {
+          "count_5m": int,           # entries with level == "error" in window
+          "warn_count_5m": int,      # entries with level == "warn" in window
+          "last_error_ts": float|None,  # epoch seconds of most recent "error"
+          "window_seconds": int
+        }
+
+    The window defaults to 300s (5 minutes). ``last_error_ts`` is the epoch
+    timestamp of the most recent *error* (not warn) entry in the buffer, or
+    None if the buffer contains no error entries at all.
+    """
+    cutoff = (time.time() if now is None else now) - float(window_seconds)
+    err_count = 0
+    warn_count = 0
+    last_error_ts: float | None = None
+    with _recent_lock:
+        for ts, level in _recent_errors:
+            if level == "error" and (last_error_ts is None or ts > last_error_ts):
+                last_error_ts = ts
+            if ts < cutoff:
+                continue
+            if level == "error":
+                err_count += 1
+            elif level == "warn":
+                warn_count += 1
+    return {
+        "count_5m": err_count,
+        "warn_count_5m": warn_count,
+        "last_error_ts": last_error_ts,
+        "window_seconds": int(window_seconds),
+    }
+
+
+def reset_recent_errors() -> None:
+    """Clear the recent-errors ring buffer (test helper)."""
+    with _recent_lock:
+        _recent_errors.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +220,12 @@ def _build_report(entry: dict[str, Any]) -> dict[str, object]:
 def _emit(report: dict[str, object]) -> None:
     """Emit a single validated report to the logger and (optionally) capture."""
     logger.warning("client log [%s]: %s", report["level"], json.dumps(report))
+    # Track every validated entry in the recent-errors ring buffer so the
+    # diagnostics endpoint (JTN-709) can surface "something is broken" to the
+    # in-app status badge.
+    level = report.get("level")
+    if isinstance(level, str):
+        _record_recent(level)
     if _capture_enabled():
         with _captured_lock:
             _captured_reports.append(dict(report))

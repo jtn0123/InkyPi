@@ -336,6 +336,33 @@ def _log_tail(max_lines: int = _LOG_TAIL_LINES) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Recent client-log errors (JTN-709)
+# ---------------------------------------------------------------------------
+
+
+def _recent_client_log_summary() -> dict[str, Any]:
+    """Return the client-log ring buffer summary for the status badge.
+
+    Surfaces ``count_5m`` / ``warn_count_5m`` / ``last_error_ts`` so the UI
+    can decide whether to flip the badge to warning/error. Returns a safe
+    all-zero shape if the module can't be imported (e.g. during early boot
+    or in test configurations that stub the blueprint).
+    """
+    try:
+        from blueprints.client_log import get_recent_error_summary
+
+        return get_recent_error_summary()
+    except Exception:
+        logger.exception("diagnostics: failed to read recent client-log errors")
+        return {
+            "count_5m": 0,
+            "warn_count_5m": 0,
+            "last_error_ts": None,
+            "window_seconds": 300,
+        }
+
+
+# ---------------------------------------------------------------------------
 # Route
 # ---------------------------------------------------------------------------
 
@@ -358,7 +385,13 @@ def api_diagnostics():
         "refresh_task": {"running": true, "last_run_ts": "...", "last_error": null},
         "plugin_health": {"clock": "ok", "weather": "fail"},
         "log_tail_100": ["..."],
-        "last_update_failure": null
+        "last_update_failure": null,
+        "recent_client_log_errors": {
+          "count_5m": 0,
+          "warn_count_5m": 0,
+          "last_error_ts": null,
+          "window_seconds": 300
+        }
       }
     """
     allowed, reason = _access_allowed()
@@ -376,5 +409,6 @@ def api_diagnostics():
         "plugin_health": _plugin_health_summary(),
         "log_tail_100": _log_tail(_LOG_TAIL_LINES),
         "last_update_failure": _read_last_update_failure(),
+        "recent_client_log_errors": _recent_client_log_summary(),
     }
     return jsonify(payload), 200

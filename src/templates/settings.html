@@ -200,6 +200,7 @@
                     <div class="update-actions">
                         <button type="button" id="checkUpdatesBtn" class="action-button compact"><span class="btn-spinner" aria-hidden="true"></span> Check for Updates</button>
                         <button type="button" id="startUpdateBtn" class="action-button compact" disabled>Update Now</button>
+                        <button type="button" id="whatsNewBtn" class="action-button compact" hidden>What's New</button>
                     </div>
                 </div>
 
@@ -385,6 +386,16 @@
     </div>
 
     <button type="button" class="action-button settings-logs-toggle" id="settingsLogsToggle">Show Logs</button>
+
+    <!-- What's New modal (JTN-589) -->
+    <div id="whatsNewModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="whatsNewModalTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeWhatsNewModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="whatsNewModalTitle">What's New</h2>
+            <div class="separator"></div>
+            <div id="whatsNewBody" class="update-release-notes-body"></div>
+        </div>
+    </div>
 
     <!-- Reboot confirmation modal (JTN-621) -->
     <div id="rebootConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rebootConfirmTitle" hidden>

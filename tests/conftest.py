@@ -40,7 +40,9 @@ UI_BROWSER_TESTS = {
     "test_toggle_reflection.py",
     "test_layout_overlap.py",
     "test_plugin_preview_smoke.py",
+    "test_plugin_preview_save_roundtrip.py",
     "test_form_roundtrip.py",
+    "test_playlist_roundtrip.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
@@ -273,6 +275,7 @@ def flask_app(device_config_dev, monkeypatch):
     from blueprints.apikeys import apikeys_bp
     from blueprints.csp_report import csp_report_bp
     from blueprints.diagnostics import diagnostics_bp
+    from blueprints.errors import errors_bp
     from blueprints.events import events_bp
     from blueprints.history import history_bp
     from blueprints.main import main_bp
@@ -341,6 +344,7 @@ def flask_app(device_config_dev, monkeypatch):
     # Register routes
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
+    app.register_blueprint(errors_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(plugin_history_bp)
