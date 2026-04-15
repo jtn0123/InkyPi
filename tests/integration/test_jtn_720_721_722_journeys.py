@@ -128,9 +128,9 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     assert "Preview the current display" in page.locator("body").inner_text()
 
     navigate_and_wait(page, live_server, "/playlist")
-    assert "No plugin instances in this playlist yet." in page.locator(
-        "body"
-    ).inner_text()
+    assert (
+        "No plugin instances in this playlist yet." in page.locator("body").inner_text()
+    )
 
     navigate_and_wait(page, live_server, "/plugin/clock")
     page.locator('button[data-open-modal="scheduleModal"]').click()

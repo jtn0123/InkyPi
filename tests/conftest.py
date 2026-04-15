@@ -44,6 +44,7 @@ UI_BROWSER_TESTS = {
     "test_form_roundtrip.py",
     "test_playlist_roundtrip.py",
     "test_api_key_roundtrip.py",
+    "test_jtn_720_721_722_journeys.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",

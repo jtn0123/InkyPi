@@ -41,9 +41,7 @@ def test_api_key_input_and_save(live_server, browser_page):
     page.on(
         "response",
         lambda resp: (
-            save_responses.append(resp.status)
-            if "/api-keys/save" in resp.url
-            else None
+            save_responses.append(resp.status) if "/api-keys/save" in resp.url else None
         ),
     )
 
