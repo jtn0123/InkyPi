@@ -27,6 +27,12 @@ types-requests==2.32.0.20241016
 black>=26.0,<27
 ruff>=0.6,<1
 
+# Dev watch-mode rebuilds (JTN-713) — provides the `watchmedo` CLI used by
+# scripts/dev_watch.sh to auto-rebuild CSS/JS bundles on file changes.
+# Not pinned in the compiled lockfile on purpose: it is an optional developer
+# convenience, not a CI requirement.
+watchdog>=4.0,<7
+
 # Browser / E2E testing
 playwright>=1.55,<2
 

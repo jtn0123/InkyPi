@@ -1,0 +1,124 @@
+/* In-app status badge (JTN-709) ------------------------------------------- */
+
+.status-badge {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 9000;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--status-badge-fg, rgb(255 255 255));
+    background: var(--status-badge-bg, #d97706);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.status-badge:hover,
+.status-badge:focus-visible {
+    transform: translateY(-1px);
+    outline: 2px solid var(--focus-ring, #60a5fa);
+    outline-offset: 2px;
+}
+
+.status-badge.hidden,
+.status-badge[hidden] {
+    display: none !important;
+}
+
+.status-badge-dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.95;
+}
+
+.status-badge.status-ok {
+    --status-badge-bg: #059669;
+}
+
+.status-badge.status-warning {
+    --status-badge-bg: #d97706;
+}
+
+.status-badge.status-error {
+    --status-badge-bg: #dc2626;
+    animation: status-badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-badge-pulse {
+    0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25); }
+    50% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-badge.status-error { animation: none; }
+}
+
+/* Popover ------------------------------------------------------------------ */
+
+.status-popover {
+    position: fixed;
+    bottom: 3.75rem;
+    right: 1rem;
+    z-index: 9001;
+    min-width: 16rem;
+    max-width: 22rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface-bg, #f9fafb);
+    color: var(--surface-fg, #111827);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+    font-size: 0.9rem;
+}
+
+.status-popover[hidden] { display: none; }
+
+.status-popover-heading {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.status-popover-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.5rem 0;
+}
+
+.status-popover-item {
+    padding: 0.25rem 0;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.status-popover-item:first-child { border-top: 0; }
+
+.status-popover-item.severity-error strong { color: #dc2626; }
+.status-popover-item.severity-warning strong { color: #d97706; }
+
+.status-popover-detail {
+    color: var(--muted-fg, #4b5563);
+}
+
+.status-popover-link,
+.status-popover-action {
+    color: var(--link-color, #2563eb);
+    text-decoration: underline;
+}
+
+.status-popover-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}

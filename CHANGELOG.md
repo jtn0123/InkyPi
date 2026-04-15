@@ -1,6 +1,173 @@
 # CHANGELOG
 
 
+## v0.57.0 (2026-04-15)
+
+### Features
+
+- **security**: Html-escape string leaves in json_error details (JTN-657)
+  ([#500](https://github.com/jtn0123/InkyPi/pull/500),
+  [`89ce9ec`](https://github.com/jtn0123/InkyPi/commit/89ce9ec3acae2435052fe5de939985f29d328d2b))
+
+Defense-in-depth: user-derived strings entering the `details` dict of the JSON error envelope are
+  now recursively sanitized via `sanitize_response_value` (HTML-escaping angle brackets and
+  ampersands) before serialisation. This closes the gap where a future `innerHTML` slip in the
+  frontend could become stored XSS. Non-string scalars pass through unchanged; the response envelope
+  shape is unaffected.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: First-run setup end-to-end (JTN-720)
+  ([#497](https://github.com/jtn0123/InkyPi/pull/497),
+  [`41260d6`](https://github.com/jtn0123/InkyPi/commit/41260d6b76899731626b03dfe1e4692bea7dce24))
+
+* test(journey): first-run setup end-to-end (JTN-720)
+
+First journey test under epic JTN-719. Unlike the existing click-sweep tests (JTN-679/693/698),
+  which only assert handlers fire without error, this drives a complete multi-step user flow and
+  asserts the end state at every checkpoint:
+
+1. Fresh dashboard load (no playlist instances). 2. Save clock plugin settings; verify persistence
+  to Default playlist. 3. Schedule a second clock instance with an explicit refresh interval via
+  /add_plugin; verify cadence stored as seconds. 4. Trigger /update_now (refresh_task idle in tests
+  → synchronous direct render path, which writes a history entry and sidecar). 5. Verify
+  /api/diagnostics exposes the refresh_task snapshot shape (running / last_run_ts / last_error) with
+  no recorded error. 6. Confirm /history renders the new entry and the newest sidecar has
+  plugin_id=clock with a fresh refresh_time.
+
+A companion browser-level test (skipped under SKIP_UI / SKIP_BROWSER) verifies the history page DOM
+  after the same setup, catching template regressions without duplicating data-model assertions.
+
+Adds `journey` marker to pytest.ini and creates `tests/integration/journeys/` as the home for the
+  remaining 9 journeys in the epic. __init__.py is intentionally minimal so sibling journey tests
+  from Batch 4 peers (JTN-721/722/723/724) can coexist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(test): skip UI journey when Playwright chromium is unavailable
+
+CI's main pytest job doesn't install Playwright browsers, so the browser-level companion test
+  previously errored at fixture setup instead of skipping cleanly. Mirror the detection already used
+  in tests/conftest.py to skip when chromium isn't installed, keeping the API-only journey running
+  in every lane.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.56.0 (2026-04-15)
+
+### Features
+
+- **observability**: In-app status badge wired to /api/diagnostics (JTN-709)
+  ([#494](https://github.com/jtn0123/InkyPi/pull/494),
+  [`49f0b09`](https://github.com/jtn0123/InkyPi/commit/49f0b09435dd775e577c0ca13fb0805ae818bd9c))
+
+* feat(observability): in-app status badge wired to /api/diagnostics (JTN-709)
+
+Surfaces a tiny fixed-position badge on every page that polls /api/diagnostics every 30s (plus on
+  page load and on visibilitychange) and flips to warning or error when something is wrong. Hidden
+  by default when healthy — no UI noise. Click opens a popover listing active issues with links to
+  /download-logs, the pretty diagnostics payload, and the settings updates page (when
+  last_update_failure is present).
+
+Server-side: /api/diagnostics now returns a `recent_client_log_errors` summary ({count_5m,
+  warn_count_5m, last_error_ts, window_seconds}) backed by a bounded 100-entry in-memory ring buffer
+  populated from /api/client-log POSTs. In-memory only; intentionally no disk persistence.
+
+Graceful degradation: 401/403 from /api/diagnostics hides the badge and stops polling (viewer isn't
+  on the local network). Tests can opt out with `<meta name="status-badge-disabled" content="1">`.
+
+JTN-707 supplied the diagnostics contract — this consumes it without breaking any existing fields.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(lint): ruff B007 + black formatting for JTN-709 tests
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.55.1 (2026-04-15)
+
+### Bug Fixes
+
+- **install**: Pin Waveshare driver + safe device.json mutation (JTN-701)
+  ([#492](https://github.com/jtn0123/InkyPi/pull/492),
+  [`b3c9214`](https://github.com/jtn0123/InkyPi/commit/b3c9214016ba2a1975008fb693c88d76b096b9a0))
+
+Two hardening changes in install/install.sh that made the installer fragile:
+
+1. fetch_waveshare_driver was pulling drivers from the `master` branch of waveshareteam/e-Paper. A
+  silent upstream change could brick a previously-working device on the next install. Introduce
+  install/waveshare-manifest.txt pinning every supported driver to a specific upstream commit sha +
+  expected sha256, and rewrite the fetch helper to verify the hash after download (fails fast on
+  mismatch).
+
+2. update_config mutated device.json with `sed` regexes — fragile on malformed input or unusual
+  whitespace and prone to silent corruption when the ending `}` is on its own line. Replace with a
+  small Python helper (install/_device_json.py) that uses json.load/json.dump, preserves unrelated
+  keys + their ordering, and writes atomically via tempfile + fsync + os.replace.
+
+Tests added to tests/unit/test_install_scripts.py: - waveshare manifest is sha-pinned (40-char git
+  sha + 64-char sha256 per row) - install.sh references the manifest + verifies sha256 + no longer
+  hard-codes /master/ - update_config contains no sed + delegates to _device_json.py - helper
+  preserves unrelated keys / ordering when setting display_type - helper keeps existing display_type
+  position when updating - helper rejects malformed JSON, non-object root, missing file, empty
+  display_type — and leaves a malformed file untouched (atomicity) - helper source uses tempfile +
+  os.replace + os.fsync
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **observability**: Unit-test log rotation (JTN-712)
+  ([#491](https://github.com/jtn0123/InkyPi/pull/491),
+  [`3ea723b`](https://github.com/jtn0123/InkyPi/commit/3ea723b7e8d028a394e8c4e7890b747c91d90df8))
+
+Rotation is load-bearing on the Pi Zero 2 W's 16GB SD, but no test exercised RotatingFileHandler
+  wiring or behavior. Runaway logging could silently fill the disk (see JTN-671 restart-loop
+  disk-wear context) and CI would not catch it.
+
+Adds tests/unit/test_log_rotation.py with 12 tests covering: * logging.conf declares a
+  [rotating_file] section with class RotatingFileHandler and non-zero maxBytes/backupCount (proves
+  rotation is configured, not defaulted). * read_rotation_config() rejects maxBytes=0,
+  backupCount=0, and a missing section — breaking the conf fails the test. * Actual rotation
+  behavior: emitting > maxBytes creates a .1 backup, primary file stays <= maxBytes, total files
+  capped at backupCount + 1. * Stress test: ~10x maxBytes forces many rotations, oldest files are
+  dropped, backupCount limit is respected. * Ordering: newest content in primary, oldest in backup.
+  * setup_logging() attaches a RotatingFileHandler when INKYPI_LOG_FILE is set, and does not when
+  unset.
+
+Minimal product-code additions to make rotation testable: * src/config/logging.conf: new
+  [rotating_file] section with maxBytes=1MB, backupCount=5 (not wired into fileConfig so default
+  behavior is unchanged — console-only). * src/app_setup/logging_setup.py: read_rotation_config()
+  and attach_rotating_file_handler() helpers; setup_logging() attaches the handler only when
+  INKYPI_LOG_FILE env var is set. Misconfigured rotation raises loudly rather than silently falling
+  back to an unbounded file.
+
+
+## v0.55.0 (2026-04-15)
+
+### Features
+
+- **dev**: Watch-mode CSS + asset rebuild script (JTN-713)
+  ([#490](https://github.com/jtn0123/InkyPi/pull/490),
+  [`1fb126e`](https://github.com/jtn0123/InkyPi/commit/1fb126e971f6f082949c9fb9e15d723da8474ca7))
+
+Add scripts/dev_watch.sh + scripts/_dev_watch_dispatch.py, a thin watchmedo-driven wrapper that
+  auto-runs build_css.py / build_assets.py when partials change. Debounces IDE save bursts (200 ms
+  window), logs one line per rebuild in the documented format, and exits cleanly on Ctrl+C. watchdog
+  is declared in requirements-dev.in as an optional dev convenience. Documented alongside
+  ./scripts/dev.sh in docs/development.md.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.54.0 (2026-04-15)
 
 ### Features

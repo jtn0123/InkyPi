@@ -2548,3 +2548,245 @@ class TestMemoryDiffWorkflow:
             "memray must be declared in install/requirements-dev.in so the "
             "memory-diff workflow can install it from the lockfile."
         )
+
+
+# ---- JTN-701: pinned Waveshare driver + safe device.json mutation ----
+
+
+class TestWaveshareManifest:
+    """JTN-701: install/waveshare-manifest.txt must sha-pin every supported
+    Waveshare display. install.sh refuses to install any driver not listed
+    here so a silent upstream change cannot break a working device."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.manifest_path = INSTALL_DIR / "waveshare-manifest.txt"
+        assert self.manifest_path.exists(), (
+            f"{self.manifest_path} must exist — install.sh reads it to verify "
+            "Waveshare drivers at a pinned commit sha."
+        )
+        self.rows = []
+        for line in self.manifest_path.read_text().splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            self.rows.append(stripped.split())
+
+    def test_manifest_has_entries(self):
+        assert len(self.rows) > 0, "manifest must contain at least one pinned driver"
+
+    def test_waveshare_manifest_is_sha_pinned(self):
+        """Every row: <driver_name> <40-char git sha> <64-char sha256>."""
+        sha_re = re.compile(r"^[0-9a-f]{40}$")
+        hash_re = re.compile(r"^[0-9a-f]{64}$")
+        for parts in self.rows:
+            assert (
+                len(parts) == 3
+            ), f"manifest row must have 3 columns (name, commit sha, sha256); got: {parts}"
+            name, commit_sha, sha256 = parts
+            assert name.endswith(".py"), f"driver name must end in .py: {name}"
+            assert sha_re.match(
+                commit_sha
+            ), f"commit sha for {name} must be 40 lowercase hex chars; got: {commit_sha}"
+            assert hash_re.match(
+                sha256
+            ), f"sha256 for {name} must be 64 lowercase hex chars; got: {sha256}"
+
+    def test_manifest_covers_common_displays(self):
+        """Regression guard: drop a widely-used display out of the manifest
+        only intentionally. epd7in3e (main InkyPi target) + epdconfig must stay."""
+        names = {parts[0] for parts in self.rows}
+        required = {"epd7in3e.py", "epdconfig.py"}
+        missing = required - names
+        assert not missing, f"manifest missing required drivers: {sorted(missing)}"
+
+    def test_manifest_has_no_duplicate_entries(self):
+        names = [parts[0] for parts in self.rows]
+        assert len(names) == len(set(names)), (
+            "duplicate driver entries in manifest: "
+            f"{sorted(n for n in names if names.count(n) > 1)}"
+        )
+
+
+class TestInstallShUsesPinManifestAndJsonHelper:
+    """JTN-701: install.sh must consult the manifest and must not mutate
+    device.json with sed."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("install.sh")
+
+    def test_install_references_waveshare_manifest(self):
+        assert (
+            "waveshare-manifest.txt" in self.content
+        ), "install.sh must read the pin manifest to verify Waveshare drivers."
+
+    def test_install_verifies_sha256_of_downloaded_drivers(self):
+        # The pin verification must actually compare hashes, not just look them up.
+        assert "sha256" in self.content.lower()
+        assert (
+            "sha256sum" in self.content or "shasum -a 256" in self.content
+        ), "install.sh must compute the downloaded driver's sha256 to verify the pin."
+
+    def test_install_pins_waveshare_url_to_commit_sha_not_master(self):
+        """The old URL hard-coded `/master/` — a rolling tag. The pinned version
+        must interpolate the commit sha from the manifest instead."""
+        old_url = (
+            "https://raw.githubusercontent.com/waveshareteam/e-Paper/master/"
+            "RaspberryPi_JetsonNano/python/lib/waveshare_epd/"
+        )
+        assert (
+            old_url not in self.content
+        ), "install.sh must not hard-code the `master` branch — that defeats the pin."
+
+    def test_device_json_mutation_uses_python_helper(self):
+        """update_config must NOT sed device.json. Must call the Python helper."""
+        match = re.search(
+            r"^update_config\(\)\s*\{(.*?)^\}",
+            self.content,
+            re.DOTALL | re.MULTILINE,
+        )
+        assert match, "update_config function not found in install.sh"
+        body = match.group(1)
+
+        # Strip comments so a mention like "previous sed-based" doesn't false-positive.
+        code_lines = [
+            line for line in body.splitlines() if not line.lstrip().startswith("#")
+        ]
+        code_only = "\n".join(code_lines)
+        assert not re.search(r"\bsed\b", code_only), (
+            "update_config must not run sed on device.json (JTN-701). "
+            "Use install/_device_json.py instead."
+        )
+        assert (
+            "_device_json.py" in body
+        ), "update_config must delegate to install/_device_json.py."
+        assert (
+            "set-display" in body
+        ), "update_config must call the set-display subcommand."
+
+
+class TestDeviceJsonHelper:
+    """JTN-701: install/_device_json.py is the sole supported device.json
+    mutation path. Must preserve unrelated keys and refuse malformed input."""
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.helper_path = INSTALL_DIR / "_device_json.py"
+        assert self.helper_path.exists(), f"{self.helper_path} must exist (JTN-701)"
+
+    def test_helper_is_valid_python(self):
+        compile(self.helper_path.read_text(), str(self.helper_path), "exec")
+
+    def _run(self, device_json_path, display_type):
+        import subprocess
+        import sys as _sys
+
+        cmd = [
+            _sys.executable,
+            str(self.helper_path),
+            "set-display",
+            display_type,
+            "--path",
+            str(device_json_path),
+        ]
+        return subprocess.run(cmd, capture_output=True, text=True)
+
+    def test_device_json_helper_preserves_unrelated_keys(self, tmp_path):
+        """Unit: load → set display → dump — every other key stays exactly
+        as-is (including ordering)."""
+        import json as _json
+
+        device_json = tmp_path / "device.json"
+        original = {
+            "name": "InkyPi",
+            "orientation": "horizontal",
+            "inverted_image": False,
+            "scheduler_sleep_time": 60,
+            "startup": True,
+        }
+        device_json.write_text(_json.dumps(original, indent=2))
+
+        result = self._run(device_json, "epd7in3e")
+        assert result.returncode == 0, f"helper failed: {result.stderr}"
+
+        loaded = _json.loads(device_json.read_text())
+        for k, v in original.items():
+            assert (
+                loaded[k] == v
+            ), f"helper clobbered key {k!r}: expected {v!r}, got {loaded.get(k)!r}"
+        assert loaded["display_type"] == "epd7in3e"
+        keys = list(loaded.keys())
+        assert keys[: len(original)] == list(
+            original.keys()
+        ), f"helper reordered existing keys; got {keys}"
+        assert keys[-1] == "display_type"
+
+    def test_device_json_helper_updates_existing_display_type_in_place(self, tmp_path):
+        """When display_type already exists, its position must not move."""
+        import json as _json
+
+        device_json = tmp_path / "device.json"
+        original = {
+            "name": "InkyPi",
+            "display_type": "epd7in3f",
+            "orientation": "horizontal",
+            "startup": True,
+        }
+        device_json.write_text(_json.dumps(original, indent=2))
+
+        result = self._run(device_json, "epd7in3e")
+        assert result.returncode == 0, result.stderr
+
+        loaded = _json.loads(device_json.read_text())
+        assert loaded["display_type"] == "epd7in3e"
+        assert list(loaded.keys()) == list(
+            original.keys()
+        ), "existing display_type position must be preserved"
+
+    def test_device_json_helper_rejects_malformed_json(self, tmp_path):
+        """Malformed input must produce a clean non-zero exit, not a silently
+        corrupted file."""
+        device_json = tmp_path / "device.json"
+        bad = '{"name": "InkyPi", "orientation":'  # truncated
+        device_json.write_text(bad)
+
+        result = self._run(device_json, "epd7in3e")
+        assert result.returncode != 0, "helper must fail on malformed JSON, got success"
+        assert "not valid JSON" in result.stderr or "JSON" in result.stderr
+        assert (
+            device_json.read_text() == bad
+        ), "malformed input file was mutated — helper must be atomic"
+
+    def test_device_json_helper_rejects_non_object_root(self, tmp_path):
+        """A JSON array or scalar at the root is not a valid device.json."""
+        device_json = tmp_path / "device.json"
+        device_json.write_text("[1, 2, 3]")
+
+        result = self._run(device_json, "epd7in3e")
+        assert result.returncode != 0
+        assert "object" in result.stderr.lower()
+
+    def test_device_json_helper_rejects_missing_file(self, tmp_path):
+        result = self._run(tmp_path / "does-not-exist.json", "epd7in3e")
+        assert result.returncode != 0
+        assert "not a file" in result.stderr.lower()
+
+    def test_device_json_helper_rejects_empty_display_type(self, tmp_path):
+        import json as _json
+
+        device_json = tmp_path / "device.json"
+        device_json.write_text(_json.dumps({"name": "InkyPi"}))
+        result = self._run(device_json, "")
+        assert result.returncode != 0
+
+    def test_device_json_helper_atomic_write_uses_tempfile_and_replace(self):
+        """Source inspection: the helper must write via a tempfile + os.replace
+        so Ctrl+C / power loss cannot leave device.json partially written."""
+        src = self.helper_path.read_text()
+        assert "tempfile" in src
+        assert "os.replace" in src
+        assert "os.fsync" in src, (
+            "atomic write must fsync before replace so contents hit disk "
+            "before the rename is recorded in the directory inode."
+        )

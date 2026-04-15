@@ -121,6 +121,25 @@ exit                                 # Exit devbox shell and deactivates Python 
 </tr>
 </table>
 
+## Dev quick reference
+
+Running commands for the tight edit-refresh loop:
+
+```bash
+# Start the Flask dev server (full program, auto-reloads Python + templates)
+./scripts/dev.sh
+# or:  .venv/bin/python src/inkypi.py --dev --web-only     # port 8080
+
+# Auto-rebuild bundled CSS/JS on file changes (JTN-713)
+./scripts/dev_watch.sh
+#   watches src/static/styles/  → runs scripts/build_css.py
+#   watches src/static/scripts/ → runs scripts/build_assets.py
+#   watches src/templates/      → logs only (Flask auto-reloads templates)
+# Requires `watchdog` (pip install watchdog). Ctrl+C exits cleanly.
+# One-shot CSS build (no watcher):
+python3 scripts/build_css.py
+```
+
 ## Development Tips
 
 1. **Check rendered output**: Images are saved to `runtime/mock_display_output/`
