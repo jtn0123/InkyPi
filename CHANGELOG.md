@@ -1,6 +1,59 @@
 # CHANGELOG
 
 
+## v0.52.1 (2026-04-15)
+
+### Bug Fixes
+
+- **update**: Timeout-based service startup wait (JTN-706)
+  ([#486](https://github.com/jtn0123/InkyPi/pull/486),
+  [`560829a`](https://github.com/jtn0123/InkyPi/commit/560829a16ff4a31a32ee32e74d3afe1ce25f9b31))
+
+* fix(update): timeout-based service startup wait (JTN-706)
+
+The previous 3-attempt loop (sleep 1 between attempts) in update_app_service() capped the total wait
+  at 3 seconds. On a Pi Zero 2 W the inkypi service routinely takes 5-8 seconds to become active
+  (flask import + plugin discovery), so updates reported false-failure while the service was healthy
+  a few seconds later.
+
+Replace the fixed-attempt loop with a `timeout 45` bounded wait and distinguish the two failure
+  modes in the error message:
+
+- systemctl reports the unit as `failed` -> show a genuine failure message and dump status +
+  journal. - 45s elapsed without becoming active -> report a timeout, still dump status + journal so
+  the user can investigate.
+
+The existing JTN-704 EXIT trap path is unchanged: exit 1 on either branch triggers the structured
+  failure record and lockfile cleanup.
+
+Regression test (tests/unit/test_install_scripts.py): test_update_service_wait_uses_timeout_bound
+  asserts the old max_attempts=3 pattern is gone and the new timeout/45/is-failed wording is
+  present.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(update): env-override timeout + tighten test assertion
+
+Address CodeRabbit review feedback on PR #486:
+
+- Make the 45s ceiling overridable via INKYPI_SERVICE_START_TIMEOUT, mirroring the
+  INKYPI_LOCKFILE_DIR test-flexibility pattern. Reject non-numeric overrides with a fallback to 45
+  so `timeout` never errors on bad input. Production callers do not set this.
+
+- Tighten test_update_service_wait_uses_timeout_bound to match an actual 45-second assignment
+  (`wait_seconds=...45` with optional env expansion, or a literal `timeout 45`) instead of any
+  occurrence of "45" in the function body. Prevents future false-positive matches from comments or
+  URLs.
+
+Skipped CodeRabbit nit about extracting shared start-service helper for install.sh: that's a
+  separate concern (install.sh start_service has no verification at all today) and belongs in its
+  own issue.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.52.0 (2026-04-15)
 
 ### Features
