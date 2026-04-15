@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}InkyPi - Error Logs{% endblock %}
+{% block head %}
+    <script src="{{ url_for('static', filename='scripts/errors_page.js') }}" defer></script>
+{% endblock %}
+{% block body %}
+    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
+    <div class="frame">
+        {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
+        <header class="app-header" role="banner">
+            <div class="header-content">
+                <div class="header-identity">
+                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
+                    {{ theme_toggle() }}
+                    <div class="title-container">
+                        {{ icon('warning', 'app-icon') | safe }}
+                        <h1 class="app-title">Error Logs</h1>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    {# data-test-skip-click: opens destructive confirm modal #}
+                    <button id="errorsClearBtn" class="header-button is-danger" type="button"
+                            {% if not reports %}disabled{% endif %}
+                            data-test-skip-click="true">Clear All</button>
+                </div>
+            </div>
+        </header>
+        <div class="separator"></div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Error Logs'}]) }}
+        <div class="page-intro">
+            <div class="page-intro-body">
+                <p class="page-subtitle">Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.</p>
+            </div>
+            <div class="page-summary">
+                <span class="status-chip {% if reports %}warn{% else %}info{% endif %}">{{ reports | length }} report{{ 's' if reports | length != 1 else '' }}</span>
+            </div>
+        </div>
+        <div class="separator"></div>
+
+        <div id="errorsEmptyState" {% if reports %}hidden{% endif %} class="empty-state">
+            <p>No error reports captured in this session.</p>
+        </div>
+
+        {% if reports %}
+        <table class="data-table" aria-label="Captured error reports">
+            <thead>
+                <tr>
+                    <th scope="col">Level</th>
+                    <th scope="col">Message</th>
+                    <th scope="col">URL</th>
+                    <th scope="col">Timestamp</th>
+                </tr>
+            </thead>
+            <tbody id="errorsTableBody">
+                {% for report in reports %}
+                <tr>
+                    <td><span class="status-chip {% if report.level == 'error' %}error{% else %}warn{% endif %}">{{ report.level }}</span></td>
+                    <td class="error-message-cell">{{ report.get('message', '') }}</td>
+                    <td>{{ report.get('url', '') }}</td>
+                    <td>{{ report.get('ts', '') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <tbody id="errorsTableBody" hidden></tbody>
+        {% endif %}
+    </div>
+
+    <!-- Clear all errors confirmation modal -->
+    <div id="clearErrorsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="clearErrorsTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeClearErrorsModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="clearErrorsTitle">Clear All Error Logs?</h2>
+            <div class="separator"></div>
+            <p>Clear all error logs? This action cannot be undone.</p>
+            <div class="buttons-container">
+                <button type="button" class="action-button is-danger" id="confirmClearErrorsBtn">Clear All</button>
+                <button type="button" class="action-button" id="cancelClearErrorsBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    {% include 'response_modal.html' %}
+    </main>
+    <div id="errorsBootData" hidden
+         data-clear-url="{{ url_for('errors.errors_clear') }}"></div>
+{% endblock %}
