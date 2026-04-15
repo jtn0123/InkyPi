@@ -45,6 +45,8 @@ UI_BROWSER_TESTS = {
     "test_playlist_roundtrip.py",
     "test_api_key_roundtrip.py",
     "test_jtn_720_721_722_journeys.py",
+    # JTN-724 update-flow happy-path journey.
+    "test_update_flow_happy_path.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",

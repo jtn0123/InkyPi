@@ -217,6 +217,110 @@ class TestSuccessPath:
         ).exists(), "Success path must never create .last-update-failure (JTN-704)"
 
 
+class TestSuccessFastHook:
+    """JTN-724: ``INKYPI_UPDATE_TEST_SUCCESS_FAST`` — happy-path simulation.
+
+    The journey happy-path test (tests/integration/journeys/
+    test_update_flow_happy_path.py) needs a way to drive update.sh to a clean
+    "completed successfully" terminal state without invoking real git / apt /
+    pip / systemctl work. The hook mirrors the existing FAIL_AT /
+    EXIT_AFTER_TRAP test hooks: guarded at the top of update.sh by an explicit
+    ``[ -n "${INKYPI_UPDATE_TEST_SUCCESS_FAST:-}" ]`` check so production
+    callers (which never set the var) are unaffected.
+    """
+
+    def test_success_fast_exits_zero(self, lockfile_dir: Path) -> None:
+        proc = _run_update(
+            lockfile_dir,
+            {"INKYPI_UPDATE_TEST_SUCCESS_FAST": "1"},
+        )
+        assert proc.returncode == 0, (
+            f"SUCCESS_FAST hook must exit 0; got {proc.returncode}. "
+            f"stderr: {proc.stderr!r}"
+        )
+
+    def test_success_fast_writes_success_sentinel(self, lockfile_dir: Path) -> None:
+        proc = _run_update(
+            lockfile_dir,
+            {
+                "INKYPI_UPDATE_TEST_SUCCESS_FAST": "1",
+                "INKYPI_UPDATE_TEST_TARGET": "v9.9.9",
+            },
+        )
+        assert proc.returncode == 0
+        sentinel = lockfile_dir / ".last-update-success"
+        assert (
+            sentinel.exists()
+        ), f"SUCCESS_FAST must write {sentinel}. stderr: {proc.stderr!r}"
+        parsed = json.loads(sentinel.read_text())
+        assert parsed["mode"] == "test_success_fast"
+        assert parsed["target_version"] == "v9.9.9"
+        assert isinstance(parsed["timestamp"], str) and parsed["timestamp"]
+
+    def test_success_fast_removes_lockfile(self, lockfile_dir: Path) -> None:
+        proc = _run_update(
+            lockfile_dir,
+            {"INKYPI_UPDATE_TEST_SUCCESS_FAST": "1"},
+        )
+        assert proc.returncode == 0
+        assert not (
+            lockfile_dir / ".install-in-progress"
+        ).exists(), "EXIT trap must remove the lockfile on SUCCESS_FAST exit"
+
+    def test_success_fast_clears_stale_failure_record(self, lockfile_dir: Path) -> None:
+        stale = lockfile_dir / ".last-update-failure"
+        stale.write_text('{"timestamp":"old","exit_code":1}')
+        proc = _run_update(
+            lockfile_dir,
+            {"INKYPI_UPDATE_TEST_SUCCESS_FAST": "1"},
+        )
+        assert proc.returncode == 0
+        assert not stale.exists(), (
+            "SUCCESS_FAST path is a successful exit, so the EXIT trap must "
+            "clear any stale .last-update-failure"
+        )
+
+    def test_success_fast_does_not_run_real_work(self, lockfile_dir: Path) -> None:
+        """Hook must exit before touching apt/git/systemctl.
+
+        We look for telltale output that would appear if stop_service or
+        apt_install had run. The success-fast branch prints a single TEST:
+        line to stderr and then exits 0 — nothing else should be emitted.
+        """
+        proc = _run_update(
+            lockfile_dir,
+            {"INKYPI_UPDATE_TEST_SUCCESS_FAST": "1"},
+        )
+        assert proc.returncode == 0
+        combined = proc.stdout + proc.stderr
+        for forbidden in (
+            "Stopping service",
+            "Installing system dependencies",
+            "apt-get install",
+            "Creating virtual environment",
+        ):
+            assert forbidden not in combined, (
+                f"SUCCESS_FAST must short-circuit before {forbidden!r} runs; "
+                f"found it in output: {combined!r}"
+            )
+
+    def test_success_fast_unset_does_not_trigger_sentinel(
+        self, lockfile_dir: Path
+    ) -> None:
+        """Production parity: with the hook unset, EXIT_AFTER_TRAP must NOT
+        create the success sentinel. This guards against a future refactor
+        that accidentally wires both hooks together."""
+        proc = _run_update(
+            lockfile_dir,
+            {"INKYPI_UPDATE_TEST_EXIT_AFTER_TRAP": "1"},
+        )
+        assert proc.returncode == 0
+        assert not (lockfile_dir / ".last-update-success").exists(), (
+            "Only INKYPI_UPDATE_TEST_SUCCESS_FAST should create "
+            ".last-update-success; EXIT_AFTER_TRAP must not."
+        )
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
