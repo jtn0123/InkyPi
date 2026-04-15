@@ -262,3 +262,279 @@ def test_access_allowed_when_auth_enabled(flask_app, monkeypatch):
     client = flask_app.test_client()
     resp = client.get("/api/diagnostics", environ_overrides={"REMOTE_ADDR": "8.8.8.8"})
     assert resp.status_code == 200
+
+
+def test_access_denied_for_unparseable_remote_addr(flask_app, monkeypatch):
+    """An unparseable REMOTE_ADDR fails closed (403), not open."""
+    monkeypatch.delenv("INKYPI_ENV", raising=False)
+    flask_app.config["AUTH_ENABLED"] = False
+    client = flask_app.test_client()
+    resp = client.get(
+        "/api/diagnostics", environ_overrides={"REMOTE_ADDR": "not-an-ip"}
+    )
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# System metric helpers — fallback branches
+# ---------------------------------------------------------------------------
+
+
+def test_uptime_seconds_falls_back_to_proc_uptime(monkeypatch, tmp_path):
+    """When psutil.boot_time raises, _uptime_seconds reads /proc/uptime."""
+    import blueprints.diagnostics as diag
+
+    fake = tmp_path / "uptime"
+    fake.write_text("54321.42 12345.67\n")
+
+    class _BoomPsutil:
+        @staticmethod
+        def boot_time():
+            raise RuntimeError("no psutil on this host")
+
+    monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
+    monkeypatch.setattr(
+        diag, "Path", lambda p="": fake if p == "/proc/uptime" else Path(p)
+    )
+    assert diag._uptime_seconds() == 54321
+
+
+def test_uptime_seconds_returns_none_on_total_failure(monkeypatch):
+    """Both psutil and /proc/uptime failing yields None instead of raising."""
+    import blueprints.diagnostics as diag
+
+    class _BoomPsutil:
+        @staticmethod
+        def boot_time():
+            raise RuntimeError("x")
+
+    monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
+
+    class _NoFile:
+        def __init__(self, *_args, **_kw):
+            pass
+
+        def read_text(self):
+            raise FileNotFoundError
+
+    monkeypatch.setattr(diag, "Path", _NoFile)
+    assert diag._uptime_seconds() is None
+
+
+def test_memory_info_falls_back_to_proc_meminfo(monkeypatch, tmp_path):
+    """When psutil raises, _memory_info parses /proc/meminfo in kB."""
+    import blueprints.diagnostics as diag
+
+    fake = tmp_path / "meminfo"
+    fake.write_text(
+        "MemTotal:         512000 kB\n"
+        "MemFree:          100000 kB\n"
+        "MemAvailable:     200000 kB\n"
+    )
+
+    class _BoomPsutil:
+        @staticmethod
+        def virtual_memory():
+            raise RuntimeError("no psutil")
+
+    monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
+
+    # Patch Path("/proc/meminfo") to our temp file while leaving others alone.
+    real_path = diag.Path
+
+    def _path(p=""):
+        if p == "/proc/meminfo":
+            return fake
+        return real_path(p)
+
+    monkeypatch.setattr(diag, "Path", _path)
+    info = diag._memory_info()
+    # Total = 512000 kB ~ 500 MB, used = 512000 - 200000 = 312000 kB ~ 304 MB
+    assert info["total_mb"] == 500
+    assert info["used_mb"] == 304
+    # pct = 100 * (512000-200000)/512000 ~= 60.9
+    assert info["pct"] == pytest.approx(60.9, abs=0.2)
+
+
+def test_memory_info_returns_nulls_on_total_failure(monkeypatch):
+    """When every source raises, _memory_info returns a null-shaped dict."""
+    import blueprints.diagnostics as diag
+
+    class _BoomPsutil:
+        @staticmethod
+        def virtual_memory():
+            raise RuntimeError("x")
+
+    monkeypatch.setitem(__import__("sys").modules, "psutil", _BoomPsutil)
+
+    class _NoFile:
+        def __init__(self, *_args, **_kw):
+            pass
+
+        def open(self, *_a, **_kw):
+            raise FileNotFoundError
+
+    monkeypatch.setattr(diag, "Path", _NoFile)
+    info = diag._memory_info()
+    assert info == {"total_mb": None, "used_mb": None, "pct": None}
+
+
+def test_disk_info_returns_nulls_on_oserror(monkeypatch):
+    """shutil.disk_usage raising gives a null-shaped disk entry (no 500)."""
+    import blueprints.diagnostics as diag
+
+    def _boom(_path):
+        raise OSError("read-only")
+
+    monkeypatch.setattr(diag.shutil, "disk_usage", _boom)
+    info = diag._disk_info("/nope")
+    assert info["path"] == "/nope"
+    assert info["total_mb"] is None
+    assert info["used_mb"] is None
+    assert info["pct"] is None
+
+
+# ---------------------------------------------------------------------------
+# Version resolution
+# ---------------------------------------------------------------------------
+
+
+def test_read_version_falls_back_to_app_config(flask_app, monkeypatch):
+    """When the VERSION file is unreadable, APP_VERSION from flask config is used."""
+    import blueprints.diagnostics as diag
+
+    flask_app.config["APP_VERSION"] = "9.9.9-test"
+
+    class _NoFile:
+        def __init__(self, *_args, **_kw):
+            pass
+
+        def resolve(self):
+            return self
+
+        @property
+        def parent(self):
+            return self
+
+        def __truediv__(self, _other):
+            return self
+
+        def read_text(self, *_a, **_kw):
+            raise FileNotFoundError
+
+    monkeypatch.setattr(diag, "Path", _NoFile)
+    with flask_app.test_request_context("/api/diagnostics"):
+        assert diag._read_version() == "9.9.9-test"
+
+
+def test_read_version_unknown_when_no_source(flask_app, monkeypatch):
+    """Returns the literal 'unknown' when VERSION and APP_VERSION are both missing."""
+    import blueprints.diagnostics as diag
+
+    flask_app.config.pop("APP_VERSION", None)
+
+    class _NoFile:
+        def __init__(self, *_args, **_kw):
+            pass
+
+        def resolve(self):
+            return self
+
+        @property
+        def parent(self):
+            return self
+
+        def __truediv__(self, _other):
+            return self
+
+        def read_text(self, *_a, **_kw):
+            raise FileNotFoundError
+
+    monkeypatch.setattr(diag, "Path", _NoFile)
+    with flask_app.test_request_context("/api/diagnostics"):
+        assert diag._read_version() == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Refresh task + plugin registry edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_refresh_task_snapshot_no_refresh_task(flask_app):
+    """Missing REFRESH_TASK yields a benign null-shaped snapshot."""
+    import blueprints.diagnostics as diag
+
+    flask_app.config["REFRESH_TASK"] = None
+    with flask_app.test_request_context("/api/diagnostics"):
+        snap = diag._refresh_task_snapshot()
+    assert snap == {"running": False, "last_run_ts": None, "last_error": None}
+
+
+def test_refresh_task_snapshot_picks_most_recent_failure(client, flask_app):
+    """When multiple plugins have errors, the most recent failure wins."""
+    import blueprints.diagnostics as diag
+
+    rt = flask_app.config["REFRESH_TASK"]
+    with patch.object(
+        rt,
+        "get_health_snapshot",
+        return_value={
+            "a": {
+                "last_error": "older",
+                "last_failure_at": "2026-01-01T00:00:00+00:00",
+            },
+            "b": {
+                "last_error": "newer",
+                "last_failure_at": "2026-04-01T00:00:00+00:00",
+            },
+        },
+    ):
+        with flask_app.test_request_context("/api/diagnostics"):
+            snap = diag._refresh_task_snapshot()
+    assert snap["last_error"] == "newer"
+
+
+def test_refresh_task_snapshot_handles_health_method_raising(client, flask_app):
+    """A health-snapshot method that raises doesn't leak past the endpoint."""
+    import blueprints.diagnostics as diag
+
+    rt = flask_app.config["REFRESH_TASK"]
+    with patch.object(rt, "get_health_snapshot", side_effect=RuntimeError("broken")):
+        with flask_app.test_request_context("/api/diagnostics"):
+            snap = diag._refresh_task_snapshot()
+    assert snap["last_error"] is None
+
+
+def test_plugin_health_registry_failure_still_returns_dict(client, monkeypatch):
+    """A broken plugin registry still yields a dict (possibly empty)."""
+
+    def _boom():
+        raise RuntimeError("registry broken")
+
+    monkeypatch.setattr("plugins.plugin_registry.get_registered_plugin_ids", _boom)
+    resp = client.get("/api/diagnostics")
+    assert resp.status_code == 200
+    ph = resp.get_json()["plugin_health"]
+    assert isinstance(ph, dict)
+
+
+# ---------------------------------------------------------------------------
+# Private-address classifier
+# ---------------------------------------------------------------------------
+
+
+def test_is_private_address_classifier():
+    """_is_private_address covers loopback, RFC1918, link-local, and public IPs."""
+    import blueprints.diagnostics as diag
+
+    assert diag._is_private_address("127.0.0.1") is True
+    assert diag._is_private_address("10.0.0.1") is True
+    assert diag._is_private_address("192.168.5.5") is True
+    assert diag._is_private_address("169.254.1.1") is True
+    assert diag._is_private_address("::1") is True
+    assert diag._is_private_address("fc00::1") is True
+    assert diag._is_private_address("8.8.8.8") is False
+    assert diag._is_private_address("1.2.3.4") is False
+    assert diag._is_private_address("") is False
+    assert diag._is_private_address(None) is False
+    assert diag._is_private_address("not-an-ip") is False
