@@ -504,27 +504,25 @@ wait_for_clock() {
 parse_arguments "$@"
 check_permissions
 
-# JTN-696: Concurrent-install guard. Re-exec ourselves under flock on fd 9 so
-# two simultaneous `sudo bash install.sh` runs can't race (previously both
-# would try to rm/repopulate $INSTALL_PATH and produce arbitrary corruption).
-# -n = non-blocking fail-fast; -E 42 = exit status 42 when the lock is held.
-# The lock releases automatically on process exit (no trap needed).
-# FLOCKER guard prevents infinite re-exec loop when flock itself runs us.
-if [ "${FLOCKER:-}" != "$0" ]; then
+# JTN-696: Concurrent-install guard. Two simultaneous `sudo bash install.sh`
+# runs previously raced through the rm/repopulate sequence in install_src()
+# and produced arbitrary corruption. Here we acquire an fd-based advisory
+# lock on $FLOCK_PATH; a second caller finds the lock held and exits fast.
+# The lock releases automatically when this shell exits (no trap needed).
+# -n = non-blocking; -E 42 = exit 42 when the lock cannot be acquired.
+if command -v flock >/dev/null 2>&1; then
   mkdir -p "$(dirname "$FLOCK_PATH")"
-  if command -v flock >/dev/null 2>&1; then
-    export FLOCKER="$0"
-    flock -n -E 42 "$FLOCK_PATH" "$0" "$@"
+  exec 9>"$FLOCK_PATH"
+  if ! flock -n -E 42 9; then
     rc=$?
     if [ "$rc" -eq 42 ]; then
       echo "ERROR: Another install/update is already running — see $LOCKFILE" >&2
       echo "       (concurrent-install lock $FLOCK_PATH is held)" >&2
-      exit 1
     fi
-    exit "$rc"
+    exit 1
   fi
-  # flock binary unavailable (non-standard env) — proceed without the guard.
 fi
+# flock binary unavailable (non-standard env) — proceed without the guard.
 
 # JTN-607: Create the install-in-progress lockfile. inkypi.service's
 # ExecStartPre refuses to start while this file exists (defense-in-depth for
