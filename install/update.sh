@@ -62,24 +62,36 @@ update_app_service() {
     sudo systemctl enable "$SERVICE_FILE"
     echo "Starting $APPNAME service."
     sudo systemctl start "$SERVICE_FILE"
-    # JTN-684: Explicitly verify the service reached active state.
+    # JTN-684 / JTN-706: Explicitly verify the service reached active state.
     # systemctl start exits 0 even when the service subsequently fails
-    # (e.g. ExecStart returns non-zero), so we poll is-active with a short
-    # retry loop to give systemd a moment to settle before declaring failure.
-    local attempts=0
-    local max_attempts=3
-    local active=0
-    while [ "$attempts" -lt "$max_attempts" ]; do
-      if sudo systemctl is-active --quiet "$SERVICE_FILE"; then
-        active=1
-        break
+    # (e.g. ExecStart returns non-zero), so we wait for is-active with a
+    # bounded timeout.
+    #
+    # JTN-706: The previous implementation used a 3-attempt retry loop with
+    # sleep 1, which capped the total wait at 3 seconds. On a Pi Zero 2 W,
+    # inkypi routinely takes 5-8 seconds to become active (flask import +
+    # plugin discovery), so updates reported false failures on healthy
+    # devices. We now poll up to 45 seconds via `timeout`, and distinguish
+    # the two error modes: a genuinely-failed service (systemctl reports
+    # `failed`) versus slow startup that exceeded the wait window.
+    # JTN-706: ceiling is overridable via env so slow dev boards or debugging
+    # sessions can extend the wait without a code change. Production callers
+    # (install.sh, settings UI, do_update.sh) do not set this; default is 45s.
+    # Mirrors the INKYPI_LOCKFILE_DIR test-flexibility pattern.
+    local wait_seconds="${INKYPI_SERVICE_START_TIMEOUT:-45}"
+    # Reject non-numeric / empty overrides to prevent `timeout` from erroring.
+    if ! [[ "$wait_seconds" =~ ^[1-9][0-9]*$ ]]; then
+      wait_seconds=45
+    fi
+    if ! sudo timeout "$wait_seconds" bash -c \
+        "until systemctl is-active --quiet \"$SERVICE_FILE\"; do sleep 1; done"; then
+      if sudo systemctl is-failed --quiet "$SERVICE_FILE"; then
+        echo_error "ERROR: $SERVICE_FILE failed to start (systemd reports failed state)."
+      else
+        echo_error "ERROR: Timed out waiting for $SERVICE_FILE to become active after ${wait_seconds}s."
       fi
-      attempts=$(( attempts + 1 ))
-      [ "$attempts" -lt "$max_attempts" ] && sleep 1
-    done
-    if [ "$active" -eq 0 ]; then
-      echo_error "ERROR: $SERVICE_FILE failed to start (not active after $max_attempts attempt(s))."
       echo "Service status:" >&2
+      sudo systemctl status --no-pager "$SERVICE_FILE" >&2 || true
       sudo systemctl show -p ActiveState,SubState,Result "$SERVICE_FILE" >&2 || true
       echo "Last 20 journal lines:" >&2
       sudo journalctl -u "$APPNAME" -n 20 --no-pager >&2 || true
