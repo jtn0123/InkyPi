@@ -1,6 +1,60 @@
 # CHANGELOG
 
 
+## v0.52.0 (2026-04-15)
+
+### Features
+
+- **observability**: Add /api/diagnostics consolidated endpoint (JTN-707)
+  ([#483](https://github.com/jtn0123/InkyPi/pull/483),
+  [`ee24e31`](https://github.com/jtn0123/InkyPi/commit/ee24e3119390d748f5a45e6fa1071053679d5994))
+
+* feat(observability): add /api/diagnostics consolidated endpoint (JTN-707)
+
+Consolidates uptime, memory, disk, refresh-task state, plugin health, log tail, version info, and
+  last-update failure into a single JSON endpoint so operators can diagnose a wedged Pi Zero 2 W
+  without SSH. This also unblocks the M2 in-app status badge and the K3 rollback UI.
+
+* New blueprint src/blueprints/diagnostics.py exposing GET /api/diagnostics * Reads prev_version and
+  .last-update-failure from /var/lib/inkypi when present (null when absent — JTN-704 will start
+  writing the latter) * Plugin health is a flat "ok"/"fail"/"unknown" map over every registered
+  plugin so the UI shape is stable even before the first refresh cycle * Access gated on the
+  app-wide PIN auth hook; when PIN auth is off, only private/loopback callers (or INKYPI_ENV=dev)
+  are allowed — avoids leaking internals on un-auth'd deployments * Log tail reuses
+  blueprints.settings._read_log_lines so journald and dev-mode in-memory buffers are both supported,
+  capped at 100 lines * tests/unit/test_diagnostics_endpoint.py covers shape, missing-file branches,
+  plugin health mapping, log-tail cap, and access control
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(diagnostics): add fallback-branch coverage (JTN-707)
+
+Pushes coverage on src/blueprints/diagnostics.py from 69% to 89% so SonarCloud's 80% New Code gate
+  passes. New tests exercise:
+
+* _uptime_seconds /proc/uptime fallback and total-failure path * _memory_info /proc/meminfo fallback
+  and total-failure path * _disk_info shutil.disk_usage error path * _read_version VERSION-missing
+  fallback to APP_VERSION and 'unknown' * _refresh_task_snapshot missing-task,
+  multi-error-most-recent-wins, and health-snapshot-raises paths * _plugin_health_summary
+  broken-registry still returns a dict * _is_private_address classifier (loopback, RFC1918,
+  link-local, v6, public, empty, None, unparseable) * unparseable REMOTE_ADDR gets 403 (fail closed)
+
+* refactor(diagnostics): extract helpers to cut cognitive complexity (JTN-707)
+
+Addresses two SonarCloud S3776 findings on the new blueprint:
+
+* _refresh_task_snapshot cognitive complexity 26 -> well under 15 by extracting _latest_refresh_ts,
+  _safe_health_snapshot, and _most_recent_plugin_error * _plugin_health_summary cognitive complexity
+  21 -> under 15 by reusing _safe_health_snapshot and extracting _status_to_label
+
+Behavior is unchanged; all 27 existing tests still pass and line coverage on the module stays at
+  89%.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.11 (2026-04-15)
 
 ### Bug Fixes
