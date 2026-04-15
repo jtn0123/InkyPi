@@ -188,4 +188,6 @@ def test_api_keys_existing_row_uses_password_input(client):
     assert "supersecret" not in html
 
     # The empty-value + placeholder pattern must be present
-    assert 'placeholder="(unchanged)"' in html
+    # JTN-722 widened the placeholder from "(unchanged)" to a more explicit
+    # "(leave blank to keep current)" once existing rows became editable.
+    assert 'placeholder="(leave blank to keep current)"' in html
