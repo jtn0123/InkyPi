@@ -1,6 +1,63 @@
 # CHANGELOG
 
 
+## v0.57.0 (2026-04-15)
+
+### Features
+
+- **security**: Html-escape string leaves in json_error details (JTN-657)
+  ([#500](https://github.com/jtn0123/InkyPi/pull/500),
+  [`89ce9ec`](https://github.com/jtn0123/InkyPi/commit/89ce9ec3acae2435052fe5de939985f29d328d2b))
+
+Defense-in-depth: user-derived strings entering the `details` dict of the JSON error envelope are
+  now recursively sanitized via `sanitize_response_value` (HTML-escaping angle brackets and
+  ampersands) before serialisation. This closes the gap where a future `innerHTML` slip in the
+  frontend could become stored XSS. Non-string scalars pass through unchanged; the response envelope
+  shape is unaffected.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- **journey**: First-run setup end-to-end (JTN-720)
+  ([#497](https://github.com/jtn0123/InkyPi/pull/497),
+  [`41260d6`](https://github.com/jtn0123/InkyPi/commit/41260d6b76899731626b03dfe1e4692bea7dce24))
+
+* test(journey): first-run setup end-to-end (JTN-720)
+
+First journey test under epic JTN-719. Unlike the existing click-sweep tests (JTN-679/693/698),
+  which only assert handlers fire without error, this drives a complete multi-step user flow and
+  asserts the end state at every checkpoint:
+
+1. Fresh dashboard load (no playlist instances). 2. Save clock plugin settings; verify persistence
+  to Default playlist. 3. Schedule a second clock instance with an explicit refresh interval via
+  /add_plugin; verify cadence stored as seconds. 4. Trigger /update_now (refresh_task idle in tests
+  → synchronous direct render path, which writes a history entry and sidecar). 5. Verify
+  /api/diagnostics exposes the refresh_task snapshot shape (running / last_run_ts / last_error) with
+  no recorded error. 6. Confirm /history renders the new entry and the newest sidecar has
+  plugin_id=clock with a fresh refresh_time.
+
+A companion browser-level test (skipped under SKIP_UI / SKIP_BROWSER) verifies the history page DOM
+  after the same setup, catching template regressions without duplicating data-model assertions.
+
+Adds `journey` marker to pytest.ini and creates `tests/integration/journeys/` as the home for the
+  remaining 9 journeys in the epic. __init__.py is intentionally minimal so sibling journey tests
+  from Batch 4 peers (JTN-721/722/723/724) can coexist.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(test): skip UI journey when Playwright chromium is unavailable
+
+CI's main pytest job doesn't install Playwright browsers, so the browser-level companion test
+  previously errored at fixture setup instead of skipping cleanly. Mirror the detection already used
+  in tests/conftest.py to skip when chromium isn't installed, keeping the API-only journey running
+  in every lane.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.56.0 (2026-04-15)
 
 ### Features
