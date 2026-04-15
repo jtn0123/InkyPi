@@ -297,6 +297,154 @@ class TestValidateRollbackScriptPath:
         )
 
 
+class TestGetRollbackScriptPath:
+    """Cover the candidate-cascade helper that resolves rollback.sh."""
+
+    def test_finds_repo_relative_script(self, monkeypatch):
+        """Developer environment: picks up install/rollback.sh via parents[3]."""
+        import blueprints.settings as mod
+
+        # Clear PROJECT_DIR so the helper falls through to the repo-relative
+        # path (the repo-relative lookup is always the last candidate).
+        monkeypatch.delenv("PROJECT_DIR", raising=False)
+        path = mod._get_rollback_script_path()
+        # In the repo-under-test, install/rollback.sh exists — confirm the
+        # helper finds it and returns an absolute path.
+        assert path is not None
+        assert path.endswith("install/rollback.sh")
+
+    def test_returns_none_when_no_candidate_exists(self, monkeypatch, tmp_path):
+        """No PROJECT_DIR + no script on disk → None (caller decides)."""
+        import blueprints.settings as mod
+
+        monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
+        # Also short-circuit the repo-relative fallback by pointing
+        # ``__file__`` resolution at a tmp tree that has no rollback.sh.
+        # We can't easily rewrite __file__ here, so instead verify by
+        # temporarily renaming the file — but renaming risks test pollution.
+        # Simpler: just patch os.path.isfile to always return False so every
+        # candidate is rejected, isolating the helper's "nothing found" branch.
+        monkeypatch.setattr(mod.os.path, "isfile", lambda _p: False)
+        assert mod._get_rollback_script_path() is None
+
+    def test_honors_project_dir_with_symlinked_src(self, monkeypatch, tmp_path):
+        """Production layout: PROJECT_DIR/src → repo/src (symlink) resolves."""
+        import blueprints.settings as mod
+
+        # Build a fake repo tree with an install/ dir holding rollback.sh.
+        repo = tmp_path / "repo"
+        (repo / "install").mkdir(parents=True)
+        script = repo / "install" / "rollback.sh"
+        script.write_text("#!/bin/bash\n")
+        # Build the production layout under project_dir: project_dir/src → repo/src.
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        (repo / "src").mkdir()
+        (project_dir / "src").symlink_to(repo / "src")
+
+        monkeypatch.setenv("PROJECT_DIR", str(project_dir))
+        resolved = mod._get_rollback_script_path()
+        assert resolved == str(script)
+
+
+class TestStartRollbackViaSystemdFullPath:
+    """End-to-end coverage of _start_rollback_via_systemd with Popen mocked."""
+
+    def test_popen_invoked_with_project_dir_override(self, monkeypatch, tmp_path):
+        """PROJECT_DIR env override flows into --setenv argv element."""
+        import blueprints.settings as mod
+
+        # Build a fake trusted-root layout under tmp_path and monkeypatch
+        # _trusted_update_dirs so the realpath check accepts our fixture.
+        install_dir = tmp_path / "install"
+        install_dir.mkdir()
+        script = install_dir / "rollback.sh"
+        script.write_text("#!/bin/bash\n")
+
+        monkeypatch.setattr(mod, "_trusted_update_dirs", lambda: (str(install_dir),))
+        monkeypatch.setattr(mod, "_get_rollback_script_path", lambda: str(script))
+
+        calls: list[list[str]] = []
+
+        def _fake_popen(cmd, *args, **kwargs):
+            calls.append(list(cmd))
+
+            class _FakeProc:
+                pass
+
+            return _FakeProc()
+
+        monkeypatch.setattr(mod.subprocess, "Popen", _fake_popen)
+
+        # Set a valid PROJECT_DIR that matches the absolute-POSIX regex.
+        monkeypatch.setenv("PROJECT_DIR", "/opt/inkypi")
+        mod._start_rollback_via_systemd()
+
+        assert len(calls) == 1
+        argv = calls[0]
+        assert "--setenv=PROJECT_DIR=/opt/inkypi" in argv
+        assert str(script) in argv
+
+    def test_popen_invoked_with_malformed_project_dir_falls_back(
+        self, monkeypatch, tmp_path
+    ):
+        """A PROJECT_DIR with ``..`` traversal falls back to the default."""
+        import blueprints.settings as mod
+
+        install_dir = tmp_path / "install"
+        install_dir.mkdir()
+        script = install_dir / "rollback.sh"
+        script.write_text("#!/bin/bash\n")
+
+        monkeypatch.setattr(mod, "_trusted_update_dirs", lambda: (str(install_dir),))
+        monkeypatch.setattr(mod, "_get_rollback_script_path", lambda: str(script))
+
+        calls: list[list[str]] = []
+
+        def _fake_popen(cmd, *args, **kwargs):
+            calls.append(list(cmd))
+            return type("P", (), {})()
+
+        monkeypatch.setattr(mod.subprocess, "Popen", _fake_popen)
+
+        # ``..`` traversal — must be rejected and replaced with default.
+        monkeypatch.setenv("PROJECT_DIR", "/opt/../etc")
+        mod._start_rollback_via_systemd()
+
+        argv = calls[0]
+        assert "--setenv=PROJECT_DIR=/usr/local/inkypi" in argv
+
+
+class TestRollbackRouteErrorPaths:
+    """Outer-except branches that don't fire in the happy path."""
+
+    def test_rollback_route_handles_systemd_run_exception(
+        self, client, monkeypatch, tmp_path
+    ):
+        """If _start_rollback_via_systemd throws, state is cleared + 500 returned."""
+        import blueprints.settings as mod
+
+        monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+        _write_failure(tmp_path)
+        _write_prev_version(tmp_path, "v0.52.0")
+        mod._set_update_state(False, None)
+
+        monkeypatch.setattr(mod, "_systemd_available", lambda: True)
+
+        def _boom():
+            raise OSError("systemd-run missing")
+
+        monkeypatch.setattr(mod, "_start_rollback_via_systemd", _boom)
+
+        try:
+            resp = client.post("/settings/update/rollback")
+            assert resp.status_code == 500
+            # State must be cleared so a subsequent rollback isn't locked out.
+            assert mod._UPDATE_STATE["running"] is False
+        finally:
+            mod._set_update_state(False, None)
+
+
 class TestUpdateStatusIncludesPrevVersion:
     """/settings/update_status surfaces prev_version for UI button gating."""
 

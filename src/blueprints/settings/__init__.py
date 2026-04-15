@@ -95,6 +95,12 @@ _UPDATE_UNIT_PREFIX = "inkypi-update"
 # ``systemctl list-units 'inkypi-rollback-*'``.
 _ROLLBACK_UNIT_PREFIX = "inkypi-rollback"
 
+# S1192: the canonical PROJECT_DIR + bash interpreter are referenced from
+# multiple Popen call sites (_start_update_via_systemd / _start_rollback_via_systemd
+# / _get_*_script_path fallbacks), so pull them to module-level constants.
+_DEFAULT_PROJECT_DIR = "/usr/local/inkypi"
+_BASH_INTERPRETER = "/bin/bash"
+
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
 MIN_LOG_HOURS = 1
@@ -611,15 +617,18 @@ def _start_rollback_via_systemd() -> None:
           environment override is re-validated against a strict absolute-POSIX
           path regex before being passed through.
     """
-    project_dir = os.getenv("PROJECT_DIR", "/usr/local/inkypi")
+    project_dir = os.getenv("PROJECT_DIR", _DEFAULT_PROJECT_DIR)
     if (
         not isinstance(project_dir, str)
         or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
         or ".." in project_dir.split("/")
     ):
-        project_dir = "/usr/local/inkypi"
+        project_dir = _DEFAULT_PROJECT_DIR
 
-    candidate = _get_rollback_script_path() or "/usr/local/inkypi/install/rollback.sh"
+    candidate = (
+        _get_rollback_script_path()
+        or f"{_DEFAULT_PROJECT_DIR}/install/{ROLLBACK_SCRIPT_NAME}"
+    )
     script_path = _validate_rollback_script_path(candidate)
 
     unit_name = f"{_ROLLBACK_UNIT_PREFIX}-{int(time.time())}"
@@ -631,7 +640,7 @@ def _start_rollback_via_systemd() -> None:
         "--property=StandardOutput=journal",
         "--property=StandardError=journal",
         f"--setenv=PROJECT_DIR={project_dir}",
-        "/bin/bash",
+        _BASH_INTERPRETER,
         script_path,
     ]
     # All argv elements above are string literals or validated internal values.
