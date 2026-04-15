@@ -100,24 +100,47 @@
     if (details) details.hidden = !journalText;
   }
 
+  // JTN-708: toggle visibility of the rollback button inside the failure
+  // banner.  Gating rule: button shows ONLY when both a last_failure record
+  // AND a validated prev_version are present — matches the server-side 409
+  // gate in /settings/update/rollback so the UI cannot offer an action the
+  // backend will reject.
+  function renderRollbackButton(lastFailure, prevVersion) {
+    const btn = document.getElementById("rollbackUpdateBtn");
+    if (!btn) return;
+    const canRollback = !!lastFailure && typeof prevVersion === "string" && prevVersion.length > 0;
+    btn.hidden = !canRollback;
+    if (canRollback) {
+      const tgt = document.getElementById("rollbackTargetVersion");
+      if (tgt) tgt.textContent = prevVersion;
+      btn.dataset.prevVersion = prevVersion;
+    } else {
+      delete btn.dataset.prevVersion;
+    }
+  }
+
   // Render the update-failure banner from a /settings/update_status payload.
   // ``lastFailure`` mirrors the JSON written to /var/lib/inkypi/.last-update-failure
   // by install/update.sh's EXIT trap (JTN-704): timestamp, exit_code,
   // last_command, recent_journal_lines.  A malformed file surfaces as
   // ``{parse_error: true}`` so we can still show a generic banner.
-  function renderUpdateFailureBanner(lastFailure) {
+  // ``prevVersion`` (JTN-708) drives the in-banner rollback button.
+  function renderUpdateFailureBanner(lastFailure, prevVersion) {
     const banner = document.getElementById("updateFailureBanner");
     if (!banner) return;
     if (!lastFailure) {
       banner.hidden = true;
+      renderRollbackButton(null, null);
       return;
     }
     if (lastFailure.parse_error) {
       renderUpdateFailureUnreadable(banner);
+      renderRollbackButton(lastFailure, prevVersion);
       return;
     }
     renderUpdateFailureFields(lastFailure);
     banner.hidden = false;
+    renderRollbackButton(lastFailure, prevVersion);
   }
 
   function prefKey(key) {
@@ -649,7 +672,7 @@
         const resp = await fetch(config.updateStatusUrl, { cache: "no-store" });
         if (!resp.ok) return;
         const data = await resp.json();
-        renderUpdateFailureBanner(data?.last_failure ?? null);
+        renderUpdateFailureBanner(data?.last_failure ?? null, data?.prev_version ?? null);
       } catch (e) {
         // Silent: the banner is best-effort; do not block the UI.
         console.warn("Update status refresh failed:", e);
@@ -676,7 +699,8 @@
             const sresp = await fetch(config.updateStatusUrl);
             const sdata = await sresp.json();
             // JTN-710: surface any newly-written failure record as soon as it lands.
-            renderUpdateFailureBanner(sdata?.last_failure ?? null);
+            // JTN-708: and keep the rollback button in sync with the breadcrumb.
+            renderUpdateFailureBanner(sdata?.last_failure ?? null, sdata?.prev_version ?? null);
             if (!sdata?.running) {
               clearInterval(state.updateTimer);
               state.updateTimer = null;
@@ -696,6 +720,66 @@
         for (const btn of btns) {
           btn.disabled = false;
         }
+      }
+    }
+
+    // JTN-708: rollback-confirm modal mirrors the reboot/shutdown pattern so
+    // an accidental tap can't silently revert the installed version.
+    function openRollbackConfirm(event) {
+      const btn = document.getElementById("rollbackUpdateBtn");
+      const tgt = btn?.dataset?.prevVersion || "the previous version";
+      const confirmVersion = document.getElementById("rollbackConfirmVersion");
+      if (confirmVersion) confirmVersion.textContent = tgt;
+      setDeviceActionModalOpen("rollbackConfirmModal", true, event?.currentTarget);
+    }
+
+    function closeRollbackConfirm() {
+      setDeviceActionModalOpen("rollbackConfirmModal", false);
+    }
+
+    async function startRollback() {
+      closeRollbackConfirm();
+      if (!config.rollbackUpdateUrl) {
+        showResponseModal("failure", "Rollback is not available on this build.");
+        return;
+      }
+      const btns = document.querySelectorAll(".header-actions .header-button");
+      try {
+        for (const btn of btns) { btn.disabled = true; }
+        const resp = await fetch(config.rollbackUpdateUrl, { method: "POST" });
+        const data = await resp.json();
+        // The route returns 202 on success; json_success sets success=true.
+        if (!resp.ok || !data.success) {
+          showResponseModal("failure", data.error || "Failed to start rollback");
+          return;
+        }
+        showResponseModal("success", data.message || "Rollback started.");
+        // Reuse the same polling loop as startUpdate — the rollback process
+        // flips _UPDATE_STATE.running to false when complete.
+        if (state.updateTimer) clearInterval(state.updateTimer);
+        state.updateTimer = setInterval(async () => {
+          try {
+            await fetchAndRenderLogs();
+            const sresp = await fetch(config.updateStatusUrl);
+            const sdata = await sresp.json();
+            renderUpdateFailureBanner(sdata?.last_failure ?? null, sdata?.prev_version ?? null);
+            if (!sdata?.running) {
+              clearInterval(state.updateTimer);
+              state.updateTimer = null;
+              setTimeout(fetchAndRenderLogs, 500);
+              checkForUpdates();
+            }
+          } catch (e) {
+            console.warn("Rollback status poll failed:", e);
+            clearInterval(state.updateTimer);
+            state.updateTimer = null;
+          }
+        }, 2000);
+      } catch (e) {
+        console.warn("Failed to start rollback:", e);
+        showResponseModal("failure", "Failed to start rollback");
+      } finally {
+        for (const btn of btns) { btn.disabled = false; }
       }
     }
 
@@ -1297,6 +1381,11 @@
       document.getElementById("confirmShutdownBtn")?.addEventListener("click", () => handleShutdown(false));
       document.getElementById("cancelShutdownBtn")?.addEventListener("click", closeShutdownConfirm);
       document.getElementById("closeShutdownConfirmModalBtn")?.addEventListener("click", closeShutdownConfirm);
+      // JTN-708: rollback button (inside the failure banner) + its confirm modal.
+      document.getElementById("rollbackUpdateBtn")?.addEventListener("click", openRollbackConfirm);
+      document.getElementById("confirmRollbackBtn")?.addEventListener("click", startRollback);
+      document.getElementById("cancelRollbackBtn")?.addEventListener("click", closeRollbackConfirm);
+      document.getElementById("closeRollbackConfirmModalBtn")?.addEventListener("click", closeRollbackConfirm);
       // JTN-652: Escape + backdrop-click dismissal for the reboot / shutdown
       // confirmation modals — parity with every other modal in the app
       // (scheduleModal JTN-461, playlist modals, image lightbox, history
@@ -1310,13 +1399,18 @@
         } else if (isDeviceActionModalOpen("shutdownConfirmModal")) {
           event.preventDefault();
           closeShutdownConfirm();
+        } else if (isDeviceActionModalOpen("rollbackConfirmModal")) {
+          event.preventDefault();
+          closeRollbackConfirm();
         }
       });
       globalThis.addEventListener("click", (event) => {
         const rebootModal = document.getElementById("rebootConfirmModal");
         const shutdownModal = document.getElementById("shutdownConfirmModal");
+        const rollbackModal = document.getElementById("rollbackConfirmModal");
         if (event.target === rebootModal) closeRebootConfirm();
         else if (event.target === shutdownModal) closeShutdownConfirm();
+        else if (event.target === rollbackModal) closeRollbackConfirm();
       });
       document.getElementById("useDeviceLocation")?.addEventListener("change", (event) => {
         toggleUseDeviceLocation(event.currentTarget);

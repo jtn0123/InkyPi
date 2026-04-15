@@ -169,6 +169,16 @@
                             <summary>Recent journal output</summary>
                             <pre id="updateFailureJournal" class="update-failure-journal"></pre>
                         </details>
+                        {# JTN-708: rollback button is injected only when
+                           /settings/update_status reports a non-null
+                           last_failure AND a validated prev_version. Kept
+                           inside the failure banner so the visibility rule
+                           is obvious to readers of the template. #}
+                        <div class="update-failure-actions">
+                            <button type="button" id="rollbackUpdateBtn" class="action-button compact warn" hidden>
+                                Roll back to <span id="rollbackTargetVersion">previous version</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="update-version-row">
                         <div class="update-version-card">
@@ -390,6 +400,20 @@
         </div>
     </div>
 
+    <!-- Rollback confirmation modal (JTN-708) -->
+    <div id="rollbackConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rollbackConfirmTitle" hidden>
+        <div class="modal-content">
+            <button type="button" id="closeRollbackConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
+            <h2 id="rollbackConfirmTitle">Roll Back Update?</h2>
+            <div class="separator"></div>
+            <p>This will check out the previous version (<span id="rollbackConfirmVersion">—</span>) and re-run the installer. The UI may be briefly unavailable while the service restarts.</p>
+            <div class="buttons-container">
+                <button type="button" class="action-button warn" id="confirmRollbackBtn">Roll Back</button>
+                <button type="button" class="action-button" id="cancelRollbackBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Shutdown confirmation modal (JTN-621) -->
     <div id="shutdownConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shutdownConfirmTitle" hidden>
         <div class="modal-content">
@@ -417,6 +441,7 @@
             saveSettingsUrl: {{ url_for('settings.save_settings') | tojson }},
             shutdownUrl: {{ url_for('settings.shutdown') | tojson }},
             startUpdateUrl: {{ url_for('settings.start_update') | tojson }},
+            rollbackUpdateUrl: {{ url_for('settings.start_rollback') | tojson }},
             updateStatusUrl: {{ url_for('settings.update_status') | tojson }},
             versionUrl: {{ url_for('settings.api_version') | tojson }},
         };
