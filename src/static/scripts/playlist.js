@@ -133,6 +133,7 @@
         const body = item?.querySelector('[data-playlist-body]');
         const toggle = item?.querySelector('[data-playlist-toggle]');
         if (!item || !body || !toggle) return;
+        const playlistName = item.getAttribute('data-playlist-name');
 
         if (!mobileQuery.matches){
             body.hidden = false;
@@ -149,7 +150,9 @@
         toggle.textContent = expanded ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
         toggle.setAttribute('aria-expanded', String(expanded));
         if (expanded){
-            state.expandedPlaylist = item.getAttribute('data-playlist-name');
+            state.expandedPlaylist = playlistName;
+        } else if (state.expandedPlaylist === playlistName){
+            state.expandedPlaylist = null;
         }
     }
 
@@ -172,7 +175,10 @@
     function togglePlaylistCard(button){
         const item = button.closest('[data-playlist-card]');
         if (!item) return;
-        const willExpand = item.classList.contains('mobile-collapsed') || !mobileQuery.matches;
+        const isExpanded =
+            button.getAttribute('aria-expanded') === 'true'
+            || item.classList.contains('mobile-expanded');
+        const willExpand = !mobileQuery.matches || !isExpanded;
         if (mobileQuery.matches && willExpand){
             document.querySelectorAll('[data-playlist-card]').forEach((card) => {
                 if (card !== item) setPlaylistExpanded(card, false);

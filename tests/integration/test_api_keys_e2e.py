@@ -31,10 +31,10 @@ def test_api_key_input_and_save(live_server, browser_page):
     # Prevent page reload after save
     page.evaluate("window.location.reload = () => {};")
 
-    # Fill the OpenAI key input
-    key_input = page.locator("#openai-input")
-    key_input.wait_for(state="attached", timeout=5000)
-    key_input.fill("test-api-key-12345")
+    page.locator("#addApiKeyBtn").click()
+    new_row = page.locator(".apikey-row").last
+    new_row.locator(".apikey-key").fill("OPEN_AI_SECRET")
+    new_row.locator(".apikey-value").fill("test-api-key-12345")
 
     # Track save requests
     save_responses = []
@@ -42,7 +42,7 @@ def test_api_key_input_and_save(live_server, browser_page):
         "response",
         lambda resp: (
             save_responses.append(resp.status)
-            if "/save_api_keys" in resp.url or "/api-keys" in resp.url
+            if "/api-keys/save" in resp.url
             else None
         ),
     )

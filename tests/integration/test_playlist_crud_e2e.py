@@ -74,6 +74,25 @@ def test_edit_playlist_opens_modal(
     rc.assert_no_errors(str(tmp_path), "edit_playlist_modal")
 
 
+def test_edit_playlist_opens_modal_mobile(
+    live_server, device_config_dev, mobile_page, tmp_path
+):
+    prepare_playlist(device_config_dev)
+    page = mobile_page
+    rc = navigate_and_wait(page, live_server, "/playlist")
+
+    edit_btn = page.locator(".edit-playlist-btn").first
+    edit_btn.wait_for(state="visible", timeout=5000)
+    edit_btn.click()
+    page.wait_for_timeout(500)
+
+    modal = page.locator("#playlistModal")
+    modal.wait_for(state="visible", timeout=3000)
+    assert modal.is_visible(), "Edit playlist modal should be visible on mobile"
+
+    rc.assert_no_errors(str(tmp_path), "edit_playlist_modal_mobile")
+
+
 def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp_path):
     prepare_playlist(device_config_dev)
     page = browser_page
