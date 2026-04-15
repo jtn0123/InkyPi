@@ -7,7 +7,16 @@ SecretRedactionFilter (JTN-364) strips any secrets before they reach disk.
 Only active when the page opts in via:
     <meta name="client-log-enabled" content="1">
 
-Rate-limited per remote IP using TokenBucket (capacity=10, refill=1/s).
+Rate-limited per remote IP using TokenBucket. In production the bucket is sized
+at capacity=60, refill=10/s (JTN-711) so a burst of errors from a broken page
+is not silently dropped. Each POST — whether it carries a single entry or a
+batch array — consumes exactly one token.
+
+Payload shapes (both accepted):
+    1. Single object: ``{"level": "warn", "message": "..."}``
+    2. Batch array:   ``[{"level": "warn", ...}, {"level": "error", ...}]``
+       Batch size is capped at ``_BATCH_MAX`` entries; oversized batches are
+       rejected with 400.
 """
 
 from __future__ import annotations
@@ -16,12 +25,12 @@ import json
 import logging
 import os
 import threading
+from typing import Any
 
-from flask import Blueprint, Response
+from flask import Blueprint, Response, request
 
-from utils.client_endpoint import parse_client_report, strip_newlines
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error, reissue_json_error
+from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)
@@ -69,16 +78,21 @@ def reset_captured_reports() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting — 10-token burst, refills at 1 token/s
+# Rate limiting — JTN-711: raised from capacity=10, refill=1/s.
+#
+# 60-token burst, refills at 10 tokens/s. A broken page can now emit ~60
+# errors in a single burst without the browser reporter self-disabling, and
+# each batched POST consumes only one token regardless of entry count.
 # ---------------------------------------------------------------------------
-_rate_limiter: TokenBucket = TokenBucket(capacity=10, refill_rate=1.0)
+_rate_limiter: TokenBucket = TokenBucket(capacity=60, refill_rate=10.0)
 
 # ---------------------------------------------------------------------------
 # Size limits
 # ---------------------------------------------------------------------------
 _MESSAGE_MAX = 2048  # bytes for message field
 _ARGS_MAX = 4096  # bytes for args field
-_BODY_MAX = 16_384  # 16 KB total body
+_BODY_MAX = 256 * 1024  # 256 KB total body — batch of 50 × ~4KB entries + slack
+_BATCH_MAX = 50  # maximum entries per batch POST
 
 # Accepted levels — info/debug rejected to avoid noise
 _ACCEPTED_LEVELS = frozenset({"warn", "error"})
@@ -89,53 +103,127 @@ def _cap(value: object, max_len: int) -> str:
     return str(value)[:max_len]
 
 
-@client_log_bp.route("/api/client-log", methods=["POST"])
-def receive_client_log() -> tuple[Response, int] | Response:
-    """Accept a browser console.warn/error report and emit it as a WARNING log entry.
+def _validate_and_normalize(entry: Any) -> tuple[dict[str, object] | None, str | None]:
+    """Validate a single client-log entry dict.
 
-    Returns 204 on success so the browser-side script has a cheap ack with
-    no body to parse.
+    Returns ``(normalized_entry, None)`` on success or ``(None, error_message)``
+    otherwise. Newline stripping happens downstream in ``_build_report``.
     """
-    data, error = parse_client_report(_rate_limiter, _BODY_MAX)
-    if error is not None:
-        return reissue_json_error(error, "Invalid client log report")
+    if not isinstance(entry, dict):
+        return None, "entry must be a JSON object"
 
-    level = data.get("level", "")
+    level = entry.get("level", "")
     if level not in _ACCEPTED_LEVELS:
-        # Log the rejected value (sanitized) for debugging but do not echo
-        # it back to the client — that would be a reflective-xss sink
-        # (CodeQL py/reflective-xss). Response carries a generic message.
         logger.warning(
             "client log rejected: invalid level %s (accepted: %s)",
             sanitize_log_field(level),
             sorted(_ACCEPTED_LEVELS),
         )
-        return json_error(
-            f"Invalid level: must be one of {sorted(_ACCEPTED_LEVELS)}",
-            status=400,
-        )
+        return None, f"Invalid level: must be one of {sorted(_ACCEPTED_LEVELS)}"
+    return entry, None
 
-    # Strip CR/LF from each field to prevent log injection (Sonar S5145).
-    # SecretRedactionFilter (JTN-364) handles secret stripping downstream.
-    report: dict[str, object] = {"level": level}
-    if "message" in data:
-        report["message"] = strip_newlines(_cap(data["message"], _MESSAGE_MAX))
-    if "args" in data:
-        report["args"] = strip_newlines(_cap(data["args"], _ARGS_MAX))
-    if "url" in data:
-        report["url"] = strip_newlines(_cap(data["url"], _MESSAGE_MAX))
-    if "ts" in data:
-        report["ts"] = strip_newlines(_cap(data["ts"], 64))
 
-    logger.warning("client log [%s]: %s", level, json.dumps(report))
+def _strip_newlines(value: str) -> str:
+    """Replace CR/LF with spaces to prevent log-injection (Sonar S5145)."""
+    return value.replace("\r", " ").replace("\n", " ")
 
-    # Test-only capture hook (JTN-680). No-op in production: the env-var
-    # check is a single dict lookup + short-circuited string compare when
-    # the variable is unset, so overhead is negligible and behaviour is
-    # bit-identical to the pre-hook implementation.
+
+def _build_report(entry: dict[str, Any]) -> dict[str, object]:
+    """Build the logged report dict from a validated entry.
+
+    CR/LF is stripped from every field to prevent log injection
+    (Sonar S5145). SecretRedactionFilter (JTN-364) handles secret stripping
+    downstream in the logging layer.
+    """
+    report: dict[str, object] = {"level": entry["level"]}
+    if "message" in entry:
+        report["message"] = _strip_newlines(_cap(entry["message"], _MESSAGE_MAX))
+    if "args" in entry:
+        report["args"] = _strip_newlines(_cap(entry["args"], _ARGS_MAX))
+    if "url" in entry:
+        report["url"] = _strip_newlines(_cap(entry["url"], _MESSAGE_MAX))
+    if "ts" in entry:
+        report["ts"] = _strip_newlines(_cap(entry["ts"], 64))
+    return report
+
+
+def _emit(report: dict[str, object]) -> None:
+    """Emit a single validated report to the logger and (optionally) capture."""
+    logger.warning("client log [%s]: %s", report["level"], json.dumps(report))
     if _capture_enabled():
         with _captured_lock:
             _captured_reports.append(dict(report))
+
+
+@client_log_bp.route("/api/client-log", methods=["POST"])
+def receive_client_log() -> tuple[Response, int] | Response:
+    """Accept a single entry OR an array of entries and log each as WARNING.
+
+    * Single object payload: legacy shape, still supported (JTN-481).
+    * Array payload: one POST carries up to ``_BATCH_MAX`` entries and
+      consumes exactly one rate-limit token (JTN-711).
+
+    Returns 204 on success. On batch requests where one or more entries fail
+    validation, returns 400 with a JSON body listing per-entry errors so the
+    client can fix the payload; valid entries in the same request are NOT
+    emitted in that case (all-or-nothing semantics keep the contract simple).
+    """
+    # ---- Size + rate-limit + JSON parse (inline, not via parse_client_report
+    # which hardcodes the dict requirement). -------------------------------
+    content_length = request.content_length
+    if content_length is not None and content_length > _BODY_MAX:
+        return json_error("Request body too large", status=413)
+
+    raw_body = request.get_data(as_text=False)
+    if len(raw_body) > _BODY_MAX:
+        return json_error("Request body too large", status=413)
+
+    remote_ip = request.remote_addr or "unknown"
+    if not _rate_limiter.try_acquire(remote_ip):
+        return json_error("Rate limit exceeded", status=429)
+
+    try:
+        data = json.loads(raw_body)
+    except ValueError:
+        return json_error("Request body must be valid JSON", status=400)
+
+    # ---- Normalise single object vs batch array --------------------------
+    if isinstance(data, list):
+        entries = data
+        if len(entries) == 0:
+            return json_error("Batch must contain at least one entry", status=400)
+        if len(entries) > _BATCH_MAX:
+            return json_error(
+                f"Batch too large: max {_BATCH_MAX} entries per POST", status=400
+            )
+    elif isinstance(data, dict):
+        entries = [data]
+    else:
+        return json_error(
+            "Request body must be a JSON object or array of objects", status=400
+        )
+
+    # ---- Validate every entry before emitting (all-or-nothing) -----------
+    validated: list[dict[str, Any]] = []
+    errors: list[dict[str, object]] = []
+    for idx, entry in enumerate(entries):
+        normalized, err = _validate_and_normalize(entry)
+        if err is not None:
+            errors.append({"index": idx, "error": err})
+        else:
+            assert normalized is not None
+            validated.append(normalized)
+
+    if errors:
+        # Return the first error in the generic `error` field (kept stable for
+        # legacy clients that only read it) and the full per-entry list so
+        # batched senders can self-correct.
+        first_msg = str(errors[0]["error"])
+        return json_error(first_msg, status=400, details={"entry_errors": errors})
+
+    # ---- Emit every validated entry --------------------------------------
+    for entry in validated:
+        _emit(_build_report(entry))
 
     return Response(status=204)
 
