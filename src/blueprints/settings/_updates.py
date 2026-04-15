@@ -6,6 +6,7 @@ from flask import current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
 import blueprints.settings as _mod
+from blueprints.settings._update_status import read_last_update_failure
 from utils.http_utils import json_error, json_internal_error, json_success
 
 
@@ -32,12 +33,29 @@ def start_update():
         else:
             body = {}
 
-        raw = body.get("target_version")
-        if raw and isinstance(raw, str):
+        # JTN-710: if ``target_version`` is present in the body, validate
+        # it explicitly instead of silently falling through to the
+        # "latest semver tag" code path when it's null/empty.  Without this
+        # guard, a client sending ``{"target_version": null}`` or
+        # ``{"target_version": ""}`` caused do_update.sh to fail with
+        # "No semver tags found" only visible in the system journal.
+        if "target_version" in body:
+            raw = body.get("target_version")
+            if raw is None or not isinstance(raw, str) or not raw.strip():
+                return json_error(
+                    "target_version must be a non-empty string",
+                    status=400,
+                    code="validation_error",
+                    details={"field": "target_version"},
+                )
             target_tag = raw.strip()
-
-        if target_tag and not _mod._TAG_RE.fullmatch(target_tag):
-            return json_error("Invalid target version format", status=400)
+            if not _mod._TAG_RE.fullmatch(target_tag):
+                return json_error(
+                    "Invalid target version format",
+                    status=400,
+                    code="validation_error",
+                    details={"field": "target_version"},
+                )
 
         script_path = _mod._get_update_script_path()
         # NOTE: the systemd unit name is now generated *inside*
@@ -140,11 +158,17 @@ def update_status():
             unit = _mod._UPDATE_STATE.get("unit")
             started_at = _mod._UPDATE_STATE.get("started_at")
 
+        # JTN-710: surface the last update failure (written by the EXIT trap
+        # in install/update.sh) so the UI can show *why* an update failed
+        # without the user SSHing in to read the system journal.
+        last_failure = read_last_update_failure()
+
         return jsonify(
             {
                 "running": running,
                 "unit": unit,
                 "started_at": started_at,
+                "last_failure": last_failure,
             }
         )
     except Exception as e:

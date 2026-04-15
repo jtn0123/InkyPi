@@ -59,6 +59,67 @@
     return /\bWARNING\b/i.test(line);
   }
 
+  // JTN-710: banner rendering helpers.  Kept at module scope (outside the
+  // createSettingsPage closure) so Sonar S7721/S3776 stay green and the
+  // helpers can be individually tested/tree-shaken.
+  function setTextIfPresent(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function renderUpdateFailureUnreadable(banner) {
+    setTextIfPresent("updateFailureTimestamp", "");
+    setTextIfPresent("updateFailureExitCode", "");
+    setTextIfPresent(
+      "updateFailureStep",
+      "Last update failure record was unreadable."
+    );
+    const details = document.getElementById("updateFailureDetails");
+    if (details) details.hidden = true;
+    banner.hidden = false;
+  }
+
+  function renderUpdateFailureFields(lastFailure) {
+    const tsText = lastFailure.timestamp
+      ? `Failed at ${lastFailure.timestamp}`
+      : "";
+    const codeText =
+      typeof lastFailure.exit_code === "number"
+        ? `exit ${lastFailure.exit_code}`
+        : "";
+    const stepText = lastFailure.last_command
+      ? `step: ${lastFailure.last_command}`
+      : "";
+    setTextIfPresent("updateFailureTimestamp", tsText);
+    setTextIfPresent("updateFailureExitCode", codeText);
+    setTextIfPresent("updateFailureStep", stepText);
+
+    const journalText = lastFailure.recent_journal_lines || "";
+    setTextIfPresent("updateFailureJournal", journalText);
+    const details = document.getElementById("updateFailureDetails");
+    if (details) details.hidden = !journalText;
+  }
+
+  // Render the update-failure banner from a /settings/update_status payload.
+  // ``lastFailure`` mirrors the JSON written to /var/lib/inkypi/.last-update-failure
+  // by install/update.sh's EXIT trap (JTN-704): timestamp, exit_code,
+  // last_command, recent_journal_lines.  A malformed file surfaces as
+  // ``{parse_error: true}`` so we can still show a generic banner.
+  function renderUpdateFailureBanner(lastFailure) {
+    const banner = document.getElementById("updateFailureBanner");
+    if (!banner) return;
+    if (!lastFailure) {
+      banner.hidden = true;
+      return;
+    }
+    if (lastFailure.parse_error) {
+      renderUpdateFailureUnreadable(banner);
+      return;
+    }
+    renderUpdateFailureFields(lastFailure);
+    banner.hidden = false;
+  }
+
   function prefKey(key) {
     return `logs_${key}`;
   }
@@ -583,6 +644,18 @@
       }
     }
 
+    async function refreshUpdateStatus() {
+      try {
+        const resp = await fetch(config.updateStatusUrl, { cache: "no-store" });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        renderUpdateFailureBanner(data?.last_failure ?? null);
+      } catch (e) {
+        // Silent: the banner is best-effort; do not block the UI.
+        console.warn("Update status refresh failed:", e);
+      }
+    }
+
     async function startUpdate() {
       const btns = document.querySelectorAll(".header-actions .header-button");
       try {
@@ -602,6 +675,8 @@
             await fetchAndRenderLogs();
             const sresp = await fetch(config.updateStatusUrl);
             const sdata = await sresp.json();
+            // JTN-710: surface any newly-written failure record as soon as it lands.
+            renderUpdateFailureBanner(sdata?.last_failure ?? null);
             if (!sdata?.running) {
               clearInterval(state.updateTimer);
               state.updateTimer = null;
@@ -1266,6 +1341,8 @@
       refreshIsolation();
       initProgressSSE();
       setTimeout(checkForUpdates, 5000);
+      // JTN-710: show a banner if the previous update failed.
+      refreshUpdateStatus();
       if (mobileQuery && typeof mobileQuery.addEventListener === "function") {
         mobileQuery.addEventListener("change", () => setActiveTab(state.activeTab));
       }
