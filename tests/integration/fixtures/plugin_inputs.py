@@ -37,6 +37,13 @@ PLUGIN_FORM_INPUTS: dict[str, dict[str, str]] = {
         "fontSize": "normal",
         "listStyle": "disc",
     },
+    # Countdown exercises text + date inputs, rendered from schema with
+    # ``style_settings = True`` so ``populateStyleSettings`` will re-hydrate
+    # the form after a page reload (JTN-723 round-trip assertion).
+    "countdown": {
+        "title": "Vacation",
+        "date": "2030-12-31",
+    },
 }
 
 
