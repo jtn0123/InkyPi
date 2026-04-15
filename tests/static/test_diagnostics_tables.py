@@ -60,6 +60,26 @@ class TestDiagnosticsTableBuilders:
         js = _read_js()
         assert "function formatPercent" in js
 
+    def test_format_disk_free_defined(self):
+        js = _read_js()
+        assert "function formatDiskFree" in js
+
+    def test_disk_row_uses_free_gb_key(self):
+        """Disk row must consume disk_free_gb, not disk_percent."""
+        js = _read_js()
+        assert '"disk_free_gb"' in js
+
+    def test_disk_row_label_contains_gb(self):
+        """formatDiskFree must append the 'GB' unit."""
+        js = _read_js()
+        assert "GB free" in js
+
+    def test_disk_row_label_contains_free(self):
+        """formatDiskFree must include the 'free' qualifier."""
+        js = _read_js()
+        assert '"disk_free_gb"' in js
+        assert "GB free" in js
+
     def test_empty_isolation_message(self):
         js = _read_js()
         assert "No plugins isolated" in js

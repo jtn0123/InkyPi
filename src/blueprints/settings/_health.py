@@ -56,14 +56,20 @@ def health_system():
         try:
             import psutil  # type: ignore
 
+            du = psutil.disk_usage("/")
+            vm = psutil.virtual_memory()
             data["cpu_percent"] = psutil.cpu_percent(interval=None)
-            data["memory_percent"] = psutil.virtual_memory().percent
-            data["disk_percent"] = psutil.disk_usage("/").percent
+            data["memory_percent"] = vm.percent
+            data["disk_percent"] = du.percent
+            data["disk_free_gb"] = round(du.free / (1024**3), 1)
+            data["disk_total_gb"] = round(du.total / (1024**3), 1)
             data["uptime_seconds"] = int(time.time() - psutil.boot_time())
         except Exception:
             data["cpu_percent"] = None
             data["memory_percent"] = None
             data["disk_percent"] = None
+            data["disk_free_gb"] = None
+            data["disk_total_gb"] = None
             data["uptime_seconds"] = None
         return json_success(**data)
     except Exception as e:
