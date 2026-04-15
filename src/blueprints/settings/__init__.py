@@ -52,6 +52,11 @@ _PRIORITY_TO_LEVEL = {
     "7": "DEBUG",
 }
 UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
+# JTN-708: rollback.sh reverts to the tag recorded in /var/lib/inkypi/prev_version.
+# It's gated separately from the forward-update path because rollback.sh only
+# runs after a failed update (guard enforced at the Flask route level) and
+# delegates to update.sh internally.
+ROLLBACK_SCRIPT_NAME = "rollback.sh"
 
 # Strict allow-lists for systemd-run command construction (JTN-319).
 # CodeQL py/command-line-injection flagged _start_update_via_systemd because
@@ -65,6 +70,12 @@ UPDATE_SCRIPT_NAMES = ("do_update.sh", "update.sh")
 # every Popen call site are intentionally not pre-compiled so CodeQL can
 # constant-fold them for sanitiser recognition.
 _ALLOWED_UPDATE_SCRIPT_BASENAMES = frozenset(UPDATE_SCRIPT_NAMES)
+# JTN-708: the rollback script is validated through the same trusted-root /
+# basename allow-list machinery as do_update.sh / update.sh.  Keeping a
+# dedicated frozenset (rather than adding rollback.sh to
+# _ALLOWED_UPDATE_SCRIPT_BASENAMES) means an accidental call to
+# _start_update_via_systemd cannot resolve to rollback.sh and vice-versa.
+_ALLOWED_ROLLBACK_SCRIPT_BASENAMES = frozenset((ROLLBACK_SCRIPT_NAME,))
 
 # Trusted install roots for update scripts. The realpath of any script we are
 # willing to exec via subprocess.Popen MUST be inside one of these directories.
@@ -79,6 +90,16 @@ _TRUSTED_UPDATE_DIRS: tuple[str, ...] = (
 # is appended in-function from a Python int (time.time()) so the final string
 # is provably not user-influenced.
 _UPDATE_UNIT_PREFIX = "inkypi-update"
+# JTN-708: distinct prefix for rollback transient units so operators (and the
+# status endpoint) can distinguish a rollback from a forward update via
+# ``systemctl list-units 'inkypi-rollback-*'``.
+_ROLLBACK_UNIT_PREFIX = "inkypi-rollback"
+
+# S1192: the canonical PROJECT_DIR + bash interpreter are referenced from
+# multiple Popen call sites (_start_update_via_systemd / _start_rollback_via_systemd
+# / _get_*_script_path fallbacks), so pull them to module-level constants.
+_DEFAULT_PROJECT_DIR = "/usr/local/inkypi"
+_BASH_INTERPRETER = "/bin/bash"
 
 # Guardrails and limits for logs APIs
 MAX_LOG_HOURS = 24
@@ -371,6 +392,37 @@ def _get_update_script_path() -> str | None:
 _get_install_update_script_path = _get_update_script_path
 
 
+def _get_rollback_script_path() -> str | None:
+    """Return absolute path to ``install/rollback.sh`` (JTN-708).
+
+    Uses the same candidate cascade as ``_get_update_script_path`` so a
+    developer running the Flask app from a repo checkout sees the in-repo
+    rollback.sh, while a production install picks up the
+    ``/usr/local/inkypi/install/rollback.sh`` copy.
+    """
+    candidates: list[str] = []
+    project_dir = os.getenv("PROJECT_DIR")
+
+    def add_install_candidate(base_dir: str) -> None:
+        candidates.append(os.path.join(base_dir, "install", ROLLBACK_SCRIPT_NAME))
+
+    if project_dir:
+        src_link = os.path.join(project_dir, "src")
+        if os.path.islink(src_link):
+            repo_root = os.path.dirname(os.path.realpath(src_link))
+            add_install_candidate(repo_root)
+        add_install_candidate(project_dir)
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_install = os.path.abspath(os.path.join(here, "..", "..", "..", "install"))
+    candidates.append(os.path.join(repo_install, ROLLBACK_SCRIPT_NAME))
+
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def _systemd_available() -> bool:
     try:
         return shutil.which("systemd-run") is not None
@@ -519,6 +571,79 @@ def _start_update_via_systemd(target_tag: str | None = None) -> None:
         cmd.append(target_tag)
     # All argv elements above are either string literals or have been
     # validated by the inline ``re.fullmatch`` guards / trusted-root check.
+    subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
+
+
+def _validate_rollback_script_path(script_path: str) -> str:
+    """JTN-708 — mirror ``_validate_update_script_path`` for rollback.sh.
+
+    Same trusted-root machinery as the update-script validator; the only
+    difference is the allowed basename, so a mis-wired caller cannot exec
+    do_update.sh through the rollback path or vice-versa.
+    """
+    if not isinstance(script_path, str) or not script_path:
+        raise ValueError(f"Invalid rollback script path: {script_path!r}")
+    real = os.path.realpath(script_path)
+    trusted = _trusted_update_dirs()
+    in_trusted_root = False
+    for root in trusted:
+        try:
+            if os.path.commonpath([real, root]) == root:
+                in_trusted_root = True
+                break
+        except ValueError:
+            continue
+    if not in_trusted_root:
+        raise ValueError(
+            f"Invalid rollback script path (not under trusted root): {script_path!r}"
+        )
+    if os.path.basename(real) not in _ALLOWED_ROLLBACK_SCRIPT_BASENAMES:
+        raise ValueError(f"Invalid rollback script basename: {script_path!r}")
+    return real
+
+
+def _start_rollback_via_systemd() -> None:
+    """Launch rollback.sh in a transient systemd unit (JTN-708).
+
+    Security posture mirrors ``_start_update_via_systemd``:
+        * No caller-controlled values flow into argv — the script path is
+          resolved internally via ``_get_rollback_script_path`` and then
+          canonicalised + trusted-root-checked via
+          ``_validate_rollback_script_path``.
+        * The transient unit name is a hardcoded literal prefix plus a fresh
+          ``int(time.time())`` so CodeQL can statically prove the value is not
+          user-influenced.
+        * PROJECT_DIR defaults to the hardcoded ``/usr/local/inkypi``; any
+          environment override is re-validated against a strict absolute-POSIX
+          path regex before being passed through.
+    """
+    project_dir = os.getenv("PROJECT_DIR", _DEFAULT_PROJECT_DIR)
+    if (
+        not isinstance(project_dir, str)
+        or not re.fullmatch(r"^/[A-Za-z0-9_./-]{1,255}$", project_dir)
+        or ".." in project_dir.split("/")
+    ):
+        project_dir = _DEFAULT_PROJECT_DIR
+
+    candidate = (
+        _get_rollback_script_path()
+        or f"{_DEFAULT_PROJECT_DIR}/install/{ROLLBACK_SCRIPT_NAME}"
+    )
+    script_path = _validate_rollback_script_path(candidate)
+
+    unit_name = f"{_ROLLBACK_UNIT_PREFIX}-{int(time.time())}"
+
+    cmd: list[str] = [
+        "systemd-run",
+        "--collect",
+        f"--unit={unit_name}",
+        "--property=StandardOutput=journal",
+        "--property=StandardError=journal",
+        f"--setenv=PROJECT_DIR={project_dir}",
+        _BASH_INTERPRETER,
+        script_path,
+    ]
+    # All argv elements above are string literals or validated internal values.
     subprocess.Popen(cmd)  # noqa: S603  # all inputs sanitized; shell=False
 
 

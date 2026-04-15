@@ -1,5 +1,6 @@
 """Update, update-status, and version-check route handlers."""
 
+import os
 import time
 
 from flask import current_app, jsonify, request
@@ -8,6 +9,35 @@ from werkzeug.exceptions import BadRequest
 import blueprints.settings as _mod
 from blueprints.settings._update_status import read_last_update_failure
 from utils.http_utils import json_error, json_internal_error, json_success
+
+
+def _prev_version_path() -> str:
+    """Resolve the prev_version breadcrumb path (JTN-673 / JTN-708).
+
+    Honors ``INKYPI_LOCKFILE_DIR`` so integration tests can redirect state
+    writes to a tempdir — same contract as ``_update_status.py`` uses for
+    ``.last-update-failure``.
+    """
+    base = os.environ.get("INKYPI_LOCKFILE_DIR") or "/var/lib/inkypi"
+    return os.path.join(base, "prev_version")
+
+
+def _read_prev_version() -> str | None:
+    """Return the tag recorded in ``/var/lib/inkypi/prev_version`` or ``None``.
+
+    Applies the same strict semver regex as ``_TAG_RE`` to refuse malformed
+    records — defense-in-depth for the UI: if the file got corrupted we
+    simply hide the rollback button rather than advertising an unusable
+    target.
+    """
+    try:
+        with open(_prev_version_path(), encoding="utf-8") as fh:
+            raw = fh.read().strip()
+    except OSError:
+        return None
+    if not raw or not _mod._TAG_RE.fullmatch(raw):
+        return None
+    return raw
 
 
 @_mod.settings_bp.route("/settings/update", methods=["POST"])  # start update
@@ -163,16 +193,115 @@ def update_status():
         # without the user SSHing in to read the system journal.
         last_failure = read_last_update_failure()
 
+        # JTN-708: surface the prev_version breadcrumb so the UI can gate the
+        # "Roll back" button on whether a valid previous tag exists.  The read
+        # already applies the strict semver regex, so an unreadable / corrupt
+        # file is returned as ``None`` (button stays hidden).
+        prev_version = _read_prev_version()
+
         return jsonify(
             {
                 "running": running,
                 "unit": unit,
                 "started_at": started_at,
                 "last_failure": last_failure,
+                "prev_version": prev_version,
             }
         )
     except Exception as e:
         return json_internal_error("update status", details={"error": str(e)})
+
+
+@_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])
+def start_rollback():
+    """Trigger a rollback to the tag recorded in ``/var/lib/inkypi/prev_version``.
+
+    JTN-708: completes the failed-update recovery loop.
+
+    Gating rules (return 409 otherwise):
+        * ``.last-update-failure`` must exist — rollback is an emergency
+          recovery path, not a "time machine". If the current install is
+          healthy, use /settings/update with an explicit target_version.
+        * ``prev_version`` must exist AND match the strict semver regex.  A
+          corrupt/missing breadcrumb means we have no safe target.
+        * No other update may be running (409 matches the /settings/update
+          TOCTOU guard).
+
+    The heavy lifting is in ``install/rollback.sh``: it reads the breadcrumb,
+    checks out the tag, then exec's ``update.sh`` — so the EXIT trap
+    (JTN-704) still records failures to ``.last-update-failure`` if the
+    rollback itself fails.
+    """
+    try:
+        # 1. Require a recorded last-update-failure.  Without one, a rollback
+        #    would be reverting a healthy install — refuse.
+        last_failure = read_last_update_failure()
+        if not last_failure:
+            return json_error(
+                "No failed update recorded; nothing to roll back.",
+                status=409,
+                code="no_failure",
+            )
+
+        # 2. Require a validated prev_version breadcrumb.
+        prev_version = _read_prev_version()
+        if not prev_version:
+            return json_error(
+                "No previous version recorded; cannot roll back.",
+                status=409,
+                code="no_prev_version",
+            )
+
+        use_systemd = _mod._systemd_available()
+        unit = f"inkypi-rollback-{int(time.time())}"
+
+        # 3. TOCTOU-safe check-and-set — mirror start_update's pattern so two
+        #    concurrent rollback clicks can't both pass the guard.
+        with _mod._update_lock:
+            if _mod._UPDATE_STATE.get("running"):
+                response, _ = json_error(
+                    "Update or rollback already in progress.", status=409
+                )
+                payload = response.get_json()
+                payload["running"] = True
+                payload["unit"] = _mod._UPDATE_STATE.get("unit")
+                return jsonify(payload), 409
+            new_unit = f"{unit}.service" if use_systemd else None
+            _mod._UPDATE_STATE["running"] = True
+            _mod._UPDATE_STATE["unit"] = new_unit
+            _mod._UPDATE_STATE["started_at"] = float(time.time())
+
+        if use_systemd:
+            try:
+                _mod._start_rollback_via_systemd()
+            except Exception:
+                _mod.logger.exception(
+                    "systemd-run failed for rollback; clearing running state"
+                )
+                _mod._set_update_state(False, None)
+                return json_internal_error("start rollback")
+        else:
+            # Dev / macOS path: reuse the simulated update runner so the UI
+            # still sees log output.  Production Pi always has systemd.
+            _mod._start_update_fallback_thread(None, target_tag=prev_version)
+
+        # JTN-708: 202 Accepted lets clients/tests distinguish "rollback
+        # kicked off" from a synchronous reply; the UI polls
+        # /settings/update_status for completion.
+        return json_success(
+            message=(
+                f"Rollback to {prev_version} started. "
+                "Watch the Logs panel for progress."
+            ),
+            status=202,
+            running=True,
+            unit=_mod._UPDATE_STATE.get("unit"),
+            target_version=prev_version,
+        )
+    except Exception as e:
+        _mod.logger.exception("/settings/update/rollback error")
+        _mod._set_update_state(False, None)
+        return json_internal_error("start rollback", details={"error": str(e)})
 
 
 @_mod.settings_bp.route("/api/version", methods=["GET"])

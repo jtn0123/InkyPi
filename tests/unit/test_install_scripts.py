@@ -2037,6 +2037,49 @@ class TestUpdateScript:
 # ---- uninstall.sh ----
 
 
+class TestRollbackScript:
+    """JTN-708: structural hygiene for install/rollback.sh.
+
+    The rich coverage lives in tests/unit/test_rollback_script.py; this class
+    keeps the "matches the rest of install/" contract (strict mode + trap/exit
+    hygiene) parallel with TestUpdateScript / TestInstallScript so future
+    drift is caught here alongside the other install scripts.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        self.content = _read("rollback.sh")
+
+    def test_rollback_sets_strict_mode(self):
+        # set -euo pipefail is the only acceptable shape — `set -e` alone
+        # silently drops unset-var errors, which we must not allow for a
+        # script that touches prev_version / git refs.
+        assert (
+            "set -euo pipefail" in self.content
+        ), "rollback.sh must use 'set -euo pipefail'"
+
+    def test_rollback_shebang_is_bash(self):
+        assert self.content.startswith(
+            "#!/bin/bash"
+        ), "rollback.sh must have a bash shebang"
+
+    def test_rollback_uses_distinct_exit_codes(self):
+        # Exit code hygiene: operators must be able to tell "no breadcrumb"
+        # from "invalid breadcrumb" from "tag unavailable" from generic errors.
+        for code in ("exit 10", "exit 11", "exit 12"):
+            assert (
+                code in self.content
+            ), f"rollback.sh must use {code!r} for a distinct failure mode"
+
+    def test_rollback_delegates_to_update_sh(self):
+        # exec'ing update.sh lets its EXIT trap (JTN-704) record any failure
+        # during the rollback to .last-update-failure for UI surfacing — the
+        # same recovery path as a forward update.
+        assert (
+            'exec bash "$UPDATE_SCRIPT"' in self.content
+        ), "rollback.sh must exec update.sh so JTN-704 failure recording applies"
+
+
 class TestUninstallScript:
     @pytest.fixture(autouse=True)
     def _load(self):
