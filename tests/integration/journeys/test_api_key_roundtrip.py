@@ -118,9 +118,17 @@ def test_api_key_add_edit_delete_roundtrip(live_server, browser_page, client):
         assert (
             env_after_edit.get(key_name) == _FAKE_KEY_VALUE_EDITED
         ), "edit should replace the stored value"
+        # dotenv_values() collapses duplicate keys in a dict, so to catch the
+        # "edit wrote a second KEY= row" regression we inspect the raw file.
+        with open(env_path, encoding="utf-8") as _env_file:
+            key_lines_after_edit = [
+                line
+                for line in _env_file.read().splitlines()
+                if line.startswith(f"{key_name}=")
+            ]
         assert (
-            sum(1 for k in env_after_edit if k == key_name) == 1
-        ), "editing must not create a duplicate key"
+            len(key_lines_after_edit) == 1
+        ), f"editing must not create a duplicate key; found {key_lines_after_edit!r}"
 
         # ---- Step 9+10: reload and verify the edit persisted visually. ----
         rc = navigate_and_wait(page, live_server, "/api-keys")
