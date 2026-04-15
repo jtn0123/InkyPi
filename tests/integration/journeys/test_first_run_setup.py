@@ -41,6 +41,27 @@ _SKIP_UI = os.getenv("SKIP_UI", "").lower() in ("1", "true") or os.getenv(
 ).lower() in ("1", "true")
 
 
+def _playwright_chromium_available() -> bool:
+    """Return True only when a real Chromium binary is installed locally.
+
+    Mirrors the detection in ``tests/conftest.py`` so the UI variant of this
+    journey cleanly skips in CI lanes that don't install Playwright browsers
+    (the main ``pytest`` job) instead of erroring at fixture setup.
+    """
+    try:  # pragma: no cover - best-effort probe
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            browser.close()
+        return True
+    except Exception:
+        return False
+
+
+_SKIP_UI = _SKIP_UI or not _playwright_chromium_available()
+
+
 def _latest_history_sidecar(history_dir: Path) -> dict | None:
     """Return the parsed JSON sidecar of the newest history entry, if any."""
     if not history_dir.is_dir():
