@@ -1,6 +1,36 @@
 # CHANGELOG
 
 
+## v0.58.0 (2026-04-15)
+
+### Features
+
+- **a11y**: Add role="dialog" to What's New modal (JTN-589)
+  ([#501](https://github.com/jtn0123/InkyPi/pull/501),
+  [`1ac381e`](https://github.com/jtn0123/InkyPi/commit/1ac381e4d492a802197fb3880a4f54659c540749))
+
+The changelog/release-notes panel lacked role="dialog", aria-modal="true", and aria-labelledby,
+  making it invisible to screen readers and automated test tools that query [role=dialog].
+
+- Added What's New modal to settings.html with full ARIA attributes - Added "What's New" trigger
+  button in the update panel (shown only when release notes are available) - Wired openWhatsNew /
+  closeWhatsNew in settings_page.js with focus management and Escape + backdrop-click dismissal -
+  Added 9 static regression tests in tests/static/test_whats_new_dialog_role.py
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- **ui**: Replace window.confirm with in-app modal on /errors Clear All (JTN-586)
+  ([#502](https://github.com/jtn0123/InkyPi/pull/502),
+  [`42ec254`](https://github.com/jtn0123/InkyPi/commit/42ec254bdbd2fd836d29f28ec048abb591467529))
+
+Build the /errors page (GET /errors, POST /errors/clear) with an in-app confirmation modal that
+  matches the History page's clear-all pattern, eliminating the native window.confirm() that blocked
+  tabs and broke agent-browser sessions. Add 15 tests covering page render, modal markup, JS source,
+  and the clear endpoint.
+
+Co-authored-by: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+
 ## v0.57.0 (2026-04-15)
 
 ### Features
