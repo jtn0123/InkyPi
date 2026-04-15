@@ -24,11 +24,10 @@ Flow:
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
-from io import BytesIO
 from random import randint
 from typing import Any
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
@@ -177,17 +176,18 @@ class Wpotd(BasePlugin):
                 "SVG format is not supported by Pillow. Skipping image download."
             )
             raise RuntimeError("Failed to load WPOTD image.")
-        try:
-            response = get_http_session().get(url, headers=self.HEADERS, timeout=10)
-            response.raise_for_status()
-            with Image.open(BytesIO(response.content)) as img:
-                return img.copy()
-        except UnidentifiedImageError as e:
-            logger.error(f"Unsupported image format at {url}: {str(e)}")
-            raise RuntimeError("Unsupported image format.") from e
-        except Exception as e:
-            logger.error(f"Failed to load WPOTD image from {url}: {str(e)}")
-            raise RuntimeError("Failed to load WPOTD image.") from e
+        dimensions = (4096, 4096)
+        image = self.image_loader.from_url(
+            url,
+            dimensions=dimensions,
+            timeout_ms=10000,
+            resize=False,
+            headers=self.HEADERS,
+        )
+        if image is None:
+            logger.error("Failed to load WPOTD image from %s", url)
+            raise RuntimeError("Failed to load WPOTD image.")
+        return image
 
     def _fetch_potd(self, cur_date: date) -> dict[str, Any]:
         title = f"Template:POTD/{cur_date.isoformat()}"

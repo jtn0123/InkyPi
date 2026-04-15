@@ -8,10 +8,7 @@ For the API key, set `NASA_SECRET={API_KEY}` in your .env file.
 import logging
 import os
 from datetime import UTC, date, datetime, timedelta
-from io import BytesIO
 from random import randint
-
-from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
@@ -27,6 +24,25 @@ _APOD_MIN_DATE = date(1995, 6, 16)
 
 
 class Apod(BasePlugin):
+    def _candidate_image_urls(self, data: dict) -> list[str]:
+        """Return APOD image URLs ordered by device-appropriate preference.
+
+        On low-resource devices like a Pi Zero 2 W, prefer NASA's standard
+        ``url`` asset before ``hdurl`` to reduce download/decode pressure.
+        """
+        standard_url = data.get("url")
+        hd_url = data.get("hdurl")
+        ordered = (
+            [standard_url, hd_url]
+            if self.image_loader.is_low_resource
+            else [hd_url, standard_url]
+        )
+        deduped: list[str] = []
+        for url in ordered:
+            if url and url not in deduped:
+                deduped.append(url)
+        return deduped
+
     def validate_settings(self, settings: dict) -> str | None:
         """Reject out-of-range custom dates at save time (JTN-379).
 
@@ -141,23 +157,41 @@ class Apod(BasePlugin):
         if data.get("media_type") != "image":
             raise RuntimeError("APOD is not an image today.")
 
-        image_url = data.get("hdurl") or data.get("url")
+        image = None
+        timeout_ms = int(self._request_timeout() * 1000)
+        dimensions = self.get_oriented_dimensions(device_config)
+        candidate_urls = self._candidate_image_urls(data)
+        if not candidate_urls:
+            raise RuntimeError("Failed to load APOD image.")
 
-        try:
-            img_data = get_http_session().get(
-                image_url, timeout=self._request_timeout()
+        for idx, image_url in enumerate(candidate_urls):
+            image = self.image_loader.from_url(
+                image_url,
+                dimensions=dimensions,
+                timeout_ms=timeout_ms,
+                resize=False,
             )
-            if not 200 <= img_data.status_code < 300:
-                logger.error(
-                    f"Failed to fetch APOD image: status {img_data.status_code}"
-                )
-                raise RuntimeError("Failed to fetch APOD image.")
-            with Image.open(BytesIO(img_data.content)) as img:
-                image = img.copy()
-        except RuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"Failed to load APOD image: {str(e)}")
-            raise RuntimeError("Failed to load APOD image.") from e
+            if image is not None:
+                break
+            logger.warning(
+                "APOD image load failed for %s (attempt %s/%s)",
+                image_url,
+                idx + 1,
+                len(candidate_urls),
+            )
+
+        if image is None:
+            raise RuntimeError("Failed to load APOD image.")
+
+        self.set_latest_metadata(
+            {
+                "date": data.get("date"),
+                "title": data.get("title"),
+                "caption": data.get("copyright"),
+                "explanation": data.get("explanation"),
+                "page_url": data.get("hdurl") or data.get("url"),
+                "description_url": data.get("url"),
+            }
+        )
 
         return image
