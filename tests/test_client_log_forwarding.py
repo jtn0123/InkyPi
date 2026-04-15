@@ -138,10 +138,11 @@ class TestGetReturns405:
 
 
 class TestOversizedBody:
-    def test_body_over_16kb_returns_413(self, cl_client):
-        giant_message = "x" * 20_000
+    def test_body_over_limit_returns_413(self, cl_client):
+        """Bodies over the 256 KB cap (JTN-711 raised to fit batches) → 413."""
+        giant_message = "x" * (300 * 1024)
         body = json.dumps({"level": "warn", "message": giant_message}).encode()
-        assert len(body) > 16_384
+        assert len(body) > 256 * 1024
         resp = _post(cl_client, body=body)
         assert resp.status_code == 413
 
@@ -157,7 +158,7 @@ class TestOversizedBody:
 
 class TestRateLimit:
     def test_rate_limit_kicks_in_after_capacity(self):
-        """After exhausting 10-token burst capacity the next request returns 429."""
+        """After exhausting 60-token burst capacity the next request returns 429 (JTN-711)."""
         import blueprints.client_log as cl_mod
 
         importlib.reload(cl_mod)
@@ -168,12 +169,12 @@ class TestRateLimit:
         app.register_blueprint(client_log_bp)
         c = app.test_client()
 
-        # First 10 requests should succeed (capacity = 10)
-        for _ in range(10):
+        # First 60 requests should succeed (capacity = 60, JTN-711)
+        for _ in range(60):
             resp = _post(c, {"level": "warn", "message": "log"})
             assert resp.status_code == 204
 
-        # The 11th request should be rate-limited
+        # The 61st request should be rate-limited
         resp = _post(c, {"level": "warn", "message": "log"})
         assert resp.status_code == 429
 
