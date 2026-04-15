@@ -31,7 +31,7 @@ from flask import Blueprint, Response
 
 from utils.client_endpoint import enforce_size_and_rate
 from utils.form_utils import sanitize_log_field
-from utils.http_utils import json_error
+from utils.http_utils import json_error, reissue_json_error
 from utils.rate_limit import TokenBucket
 
 logger = logging.getLogger(__name__)
@@ -171,9 +171,15 @@ def receive_client_log() -> tuple[Response, int] | Response:
     """
     # ---- Size + rate-limit (shared helper; parse_client_report isn't used
     # here because it hardcodes the dict requirement). ---------------------
+    #
+    # The helper already returns a server-controlled error tuple on failure,
+    # but CodeQL can't prove the message is trusted through the boundary
+    # (it treats everything derived from the request as tainted). We
+    # reissue with a hardcoded message + the helper's status to break the
+    # taint flow explicitly.
     raw_body, err = enforce_size_and_rate(_rate_limiter, _BODY_MAX)
     if err is not None:
-        return err
+        return reissue_json_error(err, "Request rejected")
     assert raw_body is not None
 
     try:
@@ -209,11 +215,19 @@ def receive_client_log() -> tuple[Response, int] | Response:
             validated.append(normalized)
 
     if errors:
-        # Return the first error in the generic `error` field (kept stable for
-        # legacy clients that only read it) and the full per-entry list so
-        # batched senders can self-correct.
-        first_msg = str(errors[0]["error"])
-        return json_error(first_msg, status=400, details={"entry_errors": errors})
+        # Top-level error message is a fixed server-controlled string —
+        # CodeQL flagged an earlier version because it tracks any value
+        # derived from the request body as tainted, even when the code path
+        # only ever picks from a fixed set of error strings. The full
+        # per-entry list is still returned under ``details.entry_errors``
+        # so batched senders can self-correct; each entry error message is
+        # one of a small set of server-controlled literals built in
+        # ``_validate_and_normalize``.
+        return json_error(
+            "One or more batch entries failed validation",
+            status=400,
+            details={"entry_errors": errors},
+        )
 
     # ---- Emit every validated entry --------------------------------------
     for entry in validated:
