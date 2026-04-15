@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.56.0 (2026-04-15)
+
+### Features
+
+- **observability**: In-app status badge wired to /api/diagnostics (JTN-709)
+  ([#494](https://github.com/jtn0123/InkyPi/pull/494),
+  [`49f0b09`](https://github.com/jtn0123/InkyPi/commit/49f0b09435dd775e577c0ca13fb0805ae818bd9c))
+
+* feat(observability): in-app status badge wired to /api/diagnostics (JTN-709)
+
+Surfaces a tiny fixed-position badge on every page that polls /api/diagnostics every 30s (plus on
+  page load and on visibilitychange) and flips to warning or error when something is wrong. Hidden
+  by default when healthy — no UI noise. Click opens a popover listing active issues with links to
+  /download-logs, the pretty diagnostics payload, and the settings updates page (when
+  last_update_failure is present).
+
+Server-side: /api/diagnostics now returns a `recent_client_log_errors` summary ({count_5m,
+  warn_count_5m, last_error_ts, window_seconds}) backed by a bounded 100-entry in-memory ring buffer
+  populated from /api/client-log POSTs. In-memory only; intentionally no disk persistence.
+
+Graceful degradation: 401/403 from /api/diagnostics hides the badge and stops polling (viewer isn't
+  on the local network). Tests can opt out with `<meta name="status-badge-disabled" content="1">`.
+
+JTN-707 supplied the diagnostics contract — this consumes it without breaking any existing fields.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(lint): ruff B007 + black formatting for JTN-709 tests
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.55.1 (2026-04-15)
 
 ### Bug Fixes
