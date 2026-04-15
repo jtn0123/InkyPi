@@ -626,6 +626,102 @@ class TestInstallScript:
                 f"rerun install.sh before the service can start (JTN-607): {line!r}"
             )
 
+    def test_install_uses_flock_concurrent_guard(self):
+        # JTN-696: install.sh must acquire an `flock -n` on a well-known lock
+        # path before running the real install steps, so two simultaneous
+        # `sudo bash install.sh` invocations fail fast instead of racing
+        # each other through the rm/repopulate sequence.
+        assert "FLOCK_PATH=" in self.content, (
+            "install.sh must define FLOCK_PATH for the concurrent-install "
+            "lock (JTN-696)"
+        )
+        assert "/var/lock/inkypi.install" in self.content, (
+            "install.sh must use /var/lock/inkypi.install* as the concurrent "
+            "install lock path (JTN-696)"
+        )
+        assert "flock -n" in self.content, (
+            "install.sh must call 'flock -n' (non-blocking) to fail fast "
+            "when the concurrent-install lock is already held (JTN-696)"
+        )
+
+        # The flock guard must appear before the main install steps (before
+        # touching $LOCKFILE or running install_debian_dependencies).
+        main_start = self.content.index('parse_arguments "$@"')
+        main_body = self.content[main_start:]
+        flock_pos = main_body.index("flock -n")
+        touch_pos = main_body.index('touch "$LOCKFILE"')
+        assert flock_pos < touch_pos, (
+            "flock -n guard must run before the install-in-progress lockfile "
+            "is created so a second caller is rejected before mutating any "
+            "shared state (JTN-696)"
+        )
+
+        # Helpful error message when the lock is already held — users need to
+        # understand why their second install attempt bailed out.
+        assert "Another install/update is already running" in self.content, (
+            "install.sh must print a clear error message when the "
+            "concurrent-install lock is held (JTN-696)"
+        )
+
+    def test_install_uses_atomic_swap_not_in_place_rm(self):
+        # JTN-696: install_src() must NOT do an in-place `rm -rf
+        # "$INSTALL_PATH"` — that pattern left dangling symlinks / a
+        # half-populated directory if the user hit Ctrl+C mid-delete.
+        # The replacement pattern stages the new tree, then swaps it in
+        # atomically with `mv -T`.
+        fn_start = self.content.index("install_src() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+
+        # Negative assertion: the old in-place delete pattern is gone.
+        assert 'rm -rf "$INSTALL_PATH"' not in fn_body, (
+            'install_src() must NOT `rm -rf "$INSTALL_PATH"` in place — '
+            "use an atomic mv -T swap via a staging dir instead so Ctrl+C "
+            "mid-install leaves the prior tree intact (JTN-696)"
+        )
+
+        # Positive assertion: staging + mv -T pattern is present.
+        assert (
+            "mv -T" in fn_body
+        ), "install_src() must use `mv -T` for the atomic dir swap (JTN-696)"
+        assert ".new" in fn_body, (
+            "install_src() must build the new tree in a `$INSTALL_PATH.new` "
+            "staging dir before the swap (JTN-696)"
+        )
+
+    def test_install_exit_trap_cleans_staging_not_lockfile(self):
+        # JTN-696: The EXIT trap added to clean up staging dirs on an
+        # interrupted install must NOT touch $LOCKFILE (that would defeat
+        # JTN-607) and must NOT rm -rf $INSTALL_PATH itself (that would
+        # destroy the prior install we're trying to protect).
+        trap_lines = [
+            line
+            for line in self.content.splitlines()
+            if line.strip().startswith("trap ") and "EXIT" in line
+        ]
+        assert trap_lines, (
+            "install.sh must register at least one EXIT trap to clean up "
+            "staging dirs after an interrupted install (JTN-696)"
+        )
+        for line in trap_lines:
+            assert (
+                "$LOCKFILE" not in line
+            ), f"JTN-696 EXIT trap must not remove $LOCKFILE: {line!r}"
+
+        # Locate the cleanup function body and verify it doesn't do a bare
+        # `rm -rf "$INSTALL_PATH"` that would nuke a healthy prior install.
+        fn_start = self.content.index("_cleanup_staging() {")
+        fn_end = self.content.index("\n}", fn_start)
+        fn_body = self.content[fn_start:fn_end]
+        for line in fn_body.splitlines():
+            stripped = line.strip()
+            if 'rm -rf "$INSTALL_PATH"' in stripped:
+                pytest.fail(
+                    '_cleanup_staging must not `rm -rf "$INSTALL_PATH"` '
+                    "directly — that destroys a healthy prior install "
+                    f"(JTN-696): {line!r}"
+                )
+
     def test_stop_service_disable_tolerates_already_disabled(self):
         # JTN-600: The disable call must not fail if the service is already
         # disabled (e.g. fresh install). Must use '|| true' or '2>/dev/null'.

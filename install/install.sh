@@ -38,6 +38,13 @@ VENV_PATH="$INSTALL_PATH/venv_$APPNAME"
 LOCKFILE_DIR="/var/lib/inkypi"
 LOCKFILE="$LOCKFILE_DIR/.install-in-progress"
 
+# JTN-696: Concurrent-install guard. Two `sudo bash install.sh` runs at the
+# same time previously raced each other (no lock), producing arbitrary
+# file-mix corruption in $INSTALL_PATH. FLOCK_PATH is an advisory fd-based
+# lock acquired with `flock -n`; the second caller fails fast.
+# /var/lock is the standard FHS location for transient lock files.
+FLOCK_PATH="/var/lock/inkypi.install.flock"
+
 SERVICE_FILE="$APPNAME.service"
 SERVICE_FILE_SOURCE="$SCRIPT_DIR/$SERVICE_FILE"
 SERVICE_FILE_TARGET="/etc/systemd/system/$SERVICE_FILE"
@@ -373,17 +380,54 @@ start_service() {
 }
 
 install_src() {
-  # Check if an existing installation is present
+  # JTN-696: Build the new install tree in a sibling temp dir, then perform an
+  # atomic swap. Previously we removed the target in place before repopulating
+  # — Ctrl+C mid-delete left dangling symlinks / a half-populated directory,
+  # which crashed the display on next refresh. With the swap pattern,
+  # $INSTALL_PATH stays fully populated with the OLD tree until the moment of
+  # the rename(2)-family mv -T, so an interruption before the swap leaves the
+  # prior install intact.
   echo "Installing $APPNAME to $INSTALL_PATH"
+
+  local parent_dir
+  parent_dir=$(dirname "$INSTALL_PATH")
+  mkdir -p "$parent_dir"
+
+  # Fresh staging dir. Clean up any leftover from a prior interrupted run.
+  INSTALL_STAGING="$INSTALL_PATH.new"
+  INSTALL_BACKUP="$INSTALL_PATH.old"
+  rm -rf "$INSTALL_STAGING" "$INSTALL_BACKUP"
+
+  mkdir -p "$INSTALL_STAGING"
+  ln -sf "$SRC_PATH" "$INSTALL_STAGING/src"
+  echo_success "\tStaged new installation at $INSTALL_STAGING"
+
+  # Atomic-ish swap: move old aside, move new into place, then remove old.
+  # mv -T treats the destination as a file/dir to overwrite rather than
+  # moving INTO it, which is what we want for a directory swap.
+  # Service is already stopped+disabled (see stop_service call near the top
+  # of install.sh main body) so no process is holding files in $INSTALL_PATH.
   if [[ -d "$INSTALL_PATH" ]]; then
-    rm -rf "$INSTALL_PATH" > /dev/null
-    show_loader "\tRemoving existing installation found at $INSTALL_PATH"
+    if ! mv -T "$INSTALL_PATH" "$INSTALL_BACKUP"; then
+      echo_error "ERROR: failed to move existing $INSTALL_PATH aside; aborting."
+      rm -rf "$INSTALL_STAGING"
+      exit 1
+    fi
+  fi
+  if ! mv -T "$INSTALL_STAGING" "$INSTALL_PATH"; then
+    echo_error "ERROR: failed to swap staging dir into $INSTALL_PATH; rolling back."
+    # Best-effort rollback: restore the prior tree if we moved one aside.
+    if [[ -d "$INSTALL_BACKUP" ]]; then
+      mv -T "$INSTALL_BACKUP" "$INSTALL_PATH" || true
+    fi
+    rm -rf "$INSTALL_STAGING"
+    exit 1
   fi
 
-  mkdir -p "$INSTALL_PATH"
-
-  ln -sf "$SRC_PATH" "$INSTALL_PATH/src"
-  show_loader "\tCreating symlink from $SRC_PATH to $INSTALL_PATH/src"
+  # Swap succeeded. Drop the old tree. If this fails we leave the orphan
+  # behind rather than risk touching the fresh install.
+  rm -rf "$INSTALL_BACKUP"
+  show_loader "\tInstalled $APPNAME to $INSTALL_PATH (atomic swap)"
 }
 
 install_cli() {
@@ -460,6 +504,26 @@ wait_for_clock() {
 parse_arguments "$@"
 check_permissions
 
+# JTN-696: Concurrent-install guard. Two simultaneous `sudo bash install.sh`
+# runs previously raced through the rm/repopulate sequence in install_src()
+# and produced arbitrary corruption. Here we acquire an fd-based advisory
+# lock on $FLOCK_PATH; a second caller finds the lock held and exits fast.
+# The lock releases automatically when this shell exits (no trap needed).
+# -n = non-blocking; -E 42 = exit 42 when the lock cannot be acquired.
+if command -v flock >/dev/null 2>&1; then
+  mkdir -p "$(dirname "$FLOCK_PATH")"
+  exec 9>"$FLOCK_PATH"
+  if ! flock -n -E 42 9; then
+    rc=$?
+    if [ "$rc" -eq 42 ]; then
+      echo "ERROR: Another install/update is already running — see $LOCKFILE" >&2
+      echo "       (concurrent-install lock $FLOCK_PATH is held)" >&2
+    fi
+    exit 1
+  fi
+fi
+# flock binary unavailable (non-standard env) — proceed without the guard.
+
 # JTN-607: Create the install-in-progress lockfile. inkypi.service's
 # ExecStartPre refuses to start while this file exists (defense-in-depth for
 # JTN-600's systemctl disable). The lockfile is removed once all install
@@ -468,6 +532,22 @@ check_permissions
 # can start.
 mkdir -p "$LOCKFILE_DIR"
 touch "$LOCKFILE"
+
+# JTN-696: EXIT trap to clean up staging dirs left behind by an interrupted
+# install (SIGINT, SIGTERM, or any early exit). Does NOT touch $LOCKFILE —
+# JTN-607 deliberately leaves that in place on failure so the user is forced
+# to rerun install.sh. Also does NOT touch $INSTALL_PATH itself, so the prior
+# install remains intact if the swap never happened.
+_cleanup_staging() {
+  [[ -n "${INSTALL_PATH:-}" ]] || return 0
+  rm -rf "$INSTALL_PATH.new" 2>/dev/null || true
+  # Only remove .old if the main $INSTALL_PATH is healthy — otherwise a
+  # partially-failed swap may need .old for manual recovery.
+  if [[ -d "$INSTALL_PATH" && -L "$INSTALL_PATH/src" ]]; then
+    rm -rf "$INSTALL_PATH.old" 2>/dev/null || true
+  fi
+}
+trap _cleanup_staging EXIT
 
 stop_service
 # fetch the WS display driver if defined.
