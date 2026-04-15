@@ -59,6 +59,67 @@
     return /\bWARNING\b/i.test(line);
   }
 
+  // JTN-710: banner rendering helpers.  Kept at module scope (outside the
+  // createSettingsPage closure) so Sonar S7721/S3776 stay green and the
+  // helpers can be individually tested/tree-shaken.
+  function setTextIfPresent(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
+
+  function renderUpdateFailureUnreadable(banner) {
+    setTextIfPresent("updateFailureTimestamp", "");
+    setTextIfPresent("updateFailureExitCode", "");
+    setTextIfPresent(
+      "updateFailureStep",
+      "Last update failure record was unreadable."
+    );
+    const details = document.getElementById("updateFailureDetails");
+    if (details) details.hidden = true;
+    banner.hidden = false;
+  }
+
+  function renderUpdateFailureFields(lastFailure) {
+    const tsText = lastFailure.timestamp
+      ? `Failed at ${lastFailure.timestamp}`
+      : "";
+    const codeText =
+      typeof lastFailure.exit_code === "number"
+        ? `exit ${lastFailure.exit_code}`
+        : "";
+    const stepText = lastFailure.last_command
+      ? `step: ${lastFailure.last_command}`
+      : "";
+    setTextIfPresent("updateFailureTimestamp", tsText);
+    setTextIfPresent("updateFailureExitCode", codeText);
+    setTextIfPresent("updateFailureStep", stepText);
+
+    const journalText = lastFailure.recent_journal_lines || "";
+    setTextIfPresent("updateFailureJournal", journalText);
+    const details = document.getElementById("updateFailureDetails");
+    if (details) details.hidden = !journalText;
+  }
+
+  // Render the update-failure banner from a /settings/update_status payload.
+  // ``lastFailure`` mirrors the JSON written to /var/lib/inkypi/.last-update-failure
+  // by install/update.sh's EXIT trap (JTN-704): timestamp, exit_code,
+  // last_command, recent_journal_lines.  A malformed file surfaces as
+  // ``{parse_error: true}`` so we can still show a generic banner.
+  function renderUpdateFailureBanner(lastFailure) {
+    const banner = document.getElementById("updateFailureBanner");
+    if (!banner) return;
+    if (!lastFailure) {
+      banner.hidden = true;
+      return;
+    }
+    if (lastFailure.parse_error) {
+      renderUpdateFailureUnreadable(banner);
+      return;
+    }
+    renderUpdateFailureFields(lastFailure);
+    banner.hidden = false;
+  }
+
   function prefKey(key) {
     return `logs_${key}`;
   }
@@ -581,54 +642,6 @@
           if (sp) sp.style.display = "none";
         }
       }
-    }
-
-    // JTN-710: render the update-failure banner from a status payload
-    // returned by /settings/update_status.  The shape of ``last_failure`` is
-    // whatever install/update.sh's EXIT trap (JTN-704) wrote to
-    // ``/var/lib/inkypi/.last-update-failure``: timestamp, exit_code,
-    // last_command, recent_journal_lines.  A malformed file surfaces as
-    // ``{parse_error: true}`` so we can still show a generic banner.
-    function renderUpdateFailureBanner(lastFailure) {
-      const banner = document.getElementById("updateFailureBanner");
-      if (!banner) return;
-      if (!lastFailure) {
-        banner.hidden = true;
-        return;
-      }
-      const ts = document.getElementById("updateFailureTimestamp");
-      const code = document.getElementById("updateFailureExitCode");
-      const step = document.getElementById("updateFailureStep");
-      const details = document.getElementById("updateFailureDetails");
-      const journal = document.getElementById("updateFailureJournal");
-      if (lastFailure.parse_error) {
-        if (ts) ts.textContent = "";
-        if (code) code.textContent = "";
-        if (step) step.textContent = "Last update failure record was unreadable.";
-        if (details) details.hidden = true;
-        banner.hidden = false;
-        return;
-      }
-      if (ts) {
-        ts.textContent = lastFailure.timestamp
-          ? `Failed at ${lastFailure.timestamp}`
-          : "";
-      }
-      if (code) {
-        code.textContent =
-          typeof lastFailure.exit_code === "number"
-            ? `exit ${lastFailure.exit_code}`
-            : "";
-      }
-      if (step) {
-        step.textContent = lastFailure.last_command
-          ? `step: ${lastFailure.last_command}`
-          : "";
-      }
-      const journalText = lastFailure.recent_journal_lines || "";
-      if (journal) journal.textContent = journalText;
-      if (details) details.hidden = !journalText;
-      banner.hidden = false;
     }
 
     async function refreshUpdateStatus() {

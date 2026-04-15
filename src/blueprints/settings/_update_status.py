@@ -98,7 +98,9 @@ def read_last_update_failure() -> dict[str, Any] | None:
 
     try:
         data = json.loads(raw.decode("utf-8", errors="replace"))
-    except (ValueError, UnicodeDecodeError):
+    except ValueError:
+        # json.JSONDecodeError is a ValueError subclass; errors="replace"
+        # above means the decode step cannot raise.
         logger.warning("Malformed JSON in %s", path)
         return {"parse_error": True}
 
