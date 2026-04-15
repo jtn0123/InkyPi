@@ -679,48 +679,71 @@
       }
     }
 
-    async function startUpdate() {
+    // JTN-708: shared polling loop for both startUpdate and startRollback —
+    // they both hit /settings/update_status and re-render the failure banner
+    // until ``running`` flips to false, so extract once to avoid duplication.
+    function pollUpdateStatusUntilDone(logLabel) {
+      if (state.updateTimer) clearInterval(state.updateTimer);
+      state.updateTimer = setInterval(async () => {
+        try {
+          await fetchAndRenderLogs();
+          const sresp = await fetch(config.updateStatusUrl);
+          const sdata = await sresp.json();
+          // JTN-710 + JTN-708: keep the banner and rollback button in sync.
+          renderUpdateFailureBanner(sdata?.last_failure ?? null, sdata?.prev_version ?? null);
+          if (!sdata?.running) {
+            clearInterval(state.updateTimer);
+            state.updateTimer = null;
+            setTimeout(fetchAndRenderLogs, 500);
+            checkForUpdates();
+          }
+        } catch (e) {
+          console.warn(`${logLabel} status poll failed:`, e);
+          clearInterval(state.updateTimer);
+          state.updateTimer = null;
+        }
+      }, 2000);
+    }
+
+    // JTN-708: shared driver for the forward-update and rollback buttons.
+    // Both POST to a Flask route that returns the same envelope shape
+    // (``success`` + ``message``) and both kick off /settings/update_status
+    // polling — only the URL, UI copy, and log label differ.
+    async function runUpdateAction({ url, kind, startingLabel, failureMessage }) {
+      if (!url) {
+        showResponseModal("failure", `${kind} is not available on this build.`);
+        return;
+      }
       const btns = document.querySelectorAll(".header-actions .header-button");
       try {
         for (const btn of btns) {
           btn.disabled = true;
         }
-        const resp = await fetch(config.startUpdateUrl, { method: "POST" });
+        const resp = await fetch(url, { method: "POST" });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to start update");
+          showResponseModal("failure", data.error || failureMessage);
           return;
         }
-        showResponseModal("success", data.message || "Update started.");
-        if (state.updateTimer) clearInterval(state.updateTimer);
-        state.updateTimer = setInterval(async () => {
-          try {
-            await fetchAndRenderLogs();
-            const sresp = await fetch(config.updateStatusUrl);
-            const sdata = await sresp.json();
-            // JTN-710: surface any newly-written failure record as soon as it lands.
-            // JTN-708: and keep the rollback button in sync with the breadcrumb.
-            renderUpdateFailureBanner(sdata?.last_failure ?? null, sdata?.prev_version ?? null);
-            if (!sdata?.running) {
-              clearInterval(state.updateTimer);
-              state.updateTimer = null;
-              setTimeout(fetchAndRenderLogs, 500);
-              checkForUpdates();
-            }
-          } catch (e) {
-            console.warn("Update status poll failed:", e);
-            clearInterval(state.updateTimer);
-            state.updateTimer = null;
-          }
-        }, 2000);
+        showResponseModal("success", data.message || startingLabel);
+        pollUpdateStatusUntilDone(kind);
       } catch (e) {
-        console.warn("Failed to start update:", e);
-        showResponseModal("failure", "Failed to start update");
+        console.warn(`Failed to start ${kind.toLowerCase()}:`, e);
+        showResponseModal("failure", failureMessage);
       } finally {
         for (const btn of btns) {
           btn.disabled = false;
         }
       }
+    }
+
+    async function startUpdate() {
+      await runUpdateAction({
+        url: config.startUpdateUrl,
+        kind: "Update",
+        startingLabel: "Update started.",
+        failureMessage: "Failed to start update",
+      });
     }
 
     // JTN-708: rollback-confirm modal mirrors the reboot/shutdown pattern so
@@ -739,48 +762,12 @@
 
     async function startRollback() {
       closeRollbackConfirm();
-      if (!config.rollbackUpdateUrl) {
-        showResponseModal("failure", "Rollback is not available on this build.");
-        return;
-      }
-      const btns = document.querySelectorAll(".header-actions .header-button");
-      try {
-        for (const btn of btns) { btn.disabled = true; }
-        const resp = await fetch(config.rollbackUpdateUrl, { method: "POST" });
-        const data = await resp.json();
-        // The route returns 202 on success; json_success sets success=true.
-        if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to start rollback");
-          return;
-        }
-        showResponseModal("success", data.message || "Rollback started.");
-        // Reuse the same polling loop as startUpdate — the rollback process
-        // flips _UPDATE_STATE.running to false when complete.
-        if (state.updateTimer) clearInterval(state.updateTimer);
-        state.updateTimer = setInterval(async () => {
-          try {
-            await fetchAndRenderLogs();
-            const sresp = await fetch(config.updateStatusUrl);
-            const sdata = await sresp.json();
-            renderUpdateFailureBanner(sdata?.last_failure ?? null, sdata?.prev_version ?? null);
-            if (!sdata?.running) {
-              clearInterval(state.updateTimer);
-              state.updateTimer = null;
-              setTimeout(fetchAndRenderLogs, 500);
-              checkForUpdates();
-            }
-          } catch (e) {
-            console.warn("Rollback status poll failed:", e);
-            clearInterval(state.updateTimer);
-            state.updateTimer = null;
-          }
-        }, 2000);
-      } catch (e) {
-        console.warn("Failed to start rollback:", e);
-        showResponseModal("failure", "Failed to start rollback");
-      } finally {
-        for (const btn of btns) { btn.disabled = false; }
-      }
+      await runUpdateAction({
+        url: config.rollbackUpdateUrl,
+        kind: "Rollback",
+        startingLabel: "Rollback started.",
+        failureMessage: "Failed to start rollback",
+      });
     }
 
     async function exportConfig() {
