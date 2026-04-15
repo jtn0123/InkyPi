@@ -1899,6 +1899,40 @@ class TestUpdateScript:
             "--no-pager" in fn_body
         ), "journalctl in update_app_service must use --no-pager for non-interactive output (JTN-684)"
 
+    def test_update_service_wait_uses_timeout_bound(self):
+        # JTN-706: the 3-attempt sleep 1 loop (total cap 3s) was replaced with
+        # a bounded wait via `timeout 45` so slow boots on Pi Zero 2 W (which
+        # routinely take 5-8s) no longer trigger false-failure reports.
+        fn_start = self.content.index("update_app_service() {")
+        fn_end = self.content.index("\n}", fn_start) + 2
+        fn_body = self.content[fn_start:fn_end]
+
+        # Old pattern must be gone.
+        assert (
+            "max_attempts=3" not in fn_body
+        ), "update_app_service must no longer use 3-attempt loop (JTN-706)"
+        assert (
+            "max_attempts" not in fn_body
+        ), "update_app_service must not reintroduce max_attempts counting (JTN-706)"
+
+        # New pattern must be present: a `timeout 45` (or similar bounded wait)
+        # wrapping the systemctl is-active poll.
+        assert (
+            "timeout" in fn_body and "is-active" in fn_body
+        ), "update_app_service must wrap is-active poll with a `timeout` bound (JTN-706)"
+        assert (
+            "45" in fn_body
+        ), "update_app_service must use a 45-second timeout ceiling (JTN-706)"
+
+        # Timeout and failed states must be distinguished so users know whether
+        # to investigate the service or just be patient.
+        assert (
+            "is-failed" in fn_body
+        ), "update_app_service must check is-failed to distinguish failure from slow start (JTN-706)"
+        assert (
+            "timed out" in fn_body.lower() or "timeout" in fn_body.lower()
+        ), "update_app_service must log timeout distinctly from failed state (JTN-706)"
+
 
 # ---- uninstall.sh ----
 
