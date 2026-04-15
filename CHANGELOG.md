@@ -1,6 +1,95 @@
 # CHANGELOG
 
 
+## v0.51.11 (2026-04-15)
+
+### Bug Fixes
+
+- **install**: Atomic swap + flock concurrent-install guard (JTN-696)
+  ([#489](https://github.com/jtn0123/InkyPi/pull/489),
+  [`956afae`](https://github.com/jtn0123/InkyPi/commit/956afae16eae9243393064d0b125554f4029bd42))
+
+* fix(install): atomic swap + flock concurrent-install guard (JTN-696)
+
+install_src() previously did `rm -rf "$INSTALL_PATH"` in place before repopulating. Ctrl+C
+  mid-delete left dangling symlinks / a half-populated directory which crashed the display on next
+  refresh. Two concurrent `sudo bash install.sh` invocations had no lock and could race each other
+  through the rm/repopulate sequence.
+
+Fix: - Add a concurrent-install guard: re-exec install.sh under `flock -n -E 42
+  /var/lock/inkypi.install.flock` before the main install body. The second caller exits fast with a
+  clear "Another install/update is already running" message. - Replace in-place delete with an
+  atomic swap: stage the new tree at `$INSTALL_PATH.new`, move the current tree aside to
+  `$INSTALL_PATH.old`, `mv -T` the staging dir into place, then rm the backup. An interruption
+  before the final mv leaves the prior install fully intact. - Install an EXIT trap
+  (`_cleanup_staging`) that removes leftover `$INSTALL_PATH.new` / `.old` staging dirs after an
+  interrupted run. The trap deliberately does NOT touch `$LOCKFILE` (JTN-607 policy: leave it in
+  place on failure so the user must rerun) and does NOT remove `$INSTALL_PATH` itself (so a healthy
+  prior install is preserved).
+
+Cooperates with JTN-704's trap-cleanup on update.sh and JTN-607's install-in-progress lockfile —
+  those files are untouched.
+
+Tests (tests/unit/test_install_scripts.py): - test_install_uses_flock_concurrent_guard — asserts
+  FLOCK_PATH, `flock -n`, and the user-facing error message are present and that flock runs before
+  `touch "$LOCKFILE"`. - test_install_uses_atomic_swap_not_in_place_rm — asserts `rm -rf
+  "$INSTALL_PATH"` is gone from install_src() and `mv -T` + `.new` staging suffix are present. -
+  test_install_exit_trap_cleans_staging_not_lockfile — asserts the new EXIT trap exists, does not
+  touch $LOCKFILE, and _cleanup_staging never bare-removes $INSTALL_PATH.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(install): use fd-based flock to avoid exec permission issue
+
+flock's exec form `flock -n "$FLOCK_PATH" "$0" "$@"` tried to exec ./install.sh directly without a
+  shell interpreter, failing with "Permission denied" on the trixie install-matrix runner where the
+  script was invoked as `./install.sh` without `bash` in front.
+
+Switch to the fd-based form: exec 9>"$FLOCK_PATH" flock -n -E 42 9 || exit ...
+
+This takes the lock on fd 9 in the current shell — no re-exec needed. The kernel releases the lock
+  automatically when the shell exits.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **ui**: Parametrize click sweep over all registered plugins (JTN-698)
+  ([#485](https://github.com/jtn0123/InkyPi/pull/485),
+  [`3b6bed6`](https://github.com/jtn0123/InkyPi/commit/3b6bed6bafa3b84e4bb6c6c50df9ca1f9abc9dc2))
+
+Adds a new `test_click_sweep_plugin_pages` parametrize that sweeps `/plugin/<id>` for every plugin
+  discovered via plugin-info.json at collection time, catching handler regressions in
+  weather/todo/comic/image pickers — previously only the clock plugin was covered, and JTN-681's
+  clock-face-picker bug was caught incidentally because we happened to sweep it. Any plugin handler
+  class of bug is now in net.
+
+- Extract the click-sweep body into a shared `_run_click_sweep()` helper so both the core-pages and
+  plugin-pages tests use identical logic. - Discover plugin IDs at collection time by scanning
+  `src/plugins/*/plugin-info.json` — parametrize IDs show up in `pytest --collect-only` output (one
+  case per plugin). - Gate the new test behind `@pytest.mark.plugin_sweep` so CI can route it to a
+  dedicated job if runtime pressure grows. Registered the marker in pytest.ini. - Tighter
+  `_PLUGIN_MAX_CLICKS_PER_PAGE = 15` cap keeps the full 21-plugin sweep to ~60s wall-time on a local
+  run. - Desktop-only by design: plugin settings pages don't have mobile reflow, so mobile coverage
+  would ~2x runtime for no new signal. - Tag the shared "Update Preview" / "Save Settings" / "Update
+  Instance" buttons with `data-test-skip-click="true"` — they submit the settings form and trigger
+  validation 400s when clicked with a default form state; dedicated submission tests already
+  exercise the real path. - Surfaced two pre-existing plugin handler bugs (weather, todo_list)
+  xfailed with tracking links (JTN-716, JTN-717) so the infra lands green and the bugs are fixed
+  separately.
+
+Runtime: 21 plugin cases in ~60s locally. Full `test_click_sweep.py` suite (core + plugin sweeps, 2
+  xfails) runs in ~87s.
+
+D1 item from the 2026-04-14 codebase audit (.claude/grade-report.md).
+
+Refs: https://linear.app/jtn0123/issue/JTN-698
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.51.10 (2026-04-15)
 
 ### Bug Fixes
