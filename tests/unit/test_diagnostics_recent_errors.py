@@ -124,7 +124,7 @@ def test_five_minute_cutoff_excludes_old_entries():
 def test_ring_buffer_is_bounded():
     """The ring buffer discards oldest entries when it fills up."""
     cl_mod.reset_recent_errors()
-    for i in range(cl_mod._RECENT_BUFFER_MAX + 25):
+    for _ in range(cl_mod._RECENT_BUFFER_MAX + 25):
         cl_mod._record_recent("error")
     assert len(cl_mod._recent_errors) == cl_mod._RECENT_BUFFER_MAX
 

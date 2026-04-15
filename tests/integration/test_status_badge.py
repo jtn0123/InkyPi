@@ -97,7 +97,7 @@ def test_no_polling_in_test_mode_via_opt_out_meta(client):
     )
     text = js_path.read_text()
     # Opt-out check happens before any fetch/polling is scheduled.
-    m_optout = re.search(r'status-badge-disabled', text)
+    m_optout = re.search(r"status-badge-disabled", text)
     m_fetch = text.find("fetch(")
     assert m_optout is not None, "opt-out meta not referenced in status_badge.js"
     assert m_fetch > 0
