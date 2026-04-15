@@ -37,6 +37,12 @@ if [ -n "${INKYPI_LOCKFILE_DIR:-}" ]; then
 fi
 LOCKFILE="$LOCKFILE_DIR/.install-in-progress"
 FAILURE_FILE="$LOCKFILE_DIR/.last-update-failure"
+# JTN-724: Success sentinel written by the INKYPI_UPDATE_TEST_SUCCESS_FAST
+# test-only hook so the happy-path journey test can assert update.sh reached
+# a "completed successfully" terminal state without invoking real git/pip.
+# Production callers never set INKYPI_UPDATE_TEST_SUCCESS_FAST, so this file
+# is not written outside of tests.
+SUCCESS_SENTINEL_FILE="$LOCKFILE_DIR/.last-update-success"
 
 SERVICE_FILE="$APPNAME.service"
 SERVICE_FILE_SOURCE="$SCRIPT_DIR/$SERVICE_FILE"
@@ -116,6 +122,7 @@ update_cli() {
 # INKYPI_UPDATE_TEST_FAIL_AT is never set.
 if [ -z "${INKYPI_UPDATE_TEST_FAIL_AT:-}" ] \
    && [ -z "${INKYPI_UPDATE_TEST_EXIT_AFTER_TRAP:-}" ] \
+   && [ -z "${INKYPI_UPDATE_TEST_SUCCESS_FAST:-}" ] \
    && [ "$EUID" -ne 0 ]; then
   echo_error "ERROR: This script requires root privileges. Please run it with sudo."
   exit 1
@@ -126,6 +133,11 @@ fi
 # JTN-600's systemctl disable).
 mkdir -p "$LOCKFILE_DIR"
 touch "$LOCKFILE"
+
+# JTN-724: Clear any stale test-only success sentinel from a previous run so a
+# new update (test or production) cannot be misread as already-finished by a
+# subsequent journey-test poll.
+rm -f "$SUCCESS_SENTINEL_FILE" 2>/dev/null || true
 
 # JTN-704: Track the most recent command-line description so the EXIT trap can
 # record *which step* failed in the structured failure record. Each top-level
@@ -230,6 +242,44 @@ _inkypi_maybe_inject_failure "startup"
 # (no .last-update-failure written, lockfile removed). Production callers do
 # not set this variable.
 if [ -n "${INKYPI_UPDATE_TEST_EXIT_AFTER_TRAP:-}" ]; then
+  exit 0
+fi
+
+# JTN-724: Test-only happy-path simulation. When set, write a success sentinel
+# file with the requested target version (passed via INKYPI_UPDATE_TEST_TARGET
+# or defaulting to "simulated") and exit 0 *without* running any real git,
+# apt, pip, or systemctl work. The EXIT trap's success branch will additionally
+# clear any stale .last-update-failure. This lets the journey happy-path test
+# assert update.sh reached a clean terminal state while still exercising the
+# real script entrypoint. Production callers never set this variable, so
+# behavior outside of tests is completely unchanged.
+if [ -n "${INKYPI_UPDATE_TEST_SUCCESS_FAST:-}" ]; then
+  _ts_success=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+  _target_success="${INKYPI_UPDATE_TEST_TARGET:-simulated}"
+  # Escape target tag for JSON embedding — any non-alphanumeric must be safe.
+  if command -v python3 >/dev/null 2>&1; then
+    _target_json=$(python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().rstrip("\n")))' \
+      <<<"$_target_success" 2>/dev/null || echo '""')
+  else
+    _target_json='"'$(printf '%s' "$_target_success" \
+      | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')'"'
+  fi
+  mkdir -p "$LOCKFILE_DIR" 2>/dev/null || true
+  _tmp_success="${SUCCESS_SENTINEL_FILE}.tmp"
+  {
+    printf '{'
+    printf '"timestamp":"%s",' "$_ts_success"
+    printf '"target_version":%s,' "$_target_json"
+    printf '"mode":"test_success_fast"'
+    printf '}\n'
+  } > "$_tmp_success" 2>/dev/null || true
+  if [ -s "$_tmp_success" ]; then
+    mv -f "$_tmp_success" "$SUCCESS_SENTINEL_FILE" 2>/dev/null \
+      || rm -f "$_tmp_success" 2>/dev/null || true
+  else
+    rm -f "$_tmp_success" 2>/dev/null || true
+  fi
+  echo "TEST: INKYPI_UPDATE_TEST_SUCCESS_FAST — wrote $SUCCESS_SENTINEL_FILE, exiting 0" >&2
   exit 0
 fi
 
