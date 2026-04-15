@@ -1,6 +1,64 @@
 # CHANGELOG
 
 
+## v0.54.0 (2026-04-15)
+
+### Features
+
+- **observability**: Batch + raise cap on /api/client-log (JTN-711)
+  ([#488](https://github.com/jtn0123/InkyPi/pull/488),
+  [`e38e438`](https://github.com/jtn0123/InkyPi/commit/e38e438f02a723a87ee9988995dcec7bc26bdffc))
+
+* feat(observability): batch + raise cap on /api/client-log (JTN-711)
+
+- Raise server rate-limit bucket to capacity=60, refill=10/s so bursts of console errors from a
+  broken page aren't silently dropped. - Accept either a single-object payload (legacy) or an array
+  of up to 50 entries in a single POST. Each POST consumes exactly one rate-limit token regardless
+  of entry count. - All-or-nothing validation on batches: any invalid entry returns 400 with
+  per-entry errors in `details.entry_errors` so the client can self-correct. - Raise body cap to 256
+  KB to fit worst-case batches (50 x ~4 KB). - client_log_reporter.js coalesces emitted reports
+  within a 500ms window into a single batched POST; chunks across multiple POSTs if > 50. - Raise
+  client-side self-disable threshold from 5x429 to 10x429 now that server capacity is higher. -
+  Flush pending queue via sendBeacon on pagehide/beforeunload so reports aren't lost when navigating
+  mid-window. - Add tests/unit/test_client_log_batch.py covering batch accept/reject, per-entry
+  validation, token accounting, newline stripping, field capping, and the 30-errors-in-a-burst
+  acceptance case.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor(client_log): share size+rate-limit helper with client_error
+
+Extract the body-size + rate-limit guard into ``enforce_size_and_rate`` in
+  ``utils/client_endpoint``. The old inline block in ``receive_client_log`` was the same 16 lines as
+  the one in ``client_error`` — SonarCloud flagged the duplication on the JTN-711 PR. The helper
+  returns the raw body so callers can still do their own JSON parsing (single-dict vs batch array).
+
+* fix(security): close CodeQL reflected-XSS alerts on client-log errors
+
+CodeQL flagged both error paths in ``receive_client_log`` as flowing user-controlled data into the
+  response body. The messages were already server-controlled literals, but the taint tracker
+  couldn't prove it across the helper boundary / error-list indirection. Rebuild both responses from
+  server-controlled strings:
+
+- Size/rate-limit failure: use ``reissue_json_error`` to preserve the HTTP status (413/429) while
+  swapping the body for a fixed string. - Per-entry validation failure: use a single fixed top-level
+  message; the actual per-entry error list stays under ``details.entry_errors`` for debuggability.
+
+Follows the pattern from feedback_codeql_url_redirection — rebuild from validated parts rather than
+  reusing tainted values, even when the reuse is provably safe by inspection.
+
+* test(client_log): adapt XSS regression to new error envelope
+
+The top-level ``error`` field is now a fixed server-controlled string ("One or more batch entries
+  failed validation") per JTN-711; the per-entry "Invalid level: ..." message moved under
+  ``details.entry_errors``. Update the reflective-xss regression to check both locations — the point
+  of the assertion (the raw attacker payload never appears anywhere in the body) is unchanged.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.53.0 (2026-04-15)
 
 ### Features
