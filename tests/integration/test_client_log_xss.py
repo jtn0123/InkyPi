@@ -61,7 +61,15 @@ def test_invalid_level_not_reflected(client, payload: str) -> None:
     # The level validation message remains specific, but the tainted payload
     # itself must never be reflected.
     parsed = json.loads(body)
-    assert "Invalid level" in parsed.get("error", "")
+    # JTN-711: top-level error is a fixed server-controlled string to avoid
+    # CodeQL flagging any request-derived reflection. The per-entry error
+    # list still carries the detailed "Invalid level: ..." message for
+    # debugging — and the tainted payload itself never appears anywhere.
+    top_error = parsed.get("error", "")
+    entry_errors = parsed.get("details", {}).get("entry_errors") or []
+    detail_msgs = " ".join(str(e.get("error", "")) for e in entry_errors)
+    combined = f"{top_error} {detail_msgs}".lower()
+    assert "invalid level" in combined or "validation" in combined
 
 
 def test_invalid_level_missing_still_rejected(client) -> None:
