@@ -223,6 +223,7 @@ coverage.xml
 !/src/static/scripts/client_errors.js
 !/src/static/scripts/client_error_reporter.js
 !/src/static/scripts/client_log_reporter.js
+!/src/static/scripts/errors_page.js
 !/src/static/scripts/store.js
 # Snapshot failure artifacts (actual PNGs saved on mismatch)
 tests/snapshots/actual/

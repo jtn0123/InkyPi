@@ -14,6 +14,7 @@ def register_blueprints(app: Flask) -> None:
     from blueprints.client_log import client_log_bp
     from blueprints.csp_report import csp_report_bp
     from blueprints.diagnostics import diagnostics_bp
+    from blueprints.errors import errors_bp
     from blueprints.events import events_bp
     from blueprints.history import history_bp
     from blueprints.main import main_bp
@@ -31,6 +32,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(apikeys_bp)
     app.register_blueprint(client_error_bp)
     app.register_blueprint(client_log_bp)
+    app.register_blueprint(errors_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)
     app.register_blueprint(plugin_history_bp)
