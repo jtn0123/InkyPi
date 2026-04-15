@@ -17,6 +17,32 @@ from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
 
 
+def enforce_size_and_rate(
+    rate_limiter: TokenBucket, body_max: int
+) -> tuple[bytes | None, tuple[Response, int] | None]:
+    """Enforce body-size cap + per-IP rate-limit.
+
+    Returns ``(raw_body, None)`` on success or ``(None, error_response)``.
+
+    Callers that need array-aware JSON parsing (e.g. /api/client-log batch
+    payloads, JTN-711) use this helper and parse the body themselves;
+    callers expecting a single object can still use ``parse_client_report``.
+    """
+    content_length = request.content_length
+    if content_length is not None and content_length > body_max:
+        return None, json_error("Request body too large", status=413)
+
+    raw_body = request.get_data(as_text=False)
+    if len(raw_body) > body_max:
+        return None, json_error("Request body too large", status=413)
+
+    remote_ip = request.remote_addr or "unknown"
+    if not rate_limiter.try_acquire(remote_ip):
+        return None, json_error("Rate limit exceeded", status=429)
+
+    return raw_body, None
+
+
 def parse_client_report(
     rate_limiter: TokenBucket, body_max: int
 ) -> tuple[dict[str, Any] | None, Response | tuple[Response, int] | None]:

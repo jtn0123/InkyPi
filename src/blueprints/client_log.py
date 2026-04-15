@@ -27,8 +27,9 @@ import os
 import threading
 from typing import Any
 
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response
 
+from utils.client_endpoint import enforce_size_and_rate
 from utils.form_utils import sanitize_log_field
 from utils.http_utils import json_error
 from utils.rate_limit import TokenBucket
@@ -168,19 +169,12 @@ def receive_client_log() -> tuple[Response, int] | Response:
     client can fix the payload; valid entries in the same request are NOT
     emitted in that case (all-or-nothing semantics keep the contract simple).
     """
-    # ---- Size + rate-limit + JSON parse (inline, not via parse_client_report
-    # which hardcodes the dict requirement). -------------------------------
-    content_length = request.content_length
-    if content_length is not None and content_length > _BODY_MAX:
-        return json_error("Request body too large", status=413)
-
-    raw_body = request.get_data(as_text=False)
-    if len(raw_body) > _BODY_MAX:
-        return json_error("Request body too large", status=413)
-
-    remote_ip = request.remote_addr or "unknown"
-    if not _rate_limiter.try_acquire(remote_ip):
-        return json_error("Rate limit exceeded", status=429)
+    # ---- Size + rate-limit (shared helper; parse_client_report isn't used
+    # here because it hardcodes the dict requirement). ---------------------
+    raw_body, err = enforce_size_and_rate(_rate_limiter, _BODY_MAX)
+    if err is not None:
+        return err
+    assert raw_body is not None
 
     try:
         data = json.loads(raw_body)
