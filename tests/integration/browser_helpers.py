@@ -186,3 +186,56 @@ def prepare_playlist(device_config_dev):
         plugin_instance="Clock A",
     )
     device_config_dev.write_config()
+
+
+def install_direct_manual_update(monkeypatch, flask_app):
+    """Patch refresh_task.manual_update with a synchronous direct-render path.
+
+    Background refresh workers are not running in browser tests, so the real
+    ``manual_update`` short-circuits to a no-op. This helper installs a
+    drop-in replacement that renders the plugin inline, writes the history
+    sidecar via ``DisplayManager.display_image``, and updates
+    ``device_config.refresh_info`` — exactly what the worker loop would do on
+    a live system. Keeping this in one place avoids per-test duplication and
+    keeps the production internal imports (model / plugin_registry /
+    image_utils / time_utils) contained to the browser-helpers layer.
+    """
+    from model import RefreshInfo
+    from plugins.plugin_registry import get_plugin_instance
+    from utils.image_utils import compute_image_hash
+    from utils.time_utils import now_device_tz
+
+    display_manager = flask_app.config["DISPLAY_MANAGER"]
+    refresh_task = flask_app.config["REFRESH_TASK"]
+    device_config = flask_app.config["DEVICE_CONFIG"]
+
+    monkeypatch.setattr(
+        display_manager.display,
+        "display_image",
+        lambda *args, **kwargs: None,
+        raising=True,
+    )
+
+    def _manual_update_direct(refresh_action):
+        plugin_config = device_config.get_plugin(refresh_action.get_plugin_id())
+        plugin = get_plugin_instance(plugin_config)
+        current_dt = now_device_tz(device_config)
+        image = refresh_action.execute(plugin, device_config, current_dt)
+        refresh_info = refresh_action.get_refresh_info()
+        display_manager.display_image(
+            image,
+            image_settings=plugin_config.get("image_settings", []),
+            history_meta=refresh_info,
+        )
+        device_config.refresh_info = RefreshInfo(
+            refresh_type=refresh_info.get("refresh_type"),
+            plugin_id=refresh_info.get("plugin_id"),
+            playlist=refresh_info.get("playlist"),
+            plugin_instance=refresh_info.get("plugin_instance"),
+            refresh_time=current_dt.isoformat(),
+            image_hash=compute_image_hash(image),
+        )
+        device_config.write_config()
+        return {"generate_ms": 0}
+
+    monkeypatch.setattr(refresh_task, "manual_update", _manual_update_direct)

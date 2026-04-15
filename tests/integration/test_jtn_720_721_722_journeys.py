@@ -12,7 +12,10 @@ pytestmark = pytest.mark.skipif(
     reason="UI interactions skipped by env",
 )
 
-from tests.integration.browser_helpers import navigate_and_wait  # noqa: E402
+from tests.integration.browser_helpers import (  # noqa: E402
+    install_direct_manual_update,
+    navigate_and_wait,
+)
 
 
 def _playlist_names(page) -> list[str]:
@@ -83,44 +86,7 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     flask_app,
     monkeypatch,
 ):
-    display_manager = flask_app.config["DISPLAY_MANAGER"]
-    refresh_task = flask_app.config["REFRESH_TASK"]
-    device_config = flask_app.config["DEVICE_CONFIG"]
-    monkeypatch.setattr(
-        display_manager.display,
-        "display_image",
-        lambda *args, **kwargs: None,
-        raising=True,
-    )
-
-    def _manual_update_direct(refresh_action):
-        from model import RefreshInfo
-        from plugins.plugin_registry import get_plugin_instance
-        from utils.image_utils import compute_image_hash
-        from utils.time_utils import now_device_tz
-
-        plugin_config = device_config.get_plugin(refresh_action.get_plugin_id())
-        plugin = get_plugin_instance(plugin_config)
-        current_dt = now_device_tz(device_config)
-        image = refresh_action.execute(plugin, device_config, current_dt)
-        refresh_info = refresh_action.get_refresh_info()
-        display_manager.display_image(
-            image,
-            image_settings=plugin_config.get("image_settings", []),
-            history_meta=refresh_info,
-        )
-        device_config.refresh_info = RefreshInfo(
-            refresh_type=refresh_info.get("refresh_type"),
-            plugin_id=refresh_info.get("plugin_id"),
-            playlist=refresh_info.get("playlist"),
-            plugin_instance=refresh_info.get("plugin_instance"),
-            refresh_time=current_dt.isoformat(),
-            image_hash=compute_image_hash(image),
-        )
-        device_config.write_config()
-        return {"generate_ms": 0}
-
-    monkeypatch.setattr(refresh_task, "manual_update", _manual_update_direct)
+    install_direct_manual_update(monkeypatch, flask_app)
 
     page = browser_page
 
@@ -155,6 +121,28 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     assert "Source:" in body_text
     assert "clock" in body_text
     assert "First Clock" in body_text
+
+
+def _wait_for_plugin_order(device_config_dev, playlist_name, expected, timeout_s=5.0):
+    """Poll device_config until the playlist's plugin order matches expected.
+
+    Avoids racing the client-side reorder POST against the reload that follows.
+    """
+    import time
+
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        pm = device_config_dev.get_playlist_manager()
+        pl = pm.get_playlist(playlist_name)
+        if pl is not None and [p.name for p in pl.plugins] == expected:
+            return
+        time.sleep(0.1)
+    pm = device_config_dev.get_playlist_manager()
+    pl = pm.get_playlist(playlist_name)
+    actual = [p.name for p in pl.plugins] if pl else None
+    raise AssertionError(
+        f"plugin order never reached {expected} (last observed: {actual})"
+    )
 
 
 def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
@@ -199,7 +187,13 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     first_item = page.locator(".plugin-item").nth(0)
     first_item.focus()
     first_item.press("ArrowDown")
-    page.wait_for_timeout(800)
+    # Wait for the reorder POST to land on the server before reloading so the
+    # reload doesn't race against the client-side save.
+    _wait_for_plugin_order(
+        device_config_dev,
+        "Journey List",
+        ["Year Beta", "Clock Alpha", "Todo Gamma"],
+    )
 
     page.reload(wait_until="domcontentloaded")
     page.wait_for_selector("[data-page-shell]", timeout=10000)
@@ -214,7 +208,12 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     page.locator(".delete-instance-btn").first.click()
     page.locator("#deleteInstanceModal").wait_for(state="visible", timeout=5000)
     page.locator("#confirmDeleteInstanceBtn").click()
-    page.wait_for_timeout(800)
+    # Wait for the delete to be reflected server-side before reloading.
+    _wait_for_plugin_order(
+        device_config_dev,
+        "Journey List",
+        ["Clock Alpha", "Todo Gamma"],
+    )
 
     page.reload(wait_until="domcontentloaded")
     page.wait_for_selector("[data-page-shell]", timeout=10000)
