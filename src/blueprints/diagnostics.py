@@ -201,6 +201,53 @@ def _read_last_update_failure() -> Any | None:
 # ---------------------------------------------------------------------------
 
 
+def _latest_refresh_ts() -> str | None:
+    """Return device_config.refresh_info.latest_refresh_time, or None on any miss."""
+    dc = current_app.config.get("DEVICE_CONFIG")
+    if dc is None:
+        return None
+    try:
+        refresh_info = dc.get_refresh_info()
+    except Exception:
+        return None
+    latest = getattr(refresh_info, "latest_refresh_time", None)
+    if isinstance(latest, str) and latest:
+        return latest
+    return None
+
+
+def _safe_health_snapshot(rt: Any) -> dict[str, Any]:
+    """Return rt.get_health_snapshot() or an empty dict when it fails / is absent."""
+    if rt is None or not hasattr(rt, "get_health_snapshot"):
+        return {}
+    try:
+        snap = rt.get_health_snapshot()
+    except Exception:
+        return {}
+    return snap if isinstance(snap, dict) else {}
+
+
+def _most_recent_plugin_error(snapshot: dict[str, Any]) -> str | None:
+    """Pick the error with the newest last_failure_at across all plugin entries."""
+    last_error: str | None = None
+    last_failure_at: str | None = None
+    for entry in snapshot.values():
+        if not isinstance(entry, dict):
+            continue
+        err = entry.get("last_error")
+        fat = entry.get("last_failure_at")
+        if not err or not isinstance(err, str):
+            continue
+        is_newer = last_failure_at is None or (
+            isinstance(fat, str) and fat > last_failure_at
+        )
+        if is_newer:
+            last_error = err
+            if isinstance(fat, str):
+                last_failure_at = fat
+    return last_error
+
+
 def _refresh_task_snapshot() -> dict[str, Any]:
     """Return running/last_run_ts/last_error summary of the refresh task singleton."""
     payload: dict[str, Any] = {
@@ -213,49 +260,20 @@ def _refresh_task_snapshot() -> dict[str, Any]:
         if rt is None:
             return payload
         payload["running"] = bool(getattr(rt, "running", False))
-
-        # Best signal for "last_run_ts" we have today is the latest_refresh_time
-        # on device_config.refresh_info, which the worker updates on every push.
-        dc = current_app.config.get("DEVICE_CONFIG")
-        if dc is not None:
-            try:
-                refresh_info = dc.get_refresh_info()
-                latest = getattr(refresh_info, "latest_refresh_time", None)
-                if isinstance(latest, str) and latest:
-                    payload["last_run_ts"] = latest
-            except Exception:
-                pass
-
-        # Pull the most recent plugin error, if any, as a coarse "last_error".
-        try:
-            snapshot = (
-                rt.get_health_snapshot() if hasattr(rt, "get_health_snapshot") else {}
-            )
-        except Exception:
-            snapshot = {}
-        last_error: str | None = None
-        last_failure_at: str | None = None
-        if isinstance(snapshot, dict):
-            for entry in snapshot.values():
-                if not isinstance(entry, dict):
-                    continue
-                err = entry.get("last_error")
-                fat = entry.get("last_failure_at")
-                if (
-                    err
-                    and isinstance(err, str)
-                    and (
-                        last_failure_at is None
-                        or (isinstance(fat, str) and fat > last_failure_at)
-                    )
-                ):
-                    last_error = err
-                    if isinstance(fat, str):
-                        last_failure_at = fat
-        payload["last_error"] = last_error
+        payload["last_run_ts"] = _latest_refresh_ts()
+        payload["last_error"] = _most_recent_plugin_error(_safe_health_snapshot(rt))
     except Exception:
         logger.exception("diagnostics: failed to introspect refresh task")
     return payload
+
+
+def _status_to_label(raw: Any) -> str | None:
+    """Map refresh-task status color codes onto the public ok/fail vocabulary."""
+    if raw == "green":
+        return "ok"
+    if raw == "red":
+        return "fail"
+    return None
 
 
 def _plugin_health_summary() -> dict[str, str]:
@@ -277,23 +295,15 @@ def _plugin_health_summary() -> dict[str, str]:
         logger.exception("diagnostics: failed to list registered plugins")
 
     # Overlay with the refresh-task health snapshot so we report ok/fail where known.
-    try:
-        rt = current_app.config.get("REFRESH_TASK")
-        if rt is not None and hasattr(rt, "get_health_snapshot"):
-            snap = rt.get_health_snapshot() or {}
-            if isinstance(snap, dict):
-                for pid, entry in snap.items():
-                    if not isinstance(entry, dict):
-                        continue
-                    status = entry.get("status")
-                    if status == "green":
-                        summary[pid] = "ok"
-                    elif status == "red":
-                        summary[pid] = "fail"
-                    else:
-                        summary.setdefault(pid, "unknown")
-    except Exception:
-        logger.exception("diagnostics: failed to read plugin health snapshot")
+    snap = _safe_health_snapshot(current_app.config.get("REFRESH_TASK"))
+    for pid, entry in snap.items():
+        if not isinstance(entry, dict):
+            continue
+        label = _status_to_label(entry.get("status"))
+        if label is not None:
+            summary[pid] = label
+        else:
+            summary.setdefault(pid, "unknown")
 
     return summary
 
