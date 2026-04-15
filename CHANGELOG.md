@@ -1,6 +1,49 @@
 # CHANGELOG
 
 
+## v0.53.0 (2026-04-15)
+
+### Features
+
+- **update**: Surface update failures in web UI (JTN-710)
+  ([#487](https://github.com/jtn0123/InkyPi/pull/487),
+  [`ec96220`](https://github.com/jtn0123/InkyPi/commit/ec96220c2a560dad80b1735e06d76f135fde8777))
+
+* feat(update): surface update failures in web UI (JTN-710)
+
+Wire the ``.last-update-failure`` JSON record (JTN-704) written by ``install/update.sh``'s EXIT trap
+  through the ``/settings/update_status`` endpoint so the Settings -> Updates page can show *why*
+  the last update failed without the user SSHing in to read the system journal.
+
+- Add ``_update_status.py`` helper that reads ``/var/lib/inkypi/.last-update-failure`` defensively
+  (missing -> ``None``, malformed -> ``{parse_error: true}``, caps oversized files to 64 KiB). -
+  Extend ``GET /settings/update_status`` with a ``last_failure`` field. - Tighten ``POST
+  /settings/update`` validation: an explicit null, empty, whitespace-only, or non-string
+  ``target_version`` now returns 400 with the standard validation envelope (``code:
+  validation_error``, ``details.field: target_version``). Previously the request silently fell
+  through to the "latest semver tag" path in ``do_update.sh``, producing "No semver tags found" only
+  visible in the system journal. - Surface the failure record in ``settings.html`` as an inline
+  banner with timestamp, exit code, last step, and a collapsible journal tail. The JS refreshes the
+  banner on page load and after every update poll.
+
+Depends on JTN-704's ``.last-update-failure`` JSON contract (#484).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* refactor(update): address SonarCloud findings on JTN-710
+
+- _update_status.py: drop redundant ``UnicodeDecodeError`` catch (S5713); it's a ``ValueError``
+  subclass and ``errors="replace"`` means decode cannot raise anyway. - settings_page.js: hoist
+  ``renderUpdateFailureBanner`` out of the ``createSettingsPage`` closure to module scope (S7721)
+  and split the two render branches into ``renderUpdateFailureUnreadable`` /
+  ``renderUpdateFailureFields`` helpers to drop cognitive complexity from 22 to well under the 15
+  threshold (S3776).
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.52.1 (2026-04-15)
 
 ### Bug Fixes
