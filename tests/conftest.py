@@ -42,6 +42,7 @@ UI_BROWSER_TESTS = {
     "test_plugin_preview_smoke.py",
     "test_plugin_preview_save_roundtrip.py",
     "test_form_roundtrip.py",
+    "test_playlist_roundtrip.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
