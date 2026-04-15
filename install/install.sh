@@ -91,35 +91,98 @@ check_permissions() {
   fi
 }
 
+# JTN-701: Download a single Waveshare driver file honoring the pin in
+# install/waveshare-manifest.txt. Verifies the downloaded content's sha256
+# matches the manifest and fails fast on mismatch (prevents a silent
+# upstream change from breaking a previously-working device).
+#
+# Arguments:
+#   $1 driver filename (e.g. epd7in3e.py)
+#   $2 destination path
+fetch_pinned_waveshare_file() {
+  local driver_name="$1"
+  local dest_file="$2"
+  local manifest="$SCRIPT_DIR/waveshare-manifest.txt"
+
+  if [ ! -f "$manifest" ]; then
+    echo_error "ERROR: Waveshare pin manifest not found at $manifest"
+    exit 1
+  fi
+
+  # Parse the pin line. Format: "<name> <commit_sha> <sha256>" (comments
+  # start with '#'). Exactly one row must match $driver_name.
+  local row
+  row=$(awk -v n="$driver_name" '$1==n && $1 !~ /^#/ {print; found=1} END{exit !found}' "$manifest") || {
+    echo_error "ERROR: '$driver_name' is not pinned in $manifest"
+    echo_error "Add a pin (name, commit sha, sha256) before installing this device."
+    exit 1
+  }
+
+  local commit_sha expected_sha256
+  commit_sha=$(echo "$row" | awk '{print $2}')
+  expected_sha256=$(echo "$row" | awk '{print $3}')
+
+  if [[ ! "$commit_sha" =~ ^[0-9a-f]{40}$ ]]; then
+    echo_error "ERROR: manifest row for '$driver_name' has invalid commit sha: $commit_sha"
+    exit 1
+  fi
+  if [[ ! "$expected_sha256" =~ ^[0-9a-f]{64}$ ]]; then
+    echo_error "ERROR: manifest row for '$driver_name' has invalid sha256: $expected_sha256"
+    exit 1
+  fi
+
+  if [ -f "$dest_file" ]; then
+    echo_success "\tWaveshare driver '$driver_name' already exists at $dest_file"
+    return 0
+  fi
+
+  local url="https://raw.githubusercontent.com/waveshareteam/e-Paper/${commit_sha}/RaspberryPi_JetsonNano/python/lib/waveshare_epd/${driver_name}"
+
+  # Download to a temp file first so a corrupted/incorrect download never
+  # ends up at $dest_file (prevents partial installs on Ctrl+C / network blip).
+  local tmp_file
+  tmp_file=$(mktemp "${dest_file}.XXXXXX")
+  if ! curl --silent --fail --location -o "$tmp_file" "$url"; then
+    rm -f "$tmp_file"
+    echo_error "ERROR: Failed to download Waveshare driver '$driver_name' from pinned commit."
+    echo_error "URL: $url"
+    exit 1
+  fi
+
+  # sha256sum (Linux) vs shasum -a 256 (macOS dev shells). Pick whichever is present.
+  local actual_sha256
+  if command -v sha256sum >/dev/null 2>&1; then
+    actual_sha256=$(sha256sum "$tmp_file" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    actual_sha256=$(shasum -a 256 "$tmp_file" | awk '{print $1}')
+  else
+    rm -f "$tmp_file"
+    echo_error "ERROR: Neither sha256sum nor shasum available to verify Waveshare driver."
+    exit 1
+  fi
+
+  if [ "$actual_sha256" != "$expected_sha256" ]; then
+    rm -f "$tmp_file"
+    echo_error "ERROR: sha256 mismatch for '$driver_name'."
+    echo_error "  expected: $expected_sha256"
+    echo_error "  actual:   $actual_sha256"
+    echo_error "Refusing to install; upstream content at the pinned commit changed unexpectedly."
+    exit 1
+  fi
+
+  mv "$tmp_file" "$dest_file"
+  echo_success "\tWaveshare driver '$driver_name' verified and installed at $dest_file"
+}
+
 fetch_waveshare_driver() {
   echo "Fetching Waveshare driver for: $WS_TYPE"
 
   DRIVER_DEST="$SRC_PATH/display/waveshare_epd"
   DRIVER_FILE="$DRIVER_DEST/$WS_TYPE.py"
-  DRIVER_URL="https://raw.githubusercontent.com/waveshareteam/e-Paper/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/$WS_TYPE.py"
-
-  # Attempt to download the file
-  if [ -f "$DRIVER_FILE" ]; then
-    echo_success "\tWaveshare driver '$WS_TYPE.py' already exists at $DRIVER_FILE"
-  elif curl --silent --fail -o "$DRIVER_FILE" "$DRIVER_URL"; then
-    echo_success "\tWaveshare driver '$WS_TYPE.py' successfully downloaded to $DRIVER_FILE"
-  else
-    echo_error "ERROR: Failed to download Waveshare driver '$WS_TYPE.py'."
-    echo_error "Ensure the model name is correct and exists at:"
-    echo_error "https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd"
-    exit 1
-  fi
-
   EPD_CONFIG_FILE="$DRIVER_DEST/epdconfig.py"
-  EPD_CONFIG_URL="https://raw.githubusercontent.com/waveshareteam/e-Paper/refs/heads/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd/epdconfig.py"
-  if [ -f "$EPD_CONFIG_FILE" ]; then
-    echo_success "\tWaveshare epdconfig file already exists at $EPD_CONFIG_FILE"
-  elif curl --silent --fail -o "$EPD_CONFIG_FILE" "$EPD_CONFIG_URL"; then
-    echo_success "\tWaveshare epdconfig file successfully downloaded to $EPD_CONFIG_FILE"
-  else
-    echo_error "ERROR: Failed to download Waveshare epdconfig file."
-    exit 1
-  fi
+
+  fetch_pinned_waveshare_file "$WS_TYPE.py" "$DRIVER_FILE"
+  fetch_pinned_waveshare_file "epdconfig.py" "$EPD_CONFIG_FILE"
 }
 
 enable_interfaces(){
@@ -353,21 +416,14 @@ install_config() {
 # Update the device.json file with the supplied Waveshare parameter (if set).
 #
 update_config() {
+  # JTN-701: Delegate to a small Python helper that uses json.load/json.dump
+  # with an atomic temp+rename swap. The previous sed-based implementation
+  # silently corrupted device.json on malformed input or unusual whitespace.
   if [[ -n "$WS_TYPE" ]]; then
       local DEVICE_JSON="$CONFIG_DIR/device.json"
-
-      if grep -q '"display_type":' "$DEVICE_JSON"; then
-          # Update existing display_type value
-          sed -i "s/\"display_type\": \".*\"/\"display_type\": \"$WS_TYPE\"/" "$DEVICE_JSON"
-          echo "Updated display_type to: $WS_TYPE"
-      else
-          # Append display_type safely, ensuring proper comma placement
-          if grep -q '}$' "$DEVICE_JSON"; then
-              sed -i '$s/}/,/' "$DEVICE_JSON"  # Replace last } with a comma
-          fi
-          echo "  \"display_type\": \"$WS_TYPE\"" >> "$DEVICE_JSON"
-          echo "}" >> "$DEVICE_JSON"  # Add trailing }
-          echo "Added display_type: $WS_TYPE"
+      if ! python3 "$SCRIPT_DIR/_device_json.py" set-display "$WS_TYPE" --path "$DEVICE_JSON"; then
+          echo_error "ERROR: Failed to set display_type in $DEVICE_JSON"
+          exit 1
       fi
   else
       echo "Config not updated as WS_TYPE flag is not set"
