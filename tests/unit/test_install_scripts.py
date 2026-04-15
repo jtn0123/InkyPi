@@ -1915,13 +1915,17 @@ class TestUpdateScript:
             "max_attempts" not in fn_body
         ), "update_app_service must not reintroduce max_attempts counting (JTN-706)"
 
-        # New pattern must be present: a `timeout 45` (or similar bounded wait)
-        # wrapping the systemctl is-active poll.
+        # New pattern must be present: a `timeout <N>` bounded wait wrapping
+        # the systemctl is-active poll.
         assert (
             "timeout" in fn_body and "is-active" in fn_body
         ), "update_app_service must wrap is-active poll with a `timeout` bound (JTN-706)"
-        assert (
-            "45" in fn_body
+        # Look for an actual 45-second timeout assignment, not just any "45" in
+        # a comment or URL. Match either `wait_seconds=...45` (with optional
+        # env-override expansion) or a literal `timeout 45` invocation.
+        assert re.search(
+            r"(wait_seconds\s*=\s*(?:\"|\')?\$?\{?[^}]*:?-?\s*45|timeout\s+(?:\"[^\"]*\"|'[^']*'|45))",
+            fn_body,
         ), "update_app_service must use a 45-second timeout ceiling (JTN-706)"
 
         # Timeout and failed states must be distinguished so users know whether

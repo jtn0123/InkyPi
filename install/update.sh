@@ -74,7 +74,15 @@ update_app_service() {
     # devices. We now poll up to 45 seconds via `timeout`, and distinguish
     # the two error modes: a genuinely-failed service (systemctl reports
     # `failed`) versus slow startup that exceeded the wait window.
-    local wait_seconds=45
+    # JTN-706: ceiling is overridable via env so slow dev boards or debugging
+    # sessions can extend the wait without a code change. Production callers
+    # (install.sh, settings UI, do_update.sh) do not set this; default is 45s.
+    # Mirrors the INKYPI_LOCKFILE_DIR test-flexibility pattern.
+    local wait_seconds="${INKYPI_SERVICE_START_TIMEOUT:-45}"
+    # Reject non-numeric / empty overrides to prevent `timeout` from erroring.
+    if ! [[ "$wait_seconds" =~ ^[1-9][0-9]*$ ]]; then
+      wait_seconds=45
+    fi
     if ! sudo timeout "$wait_seconds" bash -c \
         "until systemctl is-active --quiet \"$SERVICE_FILE\"; do sleep 1; done"; then
       if sudo systemctl is-failed --quiet "$SERVICE_FILE"; then
