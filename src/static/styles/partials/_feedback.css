@@ -1203,6 +1203,45 @@ body.modal-open {
     flex-shrink: 0;
 }
 
+/* JTN-710: banner shown when install/update.sh wrote .last-update-failure. */
+.update-failure-banner {
+    margin: var(--spacing-sm) 0 var(--spacing-md);
+    padding: 12px 14px;
+    border: 1px solid var(--color-danger, #b94a48);
+    border-left-width: 4px;
+    border-radius: var(--border-radius-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+}
+
+.update-failure-title {
+    font-weight: 600;
+    color: var(--color-danger, #b94a48);
+    margin-bottom: 4px;
+}
+
+.update-failure-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.update-failure-journal {
+    margin-top: 6px;
+    padding: 8px;
+    background: var(--surface-alt, var(--surface));
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow: auto;
+    white-space: pre-wrap;
+}
+
 .update-release-notes {
     margin-bottom: var(--spacing-md);
 }

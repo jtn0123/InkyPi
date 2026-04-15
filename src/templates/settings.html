@@ -155,6 +155,21 @@
                         <h3>Software Update</h3>
                         <span class="status-chip" id="updateBadge">Checking...</span>
                     </div>
+                    {# JTN-710: banner populated from /settings/update_status
+                       when install/update.sh's EXIT trap (JTN-704) wrote a
+                       .last-update-failure record on the previous run. #}
+                    <div class="update-failure-banner" id="updateFailureBanner" role="alert" hidden>
+                        <div class="update-failure-title">Last update failed</div>
+                        <div class="update-failure-meta">
+                            <span id="updateFailureTimestamp"></span>
+                            <span id="updateFailureExitCode"></span>
+                            <span id="updateFailureStep"></span>
+                        </div>
+                        <details id="updateFailureDetails" hidden>
+                            <summary>Recent journal output</summary>
+                            <pre id="updateFailureJournal" class="update-failure-journal"></pre>
+                        </details>
+                    </div>
                     <div class="update-version-row">
                         <div class="update-version-card">
                             <span class="update-version-label">Installed</span>
