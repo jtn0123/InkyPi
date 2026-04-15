@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.55.0 (2026-04-15)
+
+### Features
+
+- **dev**: Watch-mode CSS + asset rebuild script (JTN-713)
+  ([#490](https://github.com/jtn0123/InkyPi/pull/490),
+  [`1fb126e`](https://github.com/jtn0123/InkyPi/commit/1fb126e971f6f082949c9fb9e15d723da8474ca7))
+
+Add scripts/dev_watch.sh + scripts/_dev_watch_dispatch.py, a thin watchmedo-driven wrapper that
+  auto-runs build_css.py / build_assets.py when partials change. Debounces IDE save bursts (200 ms
+  window), logs one line per rebuild in the documented format, and exits cleanly on Ctrl+C. watchdog
+  is declared in requirements-dev.in as an optional dev convenience. Documented alongside
+  ./scripts/dev.sh in docs/development.md.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.54.0 (2026-04-15)
 
 ### Features
