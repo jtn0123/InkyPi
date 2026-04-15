@@ -24,8 +24,10 @@ browser test groups are enabled and Chromium is installed.
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
 from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
@@ -34,6 +36,41 @@ pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
     reason="UI interactions skipped by env",
 )
+
+
+def _discover_plugin_ids() -> tuple[str, ...]:
+    """Enumerate every registered plugin by scanning ``src/plugins/*/plugin-info.json``.
+
+    Runs at test collection time so pytest emits one parametrize case per
+    plugin (visible in ``--collect-only`` output). Uses the same discovery
+    rule as :func:`config.Config.read_plugins_list` — a plugin is "registered"
+    iff its directory contains a ``plugin-info.json`` whose ``id`` field is set.
+
+    Kept intentionally file-system based (rather than importing the
+    registry) so collection does not depend on Flask app setup.
+    """
+    # tests/integration/test_click_sweep.py -> repo root -> src/plugins
+    plugins_root = Path(__file__).resolve().parents[2] / "src" / "plugins"
+    if not plugins_root.is_dir():
+        return ()
+    ids: list[str] = []
+    for entry in sorted(plugins_root.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("_"):
+            continue
+        info_path = entry / "plugin-info.json"
+        if not info_path.is_file():
+            continue
+        try:
+            info = json.loads(info_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        plugin_id = info.get("id")
+        if isinstance(plugin_id, str) and plugin_id:
+            ids.append(plugin_id)
+    return tuple(ids)
+
+
+_PLUGIN_IDS: tuple[str, ...] = _discover_plugin_ids()
 
 
 @dataclass(frozen=True)
@@ -99,6 +136,23 @@ _VIEWPORTS: tuple[tuple[str, str], ...] = (
 # until a mobile-specific break is triaged into Linear — new entries must
 # link to a JTN issue so they get cleaned up.
 _MOBILE_XFAIL_PAGES: dict[str, str] = {}
+
+# Plugin-sweep cap. Plugin settings pages are structurally similar (a single
+# settings form with a handful of presets) so 15 clicks is plenty to exercise
+# every handler class while keeping the whole 21-plugin sweep well under the
+# CI wall-time budget.
+_PLUGIN_MAX_CLICKS_PER_PAGE = 15
+
+# Per-plugin xfails for the plugin sweep. New entries MUST link to a JTN
+# issue so they get cleaned up, not left to rot. Discovered during the
+# initial JTN-698 landing — these plugins have real handler bugs the sweep
+# surfaced, tracked separately so the infra lands green.
+_PLUGIN_XFAIL: dict[str, str] = {
+    "weather": (
+        "JTN-716 — Style picker collapsible + nav links no-op on /plugin/weather"
+    ),
+    "todo_list": ("JTN-717 — 'Remove list' button click produces no observable change"),
+}
 
 
 _ENUMERATE_JS = """
@@ -294,28 +348,22 @@ def _reset_page_state(page, base_url: str, sweep: SweepPage) -> None:
     _install_observer(page)
 
 
-@pytest.mark.parametrize(
-    "viewport,page_fixture",
-    _VIEWPORTS,
-    ids=[vp[0] for vp in _VIEWPORTS],
-)
-@pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
-def test_click_sweep(
-    live_server, request, sweep: SweepPage, viewport: str, page_fixture: str
-):
-    """Click every visible clickable on the page; assert no silent failures.
+def _run_click_sweep(
+    page,
+    live_server: str,
+    sweep: SweepPage,
+    *,
+    max_clicks: int = _MAX_CLICKS_PER_PAGE,
+) -> None:
+    """Shared click-sweep body used by both the core-pages and plugin-pages tests.
 
-    Parametrized over viewport: ``desktop`` (1280×900) and ``mobile``
-    (360×800). Mobile reflows can hide or overlap controls and catch
-    handlers that only break at narrow widths.
+    Loads ``sweep.path``, enumerates every visible clickable that isn't
+    flagged ``data-test-skip-click="true"``, clicks up to ``max_clicks`` of
+    them, and asserts no pageerror / console.error / 5xx / silent no-op
+    occurred. Uses the page's autouse ``client_log_capture`` fixture as
+    the final tripwire for any ``console.warn``/``error`` the browser
+    forwarded to ``/api/client-log``.
     """
-    if sweep.label in _XFAIL_PAGES:
-        pytest.xfail(_XFAIL_PAGES[sweep.label])
-    mobile_key = f"{sweep.label}:{viewport}"
-    if viewport == "mobile" and mobile_key in _MOBILE_XFAIL_PAGES:
-        pytest.xfail(_MOBILE_XFAIL_PAGES[mobile_key])
-
-    page = request.getfixturevalue(page_fixture)
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
 
@@ -338,7 +386,7 @@ def test_click_sweep(
     silent_failures: list[str] = []
     click_errors: list[str] = []
 
-    for descriptor in descriptors[:_MAX_CLICKS_PER_PAGE]:
+    for descriptor in descriptors[:max_clicks]:
         # Re-resolve: a previous click may have re-rendered the DOM.
         locator = page.locator(f"[data-clicksweep-id='{descriptor['id']}']").first
         if locator.count() == 0:
@@ -398,3 +446,63 @@ def test_click_sweep(
     assert (
         not click_errors
     ), f"{sweep.path}: {len(click_errors)} click(s) errored: {click_errors[:5]}"
+
+
+@pytest.mark.parametrize(
+    "viewport,page_fixture",
+    _VIEWPORTS,
+    ids=[vp[0] for vp in _VIEWPORTS],
+)
+@pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
+def test_click_sweep(
+    live_server, request, sweep: SweepPage, viewport: str, page_fixture: str
+):
+    """Click every visible clickable on the page; assert no silent failures.
+
+    Parametrized over viewport: ``desktop`` (1280×900) and ``mobile``
+    (360×800). Mobile reflows can hide or overlap controls and catch
+    handlers that only break at narrow widths.
+    """
+    if sweep.label in _XFAIL_PAGES:
+        pytest.xfail(_XFAIL_PAGES[sweep.label])
+    mobile_key = f"{sweep.label}:{viewport}"
+    if viewport == "mobile" and mobile_key in _MOBILE_XFAIL_PAGES:
+        pytest.xfail(_MOBILE_XFAIL_PAGES[mobile_key])
+
+    page = request.getfixturevalue(page_fixture)
+    _run_click_sweep(page, live_server, sweep)
+
+
+# JTN-698: Parametrize the sweep over every registered plugin so a handler
+# regression in weather/todo/comic/image pickers (not just clock) fails CI.
+# Discovery runs at collection time via ``_discover_plugin_ids()`` so the
+# parametrize IDs show up in ``pytest --collect-only`` output.
+#
+# Desktop-only by design: plugin settings pages don't have mobile-specific
+# reflow logic, and running 21 plugins × 2 viewports would roughly double
+# wall-time without new signal. Mark ``plugin_sweep`` so CI can route this
+# to a dedicated job if total runtime pressure grows.
+@pytest.mark.plugin_sweep
+@pytest.mark.parametrize("plugin_id", _PLUGIN_IDS, ids=list(_PLUGIN_IDS))
+def test_click_sweep_plugin_pages(live_server, browser_page, plugin_id: str):
+    """Sweep every ``/plugin/<id>`` page for silent-failure handlers.
+
+    Uses the shared :func:`_run_click_sweep` body with a tighter click cap
+    (``_PLUGIN_MAX_CLICKS_PER_PAGE``) to keep the 21-plugin sweep inside
+    the CI budget. Destructive controls are still honored via the existing
+    ``data-test-skip-click="true"`` skip selector.
+    """
+    if plugin_id in _PLUGIN_XFAIL:
+        pytest.xfail(_PLUGIN_XFAIL[plugin_id])
+
+    sweep = SweepPage(
+        label=f"plugin_{plugin_id}",
+        path=f"/plugin/{plugin_id}",
+        ready_marker="#settingsForm",
+    )
+    _run_click_sweep(
+        browser_page,
+        live_server,
+        sweep,
+        max_clicks=_PLUGIN_MAX_CLICKS_PER_PAGE,
+    )
