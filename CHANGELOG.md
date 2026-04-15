@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.55.1 (2026-04-15)
+
+### Bug Fixes
+
+- **install**: Pin Waveshare driver + safe device.json mutation (JTN-701)
+  ([#492](https://github.com/jtn0123/InkyPi/pull/492),
+  [`b3c9214`](https://github.com/jtn0123/InkyPi/commit/b3c9214016ba2a1975008fb693c88d76b096b9a0))
+
+Two hardening changes in install/install.sh that made the installer fragile:
+
+1. fetch_waveshare_driver was pulling drivers from the `master` branch of waveshareteam/e-Paper. A
+  silent upstream change could brick a previously-working device on the next install. Introduce
+  install/waveshare-manifest.txt pinning every supported driver to a specific upstream commit sha +
+  expected sha256, and rewrite the fetch helper to verify the hash after download (fails fast on
+  mismatch).
+
+2. update_config mutated device.json with `sed` regexes — fragile on malformed input or unusual
+  whitespace and prone to silent corruption when the ending `}` is on its own line. Replace with a
+  small Python helper (install/_device_json.py) that uses json.load/json.dump, preserves unrelated
+  keys + their ordering, and writes atomically via tempfile + fsync + os.replace.
+
+Tests added to tests/unit/test_install_scripts.py: - waveshare manifest is sha-pinned (40-char git
+  sha + 64-char sha256 per row) - install.sh references the manifest + verifies sha256 + no longer
+  hard-codes /master/ - update_config contains no sed + delegates to _device_json.py - helper
+  preserves unrelated keys / ordering when setting display_type - helper keeps existing display_type
+  position when updating - helper rejects malformed JSON, non-object root, missing file, empty
+  display_type — and leaves a malformed file untouched (atomicity) - helper source uses tempfile +
+  os.replace + os.fsync
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- **observability**: Unit-test log rotation (JTN-712)
+  ([#491](https://github.com/jtn0123/InkyPi/pull/491),
+  [`3ea723b`](https://github.com/jtn0123/InkyPi/commit/3ea723b7e8d028a394e8c4e7890b747c91d90df8))
+
+Rotation is load-bearing on the Pi Zero 2 W's 16GB SD, but no test exercised RotatingFileHandler
+  wiring or behavior. Runaway logging could silently fill the disk (see JTN-671 restart-loop
+  disk-wear context) and CI would not catch it.
+
+Adds tests/unit/test_log_rotation.py with 12 tests covering: * logging.conf declares a
+  [rotating_file] section with class RotatingFileHandler and non-zero maxBytes/backupCount (proves
+  rotation is configured, not defaulted). * read_rotation_config() rejects maxBytes=0,
+  backupCount=0, and a missing section — breaking the conf fails the test. * Actual rotation
+  behavior: emitting > maxBytes creates a .1 backup, primary file stays <= maxBytes, total files
+  capped at backupCount + 1. * Stress test: ~10x maxBytes forces many rotations, oldest files are
+  dropped, backupCount limit is respected. * Ordering: newest content in primary, oldest in backup.
+  * setup_logging() attaches a RotatingFileHandler when INKYPI_LOG_FILE is set, and does not when
+  unset.
+
+Minimal product-code additions to make rotation testable: * src/config/logging.conf: new
+  [rotating_file] section with maxBytes=1MB, backupCount=5 (not wired into fileConfig so default
+  behavior is unchanged — console-only). * src/app_setup/logging_setup.py: read_rotation_config()
+  and attach_rotating_file_handler() helpers; setup_logging() attaches the handler only when
+  INKYPI_LOG_FILE env var is set. Misconfigured rotation raises loudly rather than silently falling
+  back to an unbounded file.
+
+
 ## v0.55.0 (2026-04-15)
 
 ### Features
