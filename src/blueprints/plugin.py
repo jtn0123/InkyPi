@@ -414,16 +414,38 @@ def update_plugin_instance(instance_name: str):
         if plugin_config:
             try:
                 plugin = get_plugin_instance(plugin_config)
-                validation_error = validate_plugin_required_fields(
-                    plugin, plugin_settings
-                )
-                if validation_error:
-                    return json_error(validation_error, status=400)
-                settings_error = plugin.validate_settings(plugin_settings)
-                if settings_error:
-                    return json_error(settings_error, status=400)
             except Exception:
-                logger.debug("Could not validate plugin schema for %s", plugin_id)
+                logger.warning("Could not load plugin for validation: %s", plugin_id)
+                plugin = None
+
+            if plugin is not None:
+                try:
+                    validation_error = validate_plugin_required_fields(
+                        plugin, plugin_settings
+                    )
+                    if validation_error:
+                        return json_error(validation_error, status=400)
+                except Exception:
+                    logger.warning(
+                        "Required-field validation failed for %s",
+                        sanitize_log_field(plugin_id),
+                        exc_info=True,
+                    )
+
+                try:
+                    settings_error = plugin.validate_settings(plugin_settings)
+                    if settings_error:
+                        return json_error(settings_error, status=400)
+                except Exception:
+                    logger.warning(
+                        "Plugin validate_settings raised for %s",
+                        sanitize_log_field(plugin_id),
+                        exc_info=True,
+                    )
+                    return json_error(
+                        "Settings validation failed. Please check your input.",
+                        status=400,
+                    )
 
         before_settings = dict(plugin_instance.settings or {})
 
@@ -921,18 +943,42 @@ def _save_plugin_settings_common(
     # Validate required fields and plugin-specific settings
     try:
         plugin = get_plugin_instance(plugin_config)
-        validation_error = validate_plugin_required_fields(plugin, plugin_settings)
-        if validation_error:
-            if htmx:
-                return _render_plugin_form_error(validation_error, status=400)
-            return json_error(validation_error, status=400)
-        settings_error = plugin.validate_settings(plugin_settings)
-        if settings_error:
-            if htmx:
-                return _render_plugin_form_error(settings_error, status=400)
-            return json_error(settings_error, status=400)
     except Exception:
-        logger.debug("Could not validate plugin schema for %s", plugin_id)
+        logger.warning("Could not load plugin instance for validation: %s", plugin_id)
+        plugin = None
+
+    if plugin is not None:
+        try:
+            validation_error = validate_plugin_required_fields(
+                plugin, plugin_settings
+            )
+            if validation_error:
+                if htmx:
+                    return _render_plugin_form_error(validation_error, status=400)
+                return json_error(validation_error, status=400)
+        except Exception:
+            logger.warning(
+                "Required-field validation failed for %s",
+                sanitize_log_field(plugin_id),
+                exc_info=True,
+            )
+
+        try:
+            settings_error = plugin.validate_settings(plugin_settings)
+            if settings_error:
+                if htmx:
+                    return _render_plugin_form_error(settings_error, status=400)
+                return json_error(settings_error, status=400)
+        except Exception:
+            logger.warning(
+                "Plugin validate_settings raised for %s",
+                sanitize_log_field(plugin_id),
+                exc_info=True,
+            )
+            error_msg = "Settings validation failed. Please check your input."
+            if htmx:
+                return _render_plugin_form_error(error_msg, status=400)
+            return json_error(error_msg, status=400)
 
     default_playlist_name = "Default"
     playlist = playlist_manager.get_playlist(default_playlist_name)

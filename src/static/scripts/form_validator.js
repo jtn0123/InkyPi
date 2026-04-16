@@ -137,7 +137,32 @@
 
   function classifyInvalid(input) {
     var value = (input.value || "").trim();
-    return input.required && !value ? "required" : "invalid";
+    if (input.required && !value) return "required";
+    if (input.type === "number" && value) {
+      var num = parseFloat(value);
+      if (isNaN(num)) return "not_a_number";
+      if (input.min !== "" && num < parseFloat(input.min)) return "below_min";
+      if (input.max !== "" && num > parseFloat(input.max)) return "above_max";
+    }
+    if (input.type === "url" && value) return "invalid_url";
+    return "invalid";
+  }
+
+  function describeReason(input, reason) {
+    switch (reason) {
+      case "required":
+        return " is required";
+      case "not_a_number":
+        return " must be a number";
+      case "below_min":
+        return " must be at least " + input.min;
+      case "above_max":
+        return " must be at most " + input.max;
+      case "invalid_url":
+        return " must be a valid URL";
+      default:
+        return " is invalid";
+    }
   }
 
   function validateAllInputsDetailed(form) {
@@ -147,10 +172,12 @@
     var invalid = [];
     inputs.forEach(function (input) {
       if (!validateInput(input)) {
+        var reason = classifyInvalid(input);
         invalid.push({
           input: input,
           label: getInputLabel(input),
-          reason: classifyInvalid(input),
+          reason: reason,
+          message: getInputLabel(input) + describeReason(input, reason),
         });
       }
     });
@@ -160,8 +187,7 @@
   function buildValidationMessage(result) {
     if (!result || result.count === 0) return "";
     var first = result.invalid[0];
-    var suffix = first.reason === "required" ? " is required" : " is invalid";
-    var base = first.label + suffix;
+    var base = first.message || first.label + describeReason(first.input, first.reason);
     if (result.count === 1) return base;
     return base + " (and " + (result.count - 1) + " more)";
   }
@@ -237,6 +263,7 @@
     validateAllInputs: validateAllInputs,
     validateAllInputsDetailed: validateAllInputsDetailed,
     getInputLabel: getInputLabel,
+    describeReason: describeReason,
     buildValidationMessage: buildValidationMessage,
     focusFirstInvalid: focusFirstInvalid,
   };

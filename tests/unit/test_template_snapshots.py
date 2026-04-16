@@ -153,7 +153,7 @@ def test_calendar_url_input_has_aria_label(client):
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'name="calendarURLs[]"' in html
-    assert 'aria-label="Calendar URL"' in html
+    assert 'aria-label="Calendar URL 1"' in html
 
 
 # ---------------------------------------------------------------------------
