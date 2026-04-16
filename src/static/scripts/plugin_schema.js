@@ -379,7 +379,10 @@
     icon.className = "ph ph-trash ph-thin action-icon";
     icon.setAttribute("aria-hidden", "true");
     removeBtn.appendChild(icon);
-    removeBtn.addEventListener("click", () => entry.remove());
+    removeBtn.addEventListener("click", () => {
+      const list = entry.parentElement;
+      if (list) handleRemoveClick(removeBtn, list);
+    });
     toolbar.appendChild(titleInput);
     toolbar.appendChild(removeBtn);
 
@@ -409,9 +412,12 @@
         list.appendChild(createTodoEntry(titles[index] || "", items[index] || ""));
       }
     }
+    syncRemoveButtonStates(list);
     addButton.addEventListener("click", () => {
       if (list.children.length < maxItems) {
         list.appendChild(createTodoEntry("", ""));
+        bindRemoveButtons(list);
+        syncRemoveButtonStates(list);
       }
     });
   }

@@ -187,14 +187,7 @@ def _click_toggle(page, descriptor: dict) -> tuple[dict | None, dict | None]:
 
 # Pages where the initial sweep uncovered a real state-reflection bug that
 # needs a separate fix. Each entry MUST link to a tracking Linear issue.
-_XFAIL_PAGES: dict[str, str] = {
-    # JTN-692: .playlist-toggle-button is visible on desktop but clicking
-    # never changes aria-expanded / label — `setPlaylistExpanded` short-
-    # circuits for non-mobile viewports.
-    "playlist": (
-        "awaiting JTN-692 " "(playlist-toggle-button is a visible no-op on desktop)"
-    ),
-}
+_XFAIL_PAGES: dict[str, str] = {}
 
 
 @pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
