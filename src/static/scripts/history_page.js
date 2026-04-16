@@ -28,7 +28,9 @@
       );
       if (focusable) setTimeout(() => focusable.focus(), 0);
     } else if (_lastHistoryModalTrigger) {
-      _lastHistoryModalTrigger.focus?.();
+      if (typeof _lastHistoryModalTrigger.focus === "function") {
+        _lastHistoryModalTrigger.focus();
+      }
       _lastHistoryModalTrigger = null;
     }
   }

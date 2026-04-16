@@ -309,6 +309,35 @@ def _validate_instance_name(raw_name):
     return name, None
 
 
+def _form_parse_error(message, *, status=400, field="refresh_settings"):
+    """Build a ``(None, None, None, error_response)`` tuple for form parsing."""
+    return (
+        None,
+        None,
+        None,
+        json_error(
+            message, status=status, code=_CODE_VALIDATION, details={"field": field}
+        ),
+    )
+
+
+def _parse_refresh_settings_json(raw_refresh):
+    """Decode *raw_refresh* into a dict.
+
+    Returns ``(refresh_settings, error_tuple)``.  On success the error is
+    ``None``; on failure ``refresh_settings`` is ``None``.
+    """
+    if not raw_refresh or not isinstance(raw_refresh, str):
+        return None, _form_parse_error("refresh_settings is required")
+    try:
+        refresh_settings = json.loads(raw_refresh)
+    except (json.JSONDecodeError, ValueError):
+        return None, _form_parse_error("Invalid JSON in refresh_settings")
+    if not isinstance(refresh_settings, dict):
+        return None, _form_parse_error("refresh_settings must be a JSON object")
+    return refresh_settings, None
+
+
 def _parse_add_plugin_form(form, files):
     """Parse and validate the add_plugin form data.
 
@@ -317,57 +346,12 @@ def _parse_add_plugin_form(form, files):
     """
     plugin_settings = parse_form(form)
     raw_refresh = plugin_settings.pop("refresh_settings", None)
-    if not raw_refresh or not isinstance(raw_refresh, str):
-        return (
-            None,
-            None,
-            None,
-            json_error(
-                "refresh_settings is required",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            ),
-        )
-    try:
-        refresh_settings = json.loads(raw_refresh)
-    except (json.JSONDecodeError, ValueError):
-        return (
-            None,
-            None,
-            None,
-            json_error(
-                "Invalid JSON in refresh_settings",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            ),
-        )
-    if not isinstance(refresh_settings, dict):
-        return (
-            None,
-            None,
-            None,
-            json_error(
-                "refresh_settings must be a JSON object",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            ),
-        )
+    refresh_settings, err = _parse_refresh_settings_json(raw_refresh)
+    if err:
+        return err
     plugin_id = plugin_settings.pop("plugin_id", None)
     if not plugin_id or not isinstance(plugin_id, str):
-        return (
-            None,
-            None,
-            None,
-            json_error(
-                "plugin_id is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "plugin_id"},
-            ),
-        )
+        return _form_parse_error("plugin_id is required", status=422, field="plugin_id")
     plugin_settings.update(handle_request_files(files))
     return plugin_id, plugin_settings, refresh_settings, None
 
