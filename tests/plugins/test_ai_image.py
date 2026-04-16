@@ -540,3 +540,76 @@ def test_fetch_image_prompt_content_parsing():
         result = AIImage.fetch_image_prompt(mock_client, "test")
 
         assert result == expected_output
+
+
+def test_ai_image_openai_raises_when_decode_returns_none(
+    device_config_dev, monkeypatch
+):
+    """If the image loader fails to decode bytes from OpenAI, raise an error."""
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    with patch("plugins.ai_image.ai_image.OpenAI") as mock_openai:
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_image_response = MagicMock()
+        mock_image_response.data = [MagicMock()]
+        mock_image_response.data[0].b64_json = base64.b64encode(b"junk").decode()
+        mock_client.images.generate.return_value = mock_image_response
+
+        # from_bytesio returns None when decoding fails
+        with patch.object(p.image_loader, "from_bytesio", return_value=None):
+            with pytest.raises(RuntimeError, match="(Failed to decode|API request)"):
+                p.generate_image(
+                    {
+                        "textPrompt": "a cat",
+                        "imageModel": "gpt-image-1.5",
+                        "quality": "medium",
+                    },
+                    device_config_dev,
+                )
+
+
+def test_ai_image_google_raises_when_decode_returns_none(
+    device_config_dev, monkeypatch
+):
+    """If the image loader fails to decode bytes from Google Imagen, raise an error."""
+    import sys
+
+    from plugins.ai_image.ai_image import AIImage
+
+    p = AIImage({"id": "ai_image"})
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "fake_key")
+
+    # Build fake google.genai module hierarchy
+    mock_genai = MagicMock()
+    mock_google = MagicMock()
+    mock_google.genai = mock_genai
+
+    mock_client = MagicMock()
+    mock_genai.Client.return_value = mock_client
+
+    mock_response = MagicMock()
+    mock_generated = MagicMock()
+    mock_generated.image.image_bytes = b"junk-bytes"
+    mock_response.generated_images = [mock_generated]
+    mock_client.models.generate_images.return_value = mock_response
+
+    monkeypatch.setitem(sys.modules, "google", mock_google)
+    monkeypatch.setitem(sys.modules, "google.genai", mock_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", mock_genai.types)
+
+    # from_bytesio returns None when decoding fails
+    with patch.object(p.image_loader, "from_bytesio", return_value=None):
+        with pytest.raises(RuntimeError, match="(Failed to decode|API request)"):
+            p.generate_image(
+                {
+                    "textPrompt": "a cat",
+                    "provider": "google",
+                    "imageModel": "imagen-4.0-generate-001",
+                    "quality": "standard",
+                },
+                device_config_dev,
+            )

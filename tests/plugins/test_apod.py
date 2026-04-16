@@ -375,3 +375,142 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
 
         assert mock_from_url.call_args.args[0] == "http://example.com/low_res.png"
         assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# validate_settings tests (JTN-379)
+# ---------------------------------------------------------------------------
+
+
+def test_apod_validate_settings_rejects_date_before_archive_start():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    err = p.validate_settings({"customDate": "1990-01-01"})
+    assert err is not None
+    assert "1995-06-16" in err
+
+
+def test_apod_validate_settings_rejects_future_date():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    err = p.validate_settings({"customDate": "9999-12-31"})
+    assert err is not None
+    assert "on or before" in err
+
+
+def test_apod_validate_settings_rejects_malformed_date():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    err = p.validate_settings({"customDate": "not-a-date"})
+    assert err is not None
+    assert "Invalid date format" in err
+
+
+def test_apod_validate_settings_ignores_custom_date_when_randomized():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    # Bad date but randomize=true should short-circuit to None.
+    err = p.validate_settings({"randomizeApod": "true", "customDate": "1990-01-01"})
+    assert err is None
+
+
+def test_apod_validate_settings_accepts_blank_custom_date():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    assert p.validate_settings({"customDate": ""}) is None
+    assert p.validate_settings({}) is None
+
+
+def test_apod_validate_settings_accepts_valid_date():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    assert p.validate_settings({"customDate": "2023-01-01"}) is None
+
+
+# ---------------------------------------------------------------------------
+# _request_timeout fallback (lines 112-113)
+# ---------------------------------------------------------------------------
+
+
+def test_apod_request_timeout_falls_back_when_env_invalid(monkeypatch):
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "not-a-number")
+    p = Apod({"id": "apod"})
+    assert p._request_timeout() == 20.0
+
+
+def test_apod_request_timeout_uses_env_when_valid(monkeypatch):
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setenv("INKYPI_HTTP_TIMEOUT_DEFAULT_S", "5")
+    p = Apod({"id": "apod"})
+    assert p._request_timeout() == 5.0
+
+
+# ---------------------------------------------------------------------------
+# Edge cases in generate_image (non-image media, no candidate URLs)
+# ---------------------------------------------------------------------------
+
+
+def test_apod_raises_when_media_type_is_video(device_config_dev, monkeypatch):
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "test_key")
+    with patch("plugins.apod.apod.get_http_session") as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+        mock_api_response = MagicMock()
+        mock_api_response.status_code = 200
+        mock_api_response.json.return_value = {
+            "media_type": "video",
+            "url": "https://youtube.com/x",
+        }
+        mock_session.get.side_effect = [mock_api_response]
+
+        p = Apod({"id": "apod"})
+        with pytest.raises(RuntimeError, match="not an image"):
+            p.generate_image({}, device_config_dev)
+
+
+def test_apod_raises_when_no_candidate_urls_available(device_config_dev, monkeypatch):
+    """If NASA returns media_type=image but no url/hdurl, raise an error."""
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "test_key")
+    with patch("plugins.apod.apod.get_http_session") as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+        mock_api_response = MagicMock()
+        mock_api_response.status_code = 200
+        # Neither url nor hdurl present
+        mock_api_response.json.return_value = {"media_type": "image"}
+        mock_session.get.side_effect = [mock_api_response]
+
+        p = Apod({"id": "apod"})
+        with pytest.raises(RuntimeError, match="Failed to load APOD image"):
+            p.generate_image({}, device_config_dev)
+
+
+def test_apod_candidate_image_urls_dedupes_when_url_equals_hdurl():
+    """If url and hdurl are identical, only one candidate should be returned."""
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    same = "http://example.com/img.png"
+    candidates = p._candidate_image_urls({"url": same, "hdurl": same})
+    assert candidates == [same]
+
+
+def test_apod_candidate_image_urls_empty_when_no_urls():
+    from plugins.apod.apod import Apod
+
+    p = Apod({"id": "apod"})
+    assert p._candidate_image_urls({}) == []
+    assert p._candidate_image_urls({"url": None, "hdurl": None}) == []

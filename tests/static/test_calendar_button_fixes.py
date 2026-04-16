@@ -95,6 +95,32 @@ def test_calendar_page_renders_remove_button(client):
     ), "Remove button must have an accessible aria-label (JTN-311)"
 
 
+def test_create_calendar_entry_assigns_unique_label_ids(client):
+    """JTN-349: dynamically added calendar rows must have a unique label id and
+    numbered aria-label so screen readers can distinguish them."""
+    resp = client.get("/static/scripts/plugin_schema.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    # A monotonically incrementing counter is used to ensure unique ids.
+    assert "_calendarEntryCounter" in js, (
+        "plugin_schema.js must define a counter so dynamically added calendar "
+        "URL inputs get unique label ids (JTN-349)"
+    )
+    # The id prefix must be calendarURL_dyn_ so it won't collide with the
+    # template-rendered ids (calendarURL0, calendarURL1, ...).
+    assert '"calendarURL_dyn_"' in js or "'calendarURL_dyn_'" in js, (
+        "dynamically added calendar rows must use calendarURL_dyn_<n> ids to "
+        "avoid colliding with server-rendered ids (JTN-349)"
+    )
+    # Screen-reader only class so the label is announced without visual noise.
+    assert '"sr-only"' in js or "'sr-only'" in js
+    # aria-label must be numbered to match the visual order.
+    assert (
+        '"Calendar URL "' in js
+    ), "Calendar URL aria-label must be numbered per-entry (JTN-349)"
+
+
 # ---------------------------------------------------------------------------
 # JTN-312: Last progress button shows progress panel
 # ---------------------------------------------------------------------------

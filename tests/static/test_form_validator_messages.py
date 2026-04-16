@@ -95,3 +95,59 @@ def test_ai_image_prompt_field_has_label_for_textprompt(client):
     # The schema renderer emits a <label for="{field.id | default(field.name)}">.
     assert 'for="textPrompt"' in html
     assert 'name="textPrompt"' in html
+
+
+# ---------------------------------------------------------------------------
+# JTN-349: specific validation reasons (not just "is invalid") for numbers/URLs
+# ---------------------------------------------------------------------------
+
+
+def test_form_validator_has_classify_invalid_reasons(client):
+    """classifyInvalid should distinguish required/invalid_url/number reasons."""
+    resp = client.get("/static/scripts/form_validator.js")
+    js = resp.get_data(as_text=True)
+
+    # The classifyInvalid switch now returns specific reason codes.
+    for reason in (
+        '"required"',
+        '"not_a_number"',
+        '"below_min"',
+        '"above_max"',
+        '"invalid_url"',
+        '"invalid"',
+    ):
+        assert reason in js, f"classifyInvalid should emit reason {reason}"
+
+
+def test_form_validator_describe_reason_exposed(client):
+    """describeReason must be exposed on window.FormValidator for other scripts."""
+    resp = client.get("/static/scripts/form_validator.js")
+    js = resp.get_data(as_text=True)
+
+    assert "describeReason:" in js
+    assert "function describeReason(input, reason)" in js
+
+
+def test_form_validator_describe_reason_messages(client):
+    """Each reason code should produce a distinct human-readable suffix."""
+    resp = client.get("/static/scripts/form_validator.js")
+    js = resp.get_data(as_text=True)
+
+    # Each reason should have a distinct case-label message
+    assert '" must be a number"' in js
+    assert '" must be at least "' in js
+    assert '" must be at most "' in js
+    assert '" must be a valid URL"' in js
+    assert '" is required"' in js
+    assert '" is invalid"' in js
+
+
+def test_calendar_repeater_has_unique_url_label(client):
+    """Each calendar URL input in the template must have a unique label id."""
+    resp = client.get("/plugin/calendar")
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # Template rendering: label for calendarURL0 with visually-hidden class
+    assert 'for="calendarURL0"' in html
+    assert 'aria-label="Calendar URL 1"' in html

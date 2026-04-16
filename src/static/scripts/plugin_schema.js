@@ -220,19 +220,28 @@
     }
   }
 
+  var _calendarEntryCounter = 0;
+
   function createCalendarEntry(url, color) {
+    _calendarEntryCounter++;
+    const entryIndex = _calendarEntryCounter;
     const entry = document.createElement("div");
     entry.className = "dynamic-list-item compact-repeater compact-repeater-calendar";
 
     const toolbar = document.createElement("div");
     toolbar.className = "dynamic-list-toolbar compact-repeater-toolbar";
+    const urlLabel = document.createElement("label");
+    urlLabel.className = "sr-only";
+    urlLabel.setAttribute("for", "calendarURL_dyn_" + entryIndex);
+    urlLabel.textContent = "Calendar URL " + entryIndex;
     const urlInput = document.createElement("input");
     urlInput.type = "url";
+    urlInput.id = "calendarURL_dyn_" + entryIndex;
     urlInput.name = "calendarURLs[]";
     urlInput.className = "form-input";
     urlInput.placeholder = "https://calendar.google.com/…/basic.ics";
     urlInput.required = true;
-    urlInput.setAttribute("aria-label", "Calendar URL");
+    urlInput.setAttribute("aria-label", "Calendar URL " + entryIndex);
     urlInput.pattern = "https?://.+";
     urlInput.value = url || "";
     const removeBtn = document.createElement("button");
@@ -248,6 +257,7 @@
       if (list) handleRemoveClick(removeBtn, list);
     });
     removeBtn.dataset.boundRemove = "true";
+    toolbar.appendChild(urlLabel);
     toolbar.appendChild(urlInput);
     toolbar.appendChild(removeBtn);
 

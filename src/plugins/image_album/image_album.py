@@ -184,7 +184,7 @@ class ImageAlbum(BasePlugin):
                     field(
                         "backgroundOption",
                         "radio_segment",
-                        label="Background",
+                        label="Background Fill",
                         default="blur",
                         options=[
                             option("blur", "Blur"),
