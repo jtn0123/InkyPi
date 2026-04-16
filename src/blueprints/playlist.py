@@ -393,15 +393,11 @@ def add_plugin():
                     )
 
                     plugin_obj = _get_pi(plugin_config)
-                    settings_error = plugin_obj.validate_settings(
-                        plugin_settings
-                    )
+                    settings_error = plugin_obj.validate_settings(plugin_settings)
                     if settings_error:
                         return json_error(settings_error, status=400)
                 except Exception:
-                    logger.debug(
-                        "Could not validate plugin schema for %s", plugin_id
-                    )
+                    logger.debug("Could not validate plugin schema for %s", plugin_id)
         plugin_dict = {
             "plugin_id": plugin_id,
             "refresh": refresh_config,

@@ -645,7 +645,9 @@ class TestAddPluginSettingsValidation:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+        assert (
+            "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+        )
 
     def test_screenshot_file_url_rejected(self, client, device_config_dev):
         _create_playlist(client, "SecTest2", "08:00", "12:00")
@@ -668,7 +670,9 @@ class TestAddPluginSettingsValidation:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+        assert (
+            "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+        )
 
 
 # ---------------------------------------------------------------------------
