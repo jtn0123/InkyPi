@@ -247,6 +247,7 @@
       const list = entry.parentElement;
       if (list) handleRemoveClick(removeBtn, list);
     });
+    removeBtn.dataset.boundRemove = "true";
     toolbar.appendChild(urlInput);
     toolbar.appendChild(removeBtn);
 
@@ -383,6 +384,7 @@
       const list = entry.parentElement;
       if (list) handleRemoveClick(removeBtn, list);
     });
+    removeBtn.dataset.boundRemove = "true";
     toolbar.appendChild(titleInput);
     toolbar.appendChild(removeBtn);
 
