@@ -5,7 +5,11 @@ from io import BytesIO
 from openai import OpenAI
 from PIL import Image
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import (
+    BasePlugin,
+    validate_provider,
+    validate_required_text,
+)
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -25,13 +29,10 @@ DEFAULT_IMAGE_QUALITY = "medium"
 class AIImage(BasePlugin):
     def validate_settings(self, settings: dict) -> str | None:
         """Reject empty prompts at save time so bad input does not persist."""
-        prompt = (settings.get("textPrompt") or "").strip()
-        if not prompt:
-            return "Prompt is required."
-
-        provider = settings.get("provider", "openai")
-        if provider not in ("openai", "google"):
-            return f"Unsupported provider: {provider!r}"
+        if err := validate_required_text(settings, "textPrompt", "Prompt"):
+            return err
+        if err := validate_provider(settings):
+            return err
 
         model = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
         if model not in IMAGE_MODELS:

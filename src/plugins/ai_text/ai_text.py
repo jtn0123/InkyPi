@@ -3,7 +3,11 @@ from datetime import UTC, datetime
 
 from openai import OpenAI
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import (
+    BasePlugin,
+    validate_provider,
+    validate_required_text,
+)
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -19,18 +23,12 @@ logger = logging.getLogger(__name__)
 class AIText(BasePlugin):
     def validate_settings(self, settings: dict) -> str | None:
         """Reject empty prompts and missing model at save time."""
-        prompt = (settings.get("textPrompt") or "").strip()
-        if not prompt:
-            return "Prompt is required."
-
-        model = (settings.get("textModel") or "").strip()
-        if not model:
-            return "Text Model is required."
-
-        provider = settings.get("provider", "openai")
-        if provider not in ("openai", "google"):
-            return f"Unsupported provider: {provider!r}"
-
+        if err := validate_required_text(settings, "textPrompt", "Prompt"):
+            return err
+        if err := validate_required_text(settings, "textModel", "Text Model"):
+            return err
+        if err := validate_provider(settings):
+            return err
         return None
 
     def build_settings_schema(self):
