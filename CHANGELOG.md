@@ -1,6 +1,123 @@
 # CHANGELOG
 
 
+## v0.60.7 (2026-04-16)
+
+### Bug Fixes
+
+- **weather**: Jtn-716 click-sweep no-ops on Style picker + nav links
+  ([#515](https://github.com/jtn0123/InkyPi/pull/515),
+  [`dafffe2`](https://github.com/jtn0123/InkyPi/commit/dafffe2ea5140ff235611c015253a3047e6ec0f4))
+
+* fix(weather): JTN-716 click-sweep no-ops on weather plugin page
+
+The weather plugin's click-sweep flagged the Style picker + nav links as silent no-ops. Root cause:
+  `#mapModal` (weather location picker) and `#responseModal` carry `aria-modal="true"` without the
+  `hidden` attribute, so the click-sweep's `openModal` snapshot query matched them at boot —
+  clicking "Select Location" opened the real map modal on top of the page, and every subsequent
+  click (Style, Home, API Required, HOME/PLUGINS breadcrumb) was intercepted by the overlay.
+
+Fixes:
+
+* Add `hidden` to `#mapModal` + `#responseModal` templates and toggle `hidden` alongside
+  `style.display` in their open/close helpers so the snapshot correctly tracks modal visibility. *
+  Click-sweep: close any modal opened by a click before the next iteration. Prefer the modal's own
+  close button so focus restore + body-class cleanup runs; plain style-flips leave focus trapped
+  inside the hidden modal and re-route later hit-testing to the wrong element. * Click-sweep:
+  tolerate same-origin hash anchors (e.g. `/#plugins-grid` clicked from `/plugin/weather` — after
+  resetting, back on the page with a hash) so legitimate in-page scroll links aren't flagged when
+  the URL's pathname doesn't change. * Remove weather from `_PLUGIN_XFAIL` — click-sweep now passes.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* test(click-sweep): address CodeRabbit hash-link and dialog cleanup feedback
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Continuous Integration
+
+- **release**: Emoji-sectioned release notes, drop VERSION/uv.lock assets
+  ([#514](https://github.com/jtn0123/InkyPi/pull/514),
+  [`dcccbff`](https://github.com/jtn0123/InkyPi/commit/dcccbffa2626051ef3c3506a039c24b38d554ba5))
+
+Adds templates/.release_notes.md.j2 so python-semantic-release produces short, scannable GitHub
+  release bodies (❇️ New / 🔹 Changed / 🔺 Fix) instead of the default section-per-conventional-type
+  dump. Only the first line of each commit description is rendered, so squash-commit bodies and
+  Co-Authored-By trailers stop leaking into the release page.
+
+Also removes VERSION and uv.lock from the GitHub release asset list after publish. Both files still
+  get committed as part of the release commit (the semantic-release `assets` config requires that to
+  keep them in sync with the version bump) — they just no longer clutter the release downloads.
+
+Net result per release: emoji sections + 4 meaningful assets (wheelhouse tarball, two checksums,
+  SBOM) instead of 6.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Testing
+
+- Add device action journey coverage ([#513](https://github.com/jtn0123/InkyPi/pull/513),
+  [`3a1297c`](https://github.com/jtn0123/InkyPi/commit/3a1297cfdb5022a162a58a690036af24fff569f2))
+
+* fix: address JTN-376 dogfood pass 4 — validation, accessibility, and UX
+
+Add server-side validate_settings to ai_image, ai_text, countdown, and image_url plugins so bad
+  input is rejected at save time with a clear error instead of persisting silently and failing at
+  render time.
+
+Tighten client-side interval validation in RefreshSettingsManager to reject values outside 1-999
+  range before submission, preventing the silent-revert bug where the modal showed a success toast
+  but the value reverted on reload.
+
+Switch JS-built API key value inputs from type="text" to type="password" so secrets are masked
+  consistently across managed and generic modes.
+
+Improve diagnostics UX: show a human-readable empty state in benchmarks instead of a table full of
+  null values, and surface specific messages for plugin isolation actions instead of raw JSON.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: remove extraneous f-string prefix flagged by ruff
+
+* fix(lint): apply Black formatting to dogfood pass 4 test file
+
+* fix: prevent duplicate click handlers on repeater remove buttons
+
+Mark dynamically-created remove buttons with data-bound-remove="true" after attaching inline
+  handlers so bindRemoveButtons skips them. Also align todo entry handler with calendar entry by
+  using handleRemoveClick instead of raw entry.remove().
+
+* test: add device action journey coverage
+
+* style: format device actions journey test
+
+* test: add sonar coverage for validation paths
+
+* fix(ci): gate test_device_actions_roundtrip behind UI_BROWSER_TESTS
+
+Add test_device_actions_roundtrip.py to the UI_BROWSER_TESTS set in tests/conftest.py so
+  pytest_ignore_collect skips it in the regular pytest CI job (which has no Playwright Chromium
+  installed). It will still run in the browser-smoke job where REQUIRE_BROWSER_SMOKE=1 and Chromium
+  is available.
+
+* fix: address CodeRabbit review items on PR #513
+
+- ai_image: strip/lowercase provider before model-compat check; use .get() to avoid KeyError if
+  IMAGE_MODELS_BY_PROVIDER diverges from VALID_AI_PROVIDERS (items 1 & 2) -
+  refresh_settings_manager.js: drop optional-seconds from scheduled-time regex to match backend
+  HH:MM-only contract (item 7) - test_device_actions_roundtrip: reset_shutdown_limiter yields a
+  _reset() callable instead of exposing the module's private attribute directly (items 9 & 10) -
+  test_jtn_376_dogfood_pass_4: add JS contract test asserting HH:MM-only regex and no
+  optional-seconds variant (backing item 7) - test_ai_image: loosen provider-mismatch assertion to
+  survive quote style changes in the error message
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.6 (2026-04-16)
 
 ### Bug Fixes
