@@ -1203,7 +1203,13 @@
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          const errMsg = data.error || `Failed to ${verb} plugin`;
+          const fallbackMsg = `Failed to ${verb} plugin`;
+          const errMsg =
+            typeof data?.error === "string"
+              ? data.error
+              : data?.error == null
+                ? fallbackMsg
+                : String(data.error);
           // Surface a human-readable message instead of raw JSON
           showResponseModal("failure", errMsg.includes("registered")
             ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`

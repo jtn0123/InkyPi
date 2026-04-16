@@ -62,6 +62,13 @@ def test_countdown_missing_date(plugin_config, device_config_dev):
         p.generate_image({"title": "No Date"}, device_config_dev)
 
 
+def test_countdown_validate_settings_rejects_missing_date(plugin_config):
+    from plugins.countdown.countdown import Countdown
+
+    p = Countdown(plugin_config)
+    assert p.validate_settings({"title": "No Date", "date": ""}) == "Date is required."
+
+
 def test_countdown_vertical(plugin_config, device_config_dev):
     from plugins.countdown.countdown import Countdown
 

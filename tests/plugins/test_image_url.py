@@ -79,3 +79,20 @@ def test_image_url_rejects_metadata_endpoint(monkeypatch, device_config_dev):
         plugin.generate_image(
             {"url": "http://169.254.169.254/latest/meta-data/"}, device_config_dev
         )
+
+
+def test_image_url_validate_settings_uses_shared_validator(monkeypatch):
+    from plugins.image_url.image_url import ImageURL
+
+    seen = {}
+
+    def fake_validate_url(url):
+        seen["url"] = url
+        raise ValueError("URL scheme must be http or https")
+
+    monkeypatch.setattr("plugins.image_url.image_url.validate_url", fake_validate_url)
+
+    plugin = ImageURL({"id": "image_url"})
+    error = plugin.validate_settings({"url": "  ftp://example.com/image.png  "})
+    assert error == "URL scheme must be http or https"
+    assert seen["url"] == "ftp://example.com/image.png"

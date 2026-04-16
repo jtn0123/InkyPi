@@ -13,8 +13,7 @@ class Countdown(BasePlugin):
         """Reject invalid countdown dates at save time."""
         date_str = (settings.get("date") or "").strip()
         if not date_str:
-            # No date provided — generate_image will raise at render time.
-            return None
+            return "Date is required."
         try:
             date.fromisoformat(date_str)
         except ValueError:
