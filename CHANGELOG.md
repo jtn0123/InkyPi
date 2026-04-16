@@ -1,6 +1,112 @@
 # CHANGELOG
 
 
+## v0.60.4 (2026-04-16)
+
+### Bug Fixes
+
+- Address dogfood pass 5 issues (JTN-451) ([#510](https://github.com/jtn0123/InkyPi/pull/510),
+  [`19f8d4a`](https://github.com/jtn0123/InkyPi/commit/19f8d4a403f25b7072a4fa1be740f55cddb59717))
+
+* fix: address dogfood pass 5 issues (JTN-451)
+
+Security: validate plugin settings in add_plugin path to block unsafe
+
+URL schemes (javascript:, file://) from persisting via the Screenshot plugin. Modal accessibility:
+  add role/aria-labelledby to thumbnail preview modal, add hidden attr to scheduleModal, add focus
+  management and trigger restoration to history page modals. Data validation: add client-side
+  cycle_minutes validation in playlist edit modal. Toast lifecycle: dismiss stale error toasts on
+  any new toast (not just
+
+errors). Naming consistency: align plugin_history_bp regex with playlist instance name regex to
+  accept spaces.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting
+
+* fix: address SonarCloud issues — reduce complexity, fix JS scope
+
+Extract _parse_add_plugin_form and _validate_plugin_settings_security helpers to reduce add_plugin
+  cognitive complexity from 22 to under 15. Move openClearModal/closeClearModal to module scope in
+  history_page.js. Replace try/catch focus restoration with optional chaining.
+
+* fix: address SonarCloud maintainability rating on new code
+
+- Reduce _parse_add_plugin_form cognitive complexity from 22 to well under 15 by extracting
+  _form_parse_error helper and _parse_refresh_settings_json validator. Each function now has a
+  single clear responsibility. - Replace optional-chaining focus call (focus?.()) with an explicit
+  typeof guard so SonarCloud no longer flags it as silently swallowing an exception. - Convert
+  thumbnailPreviewModal from <div role="dialog"> to native <dialog> element to satisfy SonarCloud
+  S6819. The JS continues to manage visibility via inline style.display and the 'is-open' class,
+  which work identically on <dialog> elements.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.60.3 (2026-04-16)
+
+### Bug Fixes
+
+- **todo_list, playlist**: Resolve silent no-op button clicks
+  ([#511](https://github.com/jtn0123/InkyPi/pull/511),
+  [`08323f6`](https://github.com/jtn0123/InkyPi/commit/08323f6924bbc079b294ffe35ddc3509dc7efcd9))
+
+* fix(todo_list, playlist): resolve silent no-op button clicks
+
+JTN-717: The todo_list "Remove list" button was clickable but did nothing when only one list
+  existed. Added syncRemoveButtonStates to disable the button when removal is blocked, matching the
+  calendar repeater pattern.
+
+JTN-692: The playlist toggle button was visible on desktop but always forced the expanded state,
+  making clicks a no-op. Hidden the button at desktop width via CSS display:none (mobile media query
+  already sets display:inline-flex).
+
+Removed xfail entries from both test files.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: prevent duplicate click handlers on repeater remove buttons
+
+Mark dynamically-created remove buttons with data-bound-remove="true" after attaching inline
+  handlers so bindRemoveButtons skips them. Applied to both createCalendarEntry and createTodoEntry.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Reduce cognitive complexity in top 5 SonarCloud hotspots (JTN-741)
+  ([#512](https://github.com/jtn0123/InkyPi/pull/512),
+  [`93da900`](https://github.com/jtn0123/InkyPi/commit/93da900af965c0ed663d642b7fdf5a7e287cefb7))
+
+* refactor: reduce cognitive complexity in top 5 SonarCloud hotspots (JTN-741)
+
+Extract helpers from the 5 highest-complexity functions to bring each below the S3776 threshold
+  while preserving existing behavior and tests.
+
+- _validate_settings_form: split into _field_error, _validate_interval, _validate_enum_field,
+  _validate_image_settings - display_next: extract _display_next_direct, _gather_display_metrics,
+  _persist_dev_refresh_event - create_app: extract _init_core_services, _configure_upload_limits,
+  _register_before_request_hooks - http_get: extract _try_cache_lookup, _try_cache_store,
+  _log_latency_on_error, _log_latency_on_success - _execute_inprocess: extract
+  _make_inprocess_worker, _handle_thread_timeout as static methods
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: fix Black formatting and add mypy type annotations
+
+- Fix Black formatting in _handle_thread_timeout and _execute_inprocess - Add type annotations to
+  extracted http_utils helpers to satisfy mypy strict subset check
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.2 (2026-04-16)
 
 ### Bug Fixes

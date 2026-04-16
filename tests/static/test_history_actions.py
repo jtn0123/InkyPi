@@ -152,7 +152,7 @@ def test_history_page_js_delete_action_bound_via_delegation(client):
         'action === "delete"' in js
     ), "delegated click handler must branch on action === 'delete'"
     assert (
-        "openDeleteModal(filename)" in js
+        "openDeleteModal(filename" in js
     ), "delete action must call openDeleteModal with the filename"
 
 

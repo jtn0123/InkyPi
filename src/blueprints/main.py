@@ -343,137 +343,103 @@ def _reset_display_next_cooldown():
     _display_next_limiter.reset()
 
 
-@main_bp.route("/display-next", methods=["POST"])
-def display_next():
-    allowed, retry_after = _display_next_limiter.check()
-    if not allowed:
-        remaining = math.ceil(retry_after)
-        return json_error(
-            f"Please wait {remaining}s before refreshing again.",
-            status=429,
-        )
+def _display_next_direct(
+    device_config, display_manager, plugin_instance, playlist, current_dt, benchmark_id
+):
+    """Execute a direct display update (dev path, no background task).
 
-    device_config = current_app.config["DEVICE_CONFIG"]
-    refresh_task = current_app.config["REFRESH_TASK"]
-    display_manager = current_app.config["DISPLAY_MANAGER"]
-    playlist_manager = device_config.get_playlist_manager()
+    Returns ``(generate_ms, error_response)``.  When *error_response* is not
+    ``None`` it should be returned to the client immediately.
+    """
+    from time import perf_counter
 
-    # Determine current time
-    current_dt = _current_dt(device_config)
+    from plugins.plugin_registry import get_plugin_instance
+    from utils.image_utils import compute_image_hash
 
-    # Pick next eligible and commit index change
-    playlist = playlist_manager.determine_active_playlist(current_dt)
-    if not playlist:
-        return json_error("No active playlist", status=400)
+    plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
+    if not plugin_config:
+        return None, json_error("Plugin config not found", status=404)
 
-    plugin_instance = playlist.get_next_eligible_plugin(current_dt)
-    if not plugin_instance:
-        return json_error("No eligible plugin to display", status=400)
-
-    # Execute via background task if running; else do a direct update (dev path)
-    request_ms = display_ms = generate_ms = preprocess_ms = None
-    benchmark_id = str(uuid4())
+    plugin = get_plugin_instance(plugin_config)
+    _t_gen_start = perf_counter()
     try:
-        if getattr(refresh_task, "running", False):
-            from refresh_task import PlaylistRefresh
+        image = plugin.generate_image(plugin_instance.settings, device_config)
+    except RuntimeError:
+        logger.exception("generate_image failed in display_next")
+        return None, json_error("Plugin image generation failed", status=400)
+    generate_ms = int((perf_counter() - _t_gen_start) * 1000)
 
-            try:
-                refresh_task.manual_update(
-                    PlaylistRefresh(playlist, plugin_instance, force=True)
-                )
-            except RuntimeError:
-                # refresh_task.manual_update raises RuntimeError when the
-                # manual-update queue is full; treat as a client-side 400.
-                # Other exceptions fall through to the outer 500 handler.
-                logger.exception("manual_update failed")
-                return json_error("Plugin update failed", status=400)
-        else:
-            # Direct path similar to update_now
-            from time import perf_counter
-
-            from plugins.plugin_registry import get_plugin_instance
-            from utils.image_utils import compute_image_hash
-
-            plugin_config = device_config.get_plugin(plugin_instance.plugin_id)
-            if not plugin_config:
-                return json_error("Plugin config not found", status=404)
-            plugin = get_plugin_instance(plugin_config)
-            _t_gen_start = perf_counter()
-            try:
-                image = plugin.generate_image(plugin_instance.settings, device_config)
-            except RuntimeError:
-                logger.exception("generate_image failed in display_next")
-                return json_error("Plugin image generation failed", status=400)
-            generate_ms = int((perf_counter() - _t_gen_start) * 1000)
-            try:
-                save_stage_event(
-                    device_config, benchmark_id, "generate_image", generate_ms
-                )
-            except Exception:
-                pass
-            # Display
-            try:
-                display_manager.display_image(
-                    image,
-                    image_settings=plugin_config.get("image_settings", []),
-                    history_meta={
-                        "refresh_type": "Playlist",
-                        "plugin_id": plugin_instance.plugin_id,
-                        "playlist": playlist.name,
-                        "plugin_instance": plugin_instance.name,
-                    },
-                )
-            except TypeError:
-                display_manager.display_image(
-                    image,
-                    image_settings=plugin_config.get("image_settings", []),
-                )
-
-            # Persist playlist state so index is not lost on next refresh
-            device_config.write_config()
-
-            # Update refresh_info
-            try:
-                from model import RefreshInfo
-
-                device_config.refresh_info = RefreshInfo(
-                    refresh_type="Playlist",
-                    plugin_id=plugin_instance.plugin_id,
-                    playlist=playlist.name,
-                    plugin_instance=plugin_instance.name,
-                    refresh_time=current_dt.isoformat(),
-                    image_hash=compute_image_hash(image),
-                    request_ms=None,
-                    display_ms=None,
-                    generate_ms=generate_ms,
-                    preprocess_ms=None,
-                    used_cached=False,
-                    benchmark_id=benchmark_id,
-                )
-                device_config.write_config()
-            except Exception:
-                pass
-    except Exception:
-        logger.exception("display_next failed")
-        return json_error("An internal error occurred", status=500)
-
-    _display_next_limiter.record()
-
-    # Gather metrics from refresh_info if available
     try:
-        ri = device_config.get_refresh_info()
-        if request_ms is None:
-            request_ms = getattr(ri, "request_ms", None)
-        if display_ms is None:
-            display_ms = getattr(ri, "display_ms", None)
-        if generate_ms is None:
-            generate_ms = getattr(ri, "generate_ms", None)
-        if preprocess_ms is None:
-            preprocess_ms = getattr(ri, "preprocess_ms", None)
+        save_stage_event(device_config, benchmark_id, "generate_image", generate_ms)
     except Exception:
         pass
 
-    # Persist a refresh event for the dev path
+    # Display
+    image_settings = plugin_config.get("image_settings", [])
+    try:
+        display_manager.display_image(
+            image,
+            image_settings=image_settings,
+            history_meta={
+                "refresh_type": "Playlist",
+                "plugin_id": plugin_instance.plugin_id,
+                "playlist": playlist.name,
+                "plugin_instance": plugin_instance.name,
+            },
+        )
+    except TypeError:
+        display_manager.display_image(image, image_settings=image_settings)
+
+    # Persist playlist state so index is not lost on next refresh
+    device_config.write_config()
+
+    # Update refresh_info
+    try:
+        from model import RefreshInfo
+
+        device_config.refresh_info = RefreshInfo(
+            refresh_type="Playlist",
+            plugin_id=plugin_instance.plugin_id,
+            playlist=playlist.name,
+            plugin_instance=plugin_instance.name,
+            refresh_time=current_dt.isoformat(),
+            image_hash=compute_image_hash(image),
+            request_ms=None,
+            display_ms=None,
+            generate_ms=generate_ms,
+            preprocess_ms=None,
+            used_cached=False,
+            benchmark_id=benchmark_id,
+        )
+        device_config.write_config()
+    except Exception:
+        pass
+
+    return generate_ms, None
+
+
+def _gather_display_metrics(device_config, generate_ms):
+    """Read timing metrics from refresh_info, filling in any gaps.
+
+    Returns ``(request_ms, display_ms, generate_ms, preprocess_ms)``.
+    """
+    request_ms = display_ms = preprocess_ms = None
+    try:
+        ri = device_config.get_refresh_info()
+        request_ms = getattr(ri, "request_ms", None)
+        display_ms = getattr(ri, "display_ms", None)
+        generate_ms = generate_ms or getattr(ri, "generate_ms", None)
+        preprocess_ms = getattr(ri, "preprocess_ms", None)
+    except Exception:
+        pass
+    return request_ms, display_ms, generate_ms, preprocess_ms
+
+
+def _persist_dev_refresh_event(
+    device_config, benchmark_id, plugin_instance, playlist, metrics
+):
+    """Persist a refresh event for the dev (direct) path."""
+    request_ms, display_ms, generate_ms, preprocess_ms = metrics
     try:
         ri = device_config.get_refresh_info()
         cpu_percent = memory_percent = None
@@ -504,6 +470,70 @@ def display_next():
         )
     except Exception:
         pass
+
+
+@main_bp.route("/display-next", methods=["POST"])
+def display_next():
+    allowed, retry_after = _display_next_limiter.check()
+    if not allowed:
+        remaining = math.ceil(retry_after)
+        return json_error(
+            f"Please wait {remaining}s before refreshing again.",
+            status=429,
+        )
+
+    device_config = current_app.config["DEVICE_CONFIG"]
+    refresh_task = current_app.config["REFRESH_TASK"]
+    display_manager = current_app.config["DISPLAY_MANAGER"]
+    playlist_manager = device_config.get_playlist_manager()
+
+    # Determine current time
+    current_dt = _current_dt(device_config)
+
+    # Pick next eligible and commit index change
+    playlist = playlist_manager.determine_active_playlist(current_dt)
+    if not playlist:
+        return json_error("No active playlist", status=400)
+
+    plugin_instance = playlist.get_next_eligible_plugin(current_dt)
+    if not plugin_instance:
+        return json_error("No eligible plugin to display", status=400)
+
+    generate_ms = None
+    benchmark_id = str(uuid4())
+    try:
+        if getattr(refresh_task, "running", False):
+            from refresh_task import PlaylistRefresh
+
+            try:
+                refresh_task.manual_update(
+                    PlaylistRefresh(playlist, plugin_instance, force=True)
+                )
+            except RuntimeError:
+                logger.exception("manual_update failed")
+                return json_error("Plugin update failed", status=400)
+        else:
+            generate_ms, err = _display_next_direct(
+                device_config,
+                display_manager,
+                plugin_instance,
+                playlist,
+                current_dt,
+                benchmark_id,
+            )
+            if err:
+                return err
+    except Exception:
+        logger.exception("display_next failed")
+        return json_error("An internal error occurred", status=500)
+
+    _display_next_limiter.record()
+
+    metrics = _gather_display_metrics(device_config, generate_ms)
+    _persist_dev_refresh_event(
+        device_config, benchmark_id, plugin_instance, playlist, metrics
+    )
+    request_ms, display_ms, generate_ms, preprocess_ms = metrics
 
     return json_success(
         message="Display updated",

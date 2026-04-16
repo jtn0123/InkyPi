@@ -560,6 +560,35 @@
         return name;
     }
 
+    function _validateCycleMinutes() {
+        const input = document.getElementById("cycle_minutes");
+        const error = document.getElementById("cycle-minutes-error");
+        if (!input) return true;
+        const raw = (input.value || "").trim();
+        // Empty is valid — means "use device default"
+        if (!raw) {
+            input.setAttribute("aria-invalid", "false");
+            if (error) error.textContent = "";
+            return true;
+        }
+        const val = parseInt(raw, 10);
+        if (isNaN(val) || String(val) !== raw) {
+            input.setAttribute("aria-invalid", "true");
+            if (error) error.textContent = "Must be a whole number";
+            input.focus();
+            return false;
+        }
+        if (val < 1 || val > 1440) {
+            input.setAttribute("aria-invalid", "true");
+            if (error) error.textContent = "Must be between 1 and 1440";
+            input.focus();
+            return false;
+        }
+        input.setAttribute("aria-invalid", "false");
+        if (error) error.textContent = "";
+        return true;
+    }
+
     function _scheduleFormState() {
         const form = document.getElementById('scheduleForm');
         return (globalThis.FormState && form) ? globalThis.FormState.attach(form) : null;
@@ -595,6 +624,7 @@
         if (fs) fs.clearErrors();
         let playlistName = _validatePlaylistName();
         if (!playlistName) return;
+        if (!_validateCycleMinutes()) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         const submit = async () => {
@@ -619,6 +649,7 @@
         let oldName = document.getElementById("editingPlaylistName").value;
         let newName = _validatePlaylistName();
         if (!newName) return;
+        if (!_validateCycleMinutes()) return;
         let startTime = document.getElementById("start_time").value;
         let endTime = document.getElementById("end_time").value;
         let cycleMinutes = document.getElementById('cycle_minutes').value;
