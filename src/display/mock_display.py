@@ -27,11 +27,12 @@ class MockDisplay(AbstractDisplay):
         os.makedirs(self.output_dir, exist_ok=True)
         self.mock_frame_path = os.getenv(
             "INKYPI_MOCK_FRAME_PATH"
-        ) or device_config.get_config("mock_frame_path", "/tmp/inkypi-mock-frame.png")
+        ) or device_config.get_config(
+            "mock_frame_path", os.path.join(self.output_dir, "mock_frame.png")
+        )
         self.mock_frame_profile = os.getenv(
             "INKYPI_MOCK_FRAME_PROFILE"
         ) or device_config.get_config("mock_frame_profile", "tricolor")
-        os.makedirs(os.path.dirname(self.mock_frame_path) or ".", exist_ok=True)
 
     def initialize_display(self):
         """Initialize mock display (no-op for development)."""
@@ -95,7 +96,6 @@ class MockDisplay(AbstractDisplay):
             self, "mock_frame_path", os.path.join(self.output_dir, "mock_frame.png")
         )
         try:
-            os.makedirs(os.path.dirname(frame_path) or ".", exist_ok=True)
             simulated = self._simulate_eink_frame(image)
             simulated.save(frame_path, "PNG")
             simulated.save(os.path.join(self.output_dir, "latest_simulated.png"), "PNG")
