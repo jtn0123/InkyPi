@@ -377,6 +377,31 @@ def add_plugin():
             return refresh_err
 
         plugin_settings.update(handle_request_files(request.files))
+
+        # JTN-451: Run plugin-specific validation (e.g. URL scheme checks)
+        # before persisting settings. Without this, plugins like Screenshot
+        # could have javascript:/file:// URLs saved via the add_plugin path.
+        # Only validate when the settings dict has actual user values (not
+        # just empty from the form parse). This avoids rejecting plugins
+        # that are being added with settings saved from an earlier save.
+        if plugin_settings:
+            plugin_config = device_config.get_plugin(plugin_id)
+            if plugin_config:
+                try:
+                    from plugins.plugin_registry import (
+                        get_plugin_instance as _get_pi,
+                    )
+
+                    plugin_obj = _get_pi(plugin_config)
+                    settings_error = plugin_obj.validate_settings(
+                        plugin_settings
+                    )
+                    if settings_error:
+                        return json_error(settings_error, status=400)
+                except Exception:
+                    logger.debug(
+                        "Could not validate plugin schema for %s", plugin_id
+                    )
         plugin_dict = {
             "plugin_id": plugin_id,
             "refresh": refresh_config,

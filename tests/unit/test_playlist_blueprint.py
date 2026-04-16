@@ -616,6 +616,62 @@ class TestAddPlugin:
 
 
 # ---------------------------------------------------------------------------
+# JTN-451: add_plugin must validate settings (URL scheme bypass)
+# ---------------------------------------------------------------------------
+
+
+class TestAddPluginSettingsValidation:
+    """JTN-451: add_plugin must call plugin-specific validate_settings
+    to block unsafe values (e.g. javascript: URLs in the Screenshot plugin)."""
+
+    def test_screenshot_javascript_url_rejected(self, client, device_config_dev):
+        _create_playlist(client, "SecTest", "08:00", "12:00")
+        refresh_settings = json.dumps(
+            {
+                "playlist": "SecTest",
+                "instance_name": "SShot1",
+                "refreshType": "interval",
+                "unit": "minute",
+                "interval": "10",
+            }
+        )
+        resp = client.post(
+            "/add_plugin",
+            data={
+                "plugin_id": "screenshot",
+                "url": "javascript:alert(1)",
+                "refresh_settings": refresh_settings,
+            },
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+
+    def test_screenshot_file_url_rejected(self, client, device_config_dev):
+        _create_playlist(client, "SecTest2", "08:00", "12:00")
+        refresh_settings = json.dumps(
+            {
+                "playlist": "SecTest2",
+                "instance_name": "SShot2",
+                "refreshType": "interval",
+                "unit": "minute",
+                "interval": "10",
+            },
+        )
+        resp = client.post(
+            "/add_plugin",
+            data={
+                "plugin_id": "screenshot",
+                "url": "file:///etc/passwd",
+                "refresh_settings": refresh_settings,
+            },
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "URL" in data.get("error", "") or "scheme" in data.get("error", "").lower()
+
+
+# ---------------------------------------------------------------------------
 # /display_next_in_playlist (POST)
 # ---------------------------------------------------------------------------
 

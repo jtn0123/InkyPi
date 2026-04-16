@@ -26,7 +26,9 @@ plugin_history_bp = Blueprint("plugin_history", __name__)
 _CONFIG_KEY = "DEVICE_CONFIG"
 # Only allow instance names that are safe filesystem identifiers.
 # Strict allowlist regex makes this an explicit barrier for taint analyzers.
-_VALID_NAME_RE = re.compile(r"\A[a-zA-Z0-9][a-zA-Z0-9_\-]{0,63}\Z")
+# Aligned with _INSTANCE_NAME_RE in playlist.py to accept user-entered names
+# that include spaces (JTN-451).
+_VALID_NAME_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9 _\-]{0,63}\Z")
 
 
 def _safe_instance_name(name: str) -> str | None:
