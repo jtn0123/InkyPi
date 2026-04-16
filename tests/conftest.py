@@ -49,6 +49,8 @@ UI_BROWSER_TESTS = {
     "test_update_flow_happy_path.py",
     # JTN-719 device-actions journey (reboot/shutdown confirm/cancel flow).
     "test_device_actions_roundtrip.py",
+    # JTN-728/727/726/725 device/update/ops journey bundle.
+    "test_device_update_ops_journeys.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
