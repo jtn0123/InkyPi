@@ -309,45 +309,87 @@ def _validate_instance_name(raw_name):
     return name, None
 
 
+def _form_parse_error(message, *, status=400, field="refresh_settings"):
+    """Build a ``(None, None, None, error_response)`` tuple for form parsing."""
+    return (
+        None,
+        None,
+        None,
+        json_error(
+            message, status=status, code=_CODE_VALIDATION, details={"field": field}
+        ),
+    )
+
+
+def _parse_refresh_settings_json(raw_refresh):
+    """Decode *raw_refresh* into a dict.
+
+    Returns ``(refresh_settings, error_tuple)``.  On success the error is
+    ``None``; on failure ``refresh_settings`` is ``None``.
+    """
+    if not raw_refresh or not isinstance(raw_refresh, str):
+        return None, _form_parse_error("refresh_settings is required")
+    try:
+        refresh_settings = json.loads(raw_refresh)
+    except (json.JSONDecodeError, ValueError):
+        return None, _form_parse_error("Invalid JSON in refresh_settings")
+    if not isinstance(refresh_settings, dict):
+        return None, _form_parse_error("refresh_settings must be a JSON object")
+    return refresh_settings, None
+
+
+def _parse_add_plugin_form(form, files):
+    """Parse and validate the add_plugin form data.
+
+    Returns ``(plugin_id, plugin_settings, refresh_settings, error_response)``.
+    On success ``error_response`` is None; on failure the first three are None.
+    """
+    plugin_settings = parse_form(form)
+    raw_refresh = plugin_settings.pop("refresh_settings", None)
+    refresh_settings, err = _parse_refresh_settings_json(raw_refresh)
+    if err:
+        return err
+    plugin_id = plugin_settings.pop("plugin_id", None)
+    if not plugin_id or not isinstance(plugin_id, str):
+        return _form_parse_error("plugin_id is required", status=422, field="plugin_id")
+    plugin_settings.update(handle_request_files(files))
+    return plugin_id, plugin_settings, refresh_settings, None
+
+
+def _validate_plugin_settings_security(device_config, plugin_id, plugin_settings):
+    """JTN-451: Run plugin-specific validation (e.g. URL scheme checks).
+
+    Returns an error response if validation fails, or None on success.
+    Only validates when the settings dict has actual user values.
+    """
+    if not plugin_settings:
+        return None
+    plugin_config = device_config.get_plugin(plugin_id)
+    if not plugin_config:
+        return None
+    try:
+        from plugins.plugin_registry import get_plugin_instance as _get_pi
+
+        plugin_obj = _get_pi(plugin_config)
+        settings_error = plugin_obj.validate_settings(plugin_settings)
+        if settings_error:
+            return json_error(settings_error, status=400)
+    except Exception:
+        logger.debug("Could not validate plugin schema for %s", plugin_id)
+    return None
+
+
 @playlist_bp.route("/add_plugin", methods=["POST"])
 def add_plugin():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
     try:
-        plugin_settings = parse_form(request.form)
-        raw_refresh = plugin_settings.pop("refresh_settings", None)
-        if not raw_refresh or not isinstance(raw_refresh, str):
-            return json_error(
-                "refresh_settings is required",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            )
-        try:
-            refresh_settings = json.loads(raw_refresh)
-        except (json.JSONDecodeError, ValueError):
-            return json_error(
-                "Invalid JSON in refresh_settings",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            )
-        if not isinstance(refresh_settings, dict):
-            return json_error(
-                "refresh_settings must be a JSON object",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "refresh_settings"},
-            )
-        plugin_id = plugin_settings.pop("plugin_id", None)
-        if not plugin_id or not isinstance(plugin_id, str):
-            return json_error(
-                "plugin_id is required",
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "plugin_id"},
-            )
+        plugin_id, plugin_settings, refresh_settings, parse_err = (
+            _parse_add_plugin_form(request.form, request.files)
+        )
+        if parse_err:
+            return parse_err
 
         playlist = refresh_settings.get("playlist")
         if not playlist:
@@ -376,7 +418,12 @@ def add_plugin():
         if refresh_err:
             return refresh_err
 
-        plugin_settings.update(handle_request_files(request.files))
+        security_err = _validate_plugin_settings_security(
+            device_config, plugin_id, plugin_settings
+        )
+        if security_err:
+            return security_err
+
         plugin_dict = {
             "plugin_id": plugin_id,
             "refresh": refresh_config,

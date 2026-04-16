@@ -269,12 +269,13 @@
     {% include 'response_modal.html' %}
 
     <!-- Thumbnail Preview Modal -->
-    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" hidden>
+    <dialog id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" aria-labelledby="thumbnailPreviewTitle" hidden>
         <div class="thumbnail-preview-content playlist-thumbnail-content">
+            <h2 id="thumbnailPreviewTitle" class="sr-only">Image Preview</h2>
             <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
             <img id="thumbnailPreviewImage" src="" alt="Plugin Instance Preview">
             <div class="thumbnail-preview-info playlist-thumbnail-info" id="thumbnailPreviewInfo"></div>
         </div>
-    </div>
+    </dialog>
     </main>
 {% endblock %}
