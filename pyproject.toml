@@ -1,6 +1,6 @@
 [project]
 name = "inkypi"
-version = "0.60.4"
+version = "0.60.5"
 description = "InkyPi — e-ink dashboard for Raspberry Pi"
 requires-python = ">=3.11,<3.14"
 # Runtime dependencies mirror install/requirements.in during the uv-lock migration
@@ -122,7 +122,7 @@ version_toml = [
   "pyproject.toml:project.version",
   "pyproject.toml:tool.semantic_release.version",
 ]
-version = "0.60.4"
+version = "0.60.5"
 branch = "main"
 tag_format = "v{version}"
 upload_to_pypi = false

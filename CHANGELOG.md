@@ -1,6 +1,65 @@
 # CHANGELOG
 
 
+## v0.60.5 (2026-04-16)
+
+### Bug Fixes
+
+- Jtn-376 dogfood pass 4 — validation, accessibility, UX
+  ([#508](https://github.com/jtn0123/InkyPi/pull/508),
+  [`ce94b4e`](https://github.com/jtn0123/InkyPi/commit/ce94b4ea8d1d2cb7d1c6fce0dc58c5a4dc94b6ee))
+
+* fix: address JTN-376 dogfood pass 4 — validation, accessibility, and UX
+
+Add server-side validate_settings to ai_image, ai_text, countdown, and image_url plugins so bad
+  input is rejected at save time with a clear error instead of persisting silently and failing at
+  render time.
+
+Tighten client-side interval validation in RefreshSettingsManager to reject values outside 1-999
+  range before submission, preventing the silent-revert bug where the modal showed a success toast
+  but the value reverted on reload.
+
+Switch JS-built API key value inputs from type="text" to type="password" so secrets are masked
+  consistently across managed and generic modes.
+
+Improve diagnostics UX: show a human-readable empty state in benchmarks instead of a table full of
+  null values, and surface specific messages for plugin isolation actions instead of raw JSON.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: remove extraneous f-string prefix flagged by ruff
+
+* fix(lint): apply Black formatting to dogfood pass 4 test file
+
+* refactor: deduplicate plugin validation helpers and parametrize tests
+
+SonarCloud Quality Gate flagged 4.2% duplication on new code (> 3%). The `validate_settings()`
+  methods for ai_image and ai_text repeated the same required-text / provider-check logic, and the
+  new integration test file had ten near-identical POST-and-assert blocks.
+
+- Add `validate_required_text` and `validate_provider` helpers (plus `VALID_AI_PROVIDERS`) to
+  `base_plugin.py` and use them in ai_image and ai_text. - Parametrize the plugin-validation
+  integration tests (rejection + acceptance) and the interval-range tests so the boilerplate lives
+  in a single `_save_plugin` helper and shared case tables. - Resolve the JS script directory once
+  per module and reuse it.
+
+No behaviour changes; same 20 integration assertions plus existing plugin unit tests still pass.
+
+* refactor(js): dedupe isolate/un-isolate plugin helpers
+
+SonarCloud flagged isolatePlugin() and unIsolatePlugin() in settings_page.js as duplicated blocks
+  (17 lines, 2 blocks, ~4.8% on new code). Extract a shared `_toggleIsolation(method, verb)` helper
+  and reimplement the two exports as one-liners.
+
+The isolation-copy integration test is adjusted to check for the template fragments (`has been
+  ${past}`, the verb strings) that the shared helper splices together, since the literal "has been
+  isolated" / "has been un-isolated" strings no longer appear verbatim.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.4 (2026-04-16)
 
 ### Bug Fixes
