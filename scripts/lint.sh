@@ -115,6 +115,7 @@ mypy --strict \
     src/refresh_task/worker.py \
     src/utils/sri.py \
     src/utils/time_utils.py \
+    src/utils/http_cache.py \
     src/model.py
 MYPY_STRICT_EXIT=$?
 if [ $MYPY_STRICT_EXIT -ne 0 ]; then

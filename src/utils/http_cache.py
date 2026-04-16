@@ -48,7 +48,7 @@ class CacheEntry:
         resp = requests.models.Response()
         resp.status_code = self.cached_data["status_code"]
         resp.headers.update(self.cached_data["headers"])
-        resp._content = self.cached_data["content"]  # type: ignore[attr-defined]
+        resp._content = self.cached_data["content"]
         return resp
 
 
@@ -383,12 +383,14 @@ def get_cache() -> HTTPCache:
     """
     global _global_cache
 
-    if _global_cache is not None:
-        return _global_cache
+    cache = _global_cache
+    if cache is not None:
+        return cache
 
     with _cache_lock:
-        if _global_cache is not None:
-            return _global_cache
+        cache = _global_cache
+        if cache is not None:
+            return cache
 
         # Read configuration from environment
         enabled = os.getenv("INKYPI_HTTP_CACHE_ENABLED", "true").lower() in (

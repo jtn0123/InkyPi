@@ -1,5 +1,5 @@
 # pyright: reportMissingImports=false
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from hypothesis import HealthCheck, given, settings, strategies as st
 
@@ -13,7 +13,7 @@ from model import Playlist, PlaylistManager, RefreshInfo
 )
 @settings(max_examples=100, suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_should_refresh_matches_elapsed_time(latest_epoch, elapsed_s, interval_s):
-    latest = datetime.fromtimestamp(latest_epoch)
+    latest = datetime.fromtimestamp(latest_epoch, tz=UTC)
     current = latest + timedelta(seconds=elapsed_s)
     assert PlaylistManager.should_refresh(latest, interval_s, current) is (
         elapsed_s >= interval_s
