@@ -1,6 +1,51 @@
 # CHANGELOG
 
 
+## v0.60.4 (2026-04-16)
+
+### Bug Fixes
+
+- Address dogfood pass 5 issues (JTN-451) ([#510](https://github.com/jtn0123/InkyPi/pull/510),
+  [`19f8d4a`](https://github.com/jtn0123/InkyPi/commit/19f8d4a403f25b7072a4fa1be740f55cddb59717))
+
+* fix: address dogfood pass 5 issues (JTN-451)
+
+Security: validate plugin settings in add_plugin path to block unsafe
+
+URL schemes (javascript:, file://) from persisting via the Screenshot plugin. Modal accessibility:
+  add role/aria-labelledby to thumbnail preview modal, add hidden attr to scheduleModal, add focus
+  management and trigger restoration to history page modals. Data validation: add client-side
+  cycle_minutes validation in playlist edit modal. Toast lifecycle: dismiss stale error toasts on
+  any new toast (not just
+
+errors). Naming consistency: align plugin_history_bp regex with playlist instance name regex to
+  accept spaces.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting
+
+* fix: address SonarCloud issues — reduce complexity, fix JS scope
+
+Extract _parse_add_plugin_form and _validate_plugin_settings_security helpers to reduce add_plugin
+  cognitive complexity from 22 to under 15. Move openClearModal/closeClearModal to module scope in
+  history_page.js. Replace try/catch focus restoration with optional chaining.
+
+* fix: address SonarCloud maintainability rating on new code
+
+- Reduce _parse_add_plugin_form cognitive complexity from 22 to well under 15 by extracting
+  _form_parse_error helper and _parse_refresh_settings_json validator. Each function now has a
+  single clear responsibility. - Replace optional-chaining focus call (focus?.()) with an explicit
+  typeof guard so SonarCloud no longer flags it as silently swallowing an exception. - Convert
+  thumbnailPreviewModal from <div role="dialog"> to native <dialog> element to satisfy SonarCloud
+  S6819. The JS continues to manage visibility via inline style.display and the 'is-open' class,
+  which work identically on <dialog> elements.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.3 (2026-04-16)
 
 ### Bug Fixes
