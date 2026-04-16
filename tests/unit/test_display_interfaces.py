@@ -232,6 +232,7 @@ def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_confi
     display = MockDisplay(device_config_dev)
     assert os.path.basename(display.output_dir) == "mock_display_output"
     assert os.path.basename(os.path.dirname(display.output_dir)) == "runtime"
+    assert display.mock_frame_path == os.path.join(display.output_dir, "mock_frame.png")
 
 
 def test_mock_display_writes_simulated_frame(monkeypatch, device_config_dev, tmp_path):
