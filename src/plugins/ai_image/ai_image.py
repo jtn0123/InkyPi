@@ -235,7 +235,9 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
-        image = self.image_loader.from_bytesio(BytesIO(image_bytes), (1536, 1536), resize=False)
+        image = self.image_loader.from_bytesio(
+            BytesIO(image_bytes), (1536, 1536), resize=False
+        )
         if image is None:
             raise RuntimeError("Failed to decode generated image")
         return image

@@ -11,7 +11,6 @@ from typing import Any
 from PIL import Image
 from PIL.Image import Resampling
 
-from utils.image_loader import AdaptiveImageLoader
 from utils.http_utils import http_get, pinned_dns
 from utils.security_utils import validate_url_with_ips
 
@@ -152,6 +151,10 @@ def fetch_and_resize_remote_image(
 
     hostname = _urlparse.urlparse(validated_url).hostname or ""
 
+    from contextlib import closing
+
+    from utils.image_loader import AdaptiveImageLoader
+
     loader = AdaptiveImageLoader()
     # On low-memory devices, stream to disk first so large remote images do not
     # require a full in-memory response buffer before Pillow can decode them.
@@ -159,18 +162,22 @@ def fetch_and_resize_remote_image(
         tmp_path = None
         try:
             with pinned_dns(hostname, pinned_ips):
-                response = http_get(
-                    validated_url,
-                    timeout=timeout_seconds,
-                    stream=True,
-                    use_cache=False,
-                )
-                response.raise_for_status()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
-                    tmp_path = tmp.name
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            tmp.write(chunk)
+                with closing(
+                    http_get(
+                        validated_url,
+                        timeout=timeout_seconds,
+                        stream=True,
+                        use_cache=False,
+                    )
+                ) as response:
+                    response.raise_for_status()
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, suffix=".img"
+                    ) as tmp:
+                        tmp_path = tmp.name
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                tmp.write(chunk)
             return loader.from_file(tmp_path, dimensions, resize=True)
         except Exception as e:
             logger.error(f"Failed to fetch remote image from {image_url}: {e}")
