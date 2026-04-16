@@ -977,16 +977,28 @@
         const panel = document.getElementById("benchSummary");
         panel.textContent = "";
 
-        const heading1 = document.createElement("strong");
-        heading1.textContent = "Benchmark Summary (24h)";
-        panel.appendChild(heading1);
-        panel.appendChild(buildSummaryTable(summary.summary || {}));
+        const summaryData = summary.summary || {};
+        const hasData = Object.values(summaryData).some(function (stage) {
+          return stage && (stage.p50 !== null && stage.p50 !== undefined);
+        });
 
-        if ((plugins.items || []).length > 0) {
-          const heading2 = document.createElement("strong");
-          heading2.textContent = "Per-plugin Averages";
-          panel.appendChild(heading2);
-          panel.appendChild(buildPluginsTable(plugins.items));
+        if (!hasData && (plugins.items || []).length === 0) {
+          const emptyMsg = document.createElement("div");
+          emptyMsg.className = "bench-empty";
+          emptyMsg.textContent = "No benchmark data recorded in the last 24 hours. Benchmarks are collected automatically on each display refresh.";
+          panel.appendChild(emptyMsg);
+        } else {
+          const heading1 = document.createElement("strong");
+          heading1.textContent = "Benchmark Summary (24h)";
+          panel.appendChild(heading1);
+          panel.appendChild(buildSummaryTable(summaryData));
+
+          if ((plugins.items || []).length > 0) {
+            const heading2 = document.createElement("strong");
+            heading2.textContent = "Per-plugin Averages";
+            panel.appendChild(heading2);
+            panel.appendChild(buildPluginsTable(plugins.items));
+          }
         }
       } catch (e) {
         console.warn("Failed to load benchmark summary:", e);
@@ -1176,7 +1188,10 @@
 
     async function isolatePlugin() {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
-      if (!pluginId) return;
+      if (!pluginId) {
+        showResponseModal("failure", "Enter a plugin ID to isolate.");
+        return;
+      }
       try {
         const resp = await fetch("/settings/isolation", {
           method: "POST",
@@ -1185,20 +1200,28 @@
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to isolate plugin");
+          const errMsg = data.error || "Failed to isolate plugin";
+          // Surface a human-readable message instead of raw JSON
+          showResponseModal("failure", errMsg.includes("registered")
+            ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
+            : errMsg);
           return;
         }
+        showResponseModal("success", `Plugin "${pluginId}" has been isolated.`);
         await refreshIsolation();
         await refreshHealth();
       } catch (e) {
         console.warn("Failed to isolate plugin:", e);
-        showResponseModal("failure", "Failed to isolate plugin");
+        showResponseModal("failure", "Failed to isolate plugin. Check your connection and try again.");
       }
     }
 
     async function unIsolatePlugin() {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
-      if (!pluginId) return;
+      if (!pluginId) {
+        showResponseModal("failure", "Enter a plugin ID to un-isolate.");
+        return;
+      }
       try {
         const resp = await fetch("/settings/isolation", {
           method: "DELETE",
@@ -1207,14 +1230,18 @@
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to unisolate plugin");
+          const errMsg = data.error || "Failed to un-isolate plugin";
+          showResponseModal("failure", errMsg.includes("registered")
+            ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
+            : errMsg);
           return;
         }
+        showResponseModal("success", `Plugin "${pluginId}" has been un-isolated.`);
         await refreshIsolation();
         await refreshHealth();
       } catch (e) {
-        console.warn("Failed to unisolate plugin:", e);
-        showResponseModal("failure", "Failed to unisolate plugin");
+        console.warn("Failed to un-isolate plugin:", e);
+        showResponseModal("failure", "Failed to un-isolate plugin. Check your connection and try again.");
       }
     }
 

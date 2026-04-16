@@ -1,5 +1,5 @@
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import field, row, schema, section
@@ -9,6 +9,18 @@ logger = logging.getLogger(__name__)
 
 
 class Countdown(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject invalid countdown dates at save time."""
+        date_str = (settings.get("date") or "").strip()
+        if not date_str:
+            # No date provided — generate_image will raise at render time.
+            return None
+        try:
+            date.fromisoformat(date_str)
+        except ValueError:
+            return f"Invalid date format: {date_str!r} (expected YYYY-MM-DD)"
+        return None
+
     def build_settings_schema(self):
         tomorrow = (datetime.now(tz=UTC) + timedelta(days=1)).strftime("%Y-%m-%d")
         return schema(

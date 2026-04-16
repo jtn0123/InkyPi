@@ -419,7 +419,7 @@ def test_save_plugin_settings_exception_handling(client, flask_app, monkeypatch)
 
     resp = client.post(
         "/save_plugin_settings",
-        data={"plugin_id": "ai_text", "textPrompt": "Hello"},
+        data={"plugin_id": "ai_text", "textPrompt": "Hello", "textModel": "gpt-5-nano"},
     )
     assert resp.status_code == 500
     assert "An internal error occurred" in resp.get_json().get("error", "")

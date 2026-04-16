@@ -23,6 +23,22 @@ DEFAULT_IMAGE_QUALITY = "medium"
 
 
 class AIImage(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject empty prompts at save time so bad input does not persist."""
+        prompt = (settings.get("textPrompt") or "").strip()
+        if not prompt:
+            return "Prompt is required."
+
+        provider = settings.get("provider", "openai")
+        if provider not in ("openai", "google"):
+            return f"Unsupported provider: {provider!r}"
+
+        model = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
+        if model not in IMAGE_MODELS:
+            return f"Invalid image model: {model!r}"
+
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(

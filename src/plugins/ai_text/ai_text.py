@@ -17,6 +17,22 @@ logger = logging.getLogger(__name__)
 
 
 class AIText(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject empty prompts and missing model at save time."""
+        prompt = (settings.get("textPrompt") or "").strip()
+        if not prompt:
+            return "Prompt is required."
+
+        model = (settings.get("textModel") or "").strip()
+        if not model:
+            return "Text Model is required."
+
+        provider = settings.get("provider", "openai")
+        if provider not in ("openai", "google"):
+            return f"Unsupported provider: {provider!r}"
+
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
