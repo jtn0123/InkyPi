@@ -949,9 +949,7 @@ def _save_plugin_settings_common(
 
     if plugin is not None:
         try:
-            validation_error = validate_plugin_required_fields(
-                plugin, plugin_settings
-            )
+            validation_error = validate_plugin_required_fields(plugin, plugin_settings)
             if validation_error:
                 if htmx:
                     return _render_plugin_form_error(validation_error, status=400)

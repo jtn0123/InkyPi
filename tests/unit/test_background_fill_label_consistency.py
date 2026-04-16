@@ -44,6 +44,6 @@ def test_all_image_plugins_same_label():
         "image_upload": _get_background_label(ImageUpload),
         "image_album": _get_background_label(ImageAlbum),
     }
-    unique = set(v for v in labels.values() if v is not None)
+    unique = {v for v in labels.values() if v is not None}
     assert len(unique) == 1, f"Labels differ across plugins: {labels}"
     assert unique.pop() == "Background Fill"
