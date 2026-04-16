@@ -28,7 +28,7 @@ class ImageURL(BasePlugin):
         except ValueError:
             return f"Image URL is not valid: {url!r}"
         if parsed.scheme.lower() not in {"http", "https"}:
-            return f"Image URL must start with http:// or https://"
+            return "Image URL must start with http:// or https://"
         if not parsed.netloc:
             return f"Image URL is not valid: {url!r}"
         return None
