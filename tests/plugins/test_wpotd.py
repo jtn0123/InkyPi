@@ -288,11 +288,19 @@ def test_download_image_success():
     p = Wpotd({"id": "wpotd"})
     fake_image = Image.new("RGB", (10, 6), "white")
 
-    with patch.object(p.image_loader, "from_url", return_value=fake_image) as mock_from_url:
+    with patch.object(
+        p.image_loader, "from_url", return_value=fake_image
+    ) as mock_from_url:
         result = p._download_image("http://example.com/image.png")
 
     assert result is fake_image
-    assert mock_from_url.call_count == 1
+    mock_from_url.assert_called_once_with(
+        "http://example.com/image.png",
+        dimensions=(4096, 4096),
+        timeout_ms=10000,
+        resize=False,
+        headers=p.HEADERS,
+    )
 
 
 def test_download_image_network_error():
