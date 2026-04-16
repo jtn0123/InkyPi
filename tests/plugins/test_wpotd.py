@@ -475,7 +475,7 @@ def test_make_request_api_error():
 
 def test_fetch_potd_api_error():
     """Test _fetch_potd with API error."""
-    from datetime import date
+    from datetime import UTC, datetime
 
     from plugins.wpotd.wpotd import Wpotd
 
@@ -486,12 +486,12 @@ def test_fetch_potd_api_error():
         mock_make_request.side_effect = RuntimeError("Wikipedia API request failed")
 
         with pytest.raises(RuntimeError, match="Wikipedia API request failed"):
-            p._fetch_potd(date.today())
+            p._fetch_potd(datetime.now(UTC).date())
 
 
 def test_fetch_potd_missing_images():
     """Test _fetch_potd with missing images in response."""
-    from datetime import date
+    from datetime import UTC, datetime
 
     from plugins.wpotd.wpotd import Wpotd
 
@@ -505,4 +505,4 @@ def test_fetch_potd_missing_images():
         }
 
         with pytest.raises(RuntimeError, match="Failed to retrieve POTD filename"):
-            p._fetch_potd(date.today())
+            p._fetch_potd(datetime.now(UTC).date())
