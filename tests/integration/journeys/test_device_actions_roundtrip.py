@@ -68,16 +68,14 @@ def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
         timeout=30000,
     )
     page.wait_for_selector("[data-page-shell]", timeout=10000)
-    page.evaluate(
-        """() => {
+    page.evaluate("""() => {
             window.__journeyMessages = [];
             const original = window.showResponseModal;
             window.showResponseModal = function(status, message, ...rest) {
               window.__journeyMessages.push({ status, message: String(message) });
               return original.call(this, status, message, ...rest);
             };
-        }"""
-    )
+        }""")
     page.locator('[data-settings-tab="maintenance"]').first.click()
     page.wait_for_selector("#rebootBtn", timeout=10000)
     page.wait_for_selector("#shutdownBtn", timeout=10000)
