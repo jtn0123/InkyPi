@@ -100,6 +100,7 @@ isolation_suite() {
 
 fault_suite() {
     python -m pytest -q \
+        tests/integration/chaos/ \
         tests/integration/test_error_injection.py \
         tests/integration/test_error_recovery.py \
         tests/unit/test_display_save_failure_isolation.py \
@@ -107,7 +108,10 @@ fault_suite() {
 }
 
 upgrade_compat_suite() {
-    python -m pytest -q tests/unit/test_upgrade_compatibility.py
+    python -m pytest -q \
+        tests/unit/test_upgrade_compatibility.py \
+        tests/unit/test_config_migration.py \
+        tests/install/test_upgrade_chain.py
 }
 
 coverage_suite() {

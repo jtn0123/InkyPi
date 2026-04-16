@@ -1,0 +1,43 @@
+{
+  "name": "InkyPi v0.45 Legacy",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "UTC",
+  "time_format": "24h",
+  "preview_size_mode": "scaled",
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_minutes": 20,
+        "plugins": [
+          {
+            "plugin_id": "weather",
+            "name": "Weather Card",
+            "plugin_settings": {
+              "city": "San Francisco",
+              "api_token": "legacy-token-v045",
+              "custom_banner": "Welcome v0.45"
+            },
+            "refresh": {
+              "interval": 1800
+            }
+          }
+        ],
+        "current_plugin_index": 0
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_time": "2025-01-01T00:00:00+00:00",
+    "image_hash": "abc123",
+    "refresh_type": "Playlist",
+    "plugin_id": "weather",
+    "playlist": "Default",
+    "plugin_instance": "Weather Card"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "InkyPi Corrupt But Recoverable",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "UTC",
+  "time_format": "24h",
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_minutes": 10,
+        "plugins": [
+          {
+            "plugin_id": "clock",
+            "name": "Clock Recoverable",
+            "plugin_settings": {
+              "title": "Recoverable",
+              "api_token": "recoverable-token",
+              "custom_banner": "Recover banner"
+            },
+            "refresh": {
+              "schedule": "09:30"
+            }
+          }
+        ],
+        "current_plugin_index": 0
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_type": "Playlist"
+  }
+}

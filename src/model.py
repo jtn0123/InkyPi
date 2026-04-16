@@ -514,13 +514,28 @@ class Playlist:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Playlist:
+        cycle_interval_seconds = data.get("cycle_interval_seconds")
+        if cycle_interval_seconds is None:
+            # Legacy configs used cycle_minutes; migrate to seconds on load.
+            legacy_minutes = data.get("cycle_minutes")
+            try:
+                minutes = int(legacy_minutes)
+                if minutes > 0:
+                    cycle_interval_seconds = minutes * 60
+            except (TypeError, ValueError):
+                cycle_interval_seconds = None
+
+        plugins = data.get("plugins", [])
+        if not isinstance(plugins, list):
+            plugins = []
+
         return cls(
-            name=data["name"],
-            start_time=data["start_time"],
-            end_time=data["end_time"],
-            plugins=data["plugins"],
+            name=data.get("name", "Default"),
+            start_time=data.get("start_time", PlaylistManager.DEFAULT_PLAYLIST_START),
+            end_time=data.get("end_time", PlaylistManager.DEFAULT_PLAYLIST_END),
+            plugins=plugins,
             current_plugin_index=data.get("current_plugin_index"),
-            cycle_interval_seconds=data.get("cycle_interval_seconds"),
+            cycle_interval_seconds=cycle_interval_seconds,
         )
 
 
@@ -707,12 +722,30 @@ class PluginInstance:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginInstance:
+        plugin_settings = data.get("plugin_settings")
+        if plugin_settings is None:
+            # Legacy configs used "settings"; preserve user data on migration.
+            plugin_settings = data.get("settings", {})
+        if not isinstance(plugin_settings, dict):
+            plugin_settings = {}
+
+        refresh = data.get("refresh")
+        if not isinstance(refresh, dict):
+            refresh = {}
+        if "scheduled" not in refresh and "schedule" in refresh:
+            # Legacy field alias.
+            refresh = dict(refresh)
+            refresh["scheduled"] = refresh.get("schedule")
+
         return cls(
-            plugin_id=data["plugin_id"],
-            name=data["name"],
-            settings=data["plugin_settings"],
-            refresh=data["refresh"],
-            latest_refresh_time=data.get("latest_refresh_time"),
+            plugin_id=data.get("plugin_id", data.get("id", "")),
+            name=data.get(
+                "name",
+                data.get("instance_name", data.get("plugin_id", data.get("id", "unknown"))),
+            ),
+            settings=plugin_settings,
+            refresh=refresh,
+            latest_refresh_time=data.get("latest_refresh_time", data.get("latest_refresh")),
             only_show_when_fresh=data.get("only_show_when_fresh", False),
             snooze_until=data.get("snooze_until"),
             consecutive_failure_count=data.get("consecutive_failure_count", 0),
