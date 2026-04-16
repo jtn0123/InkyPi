@@ -28,12 +28,8 @@ def _assert_baseline_preserved(
     for dotted_path in paths:
         actual_value = _path_get(actual_payload, dotted_path)
         expected_value = baseline_values[dotted_path]
-        if version:
-            prefix = f"Upgrade hop {version} "
-        else:
-            prefix = ""
+        prefix = f"Upgrade hop {version} " if version else ""
         assert actual_value == expected_value, (
             f"{prefix}dropped/changed '{dotted_path}': "
             f"expected={expected_value!r} actual={actual_value!r}"
         )
-

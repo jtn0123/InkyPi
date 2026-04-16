@@ -10,13 +10,13 @@ from pathlib import Path
 import pytest
 import yaml
 from flask import Flask
+from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 
 import config as config_mod
 from blueprints.diagnostics import diagnostics_bp
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins
 from refresh_task import ManualRefresh, RefreshTask
-from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 from utils.config_schema import validate_device_config
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"

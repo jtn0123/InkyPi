@@ -8,9 +8,9 @@ import shutil
 from pathlib import Path
 
 import pytest
+from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 
 import config as config_mod
-from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 from utils.config_schema import validate_device_config
 
 LEGACY_FIXTURE_ROOT = (
@@ -71,7 +71,8 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
 
     # (b) no silent key drops for critical user-facing values.
     baseline_values = {
-        dotted_path: _path_get(raw_fixture, dotted_path) for dotted_path in SENTINEL_PATHS
+        dotted_path: _path_get(raw_fixture, dotted_path)
+        for dotted_path in SENTINEL_PATHS
     }
     _assert_baseline_preserved(
         baseline_values,

@@ -68,7 +68,9 @@ def test_metrics_helpers_work_without_prometheus(monkeypatch):
 
 
 def test_metrics_endpoint_fallback_response_when_prometheus_missing(monkeypatch):
-    _, blueprints_metrics_module, restore_modules = _import_fallback_modules(monkeypatch)
+    _, blueprints_metrics_module, restore_modules = _import_fallback_modules(
+        monkeypatch
+    )
     try:
         response = blueprints_metrics_module.prometheus_metrics()
         assert response.status_code == 200

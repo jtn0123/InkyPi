@@ -129,15 +129,13 @@ def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
     body = page.locator("[data-playlist-body]").first
 
     # Simulate a CSS/regression case where the mobile-only toggle is visible.
-    page.evaluate(
-        """
+    page.evaluate("""
         () => {
             const btn = document.querySelector('[data-playlist-toggle]');
             if (!btn) return;
             btn.style.display = 'inline-flex';
         }
-        """
-    )
+        """)
     page.wait_for_timeout(200)
 
     before_expanded = toggle.get_attribute("aria-expanded")
@@ -149,5 +147,9 @@ def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
     after_expanded = toggle.get_attribute("aria-expanded")
     after_visible = body.is_visible()
 
-    assert before_expanded != after_expanded, "Toggle must reflect changed expanded state"
-    assert before_visible != after_visible, "Toggle click must change playlist body visibility"
+    assert (
+        before_expanded != after_expanded
+    ), "Toggle must reflect changed expanded state"
+    assert (
+        before_visible != after_visible
+    ), "Toggle click must change playlist body visibility"

@@ -153,7 +153,9 @@ def main() -> int:
         )
     else:
         try:
-            failures.extend(evaluate_cold_start_budget(cold_runs, args.cold_start_max_s))
+            failures.extend(
+                evaluate_cold_start_budget(cold_runs, args.cold_start_max_s)
+            )
         except Exception as exc:
             failures.append(
                 "probe=cold_start phase=evaluation "
