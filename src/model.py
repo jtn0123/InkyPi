@@ -741,8 +741,16 @@ class PluginInstance:
             refresh = dict(refresh)
             refresh["scheduled"] = refresh.get("schedule")
 
+        raw_plugin_id = data.get("plugin_id", data.get("id"))
+        if not isinstance(raw_plugin_id, str) or not raw_plugin_id.strip():
+            logger.warning(
+                "PluginInstance.from_dict: missing plugin_id/id; defaulting to 'unknown'. data_keys=%s",
+                sorted(data.keys()),
+            )
+            raw_plugin_id = "unknown"
+
         return cls(
-            plugin_id=data.get("plugin_id", data.get("id", "")),
+            plugin_id=raw_plugin_id,
             name=data.get(
                 "name",
                 data.get(

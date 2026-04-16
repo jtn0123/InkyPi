@@ -291,6 +291,14 @@
     function addPreset(button) {
       const key = button.dataset.key;
       if (!key) return;
+      const existingRow = Array.from(document.querySelectorAll(".apikey-row")).find(
+        (row) => row.querySelector(".apikey-key")?.value.trim() === key
+      );
+      if (existingRow) {
+        existingRow.querySelector(".apikey-value, .apikey-key")?.focus();
+        showResponseModal("info", `${key} is already added.`);
+        return;
+      }
       addRow(key, "");
       button.style.display = "none";
     }

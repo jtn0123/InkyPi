@@ -129,27 +129,21 @@
         return 'INKYPI_LAST_PROGRESS';
     }
 
-    function setPlaylistExpanded(item, expanded){
+    function setPlaylistExpanded(item, expanded, options = {}){
         const body = item?.querySelector('[data-playlist-body]');
         const toggle = item?.querySelector('[data-playlist-toggle]');
         if (!item || !body || !toggle) return;
         const playlistName = item.getAttribute('data-playlist-name');
+        const forceDesktopExpanded = options.forceDesktopExpanded === true;
+        const isMobile = !!mobileQuery.matches;
+        const shouldExpand = (!isMobile && forceDesktopExpanded) ? true : !!expanded;
 
-        if (!mobileQuery.matches){
-            body.hidden = false;
-            item.classList.add('mobile-expanded');
-            item.classList.remove('mobile-collapsed');
-            toggle.textContent = toggle.getAttribute('data-expanded-label') || 'Hide';
-            toggle.setAttribute('aria-expanded', 'true');
-            return;
-        }
-
-        body.hidden = !expanded;
-        item.classList.toggle('mobile-expanded', expanded);
-        item.classList.toggle('mobile-collapsed', !expanded);
-        toggle.textContent = expanded ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
-        toggle.setAttribute('aria-expanded', String(expanded));
-        if (expanded){
+        body.hidden = !shouldExpand;
+        item.classList.toggle('mobile-expanded', shouldExpand);
+        item.classList.toggle('mobile-collapsed', !shouldExpand);
+        toggle.textContent = shouldExpand ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
+        toggle.setAttribute('aria-expanded', String(shouldExpand));
+        if (shouldExpand){
             state.expandedPlaylist = playlistName;
         } else if (state.expandedPlaylist === playlistName){
             state.expandedPlaylist = null;
@@ -160,7 +154,7 @@
         const items = Array.from(document.querySelectorAll('[data-playlist-card]'));
         if (!items.length) return;
         if (!mobileQuery.matches){
-            items.forEach((item) => setPlaylistExpanded(item, true));
+            items.forEach((item) => setPlaylistExpanded(item, true, { forceDesktopExpanded: true }));
             return;
         }
         const preferred = state.expandedPlaylist
@@ -178,7 +172,7 @@
         const isExpanded =
             button.getAttribute('aria-expanded') === 'true'
             || item.classList.contains('mobile-expanded');
-        const willExpand = !mobileQuery.matches || !isExpanded;
+        const willExpand = !isExpanded;
         if (mobileQuery.matches && willExpand){
             document.querySelectorAll('[data-playlist-card]').forEach((card) => {
                 if (card !== item) setPlaylistExpanded(card, false);

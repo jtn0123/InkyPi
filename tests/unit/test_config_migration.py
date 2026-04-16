@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import config as config_mod
+from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 from utils.config_schema import validate_device_config
 
 LEGACY_FIXTURE_ROOT = (
@@ -36,32 +37,6 @@ def _fixture_device_path(fixture_name: str) -> Path:
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _path_get(payload: object, dotted_path: str) -> object:
-    node: object = payload
-    for segment in dotted_path.split("."):
-        if isinstance(node, list):
-            node = node[int(segment)]
-            continue
-        if not isinstance(node, dict):
-            raise KeyError(f"{dotted_path}: expected mapping at '{segment}'")
-        node = node[segment]
-    return node
-
-
-def _assert_paths_preserved(
-    expected_payload: dict,
-    actual_payload: dict,
-    paths: tuple[str, ...],
-) -> None:
-    for dotted_path in paths:
-        expected_value = _path_get(expected_payload, dotted_path)
-        actual_value = _path_get(actual_payload, dotted_path)
-        assert expected_value == actual_value, (
-            f"Path '{dotted_path}' changed during migration: "
-            f"expected={expected_value!r} actual={actual_value!r}"
-        )
 
 
 def _expected_cycle_interval_seconds(playlist_dict: dict) -> int | None:
@@ -95,7 +70,15 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     validate_device_config(loaded)
 
     # (b) no silent key drops for critical user-facing values.
-    _assert_paths_preserved(raw_fixture, loaded, SENTINEL_PATHS)
+    baseline_values = {
+        dotted_path: _path_get(raw_fixture, dotted_path) for dotted_path in SENTINEL_PATHS
+    }
+    _assert_baseline_preserved(
+        baseline_values,
+        loaded,
+        SENTINEL_PATHS,
+        version=fixture_name,
+    )
 
     # (c) migration behavior: legacy cycle_minutes/schedule aliases map correctly.
     playlist = cfg.get_playlist_manager().get_playlist("Default")
@@ -146,4 +129,7 @@ def test_renamed_key_without_migration_is_detected(
     cfg = config_mod.Config()
 
     with pytest.raises((AssertionError, KeyError), match="timezone"):
-        _assert_paths_preserved(baseline, cfg.get_config(), ("timezone",))
+        baseline_values = {"timezone": _path_get(baseline, "timezone")}
+        _assert_baseline_preserved(
+            baseline_values, cfg.get_config(), ("timezone",), version="renamed-key"
+        )

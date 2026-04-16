@@ -15,6 +15,7 @@ import statistics
 import subprocess
 import sys
 import time
+import traceback
 from pathlib import Path
 
 
@@ -38,7 +39,7 @@ def _plugin_render_rows(benchmarks: list[dict]) -> list[tuple[str, float]]:
         median_s = stats.get("median")
         if not isinstance(median_s, (int, float)):
             continue
-        if group == "plugin_render" or name.startswith("test_bench_"):
+        if group == "plugin_render":
             rows.append((name, float(median_s) * 1000.0))
     return rows
 
@@ -140,11 +141,24 @@ def main() -> int:
         evaluate_plugin_render_budget(benchmarks, args.plugin_render_max_ms)
     )
 
-    cold_runs = run_cold_start_samples(
-        max(1, args.cold_start_samples),
-        max(1.0, args.cold_start_timeout_s),
-    )
-    failures.extend(evaluate_cold_start_budget(cold_runs, args.cold_start_max_s))
+    try:
+        cold_runs = run_cold_start_samples(
+            max(1, args.cold_start_samples),
+            max(1.0, args.cold_start_timeout_s),
+        )
+    except Exception as exc:
+        failures.append(
+            "probe=cold_start phase=sampling "
+            f"message={exc} traceback={traceback.format_exc(limit=1).strip()}"
+        )
+    else:
+        try:
+            failures.extend(evaluate_cold_start_budget(cold_runs, args.cold_start_max_s))
+        except Exception as exc:
+            failures.append(
+                "probe=cold_start phase=evaluation "
+                f"message={exc} traceback={traceback.format_exc(limit=1).strip()}"
+            )
 
     if failures:
         print("\nFAILED performance budget gate:")

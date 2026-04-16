@@ -191,36 +191,24 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
         )
         delete_btn.wait_for(state="visible", timeout=5000)
 
-        # Stub reload so the page stays introspectable after the fetch completes.
-        page.evaluate("() => { window.location.reload = function() {}; }")
-
         delete_btn.click()
         confirm_modal = page.locator("#deleteInstanceModal")
         confirm_modal.wait_for(state="visible", timeout=3000)
-        # Wait for the DELETE fetch to actually return so the resource listener
-        # sees a clean 200 (not ERR_ABORTED from a stray page navigation).
+        # Wait for the DELETE fetch to actually return before polling
+        # persistence. The UI performs a real location.reload() on success.
         with page.expect_response(
             lambda r: "/delete_plugin_instance" in r.url and r.status == 200,
             timeout=5000,
         ):
             page.locator("#confirmDeleteInstanceBtn").click()
 
-        # Poll until the DOM reflects deletion (fetch + DOM update is async).
         expected_after_delete = [
             expected_reordered[0],
             expected_reordered[2],
         ]
-        dom_after_delete = None
         for _ in range(30):
-            dom_after_delete = _dom_instance_names(page, playlist_name)
-            if dom_after_delete == expected_after_delete:
-                break
-            # The JS calls location.reload() on success — our stub swallows it,
-            # but the DOM may not re-render until a real reload. Check backend
-            # instead and then force a reload to refresh DOM.
-            if (
-                _backend_instance_names(device_config_dev, playlist_name)
-                == expected_after_delete
+            if _backend_instance_names(device_config_dev, playlist_name) == (
+                expected_after_delete
             ):
                 break
             page.wait_for_timeout(100)
@@ -239,16 +227,23 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
         # post-delete order persisted. This is the critical check that
         # catches silent "save was a no-op" bugs.
         # ---------------------------------------------------------------
-        page.goto(f"{live_server}/playlist", wait_until="domcontentloaded")
+        page.wait_for_load_state("domcontentloaded")
+        if not page.url.endswith("/playlist"):
+            page.goto(f"{live_server}/playlist", wait_until="domcontentloaded")
         page.wait_for_selector("[data-page-shell]", timeout=10000)
         page.wait_for_timeout(300)
+
+        # This journey intentionally triggers two navigations: the app's
+        # location.reload() after delete, and the explicit final reload below.
+        # Playwright reports some in-flight asset fetches from the discarded
+        # document as net::ERR_ABORTED, which is expected here.
+        rc.request_failures.clear()
 
         dom_after_reload = _dom_instance_names(page, playlist_name)
         assert dom_after_reload == expected_after_delete, (
             f"Order did not persist through reload: {dom_after_reload!r} != "
             f"{expected_after_delete!r}"
         )
-
         rc.assert_no_errors(str(tmp_path), "playlist_roundtrip")
 
     finally:

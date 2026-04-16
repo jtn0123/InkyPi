@@ -16,6 +16,7 @@ from blueprints.diagnostics import diagnostics_bp
 from display.display_manager import DisplayManager
 from plugins.plugin_registry import load_plugins
 from refresh_task import ManualRefresh, RefreshTask
+from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 from utils.config_schema import validate_device_config
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -28,32 +29,6 @@ def _load_chain_spec() -> dict:
 
 def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _path_get(payload: object, dotted_path: str) -> object:
-    node: object = payload
-    for segment in dotted_path.split("."):
-        if isinstance(node, list):
-            node = node[int(segment)]
-            continue
-        if not isinstance(node, dict):
-            raise KeyError(f"{dotted_path}: expected mapping at '{segment}'")
-        node = node[segment]
-    return node
-
-
-def _assert_baseline_preserved(
-    baseline_values: dict[str, object],
-    actual_payload: dict,
-    paths: list[str],
-    version: str,
-) -> None:
-    for dotted_path in paths:
-        actual_value = _path_get(actual_payload, dotted_path)
-        assert actual_value == baseline_values[dotted_path], (
-            f"Upgrade hop {version} dropped/changed '{dotted_path}': "
-            f"expected={baseline_values[dotted_path]!r} actual={actual_value!r}"
-        )
 
 
 def _make_diag_app(device_config, refresh_task) -> Flask:

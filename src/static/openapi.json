@@ -450,9 +450,10 @@
                   "$ref": "#/components/schemas/HistoryStorageResponse"
                 },
                 "example": {
-                  "count": 42,
-                  "total_size": "128.5 MB",
-                  "oldest": "2024-01-01T00:00:00"
+                  "free_gb": 64.0,
+                  "total_gb": 128.0,
+                  "used_gb": 64.0,
+                  "pct_free": 50.0
                 }
               }
             }
@@ -664,7 +665,7 @@
             }
           },
           "403": {
-            "$ref": "#/components/responses/BadRequest"
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -1293,6 +1294,8 @@
             }
           },
           "last_update_failure": {
+            "type": "object",
+            "description": "Most recent update failure details (if any).",
             "nullable": true
           },
           "recent_client_log_errors": {
@@ -1335,6 +1338,16 @@
     "responses": {
       "BadRequest": {
         "description": "Bad request \u2014 invalid parameters or missing required fields",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Access forbidden \u2014 insufficient permissions",
         "content": {
           "application/json": {
             "schema": {

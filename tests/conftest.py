@@ -151,6 +151,16 @@ def clear_managed_api_key_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_plugin_registry_state():
+    """Prevent plugin registry globals from leaking between tests."""
+    from plugins.plugin_registry import reset_plugin_registry
+
+    reset_plugin_registry()
+    yield
+    reset_plugin_registry()
+
+
+@pytest.fixture(autouse=True)
 def mock_screenshot(monkeypatch):
     # Return a simple in-memory image instead of invoking chromium
     def _fake_screenshot(*args, **kwargs):
