@@ -25,7 +25,11 @@ def test_ai_image_save_rejects_empty_prompt(client):
 def test_ai_image_save_rejects_invalid_provider(client):
     resp = client.post(
         "/save_plugin_settings",
-        data={"plugin_id": "ai_image", "textPrompt": "A cat", "provider": "badprovider"},
+        data={
+            "plugin_id": "ai_image",
+            "textPrompt": "A cat",
+            "provider": "badprovider",
+        },
     )
     assert resp.status_code == 400
     data = resp.get_json()
@@ -191,13 +195,15 @@ def test_add_plugin_rejects_interval_above_999(client, device_config_dev):
         "/add_plugin",
         data={
             "plugin_id": "clock",
-            "refresh_settings": json.dumps({
-                "refreshType": "interval",
-                "interval": "5000",
-                "unit": "minute",
-                "playlist": "Default",
-                "instance_name": "HighInterval",
-            }),
+            "refresh_settings": json.dumps(
+                {
+                    "refreshType": "interval",
+                    "interval": "5000",
+                    "unit": "minute",
+                    "playlist": "Default",
+                    "instance_name": "HighInterval",
+                }
+            ),
         },
     )
     assert resp.status_code == 422
@@ -215,13 +221,15 @@ def test_add_plugin_rejects_interval_zero(client, device_config_dev):
         "/add_plugin",
         data={
             "plugin_id": "clock",
-            "refresh_settings": json.dumps({
-                "refreshType": "interval",
-                "interval": "0",
-                "unit": "minute",
-                "playlist": "Default",
-                "instance_name": "ZeroInterval",
-            }),
+            "refresh_settings": json.dumps(
+                {
+                    "refreshType": "interval",
+                    "interval": "0",
+                    "unit": "minute",
+                    "playlist": "Default",
+                    "instance_name": "ZeroInterval",
+                }
+            ),
         },
     )
     assert resp.status_code == 422
