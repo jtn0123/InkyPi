@@ -384,3 +384,49 @@ class TestFromDictRoundTrip:
         assert plugin.only_show_when_fresh is False
         assert plugin.snooze_until is None
         assert plugin.latest_refresh_time is None
+
+
+class TestLegacyFromDictCompatibility:
+    def test_playlist_from_dict_migrates_string_cycle_minutes(self):
+        playlist = Playlist.from_dict({"cycle_minutes": " 15 ", "plugins": "invalid"})
+
+        assert playlist.cycle_interval_seconds == 900
+        assert playlist.plugins == []
+        assert playlist.name == "Default"
+        assert playlist.start_time == "00:00"
+        assert playlist.end_time == "24:00"
+
+    def test_playlist_from_dict_ignores_invalid_cycle_minutes_string(self):
+        playlist = Playlist.from_dict({"cycle_minutes": "fifteen", "plugins": []})
+
+        assert playlist.cycle_interval_seconds is None
+
+    def test_plugin_instance_from_dict_migrates_legacy_aliases(self):
+        refreshed_at = "2025-12-01T09:00:00+00:00"
+        plugin = PluginInstance.from_dict(
+            {
+                "id": "legacy-weather",
+                "instance_name": "Kitchen",
+                "settings": {"api_token": "secret"},
+                "refresh": {"schedule": "09:00"},
+                "latest_refresh": refreshed_at,
+            }
+        )
+
+        assert plugin.plugin_id == "legacy-weather"
+        assert plugin.name == "Kitchen"
+        assert plugin.settings == {"api_token": "secret"}
+        assert plugin.refresh["scheduled"] == "09:00"
+        assert plugin.latest_refresh_time == refreshed_at
+
+    def test_plugin_instance_from_dict_sanitizes_invalid_legacy_shapes(self):
+        plugin = PluginInstance.from_dict(
+            {
+                "plugin_id": "weather",
+                "plugin_settings": "not-a-dict",
+                "refresh": "not-a-dict",
+            }
+        )
+
+        assert plugin.settings == {}
+        assert plugin.refresh == {}
