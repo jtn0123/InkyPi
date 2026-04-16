@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.60.2 (2026-04-16)
+
+### Bug Fixes
+
+- Use low-memory image loading in preview plugins
+  ([#507](https://github.com/jtn0123/InkyPi/pull/507),
+  [`2e871d2`](https://github.com/jtn0123/InkyPi/commit/2e871d294f3f8abf560994f63d1c011032bc2522))
+
+* fix: use low-memory image loading in preview plugins
+
+* fix(ci): lazy-import image_loader, close streamed responses, update tests
+
+- Move AdaptiveImageLoader import from module-level to function scope in image_utils.py to avoid
+  eagerly pulling requests/PIL.ImageOps/psutil at startup (fixes lazy-import test violations per
+  JTN-606) - Wrap streamed http_get response in contextlib.closing() to prevent connection pool
+  leaks on low-memory devices - Track the actual rendered URL in APOD metadata instead of always
+  recording hdurl/url from the API response - Update test_wpotd_unit.py to mock
+  image_loader.from_url instead of the removed get_http_session code path - Tighten WPOTD test
+  assertion to verify full call contract - Run ruff/black formatting on all changed files
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+* fix(ci): extract _stream_to_disk helper, add low-memory path tests
+
+- Extract streaming download logic into _stream_to_disk() to reduce cognitive complexity of
+  fetch_and_resize_remote_image (S3776: 18→12) - Add tests for _stream_to_disk (success + HTTP error
+  propagation) - Add tests for fetch_and_resize_remote_image low-memory path (success +
+  cleanup-on-failure) to meet SonarCloud 80% new-code coverage gate
+
+---------
+
+Co-authored-by: Claude Opus 4.6 <noreply@anthropic.com>
+
+
 ## v0.60.1 (2026-04-16)
 
 ### Bug Fixes
