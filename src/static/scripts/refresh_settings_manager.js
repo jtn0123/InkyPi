@@ -190,15 +190,22 @@ class RefreshSettingsManager {
         }
 
         if (data.refreshType === 'interval') {
-            if (!data.interval || data.interval < 1) {
-                return { valid: false, error: 'Please enter a valid interval' };
+            const interval = parseInt(data.interval, 10);
+            if (!data.interval || isNaN(interval) || interval < 1) {
+                return { valid: false, error: 'Refresh interval must be at least 1' };
             }
-            if (!data.unit) {
-                return { valid: false, error: 'Please select a time unit' };
+            if (interval > 999) {
+                return { valid: false, error: 'Refresh interval must be between 1 and 999' };
+            }
+            if (!data.unit || !['minute', 'hour', 'day'].includes(data.unit)) {
+                return { valid: false, error: 'Please select a valid time unit (minute, hour, or day)' };
             }
         } else if (data.refreshType === 'scheduled') {
             if (!data.refreshTime) {
                 return { valid: false, error: 'Please select a refresh time' };
+            }
+            if (!/^\d{2}:\d{2}(:\d{2})?$/.test(data.refreshTime)) {
+                return { valid: false, error: 'Refresh time must be in HH:MM format' };
             }
         }
 

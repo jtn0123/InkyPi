@@ -34,6 +34,26 @@ FRAME_STYLES = [
     {"name": "Rectangle", "icon": "frames/rectangle.png"},
 ]
 
+# Shared set of AI provider identifiers accepted across plugins that
+# support both OpenAI and Google backends.
+VALID_AI_PROVIDERS = frozenset({"openai", "google"})
+
+
+def validate_required_text(settings: dict, key: str, label: str) -> str | None:
+    """Return an error string if *settings[key]* is missing or blank."""
+    value = (settings.get(key) or "").strip()
+    if not value:
+        return f"{label} is required."
+    return None
+
+
+def validate_provider(settings: dict) -> str | None:
+    """Return an error string if the provider value is not in VALID_AI_PROVIDERS."""
+    provider = settings.get("provider", "openai")
+    if provider not in VALID_AI_PROVIDERS:
+        return f"Unsupported provider: {provider!r}"
+    return None
+
 
 class BasePlugin:
     """Base class for all plugins."""

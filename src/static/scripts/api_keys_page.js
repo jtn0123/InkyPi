@@ -263,7 +263,7 @@
       keyInput.name = `apikey-name-${suffix}`;
       keyInput.setAttribute("aria-label", "API key name");
       const valInput = document.createElement("input");
-      valInput.type = "text";
+      valInput.type = "password";
       valInput.className = "apikey-value";
       valInput.value = value;
       valInput.placeholder = "Enter value";

@@ -977,16 +977,28 @@
         const panel = document.getElementById("benchSummary");
         panel.textContent = "";
 
-        const heading1 = document.createElement("strong");
-        heading1.textContent = "Benchmark Summary (24h)";
-        panel.appendChild(heading1);
-        panel.appendChild(buildSummaryTable(summary.summary || {}));
+        const summaryData = summary.summary || {};
+        const hasData = Object.values(summaryData).some(function (stage) {
+          return stage && (stage.p50 !== null && stage.p50 !== undefined);
+        });
 
-        if ((plugins.items || []).length > 0) {
-          const heading2 = document.createElement("strong");
-          heading2.textContent = "Per-plugin Averages";
-          panel.appendChild(heading2);
-          panel.appendChild(buildPluginsTable(plugins.items));
+        if (!hasData && (plugins.items || []).length === 0) {
+          const emptyMsg = document.createElement("div");
+          emptyMsg.className = "bench-empty";
+          emptyMsg.textContent = "No benchmark data recorded in the last 24 hours. Benchmarks are collected automatically on each display refresh.";
+          panel.appendChild(emptyMsg);
+        } else {
+          const heading1 = document.createElement("strong");
+          heading1.textContent = "Benchmark Summary (24h)";
+          panel.appendChild(heading1);
+          panel.appendChild(buildSummaryTable(summaryData));
+
+          if ((plugins.items || []).length > 0) {
+            const heading2 = document.createElement("strong");
+            heading2.textContent = "Per-plugin Averages";
+            panel.appendChild(heading2);
+            panel.appendChild(buildPluginsTable(plugins.items));
+          }
         }
       } catch (e) {
         console.warn("Failed to load benchmark summary:", e);
@@ -1174,48 +1186,49 @@
       }
     }
 
-    async function isolatePlugin() {
+    // Shared POST/DELETE helper for the isolation toggle.  Consolidates the
+    // previously duplicated isolatePlugin / unIsolatePlugin bodies
+    // (SonarCloud javascript:S4144 — Identical blocks on new code).
+    async function _toggleIsolation(method, verb) {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
-      if (!pluginId) return;
+      if (!pluginId) {
+        showResponseModal("failure", `Enter a plugin ID to ${verb}.`);
+        return;
+      }
       try {
         const resp = await fetch("/settings/isolation", {
-          method: "POST",
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plugin_id: pluginId }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to isolate plugin");
+          const errMsg = data.error || `Failed to ${verb} plugin`;
+          // Surface a human-readable message instead of raw JSON
+          showResponseModal("failure", errMsg.includes("registered")
+            ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
+            : errMsg);
           return;
         }
+        const past = verb === "isolate" ? "isolated" : "un-isolated";
+        showResponseModal("success", `Plugin "${pluginId}" has been ${past}.`);
         await refreshIsolation();
         await refreshHealth();
       } catch (e) {
-        console.warn("Failed to isolate plugin:", e);
-        showResponseModal("failure", "Failed to isolate plugin");
+        console.warn(`Failed to ${verb} plugin:`, e);
+        showResponseModal(
+          "failure",
+          `Failed to ${verb} plugin. Check your connection and try again.`
+        );
       }
     }
 
+    async function isolatePlugin() {
+      return _toggleIsolation("POST", "isolate");
+    }
+
     async function unIsolatePlugin() {
-      const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
-      if (!pluginId) return;
-      try {
-        const resp = await fetch("/settings/isolation", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plugin_id: pluginId }),
-        });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          showResponseModal("failure", data.error || "Failed to unisolate plugin");
-          return;
-        }
-        await refreshIsolation();
-        await refreshHealth();
-      } catch (e) {
-        console.warn("Failed to unisolate plugin:", e);
-        showResponseModal("failure", "Failed to unisolate plugin");
-      }
+      return _toggleIsolation("DELETE", "un-isolate");
     }
 
     async function safeReset() {

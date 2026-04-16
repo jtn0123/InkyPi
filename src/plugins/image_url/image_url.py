@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urlparse
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
@@ -16,6 +17,22 @@ def grab_image(image_url, dimensions, timeout_ms=40000):
 
 
 class ImageURL(BasePlugin):
+    def validate_settings(self, settings: dict) -> str | None:
+        """Reject non-URL image URL values at save time."""
+        raw = settings.get("url")
+        url = (raw or "").strip() if isinstance(raw, str) else ""
+        if not url:
+            return "Image URL is required."
+        try:
+            parsed = urlparse(url)
+        except ValueError:
+            return f"Image URL is not valid: {url!r}"
+        if parsed.scheme.lower() not in {"http", "https"}:
+            return "Image URL must start with http:// or https://"
+        if not parsed.netloc:
+            return f"Image URL is not valid: {url!r}"
+        return None
+
     def build_settings_schema(self):
         return schema(
             section(
