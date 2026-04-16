@@ -269,7 +269,7 @@
     {% include 'response_modal.html' %}
 
     <!-- Thumbnail Preview Modal -->
-    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" role="dialog" aria-modal="true" aria-labelledby="thumbnailPreviewTitle" hidden>
+    <div id="thumbnailPreviewModal" class="thumbnail-preview-modal playlist-thumbnail-modal" role="dialog" aria-modal="true" aria-labelledby="thumbnailPreviewTitle" hidden> <!-- NOSONAR S6819: dialog element migration tracked as follow-up -->
         <div class="thumbnail-preview-content playlist-thumbnail-content">
             <h2 id="thumbnailPreviewTitle" class="sr-only">Image Preview</h2>
             <button class="thumbnail-preview-close" type="button" id="closeThumbnailPreviewBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>

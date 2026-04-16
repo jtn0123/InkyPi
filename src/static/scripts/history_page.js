@@ -28,9 +28,17 @@
       );
       if (focusable) setTimeout(() => focusable.focus(), 0);
     } else if (_lastHistoryModalTrigger) {
-      try { _lastHistoryModalTrigger.focus(); } catch (_e) { /* ignore */ }
+      _lastHistoryModalTrigger.focus?.();
       _lastHistoryModalTrigger = null;
     }
+  }
+
+  function openClearModal(triggerEl) {
+    setModalOpen(document.getElementById("clearHistoryModal"), true, triggerEl);
+  }
+
+  function closeClearModal() {
+    setModalOpen(document.getElementById("clearHistoryModal"), false);
   }
 
   function showStoredMessage() {
@@ -122,13 +130,8 @@
       setModalOpen(document.getElementById("deleteHistoryModal"), false);
     }
 
-    function openClearModal(triggerEl) {
-      setModalOpen(document.getElementById("clearHistoryModal"), true, triggerEl);
-    }
-
-    function closeClearModal() {
-      setModalOpen(document.getElementById("clearHistoryModal"), false);
-    }
+    // openClearModal / closeClearModal are at module scope (below) — they
+    // don't access createHistoryPage closure variables.
 
     async function confirmDelete() {
       if (!state.pendingDelete) return;
