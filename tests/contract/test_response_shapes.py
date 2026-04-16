@@ -26,10 +26,14 @@ import pytest
 # sys.path via SRC_ABS. TypedDict subclasses from ``typing`` expose their
 # total-ness on the class itself.
 from schemas.responses import (  # noqa: E402  (sys.path set up by conftest)
+    BenchmarksPluginsResponse,
+    BenchmarksSummaryResponse,
+    DiagnosticsResponse,
     HealthPluginsResponse,
     HealthSystemResponse,
     HistoryStorageResponse,
     IsolationResponse,
+    JobStatusResponse,
     NextUpResponse,
     RefreshInfoResponse,
     RefreshStatsResponse,
@@ -185,6 +189,63 @@ def test_health_plugins_shape(client):
     assert_shape(body, HealthPluginsResponse)
     assert body.get("success") is True
     assert "items" in body
+
+
+def test_benchmarks_summary_shape(client, device_config_dev, tmp_path):
+    db_path = tmp_path / "contract_benchmarks_shape.db"
+    device_config_dev.update_value("enable_benchmarks", True, write=False)
+    device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
+
+    # Seed at least one refresh row so summary percentiles are meaningful.
+    client.post("/update_now", data={"plugin_id": "clock"})
+
+    body = _get_json(client, "/api/benchmarks/summary?window=24h")
+    assert_shape(body, BenchmarksSummaryResponse)
+    assert body.get("success") is True
+
+
+def test_benchmarks_plugins_shape(client, device_config_dev, tmp_path):
+    db_path = tmp_path / "contract_benchmarks_plugins.db"
+    device_config_dev.update_value("enable_benchmarks", True, write=False)
+    device_config_dev.update_value("benchmarks_db_path", str(db_path), write=True)
+
+    client.post("/update_now", data={"plugin_id": "clock"})
+
+    body = _get_json(client, "/api/benchmarks/plugins?window=24h")
+    assert_shape(body, BenchmarksPluginsResponse)
+    assert body.get("success") is True
+    assert isinstance(body.get("items"), list)
+
+
+def test_diagnostics_shape(client):
+    body = _get_json(client, "/api/diagnostics")
+    assert_shape(body, DiagnosticsResponse)
+    assert "plugin_health" in body
+
+
+def test_job_status_shape(client):
+    start = client.post("/update_now?async=1", data={"plugin_id": "clock"})
+    assert start.status_code == 202
+    start_body = start.get_json()
+    assert isinstance(start_body, dict)
+    job_id = start_body.get("job_id")
+    assert isinstance(job_id, str) and job_id
+
+    # Poll briefly until terminal state; queue states are pending/running/done/error.
+    import time
+
+    final = None
+    for _ in range(120):
+        body = _get_json(client, f"/api/job/{job_id}")
+        assert_shape(body, JobStatusResponse)
+        status = body.get("status")
+        if status in {"done", "error"}:
+            final = body
+            break
+        time.sleep(0.01)
+
+    assert isinstance(final, dict), "job did not reach done/error state in time"
+    assert final.get("status") == "done", f"async update job failed: {final!r}"
 
 
 def test_isolation_shape(client):
