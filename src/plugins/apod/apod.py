@@ -158,7 +158,6 @@ class Apod(BasePlugin):
             raise RuntimeError("APOD is not an image today.")
 
         image = None
-        selected_image_url = None
         timeout_ms = int(self._request_timeout() * 1000)
         dimensions = self.get_oriented_dimensions(device_config)
         candidate_urls = self._candidate_image_urls(data)
@@ -173,7 +172,6 @@ class Apod(BasePlugin):
                 resize=False,
             )
             if image is not None:
-                selected_image_url = image_url
                 break
             logger.warning(
                 "APOD image load failed for %s (attempt %s/%s)",
@@ -191,7 +189,7 @@ class Apod(BasePlugin):
                 "title": data.get("title"),
                 "caption": data.get("copyright"),
                 "explanation": data.get("explanation"),
-                "page_url": selected_image_url or data.get("hdurl") or data.get("url"),
+                "page_url": data.get("hdurl") or data.get("url"),
                 "description_url": data.get("url"),
             }
         )

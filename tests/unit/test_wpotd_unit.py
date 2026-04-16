@@ -61,7 +61,17 @@ def test_download_image_svg_unsupported():
 def test_download_image_unidentified(monkeypatch):
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
-    monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **k: None)
+    class Resp:
+        content = b"notanimage"
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(
+        wpotd_mod,
+        "get_http_session",
+        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp())})(),
+    )
 
     with pytest.raises(RuntimeError):
         p._download_image("http://example.com/image.png")
@@ -69,11 +79,22 @@ def test_download_image_unidentified(monkeypatch):
 
 def test_download_image_success(monkeypatch):
     p = wpotd_mod.Wpotd({"id": "wpotd"})
-    fake_image = Image.new("RGB", (10, 10), "white")
+    content = make_png_bytes()
 
-    monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **k: fake_image)
+    class Resp:
+        def __init__(self, c):
+            self.content = c
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(
+        wpotd_mod,
+        "get_http_session",
+        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp(content))})(),
+    )
     img = p._download_image("http://example.com/image.png")
-    assert img is fake_image
+    assert isinstance(img, Image.Image)
 
 
 def test_fetch_potd_and_fetch_image_src(monkeypatch):

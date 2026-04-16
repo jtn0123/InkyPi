@@ -28,9 +28,7 @@ def test_apod_success(
     plugin = Apod({"id": "apod"})
     fake_image = MagicMock()
     fake_image.size = (64, 64)
-    monkeypatch.setattr(
-        plugin.image_loader, "from_url", MagicMock(return_value=fake_image)
-    )
+    monkeypatch.setattr(plugin.image_loader, "from_url", MagicMock(return_value=fake_image))
 
     img = plugin.generate_image({}, device_config_dev)
     assert img.size[0] > 0
@@ -62,7 +60,6 @@ def test_apod_missing_key(client):
 @patch("plugins.apod.apod.get_http_session")
 def test_apod_success_via_client(mock_get_session, client):
     import os
-
     from PIL import Image
 
     os.environ["NASA_SECRET"] = "test"
@@ -79,10 +76,7 @@ def test_apod_success_via_client(mock_get_session, client):
     mock_session.get.return_value = mock_response
 
     fake_image = Image.new("RGB", (64, 64), "black")
-    with patch(
-        "plugins.base_plugin.base_plugin.AdaptiveImageLoader.from_url",
-        return_value=fake_image,
-    ):
+    with patch("plugins.base_plugin.base_plugin.AdaptiveImageLoader.from_url", return_value=fake_image):
         data = {"plugin_id": "apod"}
         resp = client.post("/update_now", data=data)
     assert resp.status_code == 200
@@ -209,18 +203,14 @@ def test_apod_hdurl_preference_on_non_low_resource(device_config_dev, monkeypatc
         p.image_loader.is_low_resource = False
         fake_image = MagicMock()
         fake_image.size = (64, 64)
-        with patch.object(
-            p.image_loader, "from_url", return_value=fake_image
-        ) as mock_from_url:
+        with patch.object(p.image_loader, "from_url", return_value=fake_image) as mock_from_url:
             result = p.generate_image({}, device_config_dev)
 
         assert mock_from_url.call_args.args[0] == "http://example.com/high_res.png"
         assert result is not None
 
 
-def test_apod_prefers_regular_url_on_low_resource_device(
-    device_config_dev, monkeypatch
-):
+def test_apod_prefers_regular_url_on_low_resource_device(device_config_dev, monkeypatch):
     """Low-memory devices should avoid NASA's HD asset when a regular URL exists."""
     from plugins.apod.apod import Apod
 
@@ -243,9 +233,7 @@ def test_apod_prefers_regular_url_on_low_resource_device(
         p.image_loader.is_low_resource = True
         fake_image = MagicMock()
         fake_image.size = (64, 64)
-        with patch.object(
-            p.image_loader, "from_url", return_value=fake_image
-        ) as mock_from_url:
+        with patch.object(p.image_loader, "from_url", return_value=fake_image) as mock_from_url:
             result = p.generate_image({}, device_config_dev)
 
         assert mock_from_url.call_args.args[0] == "http://example.com/low_res.png"
@@ -295,9 +283,7 @@ def test_apod_settings_template():
     assert "settings_schema" in template
 
 
-def test_apod_falls_back_to_second_url_when_first_load_fails(
-    device_config_dev, monkeypatch
-):
+def test_apod_falls_back_to_second_url_when_first_load_fails(device_config_dev, monkeypatch):
     """APOD should try the alternate URL if the preferred one fails to load."""
     from plugins.apod.apod import Apod
 
@@ -368,9 +354,7 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
         p = Apod({"id": "apod"})
         fake_image = MagicMock()
         fake_image.size = (64, 64)
-        with patch.object(
-            p.image_loader, "from_url", return_value=fake_image
-        ) as mock_from_url:
+        with patch.object(p.image_loader, "from_url", return_value=fake_image) as mock_from_url:
             result = p.generate_image({}, device_config_dev)
 
         assert mock_from_url.call_args.args[0] == "http://example.com/low_res.png"
