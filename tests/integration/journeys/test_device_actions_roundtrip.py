@@ -49,6 +49,16 @@ def device_action_calls(monkeypatch):
     return calls
 
 
+@pytest.fixture
+def reset_shutdown_limiter():
+    """Keep the shared shutdown limiter from leaking into later tests."""
+    import blueprints.settings as settings_mod
+
+    settings_mod._shutdown_limiter.reset()
+    yield settings_mod
+    settings_mod._shutdown_limiter.reset()
+
+
 def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
@@ -58,6 +68,17 @@ def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
         timeout=30000,
     )
     page.wait_for_selector("[data-page-shell]", timeout=10000)
+    page.evaluate(
+        """() => {
+            window.__journeyMessages = [];
+            const original = window.showResponseModal;
+            window.showResponseModal = function(status, message, ...rest) {
+              window.__journeyMessages.push({ status, message: String(message) });
+              return original.call(this, status, message, ...rest);
+            };
+        }"""
+    )
+    page.locator('[data-settings-tab="maintenance"]').first.click()
     page.wait_for_selector("#rebootBtn", timeout=10000)
     page.wait_for_selector("#shutdownBtn", timeout=10000)
     return collector
@@ -66,9 +87,12 @@ def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
 def _assert_response_message(page, text: str) -> None:
     page.wait_for_function(
         """(expected) => {
-            const modal = document.getElementById('responseModal');
-            if (!modal || modal.hidden) return false;
-            return modal.textContent.includes(expected);
+            const messages = window.__journeyMessages || [];
+            return messages.some((entry) =>
+              entry &&
+              typeof entry.message === 'string' &&
+              entry.message.includes(expected)
+            );
         }""",
         arg=text,
         timeout=5000,
@@ -79,13 +103,9 @@ def test_device_actions_confirm_cancel_paths(
     live_server,
     browser_page,
     device_action_calls,
-    monkeypatch,
+    reset_shutdown_limiter,
 ):
     """Reboot/shutdown only execute on confirm, never on initial click/cancel."""
-    import blueprints.settings as settings_mod
-
-    settings_mod._shutdown_limiter.reset()
-
     page = browser_page
     collector = _open_settings_device_panel(page, live_server)
 
@@ -124,7 +144,7 @@ def test_device_actions_confirm_cancel_paths(
 
     # Clear the cooldown so the shutdown half of the journey can run in the
     # same test without tripping the 30s safety limiter.
-    settings_mod._shutdown_limiter.reset()
+    reset_shutdown_limiter._shutdown_limiter.reset()
 
     # Shutdown: open -> cancel. Still no additional backend action.
     shutdown_btn.click()

@@ -3,9 +3,12 @@ import logging
 from io import BytesIO
 
 from openai import OpenAI
-from PIL import Image
 
-from plugins.base_plugin.base_plugin import BasePlugin
+from plugins.base_plugin.base_plugin import (
+    BasePlugin,
+    validate_provider,
+    validate_required_text,
+)
 from plugins.base_plugin.settings_schema import (
     callout,
     field,
@@ -17,7 +20,15 @@ from plugins.base_plugin.settings_schema import (
 
 logger = logging.getLogger(__name__)
 
-IMAGE_MODELS = ["gpt-image-1.5", "imagen-4.0-generate-001"]
+IMAGE_MODELS_BY_PROVIDER = {
+    "openai": ("gpt-image-1.5",),
+    "google": ("imagen-4.0-generate-001",),
+}
+IMAGE_MODELS = [
+    model
+    for provider_models in IMAGE_MODELS_BY_PROVIDER.values()
+    for model in provider_models
+]
 DEFAULT_IMAGE_MODEL = "gpt-image-1.5"
 DEFAULT_IMAGE_QUALITY = "medium"
 
@@ -25,17 +36,15 @@ DEFAULT_IMAGE_QUALITY = "medium"
 class AIImage(BasePlugin):
     def validate_settings(self, settings: dict) -> str | None:
         """Reject empty prompts at save time so bad input does not persist."""
-        prompt = (settings.get("textPrompt") or "").strip()
-        if not prompt:
-            return "Prompt is required."
+        if err := validate_required_text(settings, "textPrompt", "Prompt"):
+            return err
+        if err := validate_provider(settings):
+            return err
 
         provider = settings.get("provider", "openai")
-        if provider not in ("openai", "google"):
-            return f"Unsupported provider: {provider!r}"
-
-        model = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
-        if model not in IMAGE_MODELS:
-            return f"Invalid image model: {model!r}"
+        model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
+        if model not in IMAGE_MODELS_BY_PROVIDER[provider]:
+            return f"Invalid image model for provider {provider}: {model!r}"
 
         return None
 
@@ -139,10 +148,18 @@ class AIImage(BasePlugin):
 
         provider = settings.get("provider", "openai")
         text_prompt = settings.get("textPrompt", "")
-        image_model = settings.get("imageModel", DEFAULT_IMAGE_MODEL)
+        image_model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
+        allowed_models = IMAGE_MODELS_BY_PROVIDER.get(provider)
+        if not allowed_models:
+            logger.error(f"Invalid provider for AI image plugin: {provider}")
+            raise RuntimeError("Invalid provider provided.")
 
-        if image_model not in IMAGE_MODELS:
-            logger.error(f"Invalid image model: {image_model}")
+        if image_model not in allowed_models:
+            logger.error(
+                "Invalid image model %s for provider %s",
+                image_model,
+                provider,
+            )
             raise RuntimeError("Invalid Image Model provided.")
 
         image_quality = settings.get("quality", DEFAULT_IMAGE_QUALITY)
@@ -252,8 +269,12 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
-        with Image.open(BytesIO(image_bytes)) as opened_img:
-            return opened_img.copy()
+        image = self.image_loader.from_bytesio(
+            BytesIO(image_bytes), (1536, 1536), resize=False
+        )
+        if image is None:
+            raise RuntimeError("Failed to decode generated image")
+        return image
 
     def fetch_image_google(self, client, prompt, model):
         """Fetch image from Google Imagen API."""
@@ -278,9 +299,14 @@ class AIImage(BasePlugin):
         )
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
-        return Image.open(
-            BytesIO(response.generated_images[0].image.image_bytes)
-        ).copy()
+        image = self.image_loader.from_bytesio(
+            BytesIO(response.generated_images[0].image.image_bytes),
+            (1536, 1536),
+            resize=False,
+        )
+        if image is None:
+            raise RuntimeError("Failed to decode generated image")
+        return image
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):

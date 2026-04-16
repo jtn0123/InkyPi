@@ -31,11 +31,10 @@ function showToast(status, message, duration = TOAST_DURATION_MS) {
     const container = ensureToastContainer();
     const toastId = `toast-${++toastCounter}`;
 
-    // When showing a new error, dismiss any previous error toasts first
-    // so stale validation messages don't stack up across save attempts.
-    if (status === 'error') {
-        dismissStaleErrors();
-    }
+    // Dismiss stale error toasts when showing any new toast (error or success).
+    // This prevents stale validation messages from lingering after a successful
+    // retry and stops error toasts from stacking across rapid save attempts.
+    dismissStaleErrors();
 
     // Enforce stack limit — remove oldest toasts beyond MAX_VISIBLE_TOASTS
     while (container.children.length >= MAX_VISIBLE_TOASTS) {

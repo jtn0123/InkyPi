@@ -12,10 +12,35 @@
     node.hidden = hidden;
   }
 
-  function setModalOpen(node, open) {
+  // Track the element that triggered the most-recently opened modal so
+  // focus can be restored when the modal closes (WAI-ARIA best practice).
+  let _lastHistoryModalTrigger = null;
+
+  function setModalOpen(node, open, triggerEl) {
     if (!node) return;
+    if (open && triggerEl) _lastHistoryModalTrigger = triggerEl;
     node.hidden = !open;
     node.style.display = open ? "block" : "none";
+    if (open) {
+      // Move focus to the first focusable element inside the modal
+      const focusable = node.querySelector(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable) setTimeout(() => focusable.focus(), 0);
+    } else if (_lastHistoryModalTrigger) {
+      if (typeof _lastHistoryModalTrigger.focus === "function") {
+        _lastHistoryModalTrigger.focus();
+      }
+      _lastHistoryModalTrigger = null;
+    }
+  }
+
+  function openClearModal(triggerEl) {
+    setModalOpen(document.getElementById("clearHistoryModal"), true, triggerEl);
+  }
+
+  function closeClearModal() {
+    setModalOpen(document.getElementById("clearHistoryModal"), false);
   }
 
   function showStoredMessage() {
@@ -95,11 +120,11 @@
       }
     }
 
-    function openDeleteModal(filename) {
+    function openDeleteModal(filename, triggerEl) {
       state.pendingDelete = filename;
       const text = document.getElementById("deleteHistoryText");
       if (text) text.textContent = `Delete this image '${filename}'?`;
-      setModalOpen(document.getElementById("deleteHistoryModal"), true);
+      setModalOpen(document.getElementById("deleteHistoryModal"), true, triggerEl);
     }
 
     function closeDeleteModal() {
@@ -107,13 +132,8 @@
       setModalOpen(document.getElementById("deleteHistoryModal"), false);
     }
 
-    function openClearModal() {
-      setModalOpen(document.getElementById("clearHistoryModal"), true);
-    }
-
-    function closeClearModal() {
-      setModalOpen(document.getElementById("clearHistoryModal"), false);
-    }
+    // openClearModal / closeClearModal are at module scope (below) — they
+    // don't access createHistoryPage closure variables.
 
     async function confirmDelete() {
       if (!state.pendingDelete) return;
@@ -221,7 +241,7 @@
         ?.addEventListener("click", () => globalThis.location.reload());
       document
         .getElementById("historyClearBtn")
-        ?.addEventListener("click", openClearModal);
+        ?.addEventListener("click", (event) => openClearModal(event.currentTarget));
       document
         .getElementById("confirmDeleteHistoryBtn")
         ?.addEventListener("click", confirmDelete);
@@ -249,7 +269,7 @@
           if (action === "display" && filename) {
             redisplay(filename, actionButton);
           } else if (action === "delete" && filename) {
-            openDeleteModal(filename);
+            openDeleteModal(filename, actionButton);
           }
           return;
         }

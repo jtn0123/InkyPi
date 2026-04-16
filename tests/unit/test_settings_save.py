@@ -371,3 +371,21 @@ class TestSaveSettings:
         assert resp.status_code == 200
         assert device_config_dev.get_config("inverted_image") is False
         assert device_config_dev.get_config("log_system_stats") is False
+
+    def test_save_settings_negative_interval_accurate_error(self, client):
+        """Negative interval should say 'must be at least 1', not 'is required'."""
+        form = {**self.VALID_FORM, "interval": "-5"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "interval"
+        assert "at least 1" in data["error"]
+        assert "required" not in data["error"].lower()
+
+    def test_save_settings_non_integer_interval_error(self, client):
+        """Non-numeric interval should say 'must be a number'."""
+        form = {**self.VALID_FORM, "interval": "abc"}
+        resp = client.post("/save_settings", data=form)
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert "number" in data["error"].lower()

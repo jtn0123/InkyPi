@@ -61,17 +61,7 @@ def test_download_image_svg_unsupported():
 def test_download_image_unidentified(monkeypatch):
     p = wpotd_mod.Wpotd({"id": "wpotd"})
 
-    class Resp:
-        content = b"notanimage"
-
-        def raise_for_status(self):
-            return None
-
-    monkeypatch.setattr(
-        wpotd_mod,
-        "get_http_session",
-        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp())})(),
-    )
+    monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **k: None)
 
     with pytest.raises(RuntimeError):
         p._download_image("http://example.com/image.png")
@@ -79,22 +69,11 @@ def test_download_image_unidentified(monkeypatch):
 
 def test_download_image_success(monkeypatch):
     p = wpotd_mod.Wpotd({"id": "wpotd"})
-    content = make_png_bytes()
+    fake_image = Image.new("RGB", (10, 10), "white")
 
-    class Resp:
-        def __init__(self, c):
-            self.content = c
-
-        def raise_for_status(self):
-            return None
-
-    monkeypatch.setattr(
-        wpotd_mod,
-        "get_http_session",
-        lambda: type("S", (), {"get": staticmethod(lambda *a, **k: Resp(content))})(),
-    )
+    monkeypatch.setattr(p.image_loader, "from_url", lambda *a, **k: fake_image)
     img = p._download_image("http://example.com/image.png")
-    assert isinstance(img, Image.Image)
+    assert img is fake_image
 
 
 def test_fetch_potd_and_fetch_image_src(monkeypatch):
@@ -158,3 +137,46 @@ def test_shrink_to_fit_no_change_and_resize():
     img2 = Image.new("RGB", (200, 100), "white")
     out2 = p._shrink_to_fit(img2, 50, 50)
     assert out2.size == (50, 50)
+
+
+# ---------------------------------------------------------------------------
+# validate_settings tests
+# ---------------------------------------------------------------------------
+
+
+def test_wpotd_validate_settings_rejects_date_before_archive():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    err = p.validate_settings({"customDate": "1990-01-01"})
+    assert err is not None
+    assert "Wikipedia POTD archive start" in err
+
+
+def test_wpotd_validate_settings_rejects_future_date():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    err = p.validate_settings({"customDate": "9999-12-31"})
+    assert err is not None
+    assert "on or before" in err
+
+
+def test_wpotd_validate_settings_rejects_malformed_date():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    err = p.validate_settings({"customDate": "not-a-date"})
+    assert err is not None
+    assert "Invalid date format" in err
+
+
+def test_wpotd_validate_settings_ignores_date_when_randomized():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    err = p.validate_settings({"randomizeWpotd": "true", "customDate": "1990-01-01"})
+    assert err is None
+
+
+def test_wpotd_validate_settings_accepts_blank_custom_date():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    assert p.validate_settings({"customDate": ""}) is None
+    assert p.validate_settings({}) is None
+
+
+def test_wpotd_validate_settings_accepts_valid_date():
+    p = wpotd_mod.Wpotd({"id": "wpotd"})
+    assert p.validate_settings({"customDate": "2023-01-01"}) is None

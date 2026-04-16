@@ -7,15 +7,17 @@
     {% for idx in range(calendar_urls | length) %}
     <div class="dynamic-list-item compact-repeater compact-repeater-calendar">
         <div class="dynamic-list-toolbar compact-repeater-toolbar">
+            <label class="sr-only" for="calendarURL{{ idx }}">Calendar URL {{ idx + 1 }}</label>
             <input
                 type="url"
+                id="calendarURL{{ idx }}"
                 name="calendarURLs[]"
                 class="form-input"
                 placeholder="https://calendar.google.com/…/basic.ics"
                 value="{{ calendar_urls[idx] }}"
                 required
                 pattern="https?://.+"
-                aria-label="Calendar URL"
+                aria-label="Calendar URL {{ idx + 1 }}"
             >
             <button type="button" class="remove-btn icon-button" aria-label="Remove calendar">
                 {{ icon('trash', 'action-icon') | safe }}

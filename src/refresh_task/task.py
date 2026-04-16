@@ -1042,6 +1042,61 @@ class RefreshTask:
     _zombie_thread_count: int = 0
     _zombie_thread_lock: threading.Lock = threading.Lock()
 
+    @staticmethod
+    def _make_inprocess_worker(
+        refresh_action, plugin_config, device_config, current_dt, plugin_id
+    ):
+        """Return a ``(worker_fn, result_holder, cancel_event)`` tuple.
+
+        The returned *worker_fn* is suitable for ``threading.Thread(target=...)``.
+        """
+        result_holder: dict = {}
+        cancel_event = threading.Event()
+        result_holder["cancel_event"] = cancel_event
+
+        def _worker(holder=result_holder, _cancel=cancel_event):
+            try:
+                plugin = get_plugin_instance(plugin_config)
+                image = refresh_action.execute(plugin, device_config, current_dt)
+                meta = None
+                if hasattr(plugin, "get_latest_metadata"):
+                    meta = plugin.get_latest_metadata()
+                holder["image"] = image
+                holder["meta"] = meta
+            except Exception as exc:
+                holder["error"] = exc
+            finally:
+                if _cancel.is_set():
+                    with RefreshTask._zombie_thread_lock:
+                        RefreshTask._zombie_thread_count = max(
+                            0, RefreshTask._zombie_thread_count - 1
+                        )
+                    logging.getLogger(__name__).info(
+                        "Zombie thread for plugin '%s' has finished. "
+                        "Active zombie threads: %d",
+                        plugin_id,
+                        RefreshTask._zombie_thread_count,
+                    )
+
+        return _worker, result_holder, cancel_event
+
+    @staticmethod
+    def _handle_thread_timeout(plugin_id, timeout_s, cancel_event):
+        """Mark a timed-out worker thread as a zombie and return a TimeoutError."""
+        cancel_event.set()
+        with RefreshTask._zombie_thread_lock:
+            RefreshTask._zombie_thread_count += 1
+            zombie_count = RefreshTask._zombie_thread_count
+        logging.getLogger(__name__).warning(
+            "Plugin '%s' timed out after %ds — cancellation event set. "
+            "Thread cannot be force-killed; it will run until completion. "
+            "Active zombie threads: %d",
+            plugin_id,
+            int(timeout_s),
+            zombie_count,
+        )
+        return TimeoutError(f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s")
+
     def _execute_inprocess(self, refresh_action, plugin_config, current_dt: datetime):
         """Run a plugin directly in the current process (no subprocess isolation).
 
@@ -1066,56 +1121,21 @@ class RefreshTask:
 
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
-            result_holder: dict = {}
-            cancel_event = threading.Event()
-            result_holder["cancel_event"] = cancel_event
-
-            def _worker(holder=result_holder, _cancel=cancel_event):
-                try:
-                    plugin = get_plugin_instance(plugin_config)
-                    image = refresh_action.execute(
-                        plugin, self.device_config, current_dt
-                    )
-                    meta = None
-                    if hasattr(plugin, "get_latest_metadata"):
-                        meta = plugin.get_latest_metadata()
-                    holder["image"] = image
-                    holder["meta"] = meta
-                except Exception as exc:
-                    holder["error"] = exc
-                finally:
-                    if _cancel.is_set():
-                        # Decrement zombie count now that this thread is finishing.
-                        with RefreshTask._zombie_thread_lock:
-                            RefreshTask._zombie_thread_count = max(
-                                0, RefreshTask._zombie_thread_count - 1
-                            )
-                        logging.getLogger(__name__).info(
-                            "Zombie thread for plugin '%s' has finished. "
-                            "Active zombie threads: %d",
-                            plugin_id,
-                            RefreshTask._zombie_thread_count,
-                        )
+            _worker, result_holder, cancel_event = self._make_inprocess_worker(
+                refresh_action,
+                plugin_config,
+                self.device_config,
+                current_dt,
+                plugin_id,
+            )
 
             worker_thread = threading.Thread(target=_worker, daemon=True)
             worker_thread.start()
             worker_thread.join(timeout=timeout_s)
 
             if worker_thread.is_alive():
-                cancel_event.set()
-                with RefreshTask._zombie_thread_lock:
-                    RefreshTask._zombie_thread_count += 1
-                    zombie_count = RefreshTask._zombie_thread_count
-                logging.getLogger(__name__).warning(
-                    "Plugin '%s' timed out after %ds — cancellation event set. "
-                    "Thread cannot be force-killed; it will run until completion. "
-                    "Active zombie threads: %d",
-                    plugin_id,
-                    int(timeout_s),
-                    zombie_count,
-                )
-                last_exc = TimeoutError(
-                    f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
+                last_exc = self._handle_thread_timeout(
+                    plugin_id, timeout_s, cancel_event
                 )
             elif "error" in result_holder:
                 last_exc = result_holder["error"]

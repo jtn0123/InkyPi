@@ -265,6 +265,78 @@ def main(argv: list[str] | None = None):
     return app
 
 
+def _init_core_services(app):
+    """Create Config, DisplayManager, RefreshTask; store on app.config."""
+    try:
+        device_config = Config()
+    except ConfigValidationError as exc:
+        logger.error("Config invalid: %s", exc)
+        raise SystemExit(1) from exc
+
+    display_manager = DisplayManager(device_config)
+    refresh_task = RefreshTask(device_config, display_manager)
+
+    if FAST_DEV:
+        try:
+            device_config.update_value("plugin_cycle_interval_seconds", 30)
+            device_config.update_value("startup", False)
+            logger.info(
+                "Fast dev mode enabled: plugin cycle set to 30s; startup image disabled"
+            )
+        except Exception:
+            pass
+
+    load_plugins(device_config.get_plugins())
+
+    app.config["DEVICE_CONFIG"] = device_config
+    app.config["DISPLAY_MANAGER"] = display_manager
+    app.config["REFRESH_TASK"] = refresh_task
+    app.config["WEB_ONLY"] = WEB_ONLY
+
+    return device_config
+
+
+def _configure_upload_limits(app):
+    """Set MAX_FORM_PARTS and MAX_CONTENT_LENGTH from env or defaults."""
+    app.config["MAX_FORM_PARTS"] = 10_000
+    try:
+        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
+        _max_len = int(_max_len_env) if _max_len_env else _DEFAULT_MAX_UPLOAD
+    except Exception:
+        _max_len = _DEFAULT_MAX_UPLOAD
+    app.config["MAX_CONTENT_LENGTH"] = _max_len
+
+
+def _register_before_request_hooks(app):
+    """Attach before-request hooks for refresh task, timers, and request IDs."""
+
+    @app.before_request
+    def _ensure_refresh_task_started():
+        if WEB_ONLY:
+            return
+        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+            rt = app.config.get("REFRESH_TASK")
+            if rt and not rt.running:
+                logger.info("Starting refresh task (flask dev server lazy start)")
+                rt.start()
+
+    @app.before_request
+    def _start_request_timer():
+        try:
+            g._t0 = perf_counter()
+        except Exception:
+            pass
+
+    @app.before_request
+    def _attach_request_id():
+        try:
+            from utils.http_utils import _get_or_set_request_id
+
+            _get_or_set_request_id()
+        except Exception:
+            pass
+
+
 def create_app():
     """Build and configure the Flask application.
 
@@ -293,30 +365,7 @@ def create_app():
 
         return {"app_version": version, "url_for": versioned_url_for}
 
-    try:
-        device_config = Config()
-    except ConfigValidationError as exc:
-        logger.error("Config invalid: %s", exc)
-        raise SystemExit(1) from exc
-    display_manager = DisplayManager(device_config)
-    refresh_task = RefreshTask(device_config, display_manager)
-
-    if FAST_DEV:
-        try:
-            device_config.update_value("plugin_cycle_interval_seconds", 30)
-            device_config.update_value("startup", False)
-            logger.info(
-                "Fast dev mode enabled: plugin cycle set to 30s; startup image disabled"
-            )
-        except Exception:
-            pass
-
-    load_plugins(device_config.get_plugins())
-
-    app.config["DEVICE_CONFIG"] = device_config
-    app.config["DISPLAY_MANAGER"] = display_manager
-    app.config["REFRESH_TASK"] = refresh_task
-    app.config["WEB_ONLY"] = WEB_ONLY
+    device_config = _init_core_services(app)
 
     setup_secret_key(app, device_config)
 
@@ -324,13 +373,7 @@ def create_app():
 
     init_auth(app, device_config)
 
-    app.config["MAX_FORM_PARTS"] = 10_000
-    try:
-        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
-        _max_len = int(_max_len_env) if _max_len_env else _DEFAULT_MAX_UPLOAD
-    except Exception:
-        _max_len = _DEFAULT_MAX_UPLOAD
-    app.config["MAX_CONTENT_LENGTH"] = _max_len
+    _configure_upload_limits(app)
 
     init_i18n(app)
     register_blueprints(app)
@@ -341,34 +384,8 @@ def create_app():
     # INKYPI_SMOKE_FORCE_RENDER=1 is set in the environment.
     register_smoke_endpoints(app)
 
-    @app.before_request
-    def _ensure_refresh_task_started():
-        if WEB_ONLY:
-            return
-        if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-            rt = app.config.get("REFRESH_TASK")
-            if rt and not rt.running:
-                logger.info("Starting refresh task (flask dev server lazy start)")
-                rt.start()
-
-    @app.before_request
-    def _start_request_timer():
-        try:
-            g._t0 = perf_counter()
-        except Exception:
-            pass
-
+    _register_before_request_hooks(app)
     setup_https_redirect(app, dev_mode=DEV_MODE)
-
-    @app.before_request
-    def _attach_request_id():
-        try:
-            from utils.http_utils import _get_or_set_request_id
-
-            _get_or_set_request_id()
-        except Exception:
-            pass
-
     setup_csp_nonce(app)
     setup_csrf_protection(app)
     setup_rate_limiting(app)

@@ -1,6 +1,252 @@
 # CHANGELOG
 
 
+## v0.60.6 (2026-04-16)
+
+### Bug Fixes
+
+- Dogfood pass 3 — validation, accessibility, UX (JTN-349)
+  ([#509](https://github.com/jtn0123/InkyPi/pull/509),
+  [`0d784bd`](https://github.com/jtn0123/InkyPi/commit/0d784bdccb9718fa1515b888e27a8788bbc5301f))
+
+* fix: dogfood pass 3 — validation, accessibility, and UX consistency (JTN-349)
+
+Theme 1 (Form validation): Improve client-side form_validator.js to produce specific error messages
+  for number range violations (e.g. "must be at least 1" instead of generic "is invalid").
+
+Theme 2 (Silent persistence): Restructure plugin.py validation blocks so validate_settings errors
+  are never silently swallowed by a broad except Exception. Each validation step now has its own
+  try/except that logs at WARNING and returns a 400 error to the user.
+
+Theme 3 (Accessibility): Add proper <label> elements for calendar URL inputs in both the
+  server-rendered template and the JS-created dynamic entries.
+
+Theme 4 (UX consistency): Align "Background" label to "Background Fill" across image_folder and
+  image_album plugins to match image_upload.
+
+Themes 5 and 6 were already addressed in prior commits (inline update badge and page clamping).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(lint): apply black formatting and ruff set comprehension fix
+
+* test(coverage): boost new-code coverage and sanitize plugin_id log injection
+
+Addresses SonarCloud Quality Gate failures on PR #509:
+
+- pythonsecurity:S5145: wrap plugin_id with sanitize_log_field() in the two new exception-handler
+  log calls (src/blueprints/plugin.py) so CRLF-laden user input cannot forge log lines. - Coverage
+  on New Code: add 70+ tests exercising previously untested new branches — APOD validate_settings /
+  _request_timeout / _candidate_image_urls; WPOTD validate_settings; AI Image decode-failure paths;
+  fetch_and_resize low-memory cleanup/OSError branches; plugin.py validation-exception paths (both
+  save and update_plugin_instance routes, JSON + HTMX variants); image_folder
+  unreadable/no-image-files branches; calendar dynamic-entry label numbering; form_validator
+  classifyInvalid/describeReason reasons.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.60.5 (2026-04-16)
+
+### Bug Fixes
+
+- Jtn-376 dogfood pass 4 — validation, accessibility, UX
+  ([#508](https://github.com/jtn0123/InkyPi/pull/508),
+  [`ce94b4e`](https://github.com/jtn0123/InkyPi/commit/ce94b4ea8d1d2cb7d1c6fce0dc58c5a4dc94b6ee))
+
+* fix: address JTN-376 dogfood pass 4 — validation, accessibility, and UX
+
+Add server-side validate_settings to ai_image, ai_text, countdown, and image_url plugins so bad
+  input is rejected at save time with a clear error instead of persisting silently and failing at
+  render time.
+
+Tighten client-side interval validation in RefreshSettingsManager to reject values outside 1-999
+  range before submission, preventing the silent-revert bug where the modal showed a success toast
+  but the value reverted on reload.
+
+Switch JS-built API key value inputs from type="text" to type="password" so secrets are masked
+  consistently across managed and generic modes.
+
+Improve diagnostics UX: show a human-readable empty state in benchmarks instead of a table full of
+  null values, and surface specific messages for plugin isolation actions instead of raw JSON.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: remove extraneous f-string prefix flagged by ruff
+
+* fix(lint): apply Black formatting to dogfood pass 4 test file
+
+* refactor: deduplicate plugin validation helpers and parametrize tests
+
+SonarCloud Quality Gate flagged 4.2% duplication on new code (> 3%). The `validate_settings()`
+  methods for ai_image and ai_text repeated the same required-text / provider-check logic, and the
+  new integration test file had ten near-identical POST-and-assert blocks.
+
+- Add `validate_required_text` and `validate_provider` helpers (plus `VALID_AI_PROVIDERS`) to
+  `base_plugin.py` and use them in ai_image and ai_text. - Parametrize the plugin-validation
+  integration tests (rejection + acceptance) and the interval-range tests so the boilerplate lives
+  in a single `_save_plugin` helper and shared case tables. - Resolve the JS script directory once
+  per module and reuse it.
+
+No behaviour changes; same 20 integration assertions plus existing plugin unit tests still pass.
+
+* refactor(js): dedupe isolate/un-isolate plugin helpers
+
+SonarCloud flagged isolatePlugin() and unIsolatePlugin() in settings_page.js as duplicated blocks
+  (17 lines, 2 blocks, ~4.8% on new code). Extract a shared `_toggleIsolation(method, verb)` helper
+  and reimplement the two exports as one-liners.
+
+The isolation-copy integration test is adjusted to check for the template fragments (`has been
+  ${past}`, the verb strings) that the shared helper splices together, since the literal "has been
+  isolated" / "has been un-isolated" strings no longer appear verbatim.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.60.4 (2026-04-16)
+
+### Bug Fixes
+
+- Address dogfood pass 5 issues (JTN-451) ([#510](https://github.com/jtn0123/InkyPi/pull/510),
+  [`19f8d4a`](https://github.com/jtn0123/InkyPi/commit/19f8d4a403f25b7072a4fa1be740f55cddb59717))
+
+* fix: address dogfood pass 5 issues (JTN-451)
+
+Security: validate plugin settings in add_plugin path to block unsafe
+
+URL schemes (javascript:, file://) from persisting via the Screenshot plugin. Modal accessibility:
+  add role/aria-labelledby to thumbnail preview modal, add hidden attr to scheduleModal, add focus
+  management and trigger restoration to history page modals. Data validation: add client-side
+  cycle_minutes validation in playlist edit modal. Toast lifecycle: dismiss stale error toasts on
+  any new toast (not just
+
+errors). Naming consistency: align plugin_history_bp regex with playlist instance name regex to
+  accept spaces.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting
+
+* fix: address SonarCloud issues — reduce complexity, fix JS scope
+
+Extract _parse_add_plugin_form and _validate_plugin_settings_security helpers to reduce add_plugin
+  cognitive complexity from 22 to under 15. Move openClearModal/closeClearModal to module scope in
+  history_page.js. Replace try/catch focus restoration with optional chaining.
+
+* fix: address SonarCloud maintainability rating on new code
+
+- Reduce _parse_add_plugin_form cognitive complexity from 22 to well under 15 by extracting
+  _form_parse_error helper and _parse_refresh_settings_json validator. Each function now has a
+  single clear responsibility. - Replace optional-chaining focus call (focus?.()) with an explicit
+  typeof guard so SonarCloud no longer flags it as silently swallowing an exception. - Convert
+  thumbnailPreviewModal from <div role="dialog"> to native <dialog> element to satisfy SonarCloud
+  S6819. The JS continues to manage visibility via inline style.display and the 'is-open' class,
+  which work identically on <dialog> elements.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.60.3 (2026-04-16)
+
+### Bug Fixes
+
+- **todo_list, playlist**: Resolve silent no-op button clicks
+  ([#511](https://github.com/jtn0123/InkyPi/pull/511),
+  [`08323f6`](https://github.com/jtn0123/InkyPi/commit/08323f6924bbc079b294ffe35ddc3509dc7efcd9))
+
+* fix(todo_list, playlist): resolve silent no-op button clicks
+
+JTN-717: The todo_list "Remove list" button was clickable but did nothing when only one list
+  existed. Added syncRemoveButtonStates to disable the button when removal is blocked, matching the
+  calendar repeater pattern.
+
+JTN-692: The playlist toggle button was visible on desktop but always forced the expanded state,
+  making clicks a no-op. Hidden the button at desktop width via CSS display:none (mobile media query
+  already sets display:inline-flex).
+
+Removed xfail entries from both test files.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix: prevent duplicate click handlers on repeater remove buttons
+
+Mark dynamically-created remove buttons with data-bound-remove="true" after attaching inline
+  handlers so bindRemoveButtons skips them. Applied to both createCalendarEntry and createTodoEntry.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+### Refactoring
+
+- Reduce cognitive complexity in top 5 SonarCloud hotspots (JTN-741)
+  ([#512](https://github.com/jtn0123/InkyPi/pull/512),
+  [`93da900`](https://github.com/jtn0123/InkyPi/commit/93da900af965c0ed663d642b7fdf5a7e287cefb7))
+
+* refactor: reduce cognitive complexity in top 5 SonarCloud hotspots (JTN-741)
+
+Extract helpers from the 5 highest-complexity functions to bring each below the S3776 threshold
+  while preserving existing behavior and tests.
+
+- _validate_settings_form: split into _field_error, _validate_interval, _validate_enum_field,
+  _validate_image_settings - display_next: extract _display_next_direct, _gather_display_metrics,
+  _persist_dev_refresh_event - create_app: extract _init_core_services, _configure_upload_limits,
+  _register_before_request_hooks - http_get: extract _try_cache_lookup, _try_cache_store,
+  _log_latency_on_error, _log_latency_on_success - _execute_inprocess: extract
+  _make_inprocess_worker, _handle_thread_timeout as static methods
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* style: fix Black formatting and add mypy type annotations
+
+- Fix Black formatting in _handle_thread_timeout and _execute_inprocess - Add type annotations to
+  extracted http_utils helpers to satisfy mypy strict subset check
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
+## v0.60.2 (2026-04-16)
+
+### Bug Fixes
+
+- Use low-memory image loading in preview plugins
+  ([#507](https://github.com/jtn0123/InkyPi/pull/507),
+  [`2e871d2`](https://github.com/jtn0123/InkyPi/commit/2e871d294f3f8abf560994f63d1c011032bc2522))
+
+* fix: use low-memory image loading in preview plugins
+
+* fix(ci): lazy-import image_loader, close streamed responses, update tests
+
+- Move AdaptiveImageLoader import from module-level to function scope in image_utils.py to avoid
+  eagerly pulling requests/PIL.ImageOps/psutil at startup (fixes lazy-import test violations per
+  JTN-606) - Wrap streamed http_get response in contextlib.closing() to prevent connection pool
+  leaks on low-memory devices - Track the actual rendered URL in APOD metadata instead of always
+  recording hdurl/url from the API response - Update test_wpotd_unit.py to mock
+  image_loader.from_url instead of the removed get_http_session code path - Tighten WPOTD test
+  assertion to verify full call contract - Run ruff/black formatting on all changed files
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+* fix(ci): extract _stream_to_disk helper, add low-memory path tests
+
+- Extract streaming download logic into _stream_to_disk() to reduce cognitive complexity of
+  fetch_and_resize_remote_image (S3776: 18→12) - Add tests for _stream_to_disk (success + HTTP error
+  propagation) - Add tests for fetch_and_resize_remote_image low-memory path (success +
+  cleanup-on-failure) to meet SonarCloud 80% new-code coverage gate
+
+---------
+
+Co-authored-by: Claude Opus 4.6 <noreply@anthropic.com>
+
+
 ## v0.60.1 (2026-04-16)
 
 ### Bug Fixes
