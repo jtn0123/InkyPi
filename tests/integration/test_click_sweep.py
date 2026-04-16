@@ -212,13 +212,16 @@ _ENUMERATE_JS = """
       try { return hrefAttr ? new URL(hrefAttr, window.location.href) : null; }
       catch (_) { return null; }
     })();
+    const normalizePath = (p) =>
+      (p && p.length > 1 && p.endsWith('/')) ? p.slice(0, -1) : p;
+    const normalizedCurrentPath = normalizePath(currentPath);
     const isSameLink =
       el.tagName === 'A' && hrefAttr && (hrefAttr === currentPath ||
         hrefAttr === currentPath + '/' || hrefAttr === '#');
     const isSameOriginHashLink =
       el.tagName === 'A' && !!hrefUrl &&
       hrefUrl.origin === window.location.origin &&
-      hrefUrl.pathname === currentPath &&
+      normalizePath(hrefUrl.pathname) === normalizedCurrentPath &&
       !!hrefUrl.hash;
     const isAlreadySelected =
       el.classList.contains('selected') || el.classList.contains('active') ||
@@ -379,7 +382,7 @@ _CLOSE_OPEN_MODALS_JS = """
   const modals = Array.from(document.querySelectorAll(
     '.modal.is-open, .modal[style*="display: block"], .modal[style*="display:block"], ' +
     '.modal[style*="display: flex"], .modal[style*="display:flex"], ' +
-    '[aria-modal="true"]:not([hidden])'
+    '[aria-modal="true"]:not([hidden]), dialog[open]'
   ));
   // Filter to modals whose computed display is actually visible — matching
   // the selector without the display check picks up modals that carry
@@ -387,6 +390,18 @@ _CLOSE_OPEN_MODALS_JS = """
   const visibleModals = modals.filter((m) => getComputedStyle(m).display !== 'none');
   let closed = 0;
   for (const modal of visibleModals) {
+    if (modal.tagName === 'DIALOG') {
+      if (typeof modal.close === 'function') {
+        try { modal.close(); } catch (_) { /* ignore and continue fallback */ }
+      } else {
+        modal.removeAttribute('open');
+        modal.open = false;
+      }
+      if (!modal.open && !modal.hasAttribute('open')) {
+        closed += 1;
+        continue;
+      }
+    }
     // Prefer the modal's own close button so the page's close handler runs
     // (focus restore, backdrop cleanup, body.modal-open toggle). Only fall
     // back to attribute flips when no close button exists — raw style flips
