@@ -118,7 +118,9 @@ def test_jtn_728_reboot_shutdown_journey(
     deadline = time.monotonic() + 5.0
     while len(calls) < 1 and time.monotonic() < deadline:
         page.wait_for_timeout(100)
-    assert len(calls) >= 1, "Expected reboot confirm to POST /shutdown and run reboot cmd"
+    assert (
+        len(calls) >= 1
+    ), "Expected reboot confirm to POST /shutdown and run reboot cmd"
     assert calls[0] == ["sudo", "reboot"], f"Unexpected reboot command: {calls[0]!r}"
 
     # Shutdown path
@@ -159,7 +161,9 @@ def test_jtn_727_logs_journey(
             f"Apr 16 00:00:03 [INFO] service-{n}: heartbeat",
         ]
 
-    monkeypatch.setattr(settings_mod, "_rate_limit_ok", lambda _addr: True, raising=True)
+    monkeypatch.setattr(
+        settings_mod, "_rate_limit_ok", lambda _addr: True, raising=True
+    )
     monkeypatch.setattr(
         settings_mod, "_read_log_lines", _fake_read_log_lines, raising=True
     )
@@ -189,7 +193,9 @@ def test_jtn_727_logs_journey(
     page.fill("#logsFilter", "disk usage")
     page.wait_for_timeout(350)  # debounced input path
     filtered = _viewer_lines(page)
-    assert len(filtered) == 1, f"Filter should narrow logs to one line, got {filtered!r}"
+    assert (
+        len(filtered) == 1
+    ), f"Filter should narrow logs to one line, got {filtered!r}"
     assert "WARNING" in filtered[0]
 
     # Level filter (warnings + errors) with filter cleared.
@@ -197,11 +203,15 @@ def test_jtn_727_logs_journey(
     page.select_option("#logsLevel", "warn_errors")
     page.wait_for_timeout(200)
     leveled = _viewer_lines(page)
-    assert len(leveled) == 2, f"warn_errors should keep exactly 2 lines, got {leveled!r}"
+    assert (
+        len(leveled) == 2
+    ), f"warn_errors should keep exactly 2 lines, got {leveled!r}"
     assert all(("WARNING" in line or "ERROR" in line) for line in leveled)
 
     updated = page.locator("#logsUpdated").inner_text().strip()
-    assert updated.startswith("Updated "), f"logsUpdated should show timestamp, got {updated!r}"
+    assert updated.startswith(
+        "Updated "
+    ), f"logsUpdated should show timestamp, got {updated!r}"
 
     collector.assert_no_errors(name="jtn_727_logs")
 
