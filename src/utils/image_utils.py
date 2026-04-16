@@ -11,7 +11,6 @@ from typing import Any
 from PIL import Image
 from PIL.Image import Resampling
 
-from utils.image_loader import AdaptiveImageLoader
 from utils.http_utils import http_get, pinned_dns
 from utils.security_utils import validate_url_with_ips
 
@@ -152,36 +151,6 @@ def fetch_and_resize_remote_image(
 
     hostname = _urlparse.urlparse(validated_url).hostname or ""
 
-    loader = AdaptiveImageLoader()
-    # On low-memory devices, stream to disk first so large remote images do not
-    # require a full in-memory response buffer before Pillow can decode them.
-    if loader.is_low_resource:
-        tmp_path = None
-        try:
-            with pinned_dns(hostname, pinned_ips):
-                response = http_get(
-                    validated_url,
-                    timeout=timeout_seconds,
-                    stream=True,
-                    use_cache=False,
-                )
-                response.raise_for_status()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
-                    tmp_path = tmp.name
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            tmp.write(chunk)
-            return loader.from_file(tmp_path, dimensions, resize=True)
-        except Exception as e:
-            logger.error(f"Failed to fetch remote image from {image_url}: {e}")
-            return None
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    logger.warning("Could not delete temp file %s", tmp_path)
-
     try:
         with pinned_dns(hostname, pinned_ips):
             response = http_get(validated_url, timeout=timeout_seconds)
@@ -190,7 +159,10 @@ def fetch_and_resize_remote_image(
         logger.error(f"Failed to fetch remote image from {image_url}: {e}")
         return None
 
-    resized = loader.from_bytesio(BytesIO(response.content), dimensions, resize=True)
+    def _resize(img: Image.Image) -> Image.Image:
+        return img.resize(dimensions, LANCZOS).copy()
+
+    resized = process_image_from_bytes(response.content, _resize)
     if resized is None:
         logger.error(f"Failed to decode remote image from {image_url}")
     return resized
