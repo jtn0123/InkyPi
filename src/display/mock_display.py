@@ -2,8 +2,6 @@ import logging
 import os
 from datetime import UTC, datetime
 
-from PIL import Image, ImageEnhance
-
 from .abstract_display import AbstractDisplay
 
 logger = logging.getLogger(__name__)
@@ -39,8 +37,10 @@ class MockDisplay(AbstractDisplay):
         """Initialize mock display (no-op for development)."""
         logger.info(f"Mock display initialized: {self.width}x{self.height}")
 
-    def _simulate_eink_frame(self, image: Image.Image) -> Image.Image:
+    def _simulate_eink_frame(self, image):
         """Approximate e-ink panel output for local development previews."""
+        from PIL import Image, ImageEnhance
+
         profile = str(getattr(self, "mock_frame_profile", "tricolor")).strip().lower()
         source = image.convert("RGB") if image.mode != "RGB" else image.copy()
 
