@@ -160,7 +160,6 @@ _PLUGIN_XFAIL: dict[str, str] = {
     "weather": (
         "JTN-716 — Style picker collapsible + nav links no-op on /plugin/weather"
     ),
-    "todo_list": ("JTN-717 — 'Remove list' button click produces no observable change"),
 }
 
 
