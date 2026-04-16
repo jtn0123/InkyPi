@@ -44,10 +44,11 @@ class AIImage(BasePlugin):
         if err := validate_provider(settings):
             return err
 
-        provider = settings.get("provider", "openai")
+        provider = (settings.get("provider") or "openai").strip().lower()
         model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
-        if model not in IMAGE_MODELS_BY_PROVIDER[provider]:
-            return f"Invalid image model for provider {provider}: {model!r}"
+        allowed = IMAGE_MODELS_BY_PROVIDER.get(provider)
+        if not allowed or model not in allowed:
+            return f"Invalid image model for provider {provider!r}: {model!r}"
 
         return None
 

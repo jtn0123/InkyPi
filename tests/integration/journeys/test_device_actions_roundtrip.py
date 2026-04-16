@@ -51,12 +51,19 @@ def device_action_calls(monkeypatch):
 
 @pytest.fixture
 def reset_shutdown_limiter():
-    """Keep the shared shutdown limiter from leaking into later tests."""
+    """Keep the shared shutdown limiter from leaking into later tests.
+
+    Yields a zero-argument callable that resets the limiter so tests can clear
+    state mid-run without touching the private attribute directly.
+    """
     import blueprints.settings as settings_mod
 
-    settings_mod._shutdown_limiter.reset()
-    yield settings_mod
-    settings_mod._shutdown_limiter.reset()
+    def _reset():
+        settings_mod._shutdown_limiter.reset()
+
+    _reset()
+    yield _reset
+    _reset()
 
 
 def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
@@ -142,7 +149,7 @@ def test_device_actions_confirm_cancel_paths(
 
     # Clear the cooldown so the shutdown half of the journey can run in the
     # same test without tripping the 30s safety limiter.
-    reset_shutdown_limiter._shutdown_limiter.reset()
+    reset_shutdown_limiter()
 
     # Shutdown: open -> cancel. Still no additional backend action.
     shutdown_btn.click()

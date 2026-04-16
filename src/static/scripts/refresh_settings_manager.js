@@ -207,18 +207,13 @@ class RefreshSettingsManager {
             if (!data.refreshTime) {
                 return { valid: false, error: 'Please select a refresh time' };
             }
-            if (!/^\d{2}:\d{2}(:\d{2})?$/.test(data.refreshTime)) {
+            if (!/^\d{2}:\d{2}$/.test(data.refreshTime)) {
                 return { valid: false, error: 'Refresh time must be in HH:MM format' };
             }
-            const [hoursStr, minutesStr, secondsStr = '00'] = data.refreshTime.split(':');
+            const [hoursStr, minutesStr] = data.refreshTime.split(':');
             const hours = Number(hoursStr);
             const minutes = Number(minutesStr);
-            const seconds = Number(secondsStr);
-            if (
-                hours < 0 || hours > 23 ||
-                minutes < 0 || minutes > 59 ||
-                seconds < 0 || seconds > 59
-            ) {
+            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
                 return { valid: false, error: 'Refresh time must be in HH:MM format' };
             }
         }

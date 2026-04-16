@@ -92,7 +92,8 @@ def test_ai_image_validate_settings_rejects_provider_model_mismatch():
         }
     )
     assert error is not None
-    assert "Invalid image model for provider google" in error
+    assert "Invalid image model for provider" in error
+    assert "google" in error
 
 
 def test_ai_image_validate_settings_uses_default_model_for_openai():

@@ -237,6 +237,15 @@ def test_refresh_settings_manager_js_validates_interval_range():
     assert "between 1 and 999" in js
 
 
+def test_refresh_settings_manager_js_scheduled_time_hhmm_only():
+    """JS scheduled-time regex must match backend contract (HH:MM only, no seconds)."""
+    js = _read_js_asset("refresh_settings_manager.js")
+    # Strict HH:MM-only pattern must be present
+    assert r"/^\d{2}:\d{2}$/" in js
+    # The optional-seconds variant must NOT be present (it mismatches the backend)
+    assert r"(:\d{2})?" not in js
+
+
 # ---------------------------------------------------------------------------
 # Theme 5 — Diagnostics: human-readable benchmark + isolation messages
 # ---------------------------------------------------------------------------
