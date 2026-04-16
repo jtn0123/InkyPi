@@ -1,6 +1,97 @@
 # CHANGELOG
 
 
+## v0.60.1 (2026-04-16)
+
+### Bug Fixes
+
+- Use low-memory image loading in preview plugins
+  ([`a6c9d3c`](https://github.com/jtn0123/InkyPi/commit/a6c9d3cfa2769ca3f818f085b242af8f881006be))
+
+- **ci**: Lazy-import image_loader, close streamed responses, update tests
+  ([`47a9fcc`](https://github.com/jtn0123/InkyPi/commit/47a9fcc683ceab3df7aa654ded477c61638ed0b9))
+
+- Move AdaptiveImageLoader import from module-level to function scope in image_utils.py to avoid
+  eagerly pulling requests/PIL.ImageOps/psutil at startup (fixes lazy-import test violations per
+  JTN-606) - Wrap streamed http_get response in contextlib.closing() to prevent connection pool
+  leaks on low-memory devices - Track the actual rendered URL in APOD metadata instead of always
+  recording hdurl/url from the API response - Update test_wpotd_unit.py to mock
+  image_loader.from_url instead of the removed get_http_session code path - Tighten WPOTD test
+  assertion to verify full call contract - Run ruff/black formatting on all changed files
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+### Documentation
+
+- **readme**: Redesign landing page and expand fork comparison
+  ([`457f2c4`](https://github.com/jtn0123/InkyPi/commit/457f2c40e053f6df9eddc4338466741145634afe))
+
+Centered hero with tagline, condensed plugin table, prominent quick start, and a comprehensive
+  "What's New" section covering security, testing, install/update, UI/UX, accessibility,
+  performance, CI/CD, and developer experience improvements (1,100+ commits ahead of upstream).
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+
+### Testing
+
+- Add playlist and API key journey coverage ([#504](https://github.com/jtn0123/InkyPi/pull/504),
+  [`2077127`](https://github.com/jtn0123/InkyPi/commit/2077127bca3595ce630a06e27d1f902e42ddc62c))
+
+* test: add journey coverage for playlists and api keys (JTN-720 JTN-721 JTN-722)
+
+* fix(tests): align api-keys snapshot + register journey tests as browser-gated
+
+- Update test_api_keys_existing_row_uses_password_input to match the new placeholder text "(leave
+  blank to keep current)" introduced in JTN-722 when existing API-key rows became editable. The
+  previous "(unchanged)" text was the read-only-row wording and no longer applies. - Register
+  test_jtn_720_721_722_journeys.py in UI_BROWSER_TESTS so CI's default Tests (pytest) job skips it
+  when Playwright Chromium isn't installed (same pattern used by every other Playwright-dependent
+  file). The browser-smoke job still runs it via REQUIRE_BROWSER_SMOKE. - Apply Black formatting to
+  the two new integration test files.
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(tests): address Sonar + CodeRabbit feedback on JTN-720/721/722
+
+- Move _manual_update_direct test stub into browser_helpers.install_direct_manual_update so the
+  production imports (model, plugin_registry, image_utils, time_utils) are contained to the helpers
+  layer (fixes Sonar pythonarchitecture:S7788 x4). - Replace race-prone page.wait_for_timeout()
+  calls after reorder and delete with a _wait_for_plugin_order() poll against device_config so the
+  reload cannot run before the client-side save lands (CodeRabbit Minor race-condition). - Swap
+  aria-label for title on the playlist Edit button so the accessible name comes from the visible
+  "Edit" text, which resolves Web:S7927 without losing the per-playlist hint.
+
+Also resolves the rebase conflict in tests/conftest.py by keeping both the newly registered
+  test_playlist_roundtrip.py and test_jtn_720_721_722_journeys.py in BROWSER_TESTS.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+- **journey**: Update-flow happy path (JTN-724) ([#499](https://github.com/jtn0123/InkyPi/pull/499),
+  [`d6694a2`](https://github.com/jtn0123/InkyPi/commit/d6694a22c6e5bd91616f2beb6be76e729ea8885a))
+
+Adds the JTN-719 journey test for the happy-path update flow.
+
+What ships: - New tests/integration/journeys/test_update_flow_happy_path.py — Playwright journey
+  covering: navigate to /settings, activate Updates tab, click "Check for Updates", verify tag
+  rendered + badge says "Update available", click "Update Now", poll /settings/update_status, assert
+  running=True observed and running=False at terminal, assert last_failure cleared. - Extends
+  install/update.sh with a test-only INKYPI_UPDATE_TEST_SUCCESS_FAST env hook (mirrors JTN-704's
+  failure-injection pattern). When set, writes a structured success sentinel and exits 0 without
+  touching git/pip/systemctl. Production callers never set this; behavior is unchanged when unset. -
+  update.sh also now clears any stale .last-update-success sentinel at startup so a new update (test
+  or prod) cannot be misread as already-finished by a subsequent journey-test poll. Addresses
+  CodeRabbit major-severity finding from the original PR review. - Extends
+  tests/integration/test_update_failure_recovery.py with assertions for the new sentinel-clearing
+  behavior. - Registers the new test in tests/conftest.py UI_BROWSER_TESTS so CI jobs without
+  Chromium auto-skip cleanly.
+
+Closes JTN-724.
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.0 (2026-04-15)
 
 ### Features
