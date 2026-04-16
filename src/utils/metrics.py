@@ -42,17 +42,18 @@ except ModuleNotFoundError:
     class _NoopRegistry:
         """Placeholder registry accepted by fallback /metrics handling."""
 
-    def CollectorRegistry(*_: object, **__: object) -> _NoopRegistry:  # type: ignore[override]
-        return _NoopRegistry()
+    class _NoopRegistryFactory:
+        def __call__(self, *_: object, **__: object) -> _NoopRegistry:
+            return _NoopRegistry()
 
-    def Counter(*_: object, **__: object) -> _NoopMetric:  # type: ignore[override]
-        return _NoopMetric()
+    class _NoopMetricFactory:
+        def __call__(self, *_: object, **__: object) -> _NoopMetric:
+            return _NoopMetric()
 
-    def Gauge(*_: object, **__: object) -> _NoopMetric:  # type: ignore[override]
-        return _NoopMetric()
-
-    def Histogram(*_: object, **__: object) -> _NoopMetric:  # type: ignore[override]
-        return _NoopMetric()
+    CollectorRegistry = _NoopRegistryFactory()  # type: ignore[assignment]
+    Counter = _NoopMetricFactory()  # type: ignore[assignment]
+    Gauge = _NoopMetricFactory()  # type: ignore[assignment]
+    Histogram = _NoopMetricFactory()  # type: ignore[assignment]
 
     logger.warning(
         "prometheus_client is not installed; metrics collection is disabled."
