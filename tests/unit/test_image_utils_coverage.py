@@ -259,3 +259,110 @@ def test_fetch_and_resize_remote_image_raise_for_status():
         )
 
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _stream_to_disk tests
+# ---------------------------------------------------------------------------
+
+
+def test_stream_to_disk_writes_chunks_and_returns_path():
+    """_stream_to_disk should write streamed chunks to a temp file."""
+    import os
+
+    from utils.image_utils import _stream_to_disk
+
+    chunks = [b"chunk1", b"chunk2", b"chunk3"]
+    mock_response = Mock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.iter_content.return_value = iter(chunks)
+    mock_response.close = Mock()
+
+    with patch("utils.image_utils.http_get", return_value=mock_response):
+        with patch("utils.image_utils.pinned_dns"):
+            path = _stream_to_disk(
+                "http://example.com/img.png", 10.0, "example.com", ("1.2.3.4",)
+            )
+
+    try:
+        assert os.path.exists(path)
+        with open(path, "rb") as f:
+            assert f.read() == b"chunk1chunk2chunk3"
+    finally:
+        os.unlink(path)
+
+
+def test_stream_to_disk_raises_on_http_error():
+    """_stream_to_disk should propagate HTTP errors."""
+    from requests.exceptions import HTTPError
+
+    from utils.image_utils import _stream_to_disk
+
+    mock_response = Mock()
+    mock_response.raise_for_status.side_effect = HTTPError("500")
+    mock_response.close = Mock()
+
+    with patch("utils.image_utils.http_get", return_value=mock_response):
+        with patch("utils.image_utils.pinned_dns"):
+            try:
+                _stream_to_disk(
+                    "http://example.com/img.png", 10.0, "example.com", ("1.2.3.4",)
+                )
+                assert False, "Should have raised"
+            except HTTPError:
+                pass
+
+
+# ---------------------------------------------------------------------------
+# fetch_and_resize_remote_image low-memory path tests
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_and_resize_low_memory_success():
+    """Test the low-memory streaming path through fetch_and_resize_remote_image."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    fake_image = Image.new("RGB", (100, 50), color="green")
+
+    mock_loader = Mock()
+    mock_loader.is_low_resource = True
+    mock_loader.from_file.return_value = fake_image
+
+    with (
+        patch("utils.image_utils._stream_to_disk", return_value="/tmp/fake.img"),
+        patch("utils.image_utils.os.path.exists", return_value=True),
+        patch("utils.image_utils.os.unlink"),
+        patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is fake_image
+    mock_loader.from_file.assert_called_once_with(
+        "/tmp/fake.img", (100, 50), resize=True
+    )
+
+
+def test_fetch_and_resize_low_memory_cleans_up_on_failure():
+    """The low-memory path should delete the temp file even on error."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    mock_loader = Mock()
+    mock_loader.is_low_resource = True
+
+    with (
+        patch(
+            "utils.image_utils._stream_to_disk",
+            side_effect=Exception("download failed"),
+        ),
+        patch("utils.image_utils.os.path.exists", return_value=False),
+        patch("utils.image_utils.os.unlink") as mock_unlink,
+        patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None
+    mock_unlink.assert_not_called()

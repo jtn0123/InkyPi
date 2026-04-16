@@ -286,27 +286,21 @@ def test_download_image_success():
     from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
+    fake_image = Image.new("RGB", (10, 6), "white")
 
-    # Mock get_http_session to return a session with a mock get
-    mock_get = MagicMock()
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.content = _png_bytes()
-    mock_get.return_value = mock_response
-    mock_session = MagicMock()
-    mock_session.get = mock_get
+    with patch.object(
+        p.image_loader, "from_url", return_value=fake_image
+    ) as mock_from_url:
+        result = p._download_image("http://example.com/image.png")
 
-    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
-        # Mock PIL Image
-        with patch("plugins.wpotd.wpotd.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
-                MagicMock()
-            )
-
-            result = p._download_image("http://example.com/image.png")
-
-            assert result is not None
-            mock_get.assert_called_once()
+    assert result is fake_image
+    mock_from_url.assert_called_once_with(
+        "http://example.com/image.png",
+        dimensions=(4096, 4096),
+        timeout_ms=10000,
+        resize=False,
+        headers=p.HEADERS,
+    )
 
 
 def test_download_image_network_error():
@@ -315,39 +309,20 @@ def test_download_image_network_error():
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock get_http_session to return a session whose get raises
-    mock_session = MagicMock()
-    mock_session.get.side_effect = Exception("Network error")
-
-    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
+    with patch.object(p.image_loader, "from_url", return_value=None):
         with pytest.raises(RuntimeError, match="Failed to load WPOTD image"):
             p._download_image("http://example.com/image.png")
 
 
 def test_download_image_invalid_format():
     """Test _download_image with invalid image format."""
-    from PIL import UnidentifiedImageError
-
     from plugins.wpotd.wpotd import Wpotd
 
     p = Wpotd({"id": "wpotd"})
 
-    # Mock get_http_session to return a session with mock get
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.content = b"invalid_image_data"
-    mock_session = MagicMock()
-    mock_session.get.return_value = mock_response
-
-    with patch("plugins.wpotd.wpotd.get_http_session", return_value=mock_session):
-        # Mock PIL Image to raise UnidentifiedImageError
-        with patch("plugins.wpotd.wpotd.Image") as mock_image:
-            mock_image.open.side_effect = UnidentifiedImageError(
-                "Cannot identify image"
-            )
-
-            with pytest.raises(RuntimeError, match="Unsupported image format"):
-                p._download_image("http://example.com/image.png")
+    with patch.object(p.image_loader, "from_url", return_value=None):
+        with pytest.raises(RuntimeError, match="Failed to load WPOTD image"):
+            p._download_image("http://example.com/image.png")
 
 
 def test_fetch_image_src_success():

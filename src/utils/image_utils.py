@@ -131,6 +131,27 @@ def get_image(image_url, timeout_seconds: float = 10.0):
     return img
 
 
+def _stream_to_disk(url: str, timeout: float, hostname: str, pinned_ips: tuple) -> str:
+    """Download *url* to a temporary file via streaming and return its path.
+
+    The caller is responsible for deleting the file when done.  The response
+    is wrapped in ``contextlib.closing`` so the underlying connection is
+    returned to the pool promptly even on low-memory devices.
+    """
+    from contextlib import closing
+
+    with pinned_dns(hostname, pinned_ips):
+        with closing(
+            http_get(url, timeout=timeout, stream=True, use_cache=False)
+        ) as response:
+            response.raise_for_status()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".img") as tmp:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        tmp.write(chunk)
+                return tmp.name
+
+
 def fetch_and_resize_remote_image(
     image_url: str,
     dimensions: tuple[int, int],
@@ -149,7 +170,29 @@ def fetch_and_resize_remote_image(
 
     import urllib.parse as _urlparse
 
+    from utils.image_loader import AdaptiveImageLoader
+
     hostname = _urlparse.urlparse(validated_url).hostname or ""
+    loader = AdaptiveImageLoader()
+
+    # On low-memory devices, stream to disk first so large remote images do not
+    # require a full in-memory response buffer before Pillow can decode them.
+    if loader.is_low_resource:
+        tmp_path = None
+        try:
+            tmp_path = _stream_to_disk(
+                validated_url, timeout_seconds, hostname, pinned_ips
+            )
+            return loader.from_file(tmp_path, dimensions, resize=True)
+        except Exception as e:
+            logger.error(f"Failed to fetch remote image from {image_url}: {e}")
+            return None
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    logger.warning("Could not delete temp file %s", tmp_path)
 
     try:
         with pinned_dns(hostname, pinned_ips):
@@ -159,10 +202,7 @@ def fetch_and_resize_remote_image(
         logger.error(f"Failed to fetch remote image from {image_url}: {e}")
         return None
 
-    def _resize(img: Image.Image) -> Image.Image:
-        return img.resize(dimensions, LANCZOS).copy()
-
-    resized = process_image_from_bytes(response.content, _resize)
+    resized = loader.from_bytesio(BytesIO(response.content), dimensions, resize=True)
     if resized is None:
         logger.error(f"Failed to decode remote image from {image_url}")
     return resized

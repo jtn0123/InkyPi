@@ -18,15 +18,21 @@ def test_apod_success(
     api_resp.json.return_value = realistic_nasa_apod_response
 
     def fake_get(url, params=None, **kwargs):
-        if urlparse(url).netloc == "api.nasa.gov":
-            return api_resp
-        return fake_image_response
+        assert urlparse(url).netloc == "api.nasa.gov"
+        return api_resp
 
     mock_session = MagicMock()
     mock_session.get.side_effect = fake_get
     monkeypatch.setattr("plugins.apod.apod.get_http_session", lambda: mock_session)
 
-    img = Apod({"id": "apod"}).generate_image({}, device_config_dev)
+    plugin = Apod({"id": "apod"})
+    fake_image = MagicMock()
+    fake_image.size = (64, 64)
+    monkeypatch.setattr(
+        plugin.image_loader, "from_url", MagicMock(return_value=fake_image)
+    )
+
+    img = plugin.generate_image({}, device_config_dev)
     assert img.size[0] > 0
 
 
@@ -57,47 +63,28 @@ def test_apod_missing_key(client):
 def test_apod_success_via_client(mock_get_session, client):
     import os
 
+    from PIL import Image
+
     os.environ["NASA_SECRET"] = "test"
 
-    # Mock NASA APOD API response and image download
+    # Mock NASA APOD API response
     mock_session = MagicMock()
     mock_get_session.return_value = mock_session
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "media_type": "image",
+        "hdurl": "http://example.com/apod.png",
+    }
+    mock_session.get.return_value = mock_response
 
-    call_count = [0]
-
-    def fake_get(url, params=None, **kwargs):
-        call_count[0] += 1
-        if call_count[0] == 1:  # First call is to NASA API
-
-            class ApiResponse:
-                status_code = 200
-
-                def json(self):
-                    return {
-                        "media_type": "image",
-                        "hdurl": "http://example.com/apod.png",
-                    }
-
-            return ApiResponse()
-        # Second call is to download the image
-        from io import BytesIO
-
-        from PIL import Image
-
-        img = Image.new("RGB", (64, 64), "black")
-        buf = BytesIO()
-        img.save(buf, format="PNG")
-
-        class ImageResponse:
-            content = buf.getvalue()
-            status_code = 200
-
-        return ImageResponse()
-
-    mock_session.get.side_effect = fake_get
-
-    data = {"plugin_id": "apod"}
-    resp = client.post("/update_now", data=data)
+    fake_image = Image.new("RGB", (64, 64), "black")
+    with patch(
+        "plugins.base_plugin.base_plugin.AdaptiveImageLoader.from_url",
+        return_value=fake_image,
+    ):
+        data = {"plugin_id": "apod"}
+        resp = client.post("/update_now", data=data)
     assert resp.status_code == 200
 
 
@@ -120,32 +107,20 @@ def test_apod_randomize_date(monkeypatch, device_config_dev):
             "media_type": "image",
             "url": "http://example.com/apod.png",
         }
+        mock_session.get.side_effect = [mock_api_response]
 
-        # Mock image download response
-        mock_img_response = MagicMock()
-        mock_img_response.status_code = 200
-        mock_img_response.content = b"fake_image_data"
-
-        # Configure mock to return different responses
-        mock_session.get.side_effect = [mock_api_response, mock_img_response]
-
-        # Mock PIL Image
-        with patch("plugins.apod.apod.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
-                MagicMock()
-            )
-
-            p = Apod({"id": "apod"})
+        p = Apod({"id": "apod"})
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(p.image_loader, "from_url", return_value=fake_image):
             settings = {"randomizeApod": "true"}
-
             result = p.generate_image(settings, device_config_dev)
 
-            # Verify API was called with random date parameter
-            assert mock_session.get.call_count >= 2
-            api_call = mock_session.get.call_args_list[0]
-            assert urlparse(api_call[0][0]).netloc == "api.nasa.gov"
-            assert "date" in api_call[1]["params"]
-            assert result is not None
+        # Verify API was called with random date parameter
+        api_call = mock_session.get.call_args_list[0]
+        assert urlparse(api_call[0][0]).netloc == "api.nasa.gov"
+        assert "date" in api_call[1]["params"]
+        assert result is not None
 
 
 def test_apod_custom_date(monkeypatch, device_config_dev):
@@ -168,29 +143,20 @@ def test_apod_custom_date(monkeypatch, device_config_dev):
             "url": "http://example.com/apod.png",
         }
 
-        # Mock image download response
-        mock_img_response = MagicMock()
-        mock_img_response.status_code = 200
-        mock_img_response.content = b"fake_image_data"
+        mock_session.get.side_effect = [mock_api_response]
 
-        mock_session.get.side_effect = [mock_api_response, mock_img_response]
-
-        # Mock PIL Image
-        with patch("plugins.apod.apod.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
-                MagicMock()
-            )
-
-            p = Apod({"id": "apod"})
+        p = Apod({"id": "apod"})
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(p.image_loader, "from_url", return_value=fake_image):
             custom_date = "2023-12-25"
             settings = {"customDate": custom_date}
-
             result = p.generate_image(settings, device_config_dev)
 
-            # Verify API was called with custom date
-            api_call = mock_session.get.call_args_list[0]
-            assert api_call[1]["params"]["date"] == custom_date
-            assert result is not None
+        # Verify API was called with custom date
+        api_call = mock_session.get.call_args_list[0]
+        assert api_call[1]["params"]["date"] == custom_date
+        assert result is not None
 
 
 def test_apod_api_error_response(device_config_dev, monkeypatch):
@@ -216,8 +182,8 @@ def test_apod_api_error_response(device_config_dev, monkeypatch):
             p.generate_image({}, device_config_dev)
 
 
-def test_apod_hdurl_preference(device_config_dev, monkeypatch):
-    """Test APOD plugin prefers HD URL over regular URL."""
+def test_apod_hdurl_preference_on_non_low_resource(device_config_dev, monkeypatch):
+    """Test APOD plugin prefers HD URL on non-low-resource devices."""
     from plugins.apod.apod import Apod
 
     # Mock env key
@@ -237,30 +203,57 @@ def test_apod_hdurl_preference(device_config_dev, monkeypatch):
             "hdurl": "http://example.com/high_res.png",
         }
 
-        # Mock image download response
-        mock_img_response = MagicMock()
-        mock_img_response.status_code = 200
-        mock_img_response.content = b"fake_hd_image_data"
+        mock_session.get.side_effect = [mock_api_response]
 
-        mock_session.get.side_effect = [mock_api_response, mock_img_response]
-
-        # Mock PIL Image
-        with patch("plugins.apod.apod.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
-                MagicMock()
-            )
-
-            p = Apod({"id": "apod"})
+        p = Apod({"id": "apod"})
+        p.image_loader.is_low_resource = False
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(
+            p.image_loader, "from_url", return_value=fake_image
+        ) as mock_from_url:
             result = p.generate_image({}, device_config_dev)
 
-            # Verify HD URL was requested
-            image_call = mock_session.get.call_args_list[1]
-            assert image_call[0][0] == "http://example.com/high_res.png"
-            assert result is not None
+        assert mock_from_url.call_args.args[0] == "http://example.com/high_res.png"
+        assert result is not None
+
+
+def test_apod_prefers_regular_url_on_low_resource_device(
+    device_config_dev, monkeypatch
+):
+    """Low-memory devices should avoid NASA's HD asset when a regular URL exists."""
+    from plugins.apod.apod import Apod
+
+    monkeypatch.setattr(device_config_dev, "load_env_key", lambda key: "test_key")
+
+    with patch("plugins.apod.apod.get_http_session") as mock_get_session:
+        mock_session = MagicMock()
+        mock_get_session.return_value = mock_session
+
+        mock_api_response = MagicMock()
+        mock_api_response.status_code = 200
+        mock_api_response.json.return_value = {
+            "media_type": "image",
+            "url": "http://example.com/low_res.png",
+            "hdurl": "http://example.com/high_res.png",
+        }
+        mock_session.get.side_effect = [mock_api_response]
+
+        p = Apod({"id": "apod"})
+        p.image_loader.is_low_resource = True
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(
+            p.image_loader, "from_url", return_value=fake_image
+        ) as mock_from_url:
+            result = p.generate_image({}, device_config_dev)
+
+        assert mock_from_url.call_args.args[0] == "http://example.com/low_res.png"
+        assert result is not None
 
 
 def test_apod_image_download_failure(device_config_dev, monkeypatch):
-    """Test APOD plugin with image download failure."""
+    """Test APOD plugin errors when no candidate image URL can be loaded."""
     from plugins.apod.apod import Apod
 
     # Mock env key
@@ -279,19 +272,10 @@ def test_apod_image_download_failure(device_config_dev, monkeypatch):
             "url": "http://example.com/apod.png",
         }
 
-        # Mock image download failure
-        mock_img_response = MagicMock()
-        mock_img_response.status_code = 200
-        mock_img_response.content = b"invalid_image_data"
+        mock_session.get.side_effect = [mock_api_response]
 
-        mock_session.get.side_effect = [mock_api_response, mock_img_response]
-
-        # Mock PIL Image to raise exception
-        with patch("plugins.apod.apod.Image") as mock_image:
-            mock_image.open.side_effect = Exception("Invalid image format")
-
-            p = Apod({"id": "apod"})
-
+        p = Apod({"id": "apod"})
+        with patch.object(p.image_loader, "from_url", return_value=None):
             with pytest.raises(RuntimeError, match="Failed to load APOD image"):
                 p.generate_image({}, device_config_dev)
 
@@ -311,8 +295,10 @@ def test_apod_settings_template():
     assert "settings_schema" in template
 
 
-def test_apod_image_download_timeout(device_config_dev, monkeypatch):
-    """Test APOD plugin with image download timeout."""
+def test_apod_falls_back_to_second_url_when_first_load_fails(
+    device_config_dev, monkeypatch
+):
+    """APOD should try the alternate URL if the preferred one fails to load."""
     from plugins.apod.apod import Apod
 
     # Mock env key
@@ -331,15 +317,29 @@ def test_apod_image_download_timeout(device_config_dev, monkeypatch):
             "url": "http://example.com/apod.png",
         }
 
-        mock_session.get.side_effect = [
-            mock_api_response,
-            Exception("Image download timeout"),
-        ]
+        mock_api_response.json.return_value = {
+            "media_type": "image",
+            "url": "http://example.com/low_res.png",
+            "hdurl": "http://example.com/high_res.png",
+        }
+        mock_session.get.side_effect = [mock_api_response]
 
         p = Apod({"id": "apod"})
+        p.image_loader.is_low_resource = False
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(
+            p.image_loader,
+            "from_url",
+            side_effect=[None, fake_image],
+        ) as mock_from_url:
+            result = p.generate_image({}, device_config_dev)
 
-        with pytest.raises(RuntimeError, match="Failed to load APOD image"):
-            p.generate_image({}, device_config_dev)
+        assert [call.args[0] for call in mock_from_url.call_args_list] == [
+            "http://example.com/high_res.png",
+            "http://example.com/low_res.png",
+        ]
+        assert result is fake_image
 
 
 def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
@@ -363,23 +363,15 @@ def test_apod_missing_hdurl_fallback(device_config_dev, monkeypatch):
             # No hdurl field
         }
 
-        # Mock image download response
-        mock_img_response = MagicMock()
-        mock_img_response.status_code = 200
-        mock_img_response.content = b"fake_image_data"
+        mock_session.get.side_effect = [mock_api_response]
 
-        mock_session.get.side_effect = [mock_api_response, mock_img_response]
-
-        # Mock PIL Image
-        with patch("plugins.apod.apod.Image") as mock_image:
-            mock_image.open.return_value.__enter__.return_value.copy.return_value = (
-                MagicMock()
-            )
-
-            p = Apod({"id": "apod"})
+        p = Apod({"id": "apod"})
+        fake_image = MagicMock()
+        fake_image.size = (64, 64)
+        with patch.object(
+            p.image_loader, "from_url", return_value=fake_image
+        ) as mock_from_url:
             result = p.generate_image({}, device_config_dev)
 
-            # Verify regular URL was requested
-            image_call = mock_session.get.call_args_list[1]
-            assert image_call[0][0] == "http://example.com/low_res.png"
-            assert result is not None
+        assert mock_from_url.call_args.args[0] == "http://example.com/low_res.png"
+        assert result is not None

@@ -3,7 +3,6 @@ import logging
 from io import BytesIO
 
 from openai import OpenAI
-from PIL import Image
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import (
@@ -236,8 +235,12 @@ class AIImage(BasePlugin):
         response = ai_client.images.generate(**args)
         image_base64 = response.data[0].b64_json
         image_bytes = base64.b64decode(image_base64)
-        with Image.open(BytesIO(image_bytes)) as opened_img:
-            return opened_img.copy()
+        image = self.image_loader.from_bytesio(
+            BytesIO(image_bytes), (1536, 1536), resize=False
+        )
+        if image is None:
+            raise RuntimeError("Failed to decode generated image")
+        return image
 
     def fetch_image_google(self, client, prompt, model):
         """Fetch image from Google Imagen API."""
@@ -262,9 +265,14 @@ class AIImage(BasePlugin):
         )
         if not response.generated_images:
             raise RuntimeError("Google Imagen returned no images")
-        return Image.open(
-            BytesIO(response.generated_images[0].image.image_bytes)
-        ).copy()
+        image = self.image_loader.from_bytesio(
+            BytesIO(response.generated_images[0].image.image_bytes),
+            (1536, 1536),
+            resize=False,
+        )
+        if image is None:
+            raise RuntimeError("Failed to decode generated image")
+        return image
 
     @staticmethod
     def fetch_image_prompt(ai_client, from_prompt=None):
