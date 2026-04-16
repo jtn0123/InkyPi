@@ -20,16 +20,19 @@ from plugins.base_plugin.settings_schema import (
 
 logger = logging.getLogger(__name__)
 
+OPENAI_IMAGE_MODEL = "gpt-image-1.5"
+GOOGLE_IMAGE_MODEL = "imagen-4.0-generate-001"
+
 IMAGE_MODELS_BY_PROVIDER = {
-    "openai": ("gpt-image-1.5",),
-    "google": ("imagen-4.0-generate-001",),
+    "openai": (OPENAI_IMAGE_MODEL,),
+    "google": (GOOGLE_IMAGE_MODEL,),
 }
 IMAGE_MODELS = [
     model
     for provider_models in IMAGE_MODELS_BY_PROVIDER.values()
     for model in provider_models
 ]
-DEFAULT_IMAGE_MODEL = "gpt-image-1.5"
+DEFAULT_IMAGE_MODEL = OPENAI_IMAGE_MODEL
 DEFAULT_IMAGE_QUALITY = "medium"
 
 
@@ -99,7 +102,7 @@ class AIImage(BasePlugin):
                             ],
                             "google": [
                                 option(
-                                    "imagen-4.0-generate-001",
+                                    GOOGLE_IMAGE_MODEL,
                                     "Imagen 4 \u00b7 ~$0.04/img",
                                 ),
                             ],
@@ -120,7 +123,7 @@ class AIImage(BasePlugin):
                                 option("medium", "Medium (~$0.07)"),
                                 option("low", "Low (~$0.01)"),
                             ],
-                            "imagen-4.0-generate-001": [
+                            GOOGLE_IMAGE_MODEL: [
                                 option("standard", "Standard"),
                             ],
                         },
@@ -143,17 +146,12 @@ class AIImage(BasePlugin):
         }
         return template_params
 
-    def generate_image(self, settings, device_config):
-        logger.info("=== AI Image Plugin: Starting image generation ===")
-
-        provider = settings.get("provider", "openai")
-        text_prompt = settings.get("textPrompt", "")
+    def _validate_generate_inputs(self, settings, provider):
         image_model = (settings.get("imageModel") or DEFAULT_IMAGE_MODEL).strip()
         allowed_models = IMAGE_MODELS_BY_PROVIDER.get(provider)
         if not allowed_models:
             logger.error(f"Invalid provider for AI image plugin: {provider}")
             raise RuntimeError("Invalid provider provided.")
-
         if image_model not in allowed_models:
             logger.error(
                 "Invalid image model %s for provider %s",
@@ -161,8 +159,74 @@ class AIImage(BasePlugin):
                 provider,
             )
             raise RuntimeError("Invalid Image Model provided.")
+        return image_model, settings.get("quality", DEFAULT_IMAGE_QUALITY)
 
-        image_quality = settings.get("quality", DEFAULT_IMAGE_QUALITY)
+    def _maybe_randomize_google_prompt(
+        self, google_client, text_prompt, randomize_prompt
+    ):
+        if not randomize_prompt:
+            return text_prompt
+        logger.debug("Generating randomized prompt using Gemini...")
+        randomized = AIImage.fetch_image_prompt_google(google_client, text_prompt)
+        logger.info(f"Randomized prompt: '{randomized}'")
+        return randomized
+
+    def _maybe_randomize_openai_prompt(self, ai_client, text_prompt, randomize_prompt):
+        if not randomize_prompt:
+            return text_prompt
+        logger.debug("Generating randomized prompt using GPT...")
+        randomized = AIImage.fetch_image_prompt(ai_client, text_prompt)
+        logger.info(f"Randomized prompt: '{randomized}'")
+        return randomized
+
+    def _generate_google_image(
+        self, device_config, text_prompt, image_model, randomize
+    ):
+        api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
+        if not api_key:
+            logger.error("Google AI API Key not configured")
+            raise RuntimeError("Google AI API Key not configured.")
+
+        from google import genai
+
+        google_client = genai.Client(api_key=api_key)
+        prompt = self._maybe_randomize_google_prompt(
+            google_client, text_prompt, randomize
+        )
+        logger.info(f"Generating image with {image_model}...")
+        return self.fetch_image_google(google_client, prompt, image_model)
+
+    def _generate_openai_image(
+        self,
+        device_config,
+        text_prompt,
+        image_model,
+        image_quality,
+        orientation,
+        randomize,
+    ):
+        api_key = device_config.load_env_key("OPEN_AI_SECRET")
+        if not api_key:
+            logger.error("OpenAI API Key not configured")
+            raise RuntimeError("OpenAI API Key not configured.")
+
+        ai_client = OpenAI(api_key=api_key)
+        prompt = self._maybe_randomize_openai_prompt(ai_client, text_prompt, randomize)
+        logger.info(f"Generating image with {image_model}...")
+        return self.fetch_image(
+            ai_client,
+            prompt,
+            model=image_model,
+            quality=image_quality,
+            orientation=orientation,
+        )
+
+    def generate_image(self, settings, device_config):
+        logger.info("=== AI Image Plugin: Starting image generation ===")
+
+        provider = settings.get("provider", "openai")
+        text_prompt = settings.get("textPrompt", "")
+        image_model, image_quality = self._validate_generate_inputs(settings, provider)
         randomize_prompt = settings.get("randomizePrompt") == "true"
         orientation = device_config.get_config("orientation")
 
@@ -173,44 +237,20 @@ class AIImage(BasePlugin):
         image = None
         try:
             if provider == "google":
-                api_key = device_config.load_env_key("GOOGLE_AI_SECRET")
-                if not api_key:
-                    logger.error("Google AI API Key not configured")
-                    raise RuntimeError("Google AI API Key not configured.")
-
-                from google import genai
-
-                google_client = genai.Client(api_key=api_key)
-
-                if randomize_prompt:
-                    logger.debug("Generating randomized prompt using Gemini...")
-                    text_prompt = AIImage.fetch_image_prompt_google(
-                        google_client, text_prompt
-                    )
-                    logger.info(f"Randomized prompt: '{text_prompt}'")
-
-                logger.info(f"Generating image with {image_model}...")
-                image = self.fetch_image_google(google_client, text_prompt, image_model)
-            else:
-                api_key = device_config.load_env_key("OPEN_AI_SECRET")
-                if not api_key:
-                    logger.error("OpenAI API Key not configured")
-                    raise RuntimeError("OpenAI API Key not configured.")
-
-                ai_client = OpenAI(api_key=api_key)
-
-                if randomize_prompt:
-                    logger.debug("Generating randomized prompt using GPT...")
-                    text_prompt = AIImage.fetch_image_prompt(ai_client, text_prompt)
-                    logger.info(f"Randomized prompt: '{text_prompt}'")
-
-                logger.info(f"Generating image with {image_model}...")
-                image = self.fetch_image(
-                    ai_client,
+                image = self._generate_google_image(
+                    device_config,
                     text_prompt,
-                    model=image_model,
-                    quality=image_quality,
-                    orientation=orientation,
+                    image_model,
+                    randomize_prompt,
+                )
+            else:
+                image = self._generate_openai_image(
+                    device_config,
+                    text_prompt,
+                    image_model,
+                    image_quality,
+                    orientation,
+                    randomize_prompt,
                 )
 
             if image:
