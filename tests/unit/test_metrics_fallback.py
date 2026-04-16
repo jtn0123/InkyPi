@@ -5,6 +5,7 @@ from __future__ import annotations
 import builtins
 import importlib
 import sys
+from collections.abc import Callable
 from types import ModuleType
 
 
@@ -24,7 +25,9 @@ def _block_prometheus_imports(monkeypatch) -> None:
             monkeypatch.delitem(sys.modules, module_name, raising=False)
 
 
-def _import_fallback_modules(monkeypatch) -> tuple[ModuleType, ModuleType, callable]:
+def _import_fallback_modules(
+    monkeypatch,
+) -> tuple[ModuleType, ModuleType, Callable[[], None]]:
     original_metrics_module = sys.modules.get("utils.metrics")
     original_blueprints_metrics_module = sys.modules.get("blueprints.metrics")
 
@@ -53,6 +56,10 @@ def test_metrics_helpers_work_without_prometheus(monkeypatch):
     try:
         assert metrics_module._PROMETHEUS_AVAILABLE is False
 
+        assert (
+            metrics_module.refreshes_total.labels("success")
+            is metrics_module.refreshes_total
+        )
         metrics_module.record_refresh_success()
         metrics_module.record_refresh_failure("fallback_plugin")
         metrics_module.set_circuit_breaker_open("fallback_plugin", True)

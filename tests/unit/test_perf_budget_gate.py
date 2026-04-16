@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from scripts import perf_budget_gate as gate
 
 
@@ -43,6 +45,26 @@ def test_plugin_render_budget_ignores_non_plugin_render_group():
     ]
     failures = gate.evaluate_plugin_render_budget(benches, max_median_ms=2000)
     assert failures == []
+
+
+def test_load_benchmarks_returns_empty_for_missing_file(tmp_path):
+    missing = tmp_path / "missing-benchmarks.json"
+    assert gate._load_benchmarks(str(missing)) == []
+
+
+def test_load_benchmarks_returns_empty_for_invalid_json(tmp_path):
+    invalid = tmp_path / "invalid-benchmarks.json"
+    invalid.write_text("{not-json", encoding="utf-8")
+    assert gate._load_benchmarks(str(invalid)) == []
+
+
+def test_load_benchmarks_filters_non_mapping_rows(tmp_path):
+    bench_file = tmp_path / "benchmarks.json"
+    bench_file.write_text(
+        json.dumps({"benchmarks": [{"name": "ok"}, "bad-row", 123]}),
+        encoding="utf-8",
+    )
+    assert gate._load_benchmarks(str(bench_file)) == [{"name": "ok"}]
 
 
 def test_cold_start_budget_uses_median():

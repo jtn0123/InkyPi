@@ -295,7 +295,8 @@
         (row) => row.querySelector(".apikey-key")?.value.trim() === key
       );
       if (existingRow) {
-        existingRow.querySelector(".apikey-value, .apikey-key")?.focus();
+        const valueInput = existingRow.querySelector(".apikey-value");
+        (valueInput || existingRow.querySelector(".apikey-key"))?.focus();
         showResponseModal("info", `${key} is already added.`);
         return;
       }

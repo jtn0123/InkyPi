@@ -45,9 +45,13 @@ def _make_diag_app(device_config, refresh_task) -> Flask:
     return app
 
 
-def _run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
+def _load_migrated_config(config_path: Path, monkeypatch) -> config_mod.Config:
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_path))
-    cfg = config_mod.Config()
+    return config_mod.Config()
+
+
+def _run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
+    cfg = _load_migrated_config(config_path, monkeypatch)
 
     # Service healthy + config valid after migration load.
     validate_device_config(cfg.get_config())
@@ -125,7 +129,9 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
     runtime_config = tmp_path / "broken-device.json"
     runtime_config.write_text(json.dumps(broken), encoding="utf-8")
 
-    loaded_config, _diagnostics = _run_upgrade_hop(runtime_config, monkeypatch)
+    cfg = _load_migrated_config(runtime_config, monkeypatch)
+    loaded_config = cfg.get_config()
+    validate_device_config(loaded_config)
 
     with pytest.raises((AssertionError, KeyError), match="timezone"):
         _assert_baseline_preserved(

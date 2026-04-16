@@ -20,8 +20,11 @@ from pathlib import Path
 
 
 def _load_benchmarks(path: str) -> list[dict]:
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
     rows = data.get("benchmarks", [])
     if not isinstance(rows, list):
         return []

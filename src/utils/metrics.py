@@ -27,7 +27,7 @@ except ModuleNotFoundError:
     class _NoopMetric:
         """Small no-op shim used when prometheus_client is unavailable."""
 
-        def labels(self, **_: object) -> _NoopMetric:
+        def labels(self, *_: object, **__: object) -> _NoopMetric:
             return self
 
         def inc(self, _: float = 1.0) -> None:
