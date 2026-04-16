@@ -66,6 +66,20 @@ MANAGED_API_KEY_ENV_VARS = (
 )
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        default=False,
+        help="Regenerate tests/snapshots baselines instead of asserting diffs.",
+    )
+
+
+def pytest_configure(config):
+    if config.getoption("--update-snapshots"):
+        os.environ["SNAPSHOT_UPDATE"] = "1"
+
+
 def _is_truthy(value: str) -> bool:
     return value.strip().lower() in ("1", "true", "yes")
 

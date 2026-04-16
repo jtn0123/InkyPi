@@ -5,9 +5,8 @@ Run from the project root:
 
     python scripts/update_snapshots.py
 
-The script sets SNAPSHOT_UPDATE=1 and re-executes the snapshot tests via
-pytest so every assert_image_snapshot() call writes a fresh PNG + digest
-instead of comparing against the existing one.
+The script re-executes snapshot tests with ``--update-snapshots`` so every
+assert_image_snapshot() call writes fresh baseline PNGs instead of comparing.
 
 Pass --yes / -y to skip the confirmation prompt (e.g. in CI pipelines where
 intentional regeneration is desired):
@@ -43,7 +42,7 @@ def main() -> int:
             print("Aborted.")
             return 1
 
-    env = {**os.environ, "SNAPSHOT_UPDATE": "1", "SKIP_BROWSER": "1"}
+    env = {**os.environ}
 
     cmd = [
         sys.executable,
@@ -53,6 +52,7 @@ def main() -> int:
         "-v",
         "--no-header",
         "--tb=short",
+        "--update-snapshots",
     ]
 
     print("Running:", " ".join(cmd))

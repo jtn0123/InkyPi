@@ -232,3 +232,18 @@ def test_mock_display_default_output_dir_under_runtime(monkeypatch, device_confi
     display = MockDisplay(device_config_dev)
     assert os.path.basename(display.output_dir) == "mock_display_output"
     assert os.path.basename(os.path.dirname(display.output_dir)) == "runtime"
+
+
+def test_mock_display_writes_simulated_frame(monkeypatch, device_config_dev, tmp_path):
+    device_config_dev.update_value("display_type", "mock")
+    device_config_dev.update_value("output_dir", str(tmp_path / "mock_output"))
+    frame_path = tmp_path / "mock_frame.png"
+    monkeypatch.setenv("INKYPI_MOCK_FRAME_PATH", str(frame_path))
+
+    from display.mock_display import MockDisplay
+
+    display = MockDisplay(device_config_dev)
+    display.display_image(Image.new("RGB", (120, 80), "blue"))
+
+    assert frame_path.exists()
+    assert (tmp_path / "mock_output" / "latest_simulated.png").exists()
