@@ -130,7 +130,9 @@ def _compute_diff_stats(
     )
 
 
-def _build_diff_overlay(expected_image: Image.Image, changed_mask: np.ndarray) -> Image.Image:
+def _build_diff_overlay(
+    expected_image: Image.Image, changed_mask: np.ndarray
+) -> Image.Image:
     base = expected_image.convert("RGBA")
     overlay = Image.new("RGBA", base.size, (255, 0, 0, 0))
     alpha_mask = Image.fromarray((changed_mask.astype(np.uint8) * 160), mode="L")

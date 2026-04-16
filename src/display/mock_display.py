@@ -27,14 +27,12 @@ class MockDisplay(AbstractDisplay):
             )
         self.output_dir = device_config.get_config("output_dir", default_output_dir)
         os.makedirs(self.output_dir, exist_ok=True)
-        self.mock_frame_path = (
-            os.getenv("INKYPI_MOCK_FRAME_PATH")
-            or device_config.get_config("mock_frame_path", "/tmp/inkypi-mock-frame.png")
-        )
-        self.mock_frame_profile = (
-            os.getenv("INKYPI_MOCK_FRAME_PROFILE")
-            or device_config.get_config("mock_frame_profile", "tricolor")
-        )
+        self.mock_frame_path = os.getenv(
+            "INKYPI_MOCK_FRAME_PATH"
+        ) or device_config.get_config("mock_frame_path", "/tmp/inkypi-mock-frame.png")
+        self.mock_frame_profile = os.getenv(
+            "INKYPI_MOCK_FRAME_PROFILE"
+        ) or device_config.get_config("mock_frame_profile", "tricolor")
         os.makedirs(os.path.dirname(self.mock_frame_path) or ".", exist_ok=True)
 
     def initialize_display(self):
