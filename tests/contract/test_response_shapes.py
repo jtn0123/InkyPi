@@ -231,20 +231,25 @@ def test_job_status_shape(client):
     job_id = start_body.get("job_id")
     assert isinstance(job_id, str) and job_id
 
-    # Poll briefly until terminal state; queue states are pending/running/done/error.
+    # Poll until terminal state; queue states are pending/running/done/error.
+    # CI runners can be noisy, so allow a modest wall-clock timeout.
     import time
 
     final = None
-    for _ in range(120):
+    deadline = time.monotonic() + 8.0
+    while time.monotonic() < deadline:
         body = _get_json(client, f"/api/job/{job_id}")
         assert_shape(body, JobStatusResponse)
         status = body.get("status")
         if status in {"done", "error"}:
             final = body
             break
-        time.sleep(0.01)
+        time.sleep(0.025)
 
-    assert isinstance(final, dict), "job did not reach done/error state in time"
+    assert isinstance(final, dict), (
+        "job did not reach done/error state in time; "
+        f"last_status={body.get('status')!r} body={body!r}"
+    )
     assert final.get("status") == "done", f"async update job failed: {final!r}"
 
 

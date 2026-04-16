@@ -52,7 +52,9 @@ def evaluate_plugin_render_budget(
         return ["No plugin-render benchmarks found in benchmark JSON"]
 
     for name, median_ms in rows:
-        print(f"plugin-render: {name} median={median_ms:.2f}ms (budget {max_median_ms:.2f}ms)")
+        print(
+            f"plugin-render: {name} median={median_ms:.2f}ms (budget {max_median_ms:.2f}ms)"
+        )
         if median_ms > max_median_ms:
             failures.append(
                 f"{name} median {median_ms:.2f}ms exceeds plugin-render budget {max_median_ms:.2f}ms"
@@ -94,9 +96,7 @@ def evaluate_cold_start_budget(runs_s: list[float], max_median_s: float) -> list
     median_s = statistics.median(runs_s)
     print(f"cold-start median: {median_s:.3f}s (budget {max_median_s:.3f}s)")
     if median_s > max_median_s:
-        return [
-            f"cold-start median {median_s:.3f}s exceeds budget {max_median_s:.3f}s"
-        ]
+        return [f"cold-start median {median_s:.3f}s exceeds budget {max_median_s:.3f}s"]
     return []
 
 

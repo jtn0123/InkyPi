@@ -73,7 +73,8 @@ def test_frontend_json_routes_are_documented_in_openapi(client):
     paths = set(spec.get("paths", {}).keys())
 
     missing = [path for path in _FRONTEND_OPENAPI_PATHS if path not in paths]
-    assert not missing, (
-        "OpenAPI spec is missing frontend-consumed JSON routes:\n- "
-        + "\n- ".join(missing)
+    assert (
+        not missing
+    ), "OpenAPI spec is missing frontend-consumed JSON routes:\n- " + "\n- ".join(
+        missing
     )
