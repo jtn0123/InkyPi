@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v0.60.6 (2026-04-16)
+
+### Bug Fixes
+
+- Dogfood pass 3 — validation, accessibility, UX (JTN-349)
+  ([#509](https://github.com/jtn0123/InkyPi/pull/509),
+  [`0d784bd`](https://github.com/jtn0123/InkyPi/commit/0d784bdccb9718fa1515b888e27a8788bbc5301f))
+
+* fix: dogfood pass 3 — validation, accessibility, and UX consistency (JTN-349)
+
+Theme 1 (Form validation): Improve client-side form_validator.js to produce specific error messages
+  for number range violations (e.g. "must be at least 1" instead of generic "is invalid").
+
+Theme 2 (Silent persistence): Restructure plugin.py validation blocks so validate_settings errors
+  are never silently swallowed by a broad except Exception. Each validation step now has its own
+  try/except that logs at WARNING and returns a 400 error to the user.
+
+Theme 3 (Accessibility): Add proper <label> elements for calendar URL inputs in both the
+  server-rendered template and the JS-created dynamic entries.
+
+Theme 4 (UX consistency): Align "Background" label to "Background Fill" across image_folder and
+  image_album plugins to match image_upload.
+
+Themes 5 and 6 were already addressed in prior commits (inline update badge and page clamping).
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+* fix(lint): apply black formatting and ruff set comprehension fix
+
+* test(coverage): boost new-code coverage and sanitize plugin_id log injection
+
+Addresses SonarCloud Quality Gate failures on PR #509:
+
+- pythonsecurity:S5145: wrap plugin_id with sanitize_log_field() in the two new exception-handler
+  log calls (src/blueprints/plugin.py) so CRLF-laden user input cannot forge log lines. - Coverage
+  on New Code: add 70+ tests exercising previously untested new branches — APOD validate_settings /
+  _request_timeout / _candidate_image_urls; WPOTD validate_settings; AI Image decode-failure paths;
+  fetch_and_resize low-memory cleanup/OSError branches; plugin.py validation-exception paths (both
+  save and update_plugin_instance routes, JSON + HTMX variants); image_folder
+  unreadable/no-image-files branches; calendar dynamic-entry label numbering; form_validator
+  classifyInvalid/describeReason reasons.
+
+---------
+
+Co-authored-by: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+
+
 ## v0.60.5 (2026-04-16)
 
 ### Bug Fixes
