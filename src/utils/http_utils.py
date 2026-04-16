@@ -387,6 +387,59 @@ def _resolve_timeout(
     return DEFAULT_TIMEOUT_SECONDS
 
 
+def _try_cache_lookup(url: str, params: dict[str, Any] | None) -> Any:
+    """Return a cached response for *url* + *params*, or ``None``."""
+    try:
+        from utils.http_cache import get_cache
+
+        cache = get_cache()
+        return cache.get(url, params)
+    except Exception:
+        return None
+
+
+def _try_cache_store(
+    url: str, resp: Any, params: dict[str, Any] | None, cache_ttl: float | None
+) -> None:
+    """Silently store *resp* in the HTTP cache."""
+    try:
+        from utils.http_cache import get_cache
+
+        cache = get_cache()
+        cache.put(url, resp, params, ttl=cache_ttl)
+    except Exception:
+        pass
+
+
+def _log_latency_on_error(url: str, t0: float, ex: Exception) -> None:
+    """Log a warning about a failed HTTP GET with elapsed time."""
+    elapsed_ms = int((perf_counter() - t0) * 1000)
+    try:
+        logger.warning(
+            "HTTP GET failed | url=%s elapsed_ms=%s error=%s",
+            url,
+            elapsed_ms,
+            type(ex).__name__,
+        )
+    except Exception:
+        pass
+
+
+def _log_latency_on_success(url: str, resp: Any, t0: float, stream: bool) -> None:
+    """Log an info message about a successful HTTP GET with elapsed time."""
+    try:
+        elapsed_ms = int((perf_counter() - t0) * 1000)
+        logger.info(
+            "HTTP GET | url=%s status=%s elapsed_ms=%s bytes=%s",
+            url,
+            getattr(resp, "status_code", "?"),
+            elapsed_ms,
+            len(getattr(resp, "content", b"")) if not stream else 0,
+        )
+    except Exception:
+        pass
+
+
 def http_get(
     url: str,
     *,
@@ -425,28 +478,19 @@ def http_get(
 
     # Check cache first (unless streaming or caching disabled)
     if use_cache and not stream:
-        try:
-            from utils.http_cache import get_cache
-
-            cache = get_cache()
-            cached_response = cast(requests.Response, cache.get(url, params))
-            if cached_response is not None:
-                return cached_response
-        except Exception:
-            # Cache errors shouldn't break requests
-            pass
+        cached_response = cast(requests.Response, _try_cache_lookup(url, params))
+        if cached_response is not None:
+            return cached_response
 
     session = get_shared_session()
     final_headers = dict(DEFAULT_HEADERS)
     if headers:
         final_headers.update(headers)
 
-    # Determine timeout to use
     effective_timeout = _resolve_timeout(
         timeout, CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
     )
 
-    # Optional latency logging
     log_latency = _env_bool("INKYPI_HTTP_LOG_LATENCY", False)
     t0 = perf_counter() if log_latency else 0.0
     try:
@@ -460,41 +504,14 @@ def http_get(
         )
     except Exception as ex:
         if log_latency:
-            elapsed_ms = int((perf_counter() - t0) * 1000)
-            try:
-                logger.warning(
-                    "HTTP GET failed | url=%s elapsed_ms=%s error=%s",
-                    url,
-                    elapsed_ms,
-                    type(ex).__name__,
-                )
-            except Exception:
-                pass
+            _log_latency_on_error(url, t0, ex)
         raise
 
     if log_latency:
-        try:
-            elapsed_ms = int((perf_counter() - t0) * 1000)
-            logger.info(
-                "HTTP GET | url=%s status=%s elapsed_ms=%s bytes=%s",
-                url,
-                getattr(resp, "status_code", "?"),
-                elapsed_ms,
-                len(getattr(resp, "content", b"")) if not stream else 0,
-            )
-        except Exception:
-            pass
+        _log_latency_on_success(url, resp, t0, stream)
 
-    # Store in cache if caching is enabled and not streaming
     if use_cache and not stream:
-        try:
-            from utils.http_cache import get_cache
-
-            cache = get_cache()
-            cache.put(url, resp, params, ttl=cache_ttl)
-        except Exception:
-            # Cache errors shouldn't break requests
-            pass
+        _try_cache_store(url, resp, params, cache_ttl)
 
     return resp
 

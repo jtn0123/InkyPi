@@ -350,108 +350,64 @@ def delete_api_key():
         )
 
 
-def _validate_settings_form(form_data):
-    unit = form_data.get("unit")
+def _field_error(message, field):
+    """Return a 422 validation error response for *field*."""
+    return json_error(
+        message,
+        status=422,
+        code="validation_error",
+        details={"field": field},
+    )
+
+
+def _validate_interval(form_data):
+    """Validate and return the parsed interval, or a JSON error response."""
     interval = form_data.get("interval")
-    time_format = form_data.get("timeFormat")
+    unit = form_data.get("unit")
 
-    # Validate device name (required, non-empty)
-    device_name = form_data.get("deviceName", "").strip()
-    if not device_name:
-        return json_error(
-            "Device Name is required",
-            status=422,
-            code="validation_error",
-            details={"field": "deviceName"},
-        )
-
-    if not unit or unit not in ["minute", "hour"]:
-        return json_error(
-            "Plugin cycle interval unit is required",
-            status=422,
-            code="validation_error",
-            details={"field": "unit"},
-        )
+    if not unit or unit not in ("minute", "hour"):
+        return _field_error("Plugin cycle interval unit is required", "unit")
     if not interval or not interval.strip():
-        return json_error(
-            "Refresh interval is required",
-            status=422,
-            code="validation_error",
-            details={"field": "interval"},
-        )
+        return _field_error("Refresh interval is required", "interval")
     try:
         interval_int = int(interval)
     except (ValueError, TypeError):
-        return json_error(
-            "Refresh interval must be a number",
-            status=422,
-            code="validation_error",
-            details={"field": "interval"},
-        )
+        return _field_error("Refresh interval must be a number", "interval")
     if interval_int < 1:
-        return json_error(
-            "Refresh interval must be at least 1",
-            status=422,
-            code="validation_error",
-            details={"field": "interval"},
-        )
-    timezone_name = form_data.get("timezoneName")
-    if not timezone_name:
-        return json_error(
-            "Time Zone is required",
-            status=422,
-            code="validation_error",
-            details={"field": "timezoneName"},
-        )
-    if timezone_name not in available_timezones():
-        return json_error(
-            "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
-            status=422,
-            code="validation_error",
-            details={"field": "timezoneName"},
-        )
-    if not time_format or time_format not in ["12h", "24h"]:
-        return json_error(
-            "Time format is required",
-            status=422,
-            code="validation_error",
-            details={"field": "timeFormat"},
-        )
+        return _field_error("Refresh interval must be at least 1", "interval")
 
-    plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
+    plugin_cycle_interval_seconds = calculate_seconds(interval_int, unit)
     if plugin_cycle_interval_seconds > 86400 or plugin_cycle_interval_seconds <= 0:
-        return json_error(
-            "Plugin cycle interval must be less than 24 hours",
-            status=422,
-            code="validation_error",
-            details={"field": "interval"},
+        return _field_error(
+            "Plugin cycle interval must be less than 24 hours", "interval"
         )
+    return None
 
-    # Validate orientation enum
-    orientation = form_data.get("orientation")
-    if orientation is not None and orientation not in ("horizontal", "vertical"):
-        return json_error(
-            "orientation must be 'horizontal' or 'vertical'",
-            status=422,
-            code="validation_error",
-            details={"field": "orientation"},
-        )
 
-    # Validate preview size mode enum
-    preview_size_mode = form_data.get("previewSizeMode")
-    if preview_size_mode is not None and preview_size_mode not in (
-        "native",
-        "scaled",
-        "fit",
-    ):
-        return json_error(
-            "previewSizeMode must be 'native', 'scaled', or 'fit'",
-            status=422,
-            code="validation_error",
-            details={"field": "previewSizeMode"},
-        )
+def _validate_enum_field(form_data, field, allowed, *, required=True):
+    """Validate that *field* is one of *allowed* values.
 
-    # Validate numeric image settings
+    When *required* is True the field must be present and non-empty.
+    When False the field is only checked if present.
+    """
+    value = form_data.get(field)
+    if required:
+        if not value or value not in allowed:
+            return _field_error(
+                f"{field} is required",
+                field,
+            )
+    else:
+        if value is not None and value not in allowed:
+            return _field_error(
+                f"{field} must be one of {', '.join(repr(a) for a in allowed)}",
+                field,
+            )
+    return None
+
+
+def _validate_image_settings(form_data):
+    """Validate numeric image-adjustment fields in *form_data*."""
     import math
 
     _IMAGE_SETTING_MIN = 0.0
@@ -464,31 +420,58 @@ def _validate_settings_form(form_data):
         "inky_saturation",
     ):
         raw = form_data.get(field)
-        if raw is not None:
-            try:
-                value = float(raw)
-            except (ValueError, TypeError):
-                return json_error(
-                    f"Invalid numeric value for {field}",
-                    status=422,
-                    code="validation_error",
-                    details={"field": field},
-                )
-            if not math.isfinite(value):
-                return json_error(
-                    f"Invalid numeric value for {field}",
-                    status=422,
-                    code="validation_error",
-                    details={"field": field},
-                )
-            if value < _IMAGE_SETTING_MIN or value > _IMAGE_SETTING_MAX:
-                return json_error(
-                    f"{field} must be between {_IMAGE_SETTING_MIN} and {_IMAGE_SETTING_MAX}",
-                    status=422,
-                    code="validation_error",
-                    details={"field": field},
-                )
+        if raw is None:
+            continue
+        try:
+            value = float(raw)
+        except (ValueError, TypeError):
+            return _field_error(f"Invalid numeric value for {field}", field)
+        if not math.isfinite(value):
+            return _field_error(f"Invalid numeric value for {field}", field)
+        if value < _IMAGE_SETTING_MIN or value > _IMAGE_SETTING_MAX:
+            return _field_error(
+                f"{field} must be between {_IMAGE_SETTING_MIN} and {_IMAGE_SETTING_MAX}",
+                field,
+            )
     return None
+
+
+def _validate_settings_form(form_data):
+    # Validate device name (required, non-empty)
+    device_name = form_data.get("deviceName", "").strip()
+    if not device_name:
+        return _field_error("Device Name is required", "deviceName")
+
+    err = _validate_interval(form_data)
+    if err:
+        return err
+
+    # Timezone
+    timezone_name = form_data.get("timezoneName")
+    if not timezone_name:
+        return _field_error("Time Zone is required", "timezoneName")
+    if timezone_name not in available_timezones():
+        return _field_error(
+            "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
+            "timezoneName",
+        )
+
+    time_format = form_data.get("timeFormat")
+    if not time_format or time_format not in ("12h", "24h"):
+        return _field_error("Time format is required", "timeFormat")
+
+    err = _validate_enum_field(
+        form_data, "orientation", ("horizontal", "vertical"), required=False
+    )
+    if err:
+        return err
+    err = _validate_enum_field(
+        form_data, "previewSizeMode", ("native", "scaled", "fit"), required=False
+    )
+    if err:
+        return err
+
+    return _validate_image_settings(form_data)
 
 
 def _build_settings_dict(form_data):
