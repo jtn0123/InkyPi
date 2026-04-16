@@ -1186,63 +1186,49 @@
       }
     }
 
-    async function isolatePlugin() {
+    // Shared POST/DELETE helper for the isolation toggle.  Consolidates the
+    // previously duplicated isolatePlugin / unIsolatePlugin bodies
+    // (SonarCloud javascript:S4144 — Identical blocks on new code).
+    async function _toggleIsolation(method, verb) {
       const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
       if (!pluginId) {
-        showResponseModal("failure", "Enter a plugin ID to isolate.");
+        showResponseModal("failure", `Enter a plugin ID to ${verb}.`);
         return;
       }
       try {
         const resp = await fetch("/settings/isolation", {
-          method: "POST",
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ plugin_id: pluginId }),
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          const errMsg = data.error || "Failed to isolate plugin";
+          const errMsg = data.error || `Failed to ${verb} plugin`;
           // Surface a human-readable message instead of raw JSON
           showResponseModal("failure", errMsg.includes("registered")
             ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
             : errMsg);
           return;
         }
-        showResponseModal("success", `Plugin "${pluginId}" has been isolated.`);
+        const past = verb === "isolate" ? "isolated" : "un-isolated";
+        showResponseModal("success", `Plugin "${pluginId}" has been ${past}.`);
         await refreshIsolation();
         await refreshHealth();
       } catch (e) {
-        console.warn("Failed to isolate plugin:", e);
-        showResponseModal("failure", "Failed to isolate plugin. Check your connection and try again.");
+        console.warn(`Failed to ${verb} plugin:`, e);
+        showResponseModal(
+          "failure",
+          `Failed to ${verb} plugin. Check your connection and try again.`
+        );
       }
     }
 
+    async function isolatePlugin() {
+      return _toggleIsolation("POST", "isolate");
+    }
+
     async function unIsolatePlugin() {
-      const pluginId = document.getElementById("isolatePluginInput")?.value?.trim();
-      if (!pluginId) {
-        showResponseModal("failure", "Enter a plugin ID to un-isolate.");
-        return;
-      }
-      try {
-        const resp = await fetch("/settings/isolation", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ plugin_id: pluginId }),
-        });
-        const data = await resp.json();
-        if (!resp.ok || !data.success) {
-          const errMsg = data.error || "Failed to un-isolate plugin";
-          showResponseModal("failure", errMsg.includes("registered")
-            ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
-            : errMsg);
-          return;
-        }
-        showResponseModal("success", `Plugin "${pluginId}" has been un-isolated.`);
-        await refreshIsolation();
-        await refreshHealth();
-      } catch (e) {
-        console.warn("Failed to un-isolate plugin:", e);
-        showResponseModal("failure", "Failed to un-isolate plugin. Check your connection and try again.");
-      }
+      return _toggleIsolation("DELETE", "un-isolate");
     }
 
     async function safeReset() {

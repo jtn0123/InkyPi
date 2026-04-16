@@ -224,6 +224,9 @@ def test_settings_page_js_benchmark_empty_state_message():
 def test_settings_page_js_isolation_human_messages():
     """Isolation actions should show human-readable messages."""
     js = (_JS_DIR / "settings_page.js").read_text(encoding="utf-8")
-    assert "has been isolated" in js
-    assert "has been un-isolated" in js
+    # Isolation status messages are built from a shared helper that splices
+    # an "isolated" / "un-isolated" participle into "has been ${past}.".
+    assert "has been ${past}" in js
+    assert '"isolated"' in js
+    assert '"un-isolate"' in js
     assert "not a registered plugin" in js
