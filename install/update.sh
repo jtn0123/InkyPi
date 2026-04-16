@@ -52,7 +52,8 @@ APT_REQUIREMENTS_FILE="$SCRIPT_DIR/debian-requirements.txt"
 PIP_REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
 
 # JTN-669/674: Source shared helpers (formatting, stop_service, zramswap,
-# earlyoom, get_os_version, build_css_bundle, fetch_wheelhouse, cleanup_wheelhouse)
+# earlyoom, persistent journald, Wi-Fi hardening, get_os_version,
+# build_css_bundle, fetch_wheelhouse, cleanup_wheelhouse)
 # so install.sh and update.sh share a single source of truth.
 # shellcheck source=install/_common.sh
 source "$SCRIPT_DIR/_common.sh"
@@ -315,6 +316,8 @@ else
   echo "OS version is $os_version - skipping zramswap setup (zram-tools not available on this release)."
 fi
 setup_earlyoom_service
+configure_persistent_journal
+disable_wifi_powersave
 
 _current_step="venv_check"
 # Check if virtual environment exists
@@ -469,5 +472,5 @@ _current_step="update_app_service"
 _inkypi_maybe_inject_failure "update_app_service"
 update_app_service
 
-echo "Version: $(cat "$INSTALL_PATH/VERSION" 2>/dev/null || echo 'unknown')"
+echo "Version: $(cat "$SCRIPT_DIR/../VERSION" 2>/dev/null || echo 'unknown')"
 echo_success "Update completed."
