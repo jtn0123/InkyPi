@@ -387,7 +387,7 @@ def _resolve_timeout(
     return DEFAULT_TIMEOUT_SECONDS
 
 
-def _try_cache_lookup(url, params):
+def _try_cache_lookup(url: str, params: dict[str, Any] | None) -> Any:
     """Return a cached response for *url* + *params*, or ``None``."""
     try:
         from utils.http_cache import get_cache
@@ -398,7 +398,9 @@ def _try_cache_lookup(url, params):
         return None
 
 
-def _try_cache_store(url, resp, params, cache_ttl):
+def _try_cache_store(
+    url: str, resp: Any, params: dict[str, Any] | None, cache_ttl: float | None
+) -> None:
     """Silently store *resp* in the HTTP cache."""
     try:
         from utils.http_cache import get_cache
@@ -409,7 +411,7 @@ def _try_cache_store(url, resp, params, cache_ttl):
         pass
 
 
-def _log_latency_on_error(url, t0, ex):
+def _log_latency_on_error(url: str, t0: float, ex: Exception) -> None:
     """Log a warning about a failed HTTP GET with elapsed time."""
     elapsed_ms = int((perf_counter() - t0) * 1000)
     try:
@@ -423,7 +425,7 @@ def _log_latency_on_error(url, t0, ex):
         pass
 
 
-def _log_latency_on_success(url, resp, t0, stream):
+def _log_latency_on_success(url: str, resp: Any, t0: float, stream: bool) -> None:
     """Log an info message about a successful HTTP GET with elapsed time."""
     try:
         elapsed_ms = int((perf_counter() - t0) * 1000)

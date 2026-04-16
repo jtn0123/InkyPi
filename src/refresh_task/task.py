@@ -1095,9 +1095,7 @@ class RefreshTask:
             int(timeout_s),
             zombie_count,
         )
-        return TimeoutError(
-            f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s"
-        )
+        return TimeoutError(f"Plugin '{plugin_id}' timed out after {int(timeout_s)}s")
 
     def _execute_inprocess(self, refresh_action, plugin_config, current_dt: datetime):
         """Run a plugin directly in the current process (no subprocess isolation).
@@ -1124,8 +1122,11 @@ class RefreshTask:
         last_exc: BaseException | None = None
         for attempt in range(1, attempts + 1):
             _worker, result_holder, cancel_event = self._make_inprocess_worker(
-                refresh_action, plugin_config, self.device_config,
-                current_dt, plugin_id,
+                refresh_action,
+                plugin_config,
+                self.device_config,
+                current_dt,
+                plugin_id,
             )
 
             worker_thread = threading.Thread(target=_worker, daemon=True)
