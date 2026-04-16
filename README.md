@@ -1,186 +1,227 @@
-# InkyPi 
+<div align="center">
+
+# InkyPi
+
+### Your content, on paper. An open-source E-Ink display powered by Raspberry Pi.
 
 [![CI](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml/badge.svg)](https://github.com/jtn0123/InkyPi/actions/workflows/ci.yml)
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=jtn0123_InkyPi&metric=alert_status)](https://sonarcloud.io/summary/overall?id=jtn0123_InkyPi)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-green)](./LICENSE)
 
-<img src="./docs/images/inky_clock.jpg" />
+<br>
 
+<img src="./docs/images/inky_clock.jpg" alt="InkyPi e-ink display showing a clock face in a wooden picture frame" width="600" />
 
-## About InkyPi 
-InkyPi is an open-source, customizable E-Ink display powered by a Raspberry Pi. Designed for simplicity and flexibility, it allows you to effortlessly display the content you care about, with a simple web interface that makes setup and configuration effortless.
+<br>
 
-**Features**:
-- Natural paper-like aesthetic: crisp, minimalist visuals that are easy on the eyes, with no glare or backlight
-- Web Interface allows you to update and configure the display from any device on your network
-- Minimal distractions: no LEDs, noise, or notifications — just the content you care about
-- Easy installation and configuration, perfect for beginners and makers alike
-- Open source project allowing you to modify, customize, and create your own plugins
-- Set up scheduled playlists to display different plugins at designated times
+**No glare. No backlight. No notifications. Just the content you care about.**
 
-**Plugins**:
+[Getting Started](#quick-start) · [Plugins](#plugins) · [Hardware](#hardware) · [Docs](#documentation)
 
-| Category | Plugin | Description |
-|----------|--------|-------------|
-| Display | Clock | Customizable clock faces |
-| | Countdown | Countdown timer to a target date |
-| | Year Progress | Visual progress bar for the current year |
-| | Todo List | Display a to-do list |
-| Images | Image Upload | Upload and display any image from your browser |
-| | Image Album | Cycle through an album of images |
-| | Image Folder | Display images from a local folder |
-| | Image URL | Display an image from a URL |
-| | Unsplash | Random curated photos from Unsplash |
-| | APOD | NASA Astronomy Picture of the Day |
-| | WPOTD | Wikipedia Picture of the Day |
-| News & Media | Newspaper | Front pages of major newspapers from around the world |
-| | Comic | Daily comics from popular syndicated strips |
-| | RSS | Display items from any RSS feed |
-| Information | Weather | Current conditions and multi-day forecasts |
-| | Calendar | Google, Outlook, or Apple Calendar integration |
-| | GitHub | Contribution graph, stars, and sponsor stats |
-| AI | AI Image | Generate images from prompts using OpenAI |
-| | AI Text | Generate dynamic text from prompts using OpenAI |
-| Utility | Screenshot | Capture and display a screenshot of any URL |
+</div>
 
-For documentation on building custom plugins, see [Building InkyPi Plugins](./docs/building_plugins.md).
+---
+
+## Why InkyPi?
+
+<table>
+<tr>
+<td width="50%">
+
+**Paper-like display** — crisp, minimalist visuals that are easy on the eyes, with no glare or backlight
+
+**Web-based control** — configure and update the display from any device on your network
+
+**20+ built-in plugins** — clocks, weather, news, calendars, AI-generated art, and more
+
+</td>
+<td width="50%">
+
+**Scheduled playlists** — rotate different plugins on a schedule throughout the day
+
+**Fully open source** — modify, customize, and create your own plugins
+
+**Beginner-friendly** — one-command install, runs on a Raspberry Pi Zero 2 W and up
+
+</td>
+</tr>
+</table>
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/jtn0123/InkyPi.git
+cd InkyPi
+sudo bash install/install.sh
+```
+
+After install, reboot your Pi and the InkyPi splash screen appears. Open the web interface from any device on your network to configure plugins.
+
+> For Waveshare displays, pass the model: `sudo bash install/install.sh -W epd7in3f`
+
+For detailed setup including Raspberry Pi OS imaging, see [installation.md](./docs/installation.md) or watch the [YouTube tutorial](https://youtu.be/L5PvQj1vfC4).
+
+---
+
+## Plugins
+
+| Category | Plugins |
+|----------|---------|
+| **Display** | Clock · Countdown · Year Progress · Todo List |
+| **Images** | Image Upload · Image Album · Image Folder · Image URL · Unsplash · NASA APOD · Wikipedia POTD |
+| **News & Media** | Newspaper Front Pages · Daily Comics · RSS Feeds |
+| **Information** | Weather · Calendar (Google / Outlook / Apple) · GitHub Stats |
+| **AI** | AI Image Generation · AI Text Generation (OpenAI) |
+| **Utility** | Screenshot (capture any URL) |
+
+Want to build your own? See [Building InkyPi Plugins](./docs/building_plugins.md).
+
+---
+
+## Hardware
+
+**Raspberry Pi** — Pi 4, Pi 3, or Zero 2 W (40-pin header recommended)
+
+**MicroSD Card** — 8 GB minimum ([example](https://amzn.to/3G3Tq9W))
+
+**E-Ink Display:**
+
+| Brand | Supported Models |
+|-------|-----------------|
+| **Pimoroni Inky Impression** | [13.3"](https://collabs.shop/q2jmza) · [7.3"](https://collabs.shop/q2jmza) · [5.7"](https://collabs.shop/ns6m6m) · [4"](https://collabs.shop/cpwtbh) |
+| **Pimoroni Inky wHAT** | [4.2"](https://collabs.shop/jrzqmf) |
+| **Waveshare Spectra 6 (E6)** | [4"](https://www.waveshare.com/4inch-e-paper-hat-plus-e.htm?&aff_id=111126) · [7.3"](https://www.waveshare.com/7.3inch-e-paper-hat-e.htm?&aff_id=111126) · [13.3"](https://www.waveshare.com/13.3inch-e-paper-hat-plus-e.htm?&aff_id=111126) |
+| **Waveshare B&W** | [7.5"](https://www.waveshare.com/7.5inch-e-paper-hat.htm?&aff_id=111126) · [13.3"](https://www.waveshare.com/13.3inch-e-paper-hat-k.htm?&aff_id=111126) |
+
+See [all Waveshare displays](https://www.waveshare.com/product/raspberry-pi/displays/e-paper.htm?&aff_id=111126) or their [Amazon store](https://amzn.to/3HPRTEZ). IT8951-based displays are not supported. See [Waveshare compatibility](#waveshare-display-support) for details.
+
+**Frame** — picture frame or 3D-printed stand. See [community builds](./docs/community.md) for inspiration.
+
+> **Disclosure:** Hardware links above are affiliate links that help support the project, at no extra cost to you.
+
+---
 
 ## What's New in This Fork
 
-This fork is under active development with a focus on stability, security, and UX polish.
+This fork is **1,100+ commits** ahead of upstream, transforming InkyPi from a functional prototype into a production-grade, security-hardened system. Active development continues with a focus on reliability, security, and developer experience.
 
-| Feature | This Fork | Upstream |
-|---------|:---------:|:--------:|
-| API Keys Management UI | :white_check_mark: | :x: |
-| Server-Side Settings Validation | :white_check_mark: | :x: |
-| SSRF & Path Traversal Protection | :white_check_mark: | :x: |
-| Image History Page with Pagination | :white_check_mark: | :x: |
-| HTTP Caching | :white_check_mark: | :x: |
-| Playlist UX (smart defaults, edit refresh) | :white_check_mark: | :x: |
-| Accessibility (ARIA, dialog semantics) | :white_check_mark: | :x: |
-| Fetch Timeouts & Error Feedback | :white_check_mark: | :x: |
-| 20 Built-in Plugins | :white_check_mark: | 14 |
-| Multi-threaded Server | :white_check_mark: | :x: |
-| Hourly Weather Display | :white_check_mark: | :white_check_mark: |
-| Display Saturation Setting | :white_check_mark: | :white_check_mark: |
-| Bi-color Display Support | :white_check_mark: | :white_check_mark: |
+### Security
 
-## Hardware 
-- Raspberry Pi (4 | 3 | Zero 2 W)
-    - Recommended to get 40 pin Pre Soldered Header
-- MicroSD Card (min 8 GB) like [this one](https://amzn.to/3G3Tq9W)
-- E-Ink Display:
-    - Inky Impression by Pimoroni
-        - **[13.3 Inch Display](https://collabs.shop/q2jmza)**
-        - **[7.3 Inch Display](https://collabs.shop/q2jmza)**
-        - **[5.7 Inch Display](https://collabs.shop/ns6m6m)**
-        - **[4 Inch Display](https://collabs.shop/cpwtbh)**
-    - Inky wHAT by Pimoroni
-        - **[4.2 Inch Display](https://collabs.shop/jrzqmf)**
-    - Waveshare e-Paper Displays
-        - Spectra 6 (E6) Full Color **[4 inch](https://www.waveshare.com/4inch-e-paper-hat-plus-e.htm?&aff_id=111126)** **[7.3 inch](https://www.waveshare.com/7.3inch-e-paper-hat-e.htm?&aff_id=111126)** **[13.3 inch](https://www.waveshare.com/13.3inch-e-paper-hat-plus-e.htm?&aff_id=111126)**
-        - Black and White **[7.5 inch](https://www.waveshare.com/7.5inch-e-paper-hat.htm?&aff_id=111126)** **[13.3 inch](https://www.waveshare.com/13.3inch-e-paper-hat-k.htm?&aff_id=111126)**
-        - See [Waveshare E-Ink displays](https://www.waveshare.com/product/raspberry-pi/displays/e-paper.htm?&aff_id=111126) or visit their [Amazon store](https://amzn.to/3HPRTEZ) for additional models. Note that some models like the IT8951-based displays are not supported. See later section on [Waveshare E-Ink](#waveshare-display-support) compatibility for more information.
-- Picture Frame or 3D Stand
-    - See [community.md](./docs/community.md) for 3D models, custom builds, and other submissions from the community
+| Feature | Details |
+|---------|---------|
+| SSRF & DNS Rebinding Protection | DNS-pinned URL fetches block rebinding attacks |
+| Content Security Policy (CSP) | Nonce-based CSP eliminates inline script violations |
+| XSS Prevention | Systematic closure across 8+ blueprints |
+| Open-Redirect Defense | Host allow-list validation with safe URL rebuilding |
+| Path Traversal Protection | Input validation across all endpoints |
+| CSRF Token Validation | Per-request validation with secure token generation |
+| Rate Limiting | Token-bucket & sliding-window per-IP limits on auth/refresh/mutating endpoints |
+| Supply-Chain Integrity | Hash-pinned lockfiles (`--require-hashes`), SBOM, dependency license audit |
+| Secret Management | Persistent, entropy-rich SECRET_KEY bootstrap; secrets redacted from logs |
 
-**Disclosure:** The links above are affiliate links. I may earn a commission from qualifying purchases made through them, at no extra cost to you, which helps maintain and develop this project.
+### Testing
 
-## Installation
-To install InkyPi, follow these steps:
+| Feature | Details |
+|---------|---------|
+| End-to-End Journey Tests | First-run setup, API key CRUD, playlist management, plugin preview, update flow (Playwright) |
+| UI Audit Suite | Click sweeps, element overlap detection, responsive mobile tests, toggle state reflection |
+| Snapshot/Golden-File Testing | Plugin image output comparison for visual regressions |
+| Accessibility Testing | Axe-core scans integrated into Playwright |
+| Contract Tests | JSON response shape validation for 20+ endpoints |
+| Chaos Testing | RefreshTask error-injection paths |
+| Memory Gate | Peak RSS sampling and 512 MB smoke tests for Pi Zero 2 W |
+| Benchmark Regression Gate | Performance regression detection in CI |
+| Install Crash-Loop Gate | Prevents runaway restart bugs from merging |
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/jtn0123/InkyPi.git
-    ```
-2. Navigate to the project directory:
-    ```bash
-    cd InkyPi
-    ```
-3. Run the installation script with sudo:
-    ```bash
-    sudo bash install/install.sh [-W <waveshare device model>]
-    ``` 
-     Option: 
-    
-    * -W \<waveshare device model\> - specify this parameter **ONLY** if installing for a Waveshare display.  After the -W option specify the Waveshare device model e.g. epd7in3f.
+### Install & Update System
 
-    e.g. for Inky displays use:
-    ```bash
-    sudo bash install/install.sh
-    ```
+| Feature | Details |
+|---------|---------|
+| One-Command Update | `do_update.sh` with semver tag resolution |
+| Rollback Support | `prev_version` breadcrumb for atomic rollback |
+| Update Failure Surfacing | Errors visible in the web UI, not just logs |
+| Atomic Install | File-level atomicity with `flock` guard against concurrent installs |
+| Pre-Built Wheels | Release asset wheelhouse accelerates install on Pi |
+| uv Migration | Faster dependency resolution, lighter installs vs pip |
+| Install Matrix | CI tests across Bookworm, Bullseye, and Trixie (arm64) |
+| Waveshare Driver Pinning | Locked driver versions for stability |
 
-    and for [Waveshare displays](#waveshare-display-support) use:
-    ```bash
-    sudo bash install/install.sh -W epd7in3f
-    ```
+### UI/UX
 
+| Feature | Details |
+|---------|---------|
+| HTMX Form Submission | Non-blocking plugin settings save with inline feedback |
+| In-App Modals | Replaced `window.confirm()` with accessible dialog modals |
+| Floating Debug Console | Client-side log viewer for troubleshooting |
+| System Health Dashboard | Status badge wired to `/api/diagnostics` |
+| Plugin Breadcrumbs | Navigation context and plugin chip display |
+| Form Validation | Toast notifications naming the failing field |
+| Progress Feedback | Visible button states for all async operations |
+| Time Input Picker | Native HTML5 input for playlist scheduling |
+| API Keys Management UI | Centralized key management for plugins |
+| Image History with Pagination | Browse and manage display history |
 
-After the installation is complete, the script will prompt you to reboot your Raspberry Pi. Once rebooted, the display will update to show the InkyPi splash screen.
+### Accessibility
 
-Note: 
-- The installation script requires sudo privileges to install and run the service. We recommend starting with a fresh installation of Raspberry Pi OS to avoid potential conflicts with existing software or configurations.
-- The installation process will automatically enable the required SPI and I2C interfaces on your Raspberry Pi.
+| Feature | Details |
+|---------|---------|
+| Dialog Semantics | `role="dialog"`, Escape key handling, focus management |
+| ARIA Labels | Descriptive labels on icons, rows, buttons, toggle states |
+| Keyboard Navigation | Full keyboard support across modals and forms |
+| Skip-to-Content Link | Standard navigation landmark |
+| Automated Testing | Axe-core scans in CI prevent regressions |
 
-For more details, including instructions on how to image your microSD with Raspberry Pi OS, refer to [installation.md](./docs/installation.md). You can also checkout [this YouTube tutorial](https://youtu.be/L5PvQj1vfC4).
+### Performance & Reliability
+
+| Feature | Details |
+|---------|---------|
+| Lazy Module Imports | Reduced startup memory footprint |
+| Low-Memory Image Loading | Memory-efficient image ops for preview plugins |
+| HTTP Cache with LRU Eviction | Bounded memory growth for cached responses |
+| Async Job Queue | Non-blocking plugin renders |
+| Systemd Hardening | `StartLimitBurst`, `OOMScoreAdjust`, failure service |
+| Multi-threaded Server | Concurrent request handling |
+
+### CI/CD Pipeline
+
+| Feature | Details |
+|---------|---------|
+| Security Scanning | CodeQL, Semgrep, Trivy, GitLeaks, dependency review |
+| Browser Smoke Tests | Mandatory CI gate for UI regressions |
+| Memory Diff Comments | Per-PR startup memory impact analysis |
+| Nightly OS Drift Detector | Catches breakage from system package updates |
+| CycloneDX SBOM | Software bill of materials as release asset |
+| Snapshot Artifact Upload | PNG diffs on test failure for visual debugging |
+
+### Developer Experience
+
+| Feature | Details |
+|---------|---------|
+| Watch-Mode CSS Rebuild | Live asset rebuild during development |
+| Dev-Mode Response Validator | Middleware schema enforcement (no-op in prod) |
+| Docker Install Simulation | Multi-base Dockerfile testing |
+| Benchmark Compare Script | Performance regression analysis |
+| 22 Plugins (vs 14 upstream) | 8 additional built-in plugins |
+
+---
 
 ## Update
-
-**Recommended:** use `do_update.sh` to fetch the latest release tag and apply it:
 
 ```bash
 cd InkyPi
 sudo bash install/do_update.sh
 ```
 
-`do_update.sh` runs `git fetch origin --tags --prune`, resolves the latest
-semver tag (e.g. `v0.51.6`), checks it out, and then delegates to `update.sh`
-for dependency install, CSS build, and service restart. To pin a specific
-version, pass the tag explicitly:
+Pin a specific version: `sudo bash install/do_update.sh v0.51.6`
 
-```bash
-sudo bash install/do_update.sh v0.51.6
-```
+The web UI's "Update" button uses the same path. For branch tracking, use `git pull` then `sudo bash install/update.sh`.
 
-**Alternative — update to a branch or arbitrary commit:**
-
-```bash
-cd InkyPi
-git pull               # or: git checkout <branch-or-sha>
-sudo bash install/update.sh
-```
-
-> `install/update.sh` on its own does **not** advance the git checkout — it
-> only rebuilds deps, CSS, and the systemd unit against whatever commit is
-> already checked out. Running it against a stale working tree is a silent
-> no-op that still reports "Update completed". Use `do_update.sh` for version
-> bumps, or `git pull` before `update.sh` when tracking a branch.
-
-The web UI's "Update" button also invokes `do_update.sh` when available
-(see `src/blueprints/settings/__init__.py`), so it stays in sync with the
-CLI path.
+---
 
 ## Development
-
-### Local install verification
-
-To verify `install/install.sh` against the current branch without real Pi hardware,
-use the provided simulator (requires Docker with multi-platform support):
-
-```bash
-./scripts/sim_install.sh trixie    # Debian Trixie (default)
-./scripts/sim_install.sh bookworm  # Debian Bookworm
-./scripts/sim_install.sh bullseye  # Debian Bullseye
-```
-
-This builds an arm64 container capped at 512 MB RAM (matching the Pi Zero 2 W)
-and runs `install.sh` end-to-end against your local checkout.
-Always confirm on real hardware before merging install path changes.
-
-### Running the web UI locally
-
-To run the web UI locally without e-ink hardware:
 
 ```bash
 python -m venv .venv
@@ -189,9 +230,9 @@ pip install -r install/requirements-dev.txt
 .venv/bin/python src/inkypi.py --dev --web-only
 ```
 
-The dev server starts on port 8080. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full dev workflow and [docs/development.md](./docs/development.md) for platform-specific setup.
+Dev server runs on port 8080. See [CONTRIBUTING.md](./CONTRIBUTING.md) and [development.md](./docs/development.md) for full details.
 
-## Testing
+### Testing
 
 ```bash
 scripts/test.sh                                        # fast local test runner (sharded)
@@ -199,44 +240,61 @@ scripts/test.sh tests/unit/test_refresh_task_stress.py  # single file
 scripts/preflash_validate.sh                            # hardware-free pre-flash gate
 ```
 
-See [docs/testing.md](./docs/testing.md) for coverage, browser/accessibility suites, pre-flash hardening lanes, and CI details.
+See [testing.md](./docs/testing.md) for coverage and CI details.
+
+### Install Verification (Docker)
+
+```bash
+./scripts/sim_install.sh trixie     # Debian Trixie (default)
+./scripts/sim_install.sh bookworm   # Debian Bookworm
+./scripts/sim_install.sh bullseye   # Debian Bullseye
+```
+
+Builds an arm64 container capped at 512 MB RAM (matching Pi Zero 2 W) and runs `install.sh` end-to-end.
+
+---
 
 ## Uninstall
-To uninstall InkyPi, simply run the following command:
 
 ```bash
 sudo bash install/uninstall.sh
 ```
 
+---
+
 ## Waveshare Display Support
 
-Waveshare offers a range of e-Paper displays, similar to the Inky screens from Pimoroni, but with slightly different requirements. While Inky displays auto-configure via the inky Python library, Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd).
+Waveshare displays require model-specific drivers from their [Python EPD library](https://github.com/waveshareteam/e-Paper/tree/master/RaspberryPi_JetsonNano/python/lib/waveshare_epd). IT8951-based displays are not supported, and screens smaller than 4" are not recommended.
 
-This project has been tested with several Waveshare models. **Displays based on the IT8951 controller are not supported**, and **screens smaller than 4 inches are not recommended** due to limited resolution.
-
-If your display model has a corresponding driver in the link above, it’s likely to be compatible. When running the installation script, use the -W option to specify your display model (without the .py extension). The script will automatically fetch and install the correct driver.
-
-## License
-
-Distributed under the GPL 3.0 License, see [LICENSE](./LICENSE) for more information.
-
-This project includes fonts and icons with separate licensing and attribution requirements. See [Attribution](./docs/attribution.md) for details.
-
-## Documentation
-
-- [Architecture](./docs/architecture.md) — High-level component map and request/refresh flow
-- [Development Setup](./docs/development.md) — Local dev environment on macOS, Linux, or Windows
-- [API Keys](./docs/api_keys.md) — Configuring API keys for plugins (OpenAI, Google, etc.)
-- [Testing](./docs/testing.md) — Test suite, sharding, browser tests, and coverage
-- [Building Plugins](./docs/building_plugins.md) — Guide for creating custom plugins (includes a hello-world walkthrough)
-- [Troubleshooting](./docs/troubleshooting.md) — Common issues and fixes
-
-## Issues
-
-Check out the [troubleshooting guide](./docs/troubleshooting.md). If you're still having trouble, feel free to create an issue on the [GitHub Issues](https://github.com/jtn0123/InkyPi/issues) page.
-
-If you're using a Pi Zero W, note that there are known issues during the installation process. See [Known Issues during Pi Zero W Installation](./docs/troubleshooting.md#known-issues-during-pi-zero-w-installation) section in the troubleshooting guide for additional details.
+When installing, use `-W` with your model name (without `.py`): `sudo bash install/install.sh -W epd7in3f`
 
 ---
 
-Forked from [fatihak/InkyPi](https://github.com/fatihak/InkyPi).
+## Documentation
+
+- [Architecture](./docs/architecture.md) — Component map and request/refresh flow
+- [Development Setup](./docs/development.md) — Local dev on macOS, Linux, or Windows
+- [API Keys](./docs/api_keys.md) — Configuring keys for OpenAI, Google, etc.
+- [Testing](./docs/testing.md) — Test suite, sharding, browser tests, coverage
+- [Building Plugins](./docs/building_plugins.md) — Create custom plugins (includes hello-world)
+- [Troubleshooting](./docs/troubleshooting.md) — Common issues and fixes
+
+---
+
+## Issues
+
+Check the [troubleshooting guide](./docs/troubleshooting.md) first. If you're still stuck, open an issue on [GitHub Issues](https://github.com/jtn0123/InkyPi/issues).
+
+> Pi Zero W users: see [Known Issues during Pi Zero W Installation](./docs/troubleshooting.md#known-issues-during-pi-zero-w-installation).
+
+## License
+
+GPL 3.0 — see [LICENSE](./LICENSE). Font and icon attribution: [attribution.md](./docs/attribution.md).
+
+---
+
+<div align="center">
+
+Forked from [fatihak/InkyPi](https://github.com/fatihak/InkyPi)
+
+</div>
