@@ -205,16 +205,14 @@ def _new_page(browser, viewport: dict, theme: str):
     page = browser.new_page(
         viewport={"width": viewport["width"], "height": viewport["height"]}
     )
-    page.add_init_script(
-        script=f"""
+    page.add_init_script(script=f"""
         (() => {{
             try {{
                 localStorage.setItem("theme", {theme!r});
                 localStorage.setItem("inkypi-theme", {theme!r});
             }} catch (e) {{}}
         }})();
-        """
-    )
+        """)
     return page
 
 
