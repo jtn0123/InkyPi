@@ -3,7 +3,9 @@ from __future__ import annotations
 import time
 
 
-def test_display_hang_fault_times_out_and_surfaces_error(client, flask_app, monkeypatch):
+def test_display_hang_fault_times_out_and_surfaces_error(
+    client, flask_app, monkeypatch
+):
     refresh_task = flask_app.config["REFRESH_TASK"]
     display_manager = flask_app.config["DISPLAY_MANAGER"]
 

@@ -101,7 +101,9 @@ def _run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
     return cfg.get_config(), diagnostics
 
 
-def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(monkeypatch, tmp_path):
+def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("INKYPI_ENV", "dev")
 
     spec = _load_chain_spec()

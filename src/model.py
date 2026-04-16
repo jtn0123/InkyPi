@@ -518,12 +518,16 @@ class Playlist:
         if cycle_interval_seconds is None:
             # Legacy configs used cycle_minutes; migrate to seconds on load.
             legacy_minutes = data.get("cycle_minutes")
-            try:
-                minutes = int(legacy_minutes)
-                if minutes > 0:
-                    cycle_interval_seconds = minutes * 60
-            except (TypeError, ValueError):
-                cycle_interval_seconds = None
+            minutes: int | None = None
+            if isinstance(legacy_minutes, int):
+                minutes = legacy_minutes
+            elif isinstance(legacy_minutes, str):
+                try:
+                    minutes = int(legacy_minutes.strip())
+                except ValueError:
+                    minutes = None
+            if minutes is not None and minutes > 0:
+                cycle_interval_seconds = minutes * 60
 
         plugins = data.get("plugins", [])
         if not isinstance(plugins, list):
@@ -741,11 +745,15 @@ class PluginInstance:
             plugin_id=data.get("plugin_id", data.get("id", "")),
             name=data.get(
                 "name",
-                data.get("instance_name", data.get("plugin_id", data.get("id", "unknown"))),
+                data.get(
+                    "instance_name", data.get("plugin_id", data.get("id", "unknown"))
+                ),
             ),
             settings=plugin_settings,
             refresh=refresh,
-            latest_refresh_time=data.get("latest_refresh_time", data.get("latest_refresh")),
+            latest_refresh_time=data.get(
+                "latest_refresh_time", data.get("latest_refresh")
+            ),
             only_show_when_fresh=data.get("only_show_when_fresh", False),
             snooze_until=data.get("snooze_until"),
             consecutive_failure_count=data.get("consecutive_failure_count", 0),

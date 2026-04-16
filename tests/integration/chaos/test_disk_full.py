@@ -8,7 +8,9 @@ def test_disk_full_fault_surfaces_through_diagnostics(client, flask_app, monkeyp
     def _raise_disk_full(*_args, **_kwargs):
         raise OSError("disk full while writing display artifacts")
 
-    monkeypatch.setattr(display_manager, "display_image", _raise_disk_full, raising=True)
+    monkeypatch.setattr(
+        display_manager, "display_image", _raise_disk_full, raising=True
+    )
 
     refresh_task.start()
     try:

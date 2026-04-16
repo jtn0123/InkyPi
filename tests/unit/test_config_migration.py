@@ -12,7 +12,9 @@ import pytest
 import config as config_mod
 from utils.config_schema import validate_device_config
 
-LEGACY_FIXTURE_ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "legacy_configs"
+LEGACY_FIXTURE_ROOT = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "legacy_configs"
+)
 LEGACY_FIXTURE_VERSIONS = ("v0.40", "v0.45", "v0.50", "v0.53", "current")
 
 # User-facing values that must never silently disappear during loader migrations.
