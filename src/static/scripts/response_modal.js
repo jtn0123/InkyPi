@@ -143,6 +143,7 @@ function showResponseModal(status, message, useToast = true) {
     }
 
     // Display Modal
+    modal.hidden = false;
     modal.style.display = 'block';
 
     // Auto-close modal (skip for failure so users can read error details)
@@ -155,6 +156,7 @@ function showResponseModal(status, message, useToast = true) {
 function closeResponseModal() {
     const modal = document.getElementById('responseModal');
     if (modal) {
+        modal.hidden = true;
         modal.style.display = 'none';
     }
 }
