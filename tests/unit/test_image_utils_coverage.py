@@ -366,3 +366,72 @@ def test_fetch_and_resize_low_memory_cleans_up_on_failure():
 
     assert result is None
     mock_unlink.assert_not_called()
+
+
+def test_fetch_and_resize_low_memory_swallows_unlink_oserror():
+    """If unlink fails during cleanup, the error is logged but not propagated."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    fake_image = Image.new("RGB", (100, 50), color="green")
+
+    mock_loader = Mock()
+    mock_loader.is_low_resource = True
+    mock_loader.from_file.return_value = fake_image
+
+    with (
+        patch("utils.image_utils._stream_to_disk", return_value="/tmp/fake.img"),
+        patch("utils.image_utils.os.path.exists", return_value=True),
+        patch("utils.image_utils.os.unlink", side_effect=OSError("disk full")),
+        patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    # Result should still be returned despite cleanup failing
+    assert result is fake_image
+
+
+def test_fetch_and_resize_low_memory_loader_returns_none():
+    """When loader.from_file returns None (decode failure), we get None back."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    mock_loader = Mock()
+    mock_loader.is_low_resource = True
+    mock_loader.from_file.return_value = None
+
+    with (
+        patch("utils.image_utils._stream_to_disk", return_value="/tmp/fake.img"),
+        patch("utils.image_utils.os.path.exists", return_value=True),
+        patch("utils.image_utils.os.unlink"),
+        patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None
+
+
+def test_fetch_and_resize_non_low_memory_decode_failure_returns_none():
+    """Non-low-memory path: from_bytesio returning None logs and returns None."""
+    from utils.image_utils import fetch_and_resize_remote_image
+
+    mock_loader = Mock()
+    mock_loader.is_low_resource = False
+    mock_loader.from_bytesio.return_value = None
+
+    mock_response = Mock()
+    mock_response.content = b"bytes"
+    mock_response.raise_for_status = Mock(return_value=None)
+
+    with (
+        patch("utils.image_utils.http_get", return_value=mock_response),
+        patch("utils.image_utils.pinned_dns"),
+        patch("utils.image_loader.AdaptiveImageLoader", return_value=mock_loader),
+    ):
+        result = fetch_and_resize_remote_image(
+            "http://example.com/photo.png", (100, 50)
+        )
+
+    assert result is None

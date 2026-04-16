@@ -415,7 +415,10 @@ def update_plugin_instance(instance_name: str):
             try:
                 plugin = get_plugin_instance(plugin_config)
             except Exception:
-                logger.warning("Could not load plugin for validation: %s", plugin_id)
+                logger.warning(
+                    "Could not load plugin for validation: %s",
+                    sanitize_log_field(plugin_id),
+                )
                 plugin = None
 
             if plugin is not None:
@@ -944,7 +947,10 @@ def _save_plugin_settings_common(
     try:
         plugin = get_plugin_instance(plugin_config)
     except Exception:
-        logger.warning("Could not load plugin instance for validation: %s", plugin_id)
+        logger.warning(
+            "Could not load plugin instance for validation: %s",
+            sanitize_log_field(plugin_id),
+        )
         plugin = None
 
     if plugin is not None:
