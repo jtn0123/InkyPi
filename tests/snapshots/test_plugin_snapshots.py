@@ -1,8 +1,8 @@
 # pyright: reportMissingImports=false
 """Golden-file snapshot tests for deterministic plugin outputs.
 
-Each test freezes time (and any other non-deterministic inputs) then compares
-the SHA-256 digest of the rendered PNG against a stored baseline.
+Each test freezes time (and any other non-deterministic inputs) then performs
+pixel-level comparison against a stored baseline PNG with a small tolerance.
 
 Browser requirement
 -------------------
@@ -18,8 +18,8 @@ of the suite doesn't pay the Chromium startup cost.  A sibling
 
 Updating baselines
 ------------------
-Run ``python scripts/update_snapshots.py`` or set
-``SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1`` before running pytest.  See
+Run ``python scripts/update_snapshots.py`` or pass
+``REQUIRE_BROWSER_SMOKE=1 ... --update-snapshots`` before running pytest. See
 ``tests/snapshots/README.md`` for the full workflow (including the docker
 one-liner that matches the CI environment).
 """

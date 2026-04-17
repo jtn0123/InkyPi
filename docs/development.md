@@ -83,6 +83,7 @@ validation. See [`.pre-commit-config.yaml`](../.pre-commit-config.yaml) for the 
 - **Test UI changes** - Instant feedback on web interface modifications
 - **Debug issues** - Full error messages in terminal
 - **Verify rendering** - Check output in `runtime/mock_display_output/latest.png`
+- **Preview e-ink simulation** - Open `http://localhost:8080/dev/mock-frame` (dev mode only)
 - **Cross-platform development** - Works on macOS, Linux, Windows
 
 ## Essential Commands
@@ -143,9 +144,10 @@ python3 scripts/build_css.py
 ## Development Tips
 
 1. **Check rendered output**: Images are saved to `runtime/mock_display_output/`
-2. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
-3. **Configuration**: Edit `src/config/device_dev.json` for display settings
-4. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
+2. **Check simulated e-ink output**: latest frame is written to `/tmp/inkypi-mock-frame.png` (override with `INKYPI_MOCK_FRAME_PATH`)
+3. **Plugin development**: Copy an existing plugin as template (e.g., `clock/`)
+4. **Configuration**: Edit `src/config/device_dev.json` for display settings
+5. **Hot reload**: You can run via Flask dev server for code reload. When `INKYPI_ENV=dev` or running with `--dev`, plugin modules are reloaded on access so you can iterate without restarting.
 
 ```bash
 export FLASK_APP=src.inkypi:create_app
@@ -170,9 +172,10 @@ python scripts/plugin_validator.py clock   # validate a single plugin
 
 1. Configure a plugin through the web UI
 2. Click "Display" button
-3. Check `runtime/mock_display_output/latest.png` for result
-4. Iterate quickly without deployment
-5. BasePlugin notes:
+3. Check `runtime/mock_display_output/latest.png` for raw pre-driver result
+4. Check `/tmp/inkypi-mock-frame.png` or `GET /dev/mock-frame` for simulated panel output
+5. Iterate quickly without deployment
+6. BasePlugin notes:
    - Jinja environment is initialized even if a plugin lacks its own `render/` directory. Base templates under `plugins/base_plugin/render/` are always available.
    - If a plugin does not provide `settings.html`, the UI will include `base_plugin/settings.html` by default.
 
