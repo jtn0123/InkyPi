@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## v0.61.0 (2026-04-17)
+
+### Features
+
+- Render fidelity snapshot diffing + dev mock-frame tooling
+  ([#518](https://github.com/jtn0123/InkyPi/pull/518),
+  [`aa5605e`](https://github.com/jtn0123/InkyPi/commit/aa5605e1cf815274393e586f09bbc7a5ac138938))
+
+* feat: add pixel snapshot diffing and dev mock-frame simulator (JTN-737 JTN-715)
+
+* chore: format snapshot and mock display modules for lint
+
+* fix: defer PIL simulation imports to preserve startup lazy loading
+
+* fix: resolve snapshot + sonar blockers for JTN-737/715 (#522)
+
+
 ## v0.60.8 (2026-04-17)
 
 ### Bug Fixes
