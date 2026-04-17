@@ -195,28 +195,6 @@ def test_sustained_handler_load(live_server, browser_page):
     page = browser_page
     stub_leaflet(page)
 
-    # JTN-703 acceptance hooks: two env-guarded injections used during
-    # development to confirm the tripwires fail as expected. They are
-    # inert when unset — left in place so future maintenance can
-    # re-verify without hand-editing.
-    #   JTN703_SLOW_HANDLER_TEST=1: synchronous 700ms delay per click
-    #     pushes p95 over the 500ms budget.
-    #   JTN703_ERROR_INJECT_TEST=1: one console.error per click is
-    #     forwarded to /api/client-log so the autouse tripwire fails.
-    if os.getenv("JTN703_SLOW_HANDLER_TEST", "").strip() == "1":
-        page.add_init_script("""
-            document.addEventListener('click', () => {
-              const end = Date.now() + 700;
-              while (Date.now() < end) { /* busy-sleep */ }
-            }, { capture: true });
-            """)
-    if os.getenv("JTN703_ERROR_INJECT_TEST", "").strip() == "1":
-        page.add_init_script("""
-            document.addEventListener('click', () => {
-              console.error('JTN-703 synthetic error');
-            }, { capture: true });
-            """)
-
     collector = RuntimeCollector(page, live_server)
 
     # Seed the catalog once per page at loop start. Handler-induced DOM
@@ -286,11 +264,18 @@ def test_sustained_handler_load(live_server, browser_page):
         f"console.error during {total_clicks} clicks: {handler_errors[:5]}"
     )
 
-    # /api/client-log tripwire — the autouse ``client_log_capture``
-    # fixture asserts zero reports at teardown. In the integration test
-    # suite that endpoint is not always registered on the app-under-test
-    # (see ``tests/conftest.py::flask_app``), so the console-error
-    # assertion above is the primary reliable signal.
+    # /api/client-log tripwire note: the autouse ``client_log_capture``
+    # fixture asserts zero reports at teardown in every integration test.
+    # However, ``tests/conftest.py::flask_app`` does not register
+    # ``blueprints.client_log.client_log_bp`` (see the blueprint list
+    # there — it registers main/settings/plugin/etc. but not client_log),
+    # so the browser's POST to ``/api/client-log`` returns 404 and the
+    # server-side capture list stays empty. That means the fixture's
+    # teardown assertion is effectively inert for this test, which is
+    # why the ``collector.console_errors`` assertion above is the
+    # primary signal. (Adding client_log_bp registration here is out of
+    # scope; the browser-side ``RuntimeCollector`` already observes the
+    # same ``console.error`` calls before they would hit the shim.)
 
     p95_ms = _percentile(click_latencies_ms, 95)
     assert p95_ms < _P95_BUDGET_MS, (
