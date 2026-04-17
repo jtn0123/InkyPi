@@ -1344,6 +1344,13 @@ class TestWheelhouseBuildWorkflow:
         # existing tag without cutting a new release.
         assert "workflow_dispatch:" in self.content
 
+    def test_workflow_supports_reusable_invocation(self):
+        # JTN-745: release.yml calls this workflow directly so a failed
+        # wheelhouse upload makes the main Release workflow fail too.
+        assert "workflow_call:" in self.content
+        assert "inputs:" in self.content
+        assert "required: true" in self.content
+
     def test_workflow_builds_both_target_architectures(self):
         # Pi Zero 2 W (armv7) + Pi 4/5 (aarch64) are the two supported
         # InkyPi targets — both must be built.
@@ -1357,6 +1364,12 @@ class TestWheelhouseBuildWorkflow:
         # so wheel tags match what the Pi will install them against.
         assert "docker/setup-qemu-action" in self.content
         assert "debian:trixie" in self.content
+
+    def test_workflow_installs_native_build_dependencies(self):
+        # JTN-745 regression guards: armv7l source builds need libsystemd-dev
+        # for cysystemd and libheif-dev for pi-heif when PyPI lacks a wheel.
+        assert "libsystemd-dev" in self.content
+        assert "libheif-dev" in self.content
 
     def test_workflow_runs_pip_wheel_against_requirements(self):
         assert "pip wheel" in self.content
@@ -1546,6 +1559,30 @@ class TestPiImageBuildWorkflow:
         # attach-release step must only fire on `release` events, never on
         # workflow_dispatch (which is a dry run).
         assert "github.event_name == 'release'" in self.content
+
+
+class TestReleaseWorkflow:
+    """JTN-745: release.yml must fail when wheelhouse publication fails."""
+
+    WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "release.yml"
+
+    @pytest.fixture(autouse=True)
+    def _load(self):
+        assert (
+            self.WORKFLOW_PATH.exists()
+        ), f"Expected workflow file at {self.WORKFLOW_PATH}"
+        self.content = self.WORKFLOW_PATH.read_text()
+
+    def test_release_exports_tag_for_downstream_jobs(self):
+        assert "outputs:" in self.content
+        assert "steps.resolve_tag.outputs.tag" in self.content
+        assert "steps.resolve_tag.outputs.released" in self.content
+
+    def test_release_invokes_reusable_wheelhouse_workflow(self):
+        assert "uses: ./.github/workflows/build-wheelhouse.yml" in self.content
+        assert "needs: release" in self.content
+        assert "needs.release.outputs.released == 'true'" in self.content
+        assert "tag: ${{ needs.release.outputs.tag }}" in self.content
 
 
 class TestInstallationDocPreBuiltImage:

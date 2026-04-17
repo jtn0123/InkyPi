@@ -11,6 +11,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     if: github.repository == 'jtn0123/InkyPi'
+    outputs:
+      released: ${{ steps.resolve_tag.outputs.released }}
+      tag: ${{ steps.resolve_tag.outputs.tag }}
     concurrency:
       group: release
       cancel-in-progress: false
@@ -40,6 +43,26 @@ jobs:
           semantic-release version
           semantic-release publish
 
+      - name: Resolve released tag
+        id: resolve_tag
+        run: |
+          TAG=$(
+            git tag --points-at HEAD \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$' \
+            | sort -V \
+            | tail -n1 \
+            || true
+          )
+          if [ -n "${TAG}" ]; then
+            echo "released=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+            echo "Release tag: ${TAG}"
+          else
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "No new release tag on this run."
+          fi
+
       - name: Strip build-only files from GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,13 +72,7 @@ jobs:
           # also uploads them as GitHub release downloads. Users don't install
           # those files directly — they live in the repo — so drop them from
           # the release listing to keep it uncluttered.
-          TAG=$(
-            git tag --points-at HEAD \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$' \
-            | sort -V \
-            | tail -n1 \
-            || true
-          )
+          TAG="${{ steps.resolve_tag.outputs.tag }}"
           if [ -z "${TAG}" ]; then
             echo "No new release tag on this run, skipping asset cleanup"
             exit 0
@@ -82,13 +99,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(
-            git tag --points-at HEAD \
-            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$' \
-            | sort -V \
-            | tail -n1 \
-            || true
-          )
+          TAG="${{ steps.resolve_tag.outputs.tag }}"
           if [ -z "${TAG}" ]; then
             echo "No new release tag on this run, skipping SBOM upload"
             exit 0
@@ -106,3 +117,11 @@ jobs:
           else
             echo "No release found for ${TAG}, skipping SBOM upload"
           fi
+
+  wheelhouse:
+    name: Build wheelhouse release assets
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/build-wheelhouse.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
