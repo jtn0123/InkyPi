@@ -109,11 +109,12 @@ def test_playlist_details_expand(live_server, device_config_dev, browser_page):
     page = browser_page
     navigate_and_wait(page, live_server, "/playlist")
 
-    toggle = page.locator("[data-playlist-toggle]").first
+    toggles = page.locator("[data-playlist-toggle]")
+    toggle = toggles.first
     body = page.locator("[data-playlist-body]").first
 
     assert body.is_visible(), "Details section should be visible on desktop"
-    assert toggle.count() == 1, "Toggle button should still be rendered for mobile"
+    assert toggles.count() == 1, "Toggle button should still be rendered for mobile"
     assert not toggle.is_visible(), "Desktop layout should hide the mobile-only toggle"
 
 

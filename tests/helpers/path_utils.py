@@ -14,7 +14,10 @@ def path_get(payload: object, dotted_path: str) -> object:
             continue
         if not isinstance(node, dict):
             raise KeyError(f"{dotted_path}: expected mapping at '{segment}'")
-        node = node[segment]
+        try:
+            node = node[segment]
+        except KeyError as exc:
+            raise KeyError(f"{dotted_path}: missing key '{segment}'") from exc
     return node
 
 
