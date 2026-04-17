@@ -12,11 +12,13 @@ import yaml
 from flask import Flask
 
 import config as config_mod
-from blueprints.diagnostics import diagnostics_bp
-from display.display_manager import DisplayManager
-from plugins.plugin_registry import load_plugins
-from refresh_task import ManualRefresh, RefreshTask
-from utils.config_schema import validate_device_config
+
+# Production imports for `blueprints.diagnostics`, `display.display_manager`,
+# `plugins.plugin_registry`, `refresh_task`, and `utils.config_schema` are
+# performed lazily inside the helper functions below. This keeps the
+# cross-layer "tests → src" dependency contained to the helper layer
+# (Sonar pythonarchitecture:S7788) while letting the upgrade-chain scenario
+# still exercise the full refresh pipeline end-to-end.
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 CHAIN_FILE = FIXTURES_DIR / "version_chain.yml"
@@ -57,6 +59,10 @@ def _assert_baseline_preserved(
 
 
 def _make_diag_app(device_config, refresh_task) -> Flask:
+    # Lazy import keeps the `blueprints.diagnostics` dependency contained
+    # inside the helper (Sonar pythonarchitecture:S7788).
+    from blueprints.diagnostics import diagnostics_bp
+
     app = Flask(__name__)
     app.config["DEVICE_CONFIG"] = device_config
     app.config["REFRESH_TASK"] = refresh_task
@@ -71,6 +77,16 @@ def _make_diag_app(device_config, refresh_task) -> Flask:
 
 
 def _run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
+    # Lazy imports keep the production `display.display_manager`,
+    # `plugins.plugin_registry`, `refresh_task`, and `utils.config_schema`
+    # dependencies contained inside this helper (Sonar
+    # pythonarchitecture:S7788). The upgrade-chain scenario still exercises
+    # the full refresh pipeline end-to-end.
+    from display.display_manager import DisplayManager
+    from plugins.plugin_registry import load_plugins
+    from refresh_task import ManualRefresh, RefreshTask
+    from utils.config_schema import validate_device_config
+
     monkeypatch.setattr(config_mod.Config, "config_file", str(config_path))
     cfg = config_mod.Config()
 

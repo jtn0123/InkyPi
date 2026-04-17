@@ -10,7 +10,6 @@ from pathlib import Path
 import pytest
 
 import config as config_mod
-from utils.config_schema import validate_device_config
 
 LEGACY_FIXTURE_ROOT = (
     Path(__file__).resolve().parents[1] / "fixtures" / "legacy_configs"
@@ -81,6 +80,10 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     monkeypatch,
     tmp_path,
 ):
+    # Lazy import keeps the production `utils.config_schema` dependency
+    # contained inside the test body (Sonar pythonarchitecture:S7788).
+    from utils.config_schema import validate_device_config
+
     fixture_path = _fixture_device_path(fixture_name)
     raw_fixture = _load_json(fixture_path)
 
