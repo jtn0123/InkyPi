@@ -30,13 +30,13 @@ except ModuleNotFoundError:
         def labels(self, *_: object, **__: object) -> _NoopMetric:
             return self
 
-        def inc(self, _: float = 1.0) -> None:
+        def inc(self, amount: float = 1.0, **_: object) -> None:
             return
 
-        def set(self, _: float) -> None:
+        def set(self, value: float, **_: object) -> None:
             return
 
-        def observe(self, _: float) -> None:
+        def observe(self, amount: float, **_: object) -> None:
             return
 
     class _NoopRegistry:

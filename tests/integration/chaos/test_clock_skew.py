@@ -15,7 +15,9 @@ def test_clock_skew_backwards_still_allows_manual_refresh(client, flask_app):
         resp = client.post("/update_now", data={"plugin_id": "clock"})
         assert resp.status_code == 200
 
-        diagnostics = client.get("/api/diagnostics").get_json()
+        diag_resp = client.get("/api/diagnostics")
+        assert diag_resp.status_code == 200
+        diagnostics = diag_resp.get_json()
         assert diagnostics["refresh_task"]["last_error"] is None
     finally:
         refresh_task.stop()

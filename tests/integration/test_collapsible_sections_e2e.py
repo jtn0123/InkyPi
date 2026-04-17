@@ -132,8 +132,18 @@ def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
     page.evaluate("""
         () => {
             const btn = document.querySelector('[data-playlist-toggle]');
+            const body = document.querySelector('[data-playlist-body]');
+            const card = document.querySelector('[data-playlist-card]');
             if (!btn) return;
             btn.style.display = 'inline-flex';
+            btn.setAttribute('aria-expanded', 'true');
+            if (body) {
+                body.hidden = false;
+            }
+            if (card) {
+                card.classList.add('mobile-expanded');
+                card.classList.remove('mobile-collapsed');
+            }
         }
         """)
     page.wait_for_timeout(200)

@@ -14,7 +14,7 @@ from tests.helpers.config_runtime_helpers import (
     load_runtime_config,
     run_upgrade_hop,
 )
-from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
+from tests.helpers.path_utils import assert_baseline_preserved, path_get
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 CHAIN_FILE = FIXTURES_DIR / "version_chain.yml"
@@ -39,7 +39,7 @@ def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
 
     baseline_fixture = _load_json(FIXTURES_DIR / chain[0]["fixture"])
     baseline_values = {
-        dotted_path: _path_get(baseline_fixture, dotted_path)
+        dotted_path: path_get(baseline_fixture, dotted_path)
         for dotted_path in preserved_paths
     }
 
@@ -49,7 +49,7 @@ def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
         shutil.copyfile(fixture_path, runtime_config)
 
         loaded_config, diagnostics = run_upgrade_hop(runtime_config, monkeypatch)
-        _assert_baseline_preserved(
+        assert_baseline_preserved(
             baseline_values,
             loaded_config,
             preserved_paths,
@@ -67,7 +67,7 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
 
     baseline_fixture = _load_json(FIXTURES_DIR / chain[0]["fixture"])
     baseline_values = {
-        dotted_path: _path_get(baseline_fixture, dotted_path)
+        dotted_path: path_get(baseline_fixture, dotted_path)
         for dotted_path in preserved_paths
     }
 
@@ -82,7 +82,7 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
     assert_valid_device_config(loaded_config)
 
     with pytest.raises((AssertionError, KeyError), match="timezone"):
-        _assert_baseline_preserved(
+        assert_baseline_preserved(
             baseline_values,
             loaded_config,
             preserved_paths,

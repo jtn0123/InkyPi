@@ -14,7 +14,7 @@ def seed_future_refresh_info(device_config, *, days_ahead: int = 90) -> str:
         refresh_type="Playlist",
         plugin_id="clock",
         refresh_time=future_ts,
-        image_hash="future-hash",
+        image_hash=None,
         playlist="Default",
         plugin_instance="Clock",
     )

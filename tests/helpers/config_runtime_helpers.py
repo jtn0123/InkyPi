@@ -9,7 +9,7 @@ from flask import Flask
 import config as config_mod
 from blueprints.diagnostics import diagnostics_bp
 from display.display_manager import DisplayManager
-from plugins.plugin_registry import load_plugins
+from plugins.plugin_registry import load_plugins, reset_plugin_registry
 from refresh_task import ManualRefresh, RefreshTask
 from utils.config_schema import validate_device_config
 
@@ -35,6 +35,7 @@ def run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
 
     display_manager = DisplayManager(cfg)
     refresh_task = RefreshTask(cfg, display_manager)
+    reset_plugin_registry()
     load_plugins(cfg.get_plugins())
 
     app = Flask(__name__)
@@ -47,6 +48,7 @@ def run_upgrade_hop(config_path: Path, monkeypatch) -> tuple[dict, dict]:
         return ("OK", 200)
 
     app.register_blueprint(diagnostics_bp)
+    diagnostics: dict = {}
     with app.test_client() as client:
         refresh_task.start()
         try:

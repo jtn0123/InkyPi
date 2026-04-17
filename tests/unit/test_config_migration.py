@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from tests.helpers.config_runtime_helpers import assert_valid_device_config
-from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
+from tests.helpers.path_utils import assert_baseline_preserved, path_get
 
 import config as config_mod
 
@@ -39,13 +39,29 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _coerce_positive_int(value: object) -> int | None:
+    if isinstance(value, int) and value > 0:
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            coerced = int(stripped)
+        except ValueError:
+            return None
+        if coerced > 0:
+            return coerced
+    return None
+
+
 def _expected_cycle_interval_seconds(playlist_dict: dict) -> int | None:
-    cycle_seconds = playlist_dict.get("cycle_interval_seconds")
-    if isinstance(cycle_seconds, int) and cycle_seconds > 0:
+    cycle_seconds = _coerce_positive_int(playlist_dict.get("cycle_interval_seconds"))
+    if cycle_seconds is not None:
         return cycle_seconds
 
-    cycle_minutes = playlist_dict.get("cycle_minutes")
-    if isinstance(cycle_minutes, int) and cycle_minutes > 0:
+    cycle_minutes = _coerce_positive_int(playlist_dict.get("cycle_minutes"))
+    if cycle_minutes is not None:
         return cycle_minutes * 60
     return None
 
@@ -71,10 +87,10 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
 
     # (b) no silent key drops for critical user-facing values.
     baseline_values = {
-        dotted_path: _path_get(raw_fixture, dotted_path)
+        dotted_path: path_get(raw_fixture, dotted_path)
         for dotted_path in SENTINEL_PATHS
     }
-    _assert_baseline_preserved(
+    assert_baseline_preserved(
         baseline_values,
         loaded,
         SENTINEL_PATHS,
@@ -82,19 +98,22 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     )
 
     # (c) migration behavior: legacy cycle_minutes/schedule aliases map correctly.
+    playlist_dicts = raw_fixture.get("playlist_config", {}).get("playlists", [])
+    assert playlist_dicts, (
+        f"{fixture_name} fixture must include a playlist to verify cycle/schedule migration"
+    )
+    plugin_dicts = playlist_dicts[0].get("plugins", [])
+    assert plugin_dicts, (
+        f"{fixture_name} fixture must include a plugin to verify schedule migration"
+    )
+
     playlist = cfg.get_playlist_manager().get_playlist("Default")
     assert playlist is not None
-    expected_cycle_seconds = _expected_cycle_interval_seconds(
-        raw_fixture["playlist_config"]["playlists"][0]
-    )
+    expected_cycle_seconds = _expected_cycle_interval_seconds(playlist_dicts[0])
     assert playlist.cycle_interval_seconds == expected_cycle_seconds
 
     plugin = playlist.plugins[0]
-    legacy_schedule = (
-        raw_fixture["playlist_config"]["playlists"][0]["plugins"][0]
-        .get("refresh", {})
-        .get("schedule")
-    )
+    legacy_schedule = plugin_dicts[0].get("refresh", {}).get("schedule")
     if legacy_schedule is not None:
         assert plugin.refresh.get("scheduled") == legacy_schedule
 
@@ -130,7 +149,7 @@ def test_renamed_key_without_migration_is_detected(
     cfg = config_mod.Config()
 
     with pytest.raises((AssertionError, KeyError), match="timezone"):
-        baseline_values = {"timezone": _path_get(baseline, "timezone")}
-        _assert_baseline_preserved(
+        baseline_values = {"timezone": path_get(baseline, "timezone")}
+        assert_baseline_preserved(
             baseline_values, cfg.get_config(), ("timezone",), version="renamed-key"
         )

@@ -60,6 +60,11 @@ def test_metrics_helpers_work_without_prometheus(monkeypatch):
             metrics_module.refreshes_total.labels("success")
             is metrics_module.refreshes_total
         )
+        metrics_module.refreshes_total.inc(amount=2.0, exemplar={"trace_id": "123"})
+        metrics_module.last_successful_refresh_timestamp.set(value=1.0)
+        metrics_module.http_request_duration_seconds.observe(
+            amount=0.01, exemplar={"trace_id": "123"}
+        )
         metrics_module.record_refresh_success()
         metrics_module.record_refresh_failure("fallback_plugin")
         metrics_module.set_circuit_breaker_open("fallback_plugin", True)
