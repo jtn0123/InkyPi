@@ -30,6 +30,7 @@ ongoing feature work.
 | `src/refresh_task/worker.py` | Refresh guards PR |
 | `src/utils/sri.py` | Quality guards follow-up PR |
 | `src/utils/time_utils.py` | Quality guards PR |
+| `src/utils/http_cache.py` | JTN-676 |
 | `src/model.py` | JTN-663 |
 
 `src/utils/http_cache.py` was deliberately deferred from the initial strict

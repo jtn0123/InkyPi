@@ -12,6 +12,7 @@
 #     echo_override / show_loader)
 #   - get_os_version
 #   - setup_zramswap_service / setup_earlyoom_service
+#   - configure_persistent_journal / disable_wifi_powersave
 #   - stop_service
 #   - build_css_bundle
 # =============================================================================
@@ -115,6 +116,79 @@ setup_earlyoom_service() {
   echo "Enabling and starting earlyoom service."
   sudo apt-get install -y earlyoom > /dev/null
   sudo systemctl enable --now earlyoom
+}
+
+configure_persistent_journal() {
+  local conf="/etc/systemd/journald.conf"
+  local changed=0
+
+  if [ ! -f "$conf" ]; then
+    echo "journald config not found at $conf — skipping persistent journal setup."
+    return 0
+  fi
+
+  # Ensure logs survive reboots so post-incident diagnosis is still possible.
+  sudo mkdir -p /var/log/journal
+
+  if ! grep -Eq '^[[:space:]]*Storage=' "$conf"; then
+    echo "Configuring persistent journal storage."
+    echo "Storage=persistent" | sudo tee -a "$conf" > /dev/null
+    changed=1
+  fi
+  if ! grep -Eq '^[[:space:]]*SystemMaxUse=' "$conf"; then
+    echo "Configuring journal size limit (50M)."
+    echo "SystemMaxUse=50M" | sudo tee -a "$conf" > /dev/null
+    changed=1
+  fi
+  if ! grep -Eq '^[[:space:]]*RuntimeMaxUse=' "$conf"; then
+    echo "Configuring runtime journal size limit (50M)."
+    echo "RuntimeMaxUse=50M" | sudo tee -a "$conf" > /dev/null
+    changed=1
+  fi
+
+  if [ "$changed" -eq 1 ]; then
+    sudo systemctl restart systemd-journald
+    echo_success "Persistent journal storage configured."
+  else
+    echo_success "Persistent journal storage already configured."
+  fi
+}
+
+disable_wifi_powersave() {
+  local nm_conf_dir="/etc/NetworkManager/conf.d"
+  local nm_conf_file="$nm_conf_dir/100-inkypi-wifi-powersave.conf"
+  local active_wifi_connection=""
+
+  if [ ! -d /sys/class/net/wlan0 ]; then
+    echo "wlan0 not present — skipping Wi-Fi powersave hardening."
+    return 0
+  fi
+
+  if command -v iw >/dev/null 2>&1; then
+    sudo iw dev wlan0 set power_save off >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v nmcli >/dev/null 2>&1; then
+    echo "nmcli not available — applied best-effort runtime Wi-Fi powersave disable only."
+    return 0
+  fi
+
+  sudo mkdir -p "$nm_conf_dir"
+  if [ ! -f "$nm_conf_file" ] || ! grep -Eq '^[[:space:]]*wifi\.powersave[[:space:]]*=[[:space:]]*2[[:space:]]*$' "$nm_conf_file"; then
+    cat <<'EOF' | sudo tee "$nm_conf_file" > /dev/null
+[connection]
+wifi.powersave = 2
+EOF
+    echo "Configured NetworkManager default Wi-Fi powersave to disabled."
+  fi
+
+  active_wifi_connection=$(nmcli -g GENERAL.CONNECTION device show wlan0 2>/dev/null | head -n 1)
+  if [ -n "$active_wifi_connection" ] && [ "$active_wifi_connection" != "--" ]; then
+    sudo nmcli connection modify "$active_wifi_connection" 802-11-wireless.powersave 2 >/dev/null 2>&1 || true
+    echo_success "Disabled Wi-Fi powersave for active NetworkManager profile."
+  else
+    echo "No active NetworkManager Wi-Fi profile on wlan0 — leaving default hardening in place."
+  fi
 }
 
 # ---------------------------------------------------------------------------

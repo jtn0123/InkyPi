@@ -1,7 +1,7 @@
 # pyright: reportMissingImports=false
 """Tests for settings health and progress SSE endpoints (_health.py)."""
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 
@@ -10,7 +10,7 @@ class TestHealthPlugins:
         """Entries with last_seen older than the window are filtered out."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
 
-        stale_time = (datetime.now() - timedelta(days=2)).isoformat()
+        stale_time = (datetime.now(UTC) - timedelta(days=2)).isoformat()
         snapshot = {"old_plugin": {"last_seen": stale_time, "status": "ok"}}
 
         rt = MagicMock()
@@ -28,7 +28,7 @@ class TestHealthPlugins:
     def test_keeps_recent_entries(self, client, monkeypatch):
         """Entries with recent last_seen are preserved."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "1440")
-        recent_time = datetime.now().isoformat()
+        recent_time = datetime.now(UTC).isoformat()
         snapshot = {"fresh_plugin": {"last_seen": recent_time, "status": "ok"}}
 
         rt = MagicMock()
@@ -73,7 +73,7 @@ class TestHealthPlugins:
         """Non-numeric INKYPI_HEALTH_WINDOW_MIN falls back to 1440."""
         monkeypatch.setenv("INKYPI_HEALTH_WINDOW_MIN", "abc")
 
-        recent_time = datetime.now().isoformat()
+        recent_time = datetime.now(UTC).isoformat()
         snapshot = {"plugin": {"last_seen": recent_time}}
 
         rt = MagicMock()

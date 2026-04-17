@@ -156,11 +156,7 @@ _PLUGIN_MAX_CLICKS_PER_PAGE = 15
 # issue so they get cleaned up, not left to rot. Discovered during the
 # initial JTN-698 landing — these plugins have real handler bugs the sweep
 # surfaced, tracked separately so the infra lands green.
-_PLUGIN_XFAIL: dict[str, str] = {
-    "weather": (
-        "JTN-716 — Style picker collapsible + nav links no-op on /plugin/weather"
-    ),
-}
+_PLUGIN_XFAIL: dict[str, str] = {}
 
 
 _ENUMERATE_JS = """
@@ -204,12 +200,29 @@ _ENUMERATE_JS = """
     el.setAttribute('data-clicksweep-id', marker);
     const hrefAttr = el.getAttribute('href');
     // "Already at target state" heuristics — clicking one of these is a
-    // legitimate no-op and should not count as a silent failure. Two cases:
+    // legitimate no-op and should not count as a silent failure. Cases:
     // * An anchor whose href is the current pathname (logo/home links).
     // * A selector-style button already flagged selected/active.
+    // * A pure hash anchor (`/foo#section` on `/foo`, or `#section`) —
+    //   Playwright treats hash-only navigations as non-navigations and the
+    //   snapshot's URL comparison only tracks pathname differences, so
+    //   hash-only changes may register as no-op even though the handler
+    //   (native anchor scroll) fired correctly. See JTN-716.
+    const hrefUrl = (() => {
+      try { return hrefAttr ? new URL(hrefAttr, window.location.href) : null; }
+      catch (_) { return null; }
+    })();
+    const normalizePath = (p) =>
+      (p && p.length > 1 && p.endsWith('/')) ? p.slice(0, -1) : p;
+    const normalizedCurrentPath = normalizePath(currentPath);
     const isSameLink =
       el.tagName === 'A' && hrefAttr && (hrefAttr === currentPath ||
         hrefAttr === currentPath + '/' || hrefAttr === '#');
+    const isSameOriginHashLink =
+      el.tagName === 'A' && !!hrefUrl &&
+      hrefUrl.origin === window.location.origin &&
+      normalizePath(hrefUrl.pathname) === normalizedCurrentPath &&
+      !!hrefUrl.hash;
     const isAlreadySelected =
       el.classList.contains('selected') || el.classList.contains('active') ||
       el.getAttribute('aria-pressed') === 'true' ||
@@ -222,7 +235,7 @@ _ENUMERATE_JS = """
         !!(el.dataset && (el.dataset.pluginAction || el.dataset.apiAction ||
                           el.dataset.historyAction || el.dataset.settingsTab)),
       href: hrefAttr || null,
-      tolerateNoChange: isSameLink || isAlreadySelected,
+      tolerateNoChange: isSameLink || isSameOriginHashLink || isAlreadySelected,
     });
   }
   return descriptors;
@@ -356,6 +369,83 @@ def _reset_page_state(page, base_url: str, sweep: SweepPage) -> None:
     _install_observer(page)
 
 
+# After a click opens a modal, close it before the next iteration so the
+# overlay doesn't intercept subsequent clicks on background controls. Without
+# this, clicking "Select Location" on /plugin/weather leaves the map modal
+# open for the rest of the sweep and every later click silently no-ops.
+# Closing is best-effort: first try the modal's own close handler so focus
+# restoration + stacking-context cleanup runs (JS force-close leaves focus
+# trapped inside the hidden modal and subsequent clicks misbehave — see
+# JTN-716), then fall back to attribute flips when no close button exists.
+_CLOSE_OPEN_MODALS_JS = """
+() => {
+  const modals = Array.from(document.querySelectorAll(
+    '.modal.is-open, .modal[style*="display: block"], .modal[style*="display:block"], ' +
+    '.modal[style*="display: flex"], .modal[style*="display:flex"], ' +
+    '[aria-modal="true"]:not([hidden]), dialog[open]'
+  ));
+  // Filter to modals whose computed display is actually visible — matching
+  // the selector without the display check picks up modals that carry
+  // `aria-modal` but are already display:none via CSS.
+  const visibleModals = modals.filter((m) => getComputedStyle(m).display !== 'none');
+  let closed = 0;
+  for (const modal of visibleModals) {
+    if (modal.tagName === 'DIALOG') {
+      if (typeof modal.close === 'function') {
+        try { modal.close(); } catch (_) { /* ignore and continue fallback */ }
+      } else {
+        modal.removeAttribute('open');
+        modal.open = false;
+      }
+      if (!modal.open && !modal.hasAttribute('open')) {
+        closed += 1;
+        continue;
+      }
+    }
+    // Prefer the modal's own close button so the page's close handler runs
+    // (focus restore, backdrop cleanup, body.modal-open toggle). Only fall
+    // back to attribute flips when no close button exists — raw style flips
+    // leave focus trapped inside the now-hidden modal, which causes later
+    // hit-testing to route clicks to the wrong element.
+    const closeBtn = modal.querySelector(
+      '[data-close-modal], .close-button, .modal-close, [aria-label="Close"]'
+    );
+    if (closeBtn && typeof closeBtn.click === 'function') {
+      try {
+        closeBtn.click();
+        if (getComputedStyle(modal).display === 'none' || modal.hidden) {
+          closed += 1;
+          continue;
+        }
+      } catch (_) { /* fall through to style flip */ }
+    }
+    modal.hidden = true;
+    modal.style.display = 'none';
+    modal.classList.remove('is-open');
+    closed += 1;
+  }
+  if (closed > 0) {
+    document.body?.classList.remove('modal-open');
+    // Move focus back to body so subsequent clicks aren't trapped inside a
+    // hidden modal descendant, and blur whatever had focus inside the modal.
+    const active = document.activeElement;
+    if (active && active !== document.body && typeof active.blur === 'function') {
+      try { active.blur(); } catch (_) { /* ignore */ }
+    }
+  }
+  return closed;
+}
+"""
+
+
+def _close_open_modals(page) -> None:
+    """Best-effort close any modal dialogs opened by a click."""
+    try:
+        page.evaluate(_CLOSE_OPEN_MODALS_JS)
+    except Exception:  # noqa: BLE001 — modal-close is advisory
+        pass
+
+
 def _run_click_sweep(
     page,
     live_server: str,
@@ -418,6 +508,11 @@ def _run_click_sweep(
         # us back so the rest of the sweep runs against the intended page.
         if before["url"] != after["url"]:
             _reset_page_state(page, live_server, sweep)
+        elif after.get("openModal") and not before.get("openModal"):
+            # Click opened a modal. Close it before the next iteration so the
+            # overlay doesn't intercept clicks on background controls. See
+            # JTN-716 for why this matters on /plugin/weather.
+            _close_open_modals(page)
 
     assert clicks_performed > 0, (
         f"{sweep.path}: enumerated {len(descriptors)} candidates but clicked "

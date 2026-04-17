@@ -47,6 +47,10 @@ UI_BROWSER_TESTS = {
     "test_jtn_720_721_722_journeys.py",
     # JTN-724 update-flow happy-path journey.
     "test_update_flow_happy_path.py",
+    # JTN-719 device-actions journey (reboot/shutdown confirm/cancel flow).
+    "test_device_actions_roundtrip.py",
+    # JTN-728/727/726/725 device/update/ops journey bundle.
+    "test_device_update_ops_journeys.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_axe_a11y.py",
@@ -62,6 +66,20 @@ MANAGED_API_KEY_ENV_VARS = (
     "GITHUB_SECRET",
     "GOOGLE_AI_SECRET",
 )
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        default=False,
+        help="Regenerate tests/snapshots baselines instead of asserting diffs.",
+    )
+
+
+def pytest_configure(config):
+    if config.getoption("--update-snapshots"):
+        os.environ["SNAPSHOT_UPDATE"] = "1"
 
 
 def _is_truthy(value: str) -> bool:

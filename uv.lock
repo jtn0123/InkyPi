@@ -442,7 +442,7 @@ wheels = [
 
 [[package]]
 name = "inkypi"
-version = "0.60.6"
+version = "0.61.1"
 source = { editable = "." }
 dependencies = [
     { name = "astral" },

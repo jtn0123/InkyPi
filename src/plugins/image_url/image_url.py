@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlparse
 
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
@@ -24,13 +23,9 @@ class ImageURL(BasePlugin):
         if not url:
             return "Image URL is required."
         try:
-            parsed = urlparse(url)
-        except ValueError:
-            return f"Image URL is not valid: {url!r}"
-        if parsed.scheme.lower() not in {"http", "https"}:
-            return "Image URL must start with http:// or https://"
-        if not parsed.netloc:
-            return f"Image URL is not valid: {url!r}"
+            validate_url(url)
+        except ValueError as err:
+            return str(err)
         return None
 
     def build_settings_schema(self):

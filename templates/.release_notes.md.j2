@@ -1,0 +1,41 @@
+{#
+  Custom GitHub release notes template for python-semantic-release.
+
+  Produces short, scannable, emoji-sectioned release notes in the style of
+  https://github.com/Blur009/Blur-AutoClicker/releases — one line per change,
+  no commit hashes, no PR links, no squash-commit body leakage, no
+  Co-Authored-By noise.
+
+  Context variables (provided by python-semantic-release 9.x):
+    release         - Release TypedDict with version / tagged_date / elements
+    release.elements - dict[str, list[ParsedCommit]] keyed by commit category
+                       (e.g. "features", "bug fixes", "refactoring") — see
+                       angular.LONG_TYPE_NAMES
+
+  The CHANGELOG.md keeps its detailed auto-generated format; this file only
+  customises the GitHub release body.
+#}
+{%- macro render_line(commit) -%}
+{%- set raw = commit.descriptions[0] | trim -%}
+{%- set first_word = raw.split(" ", 1)[0] | capitalize -%}
+{%- set rest = raw.split(" ", 1)[1] if " " in raw else "" -%}
+{%- set summary = (first_word ~ " " ~ rest) | trim -%}
+{%- if commit.scope -%}**{{ commit.scope }}**: {{ summary }}{%- else -%}{{ summary }}{%- endif -%}
+{%- endmacro -%}
+{%- set new_commits     = release.elements.get("features", []) -%}
+{%- set fix_commits     = release.elements.get("bug fixes", []) -%}
+{%- set changed_commits = release.elements.get("refactoring", [])
+                        + release.elements.get("performance improvements", []) -%}
+# {{ release.version.as_tag() }} ({{ release.tagged_date.strftime("%Y-%m-%d") }})
+{% if new_commits %}
+## ❇️ New
+{% for commit in new_commits %}- {{ render_line(commit) }}
+{% endfor %}{% endif -%}
+{% if changed_commits %}
+## 🔹 Changed
+{% for commit in changed_commits %}- {{ render_line(commit) }}
+{% endfor %}{% endif -%}
+{% if fix_commits %}
+## 🔺 Fix
+{% for commit in fix_commits %}- {{ render_line(commit) }}
+{% endfor %}{% endif -%}

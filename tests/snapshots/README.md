@@ -1,21 +1,22 @@
 # Plugin Snapshot (Golden-File) Tests
 
 This directory holds golden-file baselines for plugin `generate_image()` outputs.
-Each snapshot consists of two files:
+Each snapshot baseline is a canonical PNG:
 
 ```
-tests/snapshots/<plugin_name>/<case_name>.png     # canonical image for human review
-tests/snapshots/<plugin_name>/<case_name>.sha256  # SHA-256 hex digest (what tests compare)
+tests/snapshots/<plugin_name>/<case_name>.png     # canonical image for comparison + review
 ```
 
 ## How it works
 
 1. A test freezes all non-deterministic inputs (time, network calls, random seeds).
 2. It calls `plugin.generate_image(settings, device_config)`.
-3. `assert_image_snapshot(result, plugin_name, case_name)` hashes the rendered PNG
-   and compares it against the stored `.sha256` baseline.
-4. If the digest matches → test passes.  If not → the test fails with a clear message
-   pointing at the baseline file so you can inspect the diff.
+3. `assert_image_snapshot(result, plugin_name, case_name)` performs a pixel diff
+   against the stored baseline PNG.
+4. If the diff is within tolerance → pass. If not → fail and emit:
+   - `tests/snapshots/actual/<plugin>/<case>.png` (actual output)
+   - `tests/snapshots/actual/<plugin>/<case>.diff.png` (red overlay of changed pixels)
+   - `tests/snapshots/actual/<plugin>/<case>.diff.json` (counts + thresholds)
 
 ## Browser requirement
 
@@ -72,19 +73,16 @@ docker run --rm --platform linux/amd64 -v "$(pwd):/app" -w /app \
     pip install --no-cache-dir -r install/requirements.txt \
                                -r install/requirements-dev.txt
     python -m playwright install --with-deps chromium
-    SNAPSHOT_UPDATE=1 REQUIRE_BROWSER_SMOKE=1 \
-      INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
-      python -m pytest tests/snapshots/ -v
+    REQUIRE_BROWSER_SMOKE=1 INKYPI_ENV=dev INKYPI_NO_REFRESH=1 PYTHONPATH=src \
+      python -m pytest tests/snapshots/ -v --update-snapshots
   '
 ```
 
-After the run, commit the updated `tests/snapshots/<plugin>/*.png` +
-`*.sha256` files together.
+After the run, commit the updated `tests/snapshots/<plugin>/*.png` files.
 
 > `scripts/update_snapshots.py` still works for running inside a properly
-> set-up environment (local venv with chromium, or the Pi).  It is a thin
-> wrapper that sets `SNAPSHOT_UPDATE=1` and re-executes pytest — you still
-> need `REQUIRE_BROWSER_SMOKE=1` and a working Chromium install.
+> set-up environment (local venv with chromium, or the Pi). It is a thin
+> wrapper around `pytest ... --update-snapshots`.
 
 ## Adding snapshots for a new plugin
 
@@ -97,13 +95,14 @@ After the run, commit the updated `tests/snapshots/<plugin>/*.png` +
    white canvas) before committing — if they're blank, Chromium isn't
    actually rendering and you need to debug the environment before trusting
    the baseline.
-4. Commit the `.png` + `.sha256` files alongside the test.
+4. Commit the `.png` files alongside the test.
 
 ## Design decisions
 
-- **Hash-based comparison** — we compare SHA-256 digests rather than pixel-diffing.
-  This keeps the helper dependency-free and fast.  If you need pixel-level diff
-  images for CI review, that's a Phase 2 enhancement (see JTN-509 follow-ups).
+- **Pixel-based comparison** — snapshots compare rendered pixels with configurable
+  tolerance:
+  - `SNAPSHOT_CHANNEL_THRESHOLD` (default `6`) for per-channel delta.
+  - `SNAPSHOT_MAX_CHANGED_PCT` (default `0.05`) for changed-pixel percentage.
 - **No `pytest-snapshot` dep** — a tiny custom helper avoids adding a new package
   to the lockfile and keeps the comparison logic transparent.
 - **PNG binaries** — `.gitattributes` marks `tests/snapshots/**/*.png` as binary so

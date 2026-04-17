@@ -9,20 +9,26 @@ PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
 class TestRefreshSettingsBtnListener:
-    """Verify playlist.js registers a click listener for .refresh-settings-btn."""
+    """Verify playlist.js delegates refresh-settings actions from playlist cards."""
 
-    def test_js_has_refresh_settings_btn_listener(self):
+    def test_js_delegates_playlist_actions(self):
         js_text = PLAYLIST_JS.read_text()
         assert (
-            ".refresh-settings-btn" in js_text
-        ), "playlist.js must bind a click listener on .refresh-settings-btn"
+            "[data-playlist-action]" in js_text
+        ), "playlist.js must delegate playlist card clicks via data-playlist-action"
+        assert (
+            "dataset.playlistAction" in js_text
+        ), "playlist.js must read dataset.playlistAction from the delegated target"
 
-    def test_js_calls_open_refresh_modal(self):
+    def test_js_handles_refresh_action(self):
         js_text = PLAYLIST_JS.read_text()
-        # The listener block should call openRefreshModal
+        assert (
+            "action === 'edit-refresh'" in js_text
+            or 'action === "edit-refresh"' in js_text
+        ), "delegated handler must branch on the edit-refresh action"
         assert (
             "openRefreshModal" in js_text
-        ), "playlist.js must call openRefreshModal from the refresh-settings-btn listener"
+        ), "playlist.js must call openRefreshModal from the delegated refresh action"
 
     def test_js_parses_data_refresh_attribute(self):
         js_text = PLAYLIST_JS.read_text()
@@ -52,6 +58,7 @@ class TestRefreshSettingsBtnTemplate:
         ), "playlist.html must contain a button with refresh-settings-btn class"
         btn_match = btn_pattern.group(0)
         for attr in (
+            'data-playlist-action="edit-refresh"',
             "data-playlist",
             "data-plugin-id",
             "data-instance",

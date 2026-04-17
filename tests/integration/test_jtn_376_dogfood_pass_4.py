@@ -10,12 +10,13 @@ from pathlib import Path
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
 # Root path to the JS scripts directory (resolved once).
 _JS_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "scripts"
+
+
+def _read_js_asset(filename: str) -> str:
+    """Return the contents of a JS asset from src/static/scripts."""
+    return (_JS_DIR / filename).read_text(encoding="utf-8")
 
 
 def _save_plugin(client, data, *, expect_status=400):
@@ -30,7 +31,6 @@ def _save_plugin(client, data, *, expect_status=400):
 # ---------------------------------------------------------------------------
 
 _REJECT_CASES = [
-    # (test id, form data, substring expected in error)
     (
         "ai_image_empty_prompt",
         {"plugin_id": "ai_image", "textPrompt": ""},
@@ -45,6 +45,16 @@ _REJECT_CASES = [
         "ai_image_invalid_model",
         {"plugin_id": "ai_image", "textPrompt": "A cat", "imageModel": "not-a-model"},
         "model",
+    ),
+    (
+        "ai_image_mismatched_provider_model",
+        {
+            "plugin_id": "ai_image",
+            "textPrompt": "A cat",
+            "provider": "google",
+            "imageModel": "gpt-image-1.5",
+        },
+        "provider",
     ),
     (
         "ai_text_empty_prompt",
@@ -70,6 +80,11 @@ _REJECT_CASES = [
         "countdown_invalid_date",
         {"plugin_id": "countdown", "title": "Trip", "date": "not-a-date"},
         "date",
+    ),
+    (
+        "countdown_missing_date",
+        {"plugin_id": "countdown", "title": "Trip", "date": ""},
+        "required",
     ),
     (
         "image_url_empty",
@@ -98,6 +113,18 @@ def test_save_plugin_rejects_invalid(client, form_data, error_substr):
     """Plugin validation rejects bad input with a 400 and a descriptive error."""
     _, body = _save_plugin(client, form_data, expect_status=400)
     assert error_substr.lower() in body.get("error", "").lower()
+
+
+def test_image_url_save_rejects_nonsense_url_with_error_body(client):
+    """Nonsense URLs should fail for URL validation, not an unrelated 400."""
+    _, body = _save_plugin(
+        client,
+        {"plugin_id": "image_url", "url": "not-a-url"},
+        expect_status=400,
+    )
+    assert isinstance(body, dict)
+    assert "error" in body
+    assert "http" in body["error"].lower() or "hostname" in body["error"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +220,7 @@ def test_add_plugin_rejects_bad_interval(
 
 def test_api_keys_page_js_addrow_uses_password_type():
     """JS-built API key rows must use type=password for value inputs."""
-    js = (_JS_DIR / "api_keys_page.js").read_text(encoding="utf-8")
+    js = _read_js_asset("api_keys_page.js")
     assert 'valInput.type = "password"' in js
     assert 'valInput.type = "text"' not in js
 
@@ -205,9 +232,18 @@ def test_api_keys_page_js_addrow_uses_password_type():
 
 def test_refresh_settings_manager_js_validates_interval_range():
     """The JS RefreshSettingsManager must check interval upper bound (999)."""
-    js = (_JS_DIR / "refresh_settings_manager.js").read_text(encoding="utf-8")
+    js = _read_js_asset("refresh_settings_manager.js")
     assert "999" in js
     assert "between 1 and 999" in js
+
+
+def test_refresh_settings_manager_js_scheduled_time_hhmm_only():
+    """JS scheduled-time regex must match backend contract (HH:MM only, no seconds)."""
+    js = _read_js_asset("refresh_settings_manager.js")
+    # Strict HH:MM-only pattern must be present
+    assert r"/^\d{2}:\d{2}$/" in js
+    # The optional-seconds variant must NOT be present (it mismatches the backend)
+    assert r"(:\d{2})?" not in js
 
 
 # ---------------------------------------------------------------------------
@@ -217,15 +253,13 @@ def test_refresh_settings_manager_js_validates_interval_range():
 
 def test_settings_page_js_benchmark_empty_state_message():
     """When no benchmark data exists, show a human message instead of null JSON."""
-    js = (_JS_DIR / "settings_page.js").read_text(encoding="utf-8")
+    js = _read_js_asset("settings_page.js")
     assert "No benchmark data recorded" in js
 
 
 def test_settings_page_js_isolation_human_messages():
     """Isolation actions should show human-readable messages."""
-    js = (_JS_DIR / "settings_page.js").read_text(encoding="utf-8")
-    # Isolation status messages are built from a shared helper that splices
-    # an "isolated" / "un-isolated" participle into "has been ${past}.".
+    js = _read_js_asset("settings_page.js")
     assert "has been ${past}" in js
     assert '"isolated"' in js
     assert '"un-isolate"' in js

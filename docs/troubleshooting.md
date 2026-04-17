@@ -62,7 +62,27 @@ sudo journalctl --vacuum-size=50M
 
 > **Note:** The in-memory log buffer used in dev mode (`--dev`) holds at most 1,000 entries and is never written to disk, so it has no impact on journal size.
 
-The InkyPi install script (`install/install.sh`) automatically applies a 50M journal cap during a fresh install if no `SystemMaxUse` limit is already configured.
+The InkyPi install and update scripts automatically enable persistent journald storage and apply `50M` caps for both `SystemMaxUse` and `RuntimeMaxUse` when no explicit journald settings already exist.
+
+## Intermittent Wi-Fi reachability / SSH drops
+
+If the Pi appears online but drops SSH or misses pings intermittently, check whether Wi-Fi power saving is enabled on `wlan0`:
+
+```bash
+nmcli -g 802-11-wireless.powersave connection show "$(nmcli -g GENERAL.CONNECTION device show wlan0 | head -n 1)"
+```
+
+`2` means disabled, which is the recommended setting for an always-on Pi. InkyPi now hardens NetworkManager-based installs and updates by writing a NetworkManager config drop-in and disabling Wi-Fi powersave on the active `wlan0` profile when possible.
+
+To inspect the current link and roaming state:
+
+```bash
+nmcli -f GENERAL.STATE,GENERAL.CONNECTION,IP4.ADDRESS dev show wlan0
+cat /proc/net/wireless
+journalctl -b | grep -Ei 'wlan0|brcmfmac|CTRL-EVENT|deauth|disassoc'
+```
+
+If you still see drops after power-save hardening, compare signal strength across nearby APs with the same SSID and consider pinning the Pi to the strongest BSSID.
 
 ## Restart the InkyPi Service
 
