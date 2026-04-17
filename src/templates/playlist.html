@@ -78,15 +78,15 @@
                         </div>
                         <div class="playlist-toolbar">
                             {% if playlist.plugins %}
-                            <button class="header-button is-secondary run-next-btn" type="button" data-playlist="{{ playlist.name }}">Display Next</button>
+                            <button class="header-button is-secondary run-next-btn" type="button" data-playlist-action="confirm-display-next" data-playlist="{{ playlist.name }}">Display Next</button>
                             {% endif %}
                             {# data-test-skip-click: click-sweep leaves modals open while iterating, so
                                background Edit buttons become non-interactive by design on mobile. Dedicated
                                browser tests cover the real edit-modal path directly. #}
-                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist {{ playlist.name }}" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}" data-test-skip-click="true">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
+                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist {{ playlist.name }}" data-playlist-action="edit-playlist" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}" data-test-skip-click="true">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
                             {# data-test-skip-click: deletes the playlist #}
-                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
-                            <button class="playlist-toggle-button" type="button" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
+                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist-action="delete-playlist" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
+                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
                         </div>
                     </div>
                     <div class="playlist-card-body" data-playlist-body>
@@ -143,6 +143,7 @@
                                 </a>
                                 <button class="edit-button refresh-settings-btn" type="button"
                                         title="Edit refresh settings for {{ pi_label }}"
+                                        data-playlist-action="edit-refresh"
                                         data-playlist="{{ playlist.name }}"
                                         data-plugin-id="{{ plugin_instance.plugin_id }}"
                                         data-instance="{{ plugin_instance.name }}"
@@ -152,13 +153,13 @@
                                     <span class="action-button-label">Refresh settings</span>
                                     <span class="sr-only"> for {{ pi_label }}</span>
                                 </button>
-                                <button class="edit-button plugin-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                <button class="edit-button plugin-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                     <span class="action-button-label">Display</span>
                                     <span class="sr-only"> {{ pi_label }} now</span>
                                 </button>
                                 {# data-test-skip-click: removes a plugin instance from the playlist #}
-                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
+                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
                                     {{ icon('trash', 'action-icon') | safe }}
                                     <span class="action-button-label">Delete</span>
                                     <span class="sr-only"> plugin instance {{ pi_label }}</span>
