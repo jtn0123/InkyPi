@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.61.1 (2026-04-17)
+
+### Bug Fixes
+
+- **playlist**: Delegate card actions and harden toggle state
+  ([#525](https://github.com/jtn0123/InkyPi/pull/525),
+  [`259cfe9`](https://github.com/jtn0123/InkyPi/commit/259cfe949ab25789b4a17f9381d8b1db37d1606e))
+
+
 ## v0.61.0 (2026-04-17)
 
 ### Features
