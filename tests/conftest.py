@@ -53,6 +53,8 @@ UI_BROWSER_TESTS = {
     "test_device_update_ops_journeys.py",
     # JTN-727 logs-access journey (trigger error, download, verify payload).
     "test_logs_access.py",
+    # JTN-726 refresh-interval change journey (UI save -> reload -> diagnostics).
+    "test_refresh_interval_change.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",
