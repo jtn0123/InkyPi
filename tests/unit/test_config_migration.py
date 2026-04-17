@@ -99,13 +99,13 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
 
     # (c) migration behavior: legacy cycle_minutes/schedule aliases map correctly.
     playlist_dicts = raw_fixture.get("playlist_config", {}).get("playlists", [])
-    assert playlist_dicts, (
-        f"{fixture_name} fixture must include a playlist to verify cycle/schedule migration"
-    )
+    assert (
+        playlist_dicts
+    ), f"{fixture_name} fixture must include a playlist to verify cycle/schedule migration"
     plugin_dicts = playlist_dicts[0].get("plugins", [])
-    assert plugin_dicts, (
-        f"{fixture_name} fixture must include a plugin to verify schedule migration"
-    )
+    assert (
+        plugin_dicts
+    ), f"{fixture_name} fixture must include a plugin to verify schedule migration"
 
     playlist = cfg.get_playlist_manager().get_playlist("Default")
     assert playlist is not None

@@ -52,7 +52,10 @@ def _normalize_route_pattern(route: str) -> str:
 def _find_endpoint_for_get(flask_app, route: str) -> str | None:
     normalized_route = _normalize_route_pattern(route)
     for rule in flask_app.url_map.iter_rules():
-        if _normalize_route_pattern(rule.rule) == normalized_route and "GET" in rule.methods:
+        if (
+            _normalize_route_pattern(rule.rule) == normalized_route
+            and "GET" in rule.methods
+        ):
             return rule.endpoint
     return None
 

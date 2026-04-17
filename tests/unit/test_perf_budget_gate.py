@@ -86,14 +86,20 @@ def test_parse_env_float_falls_back_for_invalid_value(monkeypatch, capsys):
     assert "ignoring malformed PERF_COLD_START_BUDGET_S" in capsys.readouterr().err
 
 
-def test_run_cold_start_samples_keeps_successful_runs_after_failures(monkeypatch, capsys):
+def test_run_cold_start_samples_keeps_successful_runs_after_failures(
+    monkeypatch, capsys
+):
     results = iter(
         [
-            subprocess.CompletedProcess(args=["probe"], returncode=0, stdout="", stderr=""),
+            subprocess.CompletedProcess(
+                args=["probe"], returncode=0, stdout="", stderr=""
+            ),
             subprocess.CompletedProcess(
                 args=["probe"], returncode=1, stdout="oops", stderr="bad"
             ),
-            subprocess.CompletedProcess(args=["probe"], returncode=0, stdout="", stderr=""),
+            subprocess.CompletedProcess(
+                args=["probe"], returncode=0, stdout="", stderr=""
+            ),
         ]
     )
     elapsed = iter([1.0, 1.4, 2.0, 2.6, 3.0, 3.9])
