@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.61.2 (2026-04-17)
+
+### Bug Fixes
+
+- **release**: Pin wheelhouse publication (JTN-745)
+  ([#524](https://github.com/jtn0123/InkyPi/pull/524),
+  [`7b62b22`](https://github.com/jtn0123/InkyPi/commit/7b62b22b8e026651e8ef942d1a6d73e769e115a2))
+
+
 ## v0.61.1 (2026-04-17)
 
 ### Bug Fixes
