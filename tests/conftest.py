@@ -53,6 +53,7 @@ UI_BROWSER_TESTS = {
     "test_device_update_ops_journeys.py",
 }
 A11Y_BROWSER_TESTS = {
+    "test_a11y_sweep.py",
     "test_axe_a11y.py",
     "test_more_a11y.py",
     "test_playlist_a11y.py",
