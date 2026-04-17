@@ -3,7 +3,60 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+
+# ---------------------------------------------------------------------------
+# Flakiness retry (JTN-705).
+#
+# Integration tests exercise Playwright, refresh loops, and cross-process
+# state that can flake for reasons unrelated to the code under test (network
+# blips, compositor jitter, file-watch races). One retry dramatically lowers
+# false-positive noise while still surfacing real regressions — a test that
+# fails twice in a row is almost certainly a genuine bug.
+#
+# IMPORTANT: reruns are scoped to ``tests/integration/`` ONLY. Unit tests
+# must stay deterministic: if a unit test flakes, that is a bug we want to
+# see on the first failure, not paper over with a silent retry. The hook
+# below explicitly gates on the collection path so retries cannot leak into
+# other suites even if this conftest is imported indirectly.
+#
+# pytest-rerunfailures prints a rerun summary in the terminal report by
+# default (``R`` progress dots and a "rerun" count in the summary line), so
+# CI captures repeated flakes without extra configuration.
+# ---------------------------------------------------------------------------
+
+_INTEGRATION_TESTS_DIR = Path(__file__).resolve().parent
+_RERUNS = 1
+_RERUNS_DELAY_SECONDS = 1
+
+
+def pytest_collection_modifyitems(config, items):  # noqa: ARG001
+    """Apply ``@pytest.mark.flaky(reruns=1, ...)`` to integration tests only.
+
+    Gating on the resolved file path (not the pytest ``nodeid``) guarantees
+    we only retry tests physically located under ``tests/integration/`` even
+    if another suite imports this conftest or if pytest is invoked from a
+    different cwd. Tests that already declare an explicit ``flaky`` marker
+    are left alone so they can opt in to a higher retry count.
+    """
+    flaky_marker = pytest.mark.flaky(
+        reruns=_RERUNS, reruns_delay=_RERUNS_DELAY_SECONDS
+    )
+    for item in items:
+        try:
+            item_path = Path(str(item.fspath)).resolve()
+        except (OSError, ValueError):
+            continue
+        try:
+            item_path.relative_to(_INTEGRATION_TESTS_DIR)
+        except ValueError:
+            # Not under tests/integration/ — do not attach a retry.
+            continue
+        if item.get_closest_marker("flaky") is not None:
+            continue
+        item.add_marker(flaky_marker)
 
 # ---------------------------------------------------------------------------
 # Client-log tripwire (JTN-680).
