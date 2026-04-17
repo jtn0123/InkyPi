@@ -62,20 +62,16 @@ def test_display_next_modal_has_labelledby(client):
 
 
 def test_run_next_btn_opens_confirm_modal_not_fire_directly(client):
-    """The .run-next-btn click handler must open the confirmation modal,
+    """The delegated run-next action must open the confirmation modal,
     not invoke displayNextInPlaylist immediately."""
     js = _read_playlist_js(client)
-    # New pattern: click handler routes through openDisplayNextConfirmModal.
     assert (
-        "openDisplayNextConfirmModal(name" in js
-    ), "run-next-btn click handler must open the confirmation modal"
-
-    # Old anti-pattern (bare displayNextInPlaylist from the click handler)
-    # must be gone. We look for the literal single-line call that used to
-    # live in the forEach body.
+        'action === "confirm-display-next"' in js
+        or "action === 'confirm-display-next'" in js
+    ), "delegated playlist handler must branch on confirm-display-next"
     assert (
-        "displayNextInPlaylist(name);\n            });" not in js
-    ), "run-next-btn is still wired to fire displayNextInPlaylist directly — no confirmation!"
+        "openDisplayNextConfirmModal(name, actionButton)" in js
+    ), "confirm-display-next action must open the confirmation modal with the trigger button"
 
 
 def test_display_next_helper_exists_and_is_async(client):

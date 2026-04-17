@@ -117,18 +117,16 @@ class TestFocusManagement:
         ), "playlist.js must call _lastModalTrigger.focus() when closing a modal"
 
     def test_refresh_btn_listener_passes_trigger(self):
-        """The refresh-settings-btn click listener must pass the button element as
-        the trigger so focus can be restored after close."""
+        """The delegated refresh action must pass the button element as the
+        trigger so focus can be restored after close."""
         js = PLAYLIST_JS.read_text()
-        # Find the .refresh-settings-btn listener block
         match = re.search(
-            r"\.refresh-settings-btn.*?openRefreshModal\((.*?)\);",
+            r'action === [\'"]edit-refresh[\'"].*?openRefreshModal\((.*?)\);',
             js,
             re.DOTALL,
         )
-        assert match, "refresh-settings-btn listener calling openRefreshModal not found"
+        assert match, "delegated edit-refresh action calling openRefreshModal not found"
         call_args = match.group(1)
-        # The last arg should reference the button element (t or e.currentTarget)
         assert re.search(
-            r",\s*(t|el|e\.currentTarget)\s*$", call_args.strip()
-        ), "openRefreshModal must receive the trigger element as last argument"
+            r",\s*actionButton\s*$", call_args.strip()
+        ), "openRefreshModal must receive the delegated trigger element as last argument"

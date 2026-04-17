@@ -104,7 +104,12 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
 
 
 def test_playlist_details_expand(live_server, device_config_dev, browser_page):
-    """Playlist details toggle expands and collapses on desktop."""
+    """Playlist details toggle logic expands and collapses on desktop.
+
+    The desktop stylesheet currently hides the toggle button, but the JS
+    handler still needs to reflect state correctly if the control is shown by a
+    future layout tweak or an accessibility override.
+    """
     prepare_playlist(device_config_dev)
     page = browser_page
     navigate_and_wait(page, live_server, "/playlist")
@@ -113,4 +118,20 @@ def test_playlist_details_expand(live_server, device_config_dev, browser_page):
     body = page.locator("[data-playlist-body]").first
 
     assert body.is_visible(), "Details section should be visible on desktop"
-    assert toggle.is_visible(), "Toggle button should exist"
+    assert toggle.get_attribute("aria-expanded") == "true"
+
+    page.evaluate("""() => {
+            const toggle = document.querySelector("[data-playlist-toggle]");
+            if (toggle) toggle.click();
+        }""")
+    page.wait_for_timeout(300)
+    assert toggle.get_attribute("aria-expanded") == "false"
+    assert not body.is_visible(), "Details section should collapse on desktop"
+
+    page.evaluate("""() => {
+            const toggle = document.querySelector("[data-playlist-toggle]");
+            if (toggle) toggle.click();
+        }""")
+    page.wait_for_timeout(300)
+    assert toggle.get_attribute("aria-expanded") == "true"
+    assert body.is_visible(), "Details section should expand again on desktop"
