@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from schemas.endpoint_map import ENDPOINT_SCHEMAS
+from tests.helpers.endpoint_schema_helpers import get_endpoint_schema_names
 
 # Flask route syntax for lookup in ``url_map``.
 _FRONTEND_JSON_ROUTES = (
@@ -51,13 +51,14 @@ def _find_endpoint_for_get(flask_app, route: str) -> str | None:
 
 
 def test_frontend_json_routes_have_endpoint_schema(flask_app):
+    endpoint_schema_names = get_endpoint_schema_names()
     missing: list[str] = []
     for route in _FRONTEND_JSON_ROUTES:
         endpoint = _find_endpoint_for_get(flask_app, route)
         if endpoint is None:
             missing.append(f"{route} (no GET route found)")
             continue
-        if endpoint not in ENDPOINT_SCHEMAS:
+        if endpoint not in endpoint_schema_names:
             missing.append(f"{route} -> {endpoint} (missing in ENDPOINT_SCHEMAS)")
 
     assert not missing, (

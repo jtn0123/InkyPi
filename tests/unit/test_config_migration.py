@@ -8,10 +8,10 @@ import shutil
 from pathlib import Path
 
 import pytest
+from tests.helpers.config_runtime_helpers import assert_valid_device_config
 from tests.helpers.path_utils import _assert_baseline_preserved, _path_get
 
 import config as config_mod
-from utils.config_schema import validate_device_config
 
 LEGACY_FIXTURE_ROOT = (
     Path(__file__).resolve().parents[1] / "fixtures" / "legacy_configs"
@@ -67,7 +67,7 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     loaded = cfg.get_config()
 
     # (a) no crash + (d) resulting config shape remains valid.
-    validate_device_config(loaded)
+    assert_valid_device_config(loaded)
 
     # (b) no silent key drops for critical user-facing values.
     baseline_values = {

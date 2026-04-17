@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-
-from model import RefreshInfo
+from tests.helpers.refresh_info_helpers import seed_future_refresh_info
 
 
 def test_clock_skew_backwards_still_allows_manual_refresh(client, flask_app):
@@ -10,15 +8,7 @@ def test_clock_skew_backwards_still_allows_manual_refresh(client, flask_app):
     device_config = flask_app.config["DEVICE_CONFIG"]
 
     # Simulate a stale future timestamp (e.g., RTC/NTP skew before correction).
-    future_ts = (datetime.now(UTC) + timedelta(days=90)).isoformat()
-    device_config.refresh_info = RefreshInfo(
-        refresh_type="Playlist",
-        plugin_id="clock",
-        refresh_time=future_ts,
-        image_hash="future-hash",
-        playlist="Default",
-        plugin_instance="Clock",
-    )
+    seed_future_refresh_info(device_config)
 
     refresh_task.start()
     try:
