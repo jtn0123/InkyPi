@@ -269,16 +269,6 @@ maybe_disable_dphys_swapfile() {
   echo "✓ Reclaimed dphys-swapfile space."
 }
 
-configure_journal_size() {
-  local conf="/etc/systemd/journald.conf"
-  if [ -f "$conf" ] && ! grep -q "^SystemMaxUse=" "$conf"; then
-    echo "Configuring journal size limit (50M)"
-    echo "SystemMaxUse=50M" | sudo tee -a "$conf" > /dev/null
-    sudo systemctl restart systemd-journald
-    echo_success "Journal size limit configured."
-  fi
-}
-
 create_venv(){
   echo "Creating python virtual environment. "
   python3 -m venv "$VENV_PATH"
@@ -625,7 +615,8 @@ else
 fi
 maybe_disable_dphys_swapfile      # JTN-593: reclaim /var/swap when zram is active
 setup_earlyoom_service
-configure_journal_size
+configure_persistent_journal
+disable_wifi_powersave
 install_src
 install_cli
 create_venv

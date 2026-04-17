@@ -407,6 +407,38 @@ class TestInstallScript:
             "and before setup_earlyoom_service in install.sh"
         )
 
+    def test_install_configures_persistent_journal_via_shared_helper(self):
+        assert "configure_persistent_journal() {" in self.combined
+        assert "Storage=persistent" in self.combined
+        assert "SystemMaxUse=50M" in self.combined
+        assert "RuntimeMaxUse=50M" in self.combined
+        assert "/var/log/journal" in self.combined
+        assert "systemctl restart systemd-journald" in self.combined
+
+        earlyoom_pos = self.content.index("setup_earlyoom_service")
+        journal_pos = self.content.index("configure_persistent_journal", earlyoom_pos)
+        install_src_pos = self.content.index("install_src", journal_pos)
+        assert earlyoom_pos < journal_pos < install_src_pos, (
+            "install.sh must configure persistent journald after earlyoom setup "
+            "and before copying the repo into place"
+        )
+
+    def test_install_disables_wifi_powersave_via_shared_helper(self):
+        assert "disable_wifi_powersave() {" in self.combined
+        assert "iw dev wlan0 set power_save off" in self.combined
+        assert "100-inkypi-wifi-powersave.conf" in self.combined
+        assert "wifi.powersave = 2" in self.combined
+        assert "nmcli -g GENERAL.CONNECTION device show wlan0" in self.combined
+        assert "802-11-wireless.powersave 2" in self.combined
+
+        journal_pos = self.content.index("configure_persistent_journal")
+        wifi_pos = self.content.index("disable_wifi_powersave", journal_pos)
+        install_src_pos = self.content.index("install_src", wifi_pos)
+        assert journal_pos < wifi_pos < install_src_pos, (
+            "install.sh must harden Wi-Fi powersave after journald setup and "
+            "before the source/venv work begins"
+        )
+
     def test_disable_dphys_only_runs_when_zram_active(self):
         # JTN-593: The function must check /proc/swaps for /dev/zram BEFORE
         # removing anything — it must be a no-op on systems without zram.
@@ -1783,6 +1815,33 @@ class TestUpdateScript:
         assert "_common.sh" in self.content
         assert 'source "$SCRIPT_DIR/_common.sh"' in self.content
 
+    def test_update_configures_persistent_journal_via_shared_helper(self):
+        assert "configure_persistent_journal() {" in self.combined
+        assert "Storage=persistent" in self.combined
+        assert "RuntimeMaxUse=50M" in self.combined
+
+        earlyoom_pos = self.content.index("setup_earlyoom_service")
+        journal_pos = self.content.index("configure_persistent_journal", earlyoom_pos)
+        venv_pos = self.content.index('_current_step="venv_check"')
+        assert earlyoom_pos < journal_pos < venv_pos, (
+            "update.sh must configure persistent journald after earlyoom setup "
+            "and before venv / pip work starts"
+        )
+
+    def test_update_disables_wifi_powersave_via_shared_helper(self):
+        assert "disable_wifi_powersave() {" in self.combined
+        assert "iw dev wlan0 set power_save off" in self.combined
+        assert "100-inkypi-wifi-powersave.conf" in self.combined
+        assert "802-11-wireless.powersave 2" in self.combined
+
+        journal_pos = self.content.index("configure_persistent_journal")
+        wifi_pos = self.content.index("disable_wifi_powersave", journal_pos)
+        venv_pos = self.content.index('_current_step="venv_check"')
+        assert journal_pos < wifi_pos < venv_pos, (
+            "update.sh must harden Wi-Fi powersave after journald setup and "
+            "before dependency updates begin"
+        )
+
     def test_update_calls_fetch_wheelhouse(self):
         # JTN-669: fetch_wheelhouse must be called before the pip upgrade
         # so the pre-built bundle is available when pip resolves packages.
@@ -1791,6 +1850,10 @@ class TestUpdateScript:
     def test_update_calls_cleanup_wheelhouse(self):
         # The temp wheelhouse dir must always be cleaned up after install.
         assert "cleanup_wheelhouse" in self.content
+
+    def test_update_reports_version_from_checked_out_repo(self):
+        assert "$SCRIPT_DIR/../VERSION" in self.content
+        assert "$INSTALL_PATH/VERSION" not in self.content
 
     def test_update_pip_uses_find_links_when_available(self):
         # When the wheelhouse is available, pip must be pointed at it via
