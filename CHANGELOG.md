@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v0.60.8 (2026-04-17)
+
+### Bug Fixes
+
+- **install**: Harden device update stability ([#523](https://github.com/jtn0123/InkyPi/pull/523),
+  [`461509e`](https://github.com/jtn0123/InkyPi/commit/461509eef66758c4b9021eb1b13d781465bc586a))
+
+### Chores
+
+- Tighten static quality gates for typing and datetime linting (JTN-676, JTN-714)
+  ([#521](https://github.com/jtn0123/InkyPi/pull/521),
+  [`9b587e0`](https://github.com/jtn0123/InkyPi/commit/9b587e09ee10461e79c3fc8b9d5ff65bc51fa9d4))
+
+### Testing
+
+- Add JTN-728..725 device/update/ops journey coverage
+  ([#517](https://github.com/jtn0123/InkyPi/pull/517),
+  [`847e604`](https://github.com/jtn0123/InkyPi/commit/847e604513f4c27f37830609a4c82a81dd47907b))
+
+* test: add device/update/ops journey coverage for JTN-728..725
+
+* style: format journey test module for black
+
+* test(ci): gate device/update/ops journey as browser-dependent
+
+- Deep settings + history Playwright coverage (JTN-730, JTN-731)
+  ([#519](https://github.com/jtn0123/InkyPi/pull/519),
+  [`cf406e6`](https://github.com/jtn0123/InkyPi/commit/cf406e6b737c5a59d67868f9d8d4af645ed4d92d))
+
+* test: deepen settings + history browser smoke coverage (JTN-730, JTN-731)
+
+* style: black-format browser smoke deep coverage tests
+
+
 ## v0.60.7 (2026-04-16)
 
 ### Bug Fixes
