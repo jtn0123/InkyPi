@@ -32,7 +32,7 @@ _RERUNS = 1
 _RERUNS_DELAY_SECONDS = 1
 
 
-def pytest_collection_modifyitems(config, items):  # noqa: ARG001
+def pytest_collection_modifyitems(items):
     """Apply ``@pytest.mark.flaky(reruns=1, ...)`` to integration tests only.
 
     Gating on the resolved file path (not the pytest ``nodeid``) guarantees
@@ -41,9 +41,7 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
     different cwd. Tests that already declare an explicit ``flaky`` marker
     are left alone so they can opt in to a higher retry count.
     """
-    flaky_marker = pytest.mark.flaky(
-        reruns=_RERUNS, reruns_delay=_RERUNS_DELAY_SECONDS
-    )
+    flaky_marker = pytest.mark.flaky(reruns=_RERUNS, reruns_delay=_RERUNS_DELAY_SECONDS)
     for item in items:
         try:
             item_path = Path(str(item.fspath)).resolve()
@@ -57,6 +55,7 @@ def pytest_collection_modifyitems(config, items):  # noqa: ARG001
         if item.get_closest_marker("flaky") is not None:
             continue
         item.add_marker(flaky_marker)
+
 
 # ---------------------------------------------------------------------------
 # Client-log tripwire (JTN-680).
