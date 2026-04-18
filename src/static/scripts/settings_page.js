@@ -705,7 +705,12 @@
           whatsNewBtn.hidden = true;
         }
       } catch (e) {
-        console.warn("Version check failed:", e);
+        if (e?.name === "AbortError") {
+          console.debug("Version check aborted:", e);
+          return;
+        } else {
+          console.warn("Version check failed:", e);
+        }
         if (badge) { badge.textContent = "Check failed"; badge.className = "status-chip"; }
       } finally {
         // Re-enable button and hide spinner (JTN-352)
