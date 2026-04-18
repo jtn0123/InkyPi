@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def chaos_diag_paths(tmp_path, monkeypatch):
     """Isolate diagnostics filesystem paths per test and allow dev access."""
     import blueprints.diagnostics as diag
