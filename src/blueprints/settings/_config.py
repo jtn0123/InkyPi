@@ -1,5 +1,6 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
+import unicodedata
 from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
@@ -7,6 +8,8 @@ from flask import current_app, redirect, render_template, request
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import calculate_seconds
+
+_DEVICE_NAME_MAX_LEN = 64
 
 
 @_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
@@ -384,6 +387,27 @@ def _validate_interval(form_data):
     return None
 
 
+def _validate_device_name(form_data):
+    """Validate device name length and control characters."""
+    raw_device_name = form_data.get("deviceName", "")
+    device_name = raw_device_name.strip()
+    if not device_name:
+        return _field_error("Device Name is required", "deviceName")
+    if len(device_name) > _DEVICE_NAME_MAX_LEN:
+        return _field_error(
+            f"Device Name must be {_DEVICE_NAME_MAX_LEN} characters or fewer",
+            "deviceName",
+        )
+    if any(
+        unicodedata.category(ch) == "Cc" and ch != "\t" for ch in raw_device_name
+    ):
+        return _field_error(
+            "Device Name may not contain control characters",
+            "deviceName",
+        )
+    return None
+
+
 def _validate_enum_field(form_data, field, allowed, *, required=True):
     """Validate that *field* is one of *allowed* values.
 
@@ -437,10 +461,9 @@ def _validate_image_settings(form_data):
 
 
 def _validate_settings_form(form_data):
-    # Validate device name (required, non-empty)
-    device_name = form_data.get("deviceName", "").strip()
-    if not device_name:
-        return _field_error("Device Name is required", "deviceName")
+    err = _validate_device_name(form_data)
+    if err:
+        return err
 
     err = _validate_interval(form_data)
     if err:
