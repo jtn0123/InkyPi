@@ -3,10 +3,10 @@ import pytest
 
 @pytest.fixture()
 def icons_csp_env(monkeypatch):
-    # Allow @phosphor-icons/web stylesheet and remote fonts in CSP during tests
+    # Allow remote fonts in CSP during tests.
     monkeypatch.setenv(
         "INKYPI_CSP",
-        "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://unpkg.com; script-src 'self'; font-src 'self' data: https:",
+        "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data: https:",
     )
     return True
 
@@ -106,7 +106,7 @@ def test_settings_logs_icon_uses_themeable_strokes(icons_csp_env, client):
     assert 'fill="#fff"' not in html
 
 
-def test_csp_allows_unpkg(icons_csp_env, client):
+def test_csp_header_present(icons_csp_env, client):
     resp = client.get("/")
     csp = resp.headers.get("Content-Security-Policy-Report-Only") or resp.headers.get(
         "Content-Security-Policy"
