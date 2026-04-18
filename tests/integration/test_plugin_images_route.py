@@ -20,6 +20,20 @@ def test_plugin_static_image_route(client):
     assert "image" in (resp.headers.get("Content-Type") or "")
 
 
+def test_plugin_static_image_route_with_relative_src_dir(client, tmp_path, monkeypatch):
+    """Relative SRC_DIR values must stay rooted at the repo, not the cwd."""
+    monkeypatch.setenv("SRC_DIR", "src")
+    monkeypatch.chdir(tmp_path)
+
+    resp = client.get("/images/ai_text/icon.png")
+    assert resp.status_code == 200
+    assert "image" in (resp.headers.get("Content-Type") or "")
+
+    resp = client.get("/images/base_plugin/frames/blank.png")
+    assert resp.status_code == 200
+    assert "image" in (resp.headers.get("Content-Type") or "")
+
+
 # ---------------------------------------------------------------------------
 # Security – py/path-injection regression (JTN-326)
 # ---------------------------------------------------------------------------

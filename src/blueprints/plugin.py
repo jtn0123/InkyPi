@@ -33,8 +33,6 @@ from utils.security_utils import validate_file_path
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
 
-PLUGINS_DIR = resolve_path("plugins")
-
 # Sonar S1192 — duplicate string constants
 _CONFIG_KEY = "DEVICE_CONFIG"
 _PLUGIN_ID = "plugin_id"
@@ -46,6 +44,11 @@ _ERR_PLUGIN_INSTANCE_NOT_FOUND = "Plugin instance not found"
 _ERR_PLUGIN_NOT_FOUND = "Plugin not found"
 _ERR_PLAYLIST_NOT_FOUND = "Playlist not found"
 _MSG_CIRCUIT_BREAKER_RESET = "Circuit-breaker reset for plugin instance."
+
+
+def _plugins_dir() -> str:
+    """Resolve the current plugin source directory at request time."""
+    return resolve_path("plugins")
 
 
 def _cacheable_send_file(path: str, ttl_env: str = "INKYPI_RENDER_CACHE_TTL_S"):
@@ -168,8 +171,10 @@ def image(plugin_id: str, filename: str):
                 return entry  # returned value is from os.listdir, not user input
         return None
 
-    # Resolve plugin_id against PLUGINS_DIR contents.
-    plugin_dirname = _match_listdir(PLUGINS_DIR, plugin_id)
+    plugins_dir = _plugins_dir()
+
+    # Resolve plugin_id against the current plugin source tree.
+    plugin_dirname = _match_listdir(plugins_dir, plugin_id)
     if plugin_dirname is None:
         logger.warning(
             "plugin.image: unknown plugin_id=%s",
@@ -178,7 +183,7 @@ def image(plugin_id: str, filename: str):
         abort(404)
 
     # Build the directory path from the listdir-derived name.
-    cursor = os.path.join(PLUGINS_DIR, plugin_dirname)
+    cursor = os.path.join(plugins_dir, plugin_dirname)
     resolved_parts: list[str] = []
     for segment in segments:
         match = _match_listdir(cursor, segment)
@@ -189,14 +194,14 @@ def image(plugin_id: str, filename: str):
 
     # Defence-in-depth: reject any symlink entry that escapes PLUGINS_DIR.
     try:
-        validate_file_path(cursor, PLUGINS_DIR)
+        validate_file_path(cursor, plugins_dir)
     except ValueError:
         abort(404)
 
     if not os.path.isfile(cursor):
         abort(404)
 
-    safe_dir = os.path.join(PLUGINS_DIR, plugin_dirname)
+    safe_dir = os.path.join(plugins_dir, plugin_dirname)
     safe_name = os.path.join(*resolved_parts)
     resp = send_from_directory(safe_dir, safe_name)
     try:
