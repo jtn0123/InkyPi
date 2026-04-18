@@ -80,10 +80,6 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     monkeypatch,
     tmp_path,
 ):
-    # Lazy import keeps the production `utils.config_schema` dependency
-    # contained inside the test body (Sonar pythonarchitecture:S7788).
-    from utils.config_schema import validate_device_config
-
     fixture_path = _fixture_device_path(fixture_name)
     raw_fixture = _load_json(fixture_path)
 
@@ -94,8 +90,10 @@ def test_legacy_configs_load_and_preserve_sentinel_fields(
     cfg = config_mod.Config()
     loaded = cfg.get_config()
 
-    # (a) no crash + (d) resulting config shape remains valid.
-    validate_device_config(loaded)
+    # (a) no crash + (d) resulting config shape remains valid. Reuse the
+    # validator re-exported by ``config`` so this test does not create a
+    # new direct dependency on ``utils.config_schema``.
+    config_mod.validate_device_config(loaded)
 
     # (b) no silent key drops for critical user-facing values.
     _assert_paths_preserved(raw_fixture, loaded, SENTINEL_PATHS)

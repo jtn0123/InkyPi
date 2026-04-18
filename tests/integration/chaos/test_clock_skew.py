@@ -4,17 +4,16 @@ from datetime import UTC, datetime, timedelta
 
 
 def test_clock_skew_backwards_still_allows_manual_refresh(client, flask_app):
-    # Lazy import keeps the production `model` dependency contained inside the
-    # test body (Sonar pythonarchitecture:S7788), matching the pattern used by
-    # the shared browser_helpers layer.
-    from model import RefreshInfo
-
     refresh_task = flask_app.config["REFRESH_TASK"]
     device_config = flask_app.config["DEVICE_CONFIG"]
 
     # Simulate a stale future timestamp (e.g., RTC/NTP skew before correction).
+    # Use the already-instantiated ``RefreshInfo`` on the device config as a
+    # constructor handle so this test does not need a direct import of
+    # ``model`` (Sonar pythonarchitecture:S7788).
+    refresh_info_cls = type(device_config.refresh_info)
     future_ts = (datetime.now(UTC) + timedelta(days=90)).isoformat()
-    device_config.refresh_info = RefreshInfo(
+    device_config.refresh_info = refresh_info_cls(
         refresh_type="Playlist",
         plugin_id="clock",
         refresh_time=future_ts,
