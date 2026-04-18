@@ -57,6 +57,10 @@ jobs:
         env:
           SKIP_BROWSER: '1'
           BENCHMARK_THRESHOLD_PCT: ${{ vars.BENCHMARK_THRESHOLD_PCT || '15' }}
+          PERF_PLUGIN_RENDER_BUDGET_MS: ${{ vars.PERF_PLUGIN_RENDER_BUDGET_MS || '2000' }}
+          PERF_COLD_START_BUDGET_S: ${{ vars.PERF_COLD_START_BUDGET_S || '3' }}
+          PERF_COLD_START_SAMPLES: ${{ vars.PERF_COLD_START_SAMPLES || '3' }}
+          PERF_COLD_START_TIMEOUT_S: ${{ vars.PERF_COLD_START_TIMEOUT_S || '90' }}
         run: |
           python -m pytest tests/benchmarks/ --benchmark-only \
             --benchmark-columns=min,mean,median,stddev,ops \
@@ -74,6 +78,9 @@ jobs:
               --baseline tests/benchmarks/baseline.json \
               --current /tmp/bench-current.json || true
           fi
+          # JTN-738: hard performance budgets on plugin render latency and
+          # cold-start startup time.
+          python scripts/perf_budget_gate.py --bench-json /tmp/bench-current.json
           # On main branch pushes, update the cached baseline for future PRs
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             cp /tmp/bench-current.json /tmp/bench-baseline.json

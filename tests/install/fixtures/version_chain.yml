@@ -1,0 +1,17 @@
+chain:
+  - version: "0.52.0"
+    fixture: "device_v0.52.0.json"
+  - version: "0.53.0"
+    fixture: "device_v0.53.0.json"
+  - version: "0.54.0"
+    fixture: "device_v0.54.0.json"
+
+preserved_paths:
+  - "name"
+  - "timezone"
+  - "time_format"
+  - "playlist_config.playlists.0.name"
+  - "playlist_config.playlists.0.plugins.0.plugin_id"
+  - "playlist_config.playlists.0.plugins.0.name"
+  - "playlist_config.playlists.0.plugins.0.plugin_settings.api_token"
+  - "playlist_config.playlists.0.plugins.0.plugin_settings.custom_banner"

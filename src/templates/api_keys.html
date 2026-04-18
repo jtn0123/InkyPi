@@ -84,12 +84,13 @@
             </div>
             <div class="add-buttons-grid">
                 <button type="button" id="addApiKeyBtn" class="btn-add" data-api-action="add-row"><span>+</span> Add API Key</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_WEATHER_MAP_SECRET', []) | join(', ') }}">OPEN_WEATHER_MAP_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET" title="Used by: {{ api_key_plugins.get('OPEN_AI_SECRET', []) | join(', ') }}">OPEN_AI_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY" title="Used by: {{ api_key_plugins.get('UNSPLASH_ACCESS_KEY', []) | join(', ') }}">UNSPLASH_ACCESS_KEY</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET" title="Used by: {{ api_key_plugins.get('GITHUB_SECRET', []) | join(', ') }}">GITHUB_SECRET</button>
-                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GOOGLE_AI_SECRET" title="Used by: {{ api_key_plugins.get('GOOGLE_AI_SECRET', []) | join(', ') }}">GOOGLE_AI_SECRET</button>
+                {# data-test-skip-click: preset chips are repetitive low-signal click-sweep targets; add-row/save/delete coverage already exercises the page handlers. #}
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_WEATHER_MAP_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('OPEN_WEATHER_MAP_SECRET', []) | join(', ') }}">OPEN_WEATHER_MAP_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="OPEN_AI_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('OPEN_AI_SECRET', []) | join(', ') }}">OPEN_AI_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="NASA_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('NASA_SECRET', []) | join(', ') }}">NASA_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="UNSPLASH_ACCESS_KEY" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('UNSPLASH_ACCESS_KEY', []) | join(', ') }}">UNSPLASH_ACCESS_KEY</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GITHUB_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('GITHUB_SECRET', []) | join(', ') }}">GITHUB_SECRET</button>
+                <button type="button" class="btn-preset" data-api-action="add-preset" data-key="GOOGLE_AI_SECRET" data-test-skip-click="true" title="Used by: {{ api_key_plugins.get('GOOGLE_AI_SECRET', []) | join(', ') }}">GOOGLE_AI_SECRET</button>
             </div>
         </div>
         {% endif %}

@@ -1,0 +1,46 @@
+{
+  "name": "InkyPi v0.40 Legacy",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "America/Los_Angeles",
+  "time_format": "12h",
+  "plugin_cycle_interval_seconds": 600,
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_minutes": 15,
+        "plugins": [
+          {
+            "plugin_id": "clock",
+            "name": "Clock Main",
+            "plugin_settings": {
+              "title": "Morning Brief",
+              "api_token": "legacy-token-v040",
+              "custom_banner": "Welcome v0.40"
+            },
+            "settings": {
+              "title": "Morning Brief",
+              "api_token": "legacy-token-v040",
+              "custom_banner": "Welcome v0.40"
+            },
+            "refresh": {
+              "schedule": "08:15"
+            }
+          }
+        ],
+        "current_plugin_index": null
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_time": null,
+    "image_hash": null,
+    "refresh_type": "Manual Update",
+    "plugin_id": ""
+  }
+}

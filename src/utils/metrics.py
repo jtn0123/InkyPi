@@ -12,9 +12,52 @@ from utils.metrics import record_refresh_success, record_plugin_failure, ...
 
 from __future__ import annotations
 
+import logging
 import time
 
-from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
+logger = logging.getLogger(__name__)
+
+try:
+    from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
+
+    _PROMETHEUS_AVAILABLE = True
+except ModuleNotFoundError:
+    _PROMETHEUS_AVAILABLE = False
+
+    class _NoopMetric:
+        """Small no-op shim used when prometheus_client is unavailable."""
+
+        def labels(self, *_: object, **__: object) -> _NoopMetric:
+            return self
+
+        def inc(self, amount: float = 1.0, **_: object) -> None:
+            return
+
+        def set(self, value: float, **_: object) -> None:
+            return
+
+        def observe(self, amount: float, **_: object) -> None:
+            return
+
+    class _NoopRegistry:
+        """Placeholder registry accepted by fallback /metrics handling."""
+
+    class _NoopRegistryFactory:
+        def __call__(self, *_: object, **__: object) -> _NoopRegistry:
+            return _NoopRegistry()
+
+    class _NoopMetricFactory:
+        def __call__(self, *_: object, **__: object) -> _NoopMetric:
+            return _NoopMetric()
+
+    CollectorRegistry = _NoopRegistryFactory()  # type: ignore[assignment]
+    Counter = _NoopMetricFactory()  # type: ignore[assignment]
+    Gauge = _NoopMetricFactory()  # type: ignore[assignment]
+    Histogram = _NoopMetricFactory()  # type: ignore[assignment]
+
+    logger.warning(
+        "prometheus_client is not installed; metrics collection is disabled."
+    )
 
 # ---------------------------------------------------------------------------
 # Registry — one per process; tests can create fresh instances as needed.

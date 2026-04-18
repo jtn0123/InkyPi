@@ -212,4 +212,88 @@ class BenchmarksSummaryResponse(TypedDict, total=False):
     success: bool
     request_id: str
     count: int
-    summary: dict[str, dict[str, int]]
+    summary: dict[str, dict[str, int | None]]
+
+
+class BenchmarksPluginEntry(TypedDict):
+    """One plugin aggregate row from ``GET /api/benchmarks/plugins``."""
+
+    plugin_id: str
+    runs: int
+    request_avg: int | None
+    generate_avg: int | None
+    display_avg: int | None
+
+
+class BenchmarksPluginsResponse(TypedDict, total=False):
+    """Response body for ``GET /api/benchmarks/plugins`` (wraps ``json_success``)."""
+
+    success: bool
+    request_id: str
+    items: list[BenchmarksPluginEntry]
+
+
+class JobStatusResult(TypedDict, total=False):
+    """Async ``/update_now`` job result payload returned by ``/api/job/<job_id>``."""
+
+    success: bool
+    message: str
+    metrics: dict[str, Any]
+
+
+class JobStatusResponse(TypedDict, total=False):
+    """Response body for ``GET /api/job/<job_id>``."""
+
+    status: str
+    result: JobStatusResult
+    error: str
+
+
+class DiagnosticsMemory(TypedDict):
+    """``memory`` object in ``GET /api/diagnostics``."""
+
+    total_mb: int | None
+    used_mb: int | None
+    pct: float | None
+
+
+class DiagnosticsDisk(TypedDict):
+    """``disk`` object in ``GET /api/diagnostics``."""
+
+    total_mb: int | None
+    used_mb: int | None
+    pct: float | None
+    path: str
+
+
+class DiagnosticsRefreshTask(TypedDict):
+    """``refresh_task`` object in ``GET /api/diagnostics``."""
+
+    running: bool
+    last_run_ts: str | None
+    last_error: str | None
+
+
+class DiagnosticsClientLogErrors(TypedDict):
+    """``recent_client_log_errors`` object in ``GET /api/diagnostics``."""
+
+    count_5m: int
+    warn_count_5m: int
+    last_error_ts: str | None
+    window_seconds: int
+
+
+class DiagnosticsResponse(TypedDict):
+    """Response body for ``GET /api/diagnostics``."""
+
+    ts: str
+    version: str
+    prev_version: str | None
+    uptime_s: int | None
+    memory: DiagnosticsMemory
+    disk: DiagnosticsDisk
+    refresh_task: DiagnosticsRefreshTask
+    plugin_health: dict[str, str]
+    log_tail_100: list[str]
+    last_update_failure: Any | None
+    recent_client_log_errors: DiagnosticsClientLogErrors

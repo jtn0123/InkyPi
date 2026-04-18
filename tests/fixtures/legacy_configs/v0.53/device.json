@@ -1,0 +1,51 @@
+{
+  "name": "InkyPi v0.53 Legacy",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "vertical",
+  "timezone": "UTC",
+  "time_format": "24h",
+  "plugin_cycle_interval_seconds": 600,
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_interval_seconds": 600,
+        "plugins": [
+          {
+            "plugin_id": "clock",
+            "name": "Clock Main",
+            "plugin_settings": {
+              "title": "Main Clock",
+              "api_token": "legacy-token-v053",
+              "custom_banner": "Welcome v0.53"
+            },
+            "refresh": {
+              "interval": 600
+            },
+            "consecutive_failure_count": 1,
+            "paused": false,
+            "latest_refresh_time": "2025-01-10T15:30:00+00:00"
+          }
+        ],
+        "current_plugin_index": 0
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_time": "2025-01-10T15:30:00+00:00",
+    "image_hash": "ghi789",
+    "refresh_type": "Playlist",
+    "plugin_id": "clock",
+    "playlist": "Default",
+    "plugin_instance": "Clock Main",
+    "request_ms": 88,
+    "display_ms": 32,
+    "generate_ms": 20,
+    "preprocess_ms": 5,
+    "used_cached": false
+  }
+}

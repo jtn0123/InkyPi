@@ -1,0 +1,44 @@
+{
+  "name": "InkyPi v0.50 Legacy",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "America/New_York",
+  "time_format": "12h",
+  "plugin_cycle_interval_seconds": 300,
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_interval_seconds": 900,
+        "plugins": [
+          {
+            "plugin_id": "rss",
+            "name": "Headlines",
+            "plugin_settings": {
+              "rss_url": "https://example.com/rss",
+              "api_token": "legacy-token-v050",
+              "custom_banner": "Welcome v0.50"
+            },
+            "refresh": {
+              "interval": 900
+            },
+            "latest_refresh": "2025-01-02T09:00:00+00:00"
+          }
+        ],
+        "current_plugin_index": 0
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_time": "2025-01-02T09:00:00+00:00",
+    "image_hash": "def456",
+    "refresh_type": "Playlist",
+    "plugin_id": "rss",
+    "playlist": "Default",
+    "plugin_instance": "Headlines"
+  }
+}

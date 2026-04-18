@@ -1,0 +1,40 @@
+{
+  "name": "InkyPi Upgrade Chain User",
+  "display_type": "mock",
+  "resolution": [800, 480],
+  "orientation": "horizontal",
+  "timezone": "America/Los_Angeles",
+  "time_format": "12h",
+  "playlist_config": {
+    "playlists": [
+      {
+        "name": "Default",
+        "start_time": "00:00",
+        "end_time": "24:00",
+        "cycle_minutes": 15,
+        "plugins": [
+          {
+            "plugin_id": "clock",
+            "name": "Chain Clock",
+            "plugin_settings": {
+              "title": "Chain Title",
+              "api_token": "chain-user-token",
+              "custom_banner": "chain-banner"
+            },
+            "refresh": {
+              "schedule": "09:00"
+            }
+          }
+        ],
+        "current_plugin_index": 0
+      }
+    ],
+    "active_playlist": "Default"
+  },
+  "refresh_info": {
+    "refresh_time": null,
+    "image_hash": null,
+    "refresh_type": "Manual Update",
+    "plugin_id": ""
+  }
+}

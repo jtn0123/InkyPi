@@ -10,7 +10,11 @@ user-identifying information.
 from __future__ import annotations
 
 from flask import Blueprint, Response
-from prometheus_client.exposition import generate_latest
+
+try:
+    from prometheus_client.exposition import generate_latest
+except ModuleNotFoundError:
+    generate_latest = None
 
 from utils.metrics import metrics_registry, update_uptime
 
@@ -22,6 +26,12 @@ _CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 @metrics_bp.route("/metrics", methods=["GET"])
 def prometheus_metrics():
     """Return all InkyPi metrics in Prometheus text exposition format."""
+    if generate_latest is None:
+        return Response(
+            b"# prometheus_client not installed; metrics disabled\n",
+            status=200,
+            content_type=_CONTENT_TYPE,
+        )
     update_uptime()
     data = generate_latest(metrics_registry)
     return Response(data, status=200, content_type=_CONTENT_TYPE)
