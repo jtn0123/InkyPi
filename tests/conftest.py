@@ -51,6 +51,8 @@ UI_BROWSER_TESTS = {
     "test_device_actions_roundtrip.py",
     # JTN-728/727/726/725 device/update/ops journey bundle.
     "test_device_update_ops_journeys.py",
+    # JTN-727 logs-access journey (trigger error, download, verify payload).
+    "test_logs_access.py",
 }
 A11Y_BROWSER_TESTS = {
     "test_a11y_sweep.py",
