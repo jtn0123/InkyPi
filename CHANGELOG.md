@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.61.4 (2026-04-18)
+
+### Bug Fixes
+
+- Prevent settings layout overflow and save-bar overlap (JTN-748)
+  ([#537](https://github.com/jtn0123/InkyPi/pull/537),
+  [`3942f9b`](https://github.com/jtn0123/InkyPi/commit/3942f9bd281e9c0402587a21d71bd2c406128289))
+
+* fix: prevent settings layout overflow and save-bar overlap (JTN-748)
+
+* fix: relax settings form-state selector
+
+* test: refresh settings snapshots on ubuntu
+
+
 ## v0.61.3 (2026-04-18)
 
 ### Bug Fixes
