@@ -19,6 +19,12 @@ fi
 
 export PYTHONPATH="src${PYTHONPATH:+:$PYTHONPATH}"
 
+if [[ "${1:-}" == "browser-smoke" ]]; then
+    shift || true
+    REQUIRE_BROWSER_SMOKE=1 python -m pytest -q tests/integration/test_browser_smoke.py "$@"
+    exit $?
+fi
+
 BROWSER_TEST_TARGETS=(
     tests/integration/test_browser_smoke.py
     tests/integration/test_e2e_form_workflows.py

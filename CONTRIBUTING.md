@@ -4,18 +4,18 @@ Thanks for your interest in contributing to InkyPi! This guide covers setup, tes
 
 ## Prerequisites
 
-- Python 3.11+
-- A virtual environment (`venv`)
+- Python 3.11-3.13
+- A virtual environment (`.venv`)
 
 ## Dev Setup
 
 ```bash
-# Clone your fork
-git clone https://github.com/<your-username>/InkyPi.git
+# Clone the current repo or your fork
+git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi
 
 # Create and activate a virtual environment
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 
 # Install dev dependencies
@@ -37,10 +37,10 @@ This starts the web UI on port 8080 without requiring e-ink display hardware.
 
 ```bash
 # Fast iteration — skip browser/Playwright tests (headless Chromium not required)
-SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --no-header --tb=no -q
+scripts/test.sh
 
 # Run a specific test file
-.venv/bin/python -m pytest tests/unit/test_inkypi.py -v
+scripts/test.sh tests/unit/test_inkypi.py -v
 
 # Run with coverage
 SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --cov=src --cov-report=term-missing
@@ -67,6 +67,12 @@ SKIP_BROWSER=0 .venv/bin/python -m pytest tests/
 # Or simply omit SKIP_BROWSER — it defaults to unset (tests run); Chromium must
 # be installed or browser tests will fail (they are not auto-skipped on missing Chromium):
 .venv/bin/python -m pytest tests/
+```
+
+**Run the lightweight browser smoke gate used by the frontend pre-commit hook:**
+
+```bash
+scripts/test.sh browser-smoke
 ```
 
 **Fine-grained control:**
@@ -136,8 +142,8 @@ Private helpers (`_*` functions) longer than ~5 lines or with non-obvious intent
 2. Create a feature branch from `main`
 3. Write tests for new functionality
 4. Ensure all tests pass:
-   - Backend-only changes: `SKIP_BROWSER=1 .venv/bin/python -m pytest tests/ --no-header --tb=no -q`
-   - **Frontend changes** (`src/static/**`, `src/templates/**`): `SKIP_BROWSER=0 .venv/bin/python -m pytest tests/`
+   - Backend-only changes: `scripts/test.sh`
+   - **Frontend changes** (`src/static/**`, `src/templates/**`): `scripts/test.sh browser-smoke`
 5. Run lint: `scripts/lint.sh`
 6. Open a PR against `main`
 
@@ -145,9 +151,9 @@ Private helpers (`_*` functions) longer than ~5 lines or with non-obvious intent
 
 Before marking your PR ready for review, confirm:
 
-- [ ] All pytest tests pass locally
+- [ ] `scripts/test.sh` passes locally
 - [ ] `scripts/lint.sh` passes (ruff + black are CI blockers)
-- [ ] **If touching `src/static/**` or `src/templates/**`**: ran browser tests with `SKIP_BROWSER=0 .venv/bin/python -m pytest tests/` and all passed
+- [ ] **If touching `src/static/**` or `src/templates/**`**: ran `scripts/test.sh browser-smoke` and it passed
 
 ## Dependency Management
 
