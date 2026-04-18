@@ -398,9 +398,7 @@ def _validate_device_name(form_data):
             f"Device Name must be {_DEVICE_NAME_MAX_LEN} characters or fewer",
             "deviceName",
         )
-    if any(
-        unicodedata.category(ch) == "Cc" and ch != "\t" for ch in raw_device_name
-    ):
+    if any(unicodedata.category(ch) == "Cc" and ch != "\t" for ch in raw_device_name):
         return _field_error(
             "Device Name may not contain control characters",
             "deviceName",
