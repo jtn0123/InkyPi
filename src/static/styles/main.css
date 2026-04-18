@@ -3314,6 +3314,18 @@ input:disabled, select:disabled, textarea:disabled {
   align-items: start;
 }
 
+.settings-device-name {
+  max-width: min(100%, 18rem);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-form--sticky-save {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
 .settings-panel {
   gap: 16px;
 }
