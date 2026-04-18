@@ -43,6 +43,7 @@ UI_BROWSER_TESTS = {
     "test_plugin_preview_save_roundtrip.py",
     "test_form_roundtrip.py",
     "test_playlist_roundtrip.py",
+    "test_playlist_roundtrip_mobile.py",
     "test_api_key_roundtrip.py",
     "test_jtn_720_721_722_journeys.py",
     # JTN-724 update-flow happy-path journey.
