@@ -30,7 +30,11 @@ logger = logging.getLogger(__name__)
 playlist_bp = Blueprint("playlist", __name__)
 
 _PLAYLIST_NAME_MAX_LEN = 64
-_PLAYLIST_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
+_PLAYLIST_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$", re.ASCII)
+_PLAYLIST_NAME_FORMAT_ERROR = (
+    "Playlist name can only contain ASCII letters, "
+    "numbers, spaces, underscores, and hyphens"
+)
 _INSTANCE_NAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
 
 # Shared string constants to avoid duplication
@@ -65,7 +69,7 @@ def _validate_playlist_name(name, field="playlist_name"):
         )
     if not _PLAYLIST_NAME_RE.match(name):
         return None, json_error(
-            "Playlist name may only contain letters, numbers, spaces, hyphens, and underscores",
+            _PLAYLIST_NAME_FORMAT_ERROR,
             status=400,
             code=_CODE_VALIDATION,
             details={"field": field},

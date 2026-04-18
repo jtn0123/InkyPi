@@ -819,11 +819,14 @@ class TestPlaylistNameValidation:
         assert "../" not in data["error"]
         assert data["details"]["field"] == "playlist_name"
 
-    def test_create_playlist_name_valid_unicode(self, client, device_config_dev):
-        r"""Unicode word characters (accented letters matched by \w) should be accepted."""
+    def test_create_playlist_name_rejects_unicode(self, client):
+        """Playlist names must stay aligned with the ASCII-only UI copy."""
         resp = _create_playlist(client, "Météo", "08:00", "12:00")
-        assert resp.status_code == 200
-        assert resp.get_json()["success"] is True
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data["details"]["field"] == "playlist_name"
+        assert "ASCII letters" in data["error"]
 
     def test_create_playlist_name_with_spaces(self, client, device_config_dev):
         """Playlist names with spaces should be accepted."""
