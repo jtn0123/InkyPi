@@ -381,6 +381,22 @@ _DETERMINISM_CSS = """
   [data-eta],
   .refresh-countdown,
   .next-up-countdown { color: transparent !important; }
+
+  /* History page: the storage card shows live disk-usage stats ("23.0%
+     FREE", "7.18 GB remaining of 31.32 GB total") plus a proportional
+     meter fill. Both vary massively between a local dev machine and the
+     GitHub runner (e.g. 23% local vs 61% CI), so mask their content but
+     keep the container rectangles to preserve layout. */
+  #storage-text { color: transparent !important; }
+  .page-summary .status-chip:not(.info) { color: transparent !important; }
+  #storage-bar-inner {
+    /* Pin the fill to a deterministic width + flat color so the meter's
+       rendered shape matches across hosts regardless of actual disk
+       usage. Overrides the inline --meter-width style. */
+    width: 50% !important;
+    background: #dfe3ea !important;
+    background-image: none !important;
+  }
 """
 
 
