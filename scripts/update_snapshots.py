@@ -49,6 +49,10 @@ def main() -> int:
         "-m",
         "pytest",
         "tests/snapshots/",
+        # Layout snapshots (JTN-700) live under tests/integration/ but share
+        # the same --update-snapshots refresh mechanism. Include them so a
+        # single script regenerates every tracked baseline PNG.
+        "tests/integration/test_visual_regression.py",
         "-v",
         "--no-header",
         "--tb=short",
