@@ -519,7 +519,9 @@ class Playlist:
             # Legacy configs used cycle_minutes; migrate to seconds on load.
             legacy_minutes = data.get("cycle_minutes")
             minutes: int | None = None
-            if isinstance(legacy_minutes, int):
+            # bool is a subclass of int in Python — reject it explicitly so
+            # malformed JSON like {"cycle_minutes": true} does not become 60s.
+            if isinstance(legacy_minutes, int) and not isinstance(legacy_minutes, bool):
                 minutes = legacy_minutes
             elif isinstance(legacy_minutes, str):
                 try:
@@ -727,9 +729,16 @@ class PluginInstance:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PluginInstance:
         plugin_settings = data.get("plugin_settings")
+        legacy_settings = data.get("settings")
         if plugin_settings is None:
             # Legacy configs used "settings"; preserve user data on migration.
-            plugin_settings = data.get("settings", {})
+            plugin_settings = legacy_settings
+        elif not isinstance(plugin_settings, dict) and isinstance(
+            legacy_settings, dict
+        ):
+            # Partially migrated: plugin_settings present but malformed while
+            # the legacy field is still a valid dict — prefer user data.
+            plugin_settings = legacy_settings
         if not isinstance(plugin_settings, dict):
             plugin_settings = {}
 

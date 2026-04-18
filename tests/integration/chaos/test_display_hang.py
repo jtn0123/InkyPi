@@ -13,7 +13,10 @@ def test_display_hang_fault_times_out_and_surfaces_error(
 
     def _hung_display(*_args, **_kwargs):
         time.sleep(0.4)
-        raise TimeoutError("display driver hang (simulated SIGSTOP)")
+        # Include "timed out" so that if the raw exception wins a timing race
+        # with the manual-update timeout wrapper, the diagnostic text still
+        # satisfies the assertion below.
+        raise TimeoutError("display driver hang timed out (simulated SIGSTOP)")
 
     monkeypatch.setattr(display_manager, "display_image", _hung_display, raising=True)
 
