@@ -169,19 +169,11 @@ def test_security_headers_coverage(monkeypatch):
     app = getattr(mod, "app", None)
     assert app is not None
 
-    # Test that after_request handlers are registered
-    assert len(app.after_request_funcs[None]) > 0
-
-    # Test security headers function can be called
-    with app.test_request_context("/"):
-        response = app.response_class("test")
-
-        # Call after_request handlers to cover the security headers code
-        for handler in app.after_request_funcs[None]:
-            response = handler(response)
-
-        # Just verify the function ran without error
-        assert response is not None
+    resp = app.test_client().get("/healthz")
+    assert resp.status_code == 200
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert resp.headers["Referrer-Policy"] == "no-referrer"
 
 
 def test_security_headers_basic(monkeypatch):
@@ -190,17 +182,11 @@ def test_security_headers_basic(monkeypatch):
     app = getattr(mod, "app", None)
     assert app is not None
 
-    with app.test_request_context("/"):
-        response = app.response_class("test")
-
-        # Call after_request handlers to trigger security headers
-        for handler in app.after_request_funcs[None]:
-            response = handler(response)
-
-        # Verify basic security headers are present
-        assert "X-Content-Type-Options" in response.headers
-        assert "X-Frame-Options" in response.headers
-        assert "Referrer-Policy" in response.headers
+    resp = app.test_client().get("/healthz")
+    assert resp.status_code == 200
+    assert "X-Content-Type-Options" in resp.headers
+    assert "X-Frame-Options" in resp.headers
+    assert "Referrer-Policy" in resp.headers
 
 
 def test_security_headers_hsts_conditions(monkeypatch):
@@ -209,19 +195,16 @@ def test_security_headers_hsts_conditions(monkeypatch):
     app = getattr(mod, "app", None)
     assert app is not None
 
-    # Test HTTPS condition
-    with app.test_request_context("/", environ_overrides={"wsgi.url_scheme": "https"}):
-        response = app.response_class("test")
-        for handler in app.after_request_funcs[None]:
-            response = handler(response)
-        # This covers the HTTPS condition check
+    resp = app.test_client().get("/healthz")
+    assert "Strict-Transport-Security" not in resp.headers
 
-    # Test proxy condition
-    with app.test_request_context("/", headers={"X-Forwarded-Proto": "https"}):
-        response = app.response_class("test")
-        for handler in app.after_request_funcs[None]:
-            response = handler(response)
-        # This covers the proxy condition check
+    https_resp = app.test_client().get("/healthz", base_url="https://localhost")
+    assert "Strict-Transport-Security" in https_resp.headers
+
+    proxy_resp = app.test_client().get(
+        "/healthz", headers={"X-Forwarded-Proto": "https"}
+    )
+    assert "Strict-Transport-Security" in proxy_resp.headers
 
 
 def test_startup_image_generation_execution(monkeypatch):

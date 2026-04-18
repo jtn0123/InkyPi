@@ -268,20 +268,11 @@ def test_inkypi_security_headers(monkeypatch):
     app = getattr(mod, "app", None)
     assert app is not None
 
-    # Test security headers middleware is registered
-    assert len(app.after_request_funcs[None]) > 0
-
-    # Create a test request context to verify headers
-    with app.test_request_context("/"):
-        response = app.response_class()
-        # Simulate the after_request function
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-
-        assert response.headers["X-Content-Type-Options"] == "nosniff"
-        assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
-        assert response.headers["Referrer-Policy"] == "no-referrer"
+    resp = app.test_client().get("/healthz")
+    assert resp.status_code == 200
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert resp.headers["Referrer-Policy"] == "no-referrer"
 
 
 def test_inkypi_refresh_task_lazy_start(monkeypatch):

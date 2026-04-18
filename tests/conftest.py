@@ -302,185 +302,44 @@ def device_config_dev(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def flask_app(device_config_dev, monkeypatch):
-    # Build a Flask app instance similar to inkypi.py but without CLI parsing/threads
-    import os
+    # Build the app through the production bootstrap path so tests exercise the
+    # same middleware registration that ships in inkypi.py.
     import secrets as _secrets
 
-    from flask import Flask, session as _session
-    from jinja2 import ChoiceLoader, FileSystemLoader
+    from flask import session as _session
 
-    from blueprints.api_docs import api_docs_bp
-    from blueprints.apikeys import apikeys_bp
-    from blueprints.client_error import client_error_bp
-    from blueprints.client_log import client_log_bp
-    from blueprints.csp_report import csp_report_bp
-    from blueprints.diagnostics import diagnostics_bp
-    from blueprints.errors import errors_bp
-    from blueprints.events import events_bp
-    from blueprints.history import history_bp
-    from blueprints.main import main_bp
-    from blueprints.metrics import metrics_bp
-    from blueprints.playlist import playlist_bp
-    from blueprints.plugin import plugin_bp
-    from blueprints.plugin_history_bp import plugin_history_bp
-    from blueprints.plugin_io import plugin_io_bp
-    from blueprints.settings import settings_bp
-    from blueprints.stats import stats_bp
-    from blueprints.version_info import version_info_bp
+    import inkypi
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
 
-    app = Flask(__name__)
-    app.secret_key = "test-secret-key-for-csrf"
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-csrf")
 
-    # Template directories
-    SRC_ABS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
-    template_dirs = [
-        os.path.join(SRC_ABS, "templates"),
-        os.path.join(SRC_ABS, "plugins"),
-    ]
-    app.jinja_loader = ChoiceLoader(
-        [FileSystemLoader(directory) for directory in template_dirs]
-    )
+    def _fake_init_core_services(app):
+        display_manager = DisplayManager(device_config_dev)
+        refresh_task = RefreshTask(device_config_dev, display_manager)
+        load_plugins(device_config_dev.get_plugins())
+        app.config["DEVICE_CONFIG"] = device_config_dev
+        app.config["DISPLAY_MANAGER"] = display_manager
+        app.config["REFRESH_TASK"] = refresh_task
+        app.config["WEB_ONLY"] = False
+        return device_config_dev
 
-    # Core services
-    display_manager = DisplayManager(device_config_dev)
-    refresh_task = RefreshTask(device_config_dev, display_manager)
+    def _setup_csrf_token_only(app):
+        def _generate_csrf_token() -> str:
+            if "_csrf_token" not in _session:
+                _session["_csrf_token"] = _secrets.token_hex(32)
+            return _session["_csrf_token"]
 
-    # Load plugins
-    load_plugins(device_config_dev.get_plugins())
+        @app.context_processor
+        def _inject_csrf_token():
+            return {"csrf_token": _generate_csrf_token}
 
-    # Store dependencies
-    app.config["DEVICE_CONFIG"] = device_config_dev
-    app.config["DISPLAY_MANAGER"] = display_manager
-    app.config["REFRESH_TASK"] = refresh_task
-    app.config["WEB_ONLY"] = False
-    app.config["MAX_FORM_PARTS"] = 10_000
-    # Mirror request size limit from app
-    try:
-        _max_len_env = os.getenv("MAX_CONTENT_LENGTH") or os.getenv("MAX_UPLOAD_BYTES")
-        _max_len = int(_max_len_env) if _max_len_env else 10 * 1024 * 1024
-    except Exception:
-        _max_len = 10 * 1024 * 1024
-    app.config["MAX_CONTENT_LENGTH"] = _max_len
+    monkeypatch.setattr(inkypi, "_init_core_services", _fake_init_core_services)
+    monkeypatch.setattr(inkypi, "setup_csrf_protection", _setup_csrf_token_only)
+    monkeypatch.setattr(inkypi, "setup_signal_handlers", lambda app: None)
 
-    # CSRF token support (mirrors inkypi.py create_app)
-    def _generate_csrf_token() -> str:
-        if "_csrf_token" not in _session:
-            _session["_csrf_token"] = _secrets.token_hex(32)
-        return _session["_csrf_token"]
-
-    @app.context_processor
-    def _inject_csrf_token():
-        return {"csrf_token": _generate_csrf_token}
-
-    from app_setup.http_metrics import setup_http_metrics
-    from app_setup.security_middleware import setup_csp_nonce
-    from utils.sri import init_sri
-
-    setup_csp_nonce(app)
-
-    # Register routes
-    app.register_blueprint(main_bp)
-    app.register_blueprint(apikeys_bp)
-    app.register_blueprint(client_error_bp)
-    app.register_blueprint(client_log_bp)
-    app.register_blueprint(errors_bp)
-    app.register_blueprint(settings_bp)
-    app.register_blueprint(plugin_bp)
-    app.register_blueprint(plugin_history_bp)
-    app.register_blueprint(plugin_io_bp)
-    app.register_blueprint(playlist_bp)
-    app.register_blueprint(history_bp)
-    app.register_blueprint(api_docs_bp)
-    app.register_blueprint(metrics_bp)
-    app.register_blueprint(stats_bp)
-    app.register_blueprint(version_info_bp)
-    app.register_blueprint(csp_report_bp)
-    app.register_blueprint(events_bp)
-    app.register_blueprint(diagnostics_bp)
-
-    setup_http_metrics(app)
-    init_sri(app)
-
-    # Lightweight health endpoints for probes/CI
-    @app.route("/healthz")
-    def healthz():
-        return ("OK", 200)
-
-    @app.route("/readyz")
-    def readyz():
-        try:
-            rt = app.config.get("REFRESH_TASK")
-            web_only = bool(app.config.get("WEB_ONLY"))
-            if web_only:
-                return ("ready:web-only", 200)
-            if rt and getattr(rt, "running", False):
-                return ("ready", 200)
-            return ("not-ready", 503)
-        except Exception:
-            return ("not-ready", 503)
-
-    @app.errorhandler(404)
-    def _handle_not_found(err):
-        from utils.http_utils import json_error, wants_json
-
-        if wants_json():
-            return json_error("Not found", status=404)
-        from flask import render_template as _rt
-
-        return _rt("404.html"), 404
-
-    @app.after_request
-    def _set_security_headers(response):
-        # Basic hardening headers
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-        response.headers.setdefault(
-            "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
-        )
-        # Enable HSTS only when under HTTPS/behind a proxy forwarding HTTPS
-        try:
-            from flask import request
-
-            if (
-                request.is_secure
-                or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
-            ):
-                response.headers.setdefault(
-                    "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
-                )
-        except Exception:
-            pass
-        # Content Security Policy (Report-Only by default)
-        try:
-            from flask import g as _g
-
-            _nonce = getattr(_g, "csp_nonce", "")
-            csp_value = os.getenv("INKYPI_CSP") or (
-                "default-src 'self'; img-src 'self' data: https:; "
-                "style-src 'self' 'unsafe-inline'; "
-                f"script-src 'self' 'nonce-{_nonce}'; font-src 'self' data:"
-            )
-            report_only = os.getenv("INKYPI_CSP_REPORT_ONLY", "1").strip().lower() in (
-                "1",
-                "true",
-                "yes",
-            )
-            header_name = (
-                "Content-Security-Policy-Report-Only"
-                if report_only
-                else "Content-Security-Policy"
-            )
-            if header_name not in response.headers:
-                response.headers[header_name] = csp_value
-        except Exception:
-            pass
-        return response
-
-    return app
+    return inkypi.create_app()
 
 
 @pytest.fixture()
