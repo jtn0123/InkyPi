@@ -129,7 +129,10 @@ The cache respects standard HTTP Cache-Control directives:
 
 ## Plugin Integration
 
-Plugins automatically benefit from caching without code changes:
+Plugins automatically benefit from caching without code changes. The cache sits on top of
+the same shared session factory used by `utils.http_client.get_http_session()`, so a
+plugin can move from the compatibility session to `http_get()` later without relearning
+new retry or pooling behavior:
 
 ### Weather Plugin Example
 

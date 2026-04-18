@@ -310,48 +310,73 @@ except Exception:
     logger.warning("Failed to parse HTTP split timeout env vars, using defaults")
     CONNECT_TIMEOUT_SECONDS = None
     READ_TIMEOUT_SECONDS = None
-DEFAULT_HEADERS: dict[str, str] = {
-    "User-Agent": "InkyPi/1.0 (+https://github.com/fatihak/InkyPi)"
-}
+HTTP_POOL_CONNECTIONS = 10
+HTTP_POOL_MAXSIZE = 10
+HTTP_POOL_BLOCK = False
+HTTP_STATUS_FORCELIST = (429, 500, 502, 503, 504)
+HTTP_ALLOWED_METHODS = ("HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE")
+HTTP_DEFAULT_USER_AGENT = "InkyPi/1.0 (+https://github.com/fatihak/InkyPi)"
+DEFAULT_HEADERS: dict[str, str] = {"User-Agent": HTTP_DEFAULT_USER_AGENT}
 
 
-def _build_retry() -> Retry:
+def _build_retry(
+    *,
+    total: int,
+    connect: int | None,
+    read: int | None,
+    status: int | None,
+    backoff_factor: float,
+    allowed_methods: tuple[str, ...],
+    raise_on_status: bool,
+) -> Retry:
+    """Build a retry policy without binding it to a specific caller profile."""
     # Retry idempotent methods on common transient failures.  ``urllib3`` is
     # imported lazily to keep it off the startup path (JTN-606).
-    from urllib3.util.retry import Retry  # noqa: F811
+    from urllib3.util.retry import Retry as _Retry  # noqa: F811
 
+    return _Retry(
+        total=total,
+        connect=connect,
+        read=read,
+        status=status,
+        backoff_factor=backoff_factor,
+        status_forcelist=HTTP_STATUS_FORCELIST,
+        allowed_methods=frozenset(allowed_methods),
+        raise_on_status=raise_on_status,
+    )
+
+
+def _build_env_retry() -> Retry:
+    """Build the default retry policy used by ``http_get``."""
     retries_total = _env_int("INKYPI_HTTP_RETRIES", 3)
     retries_connect = _env_int("INKYPI_HTTP_RETRIES_CONNECT", retries_total)
     retries_read = _env_int("INKYPI_HTTP_RETRIES_READ", retries_total)
     retries_status = _env_int("INKYPI_HTTP_RETRIES_STATUS", retries_total)
     backoff = _env_float("INKYPI_HTTP_BACKOFF", 0.0)  # keep tests snappy by default
-    return Retry(
+    return _build_retry(
         total=retries_total,
         connect=retries_connect,
         read=retries_read,
         status=retries_status,
         backoff_factor=backoff,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=(
-            "HEAD",
-            "GET",
-            "PUT",
-            "DELETE",
-            "OPTIONS",
-            "TRACE",
-        ),
+        allowed_methods=HTTP_ALLOWED_METHODS,
         raise_on_status=False,
     )
 
 
-def _build_session() -> requests.Session:
+def _build_session(*, headers: dict[str, str], retry: Retry) -> requests.Session:
     # ``requests`` / HTTPAdapter are imported lazily — see module docstring.
     import requests  # noqa: F811
     from requests.adapters import HTTPAdapter  # noqa: F811
 
     s = requests.Session()
-    adapter = HTTPAdapter(max_retries=_build_retry())
-    s.headers.update(DEFAULT_HEADERS)
+    adapter = HTTPAdapter(
+        pool_connections=HTTP_POOL_CONNECTIONS,
+        pool_maxsize=HTTP_POOL_MAXSIZE,
+        max_retries=retry,
+        pool_block=HTTP_POOL_BLOCK,
+    )
+    s.headers.update(headers)
     s.mount("http://", adapter)
     s.mount("https://", adapter)
     return s
@@ -361,7 +386,7 @@ def get_shared_session() -> requests.Session:
     """Return a requests.Session unique to the current thread."""
     session: requests.Session | None = getattr(_thread_local, "session", None)
     if session is None:
-        session = _build_session()
+        session = _build_session(headers=DEFAULT_HEADERS, retry=_build_env_retry())
         _thread_local.session = session
     return session
 

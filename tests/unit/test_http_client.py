@@ -28,8 +28,10 @@ def test_get_http_session_singleton():
 
 
 def test_session_has_user_agent():
+    import utils.http_utils as http_utils
+
     session = get_http_session()
-    assert "InkyPi/1.0" in session.headers.get("User-Agent", "")
+    assert session.headers.get("User-Agent") == http_utils.DEFAULT_HEADERS["User-Agent"]
 
 
 def test_session_has_retry_strategy():
@@ -42,6 +44,10 @@ def test_session_has_retry_strategy():
     # Verify the retry strategy is set on the adapter
     assert http_adapter.max_retries.total == 3
     assert https_adapter.max_retries.total == 3
+    assert http_adapter.max_retries.backoff_factor == 0.5
+    assert http_adapter.max_retries.allowed_methods == frozenset(
+        {"GET", "HEAD", "OPTIONS"}
+    )
 
 
 def test_close_http_session():
