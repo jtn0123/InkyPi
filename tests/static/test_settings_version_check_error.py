@@ -16,7 +16,7 @@ def test_version_check_aborts_without_warning():
     assert (
         'console.debug("Version check aborted:", e);' in js
     ), "AbortError should be logged at debug level rather than warning level"
-    assert "console.debug(\"Version check aborted:\", e);\n          return;" in js, (
+    assert 'console.debug("Version check aborted:", e);\n          return;' in js, (
         "AbortError branch should return early so the badge is not marked as "
         "a failed update check for an expected abort"
     )
