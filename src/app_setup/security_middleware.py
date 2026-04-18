@@ -367,7 +367,7 @@ _STATIC_ASSET_EXTS = (
 )
 _DEFAULT_CSP_TEMPLATE = (
     "default-src 'self'; img-src 'self' data: https:; "
-    "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline'; "
     "script-src 'self' 'nonce-{nonce}'; font-src 'self' data: https:"
 )
 

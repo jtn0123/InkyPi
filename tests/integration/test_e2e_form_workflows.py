@@ -30,11 +30,11 @@ def _leaflet_stub_js() -> str:
 
 def _stub_leaflet(page):
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+        "**/static/vendor/leaflet/leaflet.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
     )
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+        "**/static/vendor/leaflet/leaflet.js",
         lambda route: route.fulfill(
             status=200, content_type="application/javascript", body=_leaflet_stub_js()
         ),

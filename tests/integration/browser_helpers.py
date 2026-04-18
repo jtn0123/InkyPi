@@ -11,7 +11,7 @@ CRITICAL_RESPONSE_TYPES = {"document", "script", "stylesheet", "xhr", "fetch"}
 
 
 def leaflet_stub_js() -> str:
-    """Return a minimal Leaflet stub to prevent CDN requests."""
+    """Return a minimal Leaflet stub to prevent browser-side map side effects."""
     return """
       (() => {
         function chain() { return this; }
@@ -49,13 +49,13 @@ def leaflet_stub_js() -> str:
 
 
 def stub_leaflet(page):
-    """Intercept Leaflet CDN requests and return stubs."""
+    """Intercept local Leaflet asset requests and return stubs."""
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+        "**/static/vendor/leaflet/leaflet.css",
         lambda route: route.fulfill(status=200, content_type="text/css", body=""),
     )
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+        "**/static/vendor/leaflet/leaflet.js",
         lambda route: route.fulfill(
             status=200, content_type="application/javascript", body=leaflet_stub_js()
         ),
@@ -77,7 +77,7 @@ class RuntimeCollector:
             if msg.type != "error":
                 return
             text = msg.text
-            # Ignore leaflet integrity errors
+            # Ignore Leaflet asset-loading noise from the stubbed map bootstrap.
             if "integrity" in text and "leaflet" in text.lower():
                 return
             self.console_errors.append(text)

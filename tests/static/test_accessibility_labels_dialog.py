@@ -25,3 +25,11 @@ def test_weather_map_close_button_is_button_element():
     content = Path("src/templates/widgets/weather_map.html").read_text()
     span_close = re.search(r'<span[^>]*class="[^"]*close-button', content)
     assert span_close is None, "close-button should be <button>, not <span>"
+
+
+def test_weather_map_uses_local_leaflet_assets():
+    """The weather map template must point at vendored Leaflet files."""
+    content = Path("src/templates/widgets/weather_map.html").read_text()
+    assert "vendor/leaflet/leaflet.css" in content
+    assert "vendor/leaflet/leaflet.js" in content
+    assert "unpkg.com/leaflet" not in content
