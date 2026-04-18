@@ -43,12 +43,18 @@ FONTS = {
 
 def resolve_path(file_path):
     src_dir = os.getenv("SRC_DIR")
+    repo_root = Path(__file__).resolve().parents[2]
     if src_dir is None:
         # Default to the src directory
-        src_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        src_path = Path(__file__).resolve().parents[1]
+    else:
+        src_path = Path(src_dir)
+        if not src_path.is_absolute():
+            # Keep relative SRC_DIR values anchored to the repository root so
+            # callers do not depend on the current working directory.
+            src_path = (repo_root / src_path).resolve()
 
-    src_path = Path(src_dir)
-    return str(src_path / file_path)
+    return str((src_path / file_path).resolve())
 
 
 def get_ip_address():

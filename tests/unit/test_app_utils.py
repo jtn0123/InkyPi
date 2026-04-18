@@ -2,6 +2,7 @@ import os
 import socket
 import subprocess
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 from PIL import Image
@@ -69,6 +70,16 @@ def test_resolve_path_with_env(tmp_path, monkeypatch):
     monkeypatch.setenv("SRC_DIR", str(tmp_path))
     p = app_utils.resolve_path("static/images")
     assert str(tmp_path).replace("\\", "/") in p.replace("\\", "/")
+
+
+def test_resolve_path_with_relative_src_dir_ignores_cwd(tmp_path, monkeypatch):
+    repo_root = Path(__file__).resolve().parents[2]
+    monkeypatch.setenv("SRC_DIR", "src")
+    monkeypatch.chdir(tmp_path)
+
+    p = app_utils.resolve_path("plugins")
+
+    assert p == str((repo_root / "src" / "plugins").resolve())
 
 
 def test_parse_form_list_handling():
