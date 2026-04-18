@@ -484,7 +484,8 @@ jobs:
             --output artifacts/security/pip-audit-dev.json
       - name: Generate SBOM
         run: |
-          python -m cyclonedx_py environment python --of JSON \
+          python_path="$(python -c 'import sys; print(sys.executable)')"
+          python -m cyclonedx_py environment "$python_path" --of JSON \
             -o artifacts/security/sbom.json
       - name: Upload security artifacts
         if: always()
