@@ -33,7 +33,7 @@
                 <p class="page-subtitle">Manage device behavior, scheduling, recovery tools, and image processing from one control surface.</p>
             </div>
             <div class="page-summary">
-                <span class="status-chip info">{{ device_settings.name }}</span>
+                <span class="status-chip info settings-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
                 <span class="status-chip">{{ device_settings.orientation | capitalize }}</span>
                 <span class="status-chip">{{ device_settings.timezone }}</span>
             </div>
@@ -48,7 +48,7 @@
         </nav>
         <div class="settings-console-main">
         <!-- Settings Content -->
-        <form class="settings-form" data-form-state aria-busy="false">
+        <form class="settings-form settings-form--sticky-save" data-form-state aria-busy="false">
             <div id="settings-container">
                 <section class="settings-console-panel active" data-settings-panel="device">
                 <!-- Basics -->

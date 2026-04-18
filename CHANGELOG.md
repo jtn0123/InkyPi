@@ -1,6 +1,434 @@
 # CHANGELOG
 
 
+## v0.61.4 (2026-04-18)
+
+### Bug Fixes
+
+- Prevent settings layout overflow and save-bar overlap (JTN-748)
+  ([#537](https://github.com/jtn0123/InkyPi/pull/537),
+  [`3942f9b`](https://github.com/jtn0123/InkyPi/commit/3942f9bd281e9c0402587a21d71bd2c406128289))
+
+* fix: prevent settings layout overflow and save-bar overlap (JTN-748)
+
+* fix: relax settings form-state selector
+
+* test: refresh settings snapshots on ubuntu
+
+
+## v0.61.3 (2026-04-18)
+
+### Bug Fixes
+
+- Align playlist name validation with ASCII UI copy (JTN-747)
+  ([#536](https://github.com/jtn0123/InkyPi/pull/536),
+  [`cb7aa72`](https://github.com/jtn0123/InkyPi/commit/cb7aa729db8c00fd219727a36424f4eca5ff12d7))
+
+* fix: align playlist name validation with ASCII UI copy (JTN-747)
+
+* fix: format dogfood fuzz test
+
+- Stabilize plugin image asset paths for frame icons (JTN-749)
+  ([#538](https://github.com/jtn0123/InkyPi/pull/538),
+  [`f7c4d0f`](https://github.com/jtn0123/InkyPi/commit/f7c4d0f4cbda18b8a2b136c4ff4f884b7e47103d))
+
+* fix: stabilize plugin image asset paths for frame icons (JTN-749)
+
+* fix: speed up resolve_path for relative SRC_DIR
+
+- Swallow expected AbortError in version check (JTN-751)
+  ([#540](https://github.com/jtn0123/InkyPi/pull/540),
+  [`da0639b`](https://github.com/jtn0123/InkyPi/commit/da0639b560124af5c830f6d93e7dd5f75e014db8))
+
+* fix: swallow expected AbortError in version check (JTN-751)
+
+* fix: format version-check regression test
+
+- Vendor Leaflet for the weather plugin (JTN-750)
+  ([#539](https://github.com/jtn0123/InkyPi/pull/539),
+  [`dada940`](https://github.com/jtn0123/InkyPi/commit/dada94059b948ef54fae344b136214c8cb7c240c))
+
+### Testing
+
+- A11y sweep with axe-core Playwright baseline (JTN-740)
+  ([#529](https://github.com/jtn0123/InkyPi/pull/529),
+  [`01e4758`](https://github.com/jtn0123/InkyPi/commit/01e4758b38519231b118d59cca0f23b9bb454214))
+
+Adds `tests/integration/test_a11y_sweep.py` — a WCAG 2.0/2.1 A+AA axe scan that runs against every
+  page in `PAGES_TO_SWEEP` (imported from `test_click_sweep`) plus every registered plugin page,
+  gated by a human-readable `tests/integration/a11y_allowlist.yml`.
+
+The sweep is parametrised the same way as the click-sweep so any a11y regression in main chrome or
+  any plugin template fails CI. Baseline landed with only the pre-existing `color-contrast` /
+  `aria-hidden-focus` violations allowlisted (tracking JTN-510 / JTN-511). Allowlist entries require
+  a written `reason` and a new self-test fails if an entry points at a page the sweep no longer
+  visits.
+
+Acceptance verified: removing `aria-label="Home"` from the plugin header produces `link-name
+  (serious)` with the offending selector in the failure output; re-adding the label returns the
+  sweep to green without touching the allowlist.
+
+Extends JTN-507 (done via #368) rather than replacing it — `test_axe_a11y.py` keeps running the full
+  axe ruleset on the six main routes for the JTN-508/509/510/511 burndown, while this new module
+  covers the WCAG AA baseline across every page the click-sweep knows about.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Api contract + performance budget CI gates (JTN-739, JTN-738)
+  ([#520](https://github.com/jtn0123/InkyPi/pull/520),
+  [`28b3df4`](https://github.com/jtn0123/InkyPi/commit/28b3df40cb777c38697bd9d0c2ec4bf46067bdd3))
+
+* test: bundle JTN-736/JTN-735/JTN-734 regression hardening
+
+* chore: fix lint formatting and strict typing for bundle tests
+
+* test: add API contract and perf budget CI gates (JTN-739, JTN-738)
+
+* fix: stabilize contract job polling and format CI files
+
+* fix: make metrics optional when prometheus client is unavailable
+
+* refactor: avoid sonar naming issues in metrics fallback
+
+* Harden plugin registry and UI flow tests
+
+Co-authored-by: Codex <noreply@openai.com>
+
+* chore: drop local coverage artifact from PR
+
+* fix: satisfy lint/format gates for coverage fixes
+
+* fix: address review follow-ups on contract gates PR
+
+* fix(tests): reduce sonar architecture boundary violations
+
+* fix: address latest CodeRabbit review batch
+
+* style: apply black formatting to contract/perf test files
+
+Fixes the 'Lint and type-check' CI job which rejected unformatted test files. Pure
+  whitespace/line-wrapping changes — no semantics touched.
+
+* fix: address CodeRabbit 4132688608 review feedback
+
+* path_get: preserve dotted_path context when a dict key is missing by re-raising a KeyError with
+  full path information (chained from the original). * test_playlist_details_expand: count the full
+  toggles locator before narrowing to `.first` — `.first.count()` capped at 1 and could not catch
+  duplicate toggles.
+
+---------
+
+- Bundle JTN-736/JTN-735/JTN-734 regression hardening
+  ([#516](https://github.com/jtn0123/InkyPi/pull/516),
+  [`317facb`](https://github.com/jtn0123/InkyPi/commit/317facbbb6fc312e0aa1a144acfea06ac4a604fe))
+
+* test: bundle JTN-736/JTN-735/JTN-734 regression hardening
+
+* chore: fix lint formatting and strict typing for bundle tests
+
+* test: cover legacy migration branches
+
+* chore: contain src imports in test layer to clear Sonar S7788
+
+The bundle's new test files imported production modules at module scope (blueprints.diagnostics,
+  display.display_manager, plugins.plugin_registry, refresh_task, utils.config_schema, model) which
+  Sonar's pythonarchitecture:S7788 flagged as 7 new architecture-deviation issues on this PR.
+
+Match the established project pattern (see tests/integration/browser_helpers.py and
+  tests/conftest.py fixtures): move these imports into the helper functions and test bodies that
+  need them so the "tests -> src" relationship is contained to the helper layer. This preserves the
+  end-to-end coverage of the upgrade-chain scenario and chaos clock-skew case while keeping Sonar's
+  architecture rule happy for this PR.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* chore: remove new tests->src architecture edges for Sonar S7788
+
+Lazy imports still register as module relationships in the S7788 static analysis, so the 7 new
+  issues on PR #516 persisted after the previous function-scoped relocation. Eliminate the imports
+  instead:
+
+- tests/unit/test_config_migration.py: call validate_device_config via the config module (already
+  re-exports it) rather than importing utils.config_schema directly. -
+  tests/integration/chaos/test_clock_skew.py: obtain the RefreshInfo class from the
+  already-instantiated device_config.refresh_info instead of importing from model. -
+  tests/install/test_upgrade_chain.py: narrow the regression scope to the config-loader layer.
+  Config.__init__ already runs full schema validation, so dropping the ad-hoc flask/refresh-task
+  pipeline keeps the upgrade-regression signal while removing the disallowed tests-to-src edges
+  (blueprints.diagnostics, display.display_manager, plugins.plugin_registry, refresh_task,
+  utils.config_schema). End-to-end refresh-pipeline coverage is already provided by the dedicated
+  integration suites.
+
+* fix: address CodeRabbit review feedback on regression bundle
+
+Model loader: - Reject boolean cycle_minutes values explicitly (bool is an int subclass, so
+  `{"cycle_minutes": true}` previously became a 60-second interval). - Preserve legacy ``settings``
+  when ``plugin_settings`` is present but malformed (partially-migrated configs no longer lose user
+  data).
+
+Test hardening: - tests/install/test_upgrade_chain.py: move the loader call inside the
+  ``pytest.raises`` block so either loader-time or assertion-time failures register as the
+  regression signal. - tests/install/fixtures/version_chain.yml: broaden preserved_paths with
+  ``orientation``, ``resolution``, and ``active_playlist``. - tests/integration/chaos/conftest.py:
+  drop ``autouse=True`` — only test_config_corruption needs the diagnostics paths fixture, keeping
+  other chaos tests free of the tests->src import and INKYPI_ENV mutation. -
+  tests/integration/chaos/test_clock_skew.py: also set ``clock_plugin.latest_refresh_time`` (read by
+  ``PluginInstance.should_refresh`` inside ``PlaylistRefresh.execute``) so the future-timestamp
+  branch is actually exercised; restore original state in ``finally``. -
+  tests/integration/chaos/test_config_corruption.py: snapshot + restore the original device.json
+  bytes in ``finally`` to prevent bleed-over into later tests that share the flask_app
+  DEVICE_CONFIG. - tests/integration/chaos/test_display_hang.py: include "timed out" in the
+  simulated hang error so the assertion passes regardless of which exception wins the timing race. -
+  tests/unit/test_config_migration.py: pin the baseline timezone to a sentinel value in
+  ``test_renamed_key_without_migration_is_detected`` so Config()'s default can never mask the
+  regression; reject booleans in the ``_expected_cycle_interval_seconds`` helper; add explicit
+  precedence and legacy-alias survival tests for ``plugin_settings`` vs ``settings``.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Flakiness retry + reporting for integration tests (JTN-705)
+  ([#527](https://github.com/jtn0123/InkyPi/pull/527),
+  [`8fd02be`](https://github.com/jtn0123/InkyPi/commit/8fd02be228ab51f621bde309558e9c395e24aa4d))
+
+* test: flakiness retry + reporting for integration tests (JTN-705)
+
+Integration tests drive Playwright, refresh loops, and cross-process state that occasionally flake
+  for reasons unrelated to the code under test. A single retry dramatically lowers false-positive
+  noise while still surfacing real regressions — two failures in a row is almost certainly a genuine
+  bug.
+
+- Add pytest-rerunfailures>=15.0,<17 to install/requirements-dev.in (and regenerated hashes in
+  install/requirements-dev.txt). 16.x is the first release compatible with the pinned pytest 9.x
+  line. - tests/integration/conftest.py: new pytest_collection_modifyitems hook attaches
+  @pytest.mark.flaky(reruns=1, reruns_delay=1) to every test whose file path resolves under
+  tests/integration/. The path gate means unit tests do NOT get retry allowance — unit flakes must
+  stay loud. - Respect existing @pytest.mark.flaky on individual tests so they can opt in to a
+  higher retry count without the hook clobbering them. - pytest-rerunfailures emits "R" progress
+  markers and a "rerun" count in the terminal summary, so repeated flakes surface in CI logs without
+  any additional formatter work.
+
+Verified locally: - Deliberately-flaky integration test fails first, reruns, passes. -
+  Deliberately-flaky unit test fails once with no retry.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* style: satisfy black + drop unused pytest hook arg
+
+- Reformat the flaky-marker call onto one line to match Black's preferred width (was wrapped across
+  3 lines, now fits on one). - Add the PEP 8 blank line between the hook and the next comment block.
+  - Drop the unused ``config`` parameter on ``pytest_collection_modifyitems``. pytest matches hook
+  args by name and accepts any subset, so removing it eliminates the ``# noqa: ARG001`` suppression
+  without changing behavior.
+
+Verified locally: integration test still retries once and passes, unit test fails once with no
+  retry.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Sustained-handler-load test — 2-minute random-click loop (JTN-703)
+  ([#531](https://github.com/jtn0123/InkyPi/pull/531),
+  [`323c98c`](https://github.com/jtn0123/InkyPi/commit/323c98cdb7f3ea435f4e0d308609825734d751f2))
+
+* test: sustained-handler-load test - 2-minute random-click loop (JTN-703)
+
+Adds tests/integration/test_sustained_load.py that cycles through a rotating set of clickable
+  controls on home / settings / playlist for ~2 minutes to catch cumulative handler degradation that
+  no single-click test can surface: memory leaks, EventSource reconnect storms, slow handlers that
+  only become visible after dozens of invocations.
+
+The test is skipped by default (SKIP_LOAD defaults to "1" - skip). Opt in with SKIP_LOAD=0 to run
+  the full 2-minute budget. Asserts:
+
+* zero JS pageerror across the run * zero handler-level console.error (rate-limit "Failed to load
+  resource" noise is filtered - 429/503 from saturating the real rate limiter is a guard firing
+  correctly, not a regression) * p95 click-to-settle latency under 500 ms
+
+Acceptance verified: * passes on main at the full 2-minute budget * JTN703_SLOW_HANDLER_TEST=1
+  injects a 700ms click-handler delay and fails the test with a p95-exceeded assertion *
+  JTN703_ERROR_INJECT_TEST=1 emits one console.error per click and fails the test with a
+  handler-level console.error assertion
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* test: drop dev-only JTN-703 env hooks, clarify client-log tripwire
+
+The ``JTN703_SLOW_HANDLER_TEST`` / ``JTN703_ERROR_INJECT_TEST`` env guards were
+  acceptance-verification hooks that didn't belong in the committed test. Drop them. Acceptance for
+  both tripwires is already recorded in the PR description; re-verification can be done by local
+  patching if ever needed.
+
+Also expand the ``/api/client-log`` comment to spell out *why* the autouse fixture is inert here —
+  ``flask_app`` in ``tests/conftest.py`` does not register ``client_log_bp`` — so future readers
+  don't have to cross-reference the fixture/conftest to understand the fallback.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Visual regression snapshots for key pages (JTN-700)
+  ([#532](https://github.com/jtn0123/InkyPi/pull/532),
+  [`61aadea`](https://github.com/jtn0123/InkyPi/commit/61aadeae5391ab61b80b64c4c2a21a55ed69f850))
+
+* test: add visual-regression snapshots for key pages (JTN-700)
+
+Capture full-page pixel screenshots of dashboard, settings, history, and playlist at desktop
+  (1280x900) and mobile (360x800) viewports and diff against baselines stored under
+  tests/snapshots/layout/. CSS regressions (padding, alignment, cut-off buttons) now fail CI where
+  JS-level checks would silently pass.
+
+Tolerance is 12 per-channel RGB delta and 1.5% changed pixels — tuned so a 4-16px padding nudge on a
+  dashboard card produces ~5% and fails, while Chromium anti-aliasing drift stays within noise. Both
+  knobs are env-var overridable.
+
+Test is triple-gated: SKIP_VISUAL=1 disables, REQUIRE_BROWSER_SMOKE=1 opts in (matches existing
+  plugin-snapshot gate), and Playwright Chromium is probed at import so environments without a
+  browser cleanly skip. Baselines were generated inside ubuntu:24.04 to match the Browser smoke CI
+  job's font fallback.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* test: mask history storage stats + regenerate baselines (JTN-700)
+
+Browser-smoke CI caught history_mobile at 1.79% changed pixels — cause was the storage card showing
+  live disk stats that vary between hosts (23% free locally vs 61% free on GitHub runners), not font
+  drift.
+
+Extend _DETERMINISM_CSS to mask #storage-text, the "% free" chip in .page-summary, and pin
+  #storage-bar-inner to a fixed width + flat color so the meter shape is deterministic. Regenerated
+  all 8 baselines in the same ubuntu:24.04 docker image the browser-smoke job uses.
+
+Acceptance: bumped .storage-card padding 16→32 and confirmed history-desktop fails on the
+  regenerated baselines; reverted and all 8 pass.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- **conftest**: Register client_log/client_error bp on integration flask_app
+  ([#533](https://github.com/jtn0123/InkyPi/pull/533),
+  [`3b4d878`](https://github.com/jtn0123/InkyPi/commit/3b4d878c2fad0e8465285464382c5c58f971a0c3))
+
+* test(conftest): register client_log/client_error blueprints on flask_app
+
+The integration flask_app fixture in tests/conftest.py did not register client_log_bp or
+  client_error_bp, so POST /api/client-log returned 404 during integration tests. That silently
+  defanged the autouse client_log_capture tripwire added for JTN-680: it never captured any entries,
+  so tests relying on it did not enforce "zero console.error".
+
+Mirrors the prod registration order in src/app_setup/blueprints_registry.py and adds
+  tests/integration/test_client_log_tripwire_wiring.py as a regression guard: posts to
+  /api/client-log and /api/client-error must return 204, and the env-var-gated capture hook must
+  record the entry.
+
+Unblocks a stronger JTN-703-style sustained-load tripwire (PR #531).
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* test(conftest): avoid new integration→blueprint import edge
+
+Sonar flagged the wiring test's direct import of `blueprints.client_log` as a new architecture
+  deviation (S7788). Rewrite the test to prove the wiring via HTTP response status instead:
+
+- Post an invalid payload that the blueprint rejects at 400 (invalid level for /api/client-log,
+  empty body for /api/client-error). A 400 means the blueprint is registered; a 404 means it is not.
+  No successfully-validated entry means nothing lands in the capture buffer, so the autouse teardown
+  stays quiet. - Keep the env-var assertion so a regression to the autouse `client_log_capture`
+  fixture is also caught.
+
+Capture-hook mechanics themselves are still covered by the unit tests in
+  tests/unit/test_client_log_capture.py.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- **journey**: Logs access — trigger error, download, verify in payload (JTN-727)
+  ([#526](https://github.com/jtn0123/InkyPi/pull/526),
+  [`94dc475`](https://github.com/jtn0123/InkyPi/commit/94dc475c4e598f0edbf20c4abfb4cc7e501f5615))
+
+* test(journey): logs access — trigger error, download, verify payload (JTN-727)
+
+Adds a Playwright-driven journey test under tests/integration/journeys/ that exercises the full
+  Download Logs path: trigger a deliberate error, click the Download Logs button, and confirm the
+  distinctive marker plus a timestamp within the test window appear in the downloaded payload.
+
+Uses /settings/client_log for the error trigger: a malformed body returns 400 (4xx assertion) and a
+  follow-up level=error POST writes the marker. A per-test fixture installs DevModeLogHandler and
+  flips JOURNAL_AVAILABLE so /download-logs can read the in-memory buffer.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* fix(tests): skip logs-access journey in CI lanes without Playwright Chromium
+
+The regular pytest CI lane doesn't install Playwright browsers, so the new test_logs_access.py
+  (JTN-727) erred at fixture setup when it tried to launch Chromium. Register the file in
+  UI_BROWSER_TESTS so pytest_ignore_collect skips it when SKIP_UI=1 / SKIP_BROWSER=1 are set or when
+  Chromium isn't available. The browser-smoke job (which installs Chromium and sets
+  REQUIRE_BROWSER_SMOKE=1) continues to exercise it.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- **journey**: Mobile-viewport playlist round-trip 360x800 (JTN-729)
+  ([#530](https://github.com/jtn0123/InkyPi/pull/530),
+  [`3d08f97`](https://github.com/jtn0123/InkyPi/commit/3d08f97d437ffaf89ea92b966697dabd678c6757))
+
+* test(journey): mobile-viewport playlist round-trip 360x800 (JTN-729)
+
+Mirror the desktop playlist round-trip journey (JTN-721) on the mobile_page fixture (360x800) to
+  catch touch-sized-UI regressions in the create -> reorder -> delete -> reload flow.
+
+Adds two mobile-specific assertions alongside the existing backend-persistence checks: - After each
+  interaction, the targeted element's bounding rect is at least 44x44 CSS px (WCAG 2.5.5 / Apple HIG
+  touch-target minimum). - The playlist card never horizontally overflows the viewport.
+
+Also handles the mobile collapse behavior by toggling the new playlist card open after initial load
+  and again after reload.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* test(conftest): register mobile playlist journey for SKIP_BROWSER gate
+
+Add test_playlist_roundtrip_mobile.py to UI_BROWSER_TESTS so pytest_ignore_collect drops it in the
+  pytest matrix (where Playwright Chromium isn't installed), matching how the desktop playlist
+  journey is handled.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- **journey**: Refresh interval change — save, persist, cadence respected (JTN-726)
+  ([#528](https://github.com/jtn0123/InkyPi/pull/528),
+  [`a64564c`](https://github.com/jtn0123/InkyPi/commit/a64564cbbb4caccbd3a3c94713ea1bf10c7782d6))
+
+* test(journey): refresh interval change — save, persist, cadence respected (JTN-726)
+
+Adds tests/integration/journeys/test_refresh_interval_change.py covering the full UI round-trip for
+  the scheduling tab: change the cadence, confirm the save toast + /save_settings 200, reload and
+  verify the input shows the new value, hit /api/diagnostics to confirm the refresh_task snapshot
+  reflects the new cadence, and assert that last_run_ts advances by approximately one interval after
+  a simulated refresh tick. Complements the existing test_jtn_726_refresh_cadence_journey which
+  verifies the refresh task signal.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* test(conftest): gate JTN-726 refresh-interval journey on Playwright availability
+
+Register `test_refresh_interval_change.py` in `UI_BROWSER_TESTS` so the CI lane without Playwright
+  browsers (the main `pytest` job) skips the test at collection time rather than failing at fixture
+  setup with `BrowserType.launch: Executable doesn't exist`. Matches the pattern used for sibling
+  journey tests (test_device_update_ops_journeys.py, test_first_run_setup.py).
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v0.61.2 (2026-04-17)
 
 ### Bug Fixes

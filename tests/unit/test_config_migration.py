@@ -40,6 +40,10 @@ def _load_json(path: Path) -> dict:
 
 
 def _coerce_positive_int(value: object) -> int | None:
+    # ``bool`` is a subclass of ``int`` in Python, but the loader rejects it —
+    # mirror that here so the helper agrees with ``Playlist.from_dict``.
+    if isinstance(value, bool):
+        return None
     if isinstance(value, int) and value > 0:
         return value
     if isinstance(value, str):
@@ -139,6 +143,9 @@ def test_renamed_key_without_migration_is_detected(
     tmp_path,
 ):
     baseline = _load_json(_fixture_device_path("v0.40"))
+    # Use a sentinel timezone that Config() will never default to so the
+    # assertion cannot silently pass if the loader supplies a matching default.
+    baseline["timezone"] = "Pacific/Kiritimati"
     renamed = copy.deepcopy(baseline)
     renamed["tz_name"] = renamed.pop("timezone")
 
@@ -153,3 +160,65 @@ def test_renamed_key_without_migration_is_detected(
         assert_baseline_preserved(
             baseline_values, cfg.get_config(), ("timezone",), version="renamed-key"
         )
+
+
+def test_legacy_settings_alias_survives_when_plugin_settings_missing():
+    """Verify ``PluginInstance.from_dict`` honours the legacy ``settings`` alias.
+
+    The v0.40 fixture ships with both ``plugin_settings`` and ``settings`` to
+    model the real partially-migrated device.json shape users had in the
+    wild. A loader that ignored the legacy alias could still pass those
+    fixture-level checks, so this targeted unit exercises the from_dict
+    boundary directly (the JSON schema validator would reject the shape at
+    the ``Config()`` layer before migration gets a chance to run).
+    """
+    from model import PluginInstance
+
+    fixture = _load_json(_fixture_device_path("v0.40"))
+    plugin_dict = fixture["playlist_config"]["playlists"][0]["plugins"][0]
+    assert "settings" in plugin_dict  # sanity: legacy alias is present.
+    plugin_dict.pop("plugin_settings", None)
+    legacy_api_token = plugin_dict["settings"]["api_token"]
+
+    plugin = PluginInstance.from_dict(plugin_dict)
+    assert plugin.settings.get("api_token") == legacy_api_token
+
+
+def test_plugin_settings_precedence_over_legacy_settings():
+    """Loader prefers ``plugin_settings`` when both fields coexist."""
+    from model import PluginInstance
+
+    plugin_dict = {
+        "plugin_id": "clock",
+        "name": "Clock Main",
+        "plugin_settings": {
+            "title": "from_plugin_settings",
+            "api_token": "token-from-plugin-settings",
+            "custom_banner": "banner-from-plugin-settings",
+        },
+        "settings": {
+            "title": "from_legacy_settings",
+            "api_token": "token-from-legacy-settings",
+            "custom_banner": "banner-from-legacy-settings",
+        },
+        "refresh": {"schedule": "08:15"},
+    }
+
+    plugin = PluginInstance.from_dict(plugin_dict)
+    assert plugin.settings.get("api_token") == "token-from-plugin-settings"
+
+
+def test_malformed_plugin_settings_falls_back_to_legacy_settings():
+    """When plugin_settings is non-dict but legacy settings is a dict, use legacy."""
+    from model import PluginInstance
+
+    plugin_dict = {
+        "plugin_id": "clock",
+        "name": "Clock Main",
+        "plugin_settings": "not-a-dict",
+        "settings": {"api_token": "rescued-from-legacy"},
+        "refresh": {},
+    }
+
+    plugin = PluginInstance.from_dict(plugin_dict)
+    assert plugin.settings.get("api_token") == "rescued-from-legacy"

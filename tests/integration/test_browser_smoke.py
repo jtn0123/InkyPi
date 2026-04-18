@@ -101,7 +101,7 @@ def _attach_runtime_collectors(page, base_url: str):
         runtime["console_errors"].append(text)
 
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+        "**/static/vendor/leaflet/leaflet.css",
         lambda route: route.fulfill(
             status=200,
             content_type="text/css",
@@ -109,7 +109,7 @@ def _attach_runtime_collectors(page, base_url: str):
         ),
     )
     page.route(
-        "**://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+        "**/static/vendor/leaflet/leaflet.js",
         lambda route: route.fulfill(
             status=200,
             content_type="application/javascript",

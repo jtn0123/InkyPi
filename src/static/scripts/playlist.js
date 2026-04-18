@@ -17,6 +17,8 @@
     const NEXT_IN_REFRESH_MS = 60000;      // 1 minute — countdown ticker interval
     const THUMB_PREFETCH_MARGIN = '200px';  // IntersectionObserver pre-load margin
     const PROGRESS_HIDE_DELAY_MS = 2000;    // delay before hiding progress panel
+    const PLAYLIST_NAME_RE = /^[A-Za-z0-9 _-]+$/;
+    const PLAYLIST_NAME_ERROR = "Playlist name can only contain ASCII letters, numbers, spaces, underscores, and hyphens";
 
     const C = window.PLAYLIST_CTX || {};
     const mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -619,6 +621,12 @@
         if (name.length > 64) {
             input.setAttribute("aria-invalid", "true");
             if (error) error.textContent = "Name must be 64 characters or fewer";
+            input.focus();
+            return null;
+        }
+        if (!PLAYLIST_NAME_RE.test(name)) {
+            input.setAttribute("aria-invalid", "true");
+            if (error) error.textContent = PLAYLIST_NAME_ERROR;
             input.focus();
             return null;
         }

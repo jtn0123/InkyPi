@@ -202,5 +202,5 @@ The test injects an `add_style_tag` stylesheet after DOM-ready that:
   continue to occupy the same space.
 * Hides scrollbars so window width == effective render width.
 
-External network requests (Leaflet CDN, etc.) are stubbed the same way
+External network requests (Leaflet assets, etc.) are stubbed the same way
 the existing layout-overlap test does it.

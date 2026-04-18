@@ -77,11 +77,13 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
     runtime_config = tmp_path / "broken-device.json"
     runtime_config.write_text(json.dumps(broken), encoding="utf-8")
 
-    cfg = load_runtime_config(runtime_config, monkeypatch)
-    loaded_config = cfg.get_config()
-    assert_valid_device_config(loaded_config)
-
+    # Loader-time failures (e.g. schema validation catching the drop) should
+    # count as the expected regression signal just like assertion-time ones,
+    # so keep the whole load + assert chain inside ``pytest.raises``.
     with pytest.raises((AssertionError, KeyError), match="timezone"):
+        cfg = load_runtime_config(runtime_config, monkeypatch)
+        loaded_config = cfg.get_config()
+        assert_valid_device_config(loaded_config)
         assert_baseline_preserved(
             baseline_values,
             loaded_config,
