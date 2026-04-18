@@ -210,14 +210,18 @@ def test_playlist_roundtrip_create_reorder_delete_persist(
             expected_reordered[0],
             expected_reordered[2],
         ]
-        dom_after_delete = None
         for _ in range(30):
-            dom_after_delete = _dom_instance_names(page, playlist_name)
-            if dom_after_delete == expected_after_delete:
-                break
-            # The JS calls location.reload() on success — our stub swallows it,
-            # but the DOM may not re-render until a real reload. Check backend
-            # instead and then force a reload to refresh DOM.
+            # The delete handler calls location.reload(); the stub swallows it
+            # but the execution context may still churn briefly — ignore
+            # transient evaluate failures and rely on the backend check below
+            # as the load-bearing assertion. (Mirrors mobile variant in
+            # test_playlist_roundtrip_mobile.py.)
+            try:
+                dom_after_delete = _dom_instance_names(page, playlist_name)
+                if dom_after_delete == expected_after_delete:
+                    break
+            except Exception:
+                pass
             if (
                 _backend_instance_names(device_config_dev, playlist_name)
                 == expected_after_delete
