@@ -145,7 +145,7 @@ class TestJobQueue:
             time.sleep(0.05)
 
         assert info["status"] == STATUS_DONE
-        clock.advance(11.0)
+        clock.advance(10.0)
         assert q.get_status(jid) == {"status": "unknown", "error": "Job not found"}
         q.shutdown()
 
@@ -193,30 +193,32 @@ class TestJobQueue:
             max_retained_finished_jobs=1,
             clock=clock,
         )
-        active_job_id = q.enqueue(_slow)
-        started.wait(timeout=5)
+        try:
+            active_job_id = q.enqueue(_slow)
+            started.wait(timeout=5)
 
-        done_job_ids: list[str] = []
-        for _idx in range(2):
-            jid = q.enqueue(lambda: "done")
-            done_job_ids.append(jid)
-            for _ in range(50):
-                info = q.get_status(jid)
-                if info["status"] == STATUS_DONE:
-                    break
-                time.sleep(0.05)
-            assert info["status"] == STATUS_DONE
-            clock.advance(1.0)
+            done_job_ids: list[str] = []
+            for _idx in range(2):
+                jid = q.enqueue(lambda: "done")
+                done_job_ids.append(jid)
+                for _ in range(50):
+                    info = q.get_status(jid)
+                    if info["status"] == STATUS_DONE:
+                        break
+                    time.sleep(0.05)
+                assert info["status"] == STATUS_DONE
+                clock.advance(1.0)
 
-        active_info = q.get_status(active_job_id)
-        assert active_info["status"] == STATUS_RUNNING
-        assert q.get_status(done_job_ids[0]) == {
-            "status": "unknown",
-            "error": "Job not found",
-        }
-        assert q.get_status(done_job_ids[1])["status"] == STATUS_DONE
-        proceed.set()
-        q.shutdown(wait=True)
+            active_info = q.get_status(active_job_id)
+            assert active_info["status"] == STATUS_RUNNING
+            assert q.get_status(done_job_ids[0]) == {
+                "status": "unknown",
+                "error": "Job not found",
+            }
+            assert q.get_status(done_job_ids[1])["status"] == STATUS_DONE
+        finally:
+            proceed.set()
+            q.shutdown(wait=True)
 
 
 class TestSingleton:

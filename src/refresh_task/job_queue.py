@@ -122,7 +122,7 @@ class JobQueue:
             finished_at = entry.finished_at
             if finished_at is None:
                 continue
-            if now - finished_at > self._completed_ttl_seconds:
+            if now - finished_at >= self._completed_ttl_seconds:
                 del self._jobs[job_id]
                 continue
             finished_entries.append((job_id, finished_at))
