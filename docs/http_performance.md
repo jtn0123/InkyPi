@@ -6,9 +6,11 @@ the HTTP infrastructure available to plugins and how to use it correctly.
 
 ## Why use `get_http_session()`
 
-`get_http_session()` (`src/utils/http_client.py`, line 32) returns a process-wide
-`requests.Session` singleton. Using a shared session has three concrete benefits on Pi
-hardware:
+`get_http_session()` (`src/utils/http_client.py`, line 32) returns the plugin-facing
+compatibility session. Its pool/adapter wiring is built from the same shared helper used
+by `http_get()` in `src/utils/http_utils.py`, so the retry, pooling, and header defaults
+are easier to reason about across both entry points. Using a shared session has three
+concrete benefits on Pi hardware:
 
 1. **TLS session resumption** – once a TLS handshake has been negotiated with a host, the
    underlying SSL session can be reused across requests. A cold TLS handshake to a CDN or
@@ -88,8 +90,10 @@ response = session.get(url, timeout=(5, 30))
 ### `http_get()` wrapper
 
 `src/utils/http_utils.py` also exposes `http_get()` (line 285) which adds caching,
-latency logging, and applies the env-based default automatically. Use it when you want
-both the pool and caching without wiring them by hand:
+latency logging, and applies the env-based default automatically. It uses the same shared
+session factory as `get_http_session()`, but keeps its thread-local lifecycle because the
+request wrapper has different retry defaults. Use it when you want both the pool and
+caching without wiring them by hand:
 
 ```python
 from utils.http_utils import http_get

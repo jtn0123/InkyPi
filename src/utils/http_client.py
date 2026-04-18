@@ -2,11 +2,8 @@
 HTTP Client with Connection Pooling for InkyPi
 
 Provides a shared requests.Session() instance for all plugins to use.
-Benefits:
-- Connection reuse (20-30% faster requests)
-- Reduced TCP handshake overhead
-- Automatic keep-alive handling
-- Consistent headers across all requests
+The session wiring is shared with ``utils.http_utils`` so pooling, retries,
+and default headers stay aligned across the two public HTTP entry points.
 
 Usage:
     from utils.http_client import get_http_session
@@ -20,9 +17,14 @@ import logging
 import threading
 
 import requests
-from urllib3.util.retry import Retry
+
+from utils.http_utils import DEFAULT_HEADERS, _build_retry, _build_session
 
 logger = logging.getLogger(__name__)
+
+_PLUGIN_RETRY_TOTAL = 3
+_PLUGIN_RETRY_BACKOFF = 0.5
+_PLUGIN_RETRY_ALLOWED_METHODS = ("GET", "HEAD", "OPTIONS")
 
 # Global session instance (singleton)
 _HTTP_SESSION: requests.Session | None = None
@@ -42,28 +44,18 @@ def get_http_session() -> requests.Session:
     with _HTTP_SESSION_LOCK:
         if _HTTP_SESSION is None:
             logger.debug("Initializing shared HTTP session with connection pooling")
-            _HTTP_SESSION = requests.Session()
-
-            # Set common headers for all InkyPi requests
-            _HTTP_SESSION.headers.update(
-                {"User-Agent": "InkyPi/1.0 (https://github.com/fatihak/InkyPi/)"}
+            _HTTP_SESSION = _build_session(
+                headers=DEFAULT_HEADERS,
+                retry=_build_retry(
+                    total=_PLUGIN_RETRY_TOTAL,
+                    connect=None,
+                    read=None,
+                    status=None,
+                    backoff_factor=_PLUGIN_RETRY_BACKOFF,
+                    allowed_methods=_PLUGIN_RETRY_ALLOWED_METHODS,
+                    raise_on_status=True,
+                ),
             )
-
-            # Configure connection pool with retries for transient network and 5xx/429 responses.
-            retry_strategy = Retry(
-                total=3,
-                backoff_factor=0.5,
-                status_forcelist=[429, 500, 502, 503, 504],
-                allowed_methods=frozenset(["GET", "HEAD", "OPTIONS"]),
-            )
-            adapter = requests.adapters.HTTPAdapter(
-                pool_connections=10,
-                pool_maxsize=10,
-                max_retries=retry_strategy,
-                pool_block=False,
-            )
-            _HTTP_SESSION.mount("http://", adapter)
-            _HTTP_SESSION.mount("https://", adapter)
 
             atexit.register(close_http_session)
             logger.debug("HTTP session initialized successfully")
