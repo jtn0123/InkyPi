@@ -689,6 +689,7 @@
         const isActive = panel.dataset.workflowPanel === mode;
         panel.classList.toggle("active", isActive);
         panel.setAttribute("aria-hidden", isActive ? "false" : "true");
+        panel.toggleAttribute("inert", !isActive);
       });
       const targetPanel = document.querySelector(
         `[data-workflow-panel="${mode}"]`,

@@ -28,6 +28,7 @@
             </div>
         </header>
         <div class="separator"></div>
+        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Preview the current display, inspect what is showing now and next, and jump directly into the plugins that drive the device.</p>
@@ -42,9 +43,6 @@
                 {% endif %}
             </div>
         </div>
-
-        <!-- Main content area -->
-        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
             <div class="dashboard-hero">
                 <section class="dashboard-stage">
                     <div class="dashboard-stage-header">
@@ -121,8 +119,6 @@
                 </aside>
             </div>
 
-        </main>
-
         <!-- Plugin navigation section -->
         <section id="plugins-grid" aria-label="Available plugins">
             <h2 class="plugins-title compact">Plugins</h2>
@@ -148,6 +144,7 @@
                 {% endfor %}
             </div>
         </section>
+        </main>
     </div>
     {% include 'response_modal.html' %}
 <script nonce="{{ csp_nonce }}">
