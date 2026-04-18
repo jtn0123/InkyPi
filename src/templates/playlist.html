@@ -21,7 +21,6 @@
 {% endblock %}
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
-    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div id="playlist-page-content">
     <div class="frame playlist-frame">
         <!-- Settings Header -->
@@ -42,6 +41,7 @@
         </header>
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Playlists'}]) }}
+        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Organize plugin instances into time-based playlists so the display can rotate between curated sets instead of one flat queue.</p>
@@ -65,7 +65,7 @@
             <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
                     <div class="playlist-header">
                         <div class="playlist-heading">
-                        <h3 class="playlist-title">{{ playlist.name }}</h3>
+                        <h2 class="playlist-title">{{ playlist.name }}</h2>
                         <div class="playlist-summary-row">
                             {% set playlist_item_count = playlist.plugins | length %}
                             <span class="status-chip info">{{ playlist_item_count }} {{ 'item' if playlist_item_count == 1 else 'items' }}</span>
@@ -278,5 +278,6 @@
             <div class="thumbnail-preview-info playlist-thumbnail-info" id="thumbnailPreviewInfo"></div>
         </div>
     </dialog>
-    </main>
+        </main>
+    </div>
 {% endblock %}

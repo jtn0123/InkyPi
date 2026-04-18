@@ -6,7 +6,6 @@
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     {% from 'macros/api_key_card.html' import api_key_card %}
-    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
     <div class="frame api-keys-frame"
          data-delete-managed-url="{{ url_for('settings.delete_api_key') }}"
          data-mode="{{ api_keys_mode | default('managed') }}"
@@ -42,6 +41,7 @@
         </header>
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
+        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
         <div class="page-intro">
             <div class="page-intro-body">
                 <p class="page-subtitle">Store service credentials in one place. Configured fields start blank — leave a field blank to keep its current key, or type to replace it.</p>
@@ -108,6 +108,7 @@
         </div>
     </div>
 
-    {% include 'response_modal.html' %}
-    </main>
+        {% include 'response_modal.html' %}
+        </main>
+    </div>
 {% endblock %}

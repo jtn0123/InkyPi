@@ -30,13 +30,12 @@
     </script>
 {% endblock %}
 {% block body %}
-    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-workflow" data-page-shell="workflow">
     <div class="frame workflow-frame">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb, PLUGIN_ICON_MAP %}
         {% from 'macros/components.html' import status_chip, modal %}
 
         <!-- Plugin Title and Icon -->
-        <div class="app-header">
+        <div class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
@@ -76,6 +75,7 @@
 
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins', 'url': url_for('main.main_page') + '#plugins-grid'}, {'label': plugin.display_name}]) }}
+        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-workflow" data-page-shell="workflow">
 
         <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
             {% if plugin_instance %}
@@ -412,5 +412,6 @@
             window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
         });
     </script>
-    </main>
+        </main>
+    </div>
 {% endblock %}
