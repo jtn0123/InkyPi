@@ -129,30 +129,26 @@
         return 'INKYPI_LAST_PROGRESS';
     }
 
-    function setPlaylistExpanded(item, expanded){
+    function setPlaylistExpanded(item, expanded, options = {}){
         const body = item?.querySelector('[data-playlist-body]');
         const toggle = item?.querySelector('[data-playlist-toggle]');
         if (!item || !body || !toggle) return;
         const playlistName = item.getAttribute('data-playlist-name');
+        const forceDesktopExpanded = options.forceDesktopExpanded === true;
+        const isMobile = !!mobileQuery.matches;
+        const shouldExpand = (!isMobile && forceDesktopExpanded) ? true : !!expanded;
 
-        if (!mobileQuery.matches){
-            body.hidden = false;
-            item.classList.add('mobile-expanded');
-            item.classList.remove('mobile-collapsed');
-            toggle.textContent = toggle.getAttribute('data-expanded-label') || 'Hide';
-            toggle.setAttribute('aria-expanded', 'true');
-            return;
-        }
-
-        body.hidden = !expanded;
-        item.classList.toggle('mobile-expanded', expanded);
-        item.classList.toggle('mobile-collapsed', !expanded);
-        toggle.textContent = expanded ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
-        toggle.setAttribute('aria-expanded', String(expanded));
-        if (expanded){
-            state.expandedPlaylist = playlistName;
-        } else if (state.expandedPlaylist === playlistName){
-            state.expandedPlaylist = null;
+        body.hidden = !shouldExpand;
+        item.classList.toggle('mobile-expanded', shouldExpand);
+        item.classList.toggle('mobile-collapsed', !shouldExpand);
+        toggle.textContent = shouldExpand ? (toggle.getAttribute('data-expanded-label') || 'Hide') : (toggle.getAttribute('data-collapsed-label') || 'Open');
+        toggle.setAttribute('aria-expanded', String(shouldExpand));
+        if (isMobile){
+            if (shouldExpand){
+                state.expandedPlaylist = playlistName;
+            } else if (state.expandedPlaylist === playlistName){
+                state.expandedPlaylist = null;
+            }
         }
     }
 
@@ -160,7 +156,7 @@
         const items = Array.from(document.querySelectorAll('[data-playlist-card]'));
         if (!items.length) return;
         if (!mobileQuery.matches){
-            items.forEach((item) => setPlaylistExpanded(item, true));
+            items.forEach((item) => setPlaylistExpanded(item, true, { forceDesktopExpanded: true }));
             return;
         }
         const preferred = state.expandedPlaylist
@@ -178,13 +174,84 @@
         const isExpanded =
             button.getAttribute('aria-expanded') === 'true'
             || item.classList.contains('mobile-expanded');
-        const willExpand = !mobileQuery.matches || !isExpanded;
+        const willExpand = !isExpanded;
         if (mobileQuery.matches && willExpand){
             document.querySelectorAll('[data-playlist-card]').forEach((card) => {
                 if (card !== item) setPlaylistExpanded(card, false);
             });
         }
         setPlaylistExpanded(item, willExpand);
+    }
+
+    function parseRefreshSettings(rawValue){
+        if (!rawValue) return {};
+        try {
+            return JSON.parse(rawValue);
+        } catch (_err) {
+            return {};
+        }
+    }
+
+    function handlePlaylistActionClick(event){
+        const actionButton = event.target.closest('[data-playlist-action]');
+        if (!actionButton || actionButton.disabled || actionButton.getAttribute('aria-disabled') === 'true'){
+            return false;
+        }
+
+        const action = actionButton.dataset.playlistAction;
+        if (action === 'toggle-card'){
+            togglePlaylistCard(actionButton);
+            return true;
+        }
+        if (action === 'edit-playlist'){
+            openEditModal(
+                actionButton.getAttribute('data-playlist-name'),
+                actionButton.getAttribute('data-start-time'),
+                actionButton.getAttribute('data-end-time'),
+                actionButton.getAttribute('data-cycle-minutes'),
+                actionButton
+            );
+            return true;
+        }
+        if (action === 'confirm-display-next'){
+            const name = actionButton.getAttribute('data-playlist');
+            openDisplayNextConfirmModal(name, actionButton);
+            return true;
+        }
+        if (action === 'delete-playlist'){
+            openDeletePlaylistModal(actionButton.getAttribute('data-playlist'), actionButton);
+            return true;
+        }
+        if (action === 'delete-instance'){
+            openDeleteInstanceModal(
+                actionButton.getAttribute('data-playlist'),
+                actionButton.getAttribute('data-plugin-id'),
+                actionButton.getAttribute('data-instance'),
+                actionButton,
+                actionButton.getAttribute('data-instance-label') || actionButton.getAttribute('data-instance'),
+            );
+            return true;
+        }
+        if (action === 'edit-refresh'){
+            openRefreshModal(
+                actionButton.getAttribute('data-playlist'),
+                actionButton.getAttribute('data-plugin-id'),
+                actionButton.getAttribute('data-instance'),
+                parseRefreshSettings(actionButton.getAttribute('data-refresh')),
+                actionButton
+            );
+            return true;
+        }
+        if (action === 'display-instance'){
+            displayPluginInstance(
+                actionButton.getAttribute('data-playlist'),
+                actionButton.getAttribute('data-plugin-id'),
+                actionButton.getAttribute('data-instance'),
+                actionButton
+            );
+            return true;
+        }
+        return false;
     }
 
     function showThumbnailPreview(playlistName, pluginId, pluginName, instanceName, instanceLabel) {
@@ -745,9 +812,12 @@
         // Bind header buttons
         const newBtn = document.getElementById('newPlaylistBtn');
         if (newBtn){ newBtn.addEventListener('click', (e) => openCreateModal(e.currentTarget)); }
-        document.querySelectorAll('[data-playlist-toggle]').forEach((button) => {
-            button.addEventListener('click', () => togglePlaylistCard(button));
-        });
+        const pageContent = document.getElementById('playlist-page-content');
+        if (pageContent){
+            pageContent.addEventListener('click', (event) => {
+                handlePlaylistActionClick(event);
+            });
+        }
         const saveBtn = document.getElementById('saveButton');
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
@@ -760,65 +830,6 @@
         document.getElementById('closeRefreshModalBtn')?.addEventListener('click', closeRefreshModal);
         document.getElementById('saveRefreshSettingsBtn')?.addEventListener('click', saveRefreshSettings);
         document.getElementById('closeThumbnailPreviewBtn')?.addEventListener('click', closeThumbnailPreview);
-        document.querySelectorAll('.edit-playlist-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const el = e.currentTarget;
-                const name = el.getAttribute('data-playlist-name');
-                const st = el.getAttribute('data-start-time');
-                const et = el.getAttribute('data-end-time');
-                const cm = el.getAttribute('data-cycle-minutes');
-                openEditModal(name, st, et, cm, el);
-            });
-        });
-        document.querySelectorAll('.run-next-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const el = e.currentTarget;
-                const name = el.getAttribute('data-playlist');
-                openDisplayNextConfirmModal(name, el);
-            });
-        });
-        document.querySelectorAll('.delete-playlist-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const el = e.currentTarget;
-                openDeletePlaylistModal(el.getAttribute('data-playlist'), el);
-            });
-        });
-        document.querySelectorAll('.delete-instance-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const t = e.currentTarget;
-                openDeleteInstanceModal(
-                    t.getAttribute('data-playlist'),
-                    t.getAttribute('data-plugin-id'),
-                    t.getAttribute('data-instance'),
-                    t,
-                    t.getAttribute('data-instance-label') || t.getAttribute('data-instance'),
-                );
-            });
-        });
-        document.querySelectorAll('.refresh-settings-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const t = e.currentTarget;
-                let refreshSettings = {};
-                try {
-                    refreshSettings = JSON.parse(t.getAttribute('data-refresh') || '{}');
-                } catch (_err) {
-                    refreshSettings = {};
-                }
-                openRefreshModal(
-                    t.getAttribute('data-playlist'),
-                    t.getAttribute('data-plugin-id'),
-                    t.getAttribute('data-instance'),
-                    refreshSettings,
-                    t
-                );
-            });
-        });
-        document.querySelectorAll('.plugin-display-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const t = e.currentTarget;
-                displayPluginInstance(t.getAttribute('data-playlist'), t.getAttribute('data-plugin-id'), t.getAttribute('data-instance'), t);
-            });
-        });
         document.querySelectorAll('.plugin-thumbnail-container').forEach(box => {
             box.addEventListener('click', (event) => {
                 const t = event.currentTarget;

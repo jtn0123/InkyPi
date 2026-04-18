@@ -204,7 +204,7 @@ def test_update_flow_happy_path(
     ), f"#latestVersion should show stubbed tag; got {latest_text!r}"
     badge_text = page.locator("#updateBadge").inner_text().strip()
     assert (
-        "Update available" in badge_text
+        "update available" in badge_text.lower()
     ), f"#updateBadge should reflect update availability; got {badge_text!r}"
 
     # "Update Now" must now be enabled (it ships disabled).

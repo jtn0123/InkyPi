@@ -66,8 +66,20 @@ def test_settings_save_submit(live_server, tmp_path):
             )
             page.wait_for_selector("[data-page-shell]", timeout=10000)
 
-            # Click Save
             save_btn = page.locator("#saveSettingsBtn")
+            assert (
+                not save_btn.is_enabled()
+            ), "Save should start disabled until the form is dirty"
+
+            device_name = page.locator("#deviceName")
+            original_name = device_name.input_value()
+            device_name.fill(f"{original_name} Test")
+            page.wait_for_function(
+                "() => !document.getElementById('saveSettingsBtn').disabled",
+                timeout=5000,
+            )
+
+            # Click Save after making a valid change.
             save_btn.scroll_into_view_if_needed()
             save_btn.click()
 
@@ -105,8 +117,15 @@ def test_settings_save_shows_response(live_server, tmp_path):
             # The settings form should exist (class-based, not id)
             assert page.locator(".settings-form").count() >= 1
 
-            # Save button should be present and enabled
+            # Save button should be present but disabled until the form changes.
             save_btn = page.locator("#saveSettingsBtn")
+            assert not save_btn.is_enabled()
+
+            page.locator("#deviceName").fill("Workflow Test Device")
+            page.wait_for_function(
+                "() => !document.getElementById('saveSettingsBtn').disabled",
+                timeout=5000,
+            )
             assert save_btn.is_enabled()
         finally:
             browser.close()

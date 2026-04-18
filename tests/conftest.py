@@ -43,12 +43,22 @@ UI_BROWSER_TESTS = {
     "test_plugin_preview_save_roundtrip.py",
     "test_form_roundtrip.py",
     "test_playlist_roundtrip.py",
+    "test_playlist_roundtrip_mobile.py",
     "test_api_key_roundtrip.py",
     "test_jtn_720_721_722_journeys.py",
     # JTN-724 update-flow happy-path journey.
     "test_update_flow_happy_path.py",
+    # JTN-719 device-actions journey (reboot/shutdown confirm/cancel flow).
+    "test_device_actions_roundtrip.py",
+    # JTN-728/727/726/725 device/update/ops journey bundle.
+    "test_device_update_ops_journeys.py",
+    # JTN-727 logs-access journey (trigger error, download, verify payload).
+    "test_logs_access.py",
+    # JTN-726 refresh-interval change journey (UI save -> reload -> diagnostics).
+    "test_refresh_interval_change.py",
 }
 A11Y_BROWSER_TESTS = {
+    "test_a11y_sweep.py",
     "test_axe_a11y.py",
     "test_more_a11y.py",
     "test_playlist_a11y.py",
@@ -62,6 +72,20 @@ MANAGED_API_KEY_ENV_VARS = (
     "GITHUB_SECRET",
     "GOOGLE_AI_SECRET",
 )
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--update-snapshots",
+        action="store_true",
+        default=False,
+        help="Regenerate tests/snapshots baselines instead of asserting diffs.",
+    )
+
+
+def pytest_configure(config):
+    if config.getoption("--update-snapshots"):
+        os.environ["SNAPSHOT_UPDATE"] = "1"
 
 
 def _is_truthy(value: str) -> bool:
@@ -148,6 +172,16 @@ def clear_managed_api_key_env(monkeypatch):
         settings_mod._shutdown_limiter.reset()
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True)
+def reset_plugin_registry_state():
+    """Prevent plugin registry globals from leaking between tests."""
+    from plugins.plugin_registry import reset_plugin_registry
+
+    reset_plugin_registry()
+    yield
+    reset_plugin_registry()
 
 
 @pytest.fixture(autouse=True)
@@ -277,6 +311,8 @@ def flask_app(device_config_dev, monkeypatch):
 
     from blueprints.api_docs import api_docs_bp
     from blueprints.apikeys import apikeys_bp
+    from blueprints.client_error import client_error_bp
+    from blueprints.client_log import client_log_bp
     from blueprints.csp_report import csp_report_bp
     from blueprints.diagnostics import diagnostics_bp
     from blueprints.errors import errors_bp
@@ -348,6 +384,8 @@ def flask_app(device_config_dev, monkeypatch):
     # Register routes
     app.register_blueprint(main_bp)
     app.register_blueprint(apikeys_bp)
+    app.register_blueprint(client_error_bp)
+    app.register_blueprint(client_log_bp)
     app.register_blueprint(errors_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(plugin_bp)

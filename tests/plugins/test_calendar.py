@@ -366,8 +366,8 @@ def test_fetch_ics_events_empty_calendar():
                 ["http://example.com"],
                 ["#000"],
                 UTC,
-                datetime.now(),
-                datetime.now() + timedelta(days=1),
+                datetime.now(UTC),
+                datetime.now(UTC) + timedelta(days=1),
             )
             assert events == []
 

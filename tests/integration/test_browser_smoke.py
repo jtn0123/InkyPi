@@ -1,10 +1,12 @@
 # pyright: reportMissingImports=false
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 import pytest
+from PIL import Image
 from scripts.ui_audit import TOP_LEVEL_ROUTES, discover_plugin_ids
 
 REQUIRE_BROWSER_SMOKE = os.getenv("REQUIRE_BROWSER_SMOKE", "").lower() in ("1", "true")
@@ -261,6 +263,64 @@ def _artifact_dir(tmp_path: Path) -> Path:
     return tmp_path / "browser_smoke_failures"
 
 
+def _wait_for_toast_text(page, expected: str, timeout: int = 10000):
+    page.wait_for_function(
+        """(needle) => Array.from(document.querySelectorAll('.toast-content'))
+            .some((el) => (el.textContent || '').includes(needle))
+        """,
+        arg=expected,
+        timeout=timeout,
+    )
+
+
+def _open_settings_tab(page, tab_name: str):
+    tab = page.locator(f'[data-settings-tab="{tab_name}"]').first
+    tab.click()
+    page.wait_for_function(
+        """(tab) => {
+          const panel = document.querySelector(`[data-settings-panel="${tab}"]`);
+          return !!panel && panel.classList.contains("active");
+        }""",
+        arg=tab_name,
+        timeout=8000,
+    )
+
+
+def _expand_settings_section(page, section_id: str):
+    toggle = page.locator(f"{section_id} [data-collapsible-toggle]").first
+    toggle.wait_for(state="attached", timeout=8000)
+    if toggle.get_attribute("aria-expanded") != "true":
+        toggle.click()
+        page.wait_for_function(
+            """(selector) => {
+              const el = document.querySelector(selector);
+              return !!el && el.getAttribute("aria-expanded") === "true";
+            }""",
+            arg=f"{section_id} [data-collapsible-toggle]",
+            timeout=8000,
+        )
+
+
+def _seed_history_entries(history_dir: Path, count: int = 12):
+    history_dir.mkdir(parents=True, exist_ok=True)
+    names = []
+    for idx in range(count):
+        name = f"display_20260101_120{idx:02d}.png"
+        path = history_dir / name
+        Image.new("RGB", (16, 16), "white").save(path)
+        sidecar = {
+            "refresh_type": "Playlist",
+            "plugin_id": "clock",
+            "playlist": "Default",
+            "plugin_instance": f"Clock {idx + 1}",
+        }
+        (history_dir / name.replace(".png", ".json")).write_text(
+            json.dumps(sidecar), encoding="utf-8"
+        )
+        names.append(name)
+    return names
+
+
 def test_top_level_tabs_boot_cleanly(live_server, tmp_path):
     from playwright.sync_api import sync_playwright
 
@@ -282,6 +342,182 @@ def test_top_level_tabs_boot_cleanly(live_server, tmp_path):
                     assert page.locator("#newPlaylistBtn").is_enabled()
                 _assert_clean_runtime(page, runtime, screenshot_dir, route_name)
                 page.close()
+        finally:
+            browser.close()
+
+
+def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
+    """JTN-730: Exercise high-risk /settings interactions end-to-end."""
+    from playwright.sync_api import sync_playwright
+
+    screenshot_dir = _artifact_dir(tmp_path)
+    import_payload = {
+        "config": {
+            "name": "JTN730 Imported Device",
+            "orientation": "vertical",
+            "timezone": "UTC",
+            "time_format": "24h",
+            "plugin_cycle_interval_seconds": 300,
+        }
+    }
+    import_file = tmp_path / "jtn_730_import.json"
+    import_file.write_text(json.dumps(import_payload), encoding="utf-8")
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1100})
+            runtime = _open_and_check(
+                page,
+                live_server,
+                "jtn_730_settings_deep",
+                "/settings",
+                screenshot_dir,
+            )
+            page.wait_for_selector("#saveSettingsBtn", timeout=10000)
+
+            # Save-path depth: dirty-state -> POST -> persisted value after reload.
+            device_name = page.locator("#deviceName")
+            original_name = device_name.input_value().strip() or "InkyPi"
+            updated_name = f"{original_name}-JTN730"
+            device_name.fill(updated_name)
+            page.wait_for_function(
+                "() => !document.getElementById('saveSettingsBtn').disabled",
+                timeout=8000,
+            )
+            page.locator("#saveSettingsBtn").click()
+            _wait_for_toast_text(page, "Saved settings.")
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+            assert page.locator("#deviceName").input_value() == updated_name
+
+            _open_settings_tab(page, "maintenance")
+            page.wait_for_selector("#exportConfigBtn", timeout=10000)
+
+            # Backup & restore path: export feedback + file import round-trip.
+            _expand_settings_section(page, "#section-backup-restore")
+            page.locator("#exportConfigBtn").click()
+            _wait_for_toast_text(page, "Backup downloaded")
+
+            page.set_input_files("#importFile", str(import_file))
+            assert page.locator("#importConfigBtn").is_enabled()
+            page.locator("#importConfigBtn").click()
+            _wait_for_toast_text(page, "Import completed")
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+            assert page.locator("#deviceName").input_value() == "JTN730 Imported Device"
+
+            _open_settings_tab(page, "maintenance")
+
+            # Diagnostics path: isolate/un-isolate round trip on a valid plugin.
+            _expand_settings_section(page, "#section-observability")
+            page.locator("#isolatePluginInput").fill("clock")
+            page.locator("#isolatePluginBtn").click()
+            _wait_for_toast_text(page, 'Plugin "clock" has been isolated.')
+            page.locator("#unIsolatePluginBtn").click()
+            _wait_for_toast_text(page, 'Plugin "clock" has been un-isolated.')
+
+            # Device action safety gates: modal open/close + focus restore.
+            page.locator("#rebootBtn").click()
+            page.wait_for_selector("#rebootConfirmModal", state="visible", timeout=8000)
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#rebootConfirmModal", state="hidden", timeout=8000)
+            assert page.evaluate(
+                "document.activeElement && document.activeElement.id"
+            ) == ("rebootBtn")
+
+            page.locator("#shutdownBtn").click()
+            page.wait_for_selector(
+                "#shutdownConfirmModal", state="visible", timeout=8000
+            )
+            page.locator("#cancelShutdownBtn").click()
+            page.wait_for_selector(
+                "#shutdownConfirmModal", state="hidden", timeout=8000
+            )
+
+            _assert_clean_runtime(
+                page, runtime, screenshot_dir, "jtn_730_settings_deep"
+            )
+        finally:
+            browser.close()
+
+
+def test_jtn_731_history_deep_high_risk_paths(live_server, tmp_path, device_config_dev):
+    """JTN-731: Exercise high-risk /history actions and pagination end-to-end."""
+    from playwright.sync_api import sync_playwright
+
+    screenshot_dir = _artifact_dir(tmp_path)
+    _seed_history_entries(Path(device_config_dev.history_image_dir), count=12)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        try:
+            page = browser.new_page(viewport={"width": 1440, "height": 1100})
+            runtime = _open_and_check(
+                page,
+                live_server,
+                "jtn_731_history_deep",
+                "/history?per_page=10&page=1",
+                screenshot_dir,
+            )
+            page.wait_for_selector("#history-grid-container", timeout=10000)
+            assert "Page 1 of 2" in page.locator(".pagination-info").inner_text()
+
+            # Pagination depth with HTMX history grid swaps.
+            page.locator("a.btn", has_text="Next").click()
+            page.wait_for_timeout(500)
+            assert "Page 2 of 2" in page.locator(".pagination-info").inner_text()
+            page.locator("a.btn", has_text="Previous").click()
+            page.wait_for_timeout(500)
+            assert "Page 1 of 2" in page.locator(".pagination-info").inner_text()
+
+            # Redisplay path should complete and surface its success toast.
+            page.locator('[data-history-action="display"]').first.click()
+            _wait_for_toast_text(page, "Display updated")
+
+            # Delete path: ESC cancel first (focus restore), then confirm delete.
+            delete_btn = page.locator('[data-history-action="delete"]').first
+            target_filename = delete_btn.get_attribute("data-filename")
+            delete_btn.click()
+            page.wait_for_selector("#deleteHistoryModal", state="visible", timeout=8000)
+            page.keyboard.press("Escape")
+            page.wait_for_selector("#deleteHistoryModal", state="hidden", timeout=8000)
+            assert (
+                page.evaluate(
+                    "document.activeElement && document.activeElement.dataset.historyAction"
+                )
+                == "delete"
+            )
+
+            delete_btn = page.locator('[data-history-action="delete"]').first
+            delete_btn.click()
+            page.wait_for_selector("#deleteHistoryModal", state="visible", timeout=8000)
+            page.locator("#confirmDeleteHistoryBtn").click()
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+            _wait_for_toast_text(page, "Deleted")
+            assert not (
+                Path(device_config_dev.history_image_dir) / target_filename
+            ).exists()
+
+            # Clear-all path: cancel once, then confirm and verify empty state.
+            clear_btn = page.locator("#historyClearBtn")
+            clear_btn.click()
+            page.wait_for_selector("#clearHistoryModal", state="visible", timeout=8000)
+            page.locator("#cancelClearHistoryBtn").click()
+            page.wait_for_selector("#clearHistoryModal", state="hidden", timeout=8000)
+
+            page.locator("#historyClearBtn").click()
+            page.wait_for_selector("#clearHistoryModal", state="visible", timeout=8000)
+            page.locator("#confirmClearHistoryBtn").click()
+            page.wait_for_selector("[data-page-shell]", timeout=10000)
+            _wait_for_toast_text(page, "Cleared")
+            assert (
+                "No history yet."
+                in page.locator("#history-grid-container").inner_text()
+            )
+            assert page.locator("#historyClearBtn").count() == 0
+
+            _assert_clean_runtime(page, runtime, screenshot_dir, "jtn_731_history_deep")
         finally:
             browser.close()
 

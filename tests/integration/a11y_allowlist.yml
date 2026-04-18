@@ -1,0 +1,52 @@
+# A11y sweep allowlist for JTN-740.
+#
+# This file is the single source of truth for "known, tracked a11y violations"
+# in :mod:`tests.integration.test_a11y_sweep`. The sweep runs axe-core (WCAG
+# 2.0/2.1 A + AA tags) on every entry in ``PAGES_TO_SWEEP`` + every plugin
+# page and fails on any violation whose rule id isn't listed below.
+#
+# Format
+# ------
+#
+# * ``default`` — rule ids allowlisted for every main page (``/``, ``/settings``,
+#   ``/history``, ``/playlist``, ``/api-keys``).
+# * ``plugin_default`` — rule ids allowlisted for every ``/plugin/<id>`` page.
+#   Plugin pages share one base template so violations tend to be shared.
+# * ``pages`` — per-page overrides. Each page key maps to a list of entries
+#   with ``id:`` (required) and ``reason:`` (free-text, required). Listed rules
+#   are added to the page's allowlist on top of ``default`` /
+#   ``plugin_default``. Use this for page-specific violations only.
+#
+# How to shrink the allowlist
+# ---------------------------
+#
+# 1. Fix the underlying violation in the template / CSS / component.
+# 2. Remove the rule id from ``default`` / ``plugin_default`` (or the page
+#    override) and re-run ``SKIP_A11Y=0 PYTHONPATH=src pytest
+#    tests/integration/test_a11y_sweep.py``.
+# 3. If the sweep still passes, the entry is safe to delete. If it fails on
+#    another page, add a page-specific override for the remaining page(s) and
+#    keep shrinking.
+#
+# Every entry MUST have a ``reason`` explaining why the violation is tolerated
+# and (ideally) a Linear / GitHub ticket tracking the fix. Entries without
+# a reason are treated as a lint error in review.
+
+default:
+  - id: color-contrast
+    reason: >-
+      WCAG AA contrast audit pending across chips/placeholders/dim text.
+      Tracked in JTN-510.
+
+plugin_default:
+  - id: color-contrast
+    reason: >-
+      Inherits main-app chrome contrast issues. Fixes in JTN-510 will land for
+      both main + plugin pages.
+  - id: aria-hidden-focus
+    reason: >-
+      Hidden-by-default modals (response modal, schedule modal) still contain
+      focusable children at page load. Resolved when the modals render lazily
+      or use ``inert``. Tracked in JTN-511.
+
+pages: {}

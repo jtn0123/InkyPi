@@ -5,28 +5,27 @@ name: Build release wheelhouse
 # available, dropping first-boot install time on a Pi Zero 2 W from ~15 min
 # down to ~2-3 min (no on-device wheel compilation for numpy/Pillow/cffi/etc).
 #
-# JTN-683 FIX: The original `on: release: types: [published]` trigger never
-# fired because semantic-release creates releases using GITHUB_TOKEN, and
-# GitHub intentionally prevents GITHUB_TOKEN-created events from triggering
-# downstream workflow event listeners (a documented security boundary).
-#
-# Fix: added `workflow_run` trigger watching the "Release" workflow. This is
-# a first-party mechanism that explicitly allows cross-workflow chaining
-# regardless of which token the upstream workflow used. Gated on
-# `conclusion == 'success'` so we only build wheels when a real release
-# was actually cut. The release event trigger is kept for forward
-# compatibility (in case we ever switch to a PAT-based release flow).
+# JTN-745 FIX: semantic-release publishes via GITHUB_TOKEN, so the standalone
+# `release` trigger is not sufficient to guarantee wheelhouse assets are part
+# of the main release contract. This workflow is now also reusable via
+# `workflow_call`, and release.yml invokes it directly after publish so the
+# parent Release workflow goes red if wheelhouse upload fails. We keep the
+# release/manual triggers for maintainers who publish or rebuild outside that
+# default path.
 
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to build wheels for (e.g. v0.28.1)
+        required: true
+        type: string
   release:
     types: [published]
-  # Fires when the Release workflow completes successfully — works even when
-  # semantic-release uses GITHUB_TOKEN (which suppresses the release event).
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
   # Manual trigger so maintainers can rebuild wheels for an existing tag
-  # without cutting a new release.
+  # without cutting a new release. JTN-745: manual rebuilds still attach to
+  # the tagged release so historical gaps (for example v0.51.8 armv7l) can be
+  # backfilled without bespoke local upload steps.
   workflow_dispatch:
     inputs:
       tag:
@@ -42,64 +41,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Guard job: for workflow_run events, skip if the upstream run did not
-  # succeed (e.g. it was cancelled or failed with no new release).
-  check-trigger:
-    runs-on: ubuntu-latest
-    outputs:
-      should-run: ${{ steps.gate.outputs.should-run }}
-      tag: ${{ steps.gate.outputs.tag }}
-    steps:
-      - name: Evaluate trigger and resolve tag
-        id: gate
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          DISPATCH_TAG: ${{ inputs.tag }}
-          WF_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
-          REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          case "$EVENT_NAME" in
-            release)
-              TAG="$RELEASE_TAG"
-              ;;
-            workflow_dispatch)
-              TAG="$DISPATCH_TAG"
-              ;;
-            workflow_run)
-              if [ "$WF_CONCLUSION" != "success" ]; then
-                echo "Upstream Release workflow did not succeed (conclusion=$WF_CONCLUSION) — skipping."
-                echo "should-run=false" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              # Find the most recent release tag created by the Release workflow.
-              # semantic-release always creates a tag that matches vMAJOR.MINOR.PATCH.
-              TAG=$(gh release list --repo "$REPO" --limit 1 \
-                --json tagName --jq '.[0].tagName')
-              if [ -z "$TAG" ]; then
-                echo "ERROR: Could not resolve latest release tag after workflow_run" >&2
-                exit 1
-              fi
-              echo "Resolved tag from latest release: $TAG"
-              ;;
-            *)
-              echo "ERROR: Unexpected event name: $EVENT_NAME" >&2
-              exit 1
-              ;;
-          esac
-          if [ -z "$TAG" ]; then
-            echo "ERROR: No release tag resolved" >&2
-            exit 1
-          fi
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-
   build-wheels:
     name: Build wheels (${{ matrix.arch }})
-    needs: check-trigger
-    if: needs.check-trigger.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -111,17 +54,14 @@ jobs:
           - arch: linux_aarch64
             docker_platform: linux/arm64
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.check-trigger.outputs.tag }}
-
       - name: Resolve tag
         id: tag
         env:
-          RELEASE_TAG: ${{ needs.check-trigger.outputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          TAG="$RELEASE_TAG"
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-${INPUT_TAG:-}}"
           if [ -z "$TAG" ]; then
             echo "ERROR: No release tag resolved" >&2
             exit 1
@@ -129,6 +69,11 @@ jobs:
           VERSION="${TAG#v}"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -164,6 +109,7 @@ jobs:
                 libtiff-dev libopenjp2-7-dev libfreetype6-dev \
                 libopenblas-dev libjpeg-dev zlib1g-dev \
                 libffi-dev libssl-dev libxml2-dev libxslt1-dev \
+                libsystemd-dev libheif-dev \
                 libcairo2-dev libgirepository1.0-dev \
                 swig ca-certificates
               python3 -m venv /tmp/buildvenv
@@ -201,7 +147,6 @@ jobs:
           ls -la "$TARBALL" "${TARBALL}.sha256" "${TARBALL}.manifest.sha256"
 
       - name: Attach wheelhouse to release
-        if: github.event_name == 'release' || github.event_name == 'workflow_run'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
@@ -210,14 +155,3 @@ jobs:
             ${{ steps.package.outputs.tarball }}.sha256
             ${{ steps.package.outputs.tarball }}.manifest.sha256
           fail_on_unmatched_files: true
-
-      - name: Upload workflow artifact (workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheelhouse-${{ matrix.arch }}
-          path: |
-            ${{ steps.package.outputs.tarball }}
-            ${{ steps.package.outputs.tarball }}.sha256
-            ${{ steps.package.outputs.tarball }}.manifest.sha256
-          if-no-files-found: error

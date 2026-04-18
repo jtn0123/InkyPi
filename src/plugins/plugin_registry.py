@@ -14,6 +14,7 @@ logger = logging.getLogger("plugins.plugin_registry")
 PLUGINS_DIR = "plugins"
 PLUGIN_CLASSES = {}
 _PLUGIN_CONFIGS = {}
+_registry_lock = threading.RLock()
 _LAST_HOT_RELOAD: dict | None = None
 _hot_reload_lock = threading.Lock()
 
@@ -156,7 +157,8 @@ def load_plugins(plugins_config):
             plugin.setdefault("version", version)
 
         # Store config for lazy loading; actual import deferred to get_plugin_instance()
-        _PLUGIN_CONFIGS[plugin_id] = plugin
+        with _registry_lock:
+            _PLUGIN_CONFIGS[plugin_id] = plugin
         logger.debug(f"Registered plugin '{plugin_id}' for lazy loading")
 
 
@@ -167,24 +169,34 @@ def get_plugin_instance(plugin_config):
     if _is_dev_mode():
         return _load_single_plugin_instance(plugin_config)
 
-    # Retrieve cached instance if available
-    instance = PLUGIN_CLASSES.get(plugin_id)
+    with _registry_lock:
+        # Retrieve cached instance if available
+        instance = PLUGIN_CLASSES.get(plugin_id)
+        stored_config = _PLUGIN_CONFIGS.get(plugin_id)
     if instance:
         return instance
 
     # Lazy load: import and cache on first use
-    stored_config = _PLUGIN_CONFIGS.get(plugin_id)
     if stored_config:
         instance = _load_single_plugin_instance(stored_config)
-        PLUGIN_CLASSES[plugin_id] = instance
+        with _registry_lock:
+            PLUGIN_CLASSES[plugin_id] = instance
         return instance
 
     raise ValueError(f"Plugin '{plugin_id}' is not registered.")
 
 
+def reset_plugin_registry():
+    """Clear plugin loader caches/config registration (test isolation helper)."""
+    with _registry_lock:
+        PLUGIN_CLASSES.clear()
+        _PLUGIN_CONFIGS.clear()
+
+
 def get_registered_plugin_ids():
     """Return the set of plugin IDs that are registered (loaded or pending lazy load)."""
-    return set(PLUGIN_CLASSES) | set(_PLUGIN_CONFIGS)
+    with _registry_lock:
+        return set(PLUGIN_CLASSES) | set(_PLUGIN_CONFIGS)
 
 
 def pop_hot_reload_info():

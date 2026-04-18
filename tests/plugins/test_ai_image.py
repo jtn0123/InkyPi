@@ -80,6 +80,31 @@ def test_ai_image_invalid_model(client, monkeypatch):
     assert resp.status_code == 400
 
 
+def test_ai_image_validate_settings_rejects_provider_model_mismatch():
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    error = plugin.validate_settings(
+        {
+            "textPrompt": "a cat",
+            "provider": "google",
+            "imageModel": "gpt-image-1.5",
+        }
+    )
+    assert error is not None
+    assert "Invalid image model for provider" in error
+    assert "google" in error
+
+
+def test_ai_image_validate_settings_uses_default_model_for_openai():
+    from plugins.ai_image.ai_image import AIImage
+
+    plugin = AIImage({"id": "ai_image"})
+    assert (
+        plugin.validate_settings({"textPrompt": "a cat", "provider": "openai"}) is None
+    )
+
+
 def test_ai_image_generate_image_success(client, monkeypatch, mock_openai):
     monkeypatch.setenv("OPEN_AI_SECRET", "test")
 

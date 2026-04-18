@@ -190,8 +190,11 @@ class RefreshSettingsManager {
         }
 
         if (data.refreshType === 'interval') {
-            const interval = parseInt(data.interval, 10);
-            if (!data.interval || isNaN(interval) || interval < 1) {
+            if (!data.interval || !/^\d+$/.test(data.interval)) {
+                return { valid: false, error: 'Refresh interval must be at least 1' };
+            }
+            const interval = Number(data.interval);
+            if (interval < 1) {
                 return { valid: false, error: 'Refresh interval must be at least 1' };
             }
             if (interval > 999) {
@@ -204,7 +207,13 @@ class RefreshSettingsManager {
             if (!data.refreshTime) {
                 return { valid: false, error: 'Please select a refresh time' };
             }
-            if (!/^\d{2}:\d{2}(:\d{2})?$/.test(data.refreshTime)) {
+            if (!/^\d{2}:\d{2}$/.test(data.refreshTime)) {
+                return { valid: false, error: 'Refresh time must be in HH:MM format' };
+            }
+            const [hoursStr, minutesStr] = data.refreshTime.split(':');
+            const hours = Number(hoursStr);
+            const minutes = Number(minutesStr);
+            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
                 return { valid: false, error: 'Refresh time must be in HH:MM format' };
             }
         }

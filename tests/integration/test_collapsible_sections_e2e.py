@@ -104,7 +104,24 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
 
 
 def test_playlist_details_expand(live_server, device_config_dev, browser_page):
-    """Playlist details toggle expands and collapses on desktop."""
+    """Playlist details stay expanded on desktop; the mobile toggle may be hidden."""
+    prepare_playlist(device_config_dev)
+    page = browser_page
+    navigate_and_wait(page, live_server, "/playlist")
+
+    toggles = page.locator("[data-playlist-toggle]")
+    toggle = toggles.first
+    body = page.locator("[data-playlist-body]").first
+
+    assert body.is_visible(), "Details section should be visible on desktop"
+    assert toggles.count() == 1, "Toggle button should still be rendered for mobile"
+    assert not toggle.is_visible(), "Desktop layout should hide the mobile-only toggle"
+
+
+def test_playlist_toggle_is_not_noop_if_visible_on_desktop(
+    live_server, device_config_dev, browser_page
+):
+    """JTN-692: if the mobile-only toggle becomes visible on desktop, it must still work."""
     prepare_playlist(device_config_dev)
     page = browser_page
     navigate_and_wait(page, live_server, "/playlist")
@@ -112,5 +129,38 @@ def test_playlist_details_expand(live_server, device_config_dev, browser_page):
     toggle = page.locator("[data-playlist-toggle]").first
     body = page.locator("[data-playlist-body]").first
 
-    assert body.is_visible(), "Details section should be visible on desktop"
-    assert toggle.is_visible(), "Toggle button should exist"
+    # Simulate a CSS/regression case where the mobile-only toggle is visible.
+    page.evaluate("""
+        () => {
+            const btn = document.querySelector('[data-playlist-toggle]');
+            const body = document.querySelector('[data-playlist-body]');
+            const card = document.querySelector('[data-playlist-card]');
+            if (!btn) return;
+            btn.style.display = 'inline-flex';
+            btn.setAttribute('aria-expanded', 'true');
+            if (body) {
+                body.hidden = false;
+            }
+            if (card) {
+                card.classList.add('mobile-expanded');
+                card.classList.remove('mobile-collapsed');
+            }
+        }
+        """)
+    page.wait_for_timeout(200)
+
+    before_expanded = toggle.get_attribute("aria-expanded")
+    before_visible = body.is_visible()
+
+    toggle.click()
+    page.wait_for_timeout(300)
+
+    after_expanded = toggle.get_attribute("aria-expanded")
+    after_visible = body.is_visible()
+
+    assert (
+        before_expanded != after_expanded
+    ), "Toggle must reflect changed expanded state"
+    assert (
+        before_visible != after_visible
+    ), "Toggle click must change playlist body visibility"

@@ -40,6 +40,38 @@ def test_preview_image_404(client, device_config_dev):
     assert resp.status_code == 404
 
 
+# ---- /dev/mock-frame ----
+
+
+def test_dev_mock_frame_served_in_dev_mode(client, flask_app, monkeypatch):
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+    frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
+    _save_png(frame_path)
+
+    resp = client.get("/dev/mock-frame")
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+
+
+def test_dev_mock_frame_404_outside_dev_mode(client, flask_app, monkeypatch):
+    monkeypatch.setenv("INKYPI_ENV", "production")
+    frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
+    _save_png(frame_path)
+
+    resp = client.get("/dev/mock-frame")
+    assert resp.status_code == 404
+
+
+def test_dev_mock_frame_404_when_missing(client, flask_app, monkeypatch):
+    monkeypatch.setenv("INKYPI_ENV", "dev")
+    frame_path = flask_app.config["DISPLAY_MANAGER"].display.mock_frame_path
+    if os.path.exists(frame_path):
+        os.remove(frame_path)
+
+    resp = client.get("/dev/mock-frame")
+    assert resp.status_code == 404
+
+
 # ---- /api/current_image ----
 
 

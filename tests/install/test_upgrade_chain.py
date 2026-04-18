@@ -1,18 +1,4 @@
-"""Upgrade-chain regression suite (JTN-734).
-
-This test walks every pinned historical ``device.json`` fixture through the
-current loader and asserts that user-facing state survives migration. We
-deliberately keep the test at the *config-loader* layer:
-
-* ``config.Config()`` already calls ``validate_device_config()`` internally,
-  so a broken schema at any hop fails construction with
-  ``ConfigValidationError`` and the test aborts loudly.
-* The refresh pipeline, display manager, plugin registry, and diagnostics
-  blueprint are exercised by their own dedicated suites — duplicating that
-  end-to-end wiring here would pull tests across the architecture boundary
-  (Sonar ``pythonarchitecture:S7788``) without adding upgrade-specific
-  coverage.
-"""
+"""Upgrade-chain regression suite (JTN-734)."""
 
 from __future__ import annotations
 
@@ -23,8 +9,12 @@ from pathlib import Path
 
 import pytest
 import yaml
-
-import config as config_mod
+from tests.helpers.config_runtime_helpers import (
+    assert_valid_device_config,
+    load_runtime_config,
+    run_upgrade_hop,
+)
+from tests.helpers.path_utils import assert_baseline_preserved, path_get
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 CHAIN_FILE = FIXTURES_DIR / "version_chain.yml"
@@ -38,55 +28,9 @@ def _load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _path_get(payload: object, dotted_path: str) -> object:
-    node: object = payload
-    for segment in dotted_path.split("."):
-        if isinstance(node, list):
-            node = node[int(segment)]
-            continue
-        if not isinstance(node, dict):
-            raise KeyError(f"{dotted_path}: expected mapping at '{segment}'")
-        node = node[segment]
-    return node
-
-
-def _assert_baseline_preserved(
-    baseline_values: dict[str, object],
-    actual_payload: dict,
-    paths: list[str],
-    version: str,
-) -> None:
-    for dotted_path in paths:
-        actual_value = _path_get(actual_payload, dotted_path)
-        assert actual_value == baseline_values[dotted_path], (
-            f"Upgrade hop {version} dropped/changed '{dotted_path}': "
-            f"expected={baseline_values[dotted_path]!r} actual={actual_value!r}"
-        )
-
-
-def _load_upgrade_hop(config_path: Path, monkeypatch) -> dict:
-    """Load ``config_path`` through :class:`config.Config` and return its dict.
-
-    ``Config.__init__`` reads the file and runs ``validate_device_config``
-    against it, so a successful return proves *both* that the migration
-    loader accepted the fixture and that the resulting shape still matches
-    the current JSON Schema. The playlist manager is also exercised here to
-    guard against silent playlist-collection drops during migration.
-    """
-    monkeypatch.setattr(config_mod.Config, "config_file", str(config_path))
-    cfg = config_mod.Config()
-
-    # Re-run validation through the loader's own re-exported symbol so
-    # this test does not add a new tests→``utils.config_schema`` edge.
-    config_mod.validate_device_config(cfg.get_config())
-
-    assert cfg.get_playlist_manager().playlists, (
-        "Migration produced a Config with no playlists — user state lost."
-    )
-    return cfg.get_config()
-
-
-def test_upgrade_chain_preserves_user_state(monkeypatch, tmp_path):
+def test_upgrade_chain_preserves_user_state_and_diagnostics_clean(
+    monkeypatch, tmp_path
+):
     monkeypatch.setenv("INKYPI_ENV", "dev")
 
     spec = _load_chain_spec()
@@ -95,7 +39,7 @@ def test_upgrade_chain_preserves_user_state(monkeypatch, tmp_path):
 
     baseline_fixture = _load_json(FIXTURES_DIR / chain[0]["fixture"])
     baseline_values = {
-        dotted_path: _path_get(baseline_fixture, dotted_path)
+        dotted_path: path_get(baseline_fixture, dotted_path)
         for dotted_path in preserved_paths
     }
 
@@ -104,13 +48,14 @@ def test_upgrade_chain_preserves_user_state(monkeypatch, tmp_path):
         fixture_path = FIXTURES_DIR / step["fixture"]
         shutil.copyfile(fixture_path, runtime_config)
 
-        loaded_config = _load_upgrade_hop(runtime_config, monkeypatch)
-        _assert_baseline_preserved(
+        loaded_config, diagnostics = run_upgrade_hop(runtime_config, monkeypatch)
+        assert_baseline_preserved(
             baseline_values,
             loaded_config,
             preserved_paths,
             version=step["version"],
         )
+        assert diagnostics["plugin_health"].get("clock") in {"ok", "unknown"}
 
 
 def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
@@ -122,7 +67,7 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
 
     baseline_fixture = _load_json(FIXTURES_DIR / chain[0]["fixture"])
     baseline_values = {
-        dotted_path: _path_get(baseline_fixture, dotted_path)
+        dotted_path: path_get(baseline_fixture, dotted_path)
         for dotted_path in preserved_paths
     }
 
@@ -132,10 +77,12 @@ def test_upgrade_chain_detects_key_drop_at_specific_hop(monkeypatch, tmp_path):
     runtime_config = tmp_path / "broken-device.json"
     runtime_config.write_text(json.dumps(broken), encoding="utf-8")
 
-    loaded_config = _load_upgrade_hop(runtime_config, monkeypatch)
+    cfg = load_runtime_config(runtime_config, monkeypatch)
+    loaded_config = cfg.get_config()
+    assert_valid_device_config(loaded_config)
 
     with pytest.raises((AssertionError, KeyError), match="timezone"):
-        _assert_baseline_preserved(
+        assert_baseline_preserved(
             baseline_values,
             loaded_config,
             preserved_paths,

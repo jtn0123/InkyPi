@@ -430,3 +430,63 @@ class TestLegacyFromDictCompatibility:
 
         assert plugin.settings == {}
         assert plugin.refresh == {}
+
+
+class TestLegacyMigrationFromDict:
+    def test_playlist_from_dict_parses_cycle_minutes_string(self):
+        playlist = Playlist.from_dict(
+            {
+                "name": "Legacy",
+                "start_time": "08:00",
+                "end_time": "20:00",
+                "cycle_minutes": "15",
+                "plugins": [],
+            }
+        )
+        assert playlist.cycle_interval_seconds == 900
+
+    def test_playlist_from_dict_defaults_when_values_are_invalid(self):
+        playlist = Playlist.from_dict({"cycle_minutes": "not-a-number", "plugins": {}})
+        assert playlist.name == "Default"
+        assert playlist.start_time == "00:00"
+        assert playlist.end_time == "24:00"
+        assert playlist.plugins == []
+        assert playlist.cycle_interval_seconds is None
+
+    def test_plugin_from_dict_supports_legacy_alias_fields(self):
+        plugin = PluginInstance.from_dict(
+            {
+                "id": "legacy_clock",
+                "instance_name": "Kitchen Clock",
+                "settings": {"tz": "UTC"},
+                "refresh": {"schedule": "07:15"},
+                "latest_refresh": "2025-01-01T07:15:00",
+            }
+        )
+        assert plugin.plugin_id == "legacy_clock"
+        assert plugin.name == "Kitchen Clock"
+        assert plugin.settings == {"tz": "UTC"}
+        assert plugin.refresh.get("scheduled") == "07:15"
+        assert plugin.latest_refresh_time == "2025-01-01T07:15:00"
+
+    def test_plugin_from_dict_defaults_non_mapping_inputs(self):
+        plugin = PluginInstance.from_dict(
+            {
+                "plugin_id": "clock",
+                "name": "Main",
+                "plugin_settings": "invalid",
+                "refresh": "invalid",
+            }
+        )
+        assert plugin.settings == {}
+        assert plugin.refresh == {}
+
+    def test_plugin_from_dict_name_fallback_order(self):
+        from_plugin_id = PluginInstance.from_dict(
+            {"plugin_id": "weather", "plugin_settings": {}, "refresh": {}}
+        )
+        assert from_plugin_id.name == "weather"
+
+        unknown = PluginInstance.from_dict({})
+        assert unknown.plugin_id == "unknown"
+        assert unknown.name == "unknown"

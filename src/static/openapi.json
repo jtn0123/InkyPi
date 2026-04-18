@@ -3,7 +3,7 @@
   "info": {
     "title": "InkyPi API",
     "description": "HTTP API for the InkyPi e-ink display controller. Manage playlists, plugins, display refresh, settings, and system health.",
-    "version": "0.4.25",
+    "version": "0.60.6",
     "license": {
       "name": "MIT"
     }
@@ -21,7 +21,9 @@
   "paths": {
     "/api/health/system": {
       "get": {
-        "tags": ["Health"],
+        "tags": [
+          "Health"
+        ],
         "summary": "System health metrics",
         "description": "Returns CPU, memory, and disk usage percentages, disk free/total GB, and uptime in seconds. Fields are null when psutil is not installed.",
         "operationId": "healthSystem",
@@ -53,7 +55,9 @@
     },
     "/api/health/plugins": {
       "get": {
-        "tags": ["Health"],
+        "tags": [
+          "Health"
+        ],
         "summary": "Plugin health snapshot",
         "description": "Returns the last-known health status for each plugin instance, filtered to a configurable time window (default 24 hours).",
         "operationId": "healthPlugins",
@@ -85,7 +89,9 @@
     },
     "/api/version": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Current and latest version info",
         "description": "Returns the running application version and the latest available release from GitHub. Use update_available to decide whether to trigger an update.",
         "operationId": "getVersion",
@@ -115,7 +121,9 @@
     },
     "/api/logs": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Fetch application logs",
         "description": "Returns recent log lines from the inkypi.service journal (or log file fallback). Rate-limited to prevent abuse.",
         "operationId": "getLogs",
@@ -160,7 +168,13 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL"
+              ]
             }
           }
         ],
@@ -173,7 +187,9 @@
                   "$ref": "#/components/schemas/LogsResponse"
                 },
                 "example": {
-                  "lines": ["2024-01-15 10:30:00 INFO Refresh complete"],
+                  "lines": [
+                    "2024-01-15 10:30:00 INFO Refresh complete"
+                  ],
                   "truncated": false,
                   "count": 1
                 }
@@ -191,7 +207,9 @@
     },
     "/api/current_image": {
       "get": {
-        "tags": ["Display"],
+        "tags": [
+          "Display"
+        ],
         "summary": "Current display image",
         "description": "Returns the most recently rendered image as PNG. Supports conditional GET via If-Modified-Since for efficient polling.",
         "operationId": "getCurrentImage",
@@ -220,7 +238,7 @@
             }
           },
           "304": {
-            "description": "Not Modified — image unchanged since If-Modified-Since"
+            "description": "Not Modified \u2014 image unchanged since If-Modified-Since"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -230,7 +248,9 @@
     },
     "/display-next": {
       "post": {
-        "tags": ["Display"],
+        "tags": [
+          "Display"
+        ],
         "summary": "Advance to next plugin in playlist",
         "description": "Triggers an immediate display refresh, advancing to the next eligible plugin in the active playlist. Rate-limited to prevent rapid successive calls.",
         "operationId": "displayNext",
@@ -261,7 +281,9 @@
     },
     "/refresh-info": {
       "get": {
-        "tags": ["Display"],
+        "tags": [
+          "Display"
+        ],
         "summary": "Last refresh metadata",
         "description": "Returns timing and context information about the most recent display refresh.",
         "operationId": "getRefreshInfo",
@@ -289,7 +311,9 @@
     },
     "/playlist": {
       "get": {
-        "tags": ["Playlist"],
+        "tags": [
+          "Playlist"
+        ],
         "summary": "Playlist management page",
         "description": "Returns the HTML playlist management interface.",
         "operationId": "getPlaylistPage",
@@ -309,7 +333,9 @@
     },
     "/create_playlist": {
       "post": {
-        "tags": ["Playlist"],
+        "tags": [
+          "Playlist"
+        ],
         "summary": "Create a new playlist",
         "description": "Creates a new named playlist with optional time window and cycle interval.",
         "operationId": "createPlaylist",
@@ -348,7 +374,9 @@
     },
     "/delete_playlist/{playlist_name}": {
       "delete": {
-        "tags": ["Playlist"],
+        "tags": [
+          "Playlist"
+        ],
         "summary": "Delete a playlist",
         "description": "Permanently removes a playlist and its associated plugin assignments.",
         "operationId": "deletePlaylist",
@@ -385,7 +413,9 @@
     },
     "/history": {
       "get": {
-        "tags": ["History"],
+        "tags": [
+          "History"
+        ],
         "summary": "Display history page",
         "description": "Returns the HTML history browser showing previously rendered images.",
         "operationId": "getHistoryPage",
@@ -405,7 +435,9 @@
     },
     "/history/storage": {
       "get": {
-        "tags": ["History"],
+        "tags": [
+          "History"
+        ],
         "summary": "History storage usage",
         "description": "Returns storage statistics for the display history directory.",
         "operationId": "historyStorage",
@@ -418,9 +450,10 @@
                   "$ref": "#/components/schemas/HistoryStorageResponse"
                 },
                 "example": {
-                  "count": 42,
-                  "total_size": "128.5 MB",
-                  "oldest": "2024-01-01T00:00:00"
+                  "free_gb": 64.0,
+                  "total_gb": 128.0,
+                  "used_gb": 64.0,
+                  "pct_free": 50.0
                 }
               }
             }
@@ -430,7 +463,9 @@
     },
     "/api/docs": {
       "get": {
-        "tags": ["Docs"],
+        "tags": [
+          "Docs"
+        ],
         "summary": "Swagger UI interactive documentation",
         "description": "Returns an HTML page with the Swagger UI explorer, loaded from CDN and pointing at /api/openapi.json.",
         "operationId": "getDocs",
@@ -450,7 +485,9 @@
     },
     "/api/openapi.json": {
       "get": {
-        "tags": ["Docs"],
+        "tags": [
+          "Docs"
+        ],
         "summary": "OpenAPI specification",
         "description": "Returns this OpenAPI 3.0 specification as JSON.",
         "operationId": "getOpenApiSpec",
@@ -467,13 +504,212 @@
           }
         }
       }
+    },
+    "/api/version/info": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Build/version metadata",
+        "description": "Returns build metadata used by the diagnostics/settings UI.",
+        "operationId": "apiVersionInfo",
+        "responses": {
+          "200": {
+            "description": "Version metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/uptime": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Process and system uptime",
+        "description": "Returns process uptime and, when available, host uptime.",
+        "operationId": "apiUptime",
+        "responses": {
+          "200": {
+            "description": "Uptime payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UptimeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/next-up": {
+      "get": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Next scheduled plugin context",
+        "description": "Returns an empty object when nothing is scheduled, otherwise the next playlist/plugin tuple.",
+        "operationId": "nextUp",
+        "responses": {
+          "200": {
+            "description": "Next-up payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextUpResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/benchmarks/summary": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Benchmark summary percentiles",
+        "description": "Returns aggregate p50/p95 timings for recent refreshes.",
+        "operationId": "benchmarksSummary",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "24h"
+            },
+            "description": "Look-back window (for example 1h, 24h, 7d)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Benchmark summary envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarksSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/benchmarks/plugins": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Per-plugin benchmark aggregates",
+        "description": "Returns run counts and average timings per plugin.",
+        "operationId": "benchmarksPlugins",
+        "parameters": [
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "24h"
+            },
+            "description": "Look-back window (for example 1h, 24h, 7d)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-plugin benchmark envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarksPluginsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/diagnostics": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Consolidated diagnostics payload",
+        "description": "Returns system/app diagnostics used by the in-app status badge and support tooling.",
+        "operationId": "apiDiagnostics",
+        "responses": {
+          "200": {
+            "description": "Diagnostics payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiagnosticsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/job/{job_id}": {
+      "get": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Asynchronous render job status",
+        "description": "Polls a job id returned by POST /update_now?async=1.",
+        "operationId": "jobStatus",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job status payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
       "SuccessResponse": {
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "properties": {
           "success": {
             "type": "boolean",
@@ -487,7 +723,9 @@
       },
       "ErrorResponse": {
         "type": "object",
-        "required": ["error"],
+        "required": [
+          "error"
+        ],
         "properties": {
           "error": {
             "type": "string",
@@ -497,7 +735,9 @@
       },
       "SystemHealth": {
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
@@ -541,7 +781,10 @@
       },
       "PluginHealthResponse": {
         "type": "object",
-        "required": ["success", "items"],
+        "required": [
+          "success",
+          "items"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
@@ -554,7 +797,11 @@
               "properties": {
                 "status": {
                   "type": "string",
-                  "enum": ["ok", "error", "unknown"]
+                  "enum": [
+                    "ok",
+                    "error",
+                    "unknown"
+                  ]
                 },
                 "last_seen": {
                   "type": "string",
@@ -568,7 +815,11 @@
       },
       "VersionResponse": {
         "type": "object",
-        "required": ["current", "update_available", "update_running"],
+        "required": [
+          "current",
+          "update_available",
+          "update_running"
+        ],
         "properties": {
           "current": {
             "type": "string",
@@ -598,7 +849,11 @@
       },
       "LogsResponse": {
         "type": "object",
-        "required": ["lines", "truncated", "count"],
+        "required": [
+          "lines",
+          "truncated",
+          "count"
+        ],
         "properties": {
           "lines": {
             "type": "array",
@@ -619,7 +874,9 @@
       },
       "DisplayNextResponse": {
         "type": "object",
-        "required": ["success"],
+        "required": [
+          "success"
+        ],
         "properties": {
           "success": {
             "type": "boolean"
@@ -678,7 +935,9 @@
       },
       "CreatePlaylistRequest": {
         "type": "object",
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "properties": {
           "name": {
             "type": "string",
@@ -706,28 +965,389 @@
       },
       "HistoryStorageResponse": {
         "type": "object",
+        "required": [
+          "free_gb",
+          "total_gb",
+          "used_gb",
+          "pct_free"
+        ],
         "properties": {
-          "count": {
+          "free_gb": {
+            "type": "number",
+            "format": "float"
+          },
+          "total_gb": {
+            "type": "number",
+            "format": "float"
+          },
+          "used_gb": {
+            "type": "number",
+            "format": "float"
+          },
+          "pct_free": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          }
+        }
+      },
+      "VersionInfoResponse": {
+        "type": "object",
+        "required": [
+          "version",
+          "git_sha",
+          "git_branch",
+          "build_time",
+          "python_version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "git_sha": {
+            "type": "string"
+          },
+          "git_branch": {
+            "type": "string"
+          },
+          "build_time": {
+            "type": "string"
+          },
+          "python_version": {
+            "type": "string"
+          }
+        }
+      },
+      "UptimeResponse": {
+        "type": "object",
+        "required": [
+          "process_uptime_seconds",
+          "system_uptime_seconds",
+          "process_started_at"
+        ],
+        "properties": {
+          "process_uptime_seconds": {
+            "type": "number",
+            "format": "float"
+          },
+          "system_uptime_seconds": {
             "type": "integer",
-            "description": "Number of images in history"
+            "nullable": true
           },
-          "total_size": {
-            "type": "string",
-            "description": "Human-readable total disk usage",
-            "example": "128.5 MB"
+          "process_started_at": {
+            "type": "string"
+          }
+        }
+      },
+      "NextUpResponse": {
+        "type": "object",
+        "properties": {
+          "playlist": {
+            "type": "string"
           },
-          "oldest": {
+          "plugin_id": {
+            "type": "string"
+          },
+          "plugin_instance": {
+            "type": "string"
+          },
+          "plugin_instance_label": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "BenchmarksSummaryResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "count",
+          "summary"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "p50",
+                "p95"
+              ],
+              "properties": {
+                "p50": {
+                  "type": "integer",
+                  "nullable": true
+                },
+                "p95": {
+                  "type": "integer",
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "BenchmarksPluginEntry": {
+        "type": "object",
+        "required": [
+          "plugin_id",
+          "runs",
+          "request_avg",
+          "generate_avg",
+          "display_avg"
+        ],
+        "properties": {
+          "plugin_id": {
+            "type": "string"
+          },
+          "runs": {
+            "type": "integer"
+          },
+          "request_avg": {
+            "type": "integer",
+            "nullable": true
+          },
+          "generate_avg": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_avg": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "BenchmarksPluginsResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "items"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BenchmarksPluginEntry"
+            }
+          }
+        }
+      },
+      "DiagnosticsMemory": {
+        "type": "object",
+        "required": [
+          "total_mb",
+          "used_mb",
+          "pct"
+        ],
+        "properties": {
+          "total_mb": {
+            "type": "integer",
+            "nullable": true
+          },
+          "used_mb": {
+            "type": "integer",
+            "nullable": true
+          },
+          "pct": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          }
+        }
+      },
+      "DiagnosticsDisk": {
+        "type": "object",
+        "required": [
+          "total_mb",
+          "used_mb",
+          "pct",
+          "path"
+        ],
+        "properties": {
+          "total_mb": {
+            "type": "integer",
+            "nullable": true
+          },
+          "used_mb": {
+            "type": "integer",
+            "nullable": true
+          },
+          "pct": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "DiagnosticsRefreshTask": {
+        "type": "object",
+        "required": [
+          "running",
+          "last_run_ts",
+          "last_error"
+        ],
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "last_run_ts": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true,
-            "description": "Timestamp of the oldest history image"
+            "nullable": true
+          },
+          "last_error": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "DiagnosticsClientLogErrors": {
+        "type": "object",
+        "required": [
+          "count_5m",
+          "warn_count_5m",
+          "last_error_ts",
+          "window_seconds"
+        ],
+        "properties": {
+          "count_5m": {
+            "type": "integer"
+          },
+          "warn_count_5m": {
+            "type": "integer"
+          },
+          "last_error_ts": {
+            "type": "string",
+            "nullable": true
+          },
+          "window_seconds": {
+            "type": "integer"
+          }
+        }
+      },
+      "DiagnosticsResponse": {
+        "type": "object",
+        "required": [
+          "ts",
+          "version",
+          "prev_version",
+          "uptime_s",
+          "memory",
+          "disk",
+          "refresh_task",
+          "plugin_health",
+          "log_tail_100",
+          "last_update_failure",
+          "recent_client_log_errors"
+        ],
+        "properties": {
+          "ts": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "prev_version": {
+            "type": "string",
+            "nullable": true
+          },
+          "uptime_s": {
+            "type": "integer",
+            "nullable": true
+          },
+          "memory": {
+            "$ref": "#/components/schemas/DiagnosticsMemory"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiagnosticsDisk"
+          },
+          "refresh_task": {
+            "$ref": "#/components/schemas/DiagnosticsRefreshTask"
+          },
+          "plugin_health": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "log_tail_100": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "last_update_failure": {
+            "type": "object",
+            "description": "Most recent update failure details (if any).",
+            "nullable": true
+          },
+          "recent_client_log_errors": {
+            "$ref": "#/components/schemas/DiagnosticsClientLogErrors"
+          }
+        }
+      },
+      "JobStatusResult": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object"
+          }
+        }
+      },
+      "JobStatusResponse": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/JobStatusResult"
+          },
+          "error": {
+            "type": "string"
           }
         }
       }
     },
     "responses": {
       "BadRequest": {
-        "description": "Bad request — invalid parameters or missing required fields",
+        "description": "Bad request \u2014 invalid parameters or missing required fields",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Access forbidden \u2014 insufficient permissions",
         "content": {
           "application/json": {
             "schema": {
@@ -747,7 +1367,7 @@
         }
       },
       "RateLimited": {
-        "description": "Rate limit exceeded — try again after a short delay",
+        "description": "Rate limit exceeded \u2014 try again after a short delay",
         "content": {
           "application/json": {
             "schema": {

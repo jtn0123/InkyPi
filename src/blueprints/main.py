@@ -49,6 +49,11 @@ def _current_dt(device_config):
         return datetime.now(UTC)
 
 
+def _is_dev_mode() -> bool:
+    env = (os.getenv("INKYPI_ENV") or os.getenv("FLASK_ENV") or "").strip().lower()
+    return env in {"dev", "development"}
+
+
 @main_bp.route("/", methods=["GET"])
 def main_page():
     device_config = current_app.config["DEVICE_CONFIG"]
@@ -103,6 +108,29 @@ def preview_image():
     safe_root = os.path.dirname(abs_path)
     filename = os.path.basename(abs_path)
     return maybe_serve_webp(safe_root, filename, request.headers.get("Accept"))
+
+
+@main_bp.route("/dev/mock-frame", methods=["GET"])
+def dev_mock_frame():
+    """Serve the latest simulated mock-display frame in dev mode only."""
+    if not _is_dev_mode():
+        return ("Not found", 404)
+
+    display_manager = current_app.config.get("DISPLAY_MANAGER")
+    display = getattr(display_manager, "display", None)
+    frame_path = getattr(display, "mock_frame_path", None)
+    if not frame_path:
+        return ("Mock frame not available", 404)
+
+    abs_path = os.path.abspath(frame_path)
+    if not os.path.exists(abs_path):
+        return ("Mock frame not available", 404)
+
+    safe_root = os.path.dirname(abs_path)
+    filename = os.path.basename(abs_path)
+    return send_from_directory(
+        safe_root, filename, mimetype="image/png", as_attachment=False
+    )
 
 
 @main_bp.route("/api/screenshot", methods=["GET"])

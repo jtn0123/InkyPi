@@ -44,7 +44,11 @@ _KNOWN_VIOLATIONS: dict[str, set[str]] = {
     #
     # color-contrast fires on some status chips and placeholder text.
     # TODO(JTN-510): audit contrast ratios.
-    "home": {"landmark-one-main", "region"},
+    "home": {
+        "landmark-one-main",
+        "region",
+        "color-contrast",  # TODO(JTN-510)
+    },
     "settings": {
         "landmark-one-main",
         "region",

@@ -15,10 +15,14 @@ guards on ``response.mimetype == 'application/json'``.
 from __future__ import annotations
 
 from schemas.responses import (
+    BenchmarksPluginsResponse,
+    BenchmarksSummaryResponse,
+    DiagnosticsResponse,
     HealthPluginsResponse,
     HealthSystemResponse,
     HistoryStorageResponse,
     IsolationResponse,
+    JobStatusResponse,
     NextUpResponse,
     RefreshInfoResponse,
     RefreshStatsResponse,
@@ -38,6 +42,10 @@ ENDPOINT_SCHEMAS: dict[str, type] = {
     "stats.refresh_stats": RefreshStatsResponse,
     "settings.health_system": HealthSystemResponse,
     "settings.health_plugins": HealthPluginsResponse,
+    "settings.benchmarks_summary": BenchmarksSummaryResponse,
+    "settings.benchmarks_plugins": BenchmarksPluginsResponse,
+    "diagnostics.api_diagnostics": DiagnosticsResponse,
+    "plugin.job_status": JobStatusResponse,
     "settings.plugin_isolation": IsolationResponse,
     "history.history_storage": HistoryStorageResponse,
 }

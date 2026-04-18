@@ -524,7 +524,9 @@
     };
 
     const openModal = () => {
+      modal.hidden = false;
       modal.style.display = "block";
+      modal.classList.add("is-open");
       setTimeout(initLeafletMap, 100);
     };
 
@@ -534,7 +536,9 @@
         latInput.value = position.lat;
         lonInput.value = position.lng;
       }
+      modal.hidden = true;
       modal.style.display = "none";
+      modal.classList.remove("is-open");
     };
 
     openButton.addEventListener("click", openModal);
