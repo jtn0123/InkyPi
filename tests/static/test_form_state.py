@@ -67,7 +67,7 @@ def test_settings_form_has_data_form_state(client):
     body = resp.get_data(as_text=True)
     # The settings form must opt-in to FormState.
     assert re.search(
-        r'<form class="settings-form"[^>]*data-form-state', body
+        r'<form[^>]*class="[^"]*\bsettings-form\b[^"]*"[^>]*data-form-state', body
     ), "settings-form must carry data-form-state for FormState auto-attach"
     # Save button must advertise itself as the FormState submit target.
     assert 'id="saveSettingsBtn"' in body
