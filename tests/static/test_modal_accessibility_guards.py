@@ -67,3 +67,18 @@ def test_settings_page_device_action_modals_manage_focus():
 
     assert "focusable.focus()" in content
     assert "_lastDeviceActionTrigger" in content
+
+
+def test_response_modal_restores_focus_to_trigger():
+    """The shared response modal should restore focus after dismissal."""
+    content = _read_script("response_modal.js")
+
+    assert "lastResponseModalTrigger" in content
+    assert "responseModalClose" in content
+
+
+def test_plugin_workflow_panels_use_inert_for_hidden_panels():
+    """Plugin workflow tabs must keep inactive panels out of the focus order."""
+    content = _read_script("plugin_page.js")
+
+    assert 'toggleAttribute("inert"' in content

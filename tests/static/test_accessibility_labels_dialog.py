@@ -27,6 +27,15 @@ def test_weather_map_close_button_is_button_element():
     assert span_close is None, "close-button should be <button>, not <span>"
 
 
+def test_response_modal_has_accessible_name():
+    """The shared response modal must expose a stable accessible name."""
+    content = Path("src/templates/response_modal.html").read_text()
+    assert 'role="alertdialog"' in content
+    assert 'aria-labelledby="responseModalTitle"' in content
+    assert 'id="responseModalTitle"' in content
+    assert 'aria-describedby="modalMessage"' in content
+
+
 def test_weather_map_uses_local_leaflet_assets():
     """The weather map template must point at vendored Leaflet files."""
     content = Path("src/templates/widgets/weather_map.html").read_text()

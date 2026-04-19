@@ -12,7 +12,7 @@
     border-radius: 999px;
     font-size: 0.85rem;
     font-weight: 600;
-    color: var(--status-badge-fg, rgb(255 255 255));
+    color: var(--status-badge-fg, #111827);
     background: var(--status-badge-bg, #d97706);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     cursor: pointer;

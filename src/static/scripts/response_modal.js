@@ -7,6 +7,7 @@ const TOAST_FADE_MS = 300;
 
 let toastContainer = null;
 let toastCounter = 0;
+let lastResponseModalTrigger = null;
 
 function ensureToastContainer() {
     if (!toastContainer) {
@@ -127,6 +128,10 @@ function showResponseModal(status, message, useToast = true) {
 
     const modalContent = document.getElementById('modalContent');
     const modalMessage = document.getElementById('modalMessage');
+    const closeButton = document.getElementById('responseModalClose');
+    lastResponseModalTrigger = document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
 
     // Remove any previous status classes
     modal.classList.remove('success', 'failure');
@@ -145,6 +150,9 @@ function showResponseModal(status, message, useToast = true) {
     // Display Modal
     modal.hidden = false;
     modal.style.display = 'block';
+    if (closeButton) {
+        setTimeout(() => closeButton.focus(), 0);
+    }
 
     // Auto-close modal (skip for failure so users can read error details)
     if (status === 'success') {
@@ -158,6 +166,14 @@ function closeResponseModal() {
     if (modal) {
         modal.hidden = true;
         modal.style.display = 'none';
+    }
+    if (lastResponseModalTrigger) {
+        try {
+            lastResponseModalTrigger.focus();
+        } catch (_e) {
+            // Ignore focus restoration failures.
+        }
+        lastResponseModalTrigger = null;
     }
 }
 
