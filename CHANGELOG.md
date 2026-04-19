@@ -1,6 +1,47 @@
 # CHANGELOG
 
 
+## v0.61.7 (2026-04-19)
+
+### Bug Fixes
+
+- Burn down main-route accessibility gaps ([#541](https://github.com/jtn0123/InkyPi/pull/541),
+  [`d0d9f4c`](https://github.com/jtn0123/InkyPi/commit/d0d9f4ce3064537c0740442ccecb408c2b233443))
+
+* fix: tighten main-route modal accessibility
+
+* fix: address remaining main-route a11y gaps
+
+* build: sync compiled css for a11y fixes
+
+* fix: restore main-route snapshot layout stability
+
+* fix: restore banner landmarks on shared pages
+
+* test: stabilize client log rate-limit assertions
+
+* fix: use semantic plugin header markup
+
+* test: resolve sonar follow-ups for client log a11y
+
+* test: fold client log batch coverage into existing suite
+
+### Testing
+
+- Use real app bootstrap for security coverage ([#542](https://github.com/jtn0123/InkyPi/pull/542),
+  [`799e3e9`](https://github.com/jtn0123/InkyPi/commit/799e3e9d55777db11de0f3e6bddd1c54c4a20c05))
+
+* test: use real app bootstrap for security coverage
+
+* test: exercise lazy refresh start via real request hook
+
+* test: reset shared middleware state in flask_app fixture
+
+* fix: preserve HTTP error handling in test bootstrap
+
+* test: stabilize shared security bootstrap fixture
+
+
 ## v0.61.6 (2026-04-19)
 
 ### Bug Fixes
