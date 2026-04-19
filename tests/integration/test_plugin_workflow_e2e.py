@@ -80,29 +80,27 @@ def test_last_progress_button_shows_overlay(live_server, browser_page, tmp_path)
     progress = page.locator("#requestProgress")
     assert progress.count() == 1, "#requestProgress block should render"
     # Block is hidden by default until the user opens it.
-    assert progress.evaluate("(el) => el.hidden") is True, (
-        "#requestProgress should start hidden"
-    )
+    assert (
+        progress.evaluate("(el) => el.hidden") is True
+    ), "#requestProgress should start hidden"
 
     # Clear any cached progress so we get the deterministic empty-state copy.
-    page.evaluate(
-        "() => { try { localStorage.clear(); } catch (_) {} }"
-    )
+    page.evaluate("() => { try { localStorage.clear(); } catch (_) {} }")
 
     page.locator("#showLastProgressBtn").click()
     page.wait_for_timeout(200)
 
-    assert progress.evaluate("(el) => !el.hidden"), (
-        "#requestProgress should be visible after clicking Last Progress"
-    )
+    assert progress.evaluate(
+        "(el) => !el.hidden"
+    ), "#requestProgress should be visible after clicking Last Progress"
     empty = page.locator(".progress-empty-state")
     assert empty.count() == 1, "no-data empty state should render when unseeded"
 
     page.locator("#closeProgressBtn").click()
     page.wait_for_timeout(200)
 
-    assert progress.evaluate("(el) => el.hidden"), (
-        "#requestProgress should re-hide after clicking close"
-    )
+    assert progress.evaluate(
+        "(el) => el.hidden"
+    ), "#requestProgress should re-hide after clicking close"
 
     rc.assert_no_errors(str(tmp_path), "plugin_last_progress_overlay")
