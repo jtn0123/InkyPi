@@ -30,7 +30,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from tests.integration.browser_helpers import RuntimeCollector, stub_leaflet
+from tests.integration.browser_helpers import (
+    RuntimeCollector,
+    authenticate_page,
+    stub_leaflet,
+)
 
 pytestmark = pytest.mark.skipif(
     os.getenv("SKIP_UI", "").lower() in ("1", "true"),
@@ -443,6 +447,8 @@ def _run_click_sweep(
     sweep: SweepPage,
     *,
     max_clicks: int = _MAX_CLICKS_PER_PAGE,
+    flask_app=None,
+    authenticated: bool = False,
 ) -> None:
     """Shared click-sweep body used by both the core-pages and plugin-pages tests.
 
@@ -452,9 +458,25 @@ def _run_click_sweep(
     occurred. Uses the page's autouse ``client_log_capture`` fixture as
     the final tripwire for any ``console.warn``/``error`` the browser
     forwarded to ``/api/client-log``.
+
+    When ``authenticated=True`` the page's browser context is seeded with a
+    signed ``authed=True`` session cookie *before* the initial ``page.goto``
+    so logged-in-only UI branches are exercised. Today the app only gates
+    routes when ``INKYPI_AUTH_PIN`` is set, so on the default bootstrap
+    ``authenticated`` is functionally a no-op — it still locks in the
+    cookie-injection plumbing so future auth-gated routes get coverage
+    automatically (JTN-702).
     """
     stub_leaflet(page)
     collector = RuntimeCollector(page, live_server)
+
+    if authenticated:
+        if flask_app is None:
+            raise RuntimeError(
+                "authenticated=True requires flask_app so a signed session "
+                "cookie can be materialized."
+            )
+        authenticate_page(page, flask_app, live_server)
 
     page.goto(
         f"{live_server}{sweep.path}",
@@ -542,6 +564,18 @@ def _run_click_sweep(
     ), f"{sweep.path}: {len(click_errors)} click(s) errored: {click_errors[:5]}"
 
 
+# JTN-702: Each page/viewport combination runs twice — once anonymous
+# (``pre_auth``) and once with a signed ``authed=True`` session cookie set on
+# the Playwright context before navigating (``post_auth``). The default test
+# bootstrap does not set ``INKYPI_AUTH_PIN``, so ``post_auth`` is functionally
+# a no-op today — it exercises the cookie-injection plumbing so future
+# auth-gated routes get coverage automatically. See
+# :func:`tests.integration.browser_helpers.authenticate_page` for the shared
+# helper other integration tests can use when they need a logged-in session.
+_AUTH_STATES: tuple[str, ...] = ("pre_auth", "post_auth")
+
+
+@pytest.mark.parametrize("auth_state", _AUTH_STATES, ids=list(_AUTH_STATES))
 @pytest.mark.parametrize(
     "viewport,page_fixture",
     _VIEWPORTS,
@@ -549,13 +583,24 @@ def _run_click_sweep(
 )
 @pytest.mark.parametrize("sweep", PAGES_TO_SWEEP, ids=lambda sweep: sweep.label)
 def test_click_sweep(
-    live_server, request, sweep: SweepPage, viewport: str, page_fixture: str
+    live_server,
+    flask_app,
+    request,
+    sweep: SweepPage,
+    viewport: str,
+    page_fixture: str,
+    auth_state: str,
 ):
     """Click every visible clickable on the page; assert no silent failures.
 
-    Parametrized over viewport: ``desktop`` (1280×900) and ``mobile``
-    (360×800). Mobile reflows can hide or overlap controls and catch
-    handlers that only break at narrow widths.
+    Parametrized over:
+
+    * ``viewport`` — ``desktop`` (1280×900) and ``mobile`` (360×800). Mobile
+      reflows can hide or overlap controls and catch handlers that only
+      break at narrow widths.
+    * ``auth_state`` — ``pre_auth`` (anonymous) and ``post_auth`` (signed
+      ``authed=True`` session cookie set before the initial navigation).
+      See JTN-702.
     """
     if sweep.label in _XFAIL_PAGES:
         pytest.xfail(_XFAIL_PAGES[sweep.label])
@@ -564,7 +609,13 @@ def test_click_sweep(
         pytest.xfail(_MOBILE_XFAIL_PAGES[mobile_key])
 
     page = request.getfixturevalue(page_fixture)
-    _run_click_sweep(page, live_server, sweep)
+    _run_click_sweep(
+        page,
+        live_server,
+        sweep,
+        flask_app=flask_app,
+        authenticated=(auth_state == "post_auth"),
+    )
 
 
 # JTN-698: Parametrize the sweep over every registered plugin so a handler
@@ -577,14 +628,20 @@ def test_click_sweep(
 # wall-time without new signal. Mark ``plugin_sweep`` so CI can route this
 # to a dedicated job if total runtime pressure grows.
 @pytest.mark.plugin_sweep
+@pytest.mark.parametrize("auth_state", _AUTH_STATES, ids=list(_AUTH_STATES))
 @pytest.mark.parametrize("plugin_id", _PLUGIN_IDS, ids=list(_PLUGIN_IDS))
-def test_click_sweep_plugin_pages(live_server, browser_page, plugin_id: str):
+def test_click_sweep_plugin_pages(
+    live_server, flask_app, browser_page, plugin_id: str, auth_state: str
+):
     """Sweep every ``/plugin/<id>`` page for silent-failure handlers.
 
     Uses the shared :func:`_run_click_sweep` body with a tighter click cap
     (``_PLUGIN_MAX_CLICKS_PER_PAGE``) to keep the 21-plugin sweep inside
     the CI budget. Destructive controls are still honored via the existing
     ``data-test-skip-click="true"`` skip selector.
+
+    Runs twice per plugin: ``pre_auth`` (anonymous) and ``post_auth``
+    (signed session cookie set before navigation) — see JTN-702.
     """
     if plugin_id in _PLUGIN_XFAIL:
         pytest.xfail(_PLUGIN_XFAIL[plugin_id])
@@ -599,4 +656,6 @@ def test_click_sweep_plugin_pages(live_server, browser_page, plugin_id: str):
         live_server,
         sweep,
         max_clicks=_PLUGIN_MAX_CLICKS_PER_PAGE,
+        flask_app=flask_app,
+        authenticated=(auth_state == "post_auth"),
     )
