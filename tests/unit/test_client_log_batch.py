@@ -24,6 +24,8 @@ import logging
 import pytest
 from flask import Flask  # noqa: E402
 
+from utils.rate_limit import TokenBucket
+
 
 def _fresh_app(monkeypatch=None, *, capture: bool = False) -> Flask:
     """Reload ``blueprints.client_log`` and return a fresh Flask app.
@@ -148,6 +150,9 @@ class TestRateLimitCapacity:
     def test_rate_limit_capacity_raised_to_60(self, monkeypatch):
         """JTN-711: the bucket now holds 60 tokens (up from 10)."""
         app = _fresh_app(monkeypatch)
+        import blueprints.client_log as cl_mod
+
+        cl_mod._rate_limiter = TokenBucket(capacity=60, refill_rate=0)
         c = app.test_client()
 
         for i in range(60):
@@ -165,6 +170,7 @@ class TestRateLimitCapacity:
         app = _fresh_app(monkeypatch, capture=True)
         import blueprints.client_log as cl_mod
 
+        cl_mod._rate_limiter = TokenBucket(capacity=60, refill_rate=0)
         c = app.test_client()
         per_batch = 10
         batches = 60
