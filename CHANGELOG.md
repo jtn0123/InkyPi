@@ -1,6 +1,32 @@
 # CHANGELOG
 
 
+## v0.61.5 (2026-04-19)
+
+### Bug Fixes
+
+- Bound completed-job retention in JobQueue ([#545](https://github.com/jtn0123/InkyPi/pull/545),
+  [`45d7007`](https://github.com/jtn0123/InkyPi/commit/45d7007870628fef10125fd6814daed6ce4f6876))
+
+* fix: bound completed job retention in queue
+
+* test: harden job queue retention coverage
+
+### Chores
+
+- Harden release gates and contributor checks ([#544](https://github.com/jtn0123/InkyPi/pull/544),
+  [`6fa8dab`](https://github.com/jtn0123/InkyPi/commit/6fa8dab5ad78808860c70ae9f14e39854620995f))
+
+* chore: harden release gates and docs
+
+* ci: point SBOM generation at active interpreter
+
+### Refactoring
+
+- Unify shared HTTP session construction ([#543](https://github.com/jtn0123/InkyPi/pull/543),
+  [`9155fc2`](https://github.com/jtn0123/InkyPi/commit/9155fc238ee66f43e8e23410bbb33333c781c9f8))
+
+
 ## v0.61.4 (2026-04-18)
 
 ### Bug Fixes
