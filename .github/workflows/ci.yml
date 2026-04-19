@@ -128,9 +128,8 @@ jobs:
     name: Lockfile drift check
     runs-on: ubuntu-latest
     # JTN-616: migrated to `uv lock` + `uv export` for a universal cross-platform
-    # lockfile. Kept advisory for this PR so a follow-up can promote it to
-    # required after it has been stable on main.
-    continue-on-error: true
+    # lockfile. This now blocks merge because the runtime lockfile is part of
+    # the release contract and is regenerated from uv.lock.
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -150,10 +149,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: [ '3.11', '3.12', '3.13' ]
-        include:
-          - python-version: '3.13'
-            allow-failure: true
-    continue-on-error: ${{ matrix.allow-failure == true }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -480,15 +475,18 @@ jobs:
         run: |
           python -m pip install -U pip wheel
           pip install -r install/requirements.txt -r install/requirements-dev.txt
-      - name: Create venv symlink for preflash script
+      - name: Run pip-audit against hashed lockfiles
         run: |
-          python -m venv .venv
-          .venv/bin/pip install -r install/requirements.txt -r install/requirements-dev.txt
-      - name: Run security validation
-        env:
-          INKYPI_VALIDATE_SECURITY: '1'
+          mkdir -p artifacts/security
+          python -m pip_audit -r install/requirements.txt --format=json \
+            --output artifacts/security/pip-audit-runtime.json
+          python -m pip_audit -r install/requirements-dev.txt --format=json \
+            --output artifacts/security/pip-audit-dev.json
+      - name: Generate SBOM
         run: |
-          scripts/preflash_validate.sh
+          python_path="$(python -c 'import sys; print(sys.executable)')"
+          python -m cyclonedx_py environment "$python_path" --of JSON \
+            -o artifacts/security/sbom.json
       - name: Upload security artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -813,9 +811,6 @@ jobs:
   ci-gate:
     name: CI gate (all checks pass)
     needs: [lint, shellcheck, lockfile-drift, tests, sonarcloud, smoke, smoke-matrix, coverage-gate, security, browser-smoke, install-smoke-memcap, install-matrix, install-crash-loop-gate]
-    # lockfile-drift is included in needs so the gate waits for it, but it is
-    # treated as advisory (not listed in the required-success loop below) until
-    # requirements.txt is regenerated. See JTN-597.
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -828,9 +823,7 @@ jobs:
           echo "$results"
 
           # Jobs that must be 'success'
-          # lockfile-drift is advisory (continue-on-error); not in this list.
-          # Add it here once requirements.txt is refreshed under the pinned Python version.
-          for job in lint shellcheck tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap install-matrix install-crash-loop-gate; do
+          for job in lint shellcheck lockfile-drift tests smoke smoke-matrix coverage-gate security browser-smoke install-smoke-memcap install-matrix install-crash-loop-gate; do
             result=$(echo "$results" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('$job',{}).get('result','missing'))")
             if [ "$result" != "success" ]; then
               echo "Required job '$job' did not succeed (result: $result)"

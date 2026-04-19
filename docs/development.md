@@ -19,15 +19,15 @@ Traditional setup method
 
 ```bash
 # 1. Clone and setup
-git clone https://github.com/fatihak/InkyPi.git
+git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi
 
 # 2. Quick start (recommended)
 ./scripts/dev.sh
 
 # Or manual setup
-python3 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # 3. Install Python dependencies and vendor assets
 pip install -r install/requirements-dev.txt
@@ -49,7 +49,7 @@ command -v direnv >/dev/null || nix profile install "nixpkgs#direnv" \
   && source ~/.${SHELL##*/}rc # If not already present: install direnv, add hooks to shell rc and activate
 
 # 2. Clone and setup
-git clone https://github.com/fatihak/InkyPi.git
+git clone https://github.com/jtn0123/InkyPi.git
 cd InkyPi # direnv reads .envrc -> runs devbox shell -> installs deps & activates venv
 
 # 3. Run InkyPi in developer mode via devbox
@@ -196,12 +196,16 @@ To stop the container, press `Ctrl+C` or run `docker compose down`.
 ## CI Gate and Required Status Checks
 
 The CI workflow includes a `ci-gate` job that depends on all required jobs — including
-`browser-smoke`. This job is the single handle the repo owner should mark as a required
-status check in GitHub branch protection.
+`lockfile-drift`, `security`, and `browser-smoke`. This job is the single handle the repo
+owner should mark as a required status check in GitHub branch protection.
+
+Frontend changes under `src/static/**` or `src/templates/**` also trigger the local
+pre-commit browser gate, which runs `scripts/test.sh browser-smoke` before the commit is
+allowed through.
 
 ### Making `ci-gate` a required status check (repo owner steps)
 
-1. Go to **GitHub.com → fatihak/InkyPi → Settings → Branches**.
+1. Go to **GitHub.com → jtn0123/InkyPi → Settings → Branches**.
 2. Under "Branch protection rules", click **Edit** next to the `main` rule (or **Add rule**
    if none exists).
 3. Enable **"Require status checks to pass before merging"**.
@@ -230,7 +234,7 @@ InkyPi relies on system packages for some features, which are normally installed
 
 The required packages can be found in this file:
 
-https://github.com/fatihak/InkyPi/blob/main/install/debian-requirements.txt
+https://github.com/jtn0123/InkyPi/blob/main/install/debian-requirements.txt
 
 Use your favourite package manager (such as `apt`) to install them.
 
