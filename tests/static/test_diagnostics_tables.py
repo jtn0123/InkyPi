@@ -6,7 +6,7 @@ not raw JSON.stringify output. Extends the JTN-384 pattern.
 
 from pathlib import Path
 
-JS_PATH = Path("src/static/scripts/settings_page.js")
+JS_PATH = Path("src/static/scripts/settings/diagnostics.js")
 
 
 def _read_js():

@@ -217,6 +217,8 @@ coverage.xml
 !/src/static/scripts/history_page.js
 !/src/static/scripts/plugin_page.js
 !/src/static/scripts/settings_page.js
+!/src/static/scripts/settings/
+!/src/static/scripts/settings/*.js
 !/src/static/scripts/api_keys_page.js
 !/src/static/scripts/ui_helpers.js
 !/src/static/scripts/csrf.js

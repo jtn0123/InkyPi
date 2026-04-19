@@ -2,7 +2,7 @@
 
 Background
 ----------
-Before the fix, ``settings_page.js`` only checked dirty-state in ``checkDirty``
+Before the fix, the settings page JS only checked dirty-state in ``checkDirty``
 and ``handleAction`` shipped the form to the server without ever calling
 ``form.checkValidity()``. Users could clear ``deviceName`` (a ``required``
 field) or set ``interval=-5`` (which has ``min="1"``) and the only feedback
@@ -21,7 +21,7 @@ These static-analysis tests pin the fix in place by verifying that:
 
 from pathlib import Path
 
-JS_PATH = Path("src/static/scripts/settings_page.js")
+JS_PATH = Path("src/static/scripts/settings/form.js")
 HTML_PATH = Path("src/templates/settings.html")
 
 

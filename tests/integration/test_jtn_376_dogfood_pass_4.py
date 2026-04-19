@@ -253,13 +253,13 @@ def test_refresh_settings_manager_js_scheduled_time_hhmm_only():
 
 def test_settings_page_js_benchmark_empty_state_message():
     """When no benchmark data exists, show a human message instead of null JSON."""
-    js = _read_js_asset("settings_page.js")
+    js = _read_js_asset("settings/diagnostics.js")
     assert "No benchmark data recorded" in js
 
 
 def test_settings_page_js_isolation_human_messages():
     """Isolation actions should show human-readable messages."""
-    js = _read_js_asset("settings_page.js")
+    js = _read_js_asset("settings/diagnostics.js")
     assert "has been ${past}" in js
     assert '"isolated"' in js
     assert '"un-isolate"' in js
