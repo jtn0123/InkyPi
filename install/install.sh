@@ -142,15 +142,48 @@ _preflight_free_mb() {
   df -P -k "$path" 2>/dev/null | awk 'NR==2 {printf "%d\n", $4/1024}'
 }
 
+_preflight_canonical_path() {
+  # Canonicalise $1 so duplicate-mount-point detection in the disk-space loop
+  # is stable. Prefer GNU `readlink -f`, fall back to the cheap shell form if
+  # not available (e.g. on a minimal busybox container). Never errors — if
+  # nothing resolves, we echo the input unchanged so the caller can still
+  # run df against whatever string the user passed.
+  local p="$1"
+  if command -v readlink >/dev/null 2>&1 && readlink -f / >/dev/null 2>&1; then
+    readlink -f "$p" 2>/dev/null || echo "$p"
+  else
+    echo "$p"
+  fi
+}
+
 preflight_checks() {
   echo "Running preflight sanity checks..."
 
   # --- Disk space ---
+  # CodeRabbit review (#546): declare loop var `local` so it doesn't leak to
+  # enclosing scope, and dedupe usr_local vs install_parent so the same
+  # filesystem isn't checked twice with different labels when the defaults
+  # resolve to the same mount (the production case, where install_parent =
+  # dirname /usr/local/inkypi = /usr/local).
   local usr_local="${INKYPI_PREFLIGHT_USR_LOCAL:-/usr/local}"
   local install_parent="${INKYPI_PREFLIGHT_INSTALL_PARENT:-$(dirname "$INSTALL_PATH")}"
   local free_mb
+  local path
+  local canon_usr_local
+  local canon_install_parent
+  canon_usr_local="$(_preflight_canonical_path "$usr_local")"
+  canon_install_parent="$(_preflight_canonical_path "$install_parent")"
 
-  for path in "$usr_local" "$install_parent"; do
+  # Build a deduped list — if the two override vars resolve to the same
+  # canonical path we only run the df probe once. We keep the original
+  # (non-canonical) string for the error label so the message names the path
+  # the user actually configured, not its realpath.
+  local -a disk_paths=("$usr_local")
+  if [ "$canon_usr_local" != "$canon_install_parent" ]; then
+    disk_paths+=("$install_parent")
+  fi
+
+  for path in "${disk_paths[@]}"; do
     free_mb=$(_preflight_free_mb "$path")
     if [ "${free_mb:-0}" -lt "$PREFLIGHT_MIN_FREE_MB" ]; then
       _preflight_fail \
@@ -193,20 +226,40 @@ preflight_checks() {
   fi
 
   # $state_dir (= $LOCKFILE_DIR, normally /var/lib/inkypi) may not exist yet
-  # on a fresh install. Try to create it up front so we can assert it is
-  # writable — if mkdir fails, surface it here rather than deep inside the
-  # install when we first try to touch the lockfile.
-  if [ ! -d "$state_dir" ]; then
-    if ! mkdir -p "$state_dir" 2>/dev/null; then
+  # on a fresh install. CodeRabbit review (#546): we used to `mkdir -p` it
+  # here, but running as root in production that always succeeds — turning
+  # the subsequent writability check into dead code and giving a false sense
+  # of validation. Instead, probe writability of the *parent* by attempting
+  # to create+remove a throwaway file there. That's what actually needs to
+  # be writable for the real `mkdir -p "$LOCKFILE_DIR"` later to succeed,
+  # and it works whether or not $state_dir already exists.
+  if [ -d "$state_dir" ]; then
+    # Already exists — test writability by touching a probe file inside it.
+    local probe_file="$state_dir/.inkypi-preflight-probe.$$"
+    if ! (umask 077 && : > "$probe_file") 2>/dev/null; then
       _preflight_fail \
-        "state directory $state_dir does not exist and could not be created" \
+        "state directory $state_dir is not writable by $(id -un) (EUID=$EUID)" \
+        "re-run install.sh with sudo, or 'sudo chown $(id -un) $state_dir'"
+    fi
+    rm -f "$probe_file" 2>/dev/null || true
+  else
+    # Doesn't exist — test writability of the nearest existing ancestor so we
+    # know `mkdir -p "$state_dir"` will succeed later. Walking up handles the
+    # common fresh-Pi case where /var/lib/inkypi doesn't exist yet.
+    local parent="$state_dir"
+    while [ -n "$parent" ] && [ "$parent" != "/" ] && [ ! -d "$parent" ]; do
+      parent="$(dirname "$parent")"
+    done
+    if [ -z "$parent" ] || [ ! -d "$parent" ]; then
+      _preflight_fail \
+        "state directory $state_dir has no existing ancestor — cannot create" \
         "run install.sh with sudo, or manually 'sudo mkdir -p $state_dir' and retry"
     fi
-  fi
-  if [ ! -w "$state_dir" ]; then
-    _preflight_fail \
-      "state directory $state_dir is not writable by $(id -un) (EUID=$EUID)" \
-      "re-run install.sh with sudo, or 'sudo chown $(id -un) $state_dir'"
+    if [ ! -w "$parent" ]; then
+      _preflight_fail \
+        "cannot create state directory $state_dir: nearest ancestor $parent is not writable by $(id -un) (EUID=$EUID)" \
+        "re-run install.sh with sudo, or 'sudo chown $(id -un) $parent'"
+    fi
   fi
 
   # --- Source tree must be a git repo ---
@@ -214,13 +267,23 @@ preflight_checks() {
   # and vendored waveshare pins are verified against commit SHAs. A
   # non-git-repo source tree (e.g. a downloaded tarball) will break all
   # three, and the failure mode is obscure — abort here with a clear message.
+  #
+  # CodeRabbit review (#546): the canonical install flow is
+  #   `git clone … ~/inkypi && sudo bash ~/inkypi/install/install.sh`
+  # which creates a user-owned .git/ and then runs install.sh as root. Since
+  # CVE-2022-24765 git refuses to run `rev-parse --git-dir` when EUID != owner
+  # unless `safe.directory` is set, emitting the misleading "dubious ownership"
+  # error — which our `2>/dev/null` would mask and surface as "not a git repo".
+  # Bypass this by passing a scoped `safe.directory` override on this one git
+  # invocation. Still runs the real git parsing logic (so tarballs with a
+  # stray `.git/` fail this check just like before) without the ownership gate.
   local src_path="${INKYPI_PREFLIGHT_SRC_PATH:-$SRC_PATH}"
   if [ ! -d "$src_path" ]; then
     _preflight_fail \
       "source path $src_path does not exist" \
       "clone the repository via 'git clone https://github.com/fatihak/InkyPi.git' and run install/install.sh from inside the clone"
   fi
-  if ! git -C "$src_path" rev-parse --git-dir >/dev/null 2>&1; then
+  if ! git -c safe.directory='*' -C "$src_path" rev-parse --git-dir >/dev/null 2>&1; then
     _preflight_fail \
       "source tree at $src_path is not a git repository" \
       "install.sh must run from a git clone (not a downloaded tarball) so 'git describe' and waveshare pin verification work. Run: git clone https://github.com/fatihak/InkyPi.git"

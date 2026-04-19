@@ -3019,9 +3019,9 @@ class TestInstallPreflight:
         )
         # Success message must be printed so operators see what was verified.
         combined = proc.stdout + proc.stderr
-        assert "Preflight checks passed" in combined, (
-            f"preflight must announce success; output: {combined!r}"
-        )
+        assert (
+            "Preflight checks passed" in combined
+        ), f"preflight must announce success; output: {combined!r}"
 
     # --- Disk-space failures ------------------------------------------------
 
@@ -3032,16 +3032,19 @@ class TestInstallPreflight:
         env = self._base_env(tmp_path)
         env["INKYPI_PREFLIGHT_MIN_FREE_MB"] = str(10_000_000)  # 10 TB
         proc = self._run(env)
-        assert proc.returncode != 0, (
-            "preflight must fail when free space is below the min threshold"
-        )
+        assert (
+            proc.returncode != 0
+        ), "preflight must fail when free space is below the min threshold"
         combined = proc.stdout + proc.stderr
-        assert "insufficient free disk space" in combined, (
-            f"error message must name the disk-space check; got: {combined!r}"
-        )
+        assert (
+            "insufficient free disk space" in combined
+        ), f"error message must name the disk-space check; got: {combined!r}"
         # The path that failed must appear in the error so the user knows
         # which filesystem is the problem.
-        assert str(env["INKYPI_PREFLIGHT_USR_LOCAL"]) in combined or "usr_local" in combined
+        assert (
+            str(env["INKYPI_PREFLIGHT_USR_LOCAL"]) in combined
+            or "usr_local" in combined
+        )
 
     def test_preflight_disk_error_includes_remediation(self, tmp_path):
         """Actionable error messages are in the acceptance criteria — every
@@ -3050,9 +3053,9 @@ class TestInstallPreflight:
         env["INKYPI_PREFLIGHT_MIN_FREE_MB"] = str(10_000_000)
         proc = self._run(env)
         combined = proc.stdout + proc.stderr
-        assert "remediation" in combined.lower(), (
-            f"disk-space failure must suggest a remediation; got: {combined!r}"
-        )
+        assert (
+            "remediation" in combined.lower()
+        ), f"disk-space failure must suggest a remediation; got: {combined!r}"
 
     # --- Writable-target failures ------------------------------------------
 
@@ -3072,12 +3075,12 @@ class TestInstallPreflight:
             _os.chmod(install_parent, 0o755)
         assert proc.returncode != 0
         combined = proc.stdout + proc.stderr
-        assert "not writable" in combined, (
-            f"error must name the writability check; got: {combined!r}"
-        )
-        assert install_parent in combined, (
-            f"error must name the failing path; got: {combined!r}"
-        )
+        assert (
+            "not writable" in combined
+        ), f"error must name the writability check; got: {combined!r}"
+        assert (
+            install_parent in combined
+        ), f"error must name the failing path; got: {combined!r}"
 
     def test_preflight_fails_when_systemd_dir_not_writable(self, tmp_path):
         import os as _os
@@ -3137,9 +3140,9 @@ class TestInstallPreflight:
         proc = self._run(env)
         assert proc.returncode != 0
         combined = proc.stdout + proc.stderr
-        assert "not a git repository" in combined, (
-            f"error must name the git-repo check; got: {combined!r}"
-        )
+        assert (
+            "not a git repository" in combined
+        ), f"error must name the git-repo check; got: {combined!r}"
         assert env["INKYPI_PREFLIGHT_SRC_PATH"] in combined
         assert "remediation" in combined.lower()
 
@@ -3187,6 +3190,78 @@ class TestInstallPreflight:
                 f"found it in output: {combined!r}"
             )
 
+    # --- git dubious-ownership regression (CodeRabbit review #546) ---------
+
+    def test_preflight_git_check_survives_dubious_ownership(self, tmp_path):
+        """Regression gate for CodeRabbit review on PR #546.
+
+        Canonical production flow:
+            git clone https://github.com/fatihak/InkyPi.git ~/inkypi
+            sudo bash ~/inkypi/install/install.sh
+
+        After CVE-2022-24765 (fixed in git 2.35.2+), git refuses to operate on
+        a repo whose .git ownership differs from the effective uid, failing
+        with "fatal: detected dubious ownership". `git rev-parse --git-dir
+        2>/dev/null` would mask this and the preflight would emit the
+        misleading 'source tree … is not a git repository' message, sending
+        users to re-clone a repo that's already fine.
+
+        We can't actually run install.sh as root from pytest, so this test
+        simulates the condition by forcing git's ownership guard to trip via
+        GIT_TEST_ASSUME_DIFFERENT_OWNER=1 (a test-only knob shipped in git's
+        own setup.c). If the preflight invocation handles dubious-ownership
+        correctly (scoped safe.directory override) the repo is still
+        recognised and preflight passes. If somebody reverts that fix, this
+        test fails with the same 'not a git repository' message users would
+        see in the field.
+        """
+        import os as _os
+        import shutil as _shutil
+        import subprocess as _sp
+
+        if not _shutil.which("git"):
+            pytest.skip("git is not available on this host")
+        # Verify the env knob actually trips this git build before relying on
+        # it for the negative assertion — old gits, msysgit etc. may ignore
+        # it. The knob was added alongside the CVE-2022-24765 fix.
+        src_path = tmp_path / "probe-repo"
+        src_path.mkdir()
+        _sp.run(["git", "init", "-q", str(src_path)], check=True)
+        probe = _sp.run(
+            ["git", "-C", str(src_path), "rev-parse", "--git-dir"],
+            env={**_os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            pytest.skip(
+                "this git build ignores GIT_TEST_ASSUME_DIFFERENT_OWNER; "
+                "cannot simulate sudo-on-user-owned-clone here"
+            )
+        # Sanity: the knob really did raise the expected dubious-ownership
+        # error so our negative assertion below isn't a false positive.
+        assert "dubious ownership" in (probe.stderr + probe.stdout).lower()
+
+        env = self._base_env(tmp_path)
+        # Switch $src_path over to the probe repo AND turn on the ownership
+        # simulation for install.sh itself. install.sh's scoped
+        # `safe.directory=*` override should let rev-parse succeed, so
+        # preflight must still pass cleanly.
+        env["INKYPI_PREFLIGHT_SRC_PATH"] = str(src_path)
+        env["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
+        proc = self._run(env)
+        combined = proc.stdout + proc.stderr
+        assert proc.returncode == 0, (
+            "preflight must tolerate EUID != .git owner via a scoped "
+            f"safe.directory override (CVE-2022-24765 regression). "
+            f"rc={proc.returncode} output={combined!r}"
+        )
+        assert "not a git repository" not in combined, (
+            "dubious-ownership must not be masked as 'not a git repository'; "
+            f"output: {combined!r}"
+        )
+
     # --- Source inspection: env-var override contract ---------------------
 
     def test_install_sh_declares_preflight_env_hooks(self):
@@ -3204,9 +3279,9 @@ class TestInstallPreflight:
             "INKYPI_PREFLIGHT_SRC_PATH",
             "INKYPI_PREFLIGHT_MIN_FREE_MB",
         ):
-            assert var in content, (
-                f"install.sh must reference preflight env hook {var} (JTN-699)"
-            )
+            assert (
+                var in content
+            ), f"install.sh must reference preflight env hook {var} (JTN-699)"
 
     def test_install_sh_runs_preflight_before_lockfile_setup(self):
         """Preflight must be called BEFORE the $LOCKFILE touch, because an
@@ -3218,7 +3293,7 @@ class TestInstallPreflight:
         # an unwritable state dir.
         lockfile_pos = content.index('touch "$LOCKFILE"')
         assert preflight_pos < lockfile_pos, (
-            "preflight_checks must run before `touch \"$LOCKFILE\"` so an "
+            'preflight_checks must run before `touch "$LOCKFILE"` so an '
             "unwritable $LOCKFILE_DIR produces a clean preflight error "
             "(JTN-699)"
         )
