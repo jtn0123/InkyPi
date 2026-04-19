@@ -560,6 +560,22 @@ jobs:
         run: |
           scripts/preflash_validate.sh
 
+  # Mutation nightly — runs every Sunday 03:00 UTC via the workflow-level
+  # ``schedule:`` trigger. See docs/mutation_testing.md.
+  #
+  # JTN-595 (2026-04-19) finding: every nightly run since the JTN-508 scope
+  # expansion has hit the 120-minute timeout without finishing, producing no
+  # ``mutmut-cache`` artifact. Two bugs compound the problem:
+  #   1. Full-scope mutmut on src/app_setup/+blueprints/+utils/+refresh_task/
+  #      does not complete inside 120 minutes on ubuntu-latest.
+  #   2. The previous upload step did not set ``include-hidden-files: true``,
+  #      so even a successful run would have silently dropped the hidden
+  #      ``.mutmut-cache`` directory (actions/upload-artifact@v4 excludes
+  #      hidden paths by default).
+  # The hidden-files flag below is the minimum fix so a successful run can
+  # publish an artifact. Sharding the mutmut scope across a matrix of
+  # directories (or tightening the runner) is tracked for follow-up —
+  # otherwise the nightly will keep producing no actionable signal.
   mutation-nightly:
     name: Mutation nightly
     if: github.event_name == 'schedule'
@@ -604,6 +620,10 @@ jobs:
           name: mutmut-cache
           path: .mutmut-cache
           if-no-files-found: ignore
+          # ``.mutmut-cache`` is a hidden directory; without this flag
+          # actions/upload-artifact@v4 silently excludes it and the
+          # artifact is never published, even on successful runs.
+          include-hidden-files: true
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)
