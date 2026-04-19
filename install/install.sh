@@ -84,11 +84,212 @@ parse_arguments() {
 }
 
 check_permissions() {
-  # Ensure the script is run with sudo
+  # Ensure the script is run with sudo. JTN-699: when the preflight test-only
+  # env hook is set we skip the EUID check so the preflight block can be
+  # exercised from pytest without running the test suite as root; production
+  # behavior is unchanged because INKYPI_PREFLIGHT_TEST is never set by real
+  # callers (install.sh invoked by the user or by update flows).
+  if [ -n "${INKYPI_PREFLIGHT_TEST:-}" ]; then
+    return 0
+  fi
   if [ "$EUID" -ne 0 ]; then
     echo_error "ERROR: Installation requires root privileges. Please run it with sudo."
     exit 1
   fi
+}
+
+# JTN-699: Preflight sanity checks. install.sh previously had no early
+# validation — the user discovered "Permission denied" or "No space left on
+# device" 5–10 minutes into an install, with $INSTALL_PATH half-populated and
+# the systemd unit in an undefined state. Run cheap, deterministic checks
+# BEFORE any apt/pip/git work so failures surface in seconds with a clear,
+# actionable message.
+#
+# Each target path is overridable via env so tests can redirect checks at tmp
+# dirs without touching /usr/local, /etc/systemd/system or /var/lib/inkypi.
+# Production callers never set these vars, so behavior is unchanged.
+#
+# Required free space on /usr/local + $INSTALL_PATH parent (MB). 500 MB is the
+# conservative floor that covers debian-requirements.txt + pip wheelhouse +
+# venv + the app tree with headroom for a concurrent update staging dir.
+PREFLIGHT_MIN_FREE_MB="${INKYPI_PREFLIGHT_MIN_FREE_MB:-500}"
+
+_preflight_fail() {
+  # Centralise the error format so every preflight failure looks the same and
+  # downstream tests can match on a single prefix. Writes to stderr, exits 1.
+  echo_error "ERROR (preflight): $1" >&2
+  if [ -n "${2:-}" ]; then
+    echo_error "  remediation: $2" >&2
+  fi
+  exit 1
+}
+
+_preflight_free_mb() {
+  # Print the free MB on the filesystem hosting $1 (walks up to the nearest
+  # existing ancestor if $1 does not yet exist, which is the normal case for
+  # /usr/local/inkypi on a fresh Pi). Uses POSIX `df -P -k` so output is
+  # stable across GNU/BSD and then rounds KB → MB.
+  local path="$1"
+  while [ ! -e "$path" ] && [ "$path" != "/" ] && [ -n "$path" ]; do
+    path=$(dirname "$path")
+  done
+  if [ ! -e "$path" ]; then
+    echo "0"
+    return 0
+  fi
+  # df -P: POSIX output (no line wrapping on long device names).
+  # df -k: KB blocks (portable; -m is GNU-only). Available KB is column 4.
+  df -P -k "$path" 2>/dev/null | awk 'NR==2 {printf "%d\n", $4/1024}'
+}
+
+_preflight_canonical_path() {
+  # Canonicalise $1 so duplicate-mount-point detection in the disk-space loop
+  # is stable. Prefer GNU `readlink -f`, fall back to the cheap shell form if
+  # not available (e.g. on a minimal busybox container). Never errors — if
+  # nothing resolves, we echo the input unchanged so the caller can still
+  # run df against whatever string the user passed.
+  local p="$1"
+  if command -v readlink >/dev/null 2>&1 && readlink -f / >/dev/null 2>&1; then
+    readlink -f "$p" 2>/dev/null || echo "$p"
+  else
+    echo "$p"
+  fi
+}
+
+preflight_checks() {
+  echo "Running preflight sanity checks..."
+
+  # --- Disk space ---
+  # CodeRabbit review (#546): declare loop var `local` so it doesn't leak to
+  # enclosing scope, and dedupe usr_local vs install_parent so the same
+  # filesystem isn't checked twice with different labels when the defaults
+  # resolve to the same mount (the production case, where install_parent =
+  # dirname /usr/local/inkypi = /usr/local).
+  local usr_local="${INKYPI_PREFLIGHT_USR_LOCAL:-/usr/local}"
+  local install_parent="${INKYPI_PREFLIGHT_INSTALL_PARENT:-$(dirname "$INSTALL_PATH")}"
+  local free_mb
+  local path
+  local canon_usr_local
+  local canon_install_parent
+  canon_usr_local="$(_preflight_canonical_path "$usr_local")"
+  canon_install_parent="$(_preflight_canonical_path "$install_parent")"
+
+  # Build a deduped list — if the two override vars resolve to the same
+  # canonical path we only run the df probe once. We keep the original
+  # (non-canonical) string for the error label so the message names the path
+  # the user actually configured, not its realpath.
+  local -a disk_paths=("$usr_local")
+  if [ "$canon_usr_local" != "$canon_install_parent" ]; then
+    disk_paths+=("$install_parent")
+  fi
+
+  for path in "${disk_paths[@]}"; do
+    free_mb=$(_preflight_free_mb "$path")
+    if [ "${free_mb:-0}" -lt "$PREFLIGHT_MIN_FREE_MB" ]; then
+      _preflight_fail \
+        "insufficient free disk space on $path (found ${free_mb} MB, need ${PREFLIGHT_MIN_FREE_MB} MB)" \
+        "free up space on the filesystem hosting $path (e.g. 'sudo apt-get clean', remove old logs, or resize the SD card)"
+    fi
+  done
+
+  # --- Writable target paths ---
+  # $INSTALL_PATH itself may not exist yet; check its parent instead so we
+  # know the mv -T atomic swap in install_src() will be able to create it.
+  # Create parent first if missing (mirrors install_src behavior) so tests
+  # with tmp dirs where the parent doesn't exist still surface the real
+  # writability problem (e.g. a RO filesystem, not just "missing dir").
+  local systemd_dir="${INKYPI_PREFLIGHT_SYSTEMD_DIR:-/etc/systemd/system}"
+  local state_dir="${INKYPI_PREFLIGHT_STATE_DIR:-$LOCKFILE_DIR}"
+
+  if [ ! -d "$install_parent" ]; then
+    if ! mkdir -p "$install_parent" 2>/dev/null; then
+      _preflight_fail \
+        "install parent directory $install_parent does not exist and could not be created" \
+        "run install.sh with sudo, or manually 'sudo mkdir -p $install_parent' and retry"
+    fi
+  fi
+  if [ ! -w "$install_parent" ]; then
+    _preflight_fail \
+      "install parent directory $install_parent is not writable by $(id -un) (EUID=$EUID)" \
+      "run install.sh with sudo, or 'sudo chown $(id -un) $install_parent' if this is a dev environment"
+  fi
+
+  if [ ! -d "$systemd_dir" ]; then
+    _preflight_fail \
+      "systemd unit directory $systemd_dir does not exist" \
+      "ensure systemd is installed — this script targets Raspberry Pi OS (Bullseye/Bookworm/Trixie)"
+  fi
+  if [ ! -w "$systemd_dir" ]; then
+    _preflight_fail \
+      "systemd unit directory $systemd_dir is not writable by $(id -un) (EUID=$EUID)" \
+      "re-run install.sh with sudo"
+  fi
+
+  # $state_dir (= $LOCKFILE_DIR, normally /var/lib/inkypi) may not exist yet
+  # on a fresh install. CodeRabbit review (#546): we used to `mkdir -p` it
+  # here, but running as root in production that always succeeds — turning
+  # the subsequent writability check into dead code and giving a false sense
+  # of validation. Instead, probe writability of the *parent* by attempting
+  # to create+remove a throwaway file there. That's what actually needs to
+  # be writable for the real `mkdir -p "$LOCKFILE_DIR"` later to succeed,
+  # and it works whether or not $state_dir already exists.
+  if [ -d "$state_dir" ]; then
+    # Already exists — test writability by touching a probe file inside it.
+    local probe_file="$state_dir/.inkypi-preflight-probe.$$"
+    if ! (umask 077 && : > "$probe_file") 2>/dev/null; then
+      _preflight_fail \
+        "state directory $state_dir is not writable by $(id -un) (EUID=$EUID)" \
+        "re-run install.sh with sudo, or 'sudo chown $(id -un) $state_dir'"
+    fi
+    rm -f "$probe_file" 2>/dev/null || true
+  else
+    # Doesn't exist — test writability of the nearest existing ancestor so we
+    # know `mkdir -p "$state_dir"` will succeed later. Walking up handles the
+    # common fresh-Pi case where /var/lib/inkypi doesn't exist yet.
+    local parent="$state_dir"
+    while [ -n "$parent" ] && [ "$parent" != "/" ] && [ ! -d "$parent" ]; do
+      parent="$(dirname "$parent")"
+    done
+    if [ -z "$parent" ] || [ ! -d "$parent" ]; then
+      _preflight_fail \
+        "state directory $state_dir has no existing ancestor — cannot create" \
+        "run install.sh with sudo, or manually 'sudo mkdir -p $state_dir' and retry"
+    fi
+    if [ ! -w "$parent" ]; then
+      _preflight_fail \
+        "cannot create state directory $state_dir: nearest ancestor $parent is not writable by $(id -un) (EUID=$EUID)" \
+        "re-run install.sh with sudo, or 'sudo chown $(id -un) $parent'"
+    fi
+  fi
+
+  # --- Source tree must be a git repo ---
+  # The app reads its version from `git describe`, update.sh pulls via git,
+  # and vendored waveshare pins are verified against commit SHAs. A
+  # non-git-repo source tree (e.g. a downloaded tarball) will break all
+  # three, and the failure mode is obscure — abort here with a clear message.
+  #
+  # CodeRabbit review (#546): the canonical install flow is
+  #   `git clone … ~/inkypi && sudo bash ~/inkypi/install/install.sh`
+  # which creates a user-owned .git/ and then runs install.sh as root. Since
+  # CVE-2022-24765 git refuses to run `rev-parse --git-dir` when EUID != owner
+  # unless `safe.directory` is set, emitting the misleading "dubious ownership"
+  # error — which our `2>/dev/null` would mask and surface as "not a git repo".
+  # Bypass this by passing a scoped `safe.directory` override on this one git
+  # invocation. Still runs the real git parsing logic (so tarballs with a
+  # stray `.git/` fail this check just like before) without the ownership gate.
+  local src_path="${INKYPI_PREFLIGHT_SRC_PATH:-$SRC_PATH}"
+  if [ ! -d "$src_path" ]; then
+    _preflight_fail \
+      "source path $src_path does not exist" \
+      "clone the repository via 'git clone https://github.com/fatihak/InkyPi.git' and run install/install.sh from inside the clone"
+  fi
+  if ! git -c safe.directory='*' -C "$src_path" rev-parse --git-dir >/dev/null 2>&1; then
+    _preflight_fail \
+      "source tree at $src_path is not a git repository" \
+      "install.sh must run from a git clone (not a downloaded tarball) so 'git describe' and waveshare pin verification work. Run: git clone https://github.com/fatihak/InkyPi.git"
+  fi
+
+  echo_success "\tPreflight checks passed (free space, writable targets, git repo)"
 }
 
 # JTN-701: Download a single Waveshare driver file honoring the pin in
@@ -549,6 +750,24 @@ wait_for_clock() {
 # to maintain default INKY display support.
 parse_arguments "$@"
 check_permissions
+
+# JTN-699: Run preflight sanity checks BEFORE any apt/pip/git work. Catches
+# disk/perm/source-tree issues in seconds instead of 5–10 minutes into an
+# install with a half-populated tree. This must run after check_permissions
+# (so the preflight test-only bypass for EUID is consistent) but before the
+# flock + lockfile setup, because an unwritable $LOCKFILE_DIR would otherwise
+# fail with a cryptic `touch: cannot touch ...` message from the lockfile
+# `touch` call below.
+preflight_checks
+
+# JTN-699: Test hook — exit cleanly after preflight so the pytest suite can
+# assert preflight behavior end-to-end without running a full apt/pip install.
+# Production callers never set INKYPI_PREFLIGHT_TEST_EXIT_AFTER, so behavior
+# is unchanged outside of tests.
+if [ -n "${INKYPI_PREFLIGHT_TEST_EXIT_AFTER:-}" ]; then
+  echo "TEST: INKYPI_PREFLIGHT_TEST_EXIT_AFTER — exiting 0 after preflight." >&2
+  exit 0
+fi
 
 # JTN-696: Concurrent-install guard. Two simultaneous `sudo bash install.sh`
 # runs previously raced through the rm/repopulate sequence in install_src()

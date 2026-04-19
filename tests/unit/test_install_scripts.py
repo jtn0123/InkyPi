@@ -2933,3 +2933,367 @@ class TestDeviceJsonHelper:
             "atomic write must fsync before replace so contents hit disk "
             "before the rename is recorded in the directory inode."
         )
+
+
+# ---- JTN-699: install.sh preflight sanity checks ----------------------------
+#
+# install.sh previously had no early validation; the user discovered
+# "Permission denied" / "No space left on device" 5–10 minutes into a run
+# with $INSTALL_PATH half-populated. JTN-699 adds a preflight block that runs
+# BEFORE any apt/pip/git work and fails fast with actionable messages.
+#
+# Each failure path below simulates one broken precondition by pointing the
+# preflight env-var hooks at a tmp dir and asserting the exit code + error
+# message. The INKYPI_PREFLIGHT_TEST hook skips the EUID root check, and
+# INKYPI_PREFLIGHT_TEST_EXIT_AFTER short-circuits before real install work —
+# both are no-ops in production where those vars are never set.
+
+
+class TestInstallPreflight:
+    """Subprocess-runs install/install.sh with preflight env hooks and asserts
+    each check fails fast with a specific message (JTN-699)."""
+
+    INSTALL_SH = REPO_ROOT / "install" / "install.sh"
+
+    def _base_env(self, tmp_path):
+        """Build a valid set of preflight env vars pointing at tmp dirs.
+
+        Individual tests then override ONE var to simulate one failure, so
+        other preflight checks keep passing and only the targeted branch
+        trips. This mirrors how test_update_failure_recovery.py injects a
+        single failure at a time rather than a combined broken state.
+        """
+        import subprocess as _sp
+
+        usr_local = tmp_path / "usr_local"
+        install_parent = tmp_path / "install_parent"
+        systemd_dir = tmp_path / "systemd"
+        state_dir = tmp_path / "state"
+        src_path = tmp_path / "src"
+        for d in (usr_local, install_parent, systemd_dir, state_dir, src_path):
+            d.mkdir()
+        # Make $src_path a real git repo so the git-rev-parse check passes
+        # by default. Individual tests override this.
+        _sp.run(["git", "init", "-q", str(src_path)], check=True)
+        return {
+            "INKYPI_PREFLIGHT_TEST": "1",
+            "INKYPI_PREFLIGHT_TEST_EXIT_AFTER": "1",
+            "INKYPI_PREFLIGHT_USR_LOCAL": str(usr_local),
+            "INKYPI_PREFLIGHT_INSTALL_PARENT": str(install_parent),
+            "INKYPI_PREFLIGHT_SYSTEMD_DIR": str(systemd_dir),
+            "INKYPI_PREFLIGHT_STATE_DIR": str(state_dir),
+            "INKYPI_PREFLIGHT_SRC_PATH": str(src_path),
+        }
+
+    def _run(self, env_overrides):
+        import os as _os
+        import shutil as _shutil
+        import subprocess as _sp
+
+        if not _shutil.which("bash"):
+            pytest.skip("bash is not available on this host")
+        if not _shutil.which("git"):
+            pytest.skip("git is not available on this host")
+        env = dict(_os.environ)
+        env.update(env_overrides)
+        return _sp.run(
+            ["bash", str(self.INSTALL_SH)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+    # --- Happy path ---------------------------------------------------------
+
+    def test_preflight_passes_when_all_checks_satisfied(self, tmp_path):
+        """Baseline: with every precondition valid, preflight returns 0 and
+        the test short-circuit exits cleanly. This gates every failure test
+        below — if the baseline regresses, the failure-path assertions would
+        be meaningless."""
+        proc = self._run(self._base_env(tmp_path))
+        assert proc.returncode == 0, (
+            f"preflight must exit 0 when all checks pass; got {proc.returncode}. "
+            f"stdout: {proc.stdout!r} stderr: {proc.stderr!r}"
+        )
+        # Success message must be printed so operators see what was verified.
+        combined = proc.stdout + proc.stderr
+        assert (
+            "Preflight checks passed" in combined
+        ), f"preflight must announce success; output: {combined!r}"
+
+    # --- Disk-space failures ------------------------------------------------
+
+    def test_preflight_fails_when_usr_local_below_min_free(self, tmp_path):
+        """Simulate <500 MB free on /usr/local by bumping the threshold above
+        what any real filesystem would have free. A threshold of 10 PB (~10M
+        MB) is guaranteed to exceed actual free space on any test host."""
+        env = self._base_env(tmp_path)
+        env["INKYPI_PREFLIGHT_MIN_FREE_MB"] = str(10_000_000)  # 10 TB
+        proc = self._run(env)
+        assert (
+            proc.returncode != 0
+        ), "preflight must fail when free space is below the min threshold"
+        combined = proc.stdout + proc.stderr
+        assert (
+            "insufficient free disk space" in combined
+        ), f"error message must name the disk-space check; got: {combined!r}"
+        # The path that failed must appear in the error so the user knows
+        # which filesystem is the problem.
+        assert (
+            str(env["INKYPI_PREFLIGHT_USR_LOCAL"]) in combined
+            or "usr_local" in combined
+        )
+
+    def test_preflight_disk_error_includes_remediation(self, tmp_path):
+        """Actionable error messages are in the acceptance criteria — every
+        failure must include a 'remediation:' suggestion."""
+        env = self._base_env(tmp_path)
+        env["INKYPI_PREFLIGHT_MIN_FREE_MB"] = str(10_000_000)
+        proc = self._run(env)
+        combined = proc.stdout + proc.stderr
+        assert (
+            "remediation" in combined.lower()
+        ), f"disk-space failure must suggest a remediation; got: {combined!r}"
+
+    # --- Writable-target failures ------------------------------------------
+
+    def test_preflight_fails_when_install_parent_not_writable(self, tmp_path):
+        """A RO install parent is the exact permission mode this preflight is
+        designed to catch. chmod 0o500 (r-x------) removes write for the
+        owner so even the EUID running the script cannot create $INSTALL_PATH."""
+        import os as _os
+
+        env = self._base_env(tmp_path)
+        install_parent = env["INKYPI_PREFLIGHT_INSTALL_PARENT"]
+        _os.chmod(install_parent, 0o500)
+        try:
+            proc = self._run(env)
+        finally:
+            # Restore so tmp_path teardown doesn't fail on macOS.
+            _os.chmod(install_parent, 0o755)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert (
+            "not writable" in combined
+        ), f"error must name the writability check; got: {combined!r}"
+        assert (
+            install_parent in combined
+        ), f"error must name the failing path; got: {combined!r}"
+
+    def test_preflight_fails_when_systemd_dir_not_writable(self, tmp_path):
+        import os as _os
+
+        env = self._base_env(tmp_path)
+        systemd_dir = env["INKYPI_PREFLIGHT_SYSTEMD_DIR"]
+        _os.chmod(systemd_dir, 0o500)
+        try:
+            proc = self._run(env)
+        finally:
+            _os.chmod(systemd_dir, 0o755)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert "not writable" in combined
+        assert systemd_dir in combined
+
+    def test_preflight_fails_when_systemd_dir_missing(self, tmp_path):
+        """A missing /etc/systemd/system means we are not on a systemd host.
+        Preflight should abort rather than silently try to copy a unit file
+        to a nonexistent directory."""
+        env = self._base_env(tmp_path)
+        # Point at a path that does not exist AND cannot be auto-created as a
+        # systemd dir (the systemd check intentionally does not mkdir -p).
+        env["INKYPI_PREFLIGHT_SYSTEMD_DIR"] = str(tmp_path / "no-systemd-here")
+        proc = self._run(env)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert "does not exist" in combined
+        assert "systemd" in combined.lower()
+
+    def test_preflight_fails_when_state_dir_not_writable(self, tmp_path):
+        import os as _os
+
+        env = self._base_env(tmp_path)
+        state_dir = env["INKYPI_PREFLIGHT_STATE_DIR"]
+        _os.chmod(state_dir, 0o500)
+        try:
+            proc = self._run(env)
+        finally:
+            _os.chmod(state_dir, 0o755)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert "not writable" in combined
+        assert state_dir in combined
+
+    # --- git-repo failure ---------------------------------------------------
+
+    def test_preflight_fails_when_src_is_not_a_git_repo(self, tmp_path):
+        """A downloaded tarball (no .git dir) would silently break
+        git-describe-based version reporting and waveshare pin verification.
+        Abort early with a clear message."""
+        import shutil as _shutil
+
+        env = self._base_env(tmp_path)
+        # Remove the .git dir so the rev-parse check fails.
+        _shutil.rmtree(Path(env["INKYPI_PREFLIGHT_SRC_PATH"]) / ".git")
+        proc = self._run(env)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert (
+            "not a git repository" in combined
+        ), f"error must name the git-repo check; got: {combined!r}"
+        assert env["INKYPI_PREFLIGHT_SRC_PATH"] in combined
+        assert "remediation" in combined.lower()
+
+    def test_preflight_fails_when_src_path_missing(self, tmp_path):
+        import shutil as _shutil
+
+        env = self._base_env(tmp_path)
+        _shutil.rmtree(env["INKYPI_PREFLIGHT_SRC_PATH"])
+        proc = self._run(env)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        assert "does not exist" in combined
+        assert env["INKYPI_PREFLIGHT_SRC_PATH"] in combined
+
+    # --- Runs early: no apt/pip side effects -------------------------------
+
+    def test_preflight_fails_before_any_install_work(self, tmp_path):
+        """Acceptance: preflight must run BEFORE any apt/pip work. If it
+        trips on a failure, nothing downstream should have run — no vendor
+        download, no wheelhouse, no zramswap setup."""
+        env = self._base_env(tmp_path)
+        env["INKYPI_PREFLIGHT_MIN_FREE_MB"] = str(10_000_000)  # force fail
+        # Drop the exit-after hook so we'd fall through IF preflight didn't
+        # abort — any "Installing system dependencies" output would prove
+        # it reached apt-get. It MUST NOT.
+        env.pop("INKYPI_PREFLIGHT_TEST_EXIT_AFTER", None)
+        proc = self._run(env)
+        assert proc.returncode != 0
+        combined = proc.stdout + proc.stderr
+        # Look for strings that would only appear if a real install step
+        # ran. The disk-space remediation message mentions "apt-get clean"
+        # so we cannot match on a bare "apt-get" substring — use whole-word
+        # headings that only the install steps themselves print.
+        for forbidden in (
+            "Installing system dependencies",
+            "Fetch available system dependencies",
+            "Creating python virtual environment",
+            "Installing python dependencies",
+            "setting up zramswap",
+            "Enabling interfaces required for",
+            "Installing inkypi systemd service",
+        ):
+            assert forbidden not in combined, (
+                f"preflight failure must short-circuit before {forbidden!r} runs; "
+                f"found it in output: {combined!r}"
+            )
+
+    # --- git dubious-ownership regression (CodeRabbit review #546) ---------
+
+    def test_preflight_git_check_survives_dubious_ownership(self, tmp_path):
+        """Regression gate for CodeRabbit review on PR #546.
+
+        Canonical production flow:
+            git clone https://github.com/fatihak/InkyPi.git ~/inkypi
+            sudo bash ~/inkypi/install/install.sh
+
+        After CVE-2022-24765 (fixed in git 2.35.2+), git refuses to operate on
+        a repo whose .git ownership differs from the effective uid, failing
+        with "fatal: detected dubious ownership". `git rev-parse --git-dir
+        2>/dev/null` would mask this and the preflight would emit the
+        misleading 'source tree … is not a git repository' message, sending
+        users to re-clone a repo that's already fine.
+
+        We can't actually run install.sh as root from pytest, so this test
+        simulates the condition by forcing git's ownership guard to trip via
+        GIT_TEST_ASSUME_DIFFERENT_OWNER=1 (a test-only knob shipped in git's
+        own setup.c). If the preflight invocation handles dubious-ownership
+        correctly (scoped safe.directory override) the repo is still
+        recognised and preflight passes. If somebody reverts that fix, this
+        test fails with the same 'not a git repository' message users would
+        see in the field.
+        """
+        import os as _os
+        import shutil as _shutil
+        import subprocess as _sp
+
+        if not _shutil.which("git"):
+            pytest.skip("git is not available on this host")
+        # Verify the env knob actually trips this git build before relying on
+        # it for the negative assertion — old gits, msysgit etc. may ignore
+        # it. The knob was added alongside the CVE-2022-24765 fix.
+        src_path = tmp_path / "probe-repo"
+        src_path.mkdir()
+        _sp.run(["git", "init", "-q", str(src_path)], check=True)
+        probe = _sp.run(
+            ["git", "-C", str(src_path), "rev-parse", "--git-dir"],
+            env={**_os.environ, "GIT_TEST_ASSUME_DIFFERENT_OWNER": "1"},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            pytest.skip(
+                "this git build ignores GIT_TEST_ASSUME_DIFFERENT_OWNER; "
+                "cannot simulate sudo-on-user-owned-clone here"
+            )
+        # Sanity: the knob really did raise the expected dubious-ownership
+        # error so our negative assertion below isn't a false positive.
+        assert "dubious ownership" in (probe.stderr + probe.stdout).lower()
+
+        env = self._base_env(tmp_path)
+        # Switch $src_path over to the probe repo AND turn on the ownership
+        # simulation for install.sh itself. install.sh's scoped
+        # `safe.directory=*` override should let rev-parse succeed, so
+        # preflight must still pass cleanly.
+        env["INKYPI_PREFLIGHT_SRC_PATH"] = str(src_path)
+        env["GIT_TEST_ASSUME_DIFFERENT_OWNER"] = "1"
+        proc = self._run(env)
+        combined = proc.stdout + proc.stderr
+        assert proc.returncode == 0, (
+            "preflight must tolerate EUID != .git owner via a scoped "
+            f"safe.directory override (CVE-2022-24765 regression). "
+            f"rc={proc.returncode} output={combined!r}"
+        )
+        assert "not a git repository" not in combined, (
+            "dubious-ownership must not be masked as 'not a git repository'; "
+            f"output: {combined!r}"
+        )
+
+    # --- Source inspection: env-var override contract ---------------------
+
+    def test_install_sh_declares_preflight_env_hooks(self):
+        """Source inspection: the preflight env-var contract documented in
+        the module header must actually exist in install.sh. Guards against
+        a future refactor that drops a hook without updating the tests."""
+        content = (REPO_ROOT / "install" / "install.sh").read_text()
+        for var in (
+            "INKYPI_PREFLIGHT_TEST",
+            "INKYPI_PREFLIGHT_TEST_EXIT_AFTER",
+            "INKYPI_PREFLIGHT_USR_LOCAL",
+            "INKYPI_PREFLIGHT_INSTALL_PARENT",
+            "INKYPI_PREFLIGHT_SYSTEMD_DIR",
+            "INKYPI_PREFLIGHT_STATE_DIR",
+            "INKYPI_PREFLIGHT_SRC_PATH",
+            "INKYPI_PREFLIGHT_MIN_FREE_MB",
+        ):
+            assert (
+                var in content
+            ), f"install.sh must reference preflight env hook {var} (JTN-699)"
+
+    def test_install_sh_runs_preflight_before_lockfile_setup(self):
+        """Preflight must be called BEFORE the $LOCKFILE touch, because an
+        unwritable $LOCKFILE_DIR should surface as a clean preflight error,
+        not as a cryptic `touch: cannot touch ...` message."""
+        content = (REPO_ROOT / "install" / "install.sh").read_text()
+        preflight_pos = content.index("preflight_checks\n")
+        # The lockfile `touch "$LOCKFILE"` is the first place we'd trip on
+        # an unwritable state dir.
+        lockfile_pos = content.index('touch "$LOCKFILE"')
+        assert preflight_pos < lockfile_pos, (
+            'preflight_checks must run before `touch "$LOCKFILE"` so an '
+            "unwritable $LOCKFILE_DIR produces a clean preflight error "
+            "(JTN-699)"
+        )

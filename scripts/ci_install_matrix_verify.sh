@@ -40,6 +40,21 @@ cd /InkyPi/install
 # error out in the non-tty container environment.
 export TERM="${TERM:-dumb}"
 
+# JTN-699: Dockerfile.install-matrix uses `COPY . /InkyPi` and the repo
+# `.dockerignore` excludes `.git`, so the container sees a tree with no git
+# metadata. install.sh's preflight now requires the source tree to be a real
+# git clone (needed at runtime by `git describe` and update.sh). Initialise a
+# throwaway repo here so the preflight git-repo assertion reflects the same
+# invariant users hit in the field (i.e. they ran `git clone …`) without
+# bloating the image with the full .git directory.
+if ! git -C /InkyPi rev-parse --git-dir >/dev/null 2>&1; then
+    git -C /InkyPi init --quiet --initial-branch=ci-install-matrix
+    git -C /InkyPi -c user.email=ci@inkypi.local -c user.name=CI \
+        -c commit.gpgsign=false \
+        -c advice.addIgnoredFile=false \
+        commit --allow-empty --quiet -m "ci-install-matrix bootstrap"
+fi
+
 # Force the wheelhouse fetch off — we want to exercise the source pip install
 # path (install_debian_dependencies + create_venv) which is what actually
 # catches regressions like JTN-528's zramswap breakage on Trixie. A pre-built
