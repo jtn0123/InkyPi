@@ -48,6 +48,24 @@ class TestHumanizePluginId:
     def test_humanize(self, plugin_id, expected):
         assert humanize_plugin_id(plugin_id) == expected
 
+    @pytest.mark.parametrize(
+        ("plugin_id", "expected"),
+        [
+            # JTN-595 mutmut triage: kill a surviving mutant where
+            # ``.strip()`` is removed from humanize_plugin_id — leading /
+            # trailing whitespace must never leak into the humanised label.
+            ("  weather  ", "Weather"),
+            ("\tweather\n", "Weather"),
+            ("   image_folder   ", "Image Folder"),
+            # Whitespace-only input humanises to an empty string because
+            # the underscore/hyphen replacements produce a whitespace run
+            # that .strip() collapses to "".
+            ("   ", ""),
+        ],
+    )
+    def test_humanize_strips_surrounding_whitespace(self, plugin_id, expected):
+        assert humanize_plugin_id(plugin_id) == expected
+
 
 class TestFriendlyInstanceLabel:
     def test_user_renamed_instance_is_preserved(self):
