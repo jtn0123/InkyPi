@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -186,6 +187,91 @@ def prepare_playlist(device_config_dev):
         plugin_instance="Clock A",
     )
     device_config_dev.write_config()
+
+
+def _session_cookie_for_authed_user(flask_app) -> tuple[str, str]:
+    """Return the Flask signed-session cookie (name, value) for ``authed=True``.
+
+    Uses the app's real test client so the cookie is signed with the app's
+    ``SECRET_KEY`` and uses the configured session interface. This means the
+    resulting cookie is accepted by the live server thread without any
+    patching of cookie serialization.
+
+    Returns a tuple ``(cookie_name, cookie_value)`` suitable for passing to
+    :meth:`playwright.sync_api.BrowserContext.add_cookies`.
+    """
+    cookie_name = flask_app.config.get("SESSION_COOKIE_NAME", "session")
+    client = flask_app.test_client()
+    with client.session_transaction() as sess:
+        sess["authed"] = True
+    # Flask's test client keeps cookies on ``client.get`` responses; the
+    # session_transaction commit above stamps the signed cookie into the
+    # client's cookie jar. Pull it out directly. ``client`` exposes a
+    # ``CookieJar``-like object at ``_cookies`` across Werkzeug versions;
+    # iterate defensively to tolerate newer/older APIs.
+    raw_cookie: str | None = None
+    jar = getattr(client, "_cookies", None)
+    if jar is not None:
+        # Werkzeug >=3 exposes a dict-like mapping keyed by
+        # ``(domain, path, name)`` tuples.
+        try:
+            for key, cookie in jar.items():
+                name = key[-1] if isinstance(key, tuple) else key
+                if name == cookie_name:
+                    raw_cookie = getattr(cookie, "value", cookie)
+                    break
+        except AttributeError:
+            # Older API: jar is iterable of cookie objects.
+            for cookie in jar:
+                if getattr(cookie, "name", None) == cookie_name:
+                    raw_cookie = getattr(cookie, "value", None)
+                    break
+    if raw_cookie is None:
+        # Fallback: make a request so the Set-Cookie header is emitted and
+        # parse it from there. Any exempt route works.
+        resp = client.get("/login")
+        set_cookie = resp.headers.get("Set-Cookie", "")
+        for part in set_cookie.split(";"):
+            part = part.strip()
+            if part.startswith(f"{cookie_name}="):
+                raw_cookie = part.split("=", 1)[1]
+                break
+    if raw_cookie is None:
+        raise RuntimeError(
+            "Could not materialize a signed session cookie from the Flask test "
+            "client — authenticate_page cannot build a post_auth session."
+        )
+    return cookie_name, raw_cookie
+
+
+def authenticate_page(page, flask_app, base_url: str) -> None:
+    """Attach a signed ``authed=True`` session cookie to *page*'s context.
+
+    Reusable by any integration test that needs a logged-in session before
+    navigating. Today the app only gates routes when ``INKYPI_AUTH_PIN`` is
+    set, so on the default test bootstrap this helper is a no-op from the
+    server's perspective — it still exercises the cookie-injection plumbing
+    so future auth-gated routes get coverage automatically via the
+    ``post_auth`` parametrize variant.
+
+    The cookie is scoped to the ``live_server`` host so it is sent on every
+    request during the test. Call this BEFORE ``page.goto(...)``.
+    """
+    cookie_name, cookie_value = _session_cookie_for_authed_user(flask_app)
+    parsed = urlparse(base_url)
+    host = parsed.hostname or "127.0.0.1"
+    page.context.add_cookies(
+        [
+            {
+                "name": cookie_name,
+                "value": cookie_value,
+                "domain": host,
+                "path": "/",
+                "httpOnly": True,
+                "sameSite": "Lax",
+            }
+        ]
+    )
 
 
 def install_direct_manual_update(monkeypatch, flask_app):
