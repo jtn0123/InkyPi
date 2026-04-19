@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## v0.61.6 (2026-04-19)
+
+### Bug Fixes
+
+- Cap device names and reject control chars (JTN-746)
+  ([#535](https://github.com/jtn0123/InkyPi/pull/535),
+  [`5d700c9`](https://github.com/jtn0123/InkyPi/commit/5d700c967e944cf4582b9def168befd756df2a63))
+
+* fix: cap device names and reject control chars (JTN-746)
+
+* fix: format device name validation
+
+* fix: normalize persisted device names
+
+
 ## v0.61.5 (2026-04-19)
 
 ### Bug Fixes
