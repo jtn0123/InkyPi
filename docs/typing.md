@@ -3,7 +3,9 @@
 InkyPi uses [mypy](https://mypy.readthedocs.io/) for static type analysis.
 Rather than enabling strict mode everywhere at once, we follow an **incremental
 strict** path: a small "strict subset" is enforced as a CI blocker today, with
-more modules added over time as they stabilize.
+more modules added over time as they stabilize. The broader `src/` check is now
+ratcheted against a checked-in baseline so new typing debt cannot slip in while
+we keep paying down the backlog.
 
 ## Why incremental strict?
 
@@ -33,11 +35,9 @@ ongoing feature work.
 | `src/utils/http_cache.py` | JTN-676 |
 | `src/model.py` | JTN-663 |
 
-`src/utils/http_cache.py` was deliberately deferred from the initial strict
-set because it was recently refactored (JTN-493) and is still settling. It
-will be added in a follow-up once it stabilizes. This PR extends the strict
-subset with a low-churn helper cluster instead of broadening strict mode
-repo-wide.
+This list is intentionally low-churn: the broad `src/` ratchet protects the
+rest of production code from backsliding, while the modules above are held to
+full `--strict`.
 
 ## How to add a module to the strict subset
 
@@ -65,17 +65,21 @@ repo-wide.
 4. **Update the table above** with the module path and Linear issue reference.
 5. Open a PR — CI will enforce strictness from that point forward.
 
-## Advisory checks: split `src/` vs `tests/`
+## Current CI behavior: ratcheted `src/`, advisory `tests/`
 
-`scripts/lint.sh` runs the advisory (non-strict) mypy pass as **two separate
-invocations** instead of one:
+`scripts/lint.sh` runs the non-strict mypy pass as **two separate invocations**
+plus the blocking strict subset:
 
-1. `mypy src/` — production code
-2. `mypy tests/` — test suite
+1. `mypy src/` — production code, compared against the checked-in baseline in
+   `scripts/mypy_src_baseline.txt`
+2. `mypy tests/` — test suite, advisory only
+3. `mypy --strict ...` — curated strict subset, fully blocking
 
-Both are non-blocking — failures are printed with a `⚠️` warning and the
-error counts are reported separately. The strict subset above is the only
-mypy check that blocks CI.
+`src/` is no longer purely informational. CI fails only when the `src/` count
+rises above the committed baseline, or when mypy cannot produce a summary to
+compare against. `tests/` remains non-blocking because its typing noise is
+still much higher. The strict subset above is unchanged and remains fully
+blocking.
 
 ### Why the split?
 
@@ -86,14 +90,26 @@ drowned out by thousands of test-only errors. Splitting the counts makes
 **`src/` type drift legible so we can ratchet it downward** and eventually
 promote more modules into the strict subset.
 
-### What to do if the `src/` count goes up
+### What to do if the `src/` count changes
+
+If `src/` goes up:
 
 1. Run `mypy src/` locally and look at the diff in errors vs `main`.
-2. If your PR introduced the new errors, fix them before merging — even
-   though the check is advisory, rising `src/` counts block our ability to
-   grow the strict subset.
-3. If the increase is unrelated to your change (e.g. a dependency bump),
-   open a follow-up issue and call it out in the PR description.
+2. If your PR introduced the new errors, fix them before merging.
+3. If the increase is unrelated to your change (for example a dependency or
+   typeshed shift), call it out in the PR and land a coordinated baseline
+   update only if the new debt is intentional.
+
+If `src/` goes down:
+
+1. Confirm the lower count is real by rerunning `mypy src/` or
+   `bash scripts/lint.sh`.
+2. Update `scripts/mypy_src_baseline.txt` to the new lower integer.
+3. Rerun `bash scripts/lint.sh` so the ratchet records the improvement.
+
+If `mypy src/` exits without a `Found N errors` or `Success:` summary, treat it
+as a broken type-check invocation. The ratchet will fail until the underlying
+config/import problem is fixed.
 
 Increases in the `tests/` count are lower priority but still worth a glance —
 prefer fixing them opportunistically in the same area you're already editing.
