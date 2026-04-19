@@ -25,20 +25,26 @@ from flask import Flask  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _make_app() -> Flask:
-    """Build a minimal Flask app with the client_log blueprint registered."""
+def _fresh_module(monkeypatch=None, *, capture: bool | None = None):
+    """Reload ``blueprints.client_log`` and return (module, Flask app)."""
     import blueprints.client_log as cl_mod
 
-    # Reset the rate limiter between test app builds so tests are independent.
     importlib.reload(cl_mod)
+    if monkeypatch is not None:
+        if capture is True:
+            monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "1")
+        elif capture is False:
+            monkeypatch.delenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", raising=False)
 
     app = Flask(__name__)
     app.config["TESTING"] = True
+    app.register_blueprint(cl_mod.client_log_bp)
+    return cl_mod, app
 
-    from blueprints.client_log import client_log_bp
 
-    app.register_blueprint(client_log_bp)
-    return app
+def _make_app() -> Flask:
+    """Build a minimal Flask app with the client_log blueprint registered."""
+    return _fresh_module()[1]
 
 
 @pytest.fixture()
@@ -177,6 +183,188 @@ class TestRateLimit:
         # The 61st request should be rate-limited
         resp = _post(c, {"level": "warn", "message": "log"})
         assert resp.status_code == 429
+
+
+# ---------------------------------------------------------------------------
+# Batch payload support (JTN-711)
+# ---------------------------------------------------------------------------
+
+
+class TestBatchAccepted:
+    def test_batch_endpoint_accepts_array_payload(self, monkeypatch):
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        batch = [
+            {"level": "warn", "message": "w1"},
+            {"level": "error", "message": "e1"},
+            {"level": "warn", "message": "w2"},
+        ]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 204
+
+        reports = cl_mod.get_captured_reports()
+        assert [r["message"] for r in reports] == ["w1", "e1", "w2"]
+        assert [r["level"] for r in reports] == ["warn", "error", "warn"]
+
+    def test_existing_single_entry_payload_still_works(self, monkeypatch):
+        """Backwards-compat: legacy single-object POSTs still return 204."""
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        resp = _post(app.test_client(), {"level": "warn", "message": "solo"})
+        assert resp.status_code == 204
+        reports = cl_mod.get_captured_reports()
+        assert len(reports) == 1
+        assert reports[0]["message"] == "solo"
+
+    def test_batch_at_cap_is_accepted(self, monkeypatch):
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        batch = [{"level": "warn", "message": f"m{i}"} for i in range(50)]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 204
+        assert len(cl_mod.get_captured_reports()) == 50
+
+
+class TestBatchRejected:
+    def test_batch_endpoint_rejects_oversized_batch(self, monkeypatch):
+        """> 50 entries → 400."""
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        batch = [{"level": "warn", "message": f"m{i}"} for i in range(51)]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body["success"] is False
+        assert "max" in body["error"].lower() or "50" in body["error"]
+        assert cl_mod.get_captured_reports() == []
+
+    def test_empty_batch_rejected(self, monkeypatch):
+        _, app = _fresh_module(monkeypatch)
+        resp = _post(app.test_client(), [])
+        assert resp.status_code == 400
+
+    def test_batch_entries_individually_validated(self, monkeypatch):
+        """One bad entry returns 400 with per-entry errors and captures nothing."""
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        batch = [
+            {"level": "warn", "message": "ok1"},
+            {"level": "info", "message": "nope"},
+            {"level": "error", "message": "ok2"},
+        ]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        assert body["details"]["entry_errors"][0]["index"] == 1
+        assert cl_mod.get_captured_reports() == []
+
+    def test_non_object_entry_in_batch_rejected(self, monkeypatch):
+        _, app = _fresh_module(monkeypatch)
+        batch = [{"level": "warn", "message": "ok"}, "bad-entry", 42]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 400
+        body = json.loads(resp.data)
+        indexes = [e["index"] for e in body["details"]["entry_errors"]]
+        assert indexes == [1, 2]
+
+    def test_non_object_non_array_body_rejected(self, monkeypatch):
+        _, app = _fresh_module(monkeypatch)
+        resp = _post(app.test_client(), "just-a-string")
+        assert resp.status_code == 400
+
+
+class TestBatchRateLimit:
+    def test_rate_limit_capacity_raised_to_60(self, monkeypatch):
+        """JTN-711: the bucket now holds 60 tokens (up from 10)."""
+        cl_mod, app = _fresh_module(monkeypatch)
+
+        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        client = app.test_client()
+
+        for i in range(60):
+            resp = _post(client, {"level": "warn", "message": f"m{i}"})
+            assert resp.status_code == 204, f"unexpected failure at iteration {i}"
+
+        resp = _post(client, {"level": "warn", "message": "over"})
+        assert resp.status_code == 429
+
+    def test_each_batch_post_consumes_one_token(self, monkeypatch):
+        """Request-based limiting should allow 60 ten-entry batches."""
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
+        client = app.test_client()
+        per_batch = 10
+        batches = 60
+        for i in range(batches):
+            batch = [
+                {"level": "warn", "message": f"b{i}-e{j}"} for j in range(per_batch)
+            ]
+            resp = _post(client, batch)
+            assert resp.status_code == 204
+
+        resp = _post(client, [{"level": "warn", "message": "over"}])
+        assert resp.status_code == 429
+        assert len(cl_mod.get_captured_reports()) == batches * per_batch
+
+
+class TestBatchFieldHandling:
+    def test_secret_redaction_applied_to_every_batch_entry(self, monkeypatch, caplog):
+        _, app = _fresh_module(monkeypatch)
+
+        batch = [{"level": "warn", "message": f"entry-{i}"} for i in range(5)]
+        with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
+            resp = _post(app.test_client(), batch)
+        assert resp.status_code == 204
+
+        warning_msgs = [
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        ]
+        for i in range(5):
+            assert any(
+                f"entry-{i}" in m for m in warning_msgs
+            ), f"entry-{i} missing from logs"
+
+    def test_cr_lf_stripped_on_every_batch_entry(self, monkeypatch, caplog):
+        _, app = _fresh_module(monkeypatch)
+
+        batch = [
+            {"level": "warn", "message": "line\r\nbad1"},
+            {"level": "error", "message": "also\nbad2"},
+        ]
+        with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
+            resp = _post(app.test_client(), batch)
+        assert resp.status_code == 204
+        warning_msgs = " ".join(
+            r.message for r in caplog.records if r.levelno == logging.WARNING
+        )
+        assert "\r" not in warning_msgs
+        assert "\n" not in warning_msgs
+        assert "bad1" in warning_msgs
+        assert "bad2" in warning_msgs
+
+    def test_message_field_capped_per_entry(self, monkeypatch):
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        huge = "x" * 5000
+        resp = _post(app.test_client(), [{"level": "warn", "message": huge}])
+        assert resp.status_code == 204
+        reports = cl_mod.get_captured_reports()
+        assert len(reports[0]["message"]) == 2048
+
+
+class TestBurstAllLands:
+    """Acceptance test from JTN-711: 30 errors in a burst all land in one POST."""
+
+    def test_30_errors_in_a_burst_all_land(self, monkeypatch):
+        cl_mod, app = _fresh_module(monkeypatch, capture=True)
+
+        batch = [{"level": "error", "message": f"burst-{i}"} for i in range(30)]
+        resp = _post(app.test_client(), batch)
+        assert resp.status_code == 204
+
+        messages = [r["message"] for r in cl_mod.get_captured_reports()]
+        assert messages == [f"burst-{i}" for i in range(30)]
 
 
 # ---------------------------------------------------------------------------
