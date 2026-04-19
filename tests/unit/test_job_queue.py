@@ -18,6 +18,17 @@ from refresh_task.job_queue import (
 )
 
 
+class _FakeClock:
+    def __init__(self, now: float = 0.0) -> None:
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
 @pytest.fixture(autouse=True)
 def _reset_singleton():
     """Ensure the module-level singleton is reset between tests."""
@@ -121,6 +132,93 @@ class TestJobQueue:
             time.sleep(0.05)
         assert info["result"] == 13
         q.shutdown()
+
+    def test_finished_jobs_expire_after_retention_window(self):
+        clock = _FakeClock()
+        q = JobQueue(completed_ttl_seconds=10.0, clock=clock)
+
+        jid = q.enqueue(lambda: "done")
+        for _ in range(50):
+            info = q.get_status(jid)
+            if info["status"] == STATUS_DONE:
+                break
+            time.sleep(0.05)
+
+        assert info["status"] == STATUS_DONE
+        clock.advance(10.0)
+        assert q.get_status(jid) == {"status": "unknown", "error": "Job not found"}
+        q.shutdown()
+
+    def test_finished_job_retention_cap_discards_oldest_completed_jobs(self):
+        clock = _FakeClock()
+        q = JobQueue(
+            completed_ttl_seconds=60.0,
+            max_retained_finished_jobs=2,
+            clock=clock,
+        )
+
+        job_ids: list[str] = []
+        for _idx in range(3):
+            jid = q.enqueue(lambda: "done")
+            job_ids.append(jid)
+            for _ in range(50):
+                info = q.get_status(jid)
+                if info["status"] == STATUS_DONE:
+                    break
+                time.sleep(0.05)
+            assert info["status"] == STATUS_DONE
+            clock.advance(1.0)
+
+        assert q.get_status(job_ids[0]) == {
+            "status": "unknown",
+            "error": "Job not found",
+        }
+        assert q.get_status(job_ids[1])["status"] == STATUS_DONE
+        assert q.get_status(job_ids[2])["status"] == STATUS_DONE
+        q.shutdown()
+
+    def test_finished_job_pruning_never_removes_active_jobs(self):
+        clock = _FakeClock()
+        started = threading.Event()
+        proceed = threading.Event()
+
+        def _slow():
+            started.set()
+            proceed.wait(timeout=5)
+            return "slow"
+
+        q = JobQueue(
+            max_workers=3,
+            completed_ttl_seconds=60.0,
+            max_retained_finished_jobs=1,
+            clock=clock,
+        )
+        try:
+            active_job_id = q.enqueue(_slow)
+            started.wait(timeout=5)
+
+            done_job_ids: list[str] = []
+            for _idx in range(2):
+                jid = q.enqueue(lambda: "done")
+                done_job_ids.append(jid)
+                for _ in range(50):
+                    info = q.get_status(jid)
+                    if info["status"] == STATUS_DONE:
+                        break
+                    time.sleep(0.05)
+                assert info["status"] == STATUS_DONE
+                clock.advance(1.0)
+
+            active_info = q.get_status(active_job_id)
+            assert active_info["status"] == STATUS_RUNNING
+            assert q.get_status(done_job_ids[0]) == {
+                "status": "unknown",
+                "error": "Job not found",
+            }
+            assert q.get_status(done_job_ids[1])["status"] == STATUS_DONE
+        finally:
+            proceed.set()
+            q.shutdown(wait=True)
 
 
 class TestSingleton:
