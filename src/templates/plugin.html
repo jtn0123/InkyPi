@@ -35,7 +35,7 @@
         {% from 'macros/components.html' import status_chip, modal %}
 
         <!-- Plugin Title and Icon -->
-        <div class="app-header" role="banner">
+        <header class="app-header" role="banner">
             <div class="header-content">
                 <div class="header-identity">
                     <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
@@ -71,7 +71,7 @@
                     <div id="loadingIndicator" class="loading-indicator"></div>
                 </div>
             </div>
-        </div>
+        </header>
 
         <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins', 'url': url_for('main.main_page') + '#plugins-grid'}, {'label': plugin.display_name}]) }}
