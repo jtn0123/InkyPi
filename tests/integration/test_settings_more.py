@@ -261,6 +261,7 @@ def test_save_settings_exception_handling(client, flask_app, monkeypatch):
     body = resp.get_json()
     assert body.get("error") == "An internal error occurred"
     assert body.get("code") == "internal_error"
+    assert body.get("details", {}).get("context") == "saving device settings"
 
 
 def test_shutdown_route_reboot(client, monkeypatch):

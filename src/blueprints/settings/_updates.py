@@ -8,7 +8,12 @@ from werkzeug.exceptions import BadRequest
 
 import blueprints.settings as _mod
 from blueprints.settings._update_status import read_last_update_failure
-from utils.http_utils import json_error, json_internal_error, json_success
+from utils.backend_errors import (
+    ClientInputError,
+    ConflictRouteError,
+    route_error_boundary,
+)
+from utils.http_utils import json_error, json_success
 
 
 def _prev_version_path() -> str:
@@ -48,7 +53,11 @@ def start_update():
     specific tag.  Returns JSON immediately; progress is visible in the Logs
     panel via /api/logs.
     """
-    try:
+    with route_error_boundary(
+        "start update",
+        logger=_mod.logger,
+        hint="Check update script availability and update process startup.",
+    ):
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
         target_tag: str | None = None
@@ -57,9 +66,9 @@ def start_update():
             try:
                 body = request.get_json(silent=False)
             except BadRequest:
-                return json_error("Invalid JSON payload", status=400)
+                raise ClientInputError("Invalid JSON payload", status=400)
             if not isinstance(body, dict):
-                return json_error("Request body must be a JSON object", status=400)
+                raise ClientInputError("Request body must be a JSON object", status=400)
         else:
             body = {}
 
@@ -72,19 +81,19 @@ def start_update():
         if "target_version" in body:
             raw = body.get("target_version")
             if raw is None or not isinstance(raw, str) or not raw.strip():
-                return json_error(
+                raise ClientInputError(
                     "target_version must be a non-empty string",
                     status=400,
                     code="validation_error",
-                    details={"field": "target_version"},
+                    field="target_version",
                 )
             target_tag = raw.strip()
             if not _mod._TAG_RE.fullmatch(target_tag):
-                return json_error(
+                raise ClientInputError(
                     "Invalid target version format",
                     status=400,
                     code="validation_error",
-                    details={"field": "target_version"},
+                    field="target_version",
                 )
 
         script_path = _mod._get_update_script_path()
@@ -141,14 +150,15 @@ def start_update():
             running=True,
             unit=_mod._UPDATE_STATE.get("unit"),
         )
-    except Exception as e:
-        _mod.logger.exception("/settings/update error")
-        return json_internal_error("start update", details={"error": str(e)})
 
 
 @_mod.settings_bp.route("/settings/update_status", methods=["GET"])
 def update_status():
-    try:
+    with route_error_boundary(
+        "update status",
+        logger=_mod.logger,
+        hint="Check systemd status access and last-update metadata files.",
+    ):
         import subprocess
 
         running = bool(_mod._UPDATE_STATE.get("running"))
@@ -208,8 +218,6 @@ def update_status():
                 "prev_version": prev_version,
             }
         )
-    except Exception as e:
-        return json_internal_error("update status", details={"error": str(e)})
 
 
 @_mod.settings_bp.route("/settings/update/rollback", methods=["POST"])
@@ -233,81 +241,89 @@ def start_rollback():
     rollback itself fails.
     """
     try:
-        # 1. Require a recorded last-update-failure.  Without one, a rollback
-        #    would be reverting a healthy install — refuse.
-        last_failure = read_last_update_failure()
-        if not last_failure:
-            return json_error(
-                "No failed update recorded; nothing to roll back.",
-                status=409,
-                code="no_failure",
-            )
-
-        # 2. Require a validated prev_version breadcrumb.
-        prev_version = _read_prev_version()
-        if not prev_version:
-            return json_error(
-                "No previous version recorded; cannot roll back.",
-                status=409,
-                code="no_prev_version",
-            )
-
-        use_systemd = _mod._systemd_available()
-        unit = f"inkypi-rollback-{int(time.time())}"
-
-        # 3. TOCTOU-safe check-and-set — mirror start_update's pattern so two
-        #    concurrent rollback clicks can't both pass the guard.
-        with _mod._update_lock:
-            if _mod._UPDATE_STATE.get("running"):
-                response, _ = json_error(
-                    "Update or rollback already in progress.", status=409
+        with route_error_boundary(
+            "start rollback",
+            logger=_mod.logger,
+            hint="Check rollback prerequisites and update runner availability.",
+        ):
+            # 1. Require a recorded last-update-failure.  Without one, a rollback
+            #    would be reverting a healthy install — refuse.
+            last_failure = read_last_update_failure()
+            if not last_failure:
+                raise ConflictRouteError(
+                    "No failed update recorded; nothing to roll back.",
+                    status=409,
+                    code="no_failure",
                 )
-                payload = response.get_json()
-                payload["running"] = True
-                payload["unit"] = _mod._UPDATE_STATE.get("unit")
-                return jsonify(payload), 409
-            new_unit = f"{unit}.service" if use_systemd else None
-            _mod._UPDATE_STATE["running"] = True
-            _mod._UPDATE_STATE["unit"] = new_unit
-            _mod._UPDATE_STATE["started_at"] = float(time.time())
 
-        if use_systemd:
-            try:
-                _mod._start_rollback_via_systemd()
-            except Exception:
-                _mod.logger.exception(
-                    "systemd-run failed for rollback; clearing running state"
+            # 2. Require a validated prev_version breadcrumb.
+            prev_version = _read_prev_version()
+            if not prev_version:
+                raise ConflictRouteError(
+                    "No previous version recorded; cannot roll back.",
+                    status=409,
+                    code="no_prev_version",
                 )
-                _mod._set_update_state(False, None)
-                return json_internal_error("start rollback")
-        else:
-            # Dev / macOS path: reuse the simulated update runner so the UI
-            # still sees log output.  Production Pi always has systemd.
-            _mod._start_update_fallback_thread(None, target_tag=prev_version)
 
-        # JTN-708: 202 Accepted lets clients/tests distinguish "rollback
-        # kicked off" from a synchronous reply; the UI polls
-        # /settings/update_status for completion.
-        return json_success(
-            message=(
-                f"Rollback to {prev_version} started. "
-                "Watch the Logs panel for progress."
-            ),
-            status=202,
-            running=True,
-            unit=_mod._UPDATE_STATE.get("unit"),
-            target_version=prev_version,
-        )
-    except Exception as e:
-        _mod.logger.exception("/settings/update/rollback error")
+            use_systemd = _mod._systemd_available()
+            unit = f"inkypi-rollback-{int(time.time())}"
+
+            # 3. TOCTOU-safe check-and-set — mirror start_update's pattern so two
+            #    concurrent rollback clicks can't both pass the guard.
+            with _mod._update_lock:
+                if _mod._UPDATE_STATE.get("running"):
+                    response, _ = json_error(
+                        "Update or rollback already in progress.", status=409
+                    )
+                    payload = response.get_json()
+                    payload["running"] = True
+                    payload["unit"] = _mod._UPDATE_STATE.get("unit")
+                    return jsonify(payload), 409
+                new_unit = f"{unit}.service" if use_systemd else None
+                _mod._UPDATE_STATE["running"] = True
+                _mod._UPDATE_STATE["unit"] = new_unit
+                _mod._UPDATE_STATE["started_at"] = float(time.time())
+
+            if use_systemd:
+                try:
+                    _mod._start_rollback_via_systemd()
+                except Exception:
+                    _mod.logger.exception(
+                        "systemd-run failed for rollback; clearing running state"
+                    )
+                    _mod._set_update_state(False, None)
+                    raise
+            else:
+                # Dev / macOS path: reuse the simulated update runner so the UI
+                # still sees log output.  Production Pi always has systemd.
+                _mod._start_update_fallback_thread(None, target_tag=prev_version)
+
+            # JTN-708: 202 Accepted lets clients/tests distinguish "rollback
+            # kicked off" from a synchronous reply; the UI polls
+            # /settings/update_status for completion.
+            return json_success(
+                message=(
+                    f"Rollback to {prev_version} started. "
+                    "Watch the Logs panel for progress."
+                ),
+                status=202,
+                running=True,
+                unit=_mod._UPDATE_STATE.get("unit"),
+                target_version=prev_version,
+            )
+    except Exception:
         _mod._set_update_state(False, None)
-        return json_internal_error("start rollback", details={"error": str(e)})
+        raise
 
 
 @_mod.settings_bp.route("/api/version", methods=["GET"])
 def api_version():
     """Return current and latest version info."""
-    try:
+    with route_error_boundary(
+        "version check",
+        logger=_mod.logger,
+        hint="Check release metadata retrieval and semver parsing.",
+    ):
         current = current_app.config.get("APP_VERSION", "unknown")
         latest = _mod._check_latest_version()
         update_available = False
@@ -322,5 +338,3 @@ def api_version():
                 "release_notes": _mod._VERSION_CACHE.get("release_notes"),
             }
         )
-    except Exception as e:
-        return json_internal_error("version check", details={"error": str(e)})
