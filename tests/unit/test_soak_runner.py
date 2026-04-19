@@ -21,9 +21,7 @@ SCRIPT_PATH = REPO_ROOT / "scripts" / "soak_runner.py"
 
 def _load_module():
     """Load ``scripts/soak_runner.py`` as a module regardless of sys.path."""
-    spec = importlib.util.spec_from_file_location(
-        "soak_runner_under_test", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("soak_runner_under_test", SCRIPT_PATH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules["soak_runner_under_test"] = module
@@ -97,16 +95,13 @@ def _payload(**overrides):
             "window_seconds": 300,
         },
     }
-    for k, v in overrides.items():
-        base[k] = v
+    base.update(overrides)
     return base
 
 
 class TestParsePayload:
     def test_happy_path(self):
-        s = soak.parse_diagnostics_payload(
-            _payload(), elapsed_s=1.0, http_status=200
-        )
+        s = soak.parse_diagnostics_payload(_payload(), elapsed_s=1.0, http_status=200)
         assert s.fetch_ok is True
         assert s.fetch_error is None
         assert s.http_status == 200
@@ -126,9 +121,7 @@ class TestParsePayload:
         }
 
     def test_tolerates_missing_blocks(self):
-        s = soak.parse_diagnostics_payload(
-            {}, elapsed_s=0.5, http_status=200
-        )
+        s = soak.parse_diagnostics_payload({}, elapsed_s=0.5, http_status=200)
         assert s.fetch_ok is True
         assert s.memory_pct is None
         assert s.disk_pct is None
@@ -137,9 +130,7 @@ class TestParsePayload:
         assert s.plugin_health == {}
 
     def test_non_dict_is_failure(self):
-        s = soak.parse_diagnostics_payload(
-            "not-a-dict", elapsed_s=0.1, http_status=200
-        )
+        s = soak.parse_diagnostics_payload("not-a-dict", elapsed_s=0.1, http_status=200)
         assert s.fetch_ok is False
         assert s.fetch_error == "non-dict payload"
 
@@ -167,7 +158,7 @@ def _mk_sample(
     client_log_count_5m: int | None = 0,
     client_log_warn_count_5m: int | None = 0,
     fetch_error: str | None = None,
-) -> "soak.Sample":
+) -> soak.Sample:
     return soak.Sample(
         ts=f"2026-04-19T00:{int(t):02d}:00+00:00",
         elapsed_s=t,
@@ -375,9 +366,23 @@ class TestRunSoakLoop:
     def test_collects_samples_and_handles_transient_failure(self):
         # Three sample windows: success, network error, success.
         responses = [
-            _FakeResponse(200, _payload(uptime_s=100, memory={"total_mb": 512, "used_mb": 256, "pct": 50.0}, disk={"total_mb": 16000, "used_mb": 5000, "pct": 31.0, "path": "/"})),
+            _FakeResponse(
+                200,
+                _payload(
+                    uptime_s=100,
+                    memory={"total_mb": 512, "used_mb": 256, "pct": 50.0},
+                    disk={"total_mb": 16000, "used_mb": 5000, "pct": 31.0, "path": "/"},
+                ),
+            ),
             ConnectionError("simulated wedge"),
-            _FakeResponse(200, _payload(uptime_s=700, memory={"total_mb": 512, "used_mb": 280, "pct": 55.0}, disk={"total_mb": 16000, "used_mb": 5000, "pct": 31.0, "path": "/"})),
+            _FakeResponse(
+                200,
+                _payload(
+                    uptime_s=700,
+                    memory={"total_mb": 512, "used_mb": 280, "pct": 55.0},
+                    disk={"total_mb": 16000, "used_mb": 5000, "pct": 31.0, "path": "/"},
+                ),
+            ),
         ]
         session = _FakeSession(responses)
 

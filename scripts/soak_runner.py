@@ -205,9 +205,11 @@ def parse_diagnostics_payload(
     plugin_health_raw = payload.get("plugin_health")
     plugin_health: dict[str, str] = {}
     if isinstance(plugin_health_raw, dict):
-        for k, v in plugin_health_raw.items():
-            if isinstance(k, str) and isinstance(v, str):
-                plugin_health[k] = v
+        plugin_health = {
+            k: v
+            for k, v in plugin_health_raw.items()
+            if isinstance(k, str) and isinstance(v, str)
+        }
 
     return Sample(
         ts=ts,
@@ -215,14 +217,18 @@ def parse_diagnostics_payload(
         fetch_ok=True,
         fetch_error=None,
         http_status=http_status,
-        version=payload.get("version") if isinstance(payload.get("version"), str) else None,
+        version=(
+            payload.get("version") if isinstance(payload.get("version"), str) else None
+        ),
         uptime_s=_safe_int(payload.get("uptime_s")),
         memory_pct=_safe_float(memory.get("pct")),
         disk_pct=_safe_float(disk.get("pct")),
         refresh_running=bool(refresh.get("running")) if "running" in refresh else None,
-        refresh_last_error=refresh.get("last_error")
-        if isinstance(refresh.get("last_error"), str)
-        else None,
+        refresh_last_error=(
+            refresh.get("last_error")
+            if isinstance(refresh.get("last_error"), str)
+            else None
+        ),
         client_log_count_5m=_safe_int(client_log.get("count_5m")),
         client_log_warn_count_5m=_safe_int(client_log.get("warn_count_5m")),
         plugin_health=plugin_health,
@@ -250,7 +256,7 @@ def _linear_fit_slope(
         return None, None
     mean_x = sum(xs) / n
     mean_y = sum(ys) / n
-    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
     den = sum((x - mean_x) ** 2 for x in xs)
     if den == 0:
         return None, None
@@ -334,15 +340,9 @@ def summarize_samples(samples: list[Sample]) -> dict[str, Any]:
     total = len(samples)
     ok = [s for s in samples if s.fetch_ok]
     unreachable = total - len(ok)
-    refresh_failures = sum(
-        1 for s in ok if s.refresh_last_error
-    )
-    client_log_error_total = sum(
-        (s.client_log_count_5m or 0) for s in ok
-    )
-    client_log_warn_total = sum(
-        (s.client_log_warn_count_5m or 0) for s in ok
-    )
+    refresh_failures = sum(1 for s in ok if s.refresh_last_error)
+    client_log_error_total = sum((s.client_log_count_5m or 0) for s in ok)
+    client_log_warn_total = sum((s.client_log_warn_count_5m or 0) for s in ok)
 
     return {
         "total_samples": total,
