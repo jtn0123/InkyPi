@@ -135,16 +135,7 @@ _VIEWPORTS: tuple[tuple[str, str], ...] = (
 # Per-(label, viewport) xfails for mobile-only regressions. Keep empty
 # until a mobile-specific break is triaged into Linear — new entries must
 # link to a JTN issue so they get cleaned up.
-_MOBILE_XFAIL_PAGES: dict[str, str] = {
-    "playlist:mobile": (
-        "awaiting JTN-743 "
-        "(playlist mobile click-sweep still hits layered-ui no-op candidates)"
-    ),
-    "plugin_clock:mobile": (
-        "awaiting JTN-743 "
-        "(clock plugin mobile click-sweep still hits layered-ui no-op candidates)"
-    ),
-}
+_MOBILE_XFAIL_PAGES: dict[str, str] = {}
 
 # Plugin-sweep cap. Plugin settings pages are structurally similar (a single
 # settings form with a handful of presets) so 15 clicks is plenty to exercise
