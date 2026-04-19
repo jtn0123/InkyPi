@@ -13,6 +13,8 @@ EXPECTED_COPY = (
 
 
 class TestDeviceNameValidation:
+    """Regression coverage for device-name validation edge cases."""
+
     VALID_FORM = {
         "unit": "minute",
         "interval": "30",
@@ -27,15 +29,25 @@ class TestDeviceNameValidation:
     }
 
     def _form(self, **overrides):
+        """Build a valid settings payload with optional overrides."""
         form = {**self.VALID_FORM}
         form.update(overrides)
         return form
 
     def test_device_name_length_is_capped(self, client):
+        """Device names longer than the configured cap should be rejected."""
         resp = client.post(
             "/save_settings",
             data=self._form(deviceName="a" * 65),
         )
+        assert resp.status_code == 422
+        data = resp.get_json()
+        assert data["details"]["field"] == "deviceName"
+
+    def test_device_name_padding_cannot_bypass_length_cap(self, client):
+        """Over-padded submissions should still honor the raw input cap."""
+        padded_name = f" {'a' * 64} "
+        resp = client.post("/save_settings", data=self._form(deviceName=padded_name))
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
@@ -51,16 +63,28 @@ class TestDeviceNameValidation:
             "Device\x1fName",
         ],
     )
-    def test_device_name_control_chars_are_rejected_or_stripped(
+    def test_device_name_control_chars_are_rejected(
         self, client, device_config_dev, bad_name
     ):
+        """Control characters should be rejected without mutating persisted config."""
+        original_name = device_config_dev.get_config("name")
         resp = client.post("/save_settings", data=self._form(deviceName=bad_name))
         assert resp.status_code == 422
         data = resp.get_json()
         assert data["details"]["field"] == "deviceName"
-        assert device_config_dev.get_config("name") != bad_name
+        assert device_config_dev.get_config("name") == original_name
+
+    def test_device_name_is_trimmed_before_persisting(self, client, device_config_dev):
+        """Leading and trailing whitespace should not be persisted."""
+        resp = client.post(
+            "/save_settings",
+            data=self._form(deviceName="  Device\tName  "),
+        )
+        assert resp.status_code == 200
+        assert device_config_dev.get_config("name") == "Device\tName"
 
     def test_device_name_tab_is_allowed(self, client, device_config_dev):
+        """Tabs inside the device name are allowed and preserved."""
         name_with_tab = "Device\tName"
         resp = client.post("/save_settings", data=self._form(deviceName=name_with_tab))
         assert resp.status_code == 200
