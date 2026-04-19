@@ -1,6 +1,163 @@
 # CHANGELOG
 
 
+## v0.62.0 (2026-04-19)
+
+### Features
+
+- **install**: Add preflight disk/perms/git-repo sanity checks (JTN-699)
+  ([#546](https://github.com/jtn0123/InkyPi/pull/546),
+  [`3941c5a`](https://github.com/jtn0123/InkyPi/commit/3941c5ab619fac2edd53123600cd8d1f76fa5aa9))
+
+* feat(install): add preflight disk/perms/git-repo sanity checks (JTN-699)
+
+install.sh previously had no early validation — users hit "Permission denied" or "No space left on
+  device" 5–10 min into a run with $INSTALL_PATH half-populated and the systemd unit in an undefined
+  state. Preflight now runs in seconds before any apt/pip/git work:
+
+- df check on /usr/local and $INSTALL_PATH parent (>=500 MB free) - test -w on install parent,
+  /etc/systemd/system, /var/lib/inkypi - git -C "$SRC_PATH" rev-parse --git-dir (blocks tarball
+  installs that would break git-describe versioning and waveshare pin verification)
+
+Each failure exits 1 with a specific "ERROR (preflight): <what>" line plus a "remediation:"
+  suggestion naming the failing path. Env-var hooks (INKYPI_PREFLIGHT_USR_LOCAL / _INSTALL_PARENT /
+  _SYSTEMD_DIR / _STATE_DIR / _SRC_PATH / _MIN_FREE_MB) let pytest redirect checks at tmp dirs
+  without touching real paths; INKYPI_PREFLIGHT_TEST bypasses the EUID root check and
+  INKYPI_PREFLIGHT_TEST_EXIT_AFTER short-circuits before real install work. Production callers never
+  set these vars so behavior is unchanged.
+
+Adds 12 pytest cases in tests/unit/test_install_scripts.py covering the happy path, each failure
+  branch (low disk, unwritable install parent / systemd / state dirs, missing systemd dir,
+  non-git-repo, missing src), short-circuit-before-install-work, and source-level contract
+  assertions.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* fix(install): address preflight review comments (JTN-699)
+
+CodeRabbit review on PR #546 identified several real issues in the new preflight block; this commit
+  addresses all five findings and also unblocks the `install-matrix` CI job that started failing
+  once the git-repo preflight check landed.
+
+install/install.sh - Scope `path` as `local` in preflight_checks so the loop var no longer leaks
+  into the caller's scope (trivial nitpick). - Canonicalise and deduplicate $usr_local vs
+  $install_parent before the disk-space loop — in production both resolve to /usr/local and we were
+  probing the same mount twice with two different labels. - Switch $state_dir writability validation
+  away from `mkdir -p` + `-w` (which was dead code when running as root) to a probe-file write in
+  the directory (or its nearest existing ancestor when $state_dir doesn't exist yet). That's the
+  actual invariant the real lockfile `mkdir -p` needs to succeed later, and it can genuinely fail. -
+  Pass `-c safe.directory='*'` to the preflight `git rev-parse`. The canonical install flow (`git
+  clone ~/inkypi && sudo bash install.sh`) produces a user-owned .git and invokes the script as
+  root, which since CVE-2022-24765 causes git to refuse the repo with "dubious ownership".
+  `2>/dev/null` was masking that as "not a git repository" and telling users to re-clone a repo that
+  already worked.
+
+scripts/ci_install_matrix_verify.sh - `git init` a throwaway repo inside /InkyPi before invoking
+  install.sh, because Dockerfile.install-matrix uses `COPY .` and .dockerignore strips `.git`. The
+  new preflight git-repo check was correctly asserting an invariant users hit in the field — we just
+  needed the CI harness to match that invariant.
+
+tests/unit/test_install_scripts.py - Black reformat of the 12 existing assertion strings (Black
+  26.3.1 reformatted them on CI; adopt the same shape here). - Add
+  test_preflight_git_check_survives_dubious_ownership covering the sudo-on-user-owned-clone case via
+  GIT_TEST_ASSUME_DIFFERENT_OWNER, which is git's own test-only knob for simulating the ownership
+  mismatch without needing a real uid swap. Gracefully skips on git builds that ignore the knob.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Testing
+
+- Add authenticated-session click-sweep variant (JTN-702)
+  ([#548](https://github.com/jtn0123/InkyPi/pull/548),
+  [`6f0f8a5`](https://github.com/jtn0123/InkyPi/commit/6f0f8a5da903f066da5cb653bd37850a8d119084))
+
+- extract a reusable ``authenticate_page`` helper in browser_helpers.py that materializes a signed
+  Flask session cookie (``authed=True``) and attaches it to a Playwright browser context before
+  navigation - stack a ``[pre_auth, post_auth]`` parametrize layer on both ``test_click_sweep`` and
+  ``test_click_sweep_plugin_pages`` so every page/viewport combination runs twice — once anonymous,
+  once with the session cookie set before ``page.goto`` - wrap the existing sweep body in
+  ``_run_click_sweep`` behind ``authenticated=`` + ``flask_app=`` kwargs so other integration tests
+  can reuse the helper when they need a logged-in session
+
+The default test bootstrap doesn't set ``INKYPI_AUTH_PIN``, so today the ``post_auth`` variant is
+  functionally equivalent to ``pre_auth`` from the server's perspective — but it locks in the
+  cookie-injection plumbing so future auth-gated routes get coverage automatically without new test
+  wiring.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Unblock mobile click-sweep for playlist + plugin_clock (JTN-743)
+  ([#549](https://github.com/jtn0123/InkyPi/pull/549),
+  [`1a9b959`](https://github.com/jtn0123/InkyPi/commit/1a9b959de18882e760cd3651d19d560b2f0a14cf))
+
+* test: unblock mobile click-sweep for playlist + plugin_clock (JTN-743)
+
+Mobile sweep was xfailed on two pages. Triage:
+
+* `playlist-mobile` — already green on main; xfail was stale. Drop the entry so regressions fail
+  loudly.
+
+* `plugin_clock-mobile` — root cause is the header "Last progress" icon (`#showLastProgressBtn`).
+  Clicking it unhides `#requestProgress`, a `position: fixed` full-width overlay on mobile (360x800)
+  that covers the workflow tabs, header icons and breadcrumb links. Every later sweep click
+  hit-tests onto `div#requestProgress` and silent-no-ops: Preview & Apply, Home icon, breadcrumb
+  Home, breadcrumb Plugins. This is a click-sweep harness limitation — the overlay is legitimate UI
+  that dedicated tests would close between interactions. Tag the button with
+  `data-test-skip-click="true"` (with HTML comment linking to the replacement test) and add
+  dedicated browser coverage in
+  `test_plugin_workflow_e2e.py::test_last_progress_button_shows_overlay` that exercises both open
+  and close paths. Net coverage is preserved.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* style: black-format test_last_progress_button_shows_overlay
+
+Apply Black's preferred line wrapping to the new overlay test so the blocking Lint-and-type-check
+  job passes. No behavior change.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- **soak**: Real-pi nightly soak runner + workflow (JTN-733)
+  ([#547](https://github.com/jtn0123/InkyPi/pull/547),
+  [`828e452`](https://github.com/jtn0123/InkyPi/commit/828e452d2959c1c7ca9eb694f52928762400c203))
+
+* test(soak): add real-Pi nightly soak runner + workflow (JTN-733)
+
+Adds scripts/soak_runner.py, a nightly GitHub Actions workflow that runs it on a self-hosted
+  pi-zero-2w runner for 24h, and a unit test covering duration parsing, payload parsing, trend
+  summary math, and the run loop.
+
+The runner samples /api/diagnostics at a configurable cadence (5 min default) and emits a JSON
+  report with raw per-sample metrics plus a summary block: unreachable_rate, refresh_failure_rate,
+  service restart count (inferred from uptime regressions), client-log error totals, and linear-fit
+  slope_per_hour for memory_pct and disk_pct so a slow monotonic leak surfaces as a clear positive
+  slope.
+
+Unreachable windows are counted as data points rather than crashing the loop — the whole point is to
+  catch wedges and recoveries.
+
+The workflow assumes a self-hosted runner labeled 'self-hosted' + 'pi-zero-2w'; until that runner
+  exists, nightly runs will queue and time out, which is the intended no-op behaviour.
+
+* style(soak): fix ruff PERF403/B905/UP037 and black formatting
+
+CI lint gate flagged the new soak runner on PERF403 (for-loops that should be dict comprehensions),
+  B905 (zip without strict=), and UP037 (unnecessary quoted annotation under `from __future__ import
+  annotations`). Also run black so the files match repo style.
+
+No behaviour change — 32 tests still pass.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v0.61.7 (2026-04-19)
 
 ### Bug Fixes
