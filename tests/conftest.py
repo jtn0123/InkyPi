@@ -255,6 +255,8 @@ def device_config_dev(tmp_path, monkeypatch):
         "timezone": "UTC",
         "time_format": "24h",
         "plugin_cycle_interval_seconds": 300,
+        "enable_benchmarks": False,
+        "benchmarks_db_path": str(tmp_path / "benchmarks.sqlite3"),
         "image_settings": {
             "saturation": 1.0,
             "brightness": 1.0,
@@ -308,12 +310,18 @@ def flask_app(device_config_dev, monkeypatch):
 
     from flask import session as _session
 
+    from app_setup import security_middleware
     import inkypi
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
+    from utils.rate_limiter import SlidingWindowLimiter
 
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-csrf")
+    monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "100000/60")
+    monkeypatch.setenv("INKYPI_RATE_LIMIT_REFRESH", "100000/60")
+    monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "100000/60")
+    security_middleware._mutation_limiter = SlidingWindowLimiter(100000, 60)
 
     def _fake_init_core_services(app):
         display_manager = DisplayManager(device_config_dev)
