@@ -1,5 +1,6 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
+import unicodedata
 from zoneinfo import available_timezones
 
 from flask import current_app, redirect, render_template, request
@@ -7,6 +8,8 @@ from flask import current_app, redirect, render_template, request
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
 from utils.time_utils import calculate_seconds
+
+_DEVICE_NAME_MAX_LEN = 64
 
 
 @_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
@@ -384,6 +387,25 @@ def _validate_interval(form_data):
     return None
 
 
+def _validate_device_name(form_data):
+    """Validate and normalize the submitted device name."""
+    raw_device_name = form_data.get("deviceName", "")
+    device_name = raw_device_name.strip()
+    if not device_name:
+        return None, _field_error("Device Name is required", "deviceName")
+    if len(raw_device_name) > _DEVICE_NAME_MAX_LEN:
+        return None, _field_error(
+            f"Device Name must be {_DEVICE_NAME_MAX_LEN} characters or fewer",
+            "deviceName",
+        )
+    if any(unicodedata.category(ch) == "Cc" and ch != "\t" for ch in raw_device_name):
+        return None, _field_error(
+            "Device Name may not contain control characters",
+            "deviceName",
+        )
+    return device_name, None
+
+
 def _validate_enum_field(form_data, field, allowed, *, required=True):
     """Validate that *field* is one of *allowed* values.
 
@@ -437,50 +459,54 @@ def _validate_image_settings(form_data):
 
 
 def _validate_settings_form(form_data):
-    # Validate device name (required, non-empty)
-    device_name = form_data.get("deviceName", "").strip()
-    if not device_name:
-        return _field_error("Device Name is required", "deviceName")
+    """Validate settings form data and return any error plus normalized fields."""
+    normalized_device_name, err = _validate_device_name(form_data)
+    if err:
+        return err, None
 
     err = _validate_interval(form_data)
     if err:
-        return err
+        return err, None
 
     # Timezone
     timezone_name = form_data.get("timezoneName")
     if not timezone_name:
-        return _field_error("Time Zone is required", "timezoneName")
+        return _field_error("Time Zone is required", "timezoneName"), None
     if timezone_name not in available_timezones():
-        return _field_error(
-            "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
-            "timezoneName",
+        return (
+            _field_error(
+                "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
+                "timezoneName",
+            ),
+            None,
         )
 
     time_format = form_data.get("timeFormat")
     if not time_format or time_format not in ("12h", "24h"):
-        return _field_error("Time format is required", "timeFormat")
+        return _field_error("Time format is required", "timeFormat"), None
 
     err = _validate_enum_field(
         form_data, "orientation", ("horizontal", "vertical"), required=False
     )
     if err:
-        return err
+        return err, None
     err = _validate_enum_field(
         form_data, "previewSizeMode", ("native", "scaled", "fit"), required=False
     )
     if err:
-        return err
+        return err, None
 
-    return _validate_image_settings(form_data)
+    return _validate_image_settings(form_data), normalized_device_name
 
 
-def _build_settings_dict(form_data):
+def _build_settings_dict(form_data, normalized_device_name):
+    """Build the persisted settings payload from validated form data."""
     unit = form_data.get("unit")
     interval = form_data.get("interval")
     plugin_cycle_interval_seconds = calculate_seconds(int(interval), unit)
 
     settings = {
-        "name": form_data.get("deviceName"),
+        "name": normalized_device_name,
         "orientation": form_data.get("orientation"),
         "inverted_image": form_data.get("invertImage") == "on",
         "log_system_stats": form_data.get("logSystemStats") == "on",
@@ -509,14 +535,16 @@ def save_settings():
     try:
         form_data = request.form.to_dict()
 
-        error = _validate_settings_form(form_data)
+        error, normalized_device_name = _validate_settings_form(form_data)
         if error:
             return error
 
         previous_interval_seconds = device_config.get_config(
             "plugin_cycle_interval_seconds"
         )
-        settings, plugin_cycle_interval_seconds = _build_settings_dict(form_data)
+        settings, plugin_cycle_interval_seconds = _build_settings_dict(
+            form_data, normalized_device_name
+        )
         device_config.update_config(settings)
 
         if plugin_cycle_interval_seconds != previous_interval_seconds:
