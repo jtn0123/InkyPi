@@ -195,9 +195,9 @@ To stop the container, press `Ctrl+C` or run `docker compose down`.
 
 ## CI Gate and Required Status Checks
 
-The CI workflow includes a `ci-gate` job that depends on all required jobs — including
-`lockfile-drift`, `security`, and `browser-smoke`. This job is the single handle the repo
-owner should mark as a required status check in GitHub branch protection.
+The CI workflow includes a `ci-gate` job that depends on all required jobs, including the
+install gates. This job is the single handle the repo owner should mark as a required
+status check in GitHub branch protection.
 
 Frontend changes under `src/static/**` or `src/templates/**` also trigger the local
 pre-commit browser gate, which runs `scripts/test.sh browser-smoke` before the commit is
@@ -215,9 +215,8 @@ allowed through.
 6. Click **Save changes**.
 
 Once saved, every PR must have a green `ci-gate` result before it can be merged. Because
-`ci-gate` itself `needs: [lint, shellcheck, tests, sonarcloud, smoke, smoke-matrix,
-coverage-gate, security, browser-smoke]`, any failure in any of those jobs will also fail
-the gate.
+`ci-gate` mirrors the required-job list in `.github/workflows/ci.yml`, any required-job
+failure will also fail the gate.
 
 > **Why a single gate job instead of listing each check?**
 > GitHub's required-checks list is static — adding a new CI job requires a manual settings
