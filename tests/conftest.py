@@ -311,12 +311,14 @@ def flask_app(device_config_dev, monkeypatch):
 
     from flask import session as _session
 
-    from app_setup import security_middleware
     import inkypi
+    from app_setup import security_middleware
 
     # Reload the module so DEV_MODE/WEB_ONLY and related globals reflect the
     # current test's environment instead of leaking from prior reload-based
     # tests.
+    monkeypatch.delenv("INKYPI_ENV", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
     inkypi = importlib.reload(inkypi)
 
     from display.display_manager import DisplayManager
