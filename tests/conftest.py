@@ -1,4 +1,5 @@
 # pyright: reportMissingImports=false
+import importlib
 import json
 import os
 import sys
@@ -312,6 +313,12 @@ def flask_app(device_config_dev, monkeypatch):
 
     from app_setup import security_middleware
     import inkypi
+
+    # Reload the module so DEV_MODE/WEB_ONLY and related globals reflect the
+    # current test's environment instead of leaking from prior reload-based
+    # tests.
+    inkypi = importlib.reload(inkypi)
+
     from display.display_manager import DisplayManager
     from plugins.plugin_registry import load_plugins
     from refresh_task import RefreshTask
