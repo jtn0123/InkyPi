@@ -268,46 +268,29 @@ def test_inkypi_security_headers(monkeypatch):
     app = getattr(mod, "app", None)
     assert app is not None
 
-    # Test security headers middleware is registered
-    assert len(app.after_request_funcs[None]) > 0
-
-    # Create a test request context to verify headers
-    with app.test_request_context("/"):
-        response = app.response_class()
-        # Simulate the after_request function
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        response.headers.setdefault("Referrer-Policy", "no-referrer")
-
-        assert response.headers["X-Content-Type-Options"] == "nosniff"
-        assert response.headers["X-Frame-Options"] == "SAMEORIGIN"
-        assert response.headers["Referrer-Policy"] == "no-referrer"
+    resp = app.test_client().get("/healthz")
+    assert resp.status_code == 200
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
+    assert resp.headers["Referrer-Policy"] == "no-referrer"
 
 
 def test_inkypi_refresh_task_lazy_start(monkeypatch):
     """Test lazy refresh task start in Flask dev server."""
-    with patch("os.environ.get") as mock_environ_get:
-        mock_environ_get.return_value = "true"  # WERKZEUG_RUN_MAIN
+    monkeypatch.setenv("WERKZEUG_RUN_MAIN", "true")
 
-        mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
-        app = getattr(mod, "app", None)
-        assert app is not None
+    mod = _reload_inkypi(monkeypatch, argv=["inkypi.py"], env={})
+    app = getattr(mod, "app", None)
+    assert app is not None
 
-        # Mock the refresh task
-        mock_rt = MagicMock()
-        mock_rt.running = False
-        app.config["REFRESH_TASK"] = mock_rt
+    mock_rt = MagicMock()
+    mock_rt.running = False
+    app.config["REFRESH_TASK"] = mock_rt
+    mod.WEB_ONLY = False
 
-        # Mock WEB_ONLY
-        mod.WEB_ONLY = False
-
-        # Simulate before_request by calling the logic directly
-        if not mod.WEB_ONLY and mock_environ_get("WERKZEUG_RUN_MAIN") == "true":
-            rt = app.config.get("REFRESH_TASK")
-            if rt and not rt.running:
-                rt.start()
-
-        mock_rt.start.assert_called_once()
+    response = app.test_client().get("/healthz")
+    assert response.status_code == 200
+    mock_rt.start.assert_called_once()
 
 
 def test_read_version_normal(tmp_path, monkeypatch):

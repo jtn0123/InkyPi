@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from flask import Flask, make_response, render_template
+from werkzeug.exceptions import HTTPException
 
 from utils.http_utils import APIError, json_error, json_internal_error, wants_json
 
@@ -40,6 +41,8 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(Exception)
     def _handle_unexpected_error(err: Exception):
+        if isinstance(err, HTTPException):
+            return err.get_response()
         try:
             logger.exception("Unhandled exception: %s", err)
         except Exception:
