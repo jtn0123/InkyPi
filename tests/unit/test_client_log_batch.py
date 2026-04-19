@@ -17,34 +17,11 @@ Coverage:
 
 from __future__ import annotations
 
-import importlib
 import json
 import logging
 
 import pytest
-from flask import Flask  # noqa: E402
-
-from utils.rate_limit import TokenBucket
-
-
-def _fresh_app(monkeypatch=None, *, capture: bool = False) -> Flask:
-    """Reload ``blueprints.client_log`` and return a fresh Flask app.
-
-    Reloading resets the module-level rate limiter so each test starts with a
-    full bucket.
-    """
-    import blueprints.client_log as cl_mod
-
-    importlib.reload(cl_mod)
-    if monkeypatch is not None:
-        if capture:
-            monkeypatch.setenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", "1")
-        else:
-            monkeypatch.delenv("INKYPI_TEST_CAPTURE_CLIENT_LOG", raising=False)
-    app = Flask(__name__)
-    app.config["TESTING"] = True
-    app.register_blueprint(cl_mod.client_log_bp)
-    return app
+from tests.helpers.client_log_helpers import fresh_client_log_app
 
 
 def _post(client, payload):
@@ -57,8 +34,7 @@ def _post(client, payload):
 
 class TestBatchAccepted:
     def test_batch_endpoint_accepts_array_payload(self, monkeypatch):
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         batch = [
             {"level": "warn", "message": "w1"},
@@ -74,8 +50,7 @@ class TestBatchAccepted:
 
     def test_existing_single_entry_payload_still_works(self, monkeypatch):
         """Backwards-compat: legacy single-object POSTs still return 204."""
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         resp = _post(app.test_client(), {"level": "warn", "message": "solo"})
         assert resp.status_code == 204
@@ -84,8 +59,7 @@ class TestBatchAccepted:
         assert reports[0]["message"] == "solo"
 
     def test_batch_at_cap_is_accepted(self, monkeypatch):
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         batch = [{"level": "warn", "message": f"m{i}"} for i in range(50)]
         resp = _post(app.test_client(), batch)
@@ -96,8 +70,7 @@ class TestBatchAccepted:
 class TestBatchRejected:
     def test_batch_endpoint_rejects_oversized_batch(self, monkeypatch):
         """> 50 entries → 400."""
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         batch = [{"level": "warn", "message": f"m{i}"} for i in range(51)]
         resp = _post(app.test_client(), batch)
@@ -109,15 +82,14 @@ class TestBatchRejected:
         assert cl_mod.get_captured_reports() == []
 
     def test_empty_batch_rejected(self, monkeypatch):
-        app = _fresh_app(monkeypatch)
+        _, app = fresh_client_log_app(monkeypatch)
         resp = _post(app.test_client(), [])
         assert resp.status_code == 400
 
     def test_batch_entries_individually_validated(self, monkeypatch):
         """One bad entry returns 400 with per-entry errors; good entries are
         NOT emitted in that case (all-or-nothing)."""
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         batch = [
             {"level": "warn", "message": "ok1"},
@@ -132,7 +104,7 @@ class TestBatchRejected:
         assert cl_mod.get_captured_reports() == []
 
     def test_non_object_entry_in_batch_rejected(self, monkeypatch):
-        app = _fresh_app(monkeypatch)
+        _, app = fresh_client_log_app(monkeypatch)
         batch = [{"level": "warn", "message": "ok"}, "bad-entry", 42]
         resp = _post(app.test_client(), batch)
         assert resp.status_code == 400
@@ -141,7 +113,7 @@ class TestBatchRejected:
         assert indexes == [1, 2]
 
     def test_non_object_non_array_body_rejected(self, monkeypatch):
-        app = _fresh_app(monkeypatch)
+        _, app = fresh_client_log_app(monkeypatch)
         resp = _post(app.test_client(), "just-a-string")
         assert resp.status_code == 400
 
@@ -149,10 +121,9 @@ class TestBatchRejected:
 class TestRateLimitCapacity:
     def test_rate_limit_capacity_raised_to_60(self, monkeypatch):
         """JTN-711: the bucket now holds 60 tokens (up from 10)."""
-        app = _fresh_app(monkeypatch)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch)
 
-        cl_mod._rate_limiter = TokenBucket(capacity=60, refill_rate=0)
+        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
         c = app.test_client()
 
         for i in range(60):
@@ -167,10 +138,9 @@ class TestRateLimitCapacity:
         """60 POSTs, each carrying 10 entries, should all succeed. That's
         600 *entries* worth of traffic — proving the bucket is keyed on
         requests, not entries."""
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
-        cl_mod._rate_limiter = TokenBucket(capacity=60, refill_rate=0)
+        cl_mod._rate_limiter = cl_mod.TokenBucket(capacity=60, refill_rate=0)
         c = app.test_client()
         per_batch = 10
         batches = 60
@@ -194,7 +164,7 @@ class TestBatchFieldHandling:
         """Every entry is logged at WARNING so SecretRedactionFilter (JTN-364)
         strips secrets. Here we assert each entry reaches the logger — the
         downstream filter is tested separately in its own suite."""
-        app = _fresh_app(monkeypatch)
+        _, app = fresh_client_log_app(monkeypatch)
 
         batch = [{"level": "warn", "message": f"entry-{i}"} for i in range(5)]
         with caplog.at_level(logging.WARNING, logger="blueprints.client_log"):
@@ -210,7 +180,7 @@ class TestBatchFieldHandling:
             ), f"entry-{i} missing from logs"
 
     def test_cr_lf_stripped_on_every_batch_entry(self, monkeypatch, caplog):
-        app = _fresh_app(monkeypatch)
+        _, app = fresh_client_log_app(monkeypatch)
         batch = [
             {"level": "warn", "message": "line\r\nbad1"},
             {"level": "error", "message": "also\nbad2"},
@@ -227,8 +197,7 @@ class TestBatchFieldHandling:
         assert "bad2" in joined
 
     def test_message_field_capped_per_entry(self, monkeypatch):
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         huge = "x" * 5000  # exceeds 2048 message cap
         batch = [{"level": "warn", "message": huge}]
@@ -246,8 +215,7 @@ class TestBurstAllLands:
     tested in the browser integration suite."""
 
     def test_30_errors_in_a_burst_all_land(self, monkeypatch):
-        app = _fresh_app(monkeypatch, capture=True)
-        import blueprints.client_log as cl_mod
+        cl_mod, app = fresh_client_log_app(monkeypatch, capture=True)
 
         batch = [{"level": "error", "message": f"burst-{i}"} for i in range(30)]
         resp = _post(app.test_client(), batch)
