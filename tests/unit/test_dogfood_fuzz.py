@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
-PLAYLIST_JS = Path(__file__).resolve().parents[2] / "src/static/scripts/playlist.js"
+PLAYLIST_SHARED_JS = (
+    Path(__file__).resolve().parents[2] / "src/static/scripts/playlist/shared.js"
+)
 EXPECTED_COPY = (
     "Playlist name can only contain ASCII letters, "
     "numbers, spaces, underscores, and hyphens"
@@ -93,7 +95,7 @@ class TestDeviceNameValidation:
 
 def test_non_ascii_playlist_names_match_ui_copy(client):
     """Non-ASCII playlist names should be rejected by both UI copy and server."""
-    js = PLAYLIST_JS.read_text()
+    js = PLAYLIST_SHARED_JS.read_text()
     assert "^[A-Za-z0-9 _-]+$" in js
     assert EXPECTED_COPY in js
 

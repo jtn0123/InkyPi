@@ -12,41 +12,46 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PLAYLIST_JS = ROOT / "src" / "static" / "scripts" / "playlist.js"
+PLAYLIST_MODALS_JS = (
+    ROOT / "src" / "static" / "scripts" / "playlist" / "modals.js"
+)
+PLAYLIST_ACTIONS_JS = (
+    ROOT / "src" / "static" / "scripts" / "playlist" / "actions.js"
+)
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
 class TestInertAttributeManagement:
-    """Verify that playlist.js sets/removes inert on the page content wrapper."""
+    """Verify that playlist/modals.js sets/removes inert on the page content wrapper."""
 
     def test_js_sets_inert_on_page_content(self):
         """syncModalOpenState must set the inert attribute when a modal opens."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "setAttribute('inert'" in js or 'setAttribute("inert"' in js
-        ), "playlist.js must call setAttribute('inert', '') to block background"
+        ), "playlist/modals.js must call setAttribute('inert', '') to block background"
 
     def test_js_removes_inert_on_modal_close(self):
         """syncModalOpenState must remove the inert attribute when all modals close."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "removeAttribute('inert'" in js or 'removeAttribute("inert"' in js
-        ), "playlist.js must call removeAttribute('inert') when modals close"
+        ), "playlist/modals.js must call removeAttribute('inert') when modals close"
 
     def test_js_targets_playlist_page_content(self):
         """The inert toggle must target the #playlist-page-content wrapper."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         assert (
             "playlist-page-content" in js
-        ), "playlist.js must reference #playlist-page-content as the inert target"
+        ), "playlist/modals.js must reference #playlist-page-content as the inert target"
 
     def test_inert_toggled_in_sync_function(self):
         """The inert toggle must live inside the syncModalOpenState function so it
         fires on every open/close path."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         # Extract the syncModalOpenState function body
         match = re.search(
-            r"function\s+syncModalOpenState\s*\(\s*\)\s*\{(.*?)\n\s{4}\}",
+            r"function\s+syncModalOpenState\s*\(\s*\)\s*\{(.*?)\n\s*\}",
             js,
             re.DOTALL,
         )
@@ -100,26 +105,26 @@ class TestFocusManagement:
 
     def test_js_moves_focus_into_modal_on_open(self):
         """setModalOpen / openRefreshModal must focus a child element when opening."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         # Look for a focus() call inside an open path
         assert (
             "focusable.focus()" in js
-        ), "playlist.js must call focusable.focus() when opening a modal"
+        ), "playlist/modals.js must call focusable.focus() when opening a modal"
 
     def test_js_restores_focus_on_close(self):
         """On close, focus must return to _lastModalTrigger."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_MODALS_JS.read_text()
         assert (
-            "_lastModalTrigger" in js
-        ), "playlist.js must track _lastModalTrigger for focus restoration"
+            "lastModalTrigger" in js
+        ), "playlist/modals.js must track lastModalTrigger for focus restoration"
         assert (
-            "_lastModalTrigger.focus()" in js
-        ), "playlist.js must call _lastModalTrigger.focus() when closing a modal"
+            "lastModalTrigger.focus()" in js
+        ), "playlist/modals.js must call lastModalTrigger.focus() when closing a modal"
 
     def test_refresh_btn_listener_passes_trigger(self):
         """The delegated refresh action must pass the button element as the
         trigger so focus can be restored after close."""
-        js = PLAYLIST_JS.read_text()
+        js = PLAYLIST_ACTIONS_JS.read_text()
         match = re.search(
             r'action === [\'"]edit-refresh[\'"].*?openRefreshModal\((.*?)\);',
             js,

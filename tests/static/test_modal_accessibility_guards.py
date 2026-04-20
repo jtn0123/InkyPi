@@ -19,13 +19,13 @@ def test_history_page_script_handles_escape_for_open_modals():
 
 
 def test_playlist_script_handles_escape_for_playlist_modals():
-    content = _read_script("playlist.js")
+    content = _read_script("playlist/modals.js")
 
     assert "getOpenModalId" in content
     assert "closeModalById" in content
     assert "deleteInstanceModal" in content
     assert "deviceCycleModal" in content
-    assert "event.key !== 'Escape'" in content
+    assert 'event.key !== "Escape"' in content or "event.key !== 'Escape'" in content
 
 
 def test_image_modal_script_handles_escape_and_null_container():

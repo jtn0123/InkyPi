@@ -98,7 +98,7 @@ def test_settings_page_script_invokes_form_state(client):
 
 
 def test_playlist_script_invokes_form_state(client):
-    js = client.get("/static/scripts/playlist.js").get_data(as_text=True)
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
     # Both create and update flows must wrap submission in FormState.run.
     assert "FormState.attach" in js
     assert "fs.run(submit)" in js

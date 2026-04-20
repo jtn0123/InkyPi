@@ -17,6 +17,13 @@
             update_playlist_base_url: {{ url_for('playlist.update_playlist', playlist_name='') | tojson }},
         };
     </script>
+    <script src="{{ url_for('static', filename='scripts/playlist/shared.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/cards.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/modals.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/progress.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/actions.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/form.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/playlist/page.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
 {% endblock %}
 {% block body %}
