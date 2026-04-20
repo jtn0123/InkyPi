@@ -286,7 +286,7 @@ class TestRemoteExceptionPreservesPermanentType:
         subprocess path would regress to HTTP 500.
         """
         from refresh_task.worker import _remote_exception
-        from utils.security_utils import URLValidationError
+        from utils.plugin_errors import URLValidationError
 
         exc = _remote_exception(
             "URLValidationError", "Invalid URL: URL scheme must be http or https"

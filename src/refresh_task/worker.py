@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task.actions import PluginLike, RefreshAction
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
-from utils.plugin_errors import PermanentPluginError
-from utils.security_utils import URLValidationError
+from utils.plugin_errors import PermanentPluginError, URLValidationError
 
 logger = logging.getLogger(__name__)
 

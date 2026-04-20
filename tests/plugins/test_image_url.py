@@ -94,7 +94,7 @@ def test_image_url_raises_url_validation_error(bad_url, expected_fragment):
     """JTN-776: plugins must raise URLValidationError (not bare RuntimeError)
     on bad URLs so the blueprint can map it to HTTP 422."""
     from plugins.image_url.image_url import ImageURL
-    from utils.security_utils import URLValidationError
+    from utils.plugin_errors import URLValidationError
 
     plugin = ImageURL({"id": "image_url"})
     with pytest.raises(URLValidationError) as exc_info:
