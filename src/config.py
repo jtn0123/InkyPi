@@ -65,7 +65,7 @@ def _mask_config_value(value: Any) -> Any:
     return "<omitted>"
 
 
-def _coerce_device_name(config: dict) -> bool:
+def _coerce_device_name(config: dict[str, Any]) -> bool:
     """Truncate ``config['name']`` to ``_DEVICE_NAME_MAX_LEN`` characters in place.
 
     Returns True if the name was modified (over-length or non-string coerced
