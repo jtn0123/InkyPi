@@ -281,12 +281,32 @@
             if (saveBtn) saveBtn.disabled = true;
             showResponseModal("success", `Success! ${result.message}`);
           } else {
-            // Surface field-level errors inline when the server returns them.
-            if (fs && result && result.field_errors && typeof result.field_errors === "object") {
-              fs.setFieldErrors(result.field_errors);
+            // JTN-780: Surface field-level errors inline so the user sees the
+            // problem next to the bad input, not just in a dismissable toast.
+            // The settings blueprint emits `details.field` for single-field
+            // validation errors (via `_field_error`). Other forms may emit
+            // `field_errors` maps; honor both shapes.
+            let fieldLevelError = false;
+            if (fs && result) {
+              if (result.field_errors && typeof result.field_errors === "object") {
+                fs.setFieldErrors(result.field_errors);
+                fieldLevelError = true;
+              } else if (
+                result.code === "validation_error"
+                && result.details
+                && typeof result.details.field === "string"
+              ) {
+                fs.setFieldError(result.details.field, result.error);
+                fieldLevelError = true;
+              }
             }
             showResponseModal("failure", `Error! ${result.error}`);
-            restoreFormFromSnapshot(form, _formSnapshot);
+            // Preserve the user's bad input when we surfaced the error inline
+            // so they can actually fix it; otherwise fall back to the
+            // previous behavior of restoring the last-known-good snapshot.
+            if (!fieldLevelError) {
+              restoreFormFromSnapshot(form, _formSnapshot);
+            }
           }
         } catch (error) {
           console.error("Settings save failed:", error);
