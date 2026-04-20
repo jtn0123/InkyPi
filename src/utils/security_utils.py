@@ -5,6 +5,22 @@ import os
 import socket
 import urllib.parse
 
+from utils.plugin_errors import PermanentPluginError
+
+
+class URLValidationError(PermanentPluginError):
+    """Raised by plugins when a user-supplied URL fails SSRF/scheme validation.
+
+    Subclasses :class:`PermanentPluginError` (itself a :class:`RuntimeError`)
+    so the refresh-task retry loop skips extra attempts (JTN-778) and
+    existing ``except RuntimeError`` blocks in plugin code keep working.
+    The plugin blueprint catches this subclass specifically to return HTTP
+    4xx with the validator message instead of a generic 500 (JTN-776).
+    The message text is server-controlled and comes from
+    :func:`validate_url` / :func:`validate_url_with_ips`, so it is safe to
+    surface to the client.
+    """
+
 
 def validate_url(url: str) -> str:
     """Validate that a URL uses an allowed scheme and does not resolve to a private IP.
