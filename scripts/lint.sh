@@ -128,7 +128,7 @@ run_counted_mypy() {
 }
 
 enforce_mypy_src_ratchet() {
-    local display_baseline_file="${MYPY_SRC_BASELINE_FILE#${REPO_ROOT}/}"
+    local display_baseline_file="${MYPY_SRC_BASELINE_FILE#"${REPO_ROOT}"/}"
 
     if ! load_mypy_src_baseline; then
         MYPY_SRC_RATCHET_EXIT=1
