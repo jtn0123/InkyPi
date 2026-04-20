@@ -261,9 +261,13 @@ class TestDeletePlaylist:
         assert pm.get_playlist("ToDelete") is None
 
     def test_nonexistent(self, client):
+        # JTN-782: deleting a missing playlist is a 404 with code=not_found.
         resp = client.delete("/delete_playlist/Ghost")
-        assert resp.status_code == 400
-        assert "does not exist" in resp.get_json()["error"]
+        assert resp.status_code == 404
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data.get("code") == "not_found"
+        assert "does not exist" in data["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -965,8 +969,15 @@ class TestValidatorFieldAttribution:
     # --- delete ---
 
     def test_delete_nonexistent(self, client):
+        # JTN-782: delete-of-missing is a 404 not_found (not a validation
+        # error), but we still attach field attribution so the UI can
+        # highlight the offending input.
         resp = client.delete("/delete_playlist/Ghost")
-        self._assert_field(resp, "playlist_name")
+        assert resp.status_code == 404, resp.get_json()
+        data = resp.get_json()
+        assert data["success"] is False
+        assert data.get("code") == "not_found", data
+        assert data.get("details", {}).get("field") == "playlist_name", data
 
     # --- device cycle ---
 

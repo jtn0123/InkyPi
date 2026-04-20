@@ -893,10 +893,13 @@ def delete_playlist(playlist_name):
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
+        # JTN-782: missing playlist is a 404 Not Found, not a 400 validation
+        # error. Keep the field attribution so the UI can still surface the
+        # offending input when it wants to.
         return json_error(
             "Playlist does not exist",
-            status=400,
-            code=_CODE_VALIDATION,
+            status=404,
+            code="not_found",
             details={"field": "playlist_name"},
         )
 
