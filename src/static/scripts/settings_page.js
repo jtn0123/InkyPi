@@ -59,6 +59,32 @@
     return /\bWARNING\b/i.test(line);
   }
 
+  // JTN-780: Route a 4xx/5xx save response to the right surface.  Extracted
+  // from handleAction so cognitive complexity stays under Sonar's S3776 cap
+  // (the inline-error fast-path, the field_errors fallback, and the snapshot
+  // restore each add a branch that trip the threshold when inlined).
+  //
+  // Returns true when a field-level error was surfaced inline so the caller
+  // can skip restoring the last-known-good snapshot — otherwise the user's
+  // bad input gets wiped alongside the error message they need to see in
+  // order to fix it.
+  function applyFieldLevelError(fs, result) {
+    if (!fs || !result) return false;
+    if (result.field_errors && typeof result.field_errors === "object") {
+      fs.setFieldErrors(result.field_errors);
+      return true;
+    }
+    if (
+      result.code === "validation_error"
+      && result.details
+      && typeof result.details.field === "string"
+    ) {
+      fs.setFieldError(result.details.field, result.error);
+      return true;
+    }
+    return false;
+  }
+
   // JTN-710: banner rendering helpers.  Kept at module scope (outside the
   // createSettingsPage closure) so Sonar S7721/S3776 stay green and the
   // helpers can be individually tested/tree-shaken.
@@ -281,32 +307,9 @@
             if (saveBtn) saveBtn.disabled = true;
             showResponseModal("success", `Success! ${result.message}`);
           } else {
-            // JTN-780: Surface field-level errors inline so the user sees the
-            // problem next to the bad input, not just in a dismissable toast.
-            // The settings blueprint emits `details.field` for single-field
-            // validation errors (via `_field_error`). Other forms may emit
-            // `field_errors` maps; honor both shapes.
-            let fieldLevelError = false;
-            if (fs && result) {
-              if (result.field_errors && typeof result.field_errors === "object") {
-                fs.setFieldErrors(result.field_errors);
-                fieldLevelError = true;
-              } else if (
-                result.code === "validation_error"
-                && result.details
-                && typeof result.details.field === "string"
-              ) {
-                fs.setFieldError(result.details.field, result.error);
-                fieldLevelError = true;
-              }
-            }
+            const fieldLevelError = applyFieldLevelError(fs, result);
             showResponseModal("failure", `Error! ${result.error}`);
-            // Preserve the user's bad input when we surfaced the error inline
-            // so they can actually fix it; otherwise fall back to the
-            // previous behavior of restoring the last-known-good snapshot.
-            if (!fieldLevelError) {
-              restoreFormFromSnapshot(form, _formSnapshot);
-            }
+            if (!fieldLevelError) restoreFormFromSnapshot(form, _formSnapshot);
           }
         } catch (error) {
           console.error("Settings save failed:", error);
