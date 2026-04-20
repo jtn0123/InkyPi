@@ -179,6 +179,12 @@ def _float_value(
 ) -> float:
     if raw is None:
         return 1.0
+    if isinstance(raw, bool):
+        raise RequestValidationError(
+            f"Invalid numeric value for {field}",
+            status=422,
+            field=field,
+        )
     try:
         value = float(
             cast(str | bytes | bytearray | SupportsFloat | SupportsIndex, raw)
@@ -215,7 +221,14 @@ def _bool_value(raw: object, *, default: bool = False) -> bool:
             return True
         if normalized in {"0", "false", "no", "off", ""}:
             return False
-    return bool(raw)
+        raise RequestValidationError(
+            f"Invalid boolean value: {raw!r}",
+            status=400,
+        )
+    raise RequestValidationError(
+        f"Boolean value must be true/false or string, not {type(raw).__name__}",
+        status=400,
+    )
 
 
 def _parse_time_field(raw: object, *, field: str) -> tuple[str, int]:
@@ -306,7 +319,7 @@ def _parse_interval_seconds(data: Mapping[str, object]) -> tuple[int, TimeUnit]:
         range_message="Refresh interval must be at least 1",
     )
     interval_seconds = calculate_seconds(interval, unit)
-    if interval_seconds > 86400 or interval_seconds <= 0:
+    if interval_seconds >= 86400 or interval_seconds <= 0:
         raise RequestValidationError(
             "Plugin cycle interval must be less than 24 hours",
             status=422,
@@ -655,7 +668,10 @@ class SettingsFormRequest:
             status=422,
             required_message="Time Zone is required",
         )
-        allowed_timezones = set(valid_timezones or available_timezones())
+        if valid_timezones is None:
+            allowed_timezones = set(available_timezones())
+        else:
+            allowed_timezones = set(valid_timezones)
         if timezone_name not in allowed_timezones:
             raise RequestValidationError(
                 "Time Zone must be a valid IANA timezone (e.g. UTC, America/New_York)",
@@ -775,8 +791,8 @@ class SettingsImportRequest:
         allowed_config_keys: Collection[str],
         allowed_env_keys: Collection[str],
     ) -> SettingsImportRequest:
-        config_raw = payload.get("config") or {}
-        env_keys_raw = payload.get("env_keys") or {}
+        config_raw = payload.get("config", {})
+        env_keys_raw = payload.get("env_keys", {})
         if not isinstance(config_raw, Mapping):
             raise RequestValidationError(
                 "config must be a JSON object", status=400, field="config"
