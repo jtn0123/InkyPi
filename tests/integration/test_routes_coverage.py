@@ -28,9 +28,12 @@ def test_delete_playlist_route(client, device_config_dev):
 
 
 def test_delete_playlist_nonexistent(client, device_config_dev):
-    """Deleting a nonexistent playlist returns 400."""
+    """Deleting a nonexistent playlist returns 404 with not_found (JTN-782)."""
     resp = client.delete("/delete_playlist/DoesNotExist")
-    assert resp.status_code == 400
+    assert resp.status_code == 404
+    data = resp.get_json()
+    assert data["success"] is False
+    assert data.get("code") == "not_found"
 
 
 def test_reorder_plugins_route(client, device_config_dev):

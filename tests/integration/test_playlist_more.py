@@ -176,8 +176,12 @@ def test_update_playlist_errors_and_failure_branch(client, flask_app, monkeypatc
 
 
 def test_delete_playlist_not_exist(client):
+    # JTN-782: missing playlist returns 404 (not_found), not 400.
     resp = client.delete("/delete_playlist/NoSuch")
-    assert resp.status_code == 400
+    assert resp.status_code == 404
+    data = resp.get_json()
+    assert data["success"] is False
+    assert data.get("code") == "not_found"
 
 
 def test_eta_endpoint_and_request_ids(client, device_config_dev):
