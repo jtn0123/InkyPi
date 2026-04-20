@@ -597,19 +597,21 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
             image = plugin.generate_image(plugin_settings, device_config)
         except URLValidationError as e:
             # JTN-776: URL validation failures are user errors, not server
-            # errors. The message is server-controlled (from validate_url) and
-            # safe to surface verbatim so the user sees *why* their URL was
-            # rejected instead of "An internal error occurred".
+            # errors. ``safe_message()`` returns a response string looked up
+            # from the module-level whitelist in :mod:`utils.security_utils`,
+            # which avoids any exception-derived text flowing to the client
+            # (CodeQL ``py/stack-trace-exposure``).
+            safe_msg = e.safe_message()
             logger.info(
                 "Plugin %s rejected URL: %s",
                 sanitize_log_field(plugin_id),
-                sanitize_log_field(str(e)),
+                sanitize_log_field(safe_msg),
             )
             _push_update_now_fallback(
                 plugin_id, plugin_config, device_config, display_manager, e
             )
             return json_error(
-                str(e),
+                safe_msg,
                 status=422,
                 code="validation_error",
                 details={"field": "url"},
@@ -852,15 +854,18 @@ def update_now():
     except URLValidationError as e:
         # JTN-776: URL validation failures surfaced through the refresh-task
         # path (manual_update re-raises the plugin's exception) must become
-        # HTTP 4xx, not 500, so the user sees the real reason. The validator
-        # message is server-controlled and safe to return.
+        # HTTP 4xx, not 500, so the user sees the real reason. ``safe_message``
+        # returns a whitelisted string from :mod:`utils.security_utils`, so no
+        # exception-derived text reaches the response body (CodeQL
+        # ``py/stack-trace-exposure``).
+        safe_msg = e.safe_message()
         logger.info(
             "update_now: URL validation rejected plugin %s: %s",
             sanitize_log_field(plugin_id or "?"),
-            sanitize_log_field(str(e)),
+            sanitize_log_field(safe_msg),
         )
         return json_error(
-            str(e),
+            safe_msg,
             status=422,
             code="validation_error",
             details={"field": "url"},
