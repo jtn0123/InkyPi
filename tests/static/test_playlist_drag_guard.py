@@ -61,6 +61,5 @@ class TestCrossPlaylistDragGuard:
     def test_guard_uses_closest_playlist_item(self):
         block = _handle_drop_block()
         assert (
-            "closest('.playlist-item')" in block
-            or 'closest(".playlist-item")' in block
+            "closest('.playlist-item')" in block or 'closest(".playlist-item")' in block
         ), "Guard must use .closest('.playlist-item') to identify playlist boundaries"

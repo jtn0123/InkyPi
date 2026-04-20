@@ -349,7 +349,9 @@ def test_playlist_script_url_encodes_playlist_names_in_fetch_calls(client):
     assert "update_playlist_base_url + encodeURIComponent(oldName)" in form_js
 
     # Both delete_playlist fetch sites must use encodeURIComponent
-    delete_encode_count = form_js.count("delete_playlist_base_url + encodeURIComponent(")
+    delete_encode_count = form_js.count(
+        "delete_playlist_base_url + encodeURIComponent("
+    )
     delete_encode_count += modal_js.count(
         "delete_playlist_base_url + encodeURIComponent("
     )

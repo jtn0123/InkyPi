@@ -74,6 +74,35 @@
     return true;
   }
 
+  function handlePlaylistMutationSuccess(result) {
+    ns.closeModal();
+    if (result.warning) {
+      sessionStorage.setItem(
+        "storedMessage",
+        JSON.stringify({ type: "warning", text: result.warning })
+      );
+    }
+    location.reload();
+  }
+
+  async function runPlaylistMutation(fs, requestFactory) {
+    try {
+      const response = await requestFactory();
+      const result = await handleJsonResponse(response);
+      if (response.ok && result && result.success) {
+        handlePlaylistMutationSuccess(result);
+      } else if (fs && result) {
+        applyFieldErrorFromResponse(fs, result);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      showResponseModal(
+        "failure",
+        "An error occurred while processing your request."
+      );
+    }
+  }
+
   async function createPlaylist() {
     const fs = scheduleFormState();
     if (fs) fs.clearErrors();
@@ -84,8 +113,8 @@
     const endTime = document.getElementById("end_time").value;
 
     const submit = async () => {
-      try {
-        const response = await fetch(ns.config.create_playlist_url, {
+      await runPlaylistMutation(fs, () =>
+        fetch(ns.config.create_playlist_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -93,27 +122,8 @@
             start_time: startTime,
             end_time: endTime,
           }),
-        });
-        const result = await handleJsonResponse(response);
-        if (response.ok && result && result.success) {
-          ns.closeModal();
-          if (result.warning) {
-            sessionStorage.setItem(
-              "storedMessage",
-              JSON.stringify({ type: "warning", text: result.warning })
-            );
-          }
-          location.reload();
-        } else if (fs && result) {
-          applyFieldErrorFromResponse(fs, result);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        showResponseModal(
-          "failure",
-          "An error occurred while processing your request."
-        );
-      }
+        })
+      );
     };
 
     if (fs) {
@@ -135,8 +145,8 @@
     const cycleMinutes = document.getElementById("cycle_minutes").value;
 
     const submit = async () => {
-      try {
-        const response = await fetch(
+      await runPlaylistMutation(fs, () =>
+        fetch(
           ns.config.update_playlist_base_url + encodeURIComponent(oldName),
           {
             method: "PUT",
@@ -148,27 +158,8 @@
               cycle_minutes: cycleMinutes || null,
             }),
           }
-        );
-        const result = await handleJsonResponse(response);
-        if (response.ok && result && result.success) {
-          ns.closeModal();
-          if (result.warning) {
-            sessionStorage.setItem(
-              "storedMessage",
-              JSON.stringify({ type: "warning", text: result.warning })
-            );
-          }
-          location.reload();
-        } else if (fs && result) {
-          applyFieldErrorFromResponse(fs, result);
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        showResponseModal(
-          "failure",
-          "An error occurred while processing your request."
-        );
-      }
+        )
+      );
     };
 
     if (fs) {
@@ -259,7 +250,9 @@
     applyFieldErrorFromResponse,
     createPlaylist,
     deletePlaylist,
+    handlePlaylistMutationSuccess,
     initFormControls,
+    runPlaylistMutation,
     saveDeviceCycle,
     updatePlaylist,
   });

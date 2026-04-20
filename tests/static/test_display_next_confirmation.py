@@ -88,10 +88,7 @@ def test_display_next_success_surfaces_toast(client):
     """On success, the user must see positive feedback (toast) — previously
     there was only a silent reload, per JTN-630."""
     js = _read_script(client, "/static/scripts/playlist/actions.js")
-    assert (
-        "showResponseModal('success'" in js
-        or 'showResponseModal("success"' in js
-    ), (
+    assert "showResponseModal('success'" in js or 'showResponseModal("success"' in js, (
         "Display Next success path must call showResponseModal('success', ...) "
         "so the user has positive feedback — this is the JTN-630 fix"
     )

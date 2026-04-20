@@ -3,6 +3,11 @@
 
   let dragSrcEl = null;
 
+  function nextPlaylistDragId() {
+    ns.runtime.playlistDragCounter = (ns.runtime.playlistDragCounter || 0) + 1;
+    return `plg-${ns.runtime.playlistDragCounter}`;
+  }
+
   function persistPlaylistOrder(container) {
     const playlistName = container?.getAttribute("data-playlist-name");
     const ordered = Array.from(container.querySelectorAll(".plugin-item")).map(
@@ -92,7 +97,7 @@
     const items = container.querySelectorAll(".plugin-item");
     items.forEach((item) => {
       if (item.dataset.playlistDragBound === "1") return;
-      if (!item.id) item.id = `plg-${Math.random().toString(36).slice(2)}`;
+      if (!item.id) item.id = nextPlaylistDragId();
       item.draggable = true;
       item.tabIndex = 0;
       item.setAttribute("role", "listitem");
@@ -197,6 +202,7 @@
     handleDrop,
     initPlaylistCards,
     initReorderControls,
+    nextPlaylistDragId,
     persistPlaylistOrder,
     setPlaylistExpanded,
     syncPlaylistCards,

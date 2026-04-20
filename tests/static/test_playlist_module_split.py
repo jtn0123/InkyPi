@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PLAYLIST_BOOTSTRAP_JS = ROOT / "src" / "static" / "scripts" / "playlist.js"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
@@ -21,8 +20,12 @@ def test_playlist_template_loads_split_scripts_in_order():
         "scripts/playlist.js",
     ]
     positions = [html.find(script) for script in scripts]
-    assert all(pos != -1 for pos in positions), "playlist.html must load all split playlist scripts"
-    assert positions == sorted(positions), "playlist module scripts must load before the bootstrap"
+    assert all(
+        pos != -1 for pos in positions
+    ), "playlist.html must load all split playlist scripts"
+    assert positions == sorted(
+        positions
+    ), "playlist module scripts must load before the bootstrap"
 
 
 def test_playlist_bootstrap_stays_thin_and_boot_oriented():
@@ -38,4 +41,6 @@ def test_playlist_bootstrap_stays_thin_and_boot_oriented():
         "function syncModalOpenState",
         "function openCreateModal",
     ):
-        assert moved_symbol not in js, f"{moved_symbol} should live in a playlist module, not playlist.js"
+        assert (
+            moved_symbol not in js
+        ), f"{moved_symbol} should live in a playlist module, not playlist.js"

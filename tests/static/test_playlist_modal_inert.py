@@ -12,12 +12,8 @@ import pathlib
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PLAYLIST_MODALS_JS = (
-    ROOT / "src" / "static" / "scripts" / "playlist" / "modals.js"
-)
-PLAYLIST_ACTIONS_JS = (
-    ROOT / "src" / "static" / "scripts" / "playlist" / "actions.js"
-)
+PLAYLIST_MODALS_JS = ROOT / "src" / "static" / "scripts" / "playlist" / "modals.js"
+PLAYLIST_ACTIONS_JS = ROOT / "src" / "static" / "scripts" / "playlist" / "actions.js"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
