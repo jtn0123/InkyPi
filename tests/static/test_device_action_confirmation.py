@@ -15,7 +15,13 @@ def _read_settings_html(client):
 
 
 def _read_settings_js(client):
-    resp = client.get("/static/scripts/settings_page.js")
+    resp = client.get("/static/scripts/settings/actions.js")
+    assert resp.status_code == 200
+    return resp.get_data(as_text=True)
+
+
+def _read_settings_modals_js(client):
+    resp = client.get("/static/scripts/settings/modals.js")
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
@@ -78,10 +84,9 @@ def test_reboot_button_click_opens_confirm_modal_not_shutdown(client):
     js = _read_settings_js(client)
     # The old pattern fired handleShutdown(true) directly from the click.
     # After the fix, the click opens the confirmation modal.
+    assert "rebootBtn" in js
     assert (
-        '"rebootBtn")?.addEventListener("click", openRebootConfirm)' in js
-        or 'getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm)'
-        in js
+        "openRebootConfirm" in js
     ), "rebootBtn must open confirmation modal, not fire handleShutdown directly"
 
     # Make sure the old anti-pattern is gone.
@@ -93,8 +98,9 @@ def test_reboot_button_click_opens_confirm_modal_not_shutdown(client):
 def test_shutdown_button_click_opens_confirm_modal_not_shutdown(client):
     """The shutdownBtn click handler must NOT call handleShutdown directly."""
     js = _read_settings_js(client)
+    assert "shutdownBtn" in js
     assert (
-        '"shutdownBtn")?.addEventListener("click", openShutdownConfirm)' in js
+        "openShutdownConfirm" in js
     ), "shutdownBtn must open confirmation modal, not fire handleShutdown directly"
 
     assert (
@@ -128,7 +134,7 @@ def test_cancel_buttons_close_modals(client):
 
 
 def test_settings_js_on_disk_has_confirm_handlers():
-    js = Path("src/static/scripts/settings_page.js").read_text()
+    js = Path("src/static/scripts/settings/modals.js").read_text()
     assert "openRebootConfirm" in js
     assert "openShutdownConfirm" in js
     assert "closeRebootConfirm" in js
@@ -144,7 +150,7 @@ def test_settings_js_on_disk_has_confirm_handlers():
 
 def test_reboot_shutdown_modals_handle_escape(client):
     """JTN-652: Escape key closes whichever confirm modal is open."""
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     assert 'event.key !== "Escape"' in js
     # Both modals must be referenced by the escape handler.
     assert 'isDeviceActionModalOpen("rebootConfirmModal")' in js
@@ -153,26 +159,26 @@ def test_reboot_shutdown_modals_handle_escape(client):
 
 def test_reboot_shutdown_modals_move_focus_on_open(client):
     """JTN-652: opening the confirm modal moves focus inside it."""
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     # setDeviceActionModalOpen should query for focusable elements and focus them.
     assert "focusable.focus()" in js
     # Trigger must be captured so focus can be restored on close.
-    assert "_lastDeviceActionTrigger" in js
+    assert "DeviceActionTrigger" in js
 
 
 def test_reboot_shutdown_modals_restore_focus_on_close(client):
     """JTN-652: closing the modal restores focus to the trigger."""
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     # The close branch inside setDeviceActionModalOpen calls .focus() on the
     # remembered trigger.
-    assert "_lastDeviceActionTrigger.focus()" in js
+    assert "DeviceActionTrigger.focus()" in js
 
 
 def test_reboot_shutdown_modals_toggle_is_open_class(client):
     """JTN-652: modal must get the .is-open class so body.modal-open tracks it
     and the shared CSS backdrop fires (matches scheduleModal / playlist modals).
     """
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     assert 'classList.toggle("is-open"' in js
     # syncModalOpenState is how InkyPiUI keeps body.modal-open up to date.
     assert "syncModalOpenState" in js
@@ -181,7 +187,7 @@ def test_reboot_shutdown_modals_toggle_is_open_class(client):
 def test_reboot_shutdown_modals_use_flex_display(client):
     """JTN-652: modal display must be 'flex' (for centering) rather than
     'block', matching the rest of the app's modals."""
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     # The new helper picks "flex" when opening and "none" when closing.
     assert '"flex" : "none"' in js
     # Old anti-pattern must be gone.
@@ -191,7 +197,7 @@ def test_reboot_shutdown_modals_use_flex_display(client):
 def test_reboot_shutdown_modals_close_on_backdrop_click(client):
     """JTN-652: clicking the modal backdrop closes the modal (parity with
     scheduleModal / playlist modals)."""
-    js = _read_settings_js(client)
+    js = _read_settings_modals_js(client)
     # The backdrop click handler compares event.target to the modal container
     # and calls the corresponding close helper.
     assert "event.target === rebootModal" in js

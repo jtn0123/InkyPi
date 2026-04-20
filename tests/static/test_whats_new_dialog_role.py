@@ -8,7 +8,8 @@ live browser so the guard runs in every CI environment, including headless.
 from pathlib import Path
 
 _SETTINGS_TPL = Path("src/templates/settings.html")
-_SETTINGS_JS = Path("src/static/scripts/settings_page.js")
+_SETTINGS_ACTIONS_JS = Path("src/static/scripts/settings/actions.js")
+_SETTINGS_MODALS_JS = Path("src/static/scripts/settings/modals.js")
 
 
 def _settings_html() -> str:
@@ -16,7 +17,11 @@ def _settings_html() -> str:
 
 
 def _settings_js() -> str:
-    return _SETTINGS_JS.read_text(encoding="utf-8")
+    return (
+        _SETTINGS_ACTIONS_JS.read_text(encoding="utf-8")
+        + "\n"
+        + _SETTINGS_MODALS_JS.read_text(encoding="utf-8")
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -88,7 +88,7 @@ def test_playlist_schedule_form_has_data_form_state(client):
 
 
 def test_settings_page_script_invokes_form_state(client):
-    js = client.get("/static/scripts/settings_page.js").get_data(as_text=True)
+    js = client.get("/static/scripts/settings/form.js").get_data(as_text=True)
     # handleAction must route through FormState so the submit button is
     # disabled and aria-busy set for the duration of the save request.
     assert "FormState.attach" in js

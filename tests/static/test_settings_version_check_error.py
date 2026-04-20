@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-JS_PATH = Path("src/static/scripts/settings_page.js")
+JS_PATH = Path("src/static/scripts/settings/actions.js")
 
 
 def test_version_check_aborts_without_warning():
