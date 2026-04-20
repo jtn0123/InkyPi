@@ -8,6 +8,7 @@ from plugins.base_plugin.settings_schema import field, option, row, schema, sect
 from utils.http_client import get_http_session
 from utils.http_utils import pinned_dns
 from utils.image_utils import pad_image_blur
+from utils.plugin_errors import PermanentPluginError
 from utils.security_utils import validate_url_with_ips
 
 logger = logging.getLogger(__name__)
@@ -226,7 +227,10 @@ class ImageAlbum(BasePlugin):
         try:
             _validated_url, pinned_ips = validate_url_with_ips(url)
         except ValueError as e:
-            raise RuntimeError(f"Invalid URL: {e}") from e
+            # Permanent: bad scheme, SSRF-blocked address, or malformed URL.
+            # Tell refresh_task not to retry — the URL will fail identically
+            # on every subsequent attempt (JTN-778).
+            raise PermanentPluginError(f"Invalid URL: {e}") from e
 
         album = settings.get("album")
         if not album:
