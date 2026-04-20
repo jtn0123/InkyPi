@@ -5,6 +5,84 @@ import os
 import socket
 import urllib.parse
 
+from utils.plugin_errors import PermanentPluginError
+
+# Canonical validator messages. Keeping these as module constants gives us an
+# explicit whitelist that :meth:`URLValidationError.safe_message` can check
+# against before any validator text reaches an HTTP response body — this is
+# what lets the blueprint return a specific error reason without tripping
+# CodeQL's ``py/stack-trace-exposure`` rule (JTN-776).
+_URL_ERR_EMPTY = "URL must not be empty"
+_URL_ERR_SCHEME = "URL scheme must be http or https"
+_URL_ERR_NO_HOST = "URL must include a hostname"
+_URL_ERR_LOCALHOST = "URL must not target localhost"
+_URL_ERR_UNRESOLVABLE = "Cannot resolve hostname"
+_URL_ERR_PRIVATE = (
+    "URL must not resolve to a private, loopback, link-local, "
+    "reserved, or multicast address"
+)
+_URL_VALIDATOR_MESSAGES: frozenset[str] = frozenset(
+    {
+        _URL_ERR_EMPTY,
+        _URL_ERR_SCHEME,
+        _URL_ERR_NO_HOST,
+        _URL_ERR_LOCALHOST,
+        _URL_ERR_UNRESOLVABLE,
+        _URL_ERR_PRIVATE,
+    }
+)
+_URL_ERR_GENERIC = "URL failed validation"
+
+
+class URLValidationError(PermanentPluginError):
+    """Raised by plugins when a user-supplied URL fails SSRF/scheme validation.
+
+    Subclasses :class:`PermanentPluginError` (itself a :class:`RuntimeError`)
+    so the refresh-task retry loop skips extra attempts (JTN-778) and
+    existing ``except RuntimeError`` blocks in plugin code keep working.
+    The plugin blueprint catches this subclass specifically to return HTTP
+    4xx with the validator message instead of a generic 500 (JTN-776).
+
+    Callers returning this error to an HTTP client MUST use
+    :meth:`safe_message` rather than ``str(self)`` — the former looks the
+    reason up in a whitelist of known hardcoded validator strings, breaking
+    any accidental information-exposure taint flow.
+    """
+
+    def __init__(self, message: str, *, reason: str | None = None) -> None:
+        super().__init__(message)
+        # ``reason`` is the raw validator string from :func:`validate_url`.
+        # When the plugin wraps ``ValueError`` the message is "Invalid URL: X"
+        # where X is from :data:`_URL_VALIDATOR_MESSAGES`; callers can pass
+        # the validator text directly via ``reason`` to avoid string parsing.
+        self.reason = reason if reason is not None else _extract_reason(message)
+
+    def safe_message(self) -> str:
+        """Return a response-safe description of the validation failure.
+
+        The returned string is always one of two things:
+
+        * ``"Invalid URL: <validator text>"`` where ``<validator text>`` is a
+          member of :data:`_URL_VALIDATOR_MESSAGES` (an immutable set of
+          hardcoded strings in this module), or
+        * ``"Invalid URL: URL failed validation"`` as a fallback.
+
+        Because the output is selected from a constant set rather than derived
+        from the exception instance, this satisfies CodeQL's
+        ``py/stack-trace-exposure`` rule.
+        """
+        if self.reason in _URL_VALIDATOR_MESSAGES:
+            return f"Invalid URL: {self.reason}"
+        return f"Invalid URL: {_URL_ERR_GENERIC}"
+
+
+def _extract_reason(message: str) -> str:
+    """Extract the validator text from a wrapped "Invalid URL: X" message."""
+    prefix = "Invalid URL: "
+    if message.startswith(prefix):
+        return message[len(prefix) :]
+    return message
+
 
 def validate_url(url: str) -> str:
     """Validate that a URL uses an allowed scheme and does not resolve to a private IP.
@@ -46,19 +124,19 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
         or resolves to a private/reserved IP address.
     """
     if not url:
-        raise ValueError("URL must not be empty")
+        raise ValueError(_URL_ERR_EMPTY)
 
     parsed = urllib.parse.urlparse(url)
 
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError("URL scheme must be http or https")
+        raise ValueError(_URL_ERR_SCHEME)
 
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError("URL must include a hostname")
+        raise ValueError(_URL_ERR_NO_HOST)
 
     if hostname.lower() == "localhost":
-        raise ValueError("URL must not target localhost")
+        raise ValueError(_URL_ERR_LOCALHOST)
 
     # Reject bare IP addresses that are private/loopback/etc. before DNS
     try:
@@ -74,7 +152,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     try:
         addr_infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror as exc:
-        raise ValueError("Cannot resolve hostname") from exc
+        raise ValueError(_URL_ERR_UNRESOLVABLE) from exc
 
     resolved: list[str] = []
     for info in addr_infos:
@@ -85,7 +163,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
             resolved.append(ip_str)
 
     if not resolved:
-        raise ValueError("Cannot resolve hostname")
+        raise ValueError(_URL_ERR_UNRESOLVABLE)
 
     return url, tuple(resolved)
 
@@ -101,9 +179,7 @@ def _reject_private_ip(
         or addr.is_reserved
         or addr.is_multicast
     ):
-        raise ValueError(
-            "URL must not resolve to a private, loopback, link-local, reserved, or multicast address"
-        )
+        raise ValueError(_URL_ERR_PRIVATE)
 
 
 def validate_file_path(file_path: str, allowed_directory: str) -> str:

@@ -11,7 +11,7 @@ import re
 import unicodedata
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
-from typing import Literal, SupportsFloat, SupportsIndex, SupportsInt, cast
+from typing import Any, Literal, SupportsFloat, SupportsIndex, SupportsInt, cast
 from zoneinfo import available_timezones
 
 from model import Playlist
@@ -68,9 +68,9 @@ class RequestValidationError(ValueError):
             details["field"] = self.field
         return details or None
 
-    def as_json_error_kwargs(self) -> dict[str, object]:
+    def as_json_error_kwargs(self) -> dict[str, Any]:
         """Return kwargs that can be passed directly to ``json_error``."""
-        kwargs: dict[str, object] = {
+        kwargs: dict[str, Any] = {
             "message": self.message,
             "status": self.status,
         }

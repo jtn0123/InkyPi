@@ -56,7 +56,10 @@
                     <div class="section-title">Basics</div>
                     <div class="form-group">
                         <label for="deviceName" class="form-label">Device Name</label>
-                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
+                        {# JTN-780: mirror server-side constraints from JTN-746 so users see inline feedback
+                           before hitting Save. maxlength caps input at 64; pattern forbids control characters
+                           (Cc category) except tab, matching blueprints/settings/_config.py::_validate_device_name. #}
+                        <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required maxlength="64" pattern="[^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*" title="Up to 64 characters. Tabs are allowed; other control characters are not." class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
                         <span id="deviceName-error" class="validation-message" role="alert"></span>
                     </div>
                     <div class="form-group nowrap">

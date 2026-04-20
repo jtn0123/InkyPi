@@ -6,7 +6,8 @@ from zoneinfo import available_timezones
 from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
-from utils.http_utils import json_error, json_internal_error, json_success
+from utils.backend_errors import ClientInputError, route_error_boundary
+from utils.http_utils import json_error, json_success
 from utils.request_models import (
     PluginIsolationRequest,
     RequestValidationError,
@@ -53,7 +54,11 @@ def plugin_isolation():
 
 @_mod.settings_bp.route("/settings/safe_reset", methods=["POST"])
 def safe_reset():
-    try:
+    with route_error_boundary(
+        "safe reset",
+        logger=_mod.logger,
+        hint="Check config readability and write permissions.",
+    ):
         device_config = current_app.config["DEVICE_CONFIG"]
         config = device_config.get_config().copy()
         keep = {
@@ -73,8 +78,6 @@ def safe_reset():
         keep["isolated_plugins"] = []
         device_config.update_config(keep)
         return json_success(message="Safe reset applied.")
-    except Exception as e:
-        return json_internal_error("safe reset", details={"error": str(e)})
 
 
 @_mod.settings_bp.route("/settings", methods=["GET"])
@@ -131,7 +134,11 @@ def _include_export_keys() -> bool:
     "/settings/export", methods=["POST"], endpoint="export_settings_post"
 )
 def export_settings():
-    try:
+    with route_error_boundary(
+        "export settings",
+        logger=_mod.logger,
+        hint="Check config readability.",
+    ):
         include_keys = _include_export_keys()
         device_config = current_app.config["DEVICE_CONFIG"]
 
@@ -160,12 +167,6 @@ def export_settings():
 
         # JSON response for now; a file download route can be added if needed
         return json_success(data=data)
-    except Exception as e:
-        _mod.logger.exception("Error exporting settings")
-        return json_internal_error(
-            "export settings",
-            details={"hint": "Check config readability.", "error": str(e)},
-        )
 
 
 def _extract_import_payload():
@@ -188,12 +189,16 @@ def _extract_import_payload():
 
 @_mod.settings_bp.route("/settings/import", methods=["POST"])
 def import_settings():
-    try:
+    with route_error_boundary(
+        "import settings",
+        logger=_mod.logger,
+        hint="Verify JSON structure and file permissions.",
+    ):
         device_config = current_app.config["DEVICE_CONFIG"]
         # Accept JSON body or form upload with a JSON file
         payload = _extract_import_payload()
         if payload is None:
-            return json_error("Invalid import payload", status=400)
+            raise ClientInputError("Invalid import payload", status=400)
 
         cfg = payload.get("config")
         if isinstance(cfg, dict):
@@ -214,15 +219,6 @@ def import_settings():
                     _mod.logger.exception("Failed setting env key during import: %s", k)
 
         return json_success(message="Import completed")
-    except Exception as e:
-        _mod.logger.exception("Error importing settings")
-        return json_internal_error(
-            "import settings",
-            details={
-                "hint": "Verify JSON structure and file permissions.",
-                "error": str(e),
-            },
-        )
 
 
 @_mod.settings_bp.route("/settings/api-keys", methods=["GET"])
@@ -270,7 +266,11 @@ def api_keys_page():
 @_mod.settings_bp.route("/settings/save_api_keys", methods=["POST"])
 def save_api_keys():
     device_config = current_app.config["DEVICE_CONFIG"]
-    try:
+    with route_error_boundary(
+        "saving API keys",
+        logger=_mod.logger,
+        hint="Ensure .env is writable and values are valid; check disk space and permissions.",
+    ):
         form_data = request.form.to_dict()
         updated = []
         skipped_placeholder = []
@@ -312,14 +312,6 @@ def save_api_keys():
         if skipped_placeholder:
             extra["skipped_placeholder"] = skipped_placeholder
         return json_success(message="API keys saved.", **extra)
-    except Exception:
-        _mod.logger.exception("Error saving API keys")
-        return json_internal_error(
-            "saving API keys",
-            details={
-                "hint": "Ensure .env is writable and values are valid; check disk space/permissions.",
-            },
-        )
 
 
 @_mod.settings_bp.route("/settings/delete_api_key", methods=["POST"])
@@ -335,16 +327,14 @@ def delete_api_key():
         "GOOGLE_AI_SECRET",
     }
     if key not in valid_keys:
-        return json_error("Invalid key name", status=400)
-    try:
+        raise ClientInputError("Invalid key name", status=400)
+    with route_error_boundary(
+        "deleting API key",
+        logger=_mod.logger,
+        hint="Verify .env file permissions and that the key exists.",
+    ):
         device_config.unset_env_key(key)
         return json_success(message=f"Deleted {key}.")
-    except Exception:
-        _mod.logger.exception("Error deleting API key")
-        return json_internal_error(
-            "deleting API key",
-            details={"hint": "Verify .env file permissions and key exists."},
-        )
 
 
 def _field_error(message, field):
@@ -526,7 +516,11 @@ def _build_settings_dict(form_data, normalized_device_name):
 def save_settings():
     device_config = current_app.config["DEVICE_CONFIG"]
 
-    try:
+    with route_error_boundary(
+        "saving device settings",
+        logger=_mod.logger,
+        hint="Check numeric values and config file permissions.",
+    ):
         form_data = request.form.to_dict()
 
         error, normalized_device_name = _validate_settings_form(form_data)
@@ -545,16 +539,6 @@ def save_settings():
             # wake the background thread up to signal interval config change
             refresh_task = current_app.config["REFRESH_TASK"]
             refresh_task.signal_config_change()
-    except RuntimeError:
-        return json_error(
-            "An internal error occurred", status=500, code="internal_error"
-        )
-    except Exception:
-        _mod.logger.exception("Error saving device settings")
-        return json_internal_error(
-            "saving device settings",
-            details={"hint": "Check numeric values and config file permissions."},
-        )
     return json_success(message="Saved settings.")
 
 

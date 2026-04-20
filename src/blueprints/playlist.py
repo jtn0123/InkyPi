@@ -17,9 +17,14 @@ from flask import (
 from model import Playlist
 from refresh_task import PlaylistRefresh
 from utils.app_utils import handle_request_files, parse_form
+from utils.backend_errors import (
+    ClientInputError,
+    OperationFailedError,
+    ResourceLookupError,
+    route_error_boundary,
+)
 from utils.http_utils import (
     json_error,
-    json_internal_error,
     json_success,
     reissue_json_error,
 )
@@ -52,6 +57,17 @@ _MSG_SAME_TIME = "Start time and End time cannot be the same"
 _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
 _MSG_PLAYLIST_NOT_FOUND = "Playlist not found"
+
+# JTN-781: the "Default" playlist is the canonical fallback shipped with the
+# system and auto-created on startup when no playlists exist (see
+# PlaylistManager.add_default_playlist + config bootstrap). Deleting it leaves
+# the scheduler with nothing to schedule and no UI path to recreate it, so the
+# server rejects the delete outright. The match is case-sensitive because every
+# other code path (create, update, overlap-warning, plugin auto-add) keys off
+# the exact string "Default" — a lowercase "default" is just a user-created
+# playlist and is fine to delete.
+DEFAULT_PLAYLIST_NAME = "Default"
+_MSG_CANNOT_DELETE_DEFAULT = "Cannot delete the default playlist"
 
 
 def _validate_playlist_name(name, field="playlist_name"):
@@ -396,7 +412,11 @@ def add_plugin():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    try:
+    with route_error_boundary(
+        "add plugin to playlist",
+        logger=logger,
+        hint="Validate inputs; ensure playlist exists and instance name is not duplicated.",
+    ):
         plugin_id, plugin_settings, refresh_settings, parse_err = (
             _parse_add_plugin_form(request.form, request.files)
         )
@@ -451,14 +471,7 @@ def add_plugin():
 
         device_config.update_atomic(_do_add)
         if not add_result or not add_result[0]:
-            return json_error("Failed to add to playlist", status=500)
-    except Exception:
-        return json_internal_error(
-            "add plugin to playlist",
-            details={
-                "hint": "Validate inputs; ensure playlist exists and instance name isn’t duplicated.",
-            },
-        )
+            raise OperationFailedError("Failed to add to playlist")
     return json_success("Scheduled refresh configured.")
 
 
@@ -667,14 +680,18 @@ def create_playlist():
     start_min = parsed.start_min
     end_min = parsed.end_min
 
-    try:
+    with route_error_boundary(
+        "create playlist",
+        logger=logger,
+        hint="Ensure the playlist name is unique and the config is writable.",
+    ):
         playlist = playlist_manager.get_playlist(playlist_name)
         if playlist:
-            return json_error(
+            raise ClientInputError(
                 "A playlist with that name already exists",
                 status=400,
                 code=_CODE_VALIDATION,
-                details={"field": "playlist_name"},
+                field="playlist_name",
             )
 
         # Prevent overlapping time windows
@@ -699,22 +716,13 @@ def create_playlist():
 
         device_config.update_atomic(_do_add_playlist)
         if not add_pl_result or not add_pl_result[0]:
-            return json_error("Failed to create playlist", status=500)
+            raise OperationFailedError("Failed to create playlist")
 
         warning = None
         if playlist_name != "Default":
             warning = _default_overlap_warning(
                 start_min, end_min, playlist_manager.playlists
             )
-
-    except Exception as e:
-        logger.exception("EXCEPTION CAUGHT: " + str(e))
-        return json_internal_error(
-            "create playlist",
-            details={
-                "hint": "Ensure unique name and valid time range; check config write permissions.",
-            },
-        )
 
     if warning:
         return json_success("Created new Playlist!", warning=warning)
@@ -877,6 +885,19 @@ def delete_playlist(playlist_name):
             details={"field": "playlist_name"},
         )
 
+    # JTN-781: refuse to delete the canonical "Default" playlist. This match is
+    # intentionally case-sensitive to mirror how "Default" is treated elsewhere
+    # (create/update/overlap-warning/plugin auto-add all key off the exact
+    # string). A user-created playlist named "default" is a different playlist
+    # and remains deletable.
+    if playlist_name == DEFAULT_PLAYLIST_NAME:
+        return json_error(
+            _MSG_CANNOT_DELETE_DEFAULT,
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
+
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
         return json_error(
@@ -897,11 +918,23 @@ def delete_playlist(playlist_name):
 def update_device_cycle():
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
-    try:
+    with route_error_boundary(
+        "update_device_cycle",
+        logger=logger,
+        hint="Check config write permissions.",
+    ):
         data = request.get_json(silent=True) or {}
         if not isinstance(data, dict):
             data = {}
-        parsed = DeviceCycleRequest.from_mapping(data)
+        try:
+            parsed = DeviceCycleRequest.from_mapping(data)
+        except RequestValidationError as err:
+            raise ClientInputError(
+                err.message,
+                status=err.status,
+                code=err.code,
+                details=err.details,
+            ) from err
         m = parsed.minutes
         device_config.update_value("plugin_cycle_interval_seconds", m * 60, write=True)
         try:
@@ -909,12 +942,6 @@ def update_device_cycle():
         except Exception:
             pass
         return json_success("Device refresh cadence updated.")
-    except RequestValidationError as err:
-        return json_error(**err.as_json_error_kwargs())
-    except Exception:
-        return json_internal_error(
-            "update_device_cycle", details={"hint": "Check config write permissions."}
-        )
 
 
 @playlist_bp.route("/reorder_plugins", methods=["POST"])
@@ -922,16 +949,30 @@ def reorder_plugins():
     device_config = current_app.config["DEVICE_CONFIG"]
     playlist_manager = device_config.get_playlist_manager()
 
-    try:
+    with route_error_boundary(
+        "reorder plugins",
+        logger=logger,
+        hint="Validate payload shape and ensure the playlist exists.",
+    ):
         data = request.get_json(silent=True)
-        parsed = PlaylistReorderRequest.from_mapping(
-            require_mapping(data, message="Invalid or missing JSON payload", status=400)
-        )
+        try:
+            parsed = PlaylistReorderRequest.from_mapping(
+                require_mapping(
+                    data, message="Invalid or missing JSON payload", status=400
+                )
+            )
+        except RequestValidationError as err:
+            raise ClientInputError(
+                err.message,
+                status=err.status,
+                code=err.code,
+                details=err.details,
+            ) from err
         playlist_name = parsed.playlist_name
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error(
+            raise ResourceLookupError(
                 _MSG_PLAYLIST_NOT_FOUND,
                 status=400,
                 code=_CODE_VALIDATION,
@@ -945,16 +986,9 @@ def reorder_plugins():
 
         device_config.update_atomic(_do_reorder)
         if not reorder_result or not reorder_result[0]:
-            return json_error("Invalid order payload", status=400)
+            raise ClientInputError("Invalid order payload", status=400)
 
         return json_success("Reordered plugins")
-    except RequestValidationError as err:
-        return json_error(**err.as_json_error_kwargs())
-    except Exception:
-        return json_internal_error(
-            "reorder plugins",
-            details={"hint": "Validate payload shape and ensure playlist exists."},
-        )
 
 
 # Trigger next eligible instance in a specific playlist immediately
@@ -964,22 +998,26 @@ def display_next_in_playlist():
     refresh_task = current_app.config["REFRESH_TASK"]
     playlist_manager = device_config.get_playlist_manager()
 
-    try:
+    with route_error_boundary(
+        "display next in playlist",
+        logger=logger,
+        hint="Ensure the playlist exists and has an eligible instance to render.",
+    ):
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
-            return json_error("Invalid or missing JSON payload", status=400)
+            raise ClientInputError("Invalid or missing JSON payload", status=400)
         playlist_name = data.get("playlist_name")
         if not playlist_name:
-            return json_error(
+            raise ClientInputError(
                 "playlist_name required",
                 status=400,
                 code=_CODE_VALIDATION,
-                details={"field": "playlist_name"},
+                field="playlist_name",
             )
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error(
+            raise ResourceLookupError(
                 _MSG_PLAYLIST_NOT_FOUND,
                 status=400,
                 code=_CODE_VALIDATION,
@@ -991,11 +1029,11 @@ def display_next_in_playlist():
 
         plugin_instance = playlist.get_next_eligible_plugin(current_dt)
         if not plugin_instance:
-            return json_error(
+            raise ClientInputError(
                 "No eligible instance in playlist",
                 status=400,
                 code=_CODE_VALIDATION,
-                details={"field": "playlist_name"},
+                field="playlist_name",
             )
 
         refresh_task.manual_update(
@@ -1016,8 +1054,6 @@ def display_next_in_playlist():
             pass
 
         return json_success("Displayed next instance", metrics=metrics)
-    except Exception:
-        return json_internal_error("display next in playlist")
 
 
 @playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])
@@ -1031,7 +1067,7 @@ def playlist_eta(playlist_name: str):
 
     pl = playlist_manager.get_playlist(playlist_name)
     if not pl:
-        return json_error(
+        raise ResourceLookupError(
             _MSG_PLAYLIST_NOT_FOUND,
             status=404,
             code=_CODE_VALIDATION,
@@ -1048,7 +1084,11 @@ def playlist_eta(playlist_name: str):
         return json_success("ok", eta=cached[1])
 
     # Compute ETA for this playlist only
-    try:
+    with route_error_boundary(
+        "compute playlist eta",
+        logger=logger,
+        hint="Check playlist timing data and refresh info availability.",
+    ):
         # Determine cycle in minutes
         try:
             device_cycle_minutes = int(
@@ -1094,8 +1134,6 @@ def playlist_eta(playlist_name: str):
                     _eta_cache.pop(next(iter(_eta_cache)), None)
             _eta_cache[playlist_name] = (floor_min, eta_map)
         return json_success("ok", eta=eta_map)
-    except Exception:
-        return json_internal_error("compute playlist eta")
 
 
 @playlist_bp.app_template_filter("format_relative_time")

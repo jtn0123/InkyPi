@@ -1,6 +1,112 @@
 # CHANGELOG
 
 
+## v0.62.2 (2026-04-20)
+
+### Bug Fixes
+
+- Surface device-name validation inline (JTN-780)
+  ([#559](https://github.com/jtn0123/InkyPi/pull/559),
+  [`23cb6e1`](https://github.com/jtn0123/InkyPi/commit/23cb6e15053e60ffcc1ce87112186937d637b8e0))
+
+* fix: surface device-name validation inline (JTN-780)
+
+JTN-746 added a 64-char cap and a control-char rejection on the server, but the Settings page gave
+  users no inline feedback when their input violated those rules. They typed hundreds of characters,
+  clicked Save, and only saw a dismissable "Error!" toast — the field itself looked fine, so the
+  cause of the failure was opaque.
+
+- Add `maxlength="64"` so the browser caps input at the server limit. - Add a `pattern` that forbids
+  Unicode control characters except tab, mirroring `_validate_device_name` in
+  blueprints/settings/_config.py. - Add a `title` so the native :invalid popup explains the
+  constraint. - Teach `settings_page.js` to route `{code: "validation_error", details: {field}}`
+  responses to `FormState.setFieldError`, so the server's error message lands next to the bad input.
+  - Skip the snapshot restore when a field-level error was surfaced so the user can still see (and
+  correct) the value they entered. - Pin all of the above with static-analysis tests.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* style: apply black formatting to JTN-780 test additions
+
+* refactor: extract applyFieldLevelError helper to satisfy Sonar S3776
+
+SonarCloud flagged handleAction's cognitive complexity at 16 (cap: 15) after JTN-780 added the
+  validation_error fast path and the snapshot-restore gate. Extract the error-routing branch into a
+  module-scope helper (same pattern used by renderUpdateFailureUnreadable for JTN-710), keeping the
+  closure-owned _formSnapshot access inline.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
+## v0.62.1 (2026-04-20)
+
+### Bug Fixes
+
+- Skip retries on permanent plugin errors (JTN-778)
+  ([#562](https://github.com/jtn0123/InkyPi/pull/562),
+  [`0a838b1`](https://github.com/jtn0123/InkyPi/commit/0a838b14548869b0b1e35fc757bfa268c4525a26))
+
+A plugin raising `Invalid URL: ...` — a structural validation error (bad scheme, SSRF-blocked
+  address, malformed URL) — is guaranteed to fail identically on retry. The old retry loop ran two
+  full attempts + 500 ms backoff before giving up, which scheduled playlists repeated on every tick,
+  wasting CPU and spamming logs.
+
+Introduce `PermanentPluginError(RuntimeError)` in `src/utils/plugin_errors.py`. The three
+  URL-validating plugins (`image_url`, `screenshot`, `image_album`) now raise it instead of a bare
+  `RuntimeError` when `validate_url()` fails. The retry loops in both `_execute_with_policy`
+  (subprocess) and `_execute_inprocess` (in-process) re-raise `PermanentPluginError` immediately
+  after the first attempt, logging an `attempt_terminal` marker to distinguish it from the retried
+  case.
+
+Because `PermanentPluginError` subclasses `RuntimeError`, existing `except RuntimeError` handlers
+  (including the plugin blueprint fallback) keep working unchanged — and JTN-776 can re-use the same
+  type to return a 4xx from `/update_now` without coupling to string-matching.
+
+The subprocess worker's `_remote_exception` allow-list is updated so the exception class survives
+  pickling across the subprocess boundary.
+
+Tests cover: - Plugin raising `Invalid URL` → exactly one attempt, no retry, terminal log emitted. -
+  Plugin raising `RuntimeError("transient blip")` → still retries and succeeds on the second
+  attempt. - Plugin raising `ConnectionError` → still retries. - Both the `_execute_inprocess` and
+  `_execute_with_policy` paths. - `_remote_exception` round-trips `PermanentPluginError` by name.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Chores
+
+- Ratchet mypy src baseline in lint ([#554](https://github.com/jtn0123/InkyPi/pull/554),
+  [`058e0c2`](https://github.com/jtn0123/InkyPi/commit/058e0c22432c7a2f198061a60fdfd12d2d004d5e))
+
+* chore: ratchet mypy src baseline in lint
+
+* chore: fix shellcheck SC2295 in scripts/lint.sh
+
+Quote REPO_ROOT inside the parameter expansion so it matches literally instead of as a pattern,
+  resolving the shellcheck (SC2295) failure.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Documentation
+
+- Review upstream fatihak/InkyPi for features to port (JTN-718)
+  ([#556](https://github.com/jtn0123/InkyPi/pull/556),
+  [`35bd9f5`](https://github.com/jtn0123/InkyPi/commit/35bd9f538cb6950adce9bfe4b256647209be7d2a))
+
+Scanned 25 upstream commits past our merge-base (8d08acd, 2025-12-12), 35 open PRs, and 50+ recently
+  merged PRs on fatihak/InkyPi. Produced a structured shortlist with Port / Maybe later / Rejected
+  sections and filed follow-up Linear issues JTN-767..JTN-775 for each Port item.
+
+Doc: docs/upstream-review-2026-04.md
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v0.62.0 (2026-04-19)
 
 ### Features
