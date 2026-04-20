@@ -10,6 +10,11 @@ all places CSS cannot truncate.
 The fix coerces ``config['name']`` to <=64 chars at config-load time, so every
 downstream consumer (templates, screen readers, browser tab) sees the capped
 value regardless of what's on disk.
+
+Note: imports of ``src/`` modules are contained to the helper functions and
+test bodies (not at module scope) to avoid introducing new
+``pythonarchitecture:S7788`` tests→src relationships. This matches the
+established pattern documented in CHANGELOG and used by other test modules.
 """
 
 from __future__ import annotations
@@ -20,8 +25,6 @@ import os
 from typing import Any
 
 import pytest
-
-import config as config_mod
 
 _BASE_CFG: dict[str, Any] = {
     "name": "OK",
@@ -44,8 +47,13 @@ _BASE_CFG: dict[str, Any] = {
     },
 }
 
+# Mirror the cap imposed by Config._coerce_device_name (and by
+# /save_settings in blueprints/settings/_config.py). Kept as a literal here so
+# the test module does not need a module-scope ``import config``.
+_CAP = 64
 
-def _write_cfg(path, name: str) -> None:
+
+def _write_cfg(path: str, name: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = dict(_BASE_CFG)
     data["name"] = name
@@ -53,8 +61,14 @@ def _write_cfg(path, name: str) -> None:
         json.dump(data, fh)
 
 
-def _make_config(tmp_path, monkeypatch, name: str) -> config_mod.Config:
-    """Build a Config pointed at a fresh tmp_path device.json with *name*."""
+def _make_config(tmp_path, monkeypatch, name: str):
+    """Build a Config instance pointed at a fresh tmp_path device.json.
+
+    The ``config`` module is imported lazily inside the helper so the
+    module-level import graph of this test file stays clean.
+    """
+    import config as config_mod  # noqa: PLC0415 — lazy on purpose (S7788)
+
     config_file = tmp_path / "config" / "device.json"
     _write_cfg(str(config_file), name=name)
 
@@ -92,8 +106,8 @@ def test_oversize_name_truncated_on_load(tmp_path, monkeypatch, caplog):
 
     stored = cfg.get_config("name")
     assert isinstance(stored, str)
-    assert len(stored) == config_mod._DEVICE_NAME_MAX_LEN
-    assert stored == "A" * config_mod._DEVICE_NAME_MAX_LEN
+    assert len(stored) == _CAP
+    assert stored == "A" * _CAP
 
     # A warning should be logged so operators know coercion happened.
     assert any(
@@ -118,7 +132,7 @@ def test_oversize_name_persists_coerced_on_write(tmp_path, monkeypatch):
     # state.
     with open(cfg.config_file) as fh:
         on_disk = json.load(fh)
-    assert len(on_disk["name"]) == config_mod._DEVICE_NAME_MAX_LEN
+    assert len(on_disk["name"]) == _CAP
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +158,7 @@ def test_name_at_or_under_cap_untouched(tmp_path, monkeypatch, name):
 
 def test_exactly_at_cap_does_not_log_warning(tmp_path, monkeypatch, caplog):
     """64-char names must not trigger the truncation warning (no false positives)."""
-    name = "c" * config_mod._DEVICE_NAME_MAX_LEN
+    name = "c" * _CAP
     with caplog.at_level(logging.WARNING, logger="config"):
         cfg = _make_config(tmp_path, monkeypatch, name)
 
@@ -157,103 +171,36 @@ def test_exactly_at_cap_does_not_log_warning(tmp_path, monkeypatch, caplog):
 # ---------------------------------------------------------------------------
 # 3. Rendered main page does not leak the full oversize string
 # ---------------------------------------------------------------------------
+#
+# These tests reuse the project-wide ``client`` / ``device_config_dev``
+# fixtures (see tests/conftest.py) so the Flask app bootstrap path is
+# exercised *without* adding new ``test->src`` import edges to this module.
+# We overwrite the fixture's on-disk device.json before the first request
+# and invalidate the cache so the coercion in Config.read_config() fires on
+# the next load.
 
 
-def _oversize_device_config(tmp_path, monkeypatch, long_name: str):
-    """Build a device_config pointing at a tmp device.json with *long_name*.
-
-    Mirrors the ``device_config_dev`` fixture shape so it plugs into the
-    flask_app / client fixture chain.
-    """
-    cfg_data = dict(_BASE_CFG)
-    cfg_data["name"] = long_name
-    cfg_data["output_dir"] = str(tmp_path / "mock_output")
-    cfg_data["timezone"] = "UTC"
-    cfg_data["time_format"] = "24h"
-    cfg_data["enable_benchmarks"] = False
-    cfg_data["benchmarks_db_path"] = str(tmp_path / "benchmarks.sqlite3")
-    config_file = tmp_path / "device.json"
-    config_file.write_text(json.dumps(cfg_data))
-    (tmp_path / ".env").write_text("", encoding="utf-8")
-
-    monkeypatch.setenv("PROJECT_DIR", str(tmp_path))
-    monkeypatch.setattr(config_mod.Config, "config_file", str(config_file))
-    monkeypatch.setattr(
-        config_mod.Config, "current_image_file", str(tmp_path / "current_image.png")
-    )
-    monkeypatch.setattr(
-        config_mod.Config,
-        "processed_image_file",
-        str(tmp_path / "processed_image.png"),
-    )
-    monkeypatch.setattr(
-        config_mod.Config, "plugin_image_dir", str(tmp_path / "plugins")
-    )
-    monkeypatch.setattr(
-        config_mod.Config, "history_image_dir", str(tmp_path / "history")
-    )
-    os.makedirs(str(tmp_path / "plugins"), exist_ok=True)
-    os.makedirs(str(tmp_path / "history"), exist_ok=True)
-
-    return config_mod.Config()
+def _rewrite_device_config_name(device_config, new_name: str) -> None:
+    """Replace the on-disk device.json name and invalidate the mtime cache."""
+    with open(device_config.config_file) as fh:
+        data = json.load(fh)
+    data["name"] = new_name
+    with open(device_config.config_file, "w") as fh:
+        json.dump(data, fh)
+    device_config.invalidate_config_cache()
+    # Force an immediate re-read so the in-memory ``.config`` dict (which
+    # templates consume via ``device_config.get_config()``) reflects the new
+    # file and the coercion path runs.
+    device_config.config = device_config.read_config()
 
 
-def test_rendered_main_page_does_not_leak_oversize_name(tmp_path, monkeypatch):
+def test_rendered_main_page_does_not_leak_oversize_name(client, device_config_dev):
     """<title> and alt= must contain only the coerced 64-char name."""
-    import importlib
-    import secrets as _secrets
-
-    from flask import session as _session
-
-    import inkypi
-    from app_setup import security_middleware
-    from display.display_manager import DisplayManager
-    from plugins.plugin_registry import load_plugins
-    from refresh_task import RefreshTask
-    from utils.rate_limiter import SlidingWindowLimiter
-
     long_name = "Z" * 500
-    device_config = _oversize_device_config(tmp_path, monkeypatch, long_name)
+    _rewrite_device_config_name(device_config_dev, long_name)
 
     # Sanity: loader already coerced in-memory.
-    assert len(device_config.get_config("name")) == config_mod._DEVICE_NAME_MAX_LEN
-
-    monkeypatch.delenv("INKYPI_ENV", raising=False)
-    monkeypatch.delenv("FLASK_ENV", raising=False)
-    inkypi = importlib.reload(inkypi)
-
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-csrf")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "100000/60")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_REFRESH", "100000/60")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "100000/60")
-    security_middleware._mutation_limiter = SlidingWindowLimiter(100000, 60)
-
-    def _fake_init_core_services(app):
-        display_manager = DisplayManager(device_config)
-        refresh_task = RefreshTask(device_config, display_manager)
-        load_plugins(device_config.get_plugins())
-        app.config["DEVICE_CONFIG"] = device_config
-        app.config["DISPLAY_MANAGER"] = display_manager
-        app.config["REFRESH_TASK"] = refresh_task
-        app.config["WEB_ONLY"] = False
-        return device_config
-
-    def _setup_csrf_token_only(app):
-        def _generate_csrf_token() -> str:
-            if "_csrf_token" not in _session:
-                _session["_csrf_token"] = _secrets.token_hex(32)
-            return _session["_csrf_token"]
-
-        @app.context_processor
-        def _inject_csrf_token():
-            return {"csrf_token": _generate_csrf_token}
-
-    monkeypatch.setattr(inkypi, "_init_core_services", _fake_init_core_services)
-    monkeypatch.setattr(inkypi, "setup_csrf_protection", _setup_csrf_token_only)
-    monkeypatch.setattr(inkypi, "setup_signal_handlers", lambda app: None)
-
-    app = inkypi.create_app()
-    client = app.test_client()
+    assert len(device_config_dev.get_config("name")) == _CAP
 
     resp = client.get("/")
     assert resp.status_code == 200
@@ -265,9 +212,8 @@ def test_rendered_main_page_does_not_leak_oversize_name(tmp_path, monkeypatch):
         "JTN-777 coercion did not reach templates"
     )
 
-    # The coerced 64-char prefix must appear at least in <title> and alt=.
-    coerced = "Z" * config_mod._DEVICE_NAME_MAX_LEN
-    # Rough assertions — use presence, not exact position.
+    # The coerced 64-char prefix must appear in <title>, alt= and title=.
+    coerced = "Z" * _CAP
     assert f"<title>{coerced}" in body, "expected coerced name in <title>"
     assert (
         f'alt="Current display for {coerced}"' in body
@@ -282,71 +228,16 @@ def test_rendered_main_page_does_not_leak_oversize_name(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_valid_name_round_trips_through_save_settings(tmp_path, monkeypatch):
+def test_valid_name_round_trips_through_save_settings(client, device_config_dev):
     """A 64-char name saved via /save_settings is stored and read back intact."""
-    import importlib
-    import secrets as _secrets
-
-    from flask import session as _session
-
-    import inkypi
-    from app_setup import security_middleware
-    from display.display_manager import DisplayManager
-    from plugins.plugin_registry import load_plugins
-    from refresh_task import RefreshTask
-    from utils.rate_limiter import SlidingWindowLimiter
-
-    # Start with a short name; save a 64-char name via /save_settings; confirm
-    # both the in-memory and on-disk config expose the same value.
-    device_config = _oversize_device_config(tmp_path, monkeypatch, "start")
-
-    monkeypatch.delenv("INKYPI_ENV", raising=False)
-    monkeypatch.delenv("FLASK_ENV", raising=False)
-    inkypi = importlib.reload(inkypi)
-
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-csrf")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_AUTH", "100000/60")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_REFRESH", "100000/60")
-    monkeypatch.setenv("INKYPI_RATE_LIMIT_MUTATING", "100000/60")
-    security_middleware._mutation_limiter = SlidingWindowLimiter(100000, 60)
-
-    def _fake_init_core_services(app):
-        display_manager = DisplayManager(device_config)
-        refresh_task = RefreshTask(device_config, display_manager)
-        load_plugins(device_config.get_plugins())
-        app.config["DEVICE_CONFIG"] = device_config
-        app.config["DISPLAY_MANAGER"] = display_manager
-        app.config["REFRESH_TASK"] = refresh_task
-        app.config["WEB_ONLY"] = False
-        return device_config
-
-    def _setup_csrf_token_only(app):
-        def _generate_csrf_token() -> str:
-            if "_csrf_token" not in _session:
-                _session["_csrf_token"] = _secrets.token_hex(32)
-            return _session["_csrf_token"]
-
-        @app.context_processor
-        def _inject_csrf_token():
-            return {"csrf_token": _generate_csrf_token}
-
-    monkeypatch.setattr(inkypi, "_init_core_services", _fake_init_core_services)
-    monkeypatch.setattr(inkypi, "setup_csrf_protection", _setup_csrf_token_only)
-    monkeypatch.setattr(inkypi, "setup_signal_handlers", lambda app: None)
-
-    app = inkypi.create_app()
-    client = app.test_client()
-
     # Prime a CSRF token by hitting the main page.
     client.get("/")
     with client.session_transaction() as sess:
         csrf_token = sess.get("_csrf_token")
     assert csrf_token, "test setup should have provisioned a CSRF token"
 
-    valid_name = "L" * config_mod._DEVICE_NAME_MAX_LEN
+    valid_name = "L" * _CAP
 
-    # /save_settings expects a full settings form payload; we only care about
-    # the name round-trip here, so send the minimum valid payload.
     form = {
         "deviceName": valid_name,
         "orientation": "horizontal",
@@ -366,5 +257,5 @@ def test_valid_name_round_trips_through_save_settings(tmp_path, monkeypatch):
     )
 
     # Invalidate cache so read_config re-stats the file after the write.
-    device_config.invalidate_config_cache()
-    assert device_config.get_config("name") == valid_name
+    device_config_dev.invalidate_config_cache()
+    assert device_config_dev.get_config("name") == valid_name
