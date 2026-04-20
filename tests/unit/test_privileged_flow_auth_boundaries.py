@@ -40,7 +40,9 @@ _PRIVILEGED_POST_CASES = (
         {"json": {"config": {"name": "unauthorized"}}},
         id="import-settings",
     ),
-    pytest.param("/settings/export", {"json": {"include_keys": True}}, id="export-post"),
+    pytest.param(
+        "/settings/export", {"json": {"include_keys": True}}, id="export-post"
+    ),
     pytest.param("/settings/safe_reset", {}, id="safe-reset"),
     pytest.param(
         "/settings/isolation",

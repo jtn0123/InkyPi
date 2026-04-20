@@ -281,7 +281,9 @@ def test_authenticated_session_can_shutdown_with_csrf(privileged_client, monkeyp
     assert calls == [["sudo", "shutdown", "-h", "now"]]
 
 
-def test_authenticated_session_can_start_update_with_csrf(privileged_client, monkeypatch):
+def test_authenticated_session_can_start_update_with_csrf(
+    privileged_client, monkeypatch
+):
     import blueprints.settings as settings_mod
 
     _seed_authed_session(privileged_client)
