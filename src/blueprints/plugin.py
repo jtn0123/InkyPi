@@ -19,16 +19,16 @@ from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
 from utils.app_utils import handle_request_files, parse_form, resolve_path
-from utils.fallback_image import render_error_image
-from utils.form_utils import (
-    sanitize_log_field,
-    validate_plugin_required_fields,
-)
 from utils.backend_errors import (
     ClientInputError,
     ResourceLookupError,
     UnsupportedMediaTypeRouteError,
     route_error_boundary,
+)
+from utils.fallback_image import render_error_image
+from utils.form_utils import (
+    sanitize_log_field,
+    validate_plugin_required_fields,
 )
 from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
@@ -310,7 +310,7 @@ def delete_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        raise UnsupportedMediaTypeRouteError()
+        raise UnsupportedMediaTypeRouteError
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
@@ -403,13 +403,13 @@ def update_plugin_instance(instance_name: str):
         if raw_refresh is not None:
             try:
                 refresh_payload = json.loads(raw_refresh)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as exc:
                 raise ClientInputError(
                     "Refresh settings must be valid JSON",
                     status=400,
                     code="validation_error",
                     field="refresh_settings",
-                )
+                ) from exc
             if not isinstance(refresh_payload, dict):
                 raise ClientInputError(
                     "Refresh settings must be an object",
@@ -454,7 +454,7 @@ def update_plugin_instance(instance_name: str):
 
                 try:
                     settings_error = plugin.validate_settings(plugin_settings)
-                except Exception:
+                except Exception as exc:
                     logger.warning(
                         "Plugin validate_settings raised for %s",
                         sanitize_log_field(plugin_id),
@@ -463,7 +463,7 @@ def update_plugin_instance(instance_name: str):
                     raise ClientInputError(
                         "Settings validation failed. Please check your input.",
                         status=400,
-                    )
+                    ) from exc
                 else:
                     if settings_error:
                         raise ClientInputError(settings_error, status=400)
@@ -491,7 +491,7 @@ def display_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        raise UnsupportedMediaTypeRouteError()
+        raise UnsupportedMediaTypeRouteError
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")

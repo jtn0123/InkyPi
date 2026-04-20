@@ -65,8 +65,8 @@ def start_update():
         if request.is_json and raw_body.strip():
             try:
                 body = request.get_json(silent=False)
-            except BadRequest:
-                raise ClientInputError("Invalid JSON payload", status=400)
+            except BadRequest as exc:
+                raise ClientInputError("Invalid JSON payload", status=400) from exc
             if not isinstance(body, dict):
                 raise ClientInputError("Request body must be a JSON object", status=400)
         else:
