@@ -13,6 +13,7 @@ from plugins.plugin_registry import get_plugin_instance
 from refresh_task.actions import PluginLike, RefreshAction
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.plugin_errors import PermanentPluginError
+from utils.security_utils import URLValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,12 @@ def _remote_exception(error_type: str, error_message: str) -> BaseException:
         # subprocess boundary so the retry loop in the parent process can
         # distinguish it from transient RuntimeErrors and skip retries.
         "PermanentPluginError": PermanentPluginError,
+        # JTN-776: URLValidationError is a PermanentPluginError subclass that
+        # the plugin blueprint maps to HTTP 422 validation_error. Preserving
+        # the exact type across the subprocess boundary keeps both the
+        # retry-skip and 4xx-response behaviours working for manual updates
+        # that are dispatched through the refresh-task subprocess path.
+        "URLValidationError": URLValidationError,
     }
     exc_cls = exc_types.get(error_type, RuntimeError)
     return exc_cls(error_message)
