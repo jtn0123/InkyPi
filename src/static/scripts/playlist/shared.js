@@ -1,8 +1,18 @@
 (function (global) {
   const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
 
+  function mergePlaylistConfig(baseConfig, overrideConfig) {
+    const merged = {};
+    if (baseConfig && typeof baseConfig === "object") {
+      Object.assign(merged, baseConfig);
+    }
+    if (overrideConfig && typeof overrideConfig === "object") {
+      Object.assign(merged, overrideConfig);
+    }
+    return merged;
+  }
+
   ns.constants = ns.constants || {
-    NEXT_IN_REFRESH_MS: 60000,
     THUMB_PREFETCH_MARGIN: "200px",
     PROGRESS_HIDE_DELAY_MS: 2000,
     PLAYLIST_NAME_RE: /^[A-Za-z0-9 _-]+$/,
@@ -10,7 +20,7 @@
       "Playlist name can only contain ASCII letters, numbers, spaces, underscores, and hyphens",
   };
 
-  ns.config = { ...(global.PLAYLIST_CTX || {}), ...(ns.config || {}) };
+  ns.config = mergePlaylistConfig(global.PLAYLIST_CTX, ns.config);
   ns.mobileQuery =
     ns.mobileQuery ||
     (global.matchMedia
@@ -30,14 +40,13 @@
     lastModalTrigger: null,
     modalLifecycleBound: false,
     mobileSyncBound: false,
-    nextInTimer: null,
     pageEnhancementsBound: false,
     playlistRefreshManager: null,
     storedMessageBound: false,
   };
 
   ns.setConfig = function setConfig(config) {
-    ns.config = { ...(global.PLAYLIST_CTX || {}), ...(config || {}) };
+    ns.config = mergePlaylistConfig(global.PLAYLIST_CTX, config);
     return ns.config;
   };
 

@@ -27,38 +27,6 @@
     }
   }
 
-  function renderNextIn() {
-    document.querySelectorAll(".plugin-item").forEach((item) => {
-      const infoEl = item.querySelector(".plugin-info");
-      if (!infoEl) return;
-
-      const intervalSec = item.dataset.intervalSec
-        ? Number.parseInt(item.dataset.intervalSec, 10)
-        : Number.NaN;
-      if (!intervalSec || Number.isNaN(intervalSec)) return;
-
-      const lastIso = item.dataset.latestIso;
-      if (!lastIso) return;
-      const lastDate = new Date(lastIso);
-      if (Number.isNaN(lastDate.getTime())) return;
-
-      const nextTs = lastDate.getTime() + intervalSec * 1000;
-      const deltaMs = nextTs - Date.now();
-      const nextEl = infoEl.querySelector(".latest-refresh");
-      if (!nextEl || deltaMs <= 0) return;
-
-      const mins = Math.round(deltaMs / 60000);
-      if (mins < 60) {
-        nextEl.textContent = `Refreshed • Next in ${mins} min`;
-        return;
-      }
-
-      const hrs = Math.floor(mins / 60);
-      const rem = mins % 60;
-      nextEl.textContent = `Refreshed • Next in ${hrs}h ${rem}m`;
-    });
-  }
-
   function initThumbnailPreviewHandlers() {
     document.querySelectorAll(".plugin-thumbnail-container").forEach((box) => {
       if (box.dataset.playlistPreviewBound === "1") return;
@@ -178,13 +146,6 @@
     initLightboxThumbs();
     initLazyThumbnails();
     initDeviceClock();
-    renderNextIn();
-    if (!ns.runtime.nextInTimer) {
-      ns.runtime.nextInTimer = global.setInterval(
-        renderNextIn,
-        ns.constants.NEXT_IN_REFRESH_MS
-      );
-    }
 
     ns.runtime.pageEnhancementsBound = true;
   }
@@ -196,6 +157,5 @@
     initPageEnhancements,
     initThumbnailPreviewHandlers,
     loadThumb,
-    renderNextIn,
   });
 })(globalThis);

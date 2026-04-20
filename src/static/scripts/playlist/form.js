@@ -111,6 +111,7 @@
     if (!validateCycleMinutes()) return;
     const startTime = document.getElementById("start_time").value;
     const endTime = document.getElementById("end_time").value;
+    const cycleMinutes = document.getElementById("cycle_minutes")?.value || "";
 
     const submit = async () => {
       await runPlaylistMutation(fs, () =>
@@ -121,6 +122,7 @@
             playlist_name: playlistName,
             start_time: startTime,
             end_time: endTime,
+            cycle_minutes: cycleMinutes || null,
           }),
         })
       );
@@ -192,8 +194,9 @@
 
   async function saveDeviceCycle() {
     const input = document.getElementById("device_cycle_minutes");
-    const minutes = Number.parseInt((input?.value || "").trim(), 10);
-    if (Number.isNaN(minutes) || minutes < 1 || minutes > 1440) {
+    const raw = (input?.value || "").trim();
+    const minutes = Number.parseInt(raw, 10);
+    if (!/^\d+$/.test(raw) || minutes < 1 || minutes > 1440) {
       showResponseModal("failure", "Enter minutes between 1 and 1440");
       return;
     }

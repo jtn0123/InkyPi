@@ -3,11 +3,16 @@
 
   function syncModalOpenState() {
     const ui = global.InkyPiUI;
-    if (ui?.syncModalOpenState) return ui.syncModalOpenState();
-    const open = document.querySelector(
-      ".modal.is-open, .thumbnail-preview-modal.is-open"
-    );
-    document.body.classList.toggle("modal-open", !!open);
+    const delegatedState =
+      typeof ui?.syncModalOpenState === "function"
+        ? ui.syncModalOpenState()
+        : null;
+    const open =
+      typeof delegatedState === "boolean"
+        ? delegatedState
+        : document.querySelector(".modal.is-open, .thumbnail-preview-modal.is-open");
+    if (typeof ui?.syncModalOpenState !== "function")
+      document.body.classList.toggle("modal-open", !!open);
     const pageContent = document.getElementById("playlist-page-content");
     if (!pageContent) return;
     if (open) {
@@ -242,12 +247,13 @@
         const result = await handleJsonResponse(resp);
         if (resp.ok && result?.success) {
           location.reload();
+          return;
         }
       } catch (error) {
         console.debug("Failed to delete playlist from modal:", error);
         showResponseModal("failure", "Failed to delete playlist");
+        return;
       }
-      ns.closeDeletePlaylistModal();
     };
   }
 
@@ -283,12 +289,13 @@
         const result = await handleJsonResponse(resp);
         if (resp.ok && result?.success) {
           location.reload();
+          return;
         }
       } catch (error) {
         console.debug("Failed to delete playlist instance from modal:", error);
         showResponseModal("failure", "Failed to delete instance");
+        return;
       }
-      ns.closeDeleteInstanceModal();
     };
   }
 

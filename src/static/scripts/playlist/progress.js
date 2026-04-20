@@ -11,6 +11,15 @@
     }
   }
 
+  async function readResponseJson(response, label) {
+    try {
+      return await response.json();
+    } catch (error) {
+      console.debug(`Failed parsing ${label}:`, error);
+      return null;
+    }
+  }
+
   function formatElapsed(ms) {
     const seconds = Math.floor(ms / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -49,7 +58,7 @@
     let lastMatch = null;
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
-      if (!key || !key.startsWith("INKYPI_LAST_PROGRESS:playlist:")) continue;
+      if (!key?.startsWith("INKYPI_LAST_PROGRESS:playlist:")) continue;
       const parsed = parseJsonValue(localStorage.getItem(key), key);
       if (parsed) lastMatch = parsed;
     }
@@ -72,7 +81,9 @@
       const ts = document.createElement("time");
       ts.textContent = timestamp;
       li.appendChild(ts);
-      li.appendChild(document.createTextNode(line));
+      li.appendChild(
+        document.createTextNode(` ${stripLeadingTime(String(line))}`)
+      );
       list.appendChild(li);
     });
   }
@@ -237,8 +248,15 @@
 
   async function handlePluginDisplaySuccess(response, tracker) {
     tracker.setStep("Waiting (device)...", 60);
-    const result = await handleJsonResponse(response);
-    if (!(response.ok && result?.success)) return false;
+    const result = await readResponseJson(response, "playlist display response");
+    if (!(response.ok && result?.success)) {
+      showResponseModal(
+        "failure",
+        result?.error || result?.message || "Display request failed"
+      );
+      tracker.setStep("Failed", 100);
+      return false;
+    }
 
     const metrics = result.metrics || {};
     await playMetricSteps(tracker, metrics);
@@ -271,6 +289,7 @@
     if (elements.loadingIndicator) elements.loadingIndicator.style.display = "block";
     setButtonLoadingState(btnEl, true);
     tracker.start();
+    let completedSuccessfully = false;
 
     try {
       const response = await fetch(ns.config.display_plugin_instance_url, {
@@ -282,17 +301,18 @@
           plugin_instance: pluginInstance,
         }),
       });
-      await handlePluginDisplaySuccess(response, tracker);
+      completedSuccessfully = await handlePluginDisplaySuccess(response, tracker);
     } catch (error) {
       console.error("Error:", error);
       showResponseModal(
         "failure",
         "An error occurred while processing your request."
       );
+      tracker.setStep("Failed", 100);
     } finally {
       if (elements.loadingIndicator) elements.loadingIndicator.style.display = "none";
       setButtonLoadingState(btnEl, false);
-      tracker.setStep("Done", 100);
+      if (completedSuccessfully) tracker.setStep("Done", 100);
       tracker.stop();
       persistProgressSnapshot(tracker, ctx);
       global.setTimeout(() => {

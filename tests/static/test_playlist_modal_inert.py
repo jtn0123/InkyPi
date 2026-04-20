@@ -58,6 +58,12 @@ class TestInertAttributeManagement:
         ), "inert toggling must be inside syncModalOpenState"
         assert "inert" in body, "syncModalOpenState must handle the inert attribute"
 
+    def test_sync_function_does_not_return_before_inert_toggle(self):
+        js = PLAYLIST_MODALS_JS.read_text()
+        assert (
+            "return ui.syncModalOpenState()" not in js
+        ), "syncModalOpenState must not return before it toggles inert state"
+
 
 class TestPageContentWrapperInTemplate:
     """Verify playlist.html has the #playlist-page-content wrapper."""

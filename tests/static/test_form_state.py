@@ -104,3 +104,14 @@ def test_playlist_script_invokes_form_state(client):
     assert "fs.run(submit)" in js
     # Inline error handling for server-side field errors.
     assert "field_errors" in js
+
+
+def test_playlist_create_includes_cycle_minutes(client):
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
+    assert "cycle_minutes: cycleMinutes || null" in js
+
+
+def test_playlist_device_cycle_rejects_partial_numeric_values(client):
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
+    assert 'const raw = (input?.value || "").trim();' in js
+    assert "!/^\\d+$/.test(raw)" in js

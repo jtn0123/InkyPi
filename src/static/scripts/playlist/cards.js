@@ -6,7 +6,28 @@
     return `plg-${ns.runtime.playlistDragCounter}`;
   }
 
-  function persistPlaylistOrder(container) {
+  async function readResponseJson(response) {
+    try {
+      return await response.json();
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function capturePlaylistOrder(item) {
+    const parent = item?.parentNode;
+    const nextSibling = item?.nextSibling;
+    return function restorePlaylistOrder() {
+      if (!parent || !item) return;
+      if (nextSibling && nextSibling.parentNode === parent) {
+        parent.insertBefore(item, nextSibling);
+        return;
+      }
+      parent.appendChild(item);
+    };
+  }
+
+  function persistPlaylistOrder(container, restoreOrder = null) {
     const playlistName = container?.dataset.playlistName;
     const ordered = Array.from(container.querySelectorAll(".plugin-item")).map(
       (el) => ({
@@ -21,15 +42,24 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playlist_name: playlistName, ordered }),
     })
-      .then(handleJsonResponse)
-      .then((result) => {
-        if (!result?.success) return;
-        sessionStorage.setItem(
-          "storedMessage",
-          JSON.stringify({ type: "success", text: `Success! ${result.message}` })
+      .then((response) =>
+        readResponseJson(response).then((result) => ({ response, result }))
+      )
+      .then(({ response, result }) => {
+        if (response.ok && result?.success) {
+          showResponseModal("success", `Success! ${result.message || "Order saved"}`);
+          return;
+        }
+        restoreOrder?.();
+        showResponseModal(
+          "failure",
+          result?.error || result?.message || "Error saving new order"
         );
       })
-      .catch(() => showResponseModal("failure", "Error saving new order"));
+      .catch(() => {
+        restoreOrder?.();
+        showResponseModal("failure", "Error saving new order");
+      });
   }
 
   function handleDragStart(event) {
@@ -54,9 +84,10 @@
       const srcPlaylist = srcEl.closest(".playlist-item");
       const dstPlaylist = dropTarget.closest(".playlist-item");
       if (srcPlaylist !== dstPlaylist) return false;
+      const restoreOrder = capturePlaylistOrder(srcEl);
       // Keep the legacy insertBefore marker for the drag-guard static test.
       dropTarget.after(srcEl);
-      persistPlaylistOrder(dropTarget.closest(".playlist-item"));
+      persistPlaylistOrder(dropTarget.closest(".playlist-item"), restoreOrder);
     }
     return false;
   }
@@ -85,12 +116,13 @@
     );
     if (!target) return;
 
+    const restoreOrder = capturePlaylistOrder(item);
     if (event.key === "ArrowUp") {
       target.before(item);
     } else {
       target.after(item);
     }
-    persistPlaylistOrder(item.closest(".playlist-item"));
+    persistPlaylistOrder(item.closest(".playlist-item"), restoreOrder);
     item.focus();
   }
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PLAYLIST_BOOTSTRAP_JS = ROOT / "src" / "static" / "scripts" / "playlist.js"
+PLAYLIST_PAGE_JS = ROOT / "src" / "static" / "scripts" / "playlist" / "page.js"
 PLAYLIST_HTML = ROOT / "src" / "templates" / "playlist.html"
 
 
@@ -44,3 +45,8 @@ def test_playlist_bootstrap_stays_thin_and_boot_oriented():
         assert (
             moved_symbol not in js
         ), f"{moved_symbol} should live in a playlist module, not playlist.js"
+
+
+def test_playlist_page_drops_dead_next_in_timer():
+    js = PLAYLIST_PAGE_JS.read_text()
+    assert "renderNextIn" not in js

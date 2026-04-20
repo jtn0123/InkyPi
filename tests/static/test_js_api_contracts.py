@@ -222,6 +222,23 @@ def test_playlist_script_handles_invalid_stored_message_json(client):
     assert 'sessionStorage.removeItem("storedMessage");' in js
 
 
+def test_playlist_progress_restore_strips_saved_timestamps(client):
+    resp = client.get("/static/scripts/playlist/progress.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "stripLeadingTime(String(line))" in js
+
+
+def test_playlist_progress_only_marks_successful_runs_done(client):
+    resp = client.get("/static/scripts/playlist/progress.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "let completedSuccessfully = false;" in js
+    assert 'if (completedSuccessfully) tracker.setStep("Done", 100);' in js
+
+
 def test_image_modal_script_guards_missing_container(client):
     resp = client.get("/static/scripts/image_modal.js")
     assert resp.status_code == 200

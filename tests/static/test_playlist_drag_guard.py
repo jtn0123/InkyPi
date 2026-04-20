@@ -48,15 +48,28 @@ class TestCrossPlaylistDragGuard:
         ), "handleDrop must return early when srcPlaylist !== dstPlaylist"
 
     def test_guard_returns_before_dom_mutation(self):
-        """The guard must appear before insertBefore so the DOM is never mutated."""
+        """The guard must appear before the DOM mutation so the DOM is never mutated."""
         block = _handle_drop_block()
         guard_pos = block.find("srcPlaylist !== dstPlaylist")
-        insert_pos = block.find("insertBefore")
+        mutation_match = re.search(
+            r"\bdropTarget\.(?:after|before)\s*\(|\binsertBefore\s*\(|\bappendChild\s*\(",
+            block,
+        )
         assert guard_pos != -1, "srcPlaylist !== dstPlaylist guard not found"
-        assert insert_pos != -1, "insertBefore call not found"
+        assert mutation_match, "DOM mutation call not found"
         assert (
-            guard_pos < insert_pos
-        ), "Cross-playlist guard must appear before the insertBefore DOM mutation"
+            guard_pos < mutation_match.start()
+        ), "Cross-playlist guard must appear before the DOM mutation"
+
+    def test_reorder_feedback_is_immediate(self):
+        js_text = PLAYLIST_CARDS_JS.read_text()
+        assert (
+            'showResponseModal("success"' in js_text
+            or "showResponseModal('success'" in js_text
+        ), "playlist/cards.js must show immediate success feedback after reorder"
+        assert (
+            'sessionStorage.setItem("storedMessage"' not in js_text
+        ), "playlist/cards.js must not defer reorder success feedback via storedMessage"
 
     def test_guard_uses_closest_playlist_item(self):
         block = _handle_drop_block()
