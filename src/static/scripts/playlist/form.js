@@ -38,7 +38,7 @@
       if (error) error.textContent = "";
       return true;
     }
-    const value = parseInt(raw, 10);
+    const value = Number.parseInt(raw, 10);
     if (Number.isNaN(value) || String(value) !== raw) {
       input.setAttribute("aria-invalid", "true");
       if (error) error.textContent = "Must be a whole number";
@@ -67,7 +67,7 @@
       fs.setFieldErrors(result.field_errors);
       return true;
     }
-    const field = result.details && result.details.field;
+    const field = result.details?.field;
     if (!field) return false;
     const message = result.error || "Invalid value";
     fs.setFieldError(field, message);
@@ -89,7 +89,7 @@
     try {
       const response = await requestFactory();
       const result = await handleJsonResponse(response);
-      if (response.ok && result && result.success) {
+      if (response.ok && result?.success) {
         handlePlaylistMutationSuccess(result);
       } else if (fs && result) {
         applyFieldErrorFromResponse(fs, result);
@@ -177,7 +177,7 @@
         { method: "DELETE" }
       );
       const result = await handleJsonResponse(response);
-      if (response.ok && result && result.success) {
+      if (response.ok && result?.success) {
         ns.closeModal();
         location.reload();
       }
@@ -192,8 +192,8 @@
 
   async function saveDeviceCycle() {
     const input = document.getElementById("device_cycle_minutes");
-    const minutes = parseInt((input?.value || "").trim(), 10);
-    if (!minutes || minutes < 1 || minutes > 1440) {
+    const minutes = Number.parseInt((input?.value || "").trim(), 10);
+    if (Number.isNaN(minutes) || minutes < 1 || minutes > 1440) {
       showResponseModal("failure", "Enter minutes between 1 and 1440");
       return;
     }
@@ -204,11 +204,12 @@
         body: JSON.stringify({ minutes }),
       });
       const result = await handleJsonResponse(response);
-      if (response.ok && result && result.success) {
+      if (response.ok && result?.success) {
         ns.closeDeviceCycleModal();
         location.reload();
       }
-    } catch (_err) {
+    } catch (error) {
+      console.debug("Failed saving playlist device cadence:", error);
       showResponseModal("failure", "Failed saving cadence");
     }
   }
@@ -235,7 +236,9 @@
       });
     }
 
-    document.getElementById("deleteButton")?.addEventListener("click", deletePlaylist);
+    document
+      .getElementById("deleteButton")
+      ?.addEventListener("click", deletePlaylist);
     document
       .getElementById("saveRefreshSettingsBtn")
       ?.addEventListener("click", ns.saveRefreshSettings);

@@ -3,7 +3,7 @@
 
   function syncModalOpenState() {
     const ui = global.InkyPiUI;
-    if (ui && ui.syncModalOpenState) return ui.syncModalOpenState();
+    if (ui?.syncModalOpenState) return ui.syncModalOpenState();
     const open = document.querySelector(
       ".modal.is-open, .thumbnail-preview-modal.is-open"
     );
@@ -17,6 +17,25 @@
     }
   }
 
+  function focusFirstFocusable(modal) {
+    const focusable = modal.querySelector(
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable) setTimeout(() => focusable.focus(), 0);
+  }
+
+  function restoreLastModalTrigger() {
+    const lastModalTrigger = ns.runtime.lastModalTrigger;
+    if (
+      lastModalTrigger &&
+      typeof lastModalTrigger.focus === "function" &&
+      document.contains(lastModalTrigger)
+    ) {
+      lastModalTrigger.focus();
+    }
+    ns.runtime.lastModalTrigger = null;
+  }
+
   function setModalOpen(modalId, open, triggerEl) {
     const modal = document.getElementById(modalId);
     if (!modal) return;
@@ -26,18 +45,10 @@
     modal.classList.toggle("is-open", open);
     syncModalOpenState();
     if (open) {
-      const focusable = modal.querySelector(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable) setTimeout(() => focusable.focus(), 0);
+      focusFirstFocusable(modal);
       return;
     }
-    if (ns.runtime.lastModalTrigger) {
-      try {
-        ns.runtime.lastModalTrigger.focus();
-      } catch (_err) {}
-      ns.runtime.lastModalTrigger = null;
-    }
+    restoreLastModalTrigger();
   }
 
   function getOpenModalId() {
@@ -139,10 +150,7 @@
         modal.hidden = false;
         modal.classList.add("is-open");
         syncModalOpenState();
-        const focusable = modal.querySelector(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable) setTimeout(() => focusable.focus(), 0);
+        focusFirstFocusable(modal);
       }
       return;
     }
@@ -162,12 +170,7 @@
       setModalOpen("refreshSettingsModal", false);
       return;
     }
-    if (ns.runtime.lastModalTrigger) {
-      try {
-        ns.runtime.lastModalTrigger.focus();
-      } catch (_err) {}
-      ns.runtime.lastModalTrigger = null;
-    }
+    restoreLastModalTrigger();
   }
 
   function openCreateModal(triggerEl) {
@@ -214,10 +217,8 @@
   }
 
   function openDeviceCycleModal() {
-    try {
-      const input = document.getElementById("device_cycle_minutes");
-      if (input) input.value = ns.config.device_cycle_minutes || 60;
-    } catch (_err) {}
+    const input = document.getElementById("device_cycle_minutes");
+    if (input) input.value = ns.config.device_cycle_minutes || 60;
     setModalOpen("deviceCycleModal", true);
   }
 
@@ -239,10 +240,11 @@
           { method: "DELETE" }
         );
         const result = await handleJsonResponse(resp);
-        if (resp.ok && result && result.success) {
+        if (resp.ok && result?.success) {
           location.reload();
         }
-      } catch (_err) {
+      } catch (error) {
+        console.debug("Failed to delete playlist from modal:", error);
         showResponseModal("failure", "Failed to delete playlist");
       }
       ns.closeDeletePlaylistModal();
@@ -279,10 +281,11 @@
           }),
         });
         const result = await handleJsonResponse(resp);
-        if (resp.ok && result && result.success) {
+        if (resp.ok && result?.success) {
           location.reload();
         }
-      } catch (_err) {
+      } catch (error) {
+        console.debug("Failed to delete playlist instance from modal:", error);
         showResponseModal("failure", "Failed to delete instance");
       }
       ns.closeDeleteInstanceModal();

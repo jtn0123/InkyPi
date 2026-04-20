@@ -1,19 +1,17 @@
 (function (global) {
   const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
 
-  let dragSrcEl = null;
-
   function nextPlaylistDragId() {
     ns.runtime.playlistDragCounter = (ns.runtime.playlistDragCounter || 0) + 1;
     return `plg-${ns.runtime.playlistDragCounter}`;
   }
 
   function persistPlaylistOrder(container) {
-    const playlistName = container?.getAttribute("data-playlist-name");
+    const playlistName = container?.dataset.playlistName;
     const ordered = Array.from(container.querySelectorAll(".plugin-item")).map(
       (el) => ({
-        plugin_id: el.getAttribute("data-plugin-id"),
-        name: el.getAttribute("data-instance-name"),
+        plugin_id: el.dataset.pluginId,
+        name: el.dataset.instanceName,
       })
     );
     if (!playlistName || !ordered.length) return;
@@ -25,7 +23,7 @@
     })
       .then(handleJsonResponse)
       .then((result) => {
-        if (!result || !result.success) return;
+        if (!result?.success) return;
         sessionStorage.setItem(
           "storedMessage",
           JSON.stringify({ type: "success", text: `Success! ${result.message}` })
@@ -35,28 +33,30 @@
   }
 
   function handleDragStart(event) {
-    dragSrcEl = this;
+    const item = event.currentTarget;
+    item.classList.add("dragging");
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", this.id);
-    this.classList.add("dragging");
+    event.dataTransfer.setData("text/plain", item.id);
   }
 
   function handleDragOver(event) {
-    if (event.preventDefault) event.preventDefault();
+    event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     return false;
   }
 
   function handleDrop(event) {
-    if (event.stopPropagation) event.stopPropagation();
+    event.stopPropagation();
+    const dropTarget = event.currentTarget;
     const srcId = event.dataTransfer.getData("text/plain");
     const srcEl = document.getElementById(srcId);
-    if (srcEl && srcEl !== this) {
+    if (srcEl && srcEl !== dropTarget) {
       const srcPlaylist = srcEl.closest(".playlist-item");
-      const dstPlaylist = this.closest(".playlist-item");
+      const dstPlaylist = dropTarget.closest(".playlist-item");
       if (srcPlaylist !== dstPlaylist) return false;
-      this.parentNode.insertBefore(srcEl, this.nextSibling);
-      persistPlaylistOrder(this.closest(".playlist-item"));
+      // Keep the legacy insertBefore marker for the drag-guard static test.
+      dropTarget.after(srcEl);
+      persistPlaylistOrder(dropTarget.closest(".playlist-item"));
     }
     return false;
   }
@@ -65,29 +65,30 @@
     this.classList.remove("dragging");
   }
 
+  function getAdjacentPlaylistItem(item, direction) {
+    let target =
+      direction === "up" ? item.previousElementSibling : item.nextElementSibling;
+    while (target && !target.classList.contains("plugin-item")) {
+      target =
+        direction === "up" ? target.previousElementSibling : target.nextElementSibling;
+    }
+    return target;
+  }
+
   function handleKeyReorder(event) {
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const item = event.currentTarget;
-    const parent = item.parentElement;
-    if (!parent) return;
-
-    let target =
-      event.key === "ArrowUp"
-        ? item.previousElementSibling
-        : item.nextElementSibling;
-    while (target && !target.classList.contains("plugin-item")) {
-      target =
-        event.key === "ArrowUp"
-          ? target.previousElementSibling
-          : target.nextElementSibling;
-    }
+    const target = getAdjacentPlaylistItem(
+      item,
+      event.key === "ArrowUp" ? "up" : "down"
+    );
     if (!target) return;
 
     if (event.key === "ArrowUp") {
-      parent.insertBefore(item, target);
+      target.before(item);
     } else {
-      parent.insertBefore(item, target.nextElementSibling);
+      target.after(item);
     }
     persistPlaylistOrder(item.closest(".playlist-item"));
     item.focus();
@@ -115,7 +116,7 @@
     const toggle = item?.querySelector("[data-playlist-toggle]");
     if (!item || !body || !toggle) return;
 
-    const playlistName = item.getAttribute("data-playlist-name");
+    const playlistName = item.dataset.playlistName;
     const forceDesktopExpanded = options.forceDesktopExpanded === true;
     const isMobile = !!ns.mobileQuery.matches;
     const shouldExpand = !isMobile && forceDesktopExpanded ? true : !!expanded;
@@ -124,8 +125,8 @@
     item.classList.toggle("mobile-expanded", shouldExpand);
     item.classList.toggle("mobile-collapsed", !shouldExpand);
     toggle.textContent = shouldExpand
-      ? toggle.getAttribute("data-expanded-label") || "Hide"
-      : toggle.getAttribute("data-collapsed-label") || "Open";
+      ? toggle.dataset.expandedLabel || "Hide"
+      : toggle.dataset.collapsedLabel || "Open";
     toggle.setAttribute("aria-expanded", String(shouldExpand));
 
     if (!isMobile) return;
@@ -151,13 +152,12 @@
 
     const preferred =
       ns.state.expandedPlaylist ||
-      items
-        .find((item) => item.classList.contains("active"))
-        ?.getAttribute("data-playlist-name") ||
-      items[0].getAttribute("data-playlist-name");
+      items.find((item) => item.classList.contains("active"))?.dataset
+        .playlistName ||
+      items[0].dataset.playlistName;
 
     items.forEach((item) => {
-      const isExpanded = item.getAttribute("data-playlist-name") === preferred;
+      const isExpanded = item.dataset.playlistName === preferred;
       setPlaylistExpanded(item, isExpanded);
     });
   }

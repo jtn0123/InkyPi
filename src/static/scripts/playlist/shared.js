@@ -10,7 +10,7 @@
       "Playlist name can only contain ASCII letters, numbers, spaces, underscores, and hyphens",
   };
 
-  ns.config = Object.assign({}, global.PLAYLIST_CTX || {}, ns.config || {});
+  ns.config = { ...(global.PLAYLIST_CTX || {}), ...(ns.config || {}) };
   ns.mobileQuery =
     ns.mobileQuery ||
     (global.matchMedia
@@ -37,7 +37,7 @@
   };
 
   ns.setConfig = function setConfig(config) {
-    ns.config = Object.assign({}, global.PLAYLIST_CTX || {}, config || {});
+    ns.config = { ...(global.PLAYLIST_CTX || {}), ...(config || {}) };
     return ns.config;
   };
 
@@ -45,20 +45,19 @@
     if (!rawValue) return {};
     try {
       return JSON.parse(rawValue);
-    } catch (_err) {
+    } catch (error) {
+      console.debug("Failed to parse playlist refresh settings:", error);
       return {};
     }
   };
 
   ns.buildProgressKey = function buildProgressKey(ctx) {
-    try {
-      if (ctx && ctx.page === "playlist") {
-        const playlist = ctx.playlist || "_";
-        const pluginId = ctx.pluginId || "_";
-        const instance = ctx.instance || "_";
-        return `INKYPI_LAST_PROGRESS:playlist:${playlist}:${pluginId}:${instance}`;
-      }
-    } catch (_err) {}
+    if (ctx?.page === "playlist") {
+      const playlist = ctx.playlist || "_";
+      const pluginId = ctx.pluginId || "_";
+      const instance = ctx.instance || "_";
+      return `INKYPI_LAST_PROGRESS:playlist:${playlist}:${pluginId}:${instance}`;
+    }
     return "INKYPI_LAST_PROGRESS";
   };
 

@@ -1,6 +1,22 @@
 (function (global) {
   const ns = (global.InkyPiPlaylist = global.InkyPiPlaylist || {});
 
+  function getActionPayload(actionButton) {
+    const { dataset } = actionButton;
+    return {
+      cycleMinutes: dataset.cycleMinutes,
+      endTime: dataset.endTime,
+      instance: dataset.instance,
+      instanceLabel: dataset.instanceLabel || dataset.instance,
+      playlist: dataset.playlist,
+      playlistName: dataset.playlistName,
+      pluginId: dataset.pluginId,
+      // Reads the data-refresh payload from the delegated button.
+      refresh: dataset.refresh,
+      startTime: dataset.startTime,
+    };
+  }
+
   function handlePlaylistActionClick(event) {
     const actionButton = event.target.closest("[data-playlist-action]");
     if (
@@ -12,58 +28,54 @@
     }
 
     const action = actionButton.dataset.playlistAction;
+    const payload = getActionPayload(actionButton);
     if (action === "toggle-card") {
       ns.togglePlaylistCard(actionButton);
       return true;
     }
     if (action === "edit-playlist") {
       ns.openEditModal(
-        actionButton.getAttribute("data-playlist-name"),
-        actionButton.getAttribute("data-start-time"),
-        actionButton.getAttribute("data-end-time"),
-        actionButton.getAttribute("data-cycle-minutes"),
+        payload.playlistName,
+        payload.startTime,
+        payload.endTime,
+        payload.cycleMinutes,
         actionButton
       );
       return true;
     }
     if (action === "confirm-display-next") {
-      const name = actionButton.getAttribute("data-playlist");
-      ns.openDisplayNextConfirmModal(name, actionButton);
+      ns.openDisplayNextConfirmModal(payload.playlist, actionButton);
       return true;
     }
     if (action === "delete-playlist") {
-      ns.openDeletePlaylistModal(
-        actionButton.getAttribute("data-playlist"),
-        actionButton
-      );
+      ns.openDeletePlaylistModal(payload.playlist, actionButton);
       return true;
     }
     if (action === "delete-instance") {
       ns.openDeleteInstanceModal(
-        actionButton.getAttribute("data-playlist"),
-        actionButton.getAttribute("data-plugin-id"),
-        actionButton.getAttribute("data-instance"),
+        payload.playlist,
+        payload.pluginId,
+        payload.instance,
         actionButton,
-        actionButton.getAttribute("data-instance-label") ||
-          actionButton.getAttribute("data-instance")
+        payload.instanceLabel
       );
       return true;
     }
     if (action === "edit-refresh") {
       ns.openRefreshModal(
-        actionButton.getAttribute("data-playlist"),
-        actionButton.getAttribute("data-plugin-id"),
-        actionButton.getAttribute("data-instance"),
-        ns.parseRefreshSettings(actionButton.getAttribute("data-refresh")),
+        payload.playlist,
+        payload.pluginId,
+        payload.instance,
+        ns.parseRefreshSettings(payload.refresh),
         actionButton
       );
       return true;
     }
     if (action === "display-instance") {
       ns.displayPluginInstance(
-        actionButton.getAttribute("data-playlist"),
-        actionButton.getAttribute("data-plugin-id"),
-        actionButton.getAttribute("data-instance"),
+        payload.playlist,
+        payload.pluginId,
+        payload.instance,
         actionButton
       );
       return true;
@@ -78,10 +90,13 @@
       data.append("plugin_id", ns.state.currentEditPluginId);
       data.append("refresh_settings", JSON.stringify(formData));
       const encodedInstance = encodeURIComponent(ns.state.currentEditInstance);
-      const response = await fetch(ns.config.update_instance_base_url + encodedInstance, {
-        method: "PUT",
-        body: data,
-      });
+      const response = await fetch(
+        ns.config.update_instance_base_url + encodedInstance,
+        {
+          method: "PUT",
+          body: data,
+        }
+      );
       const result = await response.json();
       if (response.ok) {
         sessionStorage.setItem(
@@ -107,7 +122,7 @@
         }),
       });
       const result = await handleJsonResponse(response);
-      if (response.ok && result && result.success) {
+      if (response.ok && result?.success) {
         location.reload();
       }
     } catch (error) {
@@ -137,13 +152,14 @@
         body: JSON.stringify({ playlist_name: name }),
       });
       const result = await handleJsonResponse(resp);
-      if (resp.ok && result && result.success) {
+      if (resp.ok && result?.success) {
         showResponseModal("success", "Display updated — refreshing…");
         setTimeout(() => {
           location.reload();
         }, 500);
       }
-    } catch (_err) {
+    } catch (error) {
+      console.debug("Failed to trigger display next:", error);
       showResponseModal("failure", "Failed to trigger display");
     }
   }
@@ -152,9 +168,7 @@
     if (ns.runtime.actionDelegationBound) return;
     const pageContent = document.getElementById("playlist-page-content");
     if (!pageContent) return;
-    pageContent.addEventListener("click", (event) => {
-      handlePlaylistActionClick(event);
-    });
+    pageContent.addEventListener("click", handlePlaylistActionClick);
     ns.runtime.actionDelegationBound = true;
   }
 
