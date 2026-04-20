@@ -1,6 +1,45 @@
 # CHANGELOG
 
 
+## v0.62.2 (2026-04-20)
+
+### Bug Fixes
+
+- Surface device-name validation inline (JTN-780)
+  ([#559](https://github.com/jtn0123/InkyPi/pull/559),
+  [`23cb6e1`](https://github.com/jtn0123/InkyPi/commit/23cb6e15053e60ffcc1ce87112186937d637b8e0))
+
+* fix: surface device-name validation inline (JTN-780)
+
+JTN-746 added a 64-char cap and a control-char rejection on the server, but the Settings page gave
+  users no inline feedback when their input violated those rules. They typed hundreds of characters,
+  clicked Save, and only saw a dismissable "Error!" toast — the field itself looked fine, so the
+  cause of the failure was opaque.
+
+- Add `maxlength="64"` so the browser caps input at the server limit. - Add a `pattern` that forbids
+  Unicode control characters except tab, mirroring `_validate_device_name` in
+  blueprints/settings/_config.py. - Add a `title` so the native :invalid popup explains the
+  constraint. - Teach `settings_page.js` to route `{code: "validation_error", details: {field}}`
+  responses to `FormState.setFieldError`, so the server's error message lands next to the bad input.
+  - Skip the snapshot restore when a field-level error was surfaced so the user can still see (and
+  correct) the value they entered. - Pin all of the above with static-analysis tests.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+* style: apply black formatting to JTN-780 test additions
+
+* refactor: extract applyFieldLevelError helper to satisfy Sonar S3776
+
+SonarCloud flagged handleAction's cognitive complexity at 16 (cap: 15) after JTN-780 added the
+  validation_error fast path and the snapshot-restore gate. Extract the error-routing branch into a
+  module-scope helper (same pattern used by renderUpdateFailureUnreadable for JTN-710), keeping the
+  closure-owned _formSnapshot access inline.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+
 ## v0.62.1 (2026-04-20)
 
 ### Bug Fixes
