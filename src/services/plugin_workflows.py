@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from plugins.plugin_registry import get_plugin_instance
-from utils.form_utils import validate_plugin_required_fields
+from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
 from utils.plugin_history import record_change as _record_plugin_change
 
 logger = logging.getLogger(__name__)
@@ -133,10 +133,11 @@ def save_plugin_settings_workflow(
     The workflow mirrors the route behavior but returns structured data instead
     of Flask responses.
     """
+    plugin_log_id = sanitize_log_field(plugin_id)
     try:
         plugin_config = device_config.get_plugin(plugin_id)
     except Exception:
-        logger.exception("Plugin lookup failed for %s", plugin_id)
+        logger.exception("Plugin lookup failed for %s", plugin_log_id)
         return _failure(
             DEFAULT_PLUGIN_NOT_FOUND_MESSAGE,
             status=500,
@@ -150,7 +151,9 @@ def save_plugin_settings_workflow(
     try:
         plugin = get_plugin_instance_fn(plugin_config)
     except Exception:
-        logger.warning("Could not load plugin instance for validation: %s", plugin_id)
+        logger.warning(
+            "Could not load plugin instance for validation: %s", plugin_log_id
+        )
 
     if plugin is not None:
         try:
@@ -158,7 +161,7 @@ def save_plugin_settings_workflow(
             if validation_error:
                 return _failure(validation_error, status=400)
         except Exception:
-            logger.warning("Required-field validation failed for %s", plugin_id)
+            logger.warning("Required-field validation failed for %s", plugin_log_id)
 
         try:
             settings_error = plugin.validate_settings(plugin_settings)
@@ -166,7 +169,9 @@ def save_plugin_settings_workflow(
                 return _failure(settings_error, status=400)
         except Exception:
             logger.warning(
-                "Plugin validate_settings raised for %s", plugin_id, exc_info=True
+                "Plugin validate_settings raised for %s",
+                plugin_log_id,
+                exc_info=True,
             )
             return _failure(DEFAULT_PLUGIN_VALIDATION_MESSAGE, status=400)
 
@@ -209,7 +214,7 @@ def save_plugin_settings_workflow(
 
         device_config.update_atomic(_do_save_settings)
     except Exception:
-        logger.exception("Saving plugin settings failed for %s", plugin_id)
+        logger.exception("Saving plugin settings failed for %s", plugin_log_id)
         return _failure(
             "An internal error occurred",
             status=500,
@@ -221,7 +226,7 @@ def save_plugin_settings_workflow(
             config_dir = os.path.dirname(device_config.config_file)
             record_change_fn(config_dir, instance_name, before_settings, after_settings)
         except Exception:
-            logger.exception("Recording plugin history failed for %s", plugin_id)
+            logger.exception("Recording plugin history failed for %s", plugin_log_id)
             return _failure(
                 "An internal error occurred",
                 status=500,
