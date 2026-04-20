@@ -21,6 +21,38 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 # ---------------------------------------------------------------------------
+# Common mutating JSON success envelopes
+# ---------------------------------------------------------------------------
+
+
+class SuccessResponse(TypedDict):
+    """Base envelope returned by ``json_success``."""
+
+    success: bool
+
+
+class ActionMetricStep(TypedDict, total=False):
+    """One optional progress/metrics step emitted by render/update actions."""
+
+    name: str
+    description: str
+    status: str
+    elapsed_ms: int
+    error_message: str
+    substeps: list[str]
+
+
+class ActionMetrics(TypedDict, total=False):
+    """Timing metrics attached to display/update success responses."""
+
+    request_ms: int | None
+    generate_ms: int | None
+    preprocess_ms: int | None
+    display_ms: int | None
+    steps: list[ActionMetricStep]
+
+
+# ---------------------------------------------------------------------------
 # GET /api/version/info
 # ---------------------------------------------------------------------------
 
@@ -163,6 +195,51 @@ class HealthPluginsResponse(TypedDict, total=False):
     success: bool
     request_id: str
     items: dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Shared success envelopes for mutating UI-facing routes
+# ---------------------------------------------------------------------------
+
+
+class SuccessMessageResponse(TypedDict, total=False):
+    """Canonical ``json_success`` envelope with a message."""
+
+    success: bool
+    request_id: str
+    message: str
+
+
+class SuccessMessageWarningResponse(SuccessMessageResponse, total=False):
+    """Message envelope with an optional soft warning."""
+
+    warning: str
+
+
+class UpdateControlResponse(SuccessMessageResponse, total=False):
+    """Update / rollback launch envelope returned by settings actions."""
+
+    running: bool
+    unit: str | None
+
+
+class RollbackControlResponse(UpdateControlResponse, total=False):
+    """Rollback launch envelope with the rollback target version."""
+
+    target_version: str
+
+
+class MetricsSuccessResponse(SuccessMessageResponse, total=False):
+    """Success envelope that also includes timing metrics."""
+
+    metrics: ActionMetrics
+
+
+class SaveApiKeysResponse(SuccessMessageResponse, total=False):
+    """Success response for ``POST /settings/save_api_keys``."""
+
+    updated: list[str]
+    skipped_placeholder: list[str]
 
 
 # ---------------------------------------------------------------------------

@@ -29,6 +29,8 @@ def register(app: Flask) -> None:
         try:
             if response.mimetype != "application/json":
                 return response
+            if response.status_code < 200 or response.status_code >= 300:
+                return response
             endpoint = request.endpoint
             if endpoint is None or endpoint not in ENDPOINT_SCHEMAS:
                 return response
