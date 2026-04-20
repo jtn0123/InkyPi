@@ -3,6 +3,7 @@ import logging
 from plugins.base_plugin.base_plugin import BasePlugin
 from plugins.base_plugin.settings_schema import callout, field, schema, section
 from utils.image_utils import take_screenshot
+from utils.plugin_errors import PermanentPluginError
 from utils.security_utils import validate_url
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,10 @@ class Screenshot(BasePlugin):
         try:
             validate_url(url)
         except ValueError as e:
-            raise RuntimeError(f"Invalid URL: {e}") from e
+            # Permanent: bad scheme, SSRF-blocked address, or malformed URL.
+            # Tell refresh_task not to retry — the URL will fail identically
+            # on every subsequent attempt (JTN-778).
+            raise PermanentPluginError(f"Invalid URL: {e}") from e
 
         dimensions = self.get_oriented_dimensions(device_config)
 

@@ -29,6 +29,7 @@ from utils.metrics import (
     set_circuit_breaker_open,
 )
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
+from utils.plugin_errors import PermanentPluginError
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
@@ -1013,6 +1014,19 @@ class RefreshTask:
             if isinstance(last_exc, TimeoutError):
                 last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
 
+            # JTN-778: permanent errors (bad URL, malformed config) will fail
+            # identically on retry — skip remaining attempts to avoid burning
+            # CPU and log lines on every scheduled playlist tick.
+            if isinstance(last_exc, PermanentPluginError):
+                logger.info(
+                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    last_exc,
+                )
+                raise last_exc
+
             if attempt < attempts:
                 logger.warning(
                     "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
@@ -1141,6 +1155,17 @@ class RefreshTask:
                 last_exc = result_holder["error"]
             else:
                 return result_holder["image"], result_holder.get("meta")
+
+            # JTN-778: permanent errors are terminal — skip retries.
+            if isinstance(last_exc, PermanentPluginError):
+                logger.info(
+                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    last_exc,
+                )
+                raise last_exc
 
             if attempt < attempts:
                 sleep(max(0.0, backoff_ms / 1000.0))
