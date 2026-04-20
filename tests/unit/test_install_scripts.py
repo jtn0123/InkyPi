@@ -2457,9 +2457,7 @@ class TestInstallMatrixWorkflow:
         # matrix body (codenames, arm64 platform, 512 MB cap, verify script)
         # must inspect install-matrix.yml directly, while ci.yml is only
         # asserted to wire the reusable workflow in as a required gate.
-        self.install_matrix_yaml = (
-            WORKFLOWS_DIR / "install-matrix.yml"
-        ).read_text()
+        self.install_matrix_yaml = (WORKFLOWS_DIR / "install-matrix.yml").read_text()
         self.dockerfile = (SCRIPTS_DIR / "Dockerfile.install-matrix").read_text()
         self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
 
