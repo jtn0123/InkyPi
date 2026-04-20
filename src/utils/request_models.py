@@ -147,6 +147,8 @@ def _int_value(
         raise RequestValidationError(required_message, status=status, field=field)
     if isinstance(raw, bool):
         raise RequestValidationError(invalid_message, status=status, field=field)
+    if isinstance(raw, float):
+        raise RequestValidationError(invalid_message, status=status, field=field)
     try:
         value = int(cast(str | bytes | bytearray | SupportsInt | SupportsIndex, raw))
     except (TypeError, ValueError) as exc:
