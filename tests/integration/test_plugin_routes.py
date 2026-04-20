@@ -81,7 +81,10 @@ def test_delete_plugin_instance_exception_handling(client, flask_app, monkeypatc
         },
     )
     assert resp.status_code == 500
-    assert "An internal error occurred" in resp.get_json().get("error", "")
+    body = resp.get_json()
+    assert body.get("error") == "An internal error occurred"
+    assert body.get("code") == "internal_error"
+    assert body.get("details", {}).get("context") == "delete plugin instance"
 
 
 def test_update_plugin_instance_missing_instance_name(client):
@@ -136,7 +139,10 @@ def test_update_plugin_instance_exception_handling(client, flask_app, monkeypatc
 
     resp = client.put("/update_plugin_instance/test", data={"plugin_id": "ai_text"})
     assert resp.status_code == 500
-    assert "An internal error occurred" in resp.get_json().get("error", "")
+    body = resp.get_json()
+    assert body.get("error") == "An internal error occurred"
+    assert body.get("code") == "internal_error"
+    assert body.get("details", {}).get("context") == "update plugin instance"
 
 
 def test_display_plugin_instance_invalid_json(client):
@@ -221,7 +227,10 @@ def test_display_plugin_instance_exception_handling(client, flask_app, monkeypat
         },
     )
     assert resp.status_code == 500
-    assert "An internal error occurred" in resp.get_json().get("error", "")
+    body = resp.get_json()
+    assert body.get("error") == "An internal error occurred"
+    assert body.get("code") == "internal_error"
+    assert body.get("details", {}).get("context") == "display plugin instance"
 
 
 def test_update_now_plugin_not_found(client):

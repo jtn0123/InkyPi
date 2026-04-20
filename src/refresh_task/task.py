@@ -14,21 +14,18 @@ from model import PlaylistManager, RefreshInfo
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task.actions import ManualUpdateRequest, PlaylistRefresh
 from refresh_task.context import RefreshContext
+from refresh_task.health import PluginHealthTracker
+from refresh_task.housekeeping import RefreshHousekeeper
+from refresh_task.scheduler import RefreshScheduler
 from refresh_task.worker import (
     _execute_refresh_attempt_worker,
     _get_mp_context,
     _remote_exception,
 )
 from utils.event_bus import get_event_bus
-from utils.fallback_image import render_error_image
-from utils.history_cleanup import cleanup_history
 from utils.image_utils import compute_image_hash
-from utils.metrics import (
-    record_refresh_failure,
-    record_refresh_success,
-    set_circuit_breaker_open,
-)
 from utils.output_validator import OutputDimensionMismatch, validate_image_dimensions
+from utils.plugin_errors import PermanentPluginError
 from utils.progress import ProgressTracker, track_progress
 from utils.progress_events import get_progress_bus
 from utils.time_utils import now_device_tz
@@ -81,6 +78,20 @@ class RefreshTask:
         self.progress_bus = get_progress_bus()
         self.event_bus = get_event_bus()
         self.plugin_health: dict[str, dict] = {}
+        self.scheduler = RefreshScheduler(
+            device_config=self.device_config,
+            condition=self.condition,
+            manual_update_requests=self.manual_update_requests,
+            get_current_datetime=self._get_current_datetime,
+        )
+        self.housekeeper = RefreshHousekeeper(
+            device_config=self.device_config,
+            display_manager=self.display_manager,
+        )
+        self.health_tracker = PluginHealthTracker(
+            device_config=self.device_config,
+            plugin_health=self.plugin_health,
+        )
         self._tick_count: int = 0
         self.watchdog_thread: threading.Thread | None = None
 
@@ -90,10 +101,7 @@ class RefreshTask:
 
         Reads ``PLUGIN_FAILURE_THRESHOLD`` from the environment (default 5).
         """
-        try:
-            return max(1, int(os.getenv("PLUGIN_FAILURE_THRESHOLD", "5") or "5"))
-        except (ValueError, TypeError):
-            return 5
+        return PluginHealthTracker.circuit_breaker_threshold()
 
     def start(self):
         """Starts the background thread for refreshing the display."""
@@ -136,13 +144,7 @@ class RefreshTask:
 
         Defaults to 30s if WATCHDOG_USEC is unset (e.g. running outside systemd).
         """
-        try:
-            usec = int(os.environ.get("WATCHDOG_USEC", "0"))
-        except (ValueError, TypeError):
-            usec = 0
-        if usec <= 0:
-            return 30.0
-        return max(1.0, (usec / 1_000_000) / 2)
+        return RefreshScheduler.watchdog_interval_seconds()
 
     def _watchdog_heartbeat_loop(self) -> None:
         """Background loop that feeds the systemd watchdog at WatchdogSec/2 cadence.
@@ -150,12 +152,11 @@ class RefreshTask:
         Decoupled from the refresh cycle so a long plugin_cycle_interval_seconds
         cannot stall the heartbeat (JTN-596).
         """
-        interval = self._watchdog_interval_seconds()
-        while self.running:
-            self._notify_watchdog()
-            # Wake on stop() so shutdown is responsive.
-            with self.condition:
-                self.condition.wait(timeout=interval)
+        self.scheduler.watchdog_heartbeat_loop(
+            is_running=lambda: self.running,
+            notify_watchdog=self._notify_watchdog,
+            interval_seconds=self._watchdog_interval_seconds(),
+        )
 
     @staticmethod
     def _notify_watchdog():
@@ -166,11 +167,7 @@ class RefreshTask:
         from the notification call are caught and logged rather than propagated,
         so a watchdog hiccup never aborts the refresh loop.
         """
-        if _sd_notify:
-            try:
-                _sd_notify("WATCHDOG=1")
-            except Exception:
-                logger.exception("Failed to notify systemd watchdog")
+        RefreshScheduler.notify_watchdog(_sd_notify)
 
     @staticmethod
     def _complete_manual_request(manual_request, metrics=None, exception=None):
@@ -236,19 +233,10 @@ class RefreshTask:
 
     def _maybe_run_history_cleanup(self) -> None:
         """Run history cleanup every N ticks (non-blocking; errors are logged only)."""
-        if self._tick_count % self._CLEANUP_INTERVAL_TICKS != 0:
-            return
-        try:
-            cfg = self.device_config.get_config("history_cleanup") or {}
-            history_dir = self.device_config.history_image_dir
-            cleanup_history(
-                history_dir,
-                max_age_days=int(cfg.get("max_age_days", 30)),
-                max_count=int(cfg.get("max_count", 500)),
-                min_free_bytes=int(cfg.get("min_free_bytes", 500_000_000)),
-            )
-        except Exception:
-            logger.exception("history_cleanup: unexpected error during cleanup")
+        self.housekeeper.maybe_run_history_cleanup(
+            tick_count=self._tick_count,
+            cleanup_interval_ticks=self._CLEANUP_INTERVAL_TICKS,
+        )
 
     def _wait_for_trigger(self):
         """Wait for the next refresh trigger while holding the condition lock.
@@ -260,24 +248,7 @@ class RefreshTask:
         Threading:
             Acquires ``self.condition`` and releases it before returning.
         """
-        with self.condition:
-            sleep_time = self.device_config.get_config(
-                "plugin_cycle_interval_seconds", default=60 * 60
-            )
-            if not self.running:
-                return None
-            if not self.manual_update_requests:
-                self.condition.wait(timeout=sleep_time)
-            if not self.running:
-                return None
-
-            playlist_manager = self.device_config.get_playlist_manager()
-            latest_refresh = self.device_config.get_refresh_info()
-            current_dt = self._get_current_datetime()
-            manual_request = None
-            if self.manual_update_requests:
-                manual_request = self.manual_update_requests.popleft()
-            return playlist_manager, latest_refresh, current_dt, manual_request
+        return self.scheduler.wait_for_trigger(is_running=lambda: self.running)
 
     def _select_refresh_action(
         self, playlist_manager, latest_refresh, current_dt, manual_request
@@ -384,11 +355,15 @@ class RefreshTask:
                 )
             except Exception as exc:
                 retain_path = self._stale_display_path()
+                # JTN-779: log the full exception class + message so operators
+                # can diagnose.  The user-visible fallback image is sanitised
+                # via utils.fallback_image.sanitize_error_message.
                 logger.error(
-                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error=%s",
+                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error_class=%s error=%s",
                     plugin_id,
                     instance_name,
                     bool(retain_path),
+                    type(exc).__name__,
                     exc,
                 )
                 self._update_plugin_health(
@@ -576,12 +551,7 @@ class RefreshTask:
     ):
         """Push image to the display hardware and record benchmark stages."""
         logger.info(f"Updating display. | refresh_info: {refresh_info}")
-        history_meta = {
-            "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
-            "plugin_id": refresh_action.get_refresh_info().get("plugin_id"),
-            "playlist": refresh_action.get_refresh_info().get("playlist"),
-            "plugin_instance": refresh_action.get_refresh_info().get("plugin_instance"),
-        }
+        history_meta = self.housekeeper.build_history_meta(refresh_action)
         logger.info(
             "plugin_lifecycle: display_start",
             extra={
@@ -711,13 +681,7 @@ class RefreshTask:
         Returns:
             An absolute path string if an image file exists, otherwise ``None``.
         """
-        for path in (
-            getattr(self.device_config, "processed_image_file", None),
-            getattr(self.device_config, "current_image_file", None),
-        ):
-            if path and os.path.exists(path):
-                return path
-        return None
+        return self.housekeeper.stale_display_path()
 
     def _push_fallback_image(
         self,
@@ -733,39 +697,13 @@ class RefreshTask:
         changed rather than stale content.  Best-effort: any error here is
         logged but never re-raised.
         """
-        try:
-            width, height = self.device_config.get_resolution()
-            fallback = render_error_image(
-                width=width,
-                height=height,
-                plugin_id=plugin_id,
-                instance_name=instance_name,
-                error_class=type(exc).__name__,
-                error_message=str(exc),
-            )
-            history_meta = {
-                "refresh_type": refresh_action.get_refresh_info().get("refresh_type"),
-                "plugin_id": plugin_id,
-                "playlist": refresh_action.get_refresh_info().get("playlist"),
-                "plugin_instance": instance_name,
-            }
-            self.display_manager.display_image(
-                fallback,
-                image_settings=plugin_config.get("image_settings", []),
-                history_meta=history_meta,
-            )
-            logger.info(
-                "plugin_lifecycle: fallback_displayed | plugin_id=%s instance=%s",
-                plugin_id,
-                instance_name,
-            )
-        except Exception:
-            logger.warning(
-                "plugin_lifecycle: fallback_display_failed | plugin_id=%s instance=%s",
-                plugin_id,
-                instance_name,
-                exc_info=True,
-            )
+        self.housekeeper.push_fallback_image(
+            plugin_id=plugin_id,
+            instance_name=instance_name,
+            exc=exc,
+            plugin_config=plugin_config,
+            refresh_action=refresh_action,
+        )
 
     def _update_refresh_info(self, refresh_info, metrics, used_cached):
         """Persist the latest refresh information to the device config.
@@ -1013,6 +951,19 @@ class RefreshTask:
             if isinstance(last_exc, TimeoutError):
                 last_exc = TimeoutError(self._timeout_msg(plugin_id, timeout_s))
 
+            # JTN-778: permanent errors (bad URL, malformed config) will fail
+            # identically on retry — skip remaining attempts to avoid burning
+            # CPU and log lines on every scheduled playlist tick.
+            if isinstance(last_exc, PermanentPluginError):
+                logger.info(
+                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    last_exc,
+                )
+                raise last_exc
+
             if attempt < attempts:
                 logger.warning(
                     "plugin_lifecycle: attempt_retry | plugin_id=%s attempt=%s/%s backoff_ms=%s error=%s",
@@ -1142,6 +1093,17 @@ class RefreshTask:
             else:
                 return result_holder["image"], result_holder.get("meta")
 
+            # JTN-778: permanent errors are terminal — skip retries.
+            if isinstance(last_exc, PermanentPluginError):
+                logger.info(
+                    "plugin_lifecycle: attempt_terminal | plugin_id=%s attempt=%s/%s error=%s",
+                    plugin_id,
+                    attempt,
+                    attempts,
+                    last_exc,
+                )
+                raise last_exc
+
             if attempt < attempts:
                 sleep(max(0.0, backoff_ms / 1000.0))
 
@@ -1171,48 +1133,15 @@ class RefreshTask:
             metrics: Optional timing/steps dict to store on the health entry.
             error: Human-readable error string to store when *ok* is ``False``.
         """
-        now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
-        entry = self.plugin_health.get(plugin_id, {})
-        entry.setdefault("success_count", 0)
-        entry.setdefault("failure_count", 0)
-        entry.setdefault("retry_count", 0)
-        entry.setdefault("timeout_count", 0)
-        entry["instance"] = instance
-        entry["last_seen"] = now_iso
-
-        # Resolve the PluginInstance so we can mutate its circuit-breaker fields
-        plugin_instance = None
-        if instance:
-            plugin_instance = self.device_config.get_playlist_manager().find_plugin(
-                plugin_id, instance
-            )
-
-        if ok:
-            entry["status"] = "green"
-            entry["last_success_at"] = now_iso
-            entry["last_error"] = None
-            entry["success_count"] = int(entry.get("success_count", 0)) + 1
-            entry["failure_count"] = 0
-            entry["retained_display"] = False
-            if metrics:
-                entry["last_metrics"] = metrics
-            record_refresh_success()
-            self._cb_on_success(plugin_instance, plugin_id, instance)
-        else:
-            msg = error or "unknown error"
-            entry["status"] = "red"
-            entry["last_failure_at"] = now_iso
-            entry["last_error"] = msg
-            entry["failure_count"] = int(entry.get("failure_count", 0)) + 1
-            if "timed out" in msg.lower():
-                entry["timeout_count"] = int(entry.get("timeout_count", 0)) + 1
-            entry["retry_count"] = int(os.getenv("INKYPI_PLUGIN_RETRY_MAX", "1") or "1")
-            entry["retained_display"] = bool((metrics or {}).get("retained_display"))
-            if metrics:
-                entry["last_metrics"] = metrics
-            record_refresh_failure(plugin_id)
-            self._cb_on_failure(plugin_instance, plugin_id, instance)
-        self.plugin_health[plugin_id] = entry
+        self.health_tracker.update(
+            plugin_id=plugin_id,
+            instance=instance,
+            ok=ok,
+            metrics=metrics,
+            error=error,
+            on_success=self._cb_on_success,
+            on_failure=self._cb_on_failure,
+        )
 
     def _cb_on_success(
         self,
@@ -1221,31 +1150,7 @@ class RefreshTask:
         instance: str | None,
     ) -> None:
         """Reset the circuit breaker on a successful refresh."""
-        if plugin_instance is None:
-            return
-        changed = (
-            plugin_instance.paused or plugin_instance.consecutive_failure_count > 0
-        )
-        if changed:
-            logger.info(
-                "plugin circuit_breaker: recovered | plugin_id=%s instance=%s",
-                plugin_id,
-                instance,
-            )
-        plugin_instance.consecutive_failure_count = 0
-        plugin_instance.paused = False
-        plugin_instance.disabled_reason = None
-        set_circuit_breaker_open(plugin_id, False)
-        if changed:
-            try:
-                self.device_config.write_config()
-            except Exception:
-                logger.warning(
-                    "plugin circuit_breaker: failed to persist reset for %s/%s",
-                    plugin_id,
-                    instance,
-                    exc_info=True,
-                )
+        self.health_tracker.on_success(plugin_instance, plugin_id, instance)
 
     def _cb_on_failure(
         self,
@@ -1254,97 +1159,22 @@ class RefreshTask:
         instance: str | None,
     ) -> None:
         """Increment the failure counter and pause the plugin if threshold exceeded."""
-        if plugin_instance is None or plugin_instance.paused:
-            return
-        threshold = self._get_circuit_breaker_threshold()
-        plugin_instance.consecutive_failure_count += 1
-        logger.warning(
-            "plugin circuit_breaker: failure | plugin_id=%s instance=%s count=%d/%d",
+        self.health_tracker.on_failure(
+            plugin_instance,
             plugin_id,
             instance,
-            plugin_instance.consecutive_failure_count,
-            threshold,
+            webhook_sender=send_failure_webhook,
         )
-        newly_paused = False
-        if plugin_instance.consecutive_failure_count >= threshold:
-            now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
-            error_msg = (
-                self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
-            )
-            plugin_instance.paused = True
-            plugin_instance.disabled_reason = (
-                f"Paused after {plugin_instance.consecutive_failure_count} consecutive "
-                f"failures at {now_iso}. Last error: {error_msg[:120]}"
-            )
-            newly_paused = True
-            set_circuit_breaker_open(plugin_id, True)
-            logger.error(
-                "plugin circuit_breaker: paused | plugin_id=%s instance=%s"
-                " paused after %d consecutive failures",
-                plugin_id,
-                instance,
-                plugin_instance.consecutive_failure_count,
-            )
-        # Persist the updated counter (and paused state if newly paused) to disk
-        # so that a daemon restart preserves the circuit-breaker state.
-        if newly_paused or plugin_instance.consecutive_failure_count > 0:
-            try:
-                self.device_config.write_config()
-            except Exception:
-                logger.warning(
-                    "plugin circuit_breaker: failed to persist failure state for %s/%s",
-                    plugin_id,
-                    instance,
-                    exc_info=True,
-                )
-
-        # Best-effort webhook notification — never raises.
-        try:
-            webhook_urls = self.device_config.get_config("webhook_urls", default=[])
-            if webhook_urls:
-                now_iso = now_device_tz(self.device_config).astimezone(UTC).isoformat()
-                error_msg = (
-                    self.plugin_health.get(plugin_id, {}).get("last_error") or "unknown"
-                )
-                payload = {
-                    "event": "plugin_failure",
-                    "plugin_id": plugin_id,
-                    "instance_name": instance,
-                    "error": error_msg,
-                    "ts": now_iso,
-                }
-                send_failure_webhook(webhook_urls, payload)
-        except Exception:
-            logger.warning(
-                "webhook: unexpected error building webhook payload", exc_info=True
-            )
 
     def reset_circuit_breaker(self, plugin_id: str, instance: str) -> bool:
         """Clear the paused state and failure counter for a plugin instance.
 
         Returns True if the instance was found and reset, False otherwise.
         """
-        plugin_instance = self.device_config.get_playlist_manager().find_plugin(
-            plugin_id, instance
-        )
-        if plugin_instance is None:
-            return False
-        plugin_instance.consecutive_failure_count = 0
-        plugin_instance.paused = False
-        plugin_instance.disabled_reason = None
-        # Sanitize user-controlled values for the audit log (S5145):
-        # strip CR/LF (log injection) and truncate to a sane length.
-        safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]
-        safe_inst = str(instance).replace("\r", "").replace("\n", "")[:64]
-        logger.info(
-            "plugin circuit_breaker: manual_reset | plugin_id=%s instance=%s",
-            safe_pid,
-            safe_inst,
-        )
-        return True
+        return self.health_tracker.reset_circuit_breaker(plugin_id, instance)
 
     def get_health_snapshot(self) -> dict:
-        return dict(self.plugin_health)
+        return self.health_tracker.snapshot()
 
     def signal_config_change(self):
         """Notify the background thread that config has changed (e.g., interval updated).

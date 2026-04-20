@@ -38,7 +38,11 @@ from schemas.responses import (  # noqa: E402  (sys.path set up by conftest)
     RefreshInfoResponse,
     RefreshStatsResponse,
     RefreshStatsWindow,
+    RollbackControlResponse,
+    SuccessMessageResponse,
+    SuccessMessageWarningResponse,
     TopFailingEntry,
+    UpdateControlResponse,
     UptimeResponse,
     VersionInfoResponse,
 )
@@ -134,6 +138,17 @@ def _get_json(client, path, **kwargs):
     resp = client.get(path, **kwargs)
     assert resp.status_code == 200, f"{path} returned {resp.status_code}: {resp.data!r}"
     assert resp.is_json, f"{path} did not return JSON: {resp.content_type!r}"
+    return resp.get_json()
+
+
+def _request_json(client, method: str, path: str, expected_status: int = 200, **kwargs):
+    resp = getattr(client, method)(path, **kwargs)
+    assert (
+        resp.status_code == expected_status
+    ), f"{method.upper()} {path} returned {resp.status_code}: {resp.data!r}"
+    assert (
+        resp.is_json
+    ), f"{method.upper()} {path} did not return JSON: {resp.content_type!r}"
     return resp.get_json()
 
 
@@ -258,6 +273,126 @@ def test_isolation_shape(client):
     assert_shape(body, IsolationResponse)
     assert body.get("success") is True
     assert isinstance(body.get("isolated_plugins"), list)
+
+
+def test_isolation_mutation_shapes(client):
+    body = _request_json(
+        client,
+        "post",
+        "/settings/isolation",
+        json={"plugin_id": "clock"},
+    )
+    assert_shape(body, IsolationResponse)
+    assert body.get("success") is True
+    assert "clock" in body.get("isolated_plugins", [])
+
+    body = _request_json(
+        client,
+        "delete",
+        "/settings/isolation",
+        json={"plugin_id": "clock"},
+    )
+    assert_shape(body, IsolationResponse)
+    assert body.get("success") is True
+    assert "clock" not in body.get("isolated_plugins", [])
+
+
+def test_playlist_crud_shapes(client):
+    body = _request_json(
+        client,
+        "post",
+        "/create_playlist",
+        json={
+            "playlist_name": "Contract Playlist",
+            "start_time": "08:00",
+            "end_time": "09:00",
+        },
+    )
+    assert_shape(body, SuccessMessageWarningResponse)
+    assert body.get("success") is True
+
+    body = _request_json(
+        client,
+        "put",
+        "/update_playlist/Contract Playlist",
+        json={
+            "new_name": "Contract Playlist Updated",
+            "start_time": "09:00",
+            "end_time": "10:00",
+        },
+    )
+    assert_shape(body, SuccessMessageWarningResponse)
+    assert body.get("success") is True
+
+    body = _request_json(
+        client,
+        "delete",
+        "/delete_playlist/Contract Playlist Updated",
+    )
+    assert_shape(body, SuccessMessageResponse)
+    assert body.get("success") is True
+
+
+def test_update_device_cycle_shape(client):
+    body = _request_json(
+        client,
+        "put",
+        "/update_device_cycle",
+        json={"minutes": 30},
+    )
+    assert_shape(body, SuccessMessageResponse)
+    assert body.get("success") is True
+
+
+def test_update_control_shapes(client, monkeypatch, tmp_path):
+    import blueprints.settings as mod
+    from blueprints.settings import _updates as updates_mod
+
+    monkeypatch.setattr(mod, "_systemd_available", lambda: False)
+    monkeypatch.setattr(mod, "_get_update_script_path", lambda: None)
+    monkeypatch.setattr(
+        mod,
+        "_start_update_fallback_thread",
+        lambda script_path, target_tag=None: None,
+    )
+    monkeypatch.setattr(
+        updates_mod,
+        "read_last_update_failure",
+        lambda: {"message": "boom"},
+    )
+    monkeypatch.setattr(updates_mod, "_read_prev_version", lambda: "v1.2.3")
+    monkeypatch.setenv("INKYPI_LOCKFILE_DIR", str(tmp_path))
+    mod._set_update_state(False, None)
+
+    try:
+        body = _request_json(client, "post", "/settings/update")
+        assert_shape(body, UpdateControlResponse)
+        assert body.get("success") is True
+        assert body.get("running") is True
+
+        mod._set_update_state(False, None)
+        body = _request_json(
+            client,
+            "post",
+            "/settings/update/rollback",
+            expected_status=202,
+        )
+        assert_shape(body, RollbackControlResponse)
+        assert body.get("success") is True
+        assert body.get("running") is True
+    finally:
+        mod._set_update_state(False, None)
+
+
+def test_delete_api_key_shape(client):
+    body = _request_json(
+        client,
+        "post",
+        "/settings/delete_api_key",
+        data={"key": "OPEN_AI_SECRET"},
+    )
+    assert_shape(body, SuccessMessageResponse)
+    assert body.get("success") is True
 
 
 def test_history_storage_shape(client):

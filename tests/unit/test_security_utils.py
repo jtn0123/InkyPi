@@ -5,7 +5,11 @@ import socket
 
 import pytest
 
-from utils.security_utils import validate_file_path, validate_url
+from utils.security_utils import (
+    URLValidationError,
+    validate_file_path,
+    validate_url,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -233,3 +237,54 @@ class TestValidateFilePathRejected:
         link.symlink_to(outside)
         with pytest.raises(ValueError, match="outside the allowed directory"):
             validate_file_path(str(link), str(allowed))
+
+
+# ---------------------------------------------------------------------------
+# URLValidationError (JTN-776)
+# ---------------------------------------------------------------------------
+
+
+class TestURLValidationError:
+    """The typed error must stay catchable as RuntimeError *and* return a
+    whitelisted response message that breaks CodeQL taint flow."""
+
+    def test_is_runtime_error(self):
+        err = URLValidationError("Invalid URL: scheme must be http or https")
+        assert isinstance(err, RuntimeError)
+        assert "Invalid URL" in str(err)
+
+    def test_safe_message_passes_through_whitelisted_reason(self):
+        err = URLValidationError("Invalid URL: URL scheme must be http or https")
+        # The reason "URL scheme must be http or https" is one of the hardcoded
+        # validator strings, so safe_message must return it verbatim.
+        assert err.safe_message() == "Invalid URL: URL scheme must be http or https"
+
+    def test_safe_message_falls_back_for_unknown_reason(self):
+        err = URLValidationError("Invalid URL: something the user typed")
+        # Unknown reason -> generic fallback (this is what satisfies CodeQL).
+        assert err.safe_message() == "Invalid URL: URL failed validation"
+
+    def test_safe_message_whitelist_covers_all_validator_errors(self):
+        """Every ValueError that validate_url raises must map to a whitelisted
+        safe_message. If a new validator error is added without updating the
+        whitelist, this test will fail."""
+        # Each bad URL below triggers a distinct ValueError branch.
+        bad_urls = [
+            "",  # empty
+            "ftp://example.com/",  # bad scheme
+            "http://",  # no hostname
+            "http://localhost/",  # localhost literal
+            "http://127.0.0.1/",  # private IP literal
+        ]
+        for url in bad_urls:
+            try:
+                validate_url(url)
+            except ValueError as exc:
+                reason = str(exc)
+                err = URLValidationError(f"Invalid URL: {reason}")
+                # Whitelisted reason -> safe_message returns the real text
+                assert (
+                    err.safe_message() == f"Invalid URL: {reason}"
+                ), f"Reason '{reason}' not on whitelist"
+            else:
+                pytest.fail(f"Expected ValueError for URL: {url!r}")
