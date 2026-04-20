@@ -256,6 +256,53 @@ class TestCircuitBreakerReset:
         result = task.reset_circuit_breaker("weather", "does_not_exist")
         assert result is False
 
+    def test_manual_reset_persists_and_clears_metric(
+        self, device_config_dev, monkeypatch
+    ):
+        """Manual reset should persist config and clear the circuit-breaker metric."""
+        task = _make_task(device_config_dev)
+        pi = _make_plugin_instance()
+        _add_plugin_to_pm(device_config_dev, pi)
+
+        pi.paused = True
+        pi.consecutive_failure_count = 5
+        pi.disabled_reason = "Paused after 5 failures"
+
+        metric_calls: list[tuple[str, bool]] = []
+        monkeypatch.setattr(
+            "refresh_task.health.set_circuit_breaker_open",
+            lambda pid, is_open: metric_calls.append((pid, is_open)),
+        )
+        write_calls: list[int] = []
+        monkeypatch.setattr(
+            device_config_dev,
+            "write_config",
+            lambda: write_calls.append(1),
+        )
+
+        assert task.reset_circuit_breaker("weather", "my_weather") is True
+        assert ("weather", False) in metric_calls
+        assert len(write_calls) == 1
+
+    def test_manual_reset_no_persist_when_unchanged(
+        self, device_config_dev, monkeypatch
+    ):
+        """Reset on an already-clean instance should not persist config."""
+        task = _make_task(device_config_dev)
+        pi = _make_plugin_instance()
+        _add_plugin_to_pm(device_config_dev, pi)
+        # Instance is already in a clean state.
+
+        write_calls: list[int] = []
+        monkeypatch.setattr(
+            device_config_dev,
+            "write_config",
+            lambda: write_calls.append(1),
+        )
+
+        assert task.reset_circuit_breaker("weather", "my_weather") is True
+        assert write_calls == []
+
 
 # ---------------------------------------------------------------------------
 # Scheduler skips paused plugins

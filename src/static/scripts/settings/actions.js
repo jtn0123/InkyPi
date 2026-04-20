@@ -3,6 +3,104 @@
     globalThis.InkyPiSettingsModules ||
     (globalThis.InkyPiSettingsModules = {});
 
+  function getVersionElements() {
+    return {
+      badge: document.getElementById("updateBadge"),
+      checkBtn: document.getElementById("checkUpdatesBtn"),
+      latestEl: document.getElementById("latestVersion"),
+      notesBody: document.getElementById("releaseNotesBody"),
+      notesContainer: document.getElementById("releaseNotesContainer"),
+      updateBtn: document.getElementById("startUpdateBtn"),
+      whatsNewBody: document.getElementById("whatsNewBody"),
+      whatsNewBtn: document.getElementById("whatsNewBtn"),
+    };
+  }
+
+  function setStatusChip(chip, text, variant) {
+    if (!chip) return;
+    chip.textContent = text;
+    chip.className = variant ? `status-chip ${variant}` : "status-chip";
+  }
+
+  function setCheckButtonLoading(checkBtn, isLoading) {
+    if (!checkBtn) return;
+    checkBtn.disabled = isLoading;
+    const spinner = checkBtn.querySelector(".btn-spinner");
+    if (spinner) {
+      spinner.style.display = isLoading ? "inline-block" : "none";
+    }
+  }
+
+  function syncReleaseNotes(notesText, notesContainer, notesBody) {
+    if (!notesContainer) return;
+    notesContainer.hidden = !notesText;
+    if (notesBody) {
+      notesBody.textContent = notesText || "";
+    }
+  }
+
+  function syncWhatsNew(notesText, whatsNewBtn, whatsNewBody) {
+    if (whatsNewBody) {
+      whatsNewBody.textContent = notesText || "";
+    }
+    if (whatsNewBtn) {
+      whatsNewBtn.hidden = !notesText;
+    }
+  }
+
+  function renderVersionCheckResult(elements, data) {
+    if (elements.latestEl) {
+      elements.latestEl.textContent = data.latest || "—";
+    }
+    if (data.update_available) {
+      setStatusChip(elements.badge, "Update available", "warning");
+      if (elements.updateBtn) elements.updateBtn.disabled = false;
+    } else if (data.latest) {
+      setStatusChip(elements.badge, "Up to date", "success");
+      if (elements.updateBtn) elements.updateBtn.disabled = true;
+    } else {
+      setStatusChip(elements.badge, "Unable to check");
+    }
+    syncReleaseNotes(
+      data.release_notes,
+      elements.notesContainer,
+      elements.notesBody
+    );
+    syncWhatsNew(data.release_notes, elements.whatsNewBtn, elements.whatsNewBody);
+  }
+
+  async function fetchVersionData(versionUrl) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(versionUrl, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      return await response.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  function getExportRequestInit(includeKeys) {
+    if (!includeKeys) {
+      return { cache: "no-store" };
+    }
+    return {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ include_keys: true }),
+      cache: "no-store",
+    };
+  }
+
+  function setHeaderButtonsDisabled(disabled) {
+    for (const btn of document.querySelectorAll(".header-actions .header-button")) {
+      btn.disabled = disabled;
+    }
+  }
+
   function createActionsModule({ config, state, shared, logs, modals }) {
     const { renderUpdateFailureBanner } = shared;
     const {
@@ -17,79 +115,21 @@
     } = modals;
 
     async function checkForUpdates() {
-      const badge = document.getElementById("updateBadge");
-      const latestEl = document.getElementById("latestVersion");
-      const updateBtn = document.getElementById("startUpdateBtn");
-      const checkBtn = document.getElementById("checkUpdatesBtn");
-      const notesContainer = document.getElementById("releaseNotesContainer");
-      const notesBody = document.getElementById("releaseNotesBody");
-      const whatsNewBtn = document.getElementById("whatsNewBtn");
-      const whatsNewBody = document.getElementById("whatsNewBody");
-
-      if (checkBtn) {
-        checkBtn.disabled = true;
-        const sp = checkBtn.querySelector(".btn-spinner");
-        if (sp) sp.style.display = "inline-block";
-      }
-      if (badge) {
-        badge.textContent = "Checking...";
-        badge.className = "status-chip";
-      }
+      const elements = getVersionElements();
+      setCheckButtonLoading(elements.checkBtn, true);
+      setStatusChip(elements.badge, "Checking...");
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const resp = await fetch(config.versionUrl, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-        const data = await resp.json();
-        if (latestEl) latestEl.textContent = data.latest || "\u2014";
-        if (data.update_available) {
-          if (badge) {
-            badge.textContent = "Update available";
-            badge.className = "status-chip warning";
-          }
-          if (updateBtn) updateBtn.disabled = false;
-        } else if (data.latest) {
-          if (badge) {
-            badge.textContent = "Up to date";
-            badge.className = "status-chip success";
-          }
-          if (updateBtn) updateBtn.disabled = true;
-        } else if (badge) {
-          badge.textContent = "Unable to check";
-          badge.className = "status-chip";
-        }
-        if (data.release_notes && notesContainer && notesBody) {
-          notesBody.textContent = data.release_notes;
-          notesContainer.hidden = false;
-        } else if (notesContainer) {
-          notesContainer.hidden = true;
-        }
-        if (data.release_notes && whatsNewBtn && whatsNewBody) {
-          whatsNewBody.textContent = data.release_notes;
-          whatsNewBtn.hidden = false;
-        } else if (whatsNewBtn) {
-          whatsNewBtn.hidden = true;
-        }
+        const data = await fetchVersionData(config.versionUrl);
+        renderVersionCheckResult(elements, data);
       } catch (e) {
         if (e?.name === "AbortError") {
           console.debug("Version check aborted:", e);
           return;
-        } else {
-          console.warn("Version check failed:", e);
         }
-        if (badge) {
-          badge.textContent = "Check failed";
-          badge.className = "status-chip";
-        }
+        console.warn("Version check failed:", e);
+        setStatusChip(elements.badge, "Check failed");
       } finally {
-        if (checkBtn) {
-          checkBtn.disabled = false;
-          const sp = checkBtn.querySelector(".btn-spinner");
-          if (sp) sp.style.display = "none";
-        }
+        setCheckButtonLoading(elements.checkBtn, false);
       }
     }
 
@@ -142,11 +182,8 @@
         showResponseModal("failure", `${kind} is not available on this build.`);
         return;
       }
-      const btns = document.querySelectorAll(".header-actions .header-button");
       try {
-        for (const btn of btns) {
-          btn.disabled = true;
-        }
+        setHeaderButtonsDisabled(true);
         const resp = await fetch(url, { method: "POST" });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
@@ -159,9 +196,7 @@
         console.warn(`Failed to start ${kind.toLowerCase()}:`, e);
         showResponseModal("failure", failureMessage);
       } finally {
-        for (const btn of btns) {
-          btn.disabled = false;
-        }
+        setHeaderButtonsDisabled(false);
       }
     }
 
@@ -188,19 +223,14 @@
       const btn = document.getElementById("exportConfigBtn");
       if (btn) {
         btn.disabled = true;
-        btn.textContent = "Downloading\u2026";
+        btn.textContent = "Downloading…";
       }
       const include = document.getElementById("includeKeys")?.checked;
       try {
-        const requestInit = include
-          ? {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ include_keys: true }),
-              cache: "no-store",
-            }
-          : { cache: "no-store" };
-        const resp = await fetch(config.exportSettingsUrl, requestInit);
+        const resp = await fetch(
+          config.exportSettingsUrl,
+          getExportRequestInit(include)
+        );
         const data = await resp.json();
         if (!resp.ok || !data.success) {
           showResponseModal("failure", "Export failed");
@@ -209,11 +239,11 @@
         const blob = new Blob([JSON.stringify(data.data, null, 2)], {
           type: "application/json",
         });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `inkypi_backup_${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const anchor = document.createElement("a");
+        anchor.href = URL.createObjectURL(blob);
+        anchor.download = `inkypi_backup_${Date.now()}.json`;
+        anchor.click();
+        URL.revokeObjectURL(anchor.href);
         showResponseModal("success", "Backup downloaded");
       } catch (e) {
         console.error("Export failed", e);
@@ -230,7 +260,7 @@
       const btn = document.getElementById("importConfigBtn");
       if (btn) {
         btn.disabled = true;
-        btn.textContent = "Restoring\u2026";
+        btn.textContent = "Restoring…";
       }
       const fileInput = document.getElementById("importFile");
       const file = fileInput?.files?.[0];
@@ -284,7 +314,7 @@
           body: JSON.stringify({ reboot }),
         });
       } catch (e) {
-        // Expected — device is shutting down, connection will be severed
+        console.debug("Shutdown request ended early while the device was shutting down:", e);
       }
     }
 
@@ -313,17 +343,15 @@
       document
         .getElementById("checkUpdatesBtn")
         ?.addEventListener("click", checkForUpdates);
-      document.getElementById("startUpdateBtn")?.addEventListener("click", startUpdate);
       document
-        .getElementById("whatsNewBtn")
-        ?.addEventListener("click", openWhatsNew);
+        .getElementById("startUpdateBtn")
+        ?.addEventListener("click", startUpdate);
+      document.getElementById("whatsNewBtn")?.addEventListener("click", openWhatsNew);
       document
         .getElementById("closeWhatsNewModalBtn")
         ?.addEventListener("click", closeWhatsNew);
 
-      document
-        .getElementById("rebootBtn")
-        ?.addEventListener("click", openRebootConfirm);
+      document.getElementById("rebootBtn")?.addEventListener("click", openRebootConfirm);
       document
         .getElementById("shutdownBtn")
         ?.addEventListener("click", openShutdownConfirm);

@@ -2,7 +2,7 @@
   function requireSettingsFactory(settingsModules, name) {
     const factory = settingsModules?.[name];
     if (typeof factory !== "function") {
-      throw new Error(`Missing settings module factory: ${name}`);
+      throw new TypeError(`Missing settings module factory: ${name}`);
     }
     return factory;
   }

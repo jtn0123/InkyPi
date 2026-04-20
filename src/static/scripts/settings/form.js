@@ -3,9 +3,84 @@
     globalThis.InkyPiSettingsModules ||
     (globalThis.InkyPiSettingsModules = {});
 
+  function isFormValid(form = document.querySelector(".settings-form")) {
+    if (!form || typeof form.checkValidity !== "function") return true;
+    return form.checkValidity();
+  }
+
+  function focusFirstInvalidField(form) {
+    const firstInvalid = form?.querySelector(":invalid");
+    if (firstInvalid && typeof firstInvalid.focus === "function") {
+      firstInvalid.focus();
+    }
+  }
+
+  function applyFieldLevelError(fs, result) {
+    if (!fs || !result) return false;
+    if (result.field_errors && typeof result.field_errors === "object") {
+      fs.setFieldErrors(result.field_errors);
+      return true;
+    }
+    if (
+      result.code === "validation_error" &&
+      result.details &&
+      typeof result.details.field === "string"
+    ) {
+      fs.setFieldError(result.details.field, result.error);
+      return true;
+    }
+    return false;
+  }
+
+  function updateSliderValue(slider) {
+    const valueDisplay = document.getElementById(`${slider.id}-value`);
+    if (valueDisplay) {
+      valueDisplay.textContent = Number.parseFloat(slider.value).toFixed(1);
+    }
+  }
+
+  async function submitSettingsForm({
+    form,
+    formData,
+    fs,
+    saveBtn,
+    saveSettingsUrl,
+    snapshotState,
+    getFormSnapshot,
+    restoreFormFromSnapshot,
+    checkDirty,
+  }) {
+    try {
+      const response = await fetch(saveSettingsUrl, {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (response.ok) {
+        snapshotState.current = getFormSnapshot(form);
+        if (saveBtn) saveBtn.disabled = true;
+        showResponseModal("success", `Success! ${result.message}`);
+        return;
+      }
+
+      const fieldLevelError = applyFieldLevelError(fs, result);
+      showResponseModal("failure", `Error! ${result.error}`);
+      if (!fieldLevelError) {
+        restoreFormFromSnapshot(form, snapshotState.current);
+      }
+    } catch (error) {
+      console.error("Settings save failed:", error);
+      showResponseModal(
+        "failure",
+        "An error occurred while processing your request. Please try again."
+      );
+      checkDirty();
+    }
+  }
+
   function createFormModule({ config, state, shared }) {
     const { getFormSnapshot, restoreFormFromSnapshot } = shared;
-    let formSnapshot = null;
+    const snapshotState = { current: null };
 
     function populateIntervalFields() {
       const intervalInput = document.getElementById("interval");
@@ -23,23 +98,17 @@
       }
     }
 
-    function isFormValid() {
-      const form = document.querySelector(".settings-form");
-      if (!form || typeof form.checkValidity !== "function") return true;
-      return form.checkValidity();
-    }
-
     function checkDirty() {
       const saveBtn = document.getElementById("saveSettingsBtn");
-      if (!saveBtn || !formSnapshot) return;
+      if (!saveBtn || !snapshotState.current) return;
       const current = getFormSnapshot();
       let dirty = false;
       const allKeys = new Set([
-        ...Object.keys(formSnapshot),
+        ...Object.keys(snapshotState.current),
         ...Object.keys(current),
       ]);
       for (const key of allKeys) {
-        if (formSnapshot[key] !== current[key]) {
+        if (snapshotState.current[key] !== current[key]) {
           dirty = true;
           break;
         }
@@ -55,7 +124,7 @@
       if (!state.attachGeo || !navigator.geolocation) return;
       try {
         const pos = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { // NOSONAR javascript:S5604 — opt-in, gated by state.attachGeo above
+          navigator.geolocation.getCurrentPosition(resolve, reject, { // NOSONAR javascript:S5604 -- opt-in, gated by state.attachGeo above
             enableHighAccuracy: true,
             maximumAge: 60000,
             timeout: 4000,
@@ -73,16 +142,11 @@
     async function handleAction() {
       const form = document.querySelector(".settings-form");
       const saveBtn = document.getElementById("saveSettingsBtn");
-      if (
-        form &&
-        typeof form.checkValidity === "function" &&
-        !form.checkValidity()
-      ) {
+      if (!form) return;
+
+      if (!isFormValid(form)) {
         if (typeof form.reportValidity === "function") form.reportValidity();
-        const firstInvalid = form.querySelector(":invalid");
-        if (firstInvalid && typeof firstInvalid.focus === "function") {
-          firstInvalid.focus();
-        }
+        focusFirstInvalidField(form);
         return;
       }
       if (saveBtn?.disabled) {
@@ -93,55 +157,37 @@
       const fs =
         globalThis.FormState && form ? globalThis.FormState.attach(form) : null;
       if (fs) fs.clearErrors();
+
       const formData = new FormData(form);
       await appendGeoData(formData);
 
-      const doSubmit = async () => {
-        try {
-          const response = await fetch(config.saveSettingsUrl, {
-            method: "POST",
-            body: formData,
-          });
-          const result = await response.json();
-          if (response.ok) {
-            formSnapshot = getFormSnapshot(form);
-            if (saveBtn) saveBtn.disabled = true;
-            showResponseModal("success", `Success! ${result.message}`);
-          } else {
-            if (
-              fs &&
-              result &&
-              result.field_errors &&
-              typeof result.field_errors === "object"
-            ) {
-              fs.setFieldErrors(result.field_errors);
-            }
-            showResponseModal("failure", `Error! ${result.error}`);
-            restoreFormFromSnapshot(form, formSnapshot);
-          }
-        } catch (error) {
-          console.error("Settings save failed:", error);
-          showResponseModal(
-            "failure",
-            "An error occurred while processing your request. Please try again."
-          );
-          checkDirty();
-        }
-      };
+      const doSubmit = () =>
+        submitSettingsForm({
+          form,
+          formData,
+          fs,
+          saveBtn,
+          saveSettingsUrl: config.saveSettingsUrl,
+          snapshotState,
+          getFormSnapshot,
+          restoreFormFromSnapshot,
+          checkDirty,
+        });
 
       if (fs) {
         await fs.run(doSubmit);
-      } else {
-        if (saveBtn) {
-          saveBtn.disabled = true;
-          saveBtn.textContent = "Saving\u2026";
-        }
-        try {
-          await doSubmit();
-        } finally {
-          if (saveBtn?.textContent === "Saving\u2026") {
-            saveBtn.textContent = "Save";
-          }
+        return;
+      }
+
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving…";
+      }
+      try {
+        await doSubmit();
+      } finally {
+        if (saveBtn?.textContent === "Saving…") {
+          saveBtn.textContent = "Save";
         }
       }
     }
@@ -150,16 +196,9 @@
       state.attachGeo = !!cb?.checked;
     }
 
-    function updateSliderValue(slider) {
-      const valueDisplay = document.getElementById(`${slider.id}-value`);
-      if (valueDisplay) {
-        valueDisplay.textContent = Number.parseFloat(slider.value).toFixed(1);
-      }
-    }
-
     function bind() {
       const saveBtn = document.getElementById("saveSettingsBtn");
-      formSnapshot = getFormSnapshot();
+      snapshotState.current = getFormSnapshot();
       if (saveBtn) saveBtn.disabled = true;
 
       const settingsForm = document.querySelector(".settings-form");

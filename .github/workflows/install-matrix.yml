@@ -1,26 +1,17 @@
-name: Install matrix (arm64 e2e)
+name: Install matrix
 
-# JTN-530: Run install/install.sh end-to-end inside an arm64 Debian container
-# under a 512 MB memory cap for each supported Pi OS base (Bullseye, Bookworm,
-# Trixie). JTN-528 (a Trixie zramswap regression) went undetected for an entire
-# release cycle because no CI job exercised the install script on each base.
-# This matrix closes that gap.
+# JTN-530: end-to-end install.sh matrix against every supported Pi OS base.
+# JTN-528 silently broke Trixie installs for an entire release cycle because
+# no CI job ran install.sh against each OS.
 #
-# Wraps scripts/test_install_memcap.sh, which already accepts the codename as
-# its first positional argument and runs the same Phase 2/3/4 install + boot
-# probes used by the existing single-codename install-smoke-memcap job in
-# ci.yml.
-#
-# This workflow is intentionally a standalone advisory job for now — it is not
-# wired into the ci-gate `needs:` list. A follow-up ticket can promote it to
-# required once we've watched it run green for a few cycles. Each matrix cell
-# runs install.sh under arm64 QEMU emulation, which is slow (hence the 30 min
-# timeout per codename).
+# This workflow is now the single source of truth for that gate. `ci.yml` calls
+# it via `workflow_call`, which makes the install matrix part of the default PR
+# merge contract through `ci-gate`, while `workflow_dispatch` keeps the exact
+# same path available for manual reruns without duplicating logic.
 
 on:
-  pull_request:
-  push:
-    branches: [ main ]
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -31,13 +22,30 @@ concurrency:
 
 jobs:
   install-matrix:
+    # JTN-530: guarantee every PR runs the real install.sh inside an arm64
+    # Debian container (with the Pi OS apt repo layered on for liblgpio-dev /
+    # chromium-headless-shell) for each supported codename and asserts exit 0
+    # + venv + systemd unit parse.
+    #
+    # The Dockerfile is scripts/Dockerfile.install-matrix; the verification
+    # script that runs inside the container is scripts/ci_install_matrix_verify.sh.
+    # Memory is capped at 512 MB to inherit the JTN-536 OOM regression gate so
+    # this job also catches codename-specific OOMs during install.
+    #
+    # JTN-615: bullseye (Debian 11) ships Python 3.9.2 but InkyPi's
+    # requirements.txt pins packages that require Python>=3.10 (anyio==4.13.0
+    # is the first to bomb the uv resolver; others follow). The project also
+    # declares `target-version = "py311"` in pyproject.toml's ruff + black
+    # config, so bullseye has never been a real install target. Keeping the PR
+    # gate on bookworm + trixie reflects reality; broader drift coverage still
+    # lives in the nightly matrix and the separate memcap smoke coverage.
     name: install.sh e2e (${{ matrix.codename }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        codename: [bullseye, bookworm, trixie]
+        codename: [bookworm, trixie]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,14 +55,42 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Run install smoke test (${{ matrix.codename }})
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build install-matrix image (${{ matrix.codename }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: scripts/Dockerfile.install-matrix
+          platforms: linux/arm64
+          build-args: |
+            CODENAME=${{ matrix.codename }}
+          tags: inkypi-install-matrix:${{ matrix.codename }}
+          load: true
+          cache-from: type=gha,scope=install-matrix-${{ matrix.codename }}
+          cache-to: type=gha,mode=max,scope=install-matrix-${{ matrix.codename }}
+
+      - name: Run install.sh + verification (${{ matrix.codename }}, 512 MB cap)
         run: |
-          ./scripts/test_install_memcap.sh ${{ matrix.codename }}
+          set -euo pipefail
+          mkdir -p /tmp/install-matrix-logs
+          # JTN-536 parity: cap container memory at 512 MB to mimic the Pi
+          # Zero 2 W. Exit 137 = OOM kill = regression.
+          docker run \
+            --rm \
+            --platform linux/arm64 \
+            --memory=512m \
+            --memory-swap=512m \
+            --entrypoint bash \
+            inkypi-install-matrix:${{ matrix.codename }} \
+            /InkyPi/scripts/ci_install_matrix_verify.sh \
+            2>&1 | tee "/tmp/install-matrix-logs/${{ matrix.codename }}.log"
 
       - name: Upload container logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: install-matrix-${{ matrix.codename }}-logs
-          path: /tmp/inkypi-smoke-logs
+          name: install-matrix-logs-${{ matrix.codename }}
+          path: /tmp/install-matrix-logs
           if-no-files-found: ignore

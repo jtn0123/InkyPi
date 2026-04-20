@@ -264,8 +264,13 @@
                 },
                 "example": {
                   "success": true,
-                  "plugin_id": "clock",
-                  "plugin_instance": "My Clock"
+                  "message": "Display updated",
+                  "metrics": {
+                    "request_ms": 120,
+                    "generate_ms": 450,
+                    "preprocess_ms": 35,
+                    "display_ms": 800
+                  }
                 }
               }
             }
@@ -347,7 +352,7 @@
                 "$ref": "#/components/schemas/CreatePlaylistRequest"
               },
               "example": {
-                "name": "Daytime",
+                "playlist_name": "Daytime",
                 "start_time": "08:00",
                 "end_time": "20:00",
                 "cycle_minutes": 30
@@ -701,6 +706,573 @@
           }
         }
       }
+    },
+    "/api/plugin_order": {
+      "post": {
+        "tags": [
+          "Display"
+        ],
+        "summary": "Save dashboard plugin order",
+        "description": "Persists the drag-and-drop plugin order shown on the dashboard.",
+        "operationId": "savePluginOrder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plugin order saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/save_settings": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save device settings",
+        "description": "Saves the main settings form used by the settings page.",
+        "operationId": "saveSettings",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveSettingsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/settings/isolation": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "List isolated plugins",
+        "description": "Returns the plugin IDs currently isolated from scheduling.",
+        "operationId": "getPluginIsolation",
+        "responses": {
+          "200": {
+            "description": "Isolation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IsolationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Isolate a plugin",
+        "description": "Adds a plugin ID to the isolated set and returns the updated list.",
+        "operationId": "isolatePlugin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginIsolationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated isolation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IsolationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Remove plugin isolation",
+        "description": "Removes a plugin ID from the isolated set and returns the updated list.",
+        "operationId": "unisolatePlugin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginIsolationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated isolation state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IsolationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/settings/safe_reset": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Apply a safe reset",
+        "description": "Resets selected runtime settings to safe defaults while preserving playlists and plugins.",
+        "operationId": "safeReset",
+        "responses": {
+          "200": {
+            "description": "Safe reset applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/settings/save_api_keys": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Save managed API keys",
+        "description": "Persists API keys from the settings API-key manager and returns which keys changed.",
+        "operationId": "saveManagedApiKeys",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveApiKeysRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API keys saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveApiKeysResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
+    "/settings/delete_api_key": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Delete a managed API key",
+        "description": "Removes a stored API key from the managed settings page.",
+        "operationId": "deleteManagedApiKey",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteApiKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API key deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/settings/update": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Start a software update",
+        "description": "Triggers the settings-page software update flow and returns the running state immediately.",
+        "operationId": "startSettingsUpdate",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTriggerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateControlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/settings/update/rollback": {
+      "post": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Start an update rollback",
+        "description": "Triggers rollback to the previous recorded version after a failed update.",
+        "operationId": "startSettingsRollback",
+        "responses": {
+          "202": {
+            "description": "Rollback started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollbackControlResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/update_playlist/{playlist_name}": {
+      "put": {
+        "tags": [
+          "Playlist"
+        ],
+        "summary": "Update an existing playlist",
+        "description": "Renames a playlist and updates its schedule or cycle override.",
+        "operationId": "updatePlaylist",
+        "parameters": [
+          {
+            "name": "playlist_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlaylistRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Playlist updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/update_device_cycle": {
+      "put": {
+        "tags": [
+          "Playlist"
+        ],
+        "summary": "Update device cycle interval",
+        "description": "Saves the device-wide playlist cycle interval in minutes.",
+        "operationId": "updateDeviceCycle",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeviceCycleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cycle updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/reorder_plugins": {
+      "post": {
+        "tags": [
+          "Playlist"
+        ],
+        "summary": "Reorder plugins in a playlist",
+        "description": "Persists drag-and-drop plugin ordering for one playlist.",
+        "operationId": "reorderPlaylistPlugins",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistReorderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plugins reordered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/display_next_in_playlist": {
+      "post": {
+        "tags": [
+          "Playlist"
+        ],
+        "summary": "Display the next item in a playlist",
+        "description": "Triggers an immediate display of the next eligible plugin instance for one playlist.",
+        "operationId": "displayNextInPlaylist",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisplayNextInPlaylistRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Next instance displayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DisplayNextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/history/redisplay": {
+      "post": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Redisplay a history image",
+        "description": "Pushes a previously rendered image from history back to the display.",
+        "operationId": "historyRedisplay",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistoryFilenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "History image redisplayed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/history/delete": {
+      "post": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Delete a history entry",
+        "description": "Deletes a rendered history image and its sidecar metadata.",
+        "operationId": "historyDelete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HistoryFilenameRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "History entry deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/history/clear": {
+      "post": {
+        "tags": [
+          "History"
+        ],
+        "summary": "Clear history images",
+        "description": "Deletes all stored history PNG and JSON files.",
+        "operationId": "historyClear",
+        "responses": {
+          "200": {
+            "description": "History cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -718,6 +1290,14 @@
           "message": {
             "type": "string",
             "example": "Operation completed"
+          },
+          "request_id": {
+            "type": "string",
+            "description": "Per-request correlation ID when available"
+          },
+          "warning": {
+            "type": "string",
+            "description": "Optional non-fatal warning surfaced by the UI"
           }
         }
       },
@@ -872,6 +1452,27 @@
           }
         }
       },
+      "ActionMetrics": {
+        "type": "object",
+        "properties": {
+          "request_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "generate_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "preprocess_ms": {
+            "type": "integer",
+            "nullable": true
+          },
+          "display_ms": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
       "DisplayNextResponse": {
         "type": "object",
         "required": [
@@ -881,15 +1482,17 @@
           "success": {
             "type": "boolean"
           },
-          "plugin_id": {
+          "request_id": {
             "type": "string",
-            "description": "Plugin type that was rendered",
-            "example": "clock"
+            "description": "Per-request correlation ID when available"
           },
-          "plugin_instance": {
+          "message": {
             "type": "string",
-            "description": "Plugin instance name that was rendered",
-            "example": "My Clock"
+            "description": "Human-readable action summary",
+            "example": "Display updated"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/ActionMetrics"
           }
         }
       },
@@ -936,10 +1539,10 @@
       "CreatePlaylistRequest": {
         "type": "object",
         "required": [
-          "name"
+          "playlist_name"
         ],
         "properties": {
-          "name": {
+          "playlist_name": {
             "type": "string",
             "description": "Unique playlist name",
             "example": "Daytime"
@@ -962,6 +1565,352 @@
             "description": "Override cycle interval in minutes for this playlist"
           }
         }
+      },
+      "PluginOrderRequest": {
+        "type": "object",
+        "required": [
+          "order"
+        ],
+        "properties": {
+          "order": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Full ordered list of registered plugin IDs."
+          }
+        }
+      },
+      "SaveSettingsRequest": {
+        "type": "object",
+        "required": [
+          "deviceName",
+          "interval",
+          "unit",
+          "timezoneName",
+          "timeFormat"
+        ],
+        "properties": {
+          "deviceName": {
+            "type": "string",
+            "example": "Kitchen InkyPi"
+          },
+          "interval": {
+            "type": "string",
+            "example": "5",
+            "description": "Positive integer encoded as form data."
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "minute",
+              "hour"
+            ]
+          },
+          "timezoneName": {
+            "type": "string",
+            "example": "UTC"
+          },
+          "timeFormat": {
+            "type": "string",
+            "enum": [
+              "12h",
+              "24h"
+            ]
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "horizontal",
+              "vertical"
+            ]
+          },
+          "previewSizeMode": {
+            "type": "string",
+            "enum": [
+              "native",
+              "scaled",
+              "fit"
+            ]
+          },
+          "invertImage": {
+            "type": "string",
+            "example": "on"
+          },
+          "logSystemStats": {
+            "type": "string",
+            "example": "on"
+          },
+          "saturation": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "brightness": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "sharpness": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "contrast": {
+            "type": "string",
+            "example": "1.0"
+          },
+          "inky_saturation": {
+            "type": "string",
+            "example": "0.5"
+          }
+        }
+      },
+      "UpdatePlaylistRequest": {
+        "type": "object",
+        "required": [
+          "new_name",
+          "start_time",
+          "end_time"
+        ],
+        "properties": {
+          "new_name": {
+            "type": "string",
+            "description": "Updated playlist name",
+            "example": "Evening"
+          },
+          "start_time": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "example": "18:00"
+          },
+          "end_time": {
+            "type": "string",
+            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
+            "example": "22:00"
+          },
+          "cycle_minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          }
+        }
+      },
+      "UpdateDeviceCycleRequest": {
+        "type": "object",
+        "required": [
+          "minutes"
+        ],
+        "properties": {
+          "minutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          }
+        }
+      },
+      "PlaylistReorderItem": {
+        "type": "object",
+        "required": [
+          "plugin_id",
+          "name"
+        ],
+        "properties": {
+          "plugin_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "PlaylistReorderRequest": {
+        "type": "object",
+        "required": [
+          "playlist_name",
+          "ordered"
+        ],
+        "properties": {
+          "playlist_name": {
+            "type": "string"
+          },
+          "ordered": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaylistReorderItem"
+            }
+          }
+        }
+      },
+      "DisplayNextInPlaylistRequest": {
+        "type": "object",
+        "required": [
+          "playlist_name"
+        ],
+        "properties": {
+          "playlist_name": {
+            "type": "string"
+          }
+        }
+      },
+      "HistoryFilenameRequest": {
+        "type": "object",
+        "required": [
+          "filename"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "example": "display_20240101_010203.png"
+          }
+        }
+      },
+      "PluginIsolationRequest": {
+        "type": "object",
+        "required": [
+          "plugin_id"
+        ],
+        "properties": {
+          "plugin_id": {
+            "type": "string",
+            "example": "clock"
+          }
+        }
+      },
+      "IsolationResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "isolated_plugins"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "isolated_plugins": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "UpdateTriggerRequest": {
+        "type": "object",
+        "properties": {
+          "target_version": {
+            "type": "string",
+            "example": "v1.2.3"
+          }
+        }
+      },
+      "DeleteApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "OPEN_AI_SECRET",
+              "OPEN_WEATHER_MAP_SECRET",
+              "NASA_SECRET",
+              "UNSPLASH_ACCESS_KEY",
+              "GITHUB_SECRET",
+              "GOOGLE_AI_SECRET"
+            ]
+          }
+        }
+      },
+      "SaveApiKeysRequest": {
+        "type": "object",
+        "properties": {
+          "OPEN_AI_SECRET": {
+            "type": "string"
+          },
+          "OPEN_WEATHER_MAP_SECRET": {
+            "type": "string"
+          },
+          "NASA_SECRET": {
+            "type": "string"
+          },
+          "UNSPLASH_ACCESS_KEY": {
+            "type": "string"
+          },
+          "GITHUB_SECRET": {
+            "type": "string"
+          },
+          "GOOGLE_AI_SECRET": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateControlResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "message",
+          "running"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RollbackControlResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UpdateControlResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "target_version": {
+                "type": "string",
+                "example": "v1.2.3"
+              }
+            }
+          }
+        ]
+      },
+      "SaveApiKeysResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SuccessResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "updated": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "skipped_placeholder": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       },
       "HistoryStorageResponse": {
         "type": "object",

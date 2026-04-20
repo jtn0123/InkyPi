@@ -12,21 +12,17 @@
     }, 1500);
   }
 
-  function copyViaExecCommand(text) {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    let ok = false;
-    try {
-      ok = document.execCommand("copy");
-    } catch (e) {
-      console.warn("execCommand copy not supported:", e);
+  async function copyText(text) {
+    if (!navigator.clipboard || !globalThis.isSecureContext) {
+      return false;
     }
-    ta.remove();
-    return ok;
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      console.warn("Clipboard write failed:", e);
+      return false;
+    }
   }
 
   function getFormSnapshot(form) {
@@ -110,8 +106,8 @@
       prevVersion.length > 0;
     btn.hidden = !canRollback;
     if (canRollback) {
-      const tgt = document.getElementById("rollbackTargetVersion");
-      if (tgt) tgt.textContent = prevVersion;
+      const target = document.getElementById("rollbackTargetVersion");
+      if (target) target.textContent = prevVersion;
       btn.dataset.prevVersion = prevVersion;
     } else {
       delete btn.dataset.prevVersion;
@@ -141,7 +137,7 @@
   }
 
   settingsModules.shared = {
-    copyViaExecCommand,
+    copyText,
     getFormSnapshot,
     isErrorLine,
     isWarnLine,

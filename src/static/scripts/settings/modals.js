@@ -18,14 +18,19 @@
     );
   }
 
+  function isDeviceActionModalOpen(modalId) {
+    const modal = document.getElementById(modalId);
+    return !!(modal && !modal.hidden);
+  }
+
   function createModalModule({ ui }) {
-    let _lastDeviceActionTrigger = null;
-    let _lastWhatsNewTrigger = null;
+    let lastDeviceActionTrigger = null;
+    let lastWhatsNewTrigger = null;
 
     function setDeviceActionModalOpen(modalId, open, triggerEl) {
       const modal = document.getElementById(modalId);
       if (!modal) return;
-      if (open && triggerEl) _lastDeviceActionTrigger = triggerEl;
+      if (open && triggerEl) lastDeviceActionTrigger = triggerEl;
       modal.hidden = !open;
       modal.style.display = open ? "flex" : "none";
       modal.classList.toggle("is-open", !!open);
@@ -33,14 +38,16 @@
       if (open) {
         const focusable = findFirstFocusable(modal);
         if (focusable) setTimeout(() => focusable.focus(), 0);
-      } else if (_lastDeviceActionTrigger) {
-        try {
-          _lastDeviceActionTrigger.focus();
-        } catch (_e) {
-          /* ignore */
-        }
-        _lastDeviceActionTrigger = null;
+        return;
       }
+      if (
+        lastDeviceActionTrigger &&
+        typeof lastDeviceActionTrigger.focus === "function" &&
+        document.contains(lastDeviceActionTrigger)
+      ) {
+        lastDeviceActionTrigger.focus();
+      }
+      lastDeviceActionTrigger = null;
     }
 
     function openRebootConfirm(event) {
@@ -65,9 +72,9 @@
 
     function openRollbackConfirm(event) {
       const btn = document.getElementById("rollbackUpdateBtn");
-      const tgt = btn?.dataset?.prevVersion || "the previous version";
+      const target = btn?.dataset?.prevVersion || "the previous version";
       const confirmVersion = document.getElementById("rollbackConfirmVersion");
-      if (confirmVersion) confirmVersion.textContent = tgt;
+      if (confirmVersion) confirmVersion.textContent = target;
       setDeviceActionModalOpen(
         "rollbackConfirmModal",
         true,
@@ -82,7 +89,7 @@
     function openWhatsNew(event) {
       const modal = document.getElementById("whatsNewModal");
       if (!modal) return;
-      _lastWhatsNewTrigger = event?.currentTarget || null;
+      lastWhatsNewTrigger = event?.currentTarget || null;
       modal.hidden = false;
       modal.style.display = "flex";
       modal.classList.add("is-open");
@@ -98,19 +105,14 @@
       modal.style.display = "none";
       modal.classList.remove("is-open");
       syncModalOpenState(ui);
-      if (_lastWhatsNewTrigger) {
-        try {
-          _lastWhatsNewTrigger.focus();
-        } catch (_e) {
-          /* ignore */
-        }
-        _lastWhatsNewTrigger = null;
+      if (
+        lastWhatsNewTrigger &&
+        typeof lastWhatsNewTrigger.focus === "function" &&
+        document.contains(lastWhatsNewTrigger)
+      ) {
+        lastWhatsNewTrigger.focus();
       }
-    }
-
-    function isDeviceActionModalOpen(modalId) {
-      const modal = document.getElementById(modalId);
-      return !!(modal && !modal.hidden);
+      lastWhatsNewTrigger = null;
     }
 
     function bindGlobalDismissals() {

@@ -3,81 +3,224 @@
     globalThis.InkyPiSettingsModules ||
     (globalThis.InkyPiSettingsModules = {});
 
-  function createDiagnosticsModule({ ui }) {
-    const STAGE_LABELS = {
-      request_ms: "Request",
-      generate_ms: "Generate",
-      preprocess_ms: "Preprocess",
-      display_ms: "Display",
-    };
+  const STAGE_LABELS = {
+    request_ms: "Request",
+    generate_ms: "Generate",
+    preprocess_ms: "Preprocess",
+    display_ms: "Display",
+  };
 
-    const PLUGIN_AVG_LABELS = {
-      request_avg: "Request",
-      generate_avg: "Generate",
-      display_avg: "Display",
-    };
+  const PLUGIN_AVG_LABELS = {
+    request_avg: "Request",
+    generate_avg: "Generate",
+    display_avg: "Display",
+  };
 
-    function formatMs(val) {
-      if (val === null || val === undefined) return "\u2014";
-      const seconds = val / 1000;
-      return seconds < 10
-        ? `${seconds.toFixed(1)}s`
-        : `${Math.round(seconds)}s`;
+  function formatMs(val) {
+    if (val === null || val === undefined) return "—";
+    const seconds = val / 1000;
+    return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
+  }
+
+  function formatPercent(val) {
+    if (val === null || val === undefined || Number.isNaN(Number(val))) {
+      return "—";
     }
+    return `${Number(val).toFixed(1)}%`;
+  }
 
-    function buildSummaryTable(summaryData) {
-      const table = document.createElement("table");
-      table.className = "bench-table";
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Stage</th><th>p50</th><th>p95</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      for (const [key, label] of Object.entries(STAGE_LABELS)) {
+  function formatDiskFree(val) {
+    if (val === null || val === undefined || Number.isNaN(Number(val))) {
+      return "—";
+    }
+    return `${Number(val).toFixed(1)} GB free`;
+  }
+
+  function formatUptime(seconds) {
+    if (
+      seconds === null ||
+      seconds === undefined ||
+      Number.isNaN(Number(seconds))
+    ) {
+      return "—";
+    }
+    const total = Math.floor(Number(seconds));
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  }
+
+  const SYSTEM_HEALTH_ROWS = [
+    { key: "cpu_percent", label: "CPU", formatter: formatPercent },
+    { key: "memory_percent", label: "Memory", formatter: formatPercent },
+    { key: "disk_free_gb", label: "Disk", formatter: formatDiskFree },
+    { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
+  ];
+
+  function buildTable(headers) {
+    const table = document.createElement("table");
+    table.className = "bench-table";
+    const thead = document.createElement("thead");
+    const row = document.createElement("tr");
+    for (const header of headers) {
+      const cell = document.createElement("th");
+      cell.textContent = header;
+      row.appendChild(cell);
+    }
+    thead.appendChild(row);
+    table.appendChild(thead);
+    return table;
+  }
+
+  function appendCell(row, text) {
+    const cell = document.createElement("td");
+    cell.textContent = text;
+    row.appendChild(cell);
+  }
+
+  function buildSummaryTable(summaryData) {
+    const table = buildTable(["Stage", "p50", "p95"]);
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    for (const [key, label] of Object.entries(STAGE_LABELS)) {
+      const row = document.createElement("tr");
+      const stage = summaryData?.[key] || {};
+      appendCell(row, label);
+      appendCell(row, formatMs(stage.p50));
+      appendCell(row, formatMs(stage.p95));
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildPluginsTable(items) {
+    const table = buildTable(["Plugin", "Runs"].concat(Object.values(PLUGIN_AVG_LABELS)));
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    for (const item of items.slice(0, 10)) {
+      const row = document.createElement("tr");
+      appendCell(row, item.plugin_id || "—");
+      appendCell(row, String(item.runs || 0));
+      for (const key of Object.keys(PLUGIN_AVG_LABELS)) {
+        appendCell(row, formatMs(item[key]));
+      }
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildSystemHealthTable(systemData) {
+    const table = buildTable(["Metric", "Value"]);
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    for (const spec of SYSTEM_HEALTH_ROWS) {
+      const row = document.createElement("tr");
+      appendCell(row, spec.label);
+      appendCell(row, spec.formatter(systemData?.[spec.key]));
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function normalizePluginHealthStatus(info) {
+    if (typeof info === "string") return info;
+    if (!info || typeof info !== "object") return "—";
+    if (info.status || info.state) {
+      return info.status || info.state;
+    }
+    return info.ok === false ? "error" : "ok";
+  }
+
+  function getPluginHealthEntries(items) {
+    if (Array.isArray(items)) {
+      return items.map((item) => [
+        item.plugin_id || "—",
+        item.status || item.state || "—",
+      ]);
+    }
+    return Object.entries(items || {}).map(([pluginId, info]) => [
+      pluginId,
+      normalizePluginHealthStatus(info),
+    ]);
+  }
+
+  function buildPluginHealthTable(items) {
+    const table = buildTable(["Plugin", "Status"]);
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    const entries = getPluginHealthEntries(items);
+    if (entries.length === 0) {
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 2;
+      cell.textContent = "No plugin health data";
+      row.appendChild(cell);
+      tbody.appendChild(row);
+    } else {
+      for (const [pluginId, status] of entries) {
         const row = document.createElement("tr");
-        const stage = summaryData[key] || {};
-        row.innerHTML =
-          "<td>" +
-          label +
-          "</td><td>" +
-          formatMs(stage.p50) +
-          "</td><td>" +
-          formatMs(stage.p95) +
-          "</td>";
+        appendCell(row, pluginId);
+        appendCell(row, status);
         tbody.appendChild(row);
       }
-      table.appendChild(tbody);
-      return table;
     }
+    table.appendChild(tbody);
+    return table;
+  }
 
-    function buildPluginsTable(items) {
-      const table = document.createElement("table");
-      table.className = "bench-table";
-      const thead = document.createElement("thead");
-      const cols = ["Plugin", "Runs"].concat(Object.values(PLUGIN_AVG_LABELS));
-      thead.innerHTML =
-        "<tr>" +
-        cols.map(function (c) {
-          return "<th>" + c + "</th>";
-        }).join("") +
-        "</tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      items.slice(0, 10).forEach(function (item) {
-        const row = document.createElement("tr");
-        const cells = [item.plugin_id || "\u2014", String(item.runs || 0)];
-        for (const key of Object.keys(PLUGIN_AVG_LABELS)) {
-          cells.push(formatMs(item[key]));
-        }
-        row.innerHTML = cells
-          .map(function (c) {
-            return "<td>" + c + "</td>";
-          })
-          .join("");
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      return table;
+  function buildIsolationTable(isolationData) {
+    const isolatedPlugins = Array.isArray(isolationData?.isolated_plugins)
+      ? isolationData.isolated_plugins
+      : [];
+    if (isolatedPlugins.length === 0) {
+      const msg = document.createElement("div");
+      msg.className = "bench-empty";
+      msg.textContent = "No plugins isolated";
+      return msg;
     }
+    const table = buildTable(["Plugin", "Isolated"]);
+    table.className = "bench-table";
+    const tbody = document.createElement("tbody");
+    for (const pluginId of isolatedPlugins) {
+      const row = document.createElement("tr");
+      appendCell(row, pluginId);
+      appendCell(row, "Yes");
+      tbody.appendChild(row);
+    }
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function setPanelFailure(panelId, message, error) {
+    console.warn(message, error);
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      panel.textContent = message;
+    }
+  }
+
+  function getIsolationFailureMessage(data, verb, pluginId) {
+    const fallbackMsg = `Failed to ${verb} plugin`;
+    let errorText = fallbackMsg;
+    if (typeof data?.error === "string") {
+      errorText = data.error;
+    } else if (data?.error != null) {
+      errorText = String(data.error);
+    }
+    if (errorText.includes("registered")) {
+      return `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`;
+    }
+    return errorText;
+  }
+
+  function createDiagnosticsModule({ ui }) {
+    let progressES = null;
 
     async function refreshBenchmarks() {
       ui.setPanelLoading?.("benchSummary", true);
@@ -90,174 +233,40 @@
         const plugins = await pluginsResp.json();
 
         const panel = document.getElementById("benchSummary");
+        if (!panel) return;
         panel.textContent = "";
 
         const summaryData = summary.summary || {};
-        const hasData = Object.values(summaryData).some(function (stage) {
-          return stage && stage.p50 !== null && stage.p50 !== undefined;
-        });
+        const hasData = Object.values(summaryData).some(
+          (stage) => stage?.p50 !== null && stage?.p50 !== undefined
+        );
+        const pluginItems = Array.isArray(plugins?.items) ? plugins.items : [];
 
-        if (!hasData && (plugins.items || []).length === 0) {
+        if (!hasData && pluginItems.length === 0) {
           const emptyMsg = document.createElement("div");
           emptyMsg.className = "bench-empty";
           emptyMsg.textContent =
             "No benchmark data recorded in the last 24 hours. Benchmarks are collected automatically on each display refresh.";
           panel.appendChild(emptyMsg);
-        } else {
-          const heading1 = document.createElement("strong");
-          heading1.textContent = "Benchmark Summary (24h)";
-          panel.appendChild(heading1);
-          panel.appendChild(buildSummaryTable(summaryData));
+          return;
+        }
 
-          if ((plugins.items || []).length > 0) {
-            const heading2 = document.createElement("strong");
-            heading2.textContent = "Per-plugin Averages";
-            panel.appendChild(heading2);
-            panel.appendChild(buildPluginsTable(plugins.items));
-          }
+        const heading1 = document.createElement("strong");
+        heading1.textContent = "Benchmark Summary (24h)";
+        panel.appendChild(heading1);
+        panel.appendChild(buildSummaryTable(summaryData));
+
+        if (pluginItems.length > 0) {
+          const heading2 = document.createElement("strong");
+          heading2.textContent = "Per-plugin Averages";
+          panel.appendChild(heading2);
+          panel.appendChild(buildPluginsTable(pluginItems));
         }
       } catch (e) {
-        console.warn("Failed to load benchmark summary:", e);
-        document.getElementById("benchSummary").textContent =
-          "Failed to load benchmark summary";
+        setPanelFailure("benchSummary", "Failed to load benchmark summary", e);
       } finally {
         ui.setPanelLoading?.("benchSummary", false);
       }
-    }
-
-    function formatPercent(val) {
-      if (val === null || val === undefined || Number.isNaN(Number(val))) {
-        return "\u2014";
-      }
-      return `${Number(val).toFixed(1)}%`;
-    }
-
-    function formatDiskFree(val) {
-      if (val === null || val === undefined || Number.isNaN(Number(val))) {
-        return "\u2014";
-      }
-      return `${Number(val).toFixed(1)} GB free`;
-    }
-
-    function formatUptime(seconds) {
-      if (
-        seconds === null ||
-        seconds === undefined ||
-        Number.isNaN(Number(seconds))
-      ) {
-        return "\u2014";
-      }
-      const total = Math.floor(Number(seconds));
-      const days = Math.floor(total / 86400);
-      const hours = Math.floor((total % 86400) / 3600);
-      const mins = Math.floor((total % 3600) / 60);
-      if (days > 0) return `${days}d ${hours}h ${mins}m`;
-      if (hours > 0) return `${hours}h ${mins}m`;
-      return `${mins}m`;
-    }
-
-    const SYSTEM_HEALTH_ROWS = [
-      { key: "cpu_percent", label: "CPU", formatter: formatPercent },
-      { key: "memory_percent", label: "Memory", formatter: formatPercent },
-      { key: "disk_free_gb", label: "Disk", formatter: formatDiskFree },
-      { key: "uptime_seconds", label: "Uptime", formatter: formatUptime },
-    ];
-
-    function buildSystemHealthTable(systemData) {
-      const table = document.createElement("table");
-      table.className = "bench-table";
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Metric</th><th>Value</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      for (const spec of SYSTEM_HEALTH_ROWS) {
-        const row = document.createElement("tr");
-        const labelCell = document.createElement("td");
-        labelCell.textContent = spec.label;
-        const valueCell = document.createElement("td");
-        valueCell.textContent = spec.formatter(
-          systemData ? systemData[spec.key] : null
-        );
-        row.appendChild(labelCell);
-        row.appendChild(valueCell);
-        tbody.appendChild(row);
-      }
-      table.appendChild(tbody);
-      return table;
-    }
-
-    function buildPluginHealthTable(items) {
-      const table = document.createElement("table");
-      table.className = "bench-table";
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Plugin</th><th>Status</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      const entries = Array.isArray(items)
-        ? items.map(function (it) {
-            return [it.plugin_id || "\u2014", it.status || it.state || "\u2014"];
-          })
-        : Object.entries(items || {}).map(function (pair) {
-            const [pid, info] = pair;
-            let status = "\u2014";
-            if (info && typeof info === "object") {
-              status = info.status || info.state || (info.ok === false ? "error" : "ok");
-            } else if (typeof info === "string") {
-              status = info;
-            }
-            return [pid, status];
-          });
-      if (entries.length === 0) {
-        const row = document.createElement("tr");
-        const cell = document.createElement("td");
-        cell.colSpan = 2;
-        cell.textContent = "No plugin health data";
-        row.appendChild(cell);
-        tbody.appendChild(row);
-      } else {
-        entries.forEach(function (pair) {
-          const row = document.createElement("tr");
-          const pidCell = document.createElement("td");
-          pidCell.textContent = pair[0];
-          const statusCell = document.createElement("td");
-          statusCell.textContent = pair[1];
-          row.appendChild(pidCell);
-          row.appendChild(statusCell);
-          tbody.appendChild(row);
-        });
-      }
-      table.appendChild(tbody);
-      return table;
-    }
-
-    function buildIsolationTable(isolationData) {
-      const list = Array.isArray(isolationData?.isolated_plugins)
-        ? isolationData.isolated_plugins
-        : [];
-      if (list.length === 0) {
-        const msg = document.createElement("div");
-        msg.className = "bench-empty";
-        msg.textContent = "No plugins isolated";
-        return msg;
-      }
-      const table = document.createElement("table");
-      table.className = "bench-table";
-      const thead = document.createElement("thead");
-      thead.innerHTML = "<tr><th>Plugin</th><th>Isolated</th></tr>";
-      table.appendChild(thead);
-      const tbody = document.createElement("tbody");
-      list.forEach(function (pluginId) {
-        const row = document.createElement("tr");
-        const pidCell = document.createElement("td");
-        pidCell.textContent = pluginId;
-        const statusCell = document.createElement("td");
-        statusCell.textContent = "Yes";
-        row.appendChild(pidCell);
-        row.appendChild(statusCell);
-        tbody.appendChild(row);
-      });
-      table.appendChild(tbody);
-      return table;
     }
 
     async function refreshHealth() {
@@ -271,6 +280,7 @@
         const system = await systemResp.json();
 
         const panel = document.getElementById("healthSummary");
+        if (!panel) return;
         panel.textContent = "";
 
         const heading1 = document.createElement("strong");
@@ -283,9 +293,7 @@
         panel.appendChild(heading2);
         panel.appendChild(buildPluginHealthTable(plugins.items || {}));
       } catch (e) {
-        console.warn("Failed to load health data:", e);
-        document.getElementById("healthSummary").textContent =
-          "Failed to load health data";
+        setPanelFailure("healthSummary", "Failed to load health data", e);
       } finally {
         ui.setPanelLoading?.("healthSummary", false);
       }
@@ -297,12 +305,11 @@
         const resp = await fetch("/settings/isolation", { cache: "no-store" });
         const data = await resp.json();
         const panel = document.getElementById("isolationSummary");
+        if (!panel) return;
         panel.textContent = "";
         panel.appendChild(buildIsolationTable(data || {}));
       } catch (e) {
-        console.warn("Failed to load isolation list:", e);
-        document.getElementById("isolationSummary").textContent =
-          "Failed to load isolation list";
+        setPanelFailure("isolationSummary", "Failed to load isolation list", e);
       } finally {
         ui.setPanelLoading?.("isolationSummary", false);
       }
@@ -324,18 +331,9 @@
         });
         const data = await resp.json();
         if (!resp.ok || !data.success) {
-          const fallbackMsg = `Failed to ${verb} plugin`;
-          const errMsg =
-            typeof data?.error === "string"
-              ? data.error
-              : data?.error == null
-                ? fallbackMsg
-                : String(data.error);
           showResponseModal(
             "failure",
-            errMsg.includes("registered")
-              ? `Plugin "${pluginId}" is not a registered plugin. Check the ID and try again.`
-              : errMsg
+            getIsolationFailureMessage(data, verb, pluginId)
           );
           return;
         }
@@ -375,8 +373,6 @@
         showResponseModal("failure", "Safe reset failed");
       }
     }
-
-    let progressES = null;
 
     function initProgressSSE() {
       try {

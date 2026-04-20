@@ -81,6 +81,27 @@ def test_image_url_rejects_metadata_endpoint(monkeypatch, device_config_dev):
         )
 
 
+@pytest.mark.parametrize(
+    "bad_url,expected_fragment",
+    [
+        ("file:///etc/passwd", "scheme"),
+        ("http://127.0.0.1/", "private"),
+        ("http://169.254.169.254/", "private"),
+        ("http://", "hostname"),
+    ],
+)
+def test_image_url_raises_url_validation_error(bad_url, expected_fragment):
+    """JTN-776: plugins must raise URLValidationError (not bare RuntimeError)
+    on bad URLs so the blueprint can map it to HTTP 422."""
+    from plugins.image_url.image_url import ImageURL
+    from utils.plugin_errors import URLValidationError
+
+    plugin = ImageURL({"id": "image_url"})
+    with pytest.raises(URLValidationError) as exc_info:
+        plugin.generate_image({"url": bad_url}, device_config=None)
+    assert expected_fragment in str(exc_info.value)
+
+
 def test_image_url_validate_settings_uses_shared_validator(monkeypatch):
     from plugins.image_url.image_url import ImageURL
 

@@ -8,7 +8,7 @@ from plugins.base_plugin.settings_schema import field, option, row, schema, sect
 from utils.http_client import get_http_session
 from utils.http_utils import pinned_dns
 from utils.image_utils import pad_image_blur
-from utils.security_utils import validate_url_with_ips
+from utils.security_utils import URLValidationError, validate_url_with_ips
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,10 @@ class ImageAlbum(BasePlugin):
         try:
             _validated_url, pinned_ips = validate_url_with_ips(url)
         except ValueError as e:
-            raise RuntimeError(f"Invalid URL: {e}") from e
+            # URLValidationError is a PermanentPluginError subclass, so the
+            # refresh-task retry loop skips extra attempts (JTN-778) and the
+            # plugin blueprint maps it to HTTP 422 validation_error (JTN-776).
+            raise URLValidationError(f"Invalid URL: {e}") from e
 
         album = settings.get("album")
         if not album:

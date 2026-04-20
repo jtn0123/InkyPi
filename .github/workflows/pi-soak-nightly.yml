@@ -1,0 +1,165 @@
+name: Pi soak nightly
+
+# JTN-733: real-Pi nightly soak. Runs `scripts/soak_runner.py` against a
+# self-hosted Raspberry Pi runner for 24 hours, sampling /api/diagnostics
+# every 5 minutes, and uploads the resulting JSON report as an artifact.
+#
+# This workflow is DELIBERATELY long-running and DELIBERATELY soft-gated:
+# the whole point is to catch slow leaks, EventSource reconnect storms,
+# display-driver wedges, tempfile buildup, and refresh-task drift — all
+# phenomena that only surface after hours of continuous operation, far
+# beyond what the per-PR CI can see.
+#
+# The workflow assumes a self-hosted runner labeled `self-hosted` +
+# `pi-zero-2w` is available. Until such a runner exists, the workflow will
+# simply queue and no-op (no GitHub-hosted fallback is provided on purpose
+# — a x86 ubuntu-latest run would not be a meaningful soak signal).
+#
+# To trigger a short manual run (e.g. a smoke test of the script itself),
+# use workflow_dispatch with a `duration` input like `10m`.
+
+on:
+  schedule:
+    # 03:00 UTC daily. Off-peak for most timezones; lines up so the 24h soak
+    # finishes before the following night's run starts.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Total soak duration (e.g. 10m, 2h, 24h).'
+        required: false
+        default: '24h'
+        type: string
+      interval:
+        description: 'Sample cadence (e.g. 1m, 5m).'
+        required: false
+        default: '5m'
+        type: string
+      host:
+        description: 'Override the InkyPi host URL (default: http://127.0.0.1:8080).'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never overlap a fresh soak on top of an in-flight one — the runner is
+  # a physical Pi and can only do one thing at a time.
+  group: pi-soak-nightly
+  cancel-in-progress: false
+
+jobs:
+  soak:
+    name: Real-Pi soak (24h)
+    # The self-hosted Pi runner must carry BOTH labels. If the runner does
+    # not exist, the job will queue indefinitely and GitHub will time it
+    # out — that's acceptable until the runner is provisioned.
+    runs-on: [self-hosted, pi-zero-2w]
+    # Allow up to 26h so a full 24h soak + setup/teardown has headroom.
+    timeout-minutes: 1560
+    env:
+      # Host defaults to localhost on the self-hosted Pi — the soak runner
+      # assumes InkyPi is already running on the same box and has a fixed
+      # playlist of 5+ plugins configured on a 10-min cadence. Override via
+      # workflow_dispatch input or repository secret INKYPI_HOST.
+      INKYPI_HOST: ${{ github.event.inputs.host || secrets.INKYPI_HOST || 'http://127.0.0.1:8080' }}
+      INKYPI_TOKEN: ${{ secrets.INKYPI_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve duration + interval
+        id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DURATION: ${{ github.event.inputs.duration }}
+          INPUT_INTERVAL: ${{ github.event.inputs.interval }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            dur="${INPUT_DURATION:-24h}"
+            ivl="${INPUT_INTERVAL:-5m}"
+          else
+            dur="24h"
+            ivl="5m"
+          fi
+          echo "duration=$dur" >> "$GITHUB_OUTPUT"
+          echo "interval=$ivl" >> "$GITHUB_OUTPUT"
+          echo "Running soak: duration=$dur interval=$ivl host=$INKYPI_HOST"
+
+      - name: Setup Python
+        # The self-hosted Pi image is expected to have Python 3.11+
+        # preinstalled. actions/setup-python does not ship arm64 Pi
+        # binaries for all versions, so we deliberately fall back to the
+        # system interpreter rather than cross-installing one here.
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 -m pip --version
+
+      - name: Install runner deps (requests only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `requests` is already a runtime dep of InkyPi itself, so on the
+          # self-hosted Pi this should be a no-op. Install with --user just
+          # in case the systemd service uses a venv we don't share.
+          python3 -m pip install --user --disable-pip-version-check requests
+
+      - name: Run soak
+        id: soak
+        shell: bash
+        env:
+          SOAK_DURATION: ${{ steps.params.outputs.duration }}
+          SOAK_INTERVAL: ${{ steps.params.outputs.interval }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          OUT="artifacts/soak-report.json"
+          python3 scripts/soak_runner.py \
+            --host "$INKYPI_HOST" \
+            --duration "$SOAK_DURATION" \
+            --interval "$SOAK_INTERVAL" \
+            --output "$OUT" \
+            --verbose
+          echo "report=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Print summary
+        if: always() && steps.soak.outputs.report != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+          path = "artifacts/soak-report.json"
+          if not os.path.exists(path):
+              print("no report artifact found")
+              sys.exit(0)
+          with open(path) as fh:
+              rpt = json.load(fh)
+          s = rpt.get("summary", {})
+          print("=== Soak summary ===")
+          print(f"samples total       : {s.get('total_samples')}")
+          print(f"samples ok          : {s.get('successful_samples')}")
+          print(f"samples unreachable : {s.get('unreachable_samples')}")
+          print(f"unreachable_rate    : {s.get('unreachable_rate')}")
+          print(f"refresh_failure_rate: {s.get('refresh_failure_rate')}")
+          print(f"client_log_errors   : {s.get('client_log_error_total')}")
+          print(f"service_restarts    : {s.get('service_restarts')}")
+          mt = s.get("memory_pct_trend") or {}
+          dt = s.get("disk_pct_trend") or {}
+          print(f"memory slope/hour   : {mt.get('slope_per_hour')}")
+          print(f"disk   slope/hour   : {dt.get('slope_per_hour')}")
+          PY
+
+      - name: Upload soak report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-soak-report
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30

@@ -67,7 +67,13 @@
                         {% endif %}
                     {% endif %}
 
-                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Last progress">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
+                    {# data-test-skip-click: opens the fixed-position #requestProgress
+                       overlay, which on mobile (360×800) reflows to full width and
+                       covers the workflow tabs, breadcrumbs and header icons below.
+                       The sweep then silent-no-ops every later candidate (JTN-743).
+                       Dedicated coverage lives in
+                       tests/integration/test_plugin_workflow_e2e.py::test_last_progress_button_shows_overlay. #}
+                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Last progress" data-test-skip-click="true">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
                     <div id="loadingIndicator" class="loading-indicator"></div>
                 </div>
             </div>

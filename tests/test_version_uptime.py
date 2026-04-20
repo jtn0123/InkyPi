@@ -169,6 +169,73 @@ def test_read_app_version_falls_back_to_pyproject_when_version_missing():
     assert result
 
 
+def test_read_app_version_rejects_unexpanded_placeholder():
+    """VERSION containing the literal '{version}' placeholder falls back (JTN-595).
+
+    mutmut triage: kills a surviving mutant where
+    ``value != "{version}"`` is removed from the guard, letting a broken
+    release pipeline leak the raw Jinja-style placeholder into the UI.
+    The function must always ignore that value and fall through to
+    pyproject.toml.
+
+    The pyproject fallback is also stubbed so the assertion verifies only
+    the VERSION guard, independent of the repo's current
+    ``[project].version`` value.
+    """
+    import tomllib
+
+    from blueprints.version_info import _read_app_version
+
+    with (
+        patch("pathlib.Path.read_text", return_value="{version}\n"),
+        patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
+    ):
+        result = _read_app_version()
+
+    assert result == "7.7.7"
+
+
+def test_read_app_version_rejects_bootstrap_placeholder():
+    """VERSION containing the bootstrap '0.1.0' placeholder falls back (JTN-595).
+
+    mutmut triage: kills a surviving mutant where
+    ``value != "0.1.0"`` is removed. ``0.1.0`` is the project's pre-release
+    bootstrap value that must never be surfaced as a real shipped version.
+
+    The pyproject fallback is also stubbed so the assertion verifies only
+    the VERSION guard, independent of the repo's current
+    ``[project].version`` value.
+    """
+    import tomllib
+
+    from blueprints.version_info import _read_app_version
+
+    with (
+        patch("pathlib.Path.read_text", return_value="0.1.0\n"),
+        patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
+    ):
+        result = _read_app_version()
+
+    assert result == "7.7.7"
+
+
+def test_read_app_version_accepts_real_version_string():
+    """A real semver value in VERSION must be returned verbatim (JTN-595).
+
+    mutmut triage: kills surviving mutants where the positive branch is
+    replaced (e.g. ``return value`` → ``return "unknown"`` or the ``if
+    value`` guard is inverted). Without this test the happy path is only
+    covered indirectly by the ``/api/version/info`` integration test that
+    reads the checked-in VERSION.
+    """
+    from blueprints.version_info import _read_app_version
+
+    with patch("pathlib.Path.read_text", return_value="9.9.9\n"):
+        result = _read_app_version()
+
+    assert result == "9.9.9"
+
+
 def test_run_git_returns_unknown_on_nonzero_returncode():
     """_run_git returns 'unknown' when git exits with non-zero."""
     from blueprints.version_info import _run_git
