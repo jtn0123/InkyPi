@@ -384,11 +384,15 @@ class RefreshTask:
                 )
             except Exception as exc:
                 retain_path = self._stale_display_path()
+                # JTN-779: log the full exception class + message so operators
+                # can diagnose.  The user-visible fallback image is sanitised
+                # via utils.fallback_image.sanitize_error_message.
                 logger.error(
-                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error=%s",
+                    "plugin_lifecycle: failure | plugin_id=%s instance=%s retained_display=%s error_class=%s error=%s",
                     plugin_id,
                     instance_name,
                     bool(retain_path),
+                    type(exc).__name__,
                     exc,
                 )
                 self._update_plugin_health(
