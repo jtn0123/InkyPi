@@ -8,18 +8,26 @@ from flask import current_app, redirect, render_template, request
 import blueprints.settings as _mod
 from utils.backend_errors import ClientInputError, route_error_boundary
 from utils.http_utils import json_error, json_success
-from utils.request_models import (
-    PluginIsolationRequest,
-    RequestValidationError,
-    require_mapping,
-)
 from utils.time_utils import calculate_seconds
 
 _DEVICE_NAME_MAX_LEN = 64
 
 
+def _plugin_isolation_request_tools():
+    from utils.request_models import (  # noqa: PLC0415 - lazy on purpose (S7788)
+        PluginIsolationRequest,
+        RequestValidationError,
+        require_mapping,
+    )
+
+    return PluginIsolationRequest, RequestValidationError, require_mapping
+
+
 @_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
 def plugin_isolation():
+    PluginIsolationRequest, RequestValidationError, require_mapping = (
+        _plugin_isolation_request_tools()
+    )
     device_config = current_app.config["DEVICE_CONFIG"]
     isolated = device_config.get_config("isolated_plugins", default=[])
     if not isinstance(isolated, list):

@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, SupportsFloat, SupportsIndex, SupportsInt, cast
 from zoneinfo import available_timezones
 
-from model import Playlist
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.time_utils import calculate_seconds
 
@@ -33,6 +32,7 @@ _IMAGE_SETTING_MIN = 0.0
 _IMAGE_SETTING_MAX = 10.0
 _MSG_INVALID_TIME_FORMAT = "Invalid start/end time format"
 _MSG_SAME_TIME = "Start time and End time cannot be the same"
+_MSG_INVALID_REORDER_ENTRY = "ordered entries must include plugin_id and name"
 
 TimeUnit = Literal["minute", "hour"]
 TimeFormat = Literal["12h", "24h"]
@@ -225,7 +225,7 @@ def _parse_time_field(raw: object, *, field: str) -> tuple[str, int]:
         invalid_message=_MSG_INVALID_TIME_FORMAT,
     )
     try:
-        minutes = Playlist._to_minutes(value)
+        minutes = _to_minutes(value)
     except Exception as exc:
         raise RequestValidationError(
             _MSG_INVALID_TIME_FORMAT,
@@ -233,6 +233,16 @@ def _parse_time_field(raw: object, *, field: str) -> tuple[str, int]:
             field=field,
         ) from exc
     return value, minutes
+
+
+def _to_minutes(time_str: str) -> int:
+    """Convert an ``HH:MM`` string to minutes since midnight."""
+    if time_str == "24:00":
+        return 24 * 60
+    hour, minute = map(int, time_str.split(":"))
+    if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+        raise ValueError("Invalid time")
+    return hour * 60 + minute
 
 
 def _parse_playlist_name(raw: object, *, field: str) -> str:
@@ -444,15 +454,15 @@ class ReorderPluginItem:
             data.get("plugin_id"),
             field="ordered",
             status=400,
-            required_message="ordered entries must include plugin_id and name",
-            invalid_message="ordered entries must include plugin_id and name",
+            required_message=_MSG_INVALID_REORDER_ENTRY,
+            invalid_message=_MSG_INVALID_REORDER_ENTRY,
         )
         name = _string_value(
             data.get("name"),
             field="ordered",
             status=400,
-            required_message="ordered entries must include plugin_id and name",
-            invalid_message="ordered entries must include plugin_id and name",
+            required_message=_MSG_INVALID_REORDER_ENTRY,
+            invalid_message=_MSG_INVALID_REORDER_ENTRY,
         )
         return cls(plugin_id=plugin_id, name=name)
 

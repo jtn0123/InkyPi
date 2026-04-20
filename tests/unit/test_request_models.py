@@ -3,27 +3,21 @@
 
 from __future__ import annotations
 
+import importlib
+from types import ModuleType
+
 import pytest
 
-from utils.request_models import (
-    ClientLogRequest,
-    DeviceCycleRequest,
-    PlaylistCreateRequest,
-    PlaylistReorderRequest,
-    PlaylistSelectionRequest,
-    PlaylistUpdateRequest,
-    PluginIsolationRequest,
-    RequestValidationError,
-    SettingsFormRequest,
-    SettingsImportRequest,
-    SettingsUpdateRequest,
-    ShutdownRequest,
-    require_mapping,
-)
+
+def _request_models_mod() -> ModuleType:
+    return importlib.import_module("utils.request_models")
 
 
 def test_request_validation_error_populates_field_details() -> None:
-    err = RequestValidationError("bad input", status=422, field="playlist_name")
+    request_models_mod = _request_models_mod()
+    err = request_models_mod.RequestValidationError(
+        "bad input", status=422, field="playlist_name"
+    )
 
     assert err.details == {"field": "playlist_name"}
     assert err.as_json_error_kwargs() == {
@@ -35,8 +29,9 @@ def test_request_validation_error_populates_field_details() -> None:
 
 
 def test_require_mapping_rejects_non_mapping() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        require_mapping(["not", "a", "mapping"])
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.require_mapping(["not", "a", "mapping"])
 
     err = exc_info.value
     assert err.message == "Request body must be a JSON object"
@@ -46,7 +41,8 @@ def test_require_mapping_rejects_non_mapping() -> None:
 
 
 def test_playlist_create_request_parses_and_trims() -> None:
-    parsed = PlaylistCreateRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.PlaylistCreateRequest.from_mapping(
         {
             "playlist_name": "  Morning Run  ",
             "start_time": "08:00",
@@ -62,8 +58,9 @@ def test_playlist_create_request_parses_and_trims() -> None:
 
 
 def test_playlist_create_request_preserves_route_length_message() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        PlaylistCreateRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PlaylistCreateRequest.from_mapping(
             {
                 "playlist_name": "x" * 65,
                 "start_time": "08:00",
@@ -78,8 +75,9 @@ def test_playlist_create_request_preserves_route_length_message() -> None:
 
 
 def test_playlist_create_request_rejects_invalid_time_field() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        PlaylistCreateRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PlaylistCreateRequest.from_mapping(
             {
                 "playlist_name": "Morning",
                 "start_time": "bad",
@@ -94,8 +92,9 @@ def test_playlist_create_request_rejects_invalid_time_field() -> None:
 
 
 def test_playlist_update_request_uses_missing_fields_message() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        PlaylistUpdateRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PlaylistUpdateRequest.from_mapping(
             {"new_name": "Updated", "start_time": "08:00"}
         )
 
@@ -109,8 +108,9 @@ def test_playlist_update_request_uses_missing_fields_message() -> None:
 def test_playlist_update_request_validates_cycle_minutes(
     cycle_minutes: object,
 ) -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        PlaylistUpdateRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PlaylistUpdateRequest.from_mapping(
             {
                 "new_name": "Updated",
                 "start_time": "08:00",
@@ -123,8 +123,9 @@ def test_playlist_update_request_validates_cycle_minutes(
 
 
 def test_playlist_selection_request_supports_custom_message() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        PlaylistSelectionRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PlaylistSelectionRequest.from_mapping(
             {}, required_message="playlist_name and ordered list are required"
         )
 
@@ -134,7 +135,8 @@ def test_playlist_selection_request_supports_custom_message() -> None:
 
 
 def test_playlist_reorder_request_converts_items_to_model_payload() -> None:
-    parsed = PlaylistReorderRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.PlaylistReorderRequest.from_mapping(
         {
             "playlist_name": "Morning",
             "ordered": [
@@ -153,8 +155,9 @@ def test_playlist_reorder_request_converts_items_to_model_payload() -> None:
 
 @pytest.mark.parametrize("minutes", [None, "abc"])
 def test_device_cycle_request_rejects_invalid_minutes(minutes: object) -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        DeviceCycleRequest.from_mapping({"minutes": minutes})
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.DeviceCycleRequest.from_mapping({"minutes": minutes})
 
     err = exc_info.value
     assert err.message == "Invalid minutes"
@@ -163,13 +166,14 @@ def test_device_cycle_request_rejects_invalid_minutes(minutes: object) -> None:
 
 
 def test_plugin_isolation_request_trims_and_checks_registered_ids() -> None:
-    parsed = PluginIsolationRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.PluginIsolationRequest.from_mapping(
         {"plugin_id": " weather "}, registered_ids={"weather", "calendar"}
     )
     assert parsed.plugin_id == "weather"
 
-    with pytest.raises(RequestValidationError) as exc_info:
-        PluginIsolationRequest.from_mapping(
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.PluginIsolationRequest.from_mapping(
             {"plugin_id": "unknown"}, registered_ids={"weather"}
         )
 
@@ -180,9 +184,17 @@ def test_plugin_isolation_request_trims_and_checks_registered_ids() -> None:
 
 
 def test_shutdown_request_defaults_and_parses_bool() -> None:
-    assert ShutdownRequest.from_optional_mapping(None).reboot is False
-    assert ShutdownRequest.from_optional_mapping({}).reboot is False
-    assert ShutdownRequest.from_optional_mapping({"reboot": "yes"}).reboot is True
+    request_models_mod = _request_models_mod()
+    assert (
+        request_models_mod.ShutdownRequest.from_optional_mapping(None).reboot is False
+    )
+    assert request_models_mod.ShutdownRequest.from_optional_mapping({}).reboot is False
+    assert (
+        request_models_mod.ShutdownRequest.from_optional_mapping(
+            {"reboot": "yes"}
+        ).reboot
+        is True
+    )
 
 
 @pytest.mark.parametrize(
@@ -200,20 +212,30 @@ def test_shutdown_request_defaults_and_parses_bool() -> None:
 def test_client_log_request_normalizes_level_aliases(
     raw_level: object, expected: str
 ) -> None:
-    parsed = ClientLogRequest.from_mapping({"level": raw_level, "message": "hello"})
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.ClientLogRequest.from_mapping(
+        {"level": raw_level, "message": "hello"}
+    )
 
     assert parsed.level == expected
     assert parsed.message == "hello"
 
 
 def test_settings_update_request_validates_optional_target_version() -> None:
-    assert SettingsUpdateRequest.from_mapping({}).target_version is None
+    request_models_mod = _request_models_mod()
+    assert (
+        request_models_mod.SettingsUpdateRequest.from_mapping({}).target_version is None
+    )
 
-    parsed = SettingsUpdateRequest.from_mapping({"target_version": " v1.2.3 "})
+    parsed = request_models_mod.SettingsUpdateRequest.from_mapping(
+        {"target_version": " v1.2.3 "}
+    )
     assert parsed.target_version == "v1.2.3"
 
-    with pytest.raises(RequestValidationError) as exc_info:
-        SettingsUpdateRequest.from_mapping({"target_version": "not-a-version"})
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.SettingsUpdateRequest.from_mapping(
+            {"target_version": "not-a-version"}
+        )
 
     err = exc_info.value
     assert err.message == "Invalid target version format"
@@ -225,8 +247,11 @@ def test_settings_update_request_validates_optional_target_version() -> None:
 def test_settings_update_request_rejects_empty_or_non_string_target_versions(
     raw_value: object,
 ) -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        SettingsUpdateRequest.from_mapping({"target_version": raw_value})
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.SettingsUpdateRequest.from_mapping(
+            {"target_version": raw_value}
+        )
 
     err = exc_info.value
     assert err.message == "target_version must be a non-empty string"
@@ -235,7 +260,8 @@ def test_settings_update_request_rejects_empty_or_non_string_target_versions(
 
 
 def test_settings_form_request_builds_route_compatible_settings_dict() -> None:
-    parsed = SettingsFormRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.SettingsFormRequest.from_mapping(
         {
             "deviceName": "  Kitchen Display  ",
             "unit": "minute",
@@ -277,8 +303,9 @@ def test_settings_form_request_builds_route_compatible_settings_dict() -> None:
 
 
 def test_settings_form_request_rejects_invalid_timezone() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        SettingsFormRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.SettingsFormRequest.from_mapping(
             {
                 "deviceName": "Device",
                 "unit": "minute",
@@ -296,8 +323,9 @@ def test_settings_form_request_rejects_invalid_timezone() -> None:
 
 
 def test_settings_form_request_rejects_control_characters_in_device_name() -> None:
-    with pytest.raises(RequestValidationError) as exc_info:
-        SettingsFormRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.SettingsFormRequest.from_mapping(
             {
                 "deviceName": "Kitchen\nDisplay",
                 "unit": "minute",
@@ -315,7 +343,8 @@ def test_settings_form_request_rejects_control_characters_in_device_name() -> No
 
 
 def test_settings_import_request_filters_allowed_keys_and_stringifies_values() -> None:
-    parsed = SettingsImportRequest.from_mapping(
+    request_models_mod = _request_models_mod()
+    parsed = request_models_mod.SettingsImportRequest.from_mapping(
         {
             "config": {
                 "name": "Imported Device",
@@ -338,14 +367,15 @@ def test_settings_import_request_filters_allowed_keys_and_stringifies_values() -
 
 @pytest.mark.parametrize("field", ["config", "env_keys"])
 def test_settings_import_request_requires_mapping_children(field: str) -> None:
+    request_models_mod = _request_models_mod()
     payload: dict[str, object]
     if field == "config":
         payload = {"config": ["not", "a", "mapping"], "env_keys": {}}
     else:
         payload = {"config": {}, "env_keys": ["not", "a", "mapping"]}
 
-    with pytest.raises(RequestValidationError) as exc_info:
-        SettingsImportRequest.from_mapping(
+    with pytest.raises(request_models_mod.RequestValidationError) as exc_info:
+        request_models_mod.SettingsImportRequest.from_mapping(
             payload,
             allowed_config_keys={"name"},
             allowed_env_keys={"OPEN_AI_SECRET"},

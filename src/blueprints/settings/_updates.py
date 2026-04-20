@@ -14,11 +14,6 @@ from utils.backend_errors import (
     route_error_boundary,
 )
 from utils.http_utils import json_error, json_success
-from utils.request_models import (
-    RequestValidationError,
-    SettingsUpdateRequest,
-    require_mapping,
-)
 
 
 def _prev_version_path() -> str:
@@ -30,6 +25,16 @@ def _prev_version_path() -> str:
     """
     base = os.environ.get("INKYPI_LOCKFILE_DIR") or "/var/lib/inkypi"
     return os.path.join(base, "prev_version")
+
+
+def _settings_update_request_tools():
+    from utils.request_models import (  # noqa: PLC0415 - lazy on purpose (S7788)
+        RequestValidationError,
+        SettingsUpdateRequest,
+        require_mapping,
+    )
+
+    return RequestValidationError, SettingsUpdateRequest, require_mapping
 
 
 def _read_prev_version() -> str | None:
@@ -63,6 +68,9 @@ def start_update():
         logger=_mod.logger,
         hint="Check update script availability and update process startup.",
     ):
+        RequestValidationError, SettingsUpdateRequest, require_mapping = (
+            _settings_update_request_tools()
+        )
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
         raw_body = request.get_data(cache=True)
