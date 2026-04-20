@@ -407,7 +407,10 @@ def test_create_playlist_exception_handling(client, flask_app, monkeypatch):
         json={"playlist_name": "Test", "start_time": "06:00", "end_time": "09:00"},
     )
     assert resp.status_code == 500
-    assert "An internal error occurred" in resp.get_json().get("error", "")
+    body = resp.get_json()
+    assert body.get("error") == "An internal error occurred"
+    assert body.get("code") == "internal_error"
+    assert body.get("details", {}).get("context") == "create playlist"
 
 
 def test_update_playlist_rejects_equal_start_end(client):

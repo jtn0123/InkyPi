@@ -439,6 +439,10 @@ class TestRollbackRouteErrorPaths:
         try:
             resp = client.post("/settings/update/rollback")
             assert resp.status_code == 500
+            body = resp.get_json()
+            assert body["error"] == "An internal error occurred"
+            assert body["code"] == "internal_error"
+            assert body["details"]["context"] == "start rollback"
             # State must be cleared so a subsequent rollback isn't locked out.
             assert mod._UPDATE_STATE["running"] is False
         finally:
