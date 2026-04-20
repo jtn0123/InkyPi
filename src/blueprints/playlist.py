@@ -50,6 +50,17 @@ _MSG_TIME_OVERLAP = "Playlist time range overlaps with existing playlist"
 _MSG_INVALID_PLAYLIST_REQUEST = "Invalid playlist request"
 _MSG_PLAYLIST_NOT_FOUND = "Playlist not found"
 
+# JTN-781: the "Default" playlist is the canonical fallback shipped with the
+# system and auto-created on startup when no playlists exist (see
+# PlaylistManager.add_default_playlist + config bootstrap). Deleting it leaves
+# the scheduler with nothing to schedule and no UI path to recreate it, so the
+# server rejects the delete outright. The match is case-sensitive because every
+# other code path (create, update, overlap-warning, plugin auto-add) keys off
+# the exact string "Default" — a lowercase "default" is just a user-created
+# playlist and is fine to delete.
+DEFAULT_PLAYLIST_NAME = "Default"
+_MSG_CANNOT_DELETE_DEFAULT = "Cannot delete the default playlist"
+
 
 def _validate_playlist_name(name, field="playlist_name"):
     """Validate playlist name format. Returns (cleaned_name, error_response) tuple.
@@ -862,6 +873,19 @@ def delete_playlist(playlist_name):
     if not playlist_name:
         return json_error(
             PLAYLIST_NAME_REQUIRED_ERROR,
+            status=400,
+            code=_CODE_VALIDATION,
+            details={"field": "playlist_name"},
+        )
+
+    # JTN-781: refuse to delete the canonical "Default" playlist. This match is
+    # intentionally case-sensitive to mirror how "Default" is treated elsewhere
+    # (create/update/overlap-warning/plugin auto-add all key off the exact
+    # string). A user-created playlist named "default" is a different playlist
+    # and remains deletable.
+    if playlist_name == DEFAULT_PLAYLIST_NAME:
+        return json_error(
+            _MSG_CANNOT_DELETE_DEFAULT,
             status=400,
             code=_CODE_VALIDATION,
             details={"field": "playlist_name"},
