@@ -1,8 +1,10 @@
 # Mutmut survivor suppressions
 
-This file records surviving mutmut mutants that we have chosen **not** to kill
-with a targeted test, along with a one-line justification for each. Killed
-survivors are not listed here — they live as commits that add assertions.
+This file records mutmut-triage outcomes across three categories: surviving
+mutants we have chosen **not** to kill (with a one-line justification),
+mutants that were killed by the same PR as this file (cross-referenced to the
+assertion that catches them), and acceptable / deferred survivors. See the
+headings below for the specific sections.
 
 See `docs/mutation_testing.md` for the mutation-testing setup, CI schedule,
 and triage workflow. The source tracking issue is **JTN-595**.
@@ -81,7 +83,7 @@ interpret the short list above as complete.
 
 Format: one markdown table row under the relevant heading.
 
-```
+```md
 | file:line | mutation class | reason / killing test |
 ```
 

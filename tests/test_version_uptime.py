@@ -177,15 +177,22 @@ def test_read_app_version_rejects_unexpanded_placeholder():
     release pipeline leak the raw Jinja-style placeholder into the UI.
     The function must always ignore that value and fall through to
     pyproject.toml.
+
+    The pyproject fallback is also stubbed so the assertion verifies only
+    the VERSION guard, independent of the repo's current
+    ``[project].version`` value.
     """
+    import tomllib
+
     from blueprints.version_info import _read_app_version
 
-    with patch("pathlib.Path.read_text", return_value="{version}\n"):
+    with (
+        patch("pathlib.Path.read_text", return_value="{version}\n"),
+        patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
+    ):
         result = _read_app_version()
 
-    assert result != "{version}"
-    # pyproject.toml still resolves to a real version
-    assert result not in ("", "unknown")
+    assert result == "7.7.7"
 
 
 def test_read_app_version_rejects_bootstrap_placeholder():
@@ -194,14 +201,22 @@ def test_read_app_version_rejects_bootstrap_placeholder():
     mutmut triage: kills a surviving mutant where
     ``value != "0.1.0"`` is removed. ``0.1.0`` is the project's pre-release
     bootstrap value that must never be surfaced as a real shipped version.
+
+    The pyproject fallback is also stubbed so the assertion verifies only
+    the VERSION guard, independent of the repo's current
+    ``[project].version`` value.
     """
+    import tomllib
+
     from blueprints.version_info import _read_app_version
 
-    with patch("pathlib.Path.read_text", return_value="0.1.0\n"):
+    with (
+        patch("pathlib.Path.read_text", return_value="0.1.0\n"),
+        patch.object(tomllib, "load", return_value={"project": {"version": "7.7.7"}}),
+    ):
         result = _read_app_version()
 
-    assert result != "0.1.0"
-    assert result not in ("", "unknown")
+    assert result == "7.7.7"
 
 
 def test_read_app_version_accepts_real_version_string():

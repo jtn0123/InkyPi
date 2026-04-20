@@ -560,8 +560,8 @@ jobs:
         run: |
           scripts/preflash_validate.sh
 
-  # Mutation nightly — runs every Sunday 03:00 UTC via the workflow-level
-  # ``schedule:`` trigger. See docs/mutation_testing.md.
+  # Mutation nightly — runs daily at 09:00 UTC and weekly on Sunday 03:00 UTC
+  # via the workflow-level ``schedule:`` trigger. See docs/mutation_testing.md.
   #
   # JTN-595 (2026-04-19) finding: every nightly run since the JTN-508 scope
   # expansion has hit the 120-minute timeout without finishing, producing no
