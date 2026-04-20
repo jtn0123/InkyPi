@@ -3,18 +3,10 @@
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass, field
+from types import ModuleType
 from typing import Any
-
-from services import playlist_workflows as playlist_workflows_mod
-from services.playlist_workflows import (
-    AddPluginWorkflowResult,
-    WorkflowError,
-    build_playlist_plugin_dict,
-    normalize_instance_name,
-    prepare_add_plugin_workflow,
-    validate_plugin_refresh_settings,
-)
 
 
 @dataclass
@@ -122,14 +114,22 @@ class _Plugin:
         return self.validation_error
 
 
+def _playlist_workflows_mod() -> ModuleType:
+    return importlib.import_module("services.playlist_workflows")
+
+
 def test_normalize_instance_name_trims_and_validates():
-    name, err = normalize_instance_name("  My Instance  ")
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    name, err = playlist_workflows_mod.normalize_instance_name("  My Instance  ")
     assert err is None
     assert name == "My Instance"
 
 
 def test_normalize_instance_name_rejects_bad_value():
-    name, err = normalize_instance_name(" ")
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    name, err = playlist_workflows_mod.normalize_instance_name(" ")
     assert name is None
     assert err is not None
     assert err.field == "instance_name"
@@ -137,7 +137,9 @@ def test_normalize_instance_name_rejects_bad_value():
 
 
 def test_validate_plugin_refresh_settings_interval():
-    refresh_config, err = validate_plugin_refresh_settings(
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    refresh_config, err = playlist_workflows_mod.validate_plugin_refresh_settings(
         {
             "refreshType": "interval",
             "unit": "minute",
@@ -149,7 +151,9 @@ def test_validate_plugin_refresh_settings_interval():
 
 
 def test_validate_plugin_refresh_settings_scheduled():
-    refresh_config, err = validate_plugin_refresh_settings(
+    playlist_workflows_mod = _playlist_workflows_mod()
+
+    refresh_config, err = playlist_workflows_mod.validate_plugin_refresh_settings(
         {
             "refreshType": "scheduled",
             "refreshTime": "08:30",
@@ -160,9 +164,12 @@ def test_validate_plugin_refresh_settings_scheduled():
 
 
 def test_build_playlist_plugin_dict_copies_inputs():
+    playlist_workflows_mod = _playlist_workflows_mod()
     refresh = {"interval": 600}
     settings = {"city": "London"}
-    result = build_playlist_plugin_dict("weather", settings, refresh, "Weather 1")
+    result = playlist_workflows_mod.build_playlist_plugin_dict(
+        "weather", settings, refresh, "Weather 1"
+    )
 
     assert result == {
         "plugin_id": "weather",
@@ -177,11 +184,12 @@ def test_build_playlist_plugin_dict_copies_inputs():
 
 
 def test_prepare_add_plugin_workflow_happy_path():
+    playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     manager.add_playlist("Morning")
 
-    result = prepare_add_plugin_workflow(
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
         "weather",
         {"city": "London"},
         {
@@ -195,7 +203,7 @@ def test_prepare_add_plugin_workflow_happy_path():
         device_config=device_config,
     )
 
-    assert isinstance(result, AddPluginWorkflowResult)
+    assert isinstance(result, playlist_workflows_mod.AddPluginWorkflowResult)
     assert result.ok is True
     assert result.playlist_name == "Morning"
     assert result.instance_name == "Morning Weather"
@@ -210,6 +218,7 @@ def test_prepare_add_plugin_workflow_happy_path():
 
 
 def test_prepare_add_plugin_workflow_rejects_duplicate_instance():
+    playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     manager.add_playlist("Morning")
@@ -223,7 +232,7 @@ def test_prepare_add_plugin_workflow_rejects_duplicate_instance():
         },
     )
 
-    result = prepare_add_plugin_workflow(
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
         "weather",
         {"city": "London"},
         {
@@ -244,8 +253,9 @@ def test_prepare_add_plugin_workflow_rejects_duplicate_instance():
 
 
 def test_prepare_add_plugin_workflow_rejects_missing_playlist():
+    playlist_workflows_mod = _playlist_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
-    result = prepare_add_plugin_workflow(
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
         "weather",
         {"city": "London"},
         {
@@ -269,16 +279,17 @@ def test_prepare_add_plugin_workflow_rejects_security_error(monkeypatch):
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     manager.add_playlist("Morning")
+    playlist_workflows_mod = _playlist_workflows_mod()
 
     monkeypatch.setattr(
         playlist_workflows_mod,
         "validate_plugin_settings_security",
-        lambda device_config, plugin_id, plugin_settings: WorkflowError(
+        lambda device_config, plugin_id, plugin_settings: playlist_workflows_mod.WorkflowError(
             "bad input", status=400, field="city"
         ),
     )
 
-    result = prepare_add_plugin_workflow(
+    result = playlist_workflows_mod.prepare_add_plugin_workflow(
         "weather",
         {"city": "London"},
         {

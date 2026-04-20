@@ -111,83 +111,81 @@ def _failure(
     )
 
 
-def save_plugin_settings_workflow(
-    plugin_id: str,
-    plugin_settings: dict[str, Any],
-    device_config: Any,
-    playlist_manager: Any,
-    *,
-    get_plugin_instance_fn: Callable[[Any], Any] = get_plugin_instance,
-    validate_required_fields_fn: Callable[[Any, dict[str, Any]], str | None] = (
-        validate_plugin_required_fields
-    ),
-    record_change_fn: (
-        Callable[[str, str, dict[str, Any], dict[str, Any]], None] | None
-    ) = _record_plugin_change,
-    default_playlist_name: str = DEFAULT_PLAYLIST_NAME,
-    saved_instance_suffix: str = DEFAULT_PLUGIN_INSTANCE_SUFFIX,
-    default_refresh_interval_seconds: int = DEFAULT_PLUGIN_REFRESH_INTERVAL_SECONDS,
-) -> PluginSettingsWorkflowResult:
-    """Persist plugin settings to the Default playlist.
-
-    The workflow mirrors the route behavior but returns structured data instead
-    of Flask responses.
-    """
-    plugin_log_id = sanitize_log_field(plugin_id)
+def _load_plugin_config(
+    device_config: Any, plugin_id: str, plugin_log_id: str
+) -> tuple[Any | None, PluginSettingsWorkflowResult | None]:
     try:
         plugin_config = device_config.get_plugin(plugin_id)
     except Exception:
         logger.exception("Plugin lookup failed for %s", plugin_log_id)
-        return _failure(
+        return None, _failure(
             DEFAULT_PLUGIN_NOT_FOUND_MESSAGE,
             status=500,
             code="internal_error",
         )
 
     if not plugin_config:
-        return _failure(DEFAULT_PLUGIN_NOT_FOUND_MESSAGE, status=404)
+        return None, _failure(DEFAULT_PLUGIN_NOT_FOUND_MESSAGE, status=404)
+    return plugin_config, None
 
-    plugin = None
+
+def _load_plugin_for_validation(
+    plugin_config: Any,
+    plugin_log_id: str,
+    get_plugin_instance_fn: Callable[[Any], Any],
+) -> Any | None:
     try:
-        plugin = get_plugin_instance_fn(plugin_config)
+        return get_plugin_instance_fn(plugin_config)
     except Exception:
         logger.warning(
             "Could not load plugin instance for validation: %s", plugin_log_id
         )
+        return None
 
-    if plugin is not None:
-        try:
-            validation_error = validate_required_fields_fn(plugin, plugin_settings)
-            if validation_error:
-                return _failure(validation_error, status=400)
-        except Exception:
-            logger.warning("Required-field validation failed for %s", plugin_log_id)
 
-        try:
-            settings_error = plugin.validate_settings(plugin_settings)
-            if settings_error:
-                return _failure(settings_error, status=400)
-        except Exception:
-            logger.warning(
-                "Plugin validate_settings raised for %s",
-                plugin_log_id,
-                exc_info=True,
-            )
-            return _failure(DEFAULT_PLUGIN_VALIDATION_MESSAGE, status=400)
+def _validate_plugin_settings(
+    plugin: Any | None,
+    plugin_settings: dict[str, Any],
+    plugin_log_id: str,
+    validate_required_fields_fn: Callable[[Any, dict[str, Any]], str | None],
+) -> PluginSettingsWorkflowResult | None:
+    if plugin is None:
+        return None
 
-    playlist, created = ensure_playlist(playlist_manager, default_playlist_name)
-    if playlist is None:
-        return _failure(
-            "Failed to create Default playlist",
-            status=500,
-            code="internal_error",
+    try:
+        validation_error = validate_required_fields_fn(plugin, plugin_settings)
+        if validation_error:
+            return _failure(validation_error, status=400)
+    except Exception:
+        logger.warning("Required-field validation failed for %s", plugin_log_id)
+
+    try:
+        settings_error = plugin.validate_settings(plugin_settings)
+        if settings_error:
+            return _failure(settings_error, status=400)
+    except Exception:
+        logger.warning(
+            "Plugin validate_settings raised for %s",
+            plugin_log_id,
+            exc_info=True,
         )
+        return _failure(DEFAULT_PLUGIN_VALIDATION_MESSAGE, status=400)
 
-    instance_name = build_saved_settings_instance_name(
-        plugin_id, suffix=saved_instance_suffix
-    )
+    return None
+
+
+def _persist_plugin_settings(
+    *,
+    device_config: Any,
+    playlist_manager: Any,
+    playlist: Any,
+    plugin_id: str,
+    plugin_settings: dict[str, Any],
+    instance_name: str,
+    default_refresh_interval_seconds: int,
+    plugin_log_id: str,
+) -> tuple[dict[str, Any] | None, PluginSettingsWorkflowResult | None]:
     before_settings: dict[str, Any] = {}
-    after_settings = copy.deepcopy(plugin_settings)
 
     try:
 
@@ -215,23 +213,117 @@ def save_plugin_settings_workflow(
         device_config.update_atomic(_do_save_settings)
     except Exception:
         logger.exception("Saving plugin settings failed for %s", plugin_log_id)
+        return None, _failure(
+            "An internal error occurred",
+            status=500,
+            code="internal_error",
+        )
+
+    return before_settings, None
+
+
+def _record_saved_settings_change(
+    *,
+    device_config: Any,
+    instance_name: str,
+    before_settings: dict[str, Any],
+    after_settings: dict[str, Any],
+    plugin_log_id: str,
+    record_change_fn: Callable[[str, str, dict[str, Any], dict[str, Any]], None] | None,
+) -> PluginSettingsWorkflowResult | None:
+    if record_change_fn is None:
+        return None
+
+    try:
+        config_dir = os.path.dirname(device_config.config_file)
+        record_change_fn(config_dir, instance_name, before_settings, after_settings)
+    except Exception:
+        logger.exception("Recording plugin history failed for %s", plugin_log_id)
         return _failure(
             "An internal error occurred",
             status=500,
             code="internal_error",
         )
 
-    if record_change_fn is not None:
-        try:
-            config_dir = os.path.dirname(device_config.config_file)
-            record_change_fn(config_dir, instance_name, before_settings, after_settings)
-        except Exception:
-            logger.exception("Recording plugin history failed for %s", plugin_log_id)
-            return _failure(
-                "An internal error occurred",
-                status=500,
-                code="internal_error",
-            )
+    return None
+
+
+def save_plugin_settings_workflow(
+    plugin_id: str,
+    plugin_settings: dict[str, Any],
+    device_config: Any,
+    playlist_manager: Any,
+    *,
+    get_plugin_instance_fn: Callable[[Any], Any] = get_plugin_instance,
+    validate_required_fields_fn: Callable[[Any, dict[str, Any]], str | None] = (
+        validate_plugin_required_fields
+    ),
+    record_change_fn: (
+        Callable[[str, str, dict[str, Any], dict[str, Any]], None] | None
+    ) = _record_plugin_change,
+    default_playlist_name: str = DEFAULT_PLAYLIST_NAME,
+    saved_instance_suffix: str = DEFAULT_PLUGIN_INSTANCE_SUFFIX,
+    default_refresh_interval_seconds: int = DEFAULT_PLUGIN_REFRESH_INTERVAL_SECONDS,
+) -> PluginSettingsWorkflowResult:
+    """Persist plugin settings to the Default playlist.
+
+    The workflow mirrors the route behavior but returns structured data instead
+    of Flask responses.
+    """
+    plugin_log_id = sanitize_log_field(plugin_id)
+    plugin_config, lookup_error = _load_plugin_config(
+        device_config, plugin_id, plugin_log_id
+    )
+    if lookup_error is not None:
+        return lookup_error
+
+    plugin = _load_plugin_for_validation(
+        plugin_config, plugin_log_id, get_plugin_instance_fn
+    )
+    validation_error = _validate_plugin_settings(
+        plugin, plugin_settings, plugin_log_id, validate_required_fields_fn
+    )
+    if validation_error is not None:
+        return validation_error
+
+    playlist, created = ensure_playlist(playlist_manager, default_playlist_name)
+    if playlist is None:
+        return _failure(
+            "Failed to create Default playlist",
+            status=500,
+            code="internal_error",
+        )
+
+    instance_name = build_saved_settings_instance_name(
+        plugin_id, suffix=saved_instance_suffix
+    )
+    before_settings: dict[str, Any] = {}
+    after_settings = copy.deepcopy(plugin_settings)
+    persisted_before_settings, persist_error = _persist_plugin_settings(
+        device_config=device_config,
+        playlist_manager=playlist_manager,
+        playlist=playlist,
+        plugin_id=plugin_id,
+        plugin_settings=plugin_settings,
+        instance_name=instance_name,
+        default_refresh_interval_seconds=default_refresh_interval_seconds,
+        plugin_log_id=plugin_log_id,
+    )
+    if persist_error is not None:
+        return persist_error
+    if persisted_before_settings is not None:
+        before_settings = persisted_before_settings
+
+    record_error = _record_saved_settings_change(
+        device_config=device_config,
+        instance_name=instance_name,
+        before_settings=before_settings,
+        after_settings=after_settings,
+        plugin_log_id=plugin_log_id,
+        record_change_fn=record_change_fn,
+    )
+    if record_error is not None:
+        return record_error
 
     return PluginSettingsWorkflowResult(
         ok=True,

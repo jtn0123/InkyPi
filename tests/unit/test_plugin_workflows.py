@@ -3,16 +3,10 @@
 
 from __future__ import annotations
 
+import importlib
 from dataclasses import dataclass, field
+from types import ModuleType
 from typing import Any
-
-from services.plugin_workflows import (
-    DEFAULT_PLAYLIST_NAME,
-    PluginSettingsWorkflowResult,
-    build_saved_settings_instance_name,
-    ensure_playlist,
-    save_plugin_settings_workflow,
-)
 
 
 @dataclass
@@ -97,21 +91,34 @@ class _Plugin:
         return self.validation_error
 
 
+def _plugin_workflows_mod() -> ModuleType:
+    return importlib.import_module("services.plugin_workflows")
+
+
 def test_build_saved_settings_instance_name():
-    assert build_saved_settings_instance_name("weather") == "weather_saved_settings"
+    plugin_workflows_mod = _plugin_workflows_mod()
+
+    assert (
+        plugin_workflows_mod.build_saved_settings_instance_name("weather")
+        == "weather_saved_settings"
+    )
 
 
 def test_ensure_playlist_creates_default_playlist():
+    plugin_workflows_mod = _plugin_workflows_mod()
     manager = _PlaylistManager()
 
-    playlist, created = ensure_playlist(manager, DEFAULT_PLAYLIST_NAME)
+    playlist, created = plugin_workflows_mod.ensure_playlist(
+        manager, plugin_workflows_mod.DEFAULT_PLAYLIST_NAME
+    )
 
     assert created is True
     assert playlist is not None
-    assert playlist.name == DEFAULT_PLAYLIST_NAME
+    assert playlist.name == plugin_workflows_mod.DEFAULT_PLAYLIST_NAME
 
 
 def test_save_plugin_settings_workflow_creates_saved_settings_instance():
+    plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
     calls: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
@@ -119,7 +126,7 @@ def test_save_plugin_settings_workflow_creates_saved_settings_instance():
     def _record_change(config_dir, instance_name, before, after):
         calls.append((config_dir, instance_name, before, after))
 
-    result = save_plugin_settings_workflow(
+    result = plugin_workflows_mod.save_plugin_settings_workflow(
         "weather",
         {"city": "London"},
         device_config,
@@ -128,26 +135,27 @@ def test_save_plugin_settings_workflow_creates_saved_settings_instance():
         record_change_fn=_record_change,
     )
 
-    assert isinstance(result, PluginSettingsWorkflowResult)
+    assert isinstance(result, plugin_workflows_mod.PluginSettingsWorkflowResult)
     assert result.ok is True
     assert result.instance_name == "weather_saved_settings"
-    assert result.playlist_name == DEFAULT_PLAYLIST_NAME
+    assert result.playlist_name == plugin_workflows_mod.DEFAULT_PLAYLIST_NAME
     assert result.default_playlist_created is True
     assert result.before_settings == {}
     assert result.after_settings == {"city": "London"}
     assert len(calls) == 1
     assert calls[0][1] == "weather_saved_settings"
-    assert manager.get_playlist(DEFAULT_PLAYLIST_NAME) is not None
-    assert manager.get_playlist(DEFAULT_PLAYLIST_NAME).find_plugin(
+    assert manager.get_playlist(plugin_workflows_mod.DEFAULT_PLAYLIST_NAME) is not None
+    assert manager.get_playlist(plugin_workflows_mod.DEFAULT_PLAYLIST_NAME).find_plugin(
         "weather", "weather_saved_settings"
     )
 
 
 def test_save_plugin_settings_workflow_updates_existing_instance():
+    plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
     manager = device_config.playlist_manager
-    manager.add_playlist(DEFAULT_PLAYLIST_NAME)
-    playlist = manager.get_playlist(DEFAULT_PLAYLIST_NAME)
+    manager.add_playlist(plugin_workflows_mod.DEFAULT_PLAYLIST_NAME)
+    playlist = manager.get_playlist(plugin_workflows_mod.DEFAULT_PLAYLIST_NAME)
     playlist.add_plugin(
         {
             "plugin_id": "weather",
@@ -158,7 +166,7 @@ def test_save_plugin_settings_workflow_updates_existing_instance():
     )
     calls: list[tuple[str, str, dict[str, Any], dict[str, Any]]] = []
 
-    result = save_plugin_settings_workflow(
+    result = plugin_workflows_mod.save_plugin_settings_workflow(
         "weather",
         {"city": "London"},
         device_config,
@@ -178,8 +186,9 @@ def test_save_plugin_settings_workflow_updates_existing_instance():
 
 
 def test_save_plugin_settings_workflow_rejects_missing_plugin():
+    plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config=None)
-    result = save_plugin_settings_workflow(
+    result = plugin_workflows_mod.save_plugin_settings_workflow(
         "weather",
         {"city": "London"},
         device_config,
@@ -193,8 +202,9 @@ def test_save_plugin_settings_workflow_rejects_missing_plugin():
 
 
 def test_save_plugin_settings_workflow_rejects_validation_error():
+    plugin_workflows_mod = _plugin_workflows_mod()
     device_config = _DeviceConfig(plugin_config={"id": "weather"})
-    result = save_plugin_settings_workflow(
+    result = plugin_workflows_mod.save_plugin_settings_workflow(
         "weather",
         {"city": "London"},
         device_config,

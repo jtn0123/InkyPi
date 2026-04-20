@@ -100,49 +100,43 @@ def normalize_instance_name(raw_name: Any) -> tuple[str | None, WorkflowError | 
     return name, None
 
 
-def validate_plugin_refresh_settings(
+def _validate_interval_refresh_settings(
     refresh_settings: dict[str, Any],
 ) -> tuple[dict[str, Any] | None, WorkflowError | None]:
-    """Validate the refresh settings from ``/add_plugin``."""
-    refresh_type = refresh_settings.get("refreshType")
-    if not refresh_type or refresh_type not in {"interval", "scheduled"}:
+    unit = refresh_settings.get("unit")
+    interval = refresh_settings.get("interval")
+    if not unit or unit not in {"minute", "hour", "day"}:
         return None, WorkflowError(
-            "Refresh type is required",
+            "Refresh interval unit is required",
             status=422,
-            field="refreshType",
+            field="unit",
         )
+    if not interval:
+        return None, WorkflowError(
+            "Refresh interval is required",
+            status=422,
+            field="interval",
+        )
+    try:
+        interval_int = int(interval)
+    except (TypeError, ValueError):
+        return None, WorkflowError(
+            "Refresh interval must be a number",
+            status=422,
+            field="interval",
+        )
+    if interval_int < 1 or interval_int > _MAX_REFRESH_INTERVAL:
+        return None, WorkflowError(
+            "Refresh interval must be between 1 and 999",
+            status=422,
+            field="interval",
+        )
+    return {"interval": calculate_seconds(interval_int, unit)}, None
 
-    if refresh_type == "interval":
-        unit = refresh_settings.get("unit")
-        interval = refresh_settings.get("interval")
-        if not unit or unit not in {"minute", "hour", "day"}:
-            return None, WorkflowError(
-                "Refresh interval unit is required",
-                status=422,
-                field="unit",
-            )
-        if not interval:
-            return None, WorkflowError(
-                "Refresh interval is required",
-                status=422,
-                field="interval",
-            )
-        try:
-            interval_int = int(interval)
-        except (TypeError, ValueError):
-            return None, WorkflowError(
-                "Refresh interval must be a number",
-                status=422,
-                field="interval",
-            )
-        if interval_int < 1 or interval_int > _MAX_REFRESH_INTERVAL:
-            return None, WorkflowError(
-                "Refresh interval must be between 1 and 999",
-                status=422,
-                field="interval",
-            )
-        return {"interval": calculate_seconds(interval_int, unit)}, None
 
+def _validate_scheduled_refresh_settings(
+    refresh_settings: dict[str, Any],
+) -> tuple[dict[str, Any] | None, WorkflowError | None]:
     refresh_time = refresh_settings.get("refreshTime")
     if not refresh_time:
         return None, WorkflowError(
@@ -166,6 +160,22 @@ def validate_plugin_refresh_settings(
             field="refreshTime",
         )
     return {"scheduled": refresh_time}, None
+
+
+def validate_plugin_refresh_settings(
+    refresh_settings: dict[str, Any],
+) -> tuple[dict[str, Any] | None, WorkflowError | None]:
+    """Validate the refresh settings from ``/add_plugin``."""
+    refresh_type = refresh_settings.get("refreshType")
+    if not refresh_type or refresh_type not in {"interval", "scheduled"}:
+        return None, WorkflowError(
+            "Refresh type is required",
+            status=422,
+            field="refreshType",
+        )
+    if refresh_type == "interval":
+        return _validate_interval_refresh_settings(refresh_settings)
+    return _validate_scheduled_refresh_settings(refresh_settings)
 
 
 def validate_plugin_settings_security(
