@@ -60,12 +60,18 @@ class PluginHealthTracker:
 
     @staticmethod
     def circuit_breaker_threshold(environ: Mapping[str, str] | None = None) -> int:
-        """Return the consecutive-failure threshold before pausing a plugin."""
+        """Return the consecutive-failure threshold before pausing a plugin.
+
+        The value is read from ``PLUGIN_FAILURE_THRESHOLD`` and clamped to a
+        minimum of 1 (so ``"0"`` becomes ``1``, not ``5``). Invalid values
+        (non-integer strings, etc.) fall back to the default of ``5``.
+        """
         env = os.environ if environ is None else environ
         try:
-            return max(1, int(env.get("PLUGIN_FAILURE_THRESHOLD", "5") or "5"))
+            value = int(env.get("PLUGIN_FAILURE_THRESHOLD", "5"))
         except (ValueError, TypeError):
             return 5
+        return max(1, value)
 
     def update(
         self,
@@ -215,9 +221,15 @@ class PluginHealthTracker:
         plugin_instance = self._find_plugin_instance(plugin_id, instance)
         if plugin_instance is None:
             return False
+        changed = (
+            plugin_instance.paused
+            or plugin_instance.consecutive_failure_count > 0
+            or plugin_instance.disabled_reason is not None
+        )
         plugin_instance.consecutive_failure_count = 0
         plugin_instance.paused = False
         plugin_instance.disabled_reason = None
+        set_circuit_breaker_open(plugin_id, False)
         safe_pid = str(plugin_id).replace("\r", "").replace("\n", "")[:64]
         safe_inst = str(instance).replace("\r", "").replace("\n", "")[:64]
         logger.info(
@@ -225,6 +237,16 @@ class PluginHealthTracker:
             safe_pid,
             safe_inst,
         )
+        if changed:
+            try:
+                self.device_config.write_config()
+            except Exception:
+                logger.warning(
+                    "plugin circuit_breaker: failed to persist manual reset for %s/%s",
+                    safe_pid,
+                    safe_inst,
+                    exc_info=True,
+                )
         return True
 
     def snapshot(self) -> dict[str, HealthEntry]:
