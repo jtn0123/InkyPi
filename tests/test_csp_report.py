@@ -147,6 +147,67 @@ def test_source_file_url_is_redacted(caplog, csp_client):
     assert "secret" not in combined, f"Query string leaked into log: {combined}"
 
 
+def test_source_file_url_fragment_is_redacted(caplog, csp_client):
+    """Fragment (#...) is stripped from source-file URLs before logging.
+
+    JTN-595 mutmut triage: kills a surviving mutant where the ``#`` entry
+    is dropped from the ``("?", "#")`` separator tuple in ``_redact_url``.
+    Without fragment stripping, anchor-style identifiers would leak into
+    logs alongside the query-string redaction.
+    """
+    report = {
+        "csp-report": {
+            "document-uri": "http://localhost/",
+            "violated-directive": "script-src 'self'",
+            "source-file": "https://localhost/page#leaked-fragment-token",
+        }
+    }
+    with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
+        csp_client.post(
+            "/api/csp-report",
+            data=json.dumps(report),
+            content_type="application/csp-report",
+        )
+
+    combined = " ".join(r.message for r in caplog.records)
+    assert (
+        "leaked-fragment-token" not in combined
+    ), f"Fragment leaked into log: {combined}"
+    assert "https://localhost/page" in combined, f"Redacted URL missing: {combined}"
+
+
+def test_all_url_fields_are_redacted(caplog, csp_client):
+    """Every URL-bearing key (document-uri, referrer, blocked-uri, source-file)
+    must have its query string + fragment stripped before logging.
+
+    JTN-595 mutmut triage: kills surviving mutants where individual entries
+    are dropped from the ``url_keys`` set in ``_sanitise_report``. Without
+    per-field coverage, dropping e.g. ``"blocked-uri"`` from the set would
+    survive because the sample payload's other fields would still redact.
+    """
+    report = {
+        "csp-report": {
+            "document-uri": "http://localhost/doc?doctoken=A",
+            "referrer": "http://localhost/ref?reftoken=B",
+            "blocked-uri": "https://evil.example.com/x?blocktoken=C",
+            "source-file": "https://localhost/src?srctoken=D",
+            "violated-directive": "script-src 'self'",
+        }
+    }
+    with caplog.at_level(logging.WARNING, logger="blueprints.csp_report"):
+        csp_client.post(
+            "/api/csp-report",
+            data=json.dumps(report),
+            content_type="application/csp-report",
+        )
+
+    combined = " ".join(r.message for r in caplog.records)
+    for leaked_token in ("doctoken", "reftoken", "blocktoken", "srctoken"):
+        assert (
+            leaked_token not in combined
+        ), f"Query token {leaked_token!r} leaked into log: {combined}"
+
+
 def test_empty_body_returns_204(csp_client):
     """Empty POST body must not crash — returns 204."""
     resp = csp_client.post(
