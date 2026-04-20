@@ -220,6 +220,8 @@ coverage.xml
 !/src/static/scripts/settings/
 !/src/static/scripts/settings/*.js
 !/src/static/scripts/api_keys_page.js
+!/src/static/scripts/playlist/
+!/src/static/scripts/playlist/*.js
 !/src/static/scripts/ui_helpers.js
 !/src/static/scripts/csrf.js
 !/src/static/scripts/client_errors.js

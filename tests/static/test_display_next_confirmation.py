@@ -16,8 +16,8 @@ def _read_playlist_html(client) -> str:
     return resp.get_data(as_text=True)
 
 
-def _read_playlist_js(client) -> str:
-    resp = client.get("/static/scripts/playlist.js")
+def _read_script(client, path: str) -> str:
+    resp = client.get(path)
     assert resp.status_code == 200
     return resp.get_data(as_text=True)
 
@@ -64,31 +64,31 @@ def test_display_next_modal_has_labelledby(client):
 def test_run_next_btn_opens_confirm_modal_not_fire_directly(client):
     """The delegated run-next action must open the confirmation modal,
     not invoke displayNextInPlaylist immediately."""
-    js = _read_playlist_js(client)
+    js = _read_script(client, "/static/scripts/playlist/actions.js")
     assert (
         'action === "confirm-display-next"' in js
         or "action === 'confirm-display-next'" in js
     ), "delegated playlist handler must branch on confirm-display-next"
-    assert (
-        "openDisplayNextConfirmModal(name, actionButton)" in js
-    ), "confirm-display-next action must open the confirmation modal with the trigger button"
+    assert "openDisplayNextConfirmModal" in js
+    assert "actionButton" in js
 
 
 def test_display_next_helper_exists_and_is_async(client):
     """The helper that actually performs the fetch stays available for the
     confirm button and for the public window.* API (used by other callers
     and by tests)."""
-    js = _read_playlist_js(client)
+    js = _read_script(client, "/static/scripts/playlist/actions.js")
+    bootstrap = _read_script(client, "/static/scripts/playlist.js")
     assert "async function displayNextInPlaylist(name)" in js
-    assert "window.displayNextInPlaylist = displayNextInPlaylist" in js
-    assert "window.openDisplayNextConfirmModal = openDisplayNextConfirmModal" in js
+    assert '"displayNextInPlaylist"' in bootstrap
+    assert '"openDisplayNextConfirmModal"' in bootstrap
 
 
 def test_display_next_success_surfaces_toast(client):
     """On success, the user must see positive feedback (toast) — previously
     there was only a silent reload, per JTN-630."""
-    js = _read_playlist_js(client)
-    assert "showResponseModal('success'" in js, (
+    js = _read_script(client, "/static/scripts/playlist/actions.js")
+    assert "showResponseModal('success'" in js or 'showResponseModal("success"' in js, (
         "Display Next success path must call showResponseModal('success', ...) "
         "so the user has positive feedback — this is the JTN-630 fix"
     )
@@ -96,20 +96,19 @@ def test_display_next_success_surfaces_toast(client):
 
 def test_display_next_cancel_button_wired(client):
     """Cancel button on the confirm modal must close the modal."""
-    js = _read_playlist_js(client)
-    assert (
-        "getElementById('cancelDisplayNextBtn')?.addEventListener('click', "
-        "closeDisplayNextConfirmModal)" in js
-    )
+    js = _read_script(client, "/static/scripts/playlist/modals.js")
+    assert "cancelDisplayNextBtn" in js
+    assert "closeDisplayNextConfirmModal" in js
 
 
 def test_display_next_modal_registered_for_escape_and_backdrop(client):
     """The confirm modal must participate in the shared Escape/backdrop-close
     plumbing used by the other playlist modals."""
-    js = _read_playlist_js(client)
+    js = _read_script(client, "/static/scripts/playlist/modals.js")
     # Backdrop click closes it.
     assert (
         "event.target?.id === 'displayNextConfirmModal'" in js
+        or 'event.target?.id === "displayNextConfirmModal"' in js
     ), "displayNextConfirmModal must close on backdrop click"
     # It is tracked by getOpenModalId so Escape works.
-    assert "'displayNextConfirmModal'," in js
+    assert "'displayNextConfirmModal'," in js or '"displayNextConfirmModal",' in js

@@ -212,7 +212,7 @@ def test_theme_script_exists(client):
 
 
 def test_playlist_script_handles_invalid_stored_message_json(client):
-    resp = client.get("/static/scripts/playlist.js")
+    resp = client.get("/static/scripts/playlist/progress.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 
@@ -220,6 +220,23 @@ def test_playlist_script_handles_invalid_stored_message_json(client):
     assert "const { type, text } = JSON.parse(storedMessage);" in js
     assert "try {" in js
     assert 'sessionStorage.removeItem("storedMessage");' in js
+
+
+def test_playlist_progress_restore_strips_saved_timestamps(client):
+    resp = client.get("/static/scripts/playlist/progress.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "stripLeadingTime(String(line))" in js
+
+
+def test_playlist_progress_only_marks_successful_runs_done(client):
+    resp = client.get("/static/scripts/playlist/progress.js")
+    assert resp.status_code == 200
+    js = resp.get_data(as_text=True)
+
+    assert "let completedSuccessfully = false;" in js
+    assert 'if (completedSuccessfully) tracker.setStep("Done", 100);' in js
 
 
 def test_image_modal_script_guards_missing_container(client):
@@ -338,15 +355,24 @@ def test_playlist_script_url_encodes_playlist_names_in_fetch_calls(client):
     Playlist names can contain spaces and special characters.  Without encoding
     the URL becomes malformed and the server receives a garbled path segment.
     """
-    resp = client.get("/static/scripts/playlist.js")
-    assert resp.status_code == 200
-    js = resp.get_data(as_text=True)
+    form_resp = client.get("/static/scripts/playlist/form.js")
+    modal_resp = client.get("/static/scripts/playlist/modals.js")
+    assert form_resp.status_code == 200
+    assert modal_resp.status_code == 200
+    form_js = form_resp.get_data(as_text=True)
+    modal_js = modal_resp.get_data(as_text=True)
 
     # update_playlist_base_url must use encodeURIComponent, not raw concatenation
-    assert "update_playlist_base_url + encodeURIComponent(oldName)" in js
+    assert "update_playlist_base_url + encodeURIComponent(oldName)" in form_js
 
     # Both delete_playlist fetch sites must use encodeURIComponent
-    assert js.count("delete_playlist_base_url + encodeURIComponent(") >= 2
+    delete_encode_count = form_js.count(
+        "delete_playlist_base_url + encodeURIComponent("
+    )
+    delete_encode_count += modal_js.count(
+        "delete_playlist_base_url + encodeURIComponent("
+    )
+    assert delete_encode_count >= 2
 
 
 # --- API Keys dirty tracking (JTN-225) ---
