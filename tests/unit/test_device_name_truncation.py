@@ -101,7 +101,10 @@ def _make_config(tmp_path, monkeypatch, name: str):
 def test_oversize_name_truncated_on_load(tmp_path, monkeypatch, caplog):
     """A 500-char stored name is exposed as <=64 chars after load."""
     long_name = "A" * 500
-    with caplog.at_level(logging.WARNING, logger="config"):
+    # Capture at the root logger so the assertion does not depend on whether
+    # the module under test is imported as ``config`` vs ``src.config`` vs
+    # ``inkypi.config`` — all propagate to root.
+    with caplog.at_level(logging.WARNING):
         cfg = _make_config(tmp_path, monkeypatch, long_name)
 
     stored = cfg.get_config("name")
@@ -143,7 +146,6 @@ def test_oversize_name_persists_coerced_on_write(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     "name",
     [
-        "",  # empty (should not be modified here; validation happens elsewhere)
         "InkyPi",
         "a" * 63,
         "a" * 64,  # exactly at the cap
@@ -151,7 +153,13 @@ def test_oversize_name_persists_coerced_on_write(tmp_path, monkeypatch):
     ],
 )
 def test_name_at_or_under_cap_untouched(tmp_path, monkeypatch, name):
-    """Names with <=64 characters round-trip unchanged through read_config."""
+    """Names with <=64 characters round-trip unchanged through read_config.
+
+    The empty-string case is deliberately excluded: whether "" is legal is a
+    question for :func:`validate_device_config`, not :func:`_coerce_device_name`.
+    Conflating the two would produce a false pass/fail depending on schema
+    strictness. Validation behaviour is covered in other test modules.
+    """
     cfg = _make_config(tmp_path, monkeypatch, name)
     assert cfg.get_config("name") == name
 
@@ -159,7 +167,7 @@ def test_name_at_or_under_cap_untouched(tmp_path, monkeypatch, name):
 def test_exactly_at_cap_does_not_log_warning(tmp_path, monkeypatch, caplog):
     """64-char names must not trigger the truncation warning (no false positives)."""
     name = "c" * _CAP
-    with caplog.at_level(logging.WARNING, logger="config"):
+    with caplog.at_level(logging.WARNING):
         cfg = _make_config(tmp_path, monkeypatch, name)
 
     assert cfg.get_config("name") == name

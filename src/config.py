@@ -33,6 +33,11 @@ _DEVICE_JSON = "device.json"
 # unbounded into <title>, title=, and alt= render sites (where CSS cannot
 # truncate). Coerce at config-load time so every consumer — templates,
 # screen readers, tab titles — sees a sane value.
+# Cap enforced by the server on /save_settings (JTN-746) and re-applied at
+# config-load time (JTN-777) to coerce stale on-disk values from before the cap
+# existed. The limit is measured in Unicode code points, matching the
+# server-side cap — grapheme-aware segmentation is intentionally not used so
+# client and server agree on the boundary.
 _DEVICE_NAME_MAX_LEN = 64
 
 _SENSITIVE_TERMS = ("secret", "token", "api", "key", "password")
@@ -68,9 +73,12 @@ def _mask_config_value(value: Any) -> Any:
 def _coerce_device_name(config: dict[str, Any]) -> bool:
     """Truncate ``config['name']`` to ``_DEVICE_NAME_MAX_LEN`` characters in place.
 
-    Returns True if the name was modified (over-length or non-string coerced
-    to empty). Logs a warning on truncation so operators know the stored value
-    exceeded the render-safe cap.
+    Returns True if the name was truncated. Non-string values are left
+    unchanged (schema validation has already run and should reject them);
+    this branch is defensive and returns False.
+
+    Logs a warning on truncation so operators know the stored value exceeded
+    the render-safe cap.
 
     The on-disk config is not rewritten here; callers that subsequently invoke
     :meth:`Config.write_config` will flush the coerced value naturally. The
