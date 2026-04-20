@@ -85,9 +85,9 @@ def test_reboot_button_click_opens_confirm_modal_not_shutdown(client):
     # The old pattern fired handleShutdown(true) directly from the click.
     # After the fix, the click opens the confirmation modal.
     assert "rebootBtn" in js
-    assert "openRebootConfirm" in js, (
-        "rebootBtn must open confirmation modal, not fire handleShutdown directly"
-    )
+    assert (
+        "openRebootConfirm" in js
+    ), "rebootBtn must open confirmation modal, not fire handleShutdown directly"
 
     # Make sure the old anti-pattern is gone.
     assert (
@@ -99,9 +99,9 @@ def test_shutdown_button_click_opens_confirm_modal_not_shutdown(client):
     """The shutdownBtn click handler must NOT call handleShutdown directly."""
     js = _read_settings_js(client)
     assert "shutdownBtn" in js
-    assert "openShutdownConfirm" in js, (
-        "shutdownBtn must open confirmation modal, not fire handleShutdown directly"
-    )
+    assert (
+        "openShutdownConfirm" in js
+    ), "shutdownBtn must open confirmation modal, not fire handleShutdown directly"
 
     assert (
         '"shutdownBtn")?.addEventListener("click", () => handleShutdown(false))'

@@ -48,10 +48,14 @@
     }
 
     async function appendGeoData(formData) {
+      // Geolocation is strictly opt-in: only runs when the user explicitly
+      // enables "attach geo" in device settings (state.attachGeo). The
+      // browser still prompts the user for permission, and failure is
+      // swallowed silently so it never blocks the settings save flow.
       if (!state.attachGeo || !navigator.geolocation) return;
       try {
         const pos = await new Promise((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { // NOSONAR javascript:S5604 — opt-in, gated by state.attachGeo above
             enableHighAccuracy: true,
             maximumAge: 60000,
             timeout: 4000,
