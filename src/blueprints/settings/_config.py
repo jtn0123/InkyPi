@@ -7,6 +7,11 @@ from flask import current_app, redirect, render_template, request
 
 import blueprints.settings as _mod
 from utils.http_utils import json_error, json_internal_error, json_success
+from utils.request_models import (
+    PluginIsolationRequest,
+    RequestValidationError,
+    require_mapping,
+)
 from utils.time_utils import calculate_seconds
 
 _DEVICE_NAME_MAX_LEN = 64
@@ -24,24 +29,13 @@ def plugin_isolation():
         return json_success(isolated_plugins=sorted(set(isolated)))
 
     body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return json_error("Request body must be a JSON object", status=400)
-    plugin_id = body.get("plugin_id")
-    if not isinstance(plugin_id, str) or not plugin_id.strip():
-        return json_error(
-            "plugin_id is required and must be a non-empty string",
-            status=422,
-            code="validation_error",
-            details={"field": "plugin_id"},
+    try:
+        parsed = PluginIsolationRequest.from_mapping(
+            require_mapping(body), registered_ids=registered_ids
         )
-    normalized_plugin_id = plugin_id.strip()
-    if normalized_plugin_id not in registered_ids:
-        return json_error(
-            "plugin_id must reference a registered plugin",
-            status=422,
-            code="validation_error",
-            details={"field": "plugin_id"},
-        )
+    except RequestValidationError as err:
+        return json_error(**err.as_json_error_kwargs())
+    normalized_plugin_id = parsed.plugin_id
 
     if request.method == "POST":
         if normalized_plugin_id not in isolated:

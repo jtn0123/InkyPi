@@ -24,6 +24,14 @@ from utils.http_utils import (
     reissue_json_error,
 )
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
+from utils.request_models import (
+    DeviceCycleRequest,
+    PlaylistCreateRequest,
+    PlaylistReorderRequest,
+    PlaylistUpdateRequest,
+    RequestValidationError,
+    require_mapping,
+)
 from utils.time_utils import calculate_seconds, now_device_tz
 
 logger = logging.getLogger(__name__)
@@ -651,14 +659,13 @@ def create_playlist():
     if err:
         return reissue_json_error(err, _MSG_INVALID_PLAYLIST_REQUEST)
 
-    playlist_name, name_err = _validate_playlist_name(data.get("playlist_name"))
-    if name_err:
-        return name_err
-    start_min, end_min, time_err = _validate_playlist_times(
-        data.get("start_time"), data.get("end_time")
-    )
-    if time_err:
-        return time_err
+    try:
+        parsed = PlaylistCreateRequest.from_mapping(data)
+    except RequestValidationError as err:
+        return json_error(**err.as_json_error_kwargs())
+    playlist_name = parsed.playlist_name
+    start_min = parsed.start_min
+    end_min = parsed.end_min
 
     try:
         playlist = playlist_manager.get_playlist(playlist_name)
@@ -686,7 +693,7 @@ def create_playlist():
         def _do_add_playlist(cfg):
             add_pl_result.append(
                 playlist_manager.add_playlist(
-                    playlist_name, data.get("start_time"), data.get("end_time")
+                    playlist_name, parsed.start_time, parsed.end_time
                 )
             )
 
@@ -799,18 +806,18 @@ def update_playlist(playlist_name):
     playlist_manager = device_config.get_playlist_manager()
 
     data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return json_error("Invalid JSON data", status=400)
-
-    parsed, err = _validate_update_playlist_payload(data)
-    if err:
-        return err
-    new_name = parsed["new_name"]
-    start_time = parsed["start_time"]
-    end_time = parsed["end_time"]
-    start_min = parsed["start_min"]
-    end_min = parsed["end_min"]
-    cycle_minutes_int = parsed["cycle_minutes_int"]
+    try:
+        parsed = PlaylistUpdateRequest.from_mapping(
+            require_mapping(data, message="Invalid JSON data", status=400)
+        )
+    except RequestValidationError as err:
+        return json_error(**err.as_json_error_kwargs())
+    new_name = parsed.new_name
+    start_time = parsed.start_time
+    end_time = parsed.end_time
+    start_min = parsed.start_min
+    end_min = parsed.end_min
+    cycle_minutes_int = parsed.cycle_minutes
 
     playlist = playlist_manager.get_playlist(playlist_name)
     if not playlist:
@@ -890,31 +897,20 @@ def delete_playlist(playlist_name):
 def update_device_cycle():
     device_config = current_app.config["DEVICE_CONFIG"]
     refresh_task = current_app.config["REFRESH_TASK"]
-    data = request.get_json(silent=True) or {}
-    minutes = data.get("minutes") or 0
     try:
-        m = int(minutes)
-        if m < 1 or m > 1440:
-            return json_error(
-                "Minutes must be between 1 and 1440",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "minutes"},
-            )
-    except Exception:
-        return json_error(
-            "Invalid minutes",
-            status=400,
-            code=_CODE_VALIDATION,
-            details={"field": "minutes"},
-        )
-    try:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            data = {}
+        parsed = DeviceCycleRequest.from_mapping(data)
+        m = parsed.minutes
         device_config.update_value("plugin_cycle_interval_seconds", m * 60, write=True)
         try:
             refresh_task.signal_config_change()
         except Exception:
             pass
         return json_success("Device refresh cadence updated.")
+    except RequestValidationError as err:
+        return json_error(**err.as_json_error_kwargs())
     except Exception:
         return json_internal_error(
             "update_device_cycle", details={"hint": "Check config write permissions."}
@@ -928,24 +924,10 @@ def reorder_plugins():
 
     try:
         data = request.get_json(silent=True)
-        if not isinstance(data, dict):
-            return json_error("Invalid or missing JSON payload", status=400)
-        playlist_name = data.get("playlist_name")
-        ordered = data.get("ordered")  # list of {plugin_id, name}
-        if not playlist_name:
-            return json_error(
-                "playlist_name and ordered list are required",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "playlist_name"},
-            )
-        if not isinstance(ordered, list):
-            return json_error(
-                "playlist_name and ordered list are required",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "ordered"},
-            )
+        parsed = PlaylistReorderRequest.from_mapping(
+            require_mapping(data, message="Invalid or missing JSON payload", status=400)
+        )
+        playlist_name = parsed.playlist_name
 
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
@@ -959,13 +941,15 @@ def reorder_plugins():
         reorder_result: list[bool] = []
 
         def _do_reorder(cfg):
-            reorder_result.append(playlist.reorder_plugins(ordered))
+            reorder_result.append(playlist.reorder_plugins(parsed.as_reorder_payload()))
 
         device_config.update_atomic(_do_reorder)
         if not reorder_result or not reorder_result[0]:
             return json_error("Invalid order payload", status=400)
 
         return json_success("Reordered plugins")
+    except RequestValidationError as err:
+        return json_error(**err.as_json_error_kwargs())
     except Exception:
         return json_internal_error(
             "reorder plugins",

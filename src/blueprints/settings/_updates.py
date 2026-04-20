@@ -9,6 +9,11 @@ from werkzeug.exceptions import BadRequest
 import blueprints.settings as _mod
 from blueprints.settings._update_status import read_last_update_failure
 from utils.http_utils import json_error, json_internal_error, json_success
+from utils.request_models import (
+    RequestValidationError,
+    SettingsUpdateRequest,
+    require_mapping,
+)
 
 
 def _prev_version_path() -> str:
@@ -51,41 +56,19 @@ def start_update():
     try:
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
-        target_tag: str | None = None
         raw_body = request.get_data(cache=True)
         if request.is_json and raw_body.strip():
             try:
                 body = request.get_json(silent=False)
             except BadRequest:
                 return json_error("Invalid JSON payload", status=400)
-            if not isinstance(body, dict):
-                return json_error("Request body must be a JSON object", status=400)
+            try:
+                parsed = SettingsUpdateRequest.from_mapping(require_mapping(body))
+            except RequestValidationError as err:
+                return json_error(**err.as_json_error_kwargs())
         else:
-            body = {}
-
-        # JTN-710: if ``target_version`` is present in the body, validate
-        # it explicitly instead of silently falling through to the
-        # "latest semver tag" code path when it's null/empty.  Without this
-        # guard, a client sending ``{"target_version": null}`` or
-        # ``{"target_version": ""}`` caused do_update.sh to fail with
-        # "No semver tags found" only visible in the system journal.
-        if "target_version" in body:
-            raw = body.get("target_version")
-            if raw is None or not isinstance(raw, str) or not raw.strip():
-                return json_error(
-                    "target_version must be a non-empty string",
-                    status=400,
-                    code="validation_error",
-                    details={"field": "target_version"},
-                )
-            target_tag = raw.strip()
-            if not _mod._TAG_RE.fullmatch(target_tag):
-                return json_error(
-                    "Invalid target version format",
-                    status=400,
-                    code="validation_error",
-                    details={"field": "target_version"},
-                )
+            parsed = SettingsUpdateRequest.from_mapping({})
+        target_tag = parsed.target_version
 
         script_path = _mod._get_update_script_path()
         # NOTE: the systemd unit name is now generated *inside*
