@@ -28,7 +28,7 @@ from utils.http_utils import APIError, json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
-from utils.security_utils import validate_file_path
+from utils.security_utils import URLValidationError, validate_file_path
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -595,6 +595,27 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
         _t_gen_start = perf_counter()
         try:
             image = plugin.generate_image(plugin_settings, device_config)
+        except URLValidationError as e:
+            # JTN-776: URL validation failures are user errors, not server
+            # errors. ``safe_message()`` returns a response string looked up
+            # from the module-level whitelist in :mod:`utils.security_utils`,
+            # which avoids any exception-derived text flowing to the client
+            # (CodeQL ``py/stack-trace-exposure``).
+            safe_msg = e.safe_message()
+            logger.info(
+                "Plugin %s rejected URL: %s",
+                sanitize_log_field(plugin_id),
+                sanitize_log_field(safe_msg),
+            )
+            _push_update_now_fallback(
+                plugin_id, plugin_config, device_config, display_manager, e
+            )
+            return json_error(
+                safe_msg,
+                status=422,
+                code="validation_error",
+                details={"field": "url"},
+            )
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
             # failure (bad config, upstream API returned empty, etc.).  Do not
@@ -797,6 +818,7 @@ def update_now():
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
 
+    plugin_id: str | None = None
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
@@ -828,6 +850,25 @@ def update_now():
         logger.info("Refresh task not running, updating display directly")
         return _update_now_direct(
             plugin_id, plugin_settings, device_config, display_manager
+        )
+    except URLValidationError as e:
+        # JTN-776: URL validation failures surfaced through the refresh-task
+        # path (manual_update re-raises the plugin's exception) must become
+        # HTTP 4xx, not 500, so the user sees the real reason. ``safe_message``
+        # returns a whitelisted string from :mod:`utils.security_utils`, so no
+        # exception-derived text reaches the response body (CodeQL
+        # ``py/stack-trace-exposure``).
+        safe_msg = e.safe_message()
+        logger.info(
+            "update_now: URL validation rejected plugin %s: %s",
+            sanitize_log_field(plugin_id or "?"),
+            sanitize_log_field(safe_msg),
+        )
+        return json_error(
+            safe_msg,
+            status=422,
+            code="validation_error",
+            details={"field": "url"},
         )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)

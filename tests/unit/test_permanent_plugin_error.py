@@ -276,3 +276,24 @@ class TestRemoteExceptionPreservesPermanentType:
 
         exc = _remote_exception("SomeUnknownError", "boom")
         assert type(exc) is RuntimeError
+
+    def test_remote_exception_reconstructs_url_validation_error(self):
+        """JTN-776: Worker must round-trip ``URLValidationError`` by class name.
+
+        The blueprint's URLValidationError handler relies on the type to map
+        the error to HTTP 422. If the subprocess reconstructor silently fell
+        back to RuntimeError, manual updates dispatched via the refresh-task
+        subprocess path would regress to HTTP 500.
+        """
+        from refresh_task.worker import _remote_exception
+        from utils.security_utils import URLValidationError
+
+        exc = _remote_exception(
+            "URLValidationError", "Invalid URL: URL scheme must be http or https"
+        )
+        assert isinstance(exc, URLValidationError)
+        # Still a PermanentPluginError -> retry loop skips extra attempts.
+        assert isinstance(exc, PermanentPluginError)
+        # Still a RuntimeError -> existing except-RuntimeError handlers catch.
+        assert isinstance(exc, RuntimeError)
+        assert "scheme must be http or https" in str(exc)
