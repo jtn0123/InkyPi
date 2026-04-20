@@ -24,8 +24,6 @@ from __future__ import annotations
 
 import socket
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # image_url plugin
 # ---------------------------------------------------------------------------
@@ -219,36 +217,7 @@ class TestNonUrlFailuresStillOpaque:
         assert "unexpected internal failure" not in body["error"]
 
 
-# ---------------------------------------------------------------------------
-# URLValidationError itself — unit-level smoke test.
-# ---------------------------------------------------------------------------
-
-
-class TestURLValidationErrorSubclass:
-    """The typed error must still be catchable as RuntimeError for existing code."""
-
-    def test_is_runtime_error(self):
-        from utils.security_utils import URLValidationError
-
-        err = URLValidationError("Invalid URL: scheme must be http or https")
-        assert isinstance(err, RuntimeError)
-        assert "Invalid URL" in str(err)
-
-    @pytest.mark.parametrize(
-        "bad_url,expected_fragment",
-        [
-            ("file:///etc/passwd", "scheme"),
-            ("http://127.0.0.1/", "private"),
-            ("http://169.254.169.254/", "private"),
-            ("http://", "hostname"),
-        ],
-    )
-    def test_plugin_raises_url_validation_error(self, bad_url, expected_fragment):
-        """Plugins must raise URLValidationError (not bare RuntimeError) on bad URLs."""
-        from plugins.image_url.image_url import ImageURL
-        from utils.security_utils import URLValidationError
-
-        plugin = ImageURL({"id": "image_url"})
-        with pytest.raises(URLValidationError) as exc_info:
-            plugin.generate_image({"url": bad_url}, device_config=None)
-        assert expected_fragment in str(exc_info.value)
+# Note: unit-level tests for URLValidationError itself live in
+# tests/unit/test_security_utils.py (TestURLValidationError) and
+# tests/plugins/test_image_url.py (test_image_url_raises_url_validation_error)
+# to keep this integration module focused on the HTTP contract.
