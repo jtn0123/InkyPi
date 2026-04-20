@@ -141,17 +141,17 @@ def test_device_name_declares_control_char_pattern():
     # The regex must forbid \x00-\x08 and \x0A-\x1F (i.e. everything up to
     # 0x1F except \t=0x09) plus DEL and C1 controls. Tab must remain allowed
     # because the server accepts it (see test_device_name_tab_is_allowed).
-    assert r"\u0000-\u0008" in device_line, (
-        "pattern must exclude NUL through backspace (U+0000–U+0008)"
-    )
+    assert (
+        r"\u0000-\u0008" in device_line
+    ), "pattern must exclude NUL through backspace (U+0000–U+0008)"
     assert r"\u000A-\u001F" in device_line, (
         "pattern must exclude LF through unit-separator (U+000A–U+001F) "
         "while leaving tab (U+0009) allowed to match the server"
     )
     assert r"\u007F" in device_line, "pattern must exclude DEL (U+007F)"
-    assert "title=" in device_line, (
-        "pattern inputs should carry a title= for the native validation popup"
-    )
+    assert (
+        "title=" in device_line
+    ), "pattern inputs should carry a title= for the native validation popup"
 
 
 def test_handle_action_surfaces_field_level_validation_errors_inline():
@@ -167,9 +167,9 @@ def test_handle_action_surfaces_field_level_validation_errors_inline():
         "handleAction must branch on the validation_error code so it can "
         "route the error message to the field that failed"
     )
-    assert "result.details.field" in js, (
-        "handleAction must read details.field to target the inline error"
-    )
+    assert (
+        "result.details.field" in js
+    ), "handleAction must read details.field to target the inline error"
     assert "fs.setFieldError(" in js, (
         "handleAction must call FormState.setFieldError so the validation "
         "message lands next to the bad input (JTN-780)"
