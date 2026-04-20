@@ -18,12 +18,10 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
+from services.plugin_workflows import save_plugin_settings_workflow
 from utils.app_utils import handle_request_files, parse_form, resolve_path
 from utils.fallback_image import render_error_image
-from utils.form_utils import (
-    sanitize_log_field,
-    validate_plugin_required_fields,
-)
+from utils.form_utils import sanitize_log_field, validate_plugin_required_fields
 from utils.http_utils import APIError, json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
@@ -938,92 +936,36 @@ def _save_plugin_settings_common(
     plugin_id, plugin_settings, device_config, playlist_manager
 ):
     htmx = _is_htmx_request()
-    plugin_config = device_config.get_plugin(plugin_id)
-    if not plugin_config:
-        logger.warning(
-            "_save_plugin_settings_common: plugin not found plugin_id=%s",
-            sanitize_log_field(plugin_id),
-        )
-        if htmx:
-            return _render_plugin_form_error(_ERR_PLUGIN_NOT_FOUND, status=404)
-        return json_error(_ERR_PLUGIN_NOT_FOUND, status=404)
-
-    # Validate required fields and plugin-specific settings
-    try:
-        plugin = get_plugin_instance(plugin_config)
-    except Exception:
-        logger.warning(
-            "Could not load plugin instance for validation: %s",
-            sanitize_log_field(plugin_id),
-        )
-        plugin = None
-
-    if plugin is not None:
-        try:
-            validation_error = validate_plugin_required_fields(plugin, plugin_settings)
-            if validation_error:
-                if htmx:
-                    return _render_plugin_form_error(validation_error, status=400)
-                return json_error(validation_error, status=400)
-        except Exception:
-            logger.warning(
-                "Required-field validation failed for %s",
+    result = save_plugin_settings_workflow(
+        plugin_id,
+        plugin_settings,
+        device_config,
+        playlist_manager,
+    )
+    if not result.ok:
+        error = result.error
+        if error is None:
+            logger.error(
+                "_save_plugin_settings_common: workflow failed without error plugin_id=%s",
                 sanitize_log_field(plugin_id),
-                exc_info=True,
             )
-
-        try:
-            settings_error = plugin.validate_settings(plugin_settings)
-            if settings_error:
-                if htmx:
-                    return _render_plugin_form_error(settings_error, status=400)
-                return json_error(settings_error, status=400)
-        except Exception:
-            logger.warning(
-                "Plugin validate_settings raised for %s",
-                sanitize_log_field(plugin_id),
-                exc_info=True,
-            )
-            error_msg = "Settings validation failed. Please check your input."
             if htmx:
-                return _render_plugin_form_error(error_msg, status=400)
-            return json_error(error_msg, status=400)
-
-    default_playlist_name = "Default"
-    playlist = playlist_manager.get_playlist(default_playlist_name)
-    if not playlist:
-        playlist_manager.add_playlist(default_playlist_name)
-        playlist = playlist_manager.get_playlist(default_playlist_name)
-
-    instance_name = f"{plugin_id}_saved_settings"
-    before_settings: dict = {}
-
-    def _do_save_settings(cfg):
-        nonlocal before_settings
-        inst = playlist.find_plugin(plugin_id, instance_name)
-        if inst:
-            before_settings = dict(inst.settings or {})
-            inst.settings = plugin_settings
-        else:
-            playlist.add_plugin(
-                {
-                    _PLUGIN_ID: plugin_id,
-                    "refresh": {"interval": 3600},
-                    "plugin_settings": plugin_settings,
-                    "name": instance_name,
-                }
+                return _render_plugin_form_error(_ERR_INTERNAL, status=500)
+            return json_error(_ERR_INTERNAL, status=500, code="internal_error")
+        if htmx:
+            return _render_plugin_form_error(
+                error.message,
+                status=error.status,
+                field=error.field,
             )
-        cfg["playlist_config"] = playlist_manager.to_dict()
+        return json_error(error.message, **error.as_json_kwargs())
 
-    device_config.update_atomic(_do_save_settings)
-    config_dir = os.path.dirname(device_config.config_file)
-    _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
-    success_message = "Settings saved. Add to Playlist to schedule this instance."
+    success_message = result.message
     if htmx:
         return _render_plugin_form_success(success_message)
     return json_success(
         message=success_message,
-        instance_name=instance_name,
+        instance_name=result.instance_name,
     )
 
 

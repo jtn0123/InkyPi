@@ -16,6 +16,7 @@ from flask import (
 
 from model import Playlist
 from refresh_task import PlaylistRefresh
+from services.playlist_workflows import prepare_add_plugin_workflow
 from utils.app_utils import handle_request_files, parse_form
 from utils.http_utils import (
     json_error,
@@ -395,55 +396,18 @@ def add_plugin():
         if parse_err:
             return parse_err
 
-        playlist = refresh_settings.get("playlist")
-        if not playlist:
-            return json_error(
-                PLAYLIST_NAME_REQUIRED_ERROR,
-                status=422,
-                code=_CODE_VALIDATION,
-                details={"field": "playlist"},
-            )
-        instance_name, name_err = _validate_instance_name(
-            refresh_settings.get("instance_name")
+        result = prepare_add_plugin_workflow(
+            plugin_id,
+            plugin_settings,
+            refresh_settings,
+            playlist_manager=playlist_manager,
+            device_config=device_config,
         )
-        if name_err:
-            return name_err
-
-        existing = playlist_manager.find_plugin(plugin_id, instance_name)
-        if existing:
-            return json_error(
-                f"Plugin instance '{instance_name}' already exists",
-                status=400,
-                code=_CODE_VALIDATION,
-                details={"field": "instance_name"},
-            )
-
-        refresh_config, refresh_err = validate_plugin_refresh_settings(refresh_settings)
-        if refresh_err:
-            return refresh_err
-
-        security_err = _validate_plugin_settings_security(
-            device_config, plugin_id, plugin_settings
-        )
-        if security_err:
-            return security_err
-
-        plugin_dict = {
-            "plugin_id": plugin_id,
-            "refresh": refresh_config,
-            "plugin_settings": plugin_settings,
-            "name": instance_name,
-        }
-        add_result: list[bool] = []
-
-        def _do_add(cfg):
-            add_result.append(
-                playlist_manager.add_plugin_to_playlist(playlist, plugin_dict)
-            )
-
-        device_config.update_atomic(_do_add)
-        if not add_result or not add_result[0]:
-            return json_error("Failed to add to playlist", status=500)
+        if not result.ok:
+            error = result.error
+            if error is None:
+                return json_error("Failed to add to playlist", status=500)
+            return json_error(error.message, **error.as_json_kwargs())
     except Exception:
         return json_internal_error(
             "add plugin to playlist",
