@@ -2452,38 +2452,53 @@ class TestInstallMatrixWorkflow:
     @pytest.fixture(autouse=True)
     def _load(self):
         self.ci_yaml = (WORKFLOWS_DIR / "ci.yml").read_text()
+        # JTN-616: the install matrix now lives in a reusable workflow that
+        # ci.yml calls via `workflow_call`. Structural assertions about the
+        # matrix body (codenames, arm64 platform, 512 MB cap, verify script)
+        # must inspect install-matrix.yml directly, while ci.yml is only
+        # asserted to wire the reusable workflow in as a required gate.
+        self.install_matrix_yaml = (WORKFLOWS_DIR / "install-matrix.yml").read_text()
         self.dockerfile = (SCRIPTS_DIR / "Dockerfile.install-matrix").read_text()
         self.verify_script = (SCRIPTS_DIR / "ci_install_matrix_verify.sh").read_text()
 
     def test_install_matrix_job_defined(self):
         assert "install-matrix:" in self.ci_yaml
 
+    def test_install_matrix_wired_as_reusable_workflow(self):
+        # JTN-616: ci.yml must call the reusable install-matrix workflow so
+        # the PR gate and manual reruns share a single implementation.
+        import yaml
+
+        data = yaml.safe_load(self.ci_yaml)
+        job = data["jobs"]["install-matrix"]
+        assert job.get("uses") == "./.github/workflows/install-matrix.yml"
+
     def test_install_matrix_references_supported_os_bases(self):
-        # JTN-615: bullseye was removed from the ci.yml install-matrix
-        # because Debian 11 ships Python 3.9.2 while InkyPi's requirements
-        # pin packages that need Python>=3.10 (anyio==4.13.0 is the first
-        # to bomb the uv resolver). pyproject.toml also targets py311. The
+        # JTN-615: bullseye was removed from the install-matrix because
+        # Debian 11 ships Python 3.9.2 while InkyPi's requirements pin
+        # packages that need Python>=3.10 (anyio==4.13.0 is the first to
+        # bomb the uv resolver). pyproject.toml also targets py311. The
         # standalone Install matrix (arm64 e2e) workflow still exercises
         # bullseye via test_install_memcap.sh because that path uses a
         # python:3.12-slim base image and therefore isn't blocked by the
         # codename's own interpreter version.
         import yaml
 
-        data = yaml.safe_load(self.ci_yaml)
+        data = yaml.safe_load(self.install_matrix_yaml)
         job = data["jobs"]["install-matrix"]
         codenames = job["strategy"]["matrix"]["codename"]
         assert set(codenames) == {"bookworm", "trixie"}
 
     def test_install_matrix_runs_on_arm64(self):
-        assert "linux/arm64" in self.ci_yaml
-        assert "setup-qemu-action" in self.ci_yaml
+        assert "linux/arm64" in self.install_matrix_yaml
+        assert "setup-qemu-action" in self.install_matrix_yaml
 
     def test_install_matrix_uses_512m_memory_cap(self):
-        assert "--memory=512m" in self.ci_yaml
-        assert "--memory-swap=512m" in self.ci_yaml
+        assert "--memory=512m" in self.install_matrix_yaml
+        assert "--memory-swap=512m" in self.install_matrix_yaml
 
     def test_install_matrix_invokes_verify_script(self):
-        assert "ci_install_matrix_verify.sh" in self.ci_yaml
+        assert "ci_install_matrix_verify.sh" in self.install_matrix_yaml
 
     def test_install_matrix_feeds_ci_gate(self):
         import yaml
