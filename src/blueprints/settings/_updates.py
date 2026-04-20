@@ -1,5 +1,6 @@
 """Update, update-status, and version-check route handlers."""
 
+import importlib
 import os
 import time
 
@@ -27,14 +28,8 @@ def _prev_version_path() -> str:
     return os.path.join(base, "prev_version")
 
 
-def _settings_update_request_tools():
-    from utils.request_models import (  # noqa: PLC0415 - lazy on purpose (S7788)
-        RequestValidationError,
-        SettingsUpdateRequest,
-        require_mapping,
-    )
-
-    return RequestValidationError, SettingsUpdateRequest, require_mapping
+def _settings_update_request_module():
+    return importlib.import_module("utils.request_models")
 
 
 def _read_prev_version() -> str | None:
@@ -68,18 +63,18 @@ def start_update():
         logger=_mod.logger,
         hint="Check update script availability and update process startup.",
     ):
-        RequestValidationError, SettingsUpdateRequest, require_mapping = (
-            _settings_update_request_tools()
-        )
+        request_models_mod = _settings_update_request_module()
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
         raw_body = request.get_data(cache=True)
         if request.is_json and raw_body.strip():
             try:
-                body = require_mapping(request.get_json(silent=False))
+                body = request_models_mod.require_mapping(
+                    request.get_json(silent=False)
+                )
             except BadRequest as exc:
                 raise ClientInputError("Invalid JSON payload", status=400) from exc
-            except RequestValidationError as err:
+            except request_models_mod.RequestValidationError as err:
                 raise ClientInputError(
                     err.message,
                     status=err.status,
@@ -89,8 +84,8 @@ def start_update():
         else:
             body = {}
         try:
-            parsed = SettingsUpdateRequest.from_mapping(body)
-        except RequestValidationError as err:
+            parsed = request_models_mod.SettingsUpdateRequest.from_mapping(body)
+        except request_models_mod.RequestValidationError as err:
             raise ClientInputError(
                 err.message,
                 status=err.status,

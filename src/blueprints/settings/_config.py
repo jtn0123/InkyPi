@@ -1,5 +1,6 @@
 """Settings pages, save, import/export, API keys, isolation, and safe-reset route handlers."""
 
+import importlib
 import unicodedata
 from zoneinfo import available_timezones
 
@@ -13,21 +14,13 @@ from utils.time_utils import calculate_seconds
 _DEVICE_NAME_MAX_LEN = 64
 
 
-def _plugin_isolation_request_tools():
-    from utils.request_models import (  # noqa: PLC0415 - lazy on purpose (S7788)
-        PluginIsolationRequest,
-        RequestValidationError,
-        require_mapping,
-    )
-
-    return PluginIsolationRequest, RequestValidationError, require_mapping
+def _plugin_isolation_request_module():
+    return importlib.import_module("utils.request_models")
 
 
 @_mod.settings_bp.route("/settings/isolation", methods=["GET", "POST", "DELETE"])
 def plugin_isolation():
-    PluginIsolationRequest, RequestValidationError, require_mapping = (
-        _plugin_isolation_request_tools()
-    )
+    request_models_mod = _plugin_isolation_request_module()
     device_config = current_app.config["DEVICE_CONFIG"]
     isolated = device_config.get_config("isolated_plugins", default=[])
     if not isinstance(isolated, list):
@@ -39,10 +32,10 @@ def plugin_isolation():
 
     body = request.get_json(silent=True)
     try:
-        parsed = PluginIsolationRequest.from_mapping(
-            require_mapping(body), registered_ids=registered_ids
+        parsed = request_models_mod.PluginIsolationRequest.from_mapping(
+            request_models_mod.require_mapping(body), registered_ids=registered_ids
         )
-    except RequestValidationError as err:
+    except request_models_mod.RequestValidationError as err:
         return json_error(**err.as_json_error_kwargs())
     normalized_plugin_id = parsed.plugin_id
 
