@@ -22,6 +22,7 @@ from refresh_task.worker import (
     _execute_refresh_attempt_worker,
     _get_mp_context,
     _remote_exception,
+    sweep_orphan_render_tempfiles,
 )
 from utils.event_bus import get_event_bus
 from utils.image_utils import compute_image_hash
@@ -108,6 +109,21 @@ class RefreshTask:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
+            # Clean up any render tempfiles left behind by a prior crash.
+            # Harmless on tmpfs-backed /tmp (reboot already cleared them)
+            # but keeps disk-backed /tmp installs from accumulating orphans
+            # indefinitely.  Swallows all errors so a slow/unreadable tmpdir
+            # can never block service startup.
+            try:
+                deleted, bytes_freed = sweep_orphan_render_tempfiles()
+                if deleted:
+                    logger.info(
+                        "Swept %d orphan render tempfile(s), freed %d bytes",
+                        deleted,
+                        bytes_freed,
+                    )
+            except Exception as exc:  # noqa: BLE001  defensive — startup must not fail
+                logger.warning("Orphan render tempfile sweep failed: %s", exc)
             self.thread = threading.Thread(
                 target=self._run, daemon=True, name="RefreshTask"
             )

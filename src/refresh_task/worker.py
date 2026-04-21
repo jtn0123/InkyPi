@@ -1,9 +1,12 @@
 """Subprocess worker helpers for plugin execution."""
 
+import glob
 import logging
 import multiprocessing
+import os
 import sys
 import tempfile
+import time
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -54,6 +57,52 @@ class ResultQueueLike(Protocol):
     """Queue interface shared by queue.Queue and multiprocessing.Queue."""
 
     def put(self, item: WorkerPayload) -> object: ...
+
+
+_RENDER_TEMPFILE_PREFIX = "inkypi_render_"
+_RENDER_TEMPFILE_SUFFIX = ".png"
+
+
+def sweep_orphan_render_tempfiles(max_age_seconds: int = 3600) -> tuple[int, int]:
+    """Delete leftover render tempfiles older than *max_age_seconds*.
+
+    The child writes a PNG tempfile and puts its path on the result queue;
+    the parent opens, copies, and unlinks.  If the parent crashes between
+    read and unlink — or terminates the child before it can put — the
+    tempfile leaks.  On tmpfs-backed ``/tmp`` this is harmless (reboot
+    clears it), but disk-backed ``/tmp`` accumulates them indefinitely.
+
+    Called at service startup from :meth:`RefreshTask.start`.  Bounded by
+    file age so a currently-running render (child just wrote file, parent
+    hasn't read yet) is never touched.
+
+    Returns:
+        ``(file_count, total_bytes_freed)``.  Caller typically only uses
+        this for logging; failures are swallowed so a slow or unreadable
+        ``/tmp`` cannot prevent the service from starting.
+    """
+    tmpdir = tempfile.gettempdir()
+    pattern = os.path.join(
+        tmpdir, f"{_RENDER_TEMPFILE_PREFIX}*{_RENDER_TEMPFILE_SUFFIX}"
+    )
+    now = time.time()
+    deleted = 0
+    bytes_freed = 0
+    for path in glob.iglob(pattern):
+        try:
+            stat = os.stat(path)
+        except OSError:
+            # File vanished between glob and stat, or permission denied.
+            continue
+        if now - stat.st_mtime <= max_age_seconds:
+            continue
+        try:
+            os.unlink(path)
+        except OSError:
+            continue
+        deleted += 1
+        bytes_freed += stat.st_size
+    return deleted, bytes_freed
 
 
 def _get_mp_context() -> multiprocessing.context.BaseContext:
@@ -228,7 +277,9 @@ def _execute_refresh_attempt_worker(
         # and sidesteps the pipe buffer entirely.  Parent deletes the file
         # after reading in task.py::_handle_process_result.
         with tempfile.NamedTemporaryFile(
-            suffix=".png", prefix="inkypi_render_", delete=False
+            suffix=_RENDER_TEMPFILE_SUFFIX,
+            prefix=_RENDER_TEMPFILE_PREFIX,
+            delete=False,
         ) as png_file:
             image.save(png_file, format="PNG")
             image_path = png_file.name

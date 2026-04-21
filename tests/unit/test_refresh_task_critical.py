@@ -13,6 +13,7 @@ import io
 import os
 import queue
 import threading
+import time
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -415,6 +416,82 @@ class TestSubprocessPipeBufferDeadlockRegression:
         assert img.size == (800, 480)
         img.close()
         os.unlink(png_path)
+
+
+# ---------------------------------------------------------------------------
+# Orphan render tempfile sweep
+# ---------------------------------------------------------------------------
+
+
+class TestSweepOrphanRenderTempfiles:
+    """Guards the cleanup that runs at service start.
+
+    The pipe-buffer fix writes a PNG tempfile in the child and unlinks it
+    in the parent.  If the parent crashes between read and unlink (or
+    terminates the child before it can put), the tempfile leaks.  The
+    sweep prevents indefinite accumulation on disk-backed ``/tmp`` setups.
+    """
+
+    def _patch_tmpdir(self, monkeypatch, path):
+        # ``tempfile.gettempdir`` caches; clear that cache so each test
+        # picks up the patched env-var ``TMPDIR``.
+        monkeypatch.setattr("tempfile.tempdir", str(path))
+
+    def test_deletes_old_files_only(self, tmp_path, monkeypatch):
+        from refresh_task.worker import sweep_orphan_render_tempfiles
+
+        self._patch_tmpdir(monkeypatch, tmp_path)
+
+        old = tmp_path / "inkypi_render_old.png"
+        old.write_bytes(b"x" * 100)
+        new = tmp_path / "inkypi_render_new.png"
+        new.write_bytes(b"x" * 200)
+        unrelated = tmp_path / "something_else.png"
+        unrelated.write_bytes(b"x" * 50)
+
+        # Backdate `old` to 2 hours ago.
+        two_hours_ago = time.time() - 7200
+        os.utime(old, (two_hours_ago, two_hours_ago))
+
+        deleted, freed = sweep_orphan_render_tempfiles(max_age_seconds=3600)
+
+        assert deleted == 1
+        assert freed == 100
+        assert not old.exists()
+        assert new.exists(), "in-flight render must not be touched"
+        assert unrelated.exists(), "non-inkypi files must not be touched"
+
+    def test_returns_zero_when_directory_empty(self, tmp_path, monkeypatch):
+        from refresh_task.worker import sweep_orphan_render_tempfiles
+
+        self._patch_tmpdir(monkeypatch, tmp_path)
+        deleted, freed = sweep_orphan_render_tempfiles()
+        assert (deleted, freed) == (0, 0)
+
+    def test_unlink_failure_continues_sweep(self, tmp_path, monkeypatch):
+        from refresh_task.worker import sweep_orphan_render_tempfiles
+
+        self._patch_tmpdir(monkeypatch, tmp_path)
+        a = tmp_path / "inkypi_render_a.png"
+        b = tmp_path / "inkypi_render_b.png"
+        for f in (a, b):
+            f.write_bytes(b"x")
+            os.utime(f, (time.time() - 7200, time.time() - 7200))
+
+        # Make `a.unlink` fail (simulate a permission/race) — sweep must
+        # still process `b`.
+        real_unlink = os.unlink
+
+        def flaky_unlink(path, *args, **kwargs):
+            if path == str(a):
+                raise PermissionError("simulated")
+            return real_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr("refresh_task.worker.os.unlink", flaky_unlink)
+        deleted, _ = sweep_orphan_render_tempfiles()
+        assert deleted == 1, "sweep must continue after a single-file unlink failure"
+        assert a.exists()
+        assert not b.exists()
 
 
 # ---------------------------------------------------------------------------
