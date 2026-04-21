@@ -8,6 +8,7 @@ import threading
 from collections import deque
 from datetime import UTC, datetime
 from time import perf_counter, sleep
+from typing import Any, NoReturn
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
@@ -103,7 +104,7 @@ class RefreshTask:
         """
         return PluginHealthTracker.circuit_breaker_threshold()
 
-    def start(self):
+    def start(self) -> None:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
@@ -173,8 +174,10 @@ class RefreshTask:
     def _complete_manual_request(manual_request, metrics=None, exception=None):
         """Signal the waiting caller that a manual update request has finished.
 
-        Sets the ``done`` event on *manual_request* so the thread blocked in
-        :meth:`manual_update` can unblock and inspect the outcome.
+        Sets both the ``done`` and ``image_saved`` events on *manual_request*
+        so that any thread blocked in :meth:`manual_update` — whether it is
+        waiting for the early "image on disk" signal (JTN-786) or for full
+        completion — unblocks and inspects the outcome.
 
         Args:
             manual_request: A :class:`ManualUpdateRequest` to complete, or
@@ -190,6 +193,11 @@ class RefreshTask:
         if metrics is not None:
             manual_request.metrics = metrics
         manual_request.done.set()
+        # Also unblock anyone still waiting on image_saved — e.g. if the
+        # refresh failed before the image could be persisted (generate error,
+        # dimension mismatch) the API caller needs to see the exception
+        # instead of timing out waiting for a signal that will never come.
+        manual_request.image_saved.set()
 
     def _run(self):
         """Background thread loop coordinating refresh operations."""
@@ -212,6 +220,7 @@ class RefreshTask:
                         latest_refresh,
                         current_dt,
                         request_id=request_id,
+                        manual_request=manual_request,
                     )
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
@@ -281,7 +290,12 @@ class RefreshTask:
         return refresh_action, request_id
 
     def _perform_refresh(
-        self, refresh_action, latest_refresh, current_dt, request_id=None
+        self,
+        refresh_action,
+        latest_refresh,
+        current_dt,
+        request_id=None,
+        manual_request=None,
     ):
         """Execute the refresh action and update the display if needed.
 
@@ -485,22 +499,18 @@ class RefreshTask:
             {"refresh_time": current_dt.isoformat(), "image_hash": image_hash}
         )
         used_cached = image_hash == latest_refresh.image_hash
-        if not used_cached:
-            display_duration_ms, preprocess_ms = self._push_to_display(
-                image,
-                plugin_config,
-                refresh_action,
-                refresh_info,
-                benchmark_id,
-                plugin_id,
-                instance_name,
-                request_id,
-            )
-        else:
-            display_duration_ms = preprocess_ms = None
-            logger.info(
-                f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
-            )
+        display_duration_ms, preprocess_ms = self._push_or_skip_display(
+            used_cached=used_cached,
+            image=image,
+            plugin_config=plugin_config,
+            refresh_action=refresh_action,
+            refresh_info=refresh_info,
+            benchmark_id=benchmark_id,
+            plugin_id=plugin_id,
+            instance_name=instance_name,
+            request_id=request_id,
+            manual_request=manual_request,
+        )
 
         request_ms = int((perf_counter() - _t_req_start) * 1000)
         metrics = {
@@ -538,6 +548,48 @@ class RefreshTask:
         )
         return refresh_info | {"benchmark_id": benchmark_id}, used_cached, metrics
 
+    def _push_or_skip_display(
+        self,
+        *,
+        used_cached: bool,
+        image: Any,
+        plugin_config: dict[str, Any],
+        refresh_action: Any,
+        refresh_info: RefreshInfo,
+        benchmark_id: str | None,
+        plugin_id: str,
+        instance_name: str | None,
+        request_id: str | None,
+        manual_request: ManualUpdateRequest | None,
+    ) -> tuple[int, int]:
+        """Push the image to the display, or skip when the cache is warm.
+
+        Returns ``(display_duration_ms, preprocess_ms)``.  Also unblocks the
+        manual-update waiter on the cached path since the image-on-disk
+        invariant still holds (JTN-786).
+        """
+        if not used_cached:
+            return self._push_to_display(
+                image,
+                plugin_config,
+                refresh_action,
+                refresh_info,
+                benchmark_id,
+                plugin_id,
+                instance_name,
+                request_id,
+                manual_request=manual_request,
+            )
+        logger.info(
+            f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
+        )
+        # JTN-786: no display push means no ``on_image_saved`` callback, but
+        # the image-on-disk invariant still holds (the previous refresh
+        # already wrote it), so unblock the manual-update waiter immediately.
+        if manual_request is not None:
+            manual_request.image_saved.set()
+        return None, None
+
     def _push_to_display(
         self,
         image,
@@ -548,6 +600,7 @@ class RefreshTask:
         plugin_id,
         instance_name,
         request_id,
+        manual_request=None,
     ):
         """Push image to the display hardware and record benchmark stages."""
         logger.info(f"Updating display. | refresh_info: {refresh_info}")
@@ -566,11 +619,28 @@ class RefreshTask:
         display_duration_ms = None
         preprocess_ms = None
         display_driver = None
+        # JTN-786: wire a callback so ``manual_update`` can return once the
+        # processed image is persisted to disk — the hardware write that
+        # follows can take ~27s on an Inky 7.3" Impression and was tripping
+        # the 60s manual-update cap for renders with a slow generate phase.
+        on_image_saved = None
+        if manual_request is not None:
+
+            def on_image_saved(save_metrics: dict):  # noqa: E306
+                manual_request.image_saved_metrics = {
+                    "generate_ms": None,  # filled in by the waiter if needed
+                    "preprocess_ms": save_metrics.get("preprocess_ms"),
+                    "display_ms": None,  # still running
+                    "stage": "image_saved",
+                }
+                manual_request.image_saved.set()
+
         try:
             display_metrics = self.display_manager.display_image(
                 image,
                 image_settings=plugin_config.get("image_settings", []),
                 history_meta=history_meta,
+                on_image_saved=on_image_saved,
             )
             if isinstance(display_metrics, dict):
                 preprocess_ms = display_metrics.get("preprocess_ms")
@@ -721,74 +791,119 @@ class RefreshTask:
         )
         self.device_config.write_config()
 
+    def _enqueue_manual_request(self, refresh_action: Any) -> ManualUpdateRequest:
+        """Create and queue a ManualUpdateRequest; wake the background thread."""
+        request = ManualUpdateRequest(str(uuid4()), refresh_action)
+        with self.condition:
+            if len(self.manual_update_requests) >= self.manual_update_requests.maxlen:
+                raise RuntimeError(
+                    "Manual update queue is full. Please wait for pending requests to complete."
+                )
+            self.progress_bus.publish(
+                {
+                    "state": "queued",
+                    "plugin_id": refresh_action.get_plugin_id(),
+                    "request_id": request.request_id,
+                }
+            )
+            self.manual_update_requests.append(request)
+            self.condition.notify_all()
+        return request
+
+    def _handle_manual_update_timeout(
+        self,
+        request: ManualUpdateRequest,
+        refresh_action: Any,
+        wait_s: float,
+    ) -> NoReturn:
+        """Remove the request from the queue and raise a canonical TimeoutError."""
+        with self.condition:
+            try:
+                self.manual_update_requests.remove(request)
+            except ValueError:
+                pass
+        timeout_exc = TimeoutError(f"Manual update timed out after {int(wait_s)}s")
+        self._update_plugin_health(
+            plugin_id=refresh_action.get_plugin_id(),
+            instance=refresh_action.get_refresh_info().get("plugin_instance"),
+            ok=False,
+            metrics=None,
+            error=str(timeout_exc),
+        )
+        self.progress_bus.publish(
+            {
+                "state": "error",
+                "plugin_id": refresh_action.get_plugin_id(),
+                "request_id": request.request_id,
+                "error": str(timeout_exc),
+            }
+        )
+        raise timeout_exc
+
+    def _resolve_completed_request(
+        self, request: ManualUpdateRequest, refresh_action: Any
+    ) -> dict[str, Any] | None:
+        """Return metrics or raise the stored exception for a finished request."""
+        exc = request.exception
+        if exc is None:
+            return request.metrics
+        self.progress_bus.publish(
+            {
+                "state": "error",
+                "plugin_id": refresh_action.get_plugin_id(),
+                "request_id": request.request_id,
+                "error": str(exc),
+            }
+        )
+        if isinstance(exc, BaseException):
+            raise exc
+        raise RuntimeError(str(exc))
+
     def manual_update(self, refresh_action):
         """Manually triggers an update for the specified plugin id and plugin settings by notifying the background process."""
-        if self.running:
-            request = ManualUpdateRequest(str(uuid4()), refresh_action)
-            with self.condition:
-                if (
-                    len(self.manual_update_requests)
-                    >= self.manual_update_requests.maxlen
-                ):
-                    raise RuntimeError(
-                        "Manual update queue is full. Please wait for pending requests to complete."
-                    )
-                self.progress_bus.publish(
-                    {
-                        "state": "queued",
-                        "plugin_id": refresh_action.get_plugin_id(),
-                        "request_id": request.request_id,
-                    }
-                )
-                self.manual_update_requests.append(request)
-                self.condition.notify_all()  # Wake the thread to process manual update
+        if not self.running:
+            logger.warning(
+                "Background refresh task is not running, unable to do a manual update"
+            )
+            return None
 
-            wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
-            completed = request.done.wait(timeout=max(0.0, wait_s))
-            if not completed:
-                with self.condition:
-                    try:
-                        self.manual_update_requests.remove(request)
-                    except ValueError:
-                        pass
-                timeout_exc = TimeoutError(
-                    f"Manual update timed out after {int(wait_s)}s"
-                )
-                self._update_plugin_health(
-                    plugin_id=refresh_action.get_plugin_id(),
-                    instance=refresh_action.get_refresh_info().get("plugin_instance"),
-                    ok=False,
-                    metrics=None,
-                    error=str(timeout_exc),
-                )
-                self.progress_bus.publish(
-                    {
-                        "state": "error",
-                        "plugin_id": refresh_action.get_plugin_id(),
-                        "request_id": request.request_id,
-                        "error": str(timeout_exc),
-                    }
-                )
-                raise timeout_exc
-            metrics = request.metrics
-            exc = request.exception
-            if exc is not None:
-                self.progress_bus.publish(
-                    {
-                        "state": "error",
-                        "plugin_id": refresh_action.get_plugin_id(),
-                        "request_id": request.request_id,
-                        "error": str(exc),
-                    }
-                )
-                if isinstance(exc, BaseException):
-                    raise exc
-                raise RuntimeError(str(exc))
-            return metrics
-        logger.warning(
-            "Background refresh task is not running, unable to do a manual update"
+        request = self._enqueue_manual_request(refresh_action)
+
+        wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
+        # JTN-786: wait for the image to hit disk rather than for the full
+        # refresh (including the slow e-paper SPI write) to finish.
+        # ``image_saved`` is also set by ``_complete_manual_request`` on any
+        # terminal outcome, so this wait unblocks on error/cached paths too —
+        # the post-wait branches below distinguish them.
+        signalled = request.image_saved.wait(timeout=max(0.0, wait_s))
+        if not signalled:
+            self._handle_manual_update_timeout(request, refresh_action, wait_s)
+
+        # Small grace period: if the display hardware is fast (mock display,
+        # cached image, unit tests) ``done`` will fire almost immediately
+        # after ``image_saved``.  Prefer the richer full-refresh metrics when
+        # they're readily available so well-behaved callers still see
+        # ``request_ms`` etc. without a second round-trip to ``/refresh-info``.
+        grace_s = float(
+            os.getenv("INKYPI_MANUAL_UPDATE_DONE_GRACE_S", "0.25") or "0.25"
         )
-        return None
+        if grace_s > 0:
+            request.done.wait(timeout=grace_s)
+
+        if request.done.is_set():
+            return self._resolve_completed_request(request, refresh_action)
+
+        # Image is on disk but the hardware write is still in progress —
+        # return early so the caller is not blocked on slow SPI writes.
+        # ``/refresh-info`` will reflect the full metrics once the background
+        # thread finishes.
+        logger.info(
+            "manual_update: returning after image_saved; "
+            "display hardware write continues asynchronously | plugin_id=%s request_id=%s",
+            refresh_action.get_plugin_id(),
+            request.request_id,
+        )
+        return request.image_saved_metrics or {"stage": "image_saved"}
 
     @staticmethod
     def _timeout_msg(plugin_id: str, timeout_s: float) -> str:

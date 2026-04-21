@@ -170,13 +170,23 @@ class DisplayManager:
             logger.exception("Failed to persist history metadata for %s", base_name)
         self._prune_history(history_dir)
 
-    def display_image(self, image, image_settings=None, history_meta=None):
+    def display_image(
+        self, image, image_settings=None, history_meta=None, on_image_saved=None
+    ):
         """
         Delegates image rendering to the appropriate display instance.
 
         Args:
             image (PIL.Image): The image to be displayed.
             image_settings (list, optional): List of settings to modify image rendering.
+            history_meta (dict, optional): Metadata persisted alongside the
+                history snapshot.
+            on_image_saved (callable, optional): Invoked once the processed
+                image has been written to disk but before the (slow) hardware
+                push.  Used by the manual-update path (JTN-786) to release the
+                API caller without waiting for the SPI write to finish.
+                Receives a metrics dict ``{"preprocess_ms": int}``.  Exceptions
+                raised by the callback are logged but never propagated.
 
         Raises:
             ValueError: If no valid display instance is found.
@@ -228,6 +238,19 @@ class DisplayManager:
                 logger.exception("Failed to save processed image preview")
             self._save_history_entry(image, history_meta=history_meta)
             preprocess_ms = int((perf_counter() - preprocess_t0) * 1000)
+
+            # JTN-786: signal the caller that the image is safely on disk
+            # BEFORE the slow SPI write below.  On a Pi Zero 2 W driving an
+            # Inky 7.3" Impression the display_image() call below can take
+            # ~27s — long enough to blow the manual-update 60s cap when
+            # combined with preprocessing.  Firing this callback early lets
+            # ``manual_update`` return HTTP 200 while the hardware finishes
+            # asynchronously.
+            if on_image_saved is not None:
+                try:
+                    on_image_saved({"preprocess_ms": preprocess_ms})
+                except Exception:
+                    logger.exception("on_image_saved callback failed")
 
             # Pass to the concrete instance to render to the device.
             display_t0 = perf_counter()
