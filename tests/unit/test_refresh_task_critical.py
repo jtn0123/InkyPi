@@ -175,6 +175,66 @@ class TestExecuteRefreshAttemptWorker:
         assert "bad config" in payload["error_message"]
         assert "traceback" in payload
 
+    def test_worker_reloads_plugin_registry_in_child(self, device_config_dev):
+        """JTN-783: spawned subprocess starts with empty plugin registry.
+
+        Simulates the real bug: when multiprocessing spawn/forkserver starts a
+        child process, the module-level `PLUGIN_CLASSES` / `_PLUGIN_CONFIGS`
+        dicts in `plugins.plugin_registry` are empty. The worker must call
+        `load_plugins(child_config.get_plugins())` so `get_plugin_instance`
+        can resolve the plugin_id, otherwise every manual `/update_now` in
+        the default `process` isolation mode raises
+        `ValueError: Plugin 'clock' is not registered.`.
+
+        This test fails on main (before the fix) because the worker calls
+        `get_plugin_instance` against an empty registry.
+        """
+        # Simulate a freshly-spawned child: wipe the module-level registries
+        # the same way `spawn` would (child gets a fresh interpreter).
+        from plugins import plugin_registry
+        from refresh_task import _execute_refresh_attempt_worker
+        from refresh_task.context import RefreshContext
+
+        saved_classes = dict(plugin_registry.PLUGIN_CLASSES)
+        saved_configs = dict(plugin_registry._PLUGIN_CONFIGS)
+        plugin_registry.PLUGIN_CLASSES.clear()
+        plugin_registry._PLUGIN_CONFIGS.clear()
+
+        # Use a real plugin_id the bundled Config will discover from the
+        # plugins/ directory tree. `clock` is a stable, always-present plugin.
+        plugin_config = {"id": "clock", "class": "Clock"}
+        refresh_context = RefreshContext.from_config(device_config_dev)
+
+        class FakeAction:
+            def execute(self, plugin, cfg, dt):
+                return Image.new("RGB", (10, 10), "blue")
+
+        result_queue = queue.Queue()
+        try:
+            _execute_refresh_attempt_worker(
+                result_queue,
+                plugin_config,
+                FakeAction(),
+                refresh_context,
+                datetime.now(UTC),
+            )
+            payload = result_queue.get_nowait()
+            # With the fix: worker calls load_plugins(child_config.get_plugins())
+            # before get_plugin_instance, so the clock plugin resolves and the
+            # fake action returns a valid image.
+            assert (
+                payload["ok"] is True
+            ), f"Expected ok=True after registry reload; got: {payload}"
+            assert "image_bytes" in payload
+            # Registry should now contain clock (populated by load_plugins).
+            assert "clock" in plugin_registry.get_registered_plugin_ids()
+        finally:
+            # Restore whatever the suite had before this test ran.
+            plugin_registry.PLUGIN_CLASSES.clear()
+            plugin_registry._PLUGIN_CONFIGS.clear()
+            plugin_registry.PLUGIN_CLASSES.update(saved_classes)
+            plugin_registry._PLUGIN_CONFIGS.update(saved_configs)
+
 
 # ---------------------------------------------------------------------------
 # RefreshTask.stop()
