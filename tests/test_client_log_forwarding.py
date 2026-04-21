@@ -163,11 +163,24 @@ class TestOversizedBody:
 
 
 class TestRateLimit:
-    def test_rate_limit_kicks_in_after_capacity(self):
-        """After exhausting 60-token burst capacity the next request returns 429 (JTN-711)."""
+    def test_rate_limit_kicks_in_after_capacity(self, monkeypatch):
+        """After exhausting 60-token burst capacity the next request returns 429 (JTN-711).
+
+        Freezes ``time.monotonic`` so the token bucket cannot refill mid-test:
+        at CI speed the 60 request loop easily takes >100 ms, which would let
+        the 10 tokens/s refill rate hand out another token and turn the 61st
+        request into a 204 (flaky on slower runners).
+        """
         import blueprints.client_log as cl_mod
 
         importlib.reload(cl_mod)
+
+        # Freeze time in the rate-limit module so elapsed == 0 on every call.
+        import utils.rate_limit as rl_mod
+
+        frozen = rl_mod.time.monotonic()
+        monkeypatch.setattr(rl_mod.time, "monotonic", lambda: frozen)
+
         app = Flask(__name__)
         app.config["TESTING"] = True
         from blueprints.client_log import client_log_bp
