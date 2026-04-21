@@ -29,83 +29,131 @@
         const uploadedFiles = window.uploadedFiles = window.uploadedFiles || {};
     </script>
 {% endblock %}
+{% block body_attrs %} data-page="plugin"{% endblock %}
 {% block body %}
     <div class="frame workflow-frame">
-        {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb, PLUGIN_ICON_MAP %}
+        {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb, PLUGIN_ICON_MAP, PLUGIN_DESC_MAP %}
         {% from 'macros/components.html' import status_chip, modal %}
+        {% set plugin_desc = PLUGIN_DESC_MAP.get(plugin.id) %}
 
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins', 'url': url_for('plugin.plugins_page')}, {'label': plugin.display_name}]) }}
         <!-- Plugin Title and Icon -->
-        <header class="app-header">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
-                        {% if ph_icon %}{{ icon(ph_icon, 'app-icon') | safe }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
-                        <div class="title-stack">
-                            <h1 class="app-title">{{ plugin.display_name }}</h1>
-                            {% if request.args.get('debug') %}
-                            <span class="app-subtitle" data-debug-slug>{{ plugin.id }}</span>
-                            {% endif %}
-                        </div>
+        <header class="pageheader pageheader-plugin">
+            <div class="pageheader-main">
+                <div class="plugin-titlerow">
+                    {% set ph_icon = PLUGIN_ICON_MAP.get(plugin.id, None) %}
+                    {% if ph_icon %}{{ icon(ph_icon, 'app-icon') | safe }}{% else %}<img src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}" alt="{{ plugin.display_name }} icon" class="app-icon">{% endif %}
+                    <div class="title-stack">
+                        <div class="eyebrow">Plugin</div>
+                        <h1 class="page-title app-title" title="{{ plugin.display_name }}">{{ plugin.display_name }}</h1>
+                        {% if plugin_desc %}
+                        <p class="plugin-page-desc">{{ plugin_desc }}</p>
+                        {% endif %}
+                        {% if request.args.get('debug') %}
+                        <span class="app-subtitle" data-debug-slug>{{ plugin.id }}</span>
+                        {% endif %}
                     </div>
                 </div>
-                <div class="header-actions">
-                    <!-- API Key Status Indicator -->
-                    {% if api_key and api_key.required %}
-                        {% if api_key.present %}
-                        <div class="api-key-indicator configured" id="apiKeyIndicator" title="{{ api_key.service }} API Key is configured">
-                            <span class="api-key-icon">✓</span>
-                            <span class="api-key-text">API</span>
-                        </div>
-                        {% else %}
-                        <a href="{{ url_for('settings.api_keys_page') }}" class="api-key-indicator missing" id="apiKeyIndicator" data-api-keys-link title="{{ api_key.service }} API Key required - Click to configure">
-                            <span class="api-key-icon">⚠</span>
-                            <span class="api-key-text">API Required</span>
-                        </a>
-                        {% endif %}
+                <div class="status-row plugin-mode-row page-meta" aria-label="Plugin mode indicators">
+                    {% if plugin_instance %}
+                    {{ status_chip('Instance', 'success', title='This plugin has saved settings stored as an instance.', describedby='instance-chip-help') }}
+                    <span id="instance-chip-help" class="sr-only">This plugin has saved settings stored as an instance.</span>
+                    {% else %}
+                    {{ status_chip('Draft', 'warning', title='This plugin has not been saved yet. Use the save action below to activate it.', describedby='draft-chip-help') }}
+                    <span id="draft-chip-help" class="sr-only">This plugin has not been saved yet. Use the save action below to activate it.</span>
                     {% endif %}
-
-                    {# data-test-skip-click: opens the fixed-position #requestProgress
-                       overlay, which on mobile (360×800) reflows to full width and
-                       covers the workflow tabs, breadcrumbs and header icons below.
-                       The sweep then silent-no-ops every later candidate (JTN-743).
-                       Dedicated coverage lives in
-                       tests/integration/test_plugin_workflow_e2e.py::test_last_progress_button_shows_overlay. #}
-                    <button id="showLastProgressBtn" class="header-button icon" type="button" title="Last progress" aria-label="Last progress" data-test-skip-click="true">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</button>
-                    <div id="loadingIndicator" class="loading-indicator"></div>
                 </div>
             </div>
+            {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
+            <div class="pageheader-actions">
+                <button type="button"
+                        id="savePluginSettingsBtn"
+                        class="header-button is-secondary"
+                        data-test-skip-click="true"
+                        aria-describedby="save-settings-help"
+                        hx-post="{{ url_for('plugin.save_plugin_settings') }}"
+                        hx-include="#settingsForm"
+                        hx-target="#plugin-form-errors"
+                        hx-swap="innerHTML"
+                        hx-disabled-elt="this">Save settings</button>
+                {% if plugin_instance %}
+                <button type="button" data-plugin-action="update_instance" data-test-skip-click="true" class="header-button is-secondary" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update instance</button>
+                {% else %}
+                <button type="button" data-plugin-subtab-target="schedule" data-plugin-draft="true" class="header-button is-secondary" aria-describedby="add-playlist-help" aria-controls="pluginSchedulePanel" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to playlist</button>
+                {% endif %}
+                {# data-test-skip-click: these buttons submit the settings form; clicking them
+                   with an empty/default form triggers validation 400s that the click-sweep
+                   (JTN-698) would report as console errors. Dedicated plugin-submission
+                   tests cover the real submit path. #}
+                <button type="button" data-plugin-action="update_now" data-test-skip-click="true" class="header-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update preview</button>
+                <div id="loadingIndicator" class="loading-indicator"></div>
+            </div>
         </header>
-
-        <div class="separator"></div>
-        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins', 'url': url_for('main.main_page') + '#plugins-grid'}, {'label': plugin.display_name}]) }}
         <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-workflow" data-page-shell="workflow">
-
-        <div class="status-row plugin-mode-row" aria-label="Plugin mode indicators">
-            {% if plugin_instance %}
-            {{ status_chip('Instance', 'success', title='This plugin has saved settings stored as an instance.', describedby='instance-chip-help') }}
-            <span id="instance-chip-help" class="sr-only">This plugin has saved settings stored as an instance.</span>
-            {% else %}
-            {{ status_chip('Draft', 'warning', title='This plugin has not been saved yet. Use the save action below to activate it.', describedby='draft-chip-help') }}
-            <span id="draft-chip-help" class="sr-only">This plugin has not been saved yet. Use the save action below to activate it.</span>
-            {% endif %}
-        </div>
-
-        <div class="workflow-mode-bar" role="tablist" aria-label="Plugin workflow">
-            <button id="configureModeBtn" class="workflow-mode-tab active" type="button" role="tab" aria-selected="true" data-workflow-mode="configure">Configure</button>
-            <button id="previewModeBtn" class="workflow-mode-tab" type="button" role="tab" aria-selected="false" data-workflow-mode="preview">Preview &amp; Apply</button>
-        </div>
 
         {% set fit = (config.get('preview_size_mode') == 'fit') %}
         <div class="workflow-layout" data-workflow-layout>
         <section class="workflow-main-panel" data-workflow-panel="configure">
+        <div class="plugin-subtab-bar" role="tablist" aria-label="Plugin configuration sections">
+            <button type="button" class="plugin-subtab active" role="tab" aria-selected="true" data-plugin-subtab="configure">Configure</button>
+            {% if style_settings %}
+            <button type="button" class="plugin-subtab" role="tab" aria-selected="false" data-plugin-subtab="style">Style</button>
+            {% endif %}
+            <button type="button" class="plugin-subtab" role="tab" aria-selected="false" data-plugin-subtab="schedule">Schedule</button>
+        </div>
         <form id="settingsForm" class="settings-form workflow-settings-form" action="{{ url_for('plugin.save_plugin_settings') }}" method="post" aria-label="Plugin settings for {{ plugin.display_name }}" novalidate>
-            <div class="settings-container">
+            <div class="settings-container plugin-subpanel" data-plugin-subpanel="configure">
                 <div class="workflow-section-header">
                     <h2>Configuration</h2>
                     <p>Adjust content and presentation settings before generating a new preview.</p>
+                </div>
+                <div class="plugin-editor-overview">
+                    <section class="plugin-editor-card plugin-editor-card-summary">
+                        <div class="plugin-editor-card-label">Content</div>
+                        <h3>{{ plugin.display_name }}</h3>
+                        <p>{{ plugin_desc or 'Adjust what this plugin pulls and shows before generating a new image.' }}</p>
+                        <div class="plugin-editor-summary-meta">
+                            {% if plugin_instance %}
+                            <span>Saved as <strong>{{ plugin_instance }}</strong>{% if plugin_instance_playlist %} in <strong>{{ plugin_instance_playlist }}</strong>{% endif %}.</span>
+                            {% else %}
+                            <span>Draft settings stay local until you save them or add this plugin to a playlist.</span>
+                            {% endif %}
+                        </div>
+                    </section>
+                    {% if api_key and api_key.required %}
+                    <section class="plugin-editor-card plugin-editor-card-api" aria-labelledby="pluginApiCardHeading">
+                        <div class="plugin-editor-card-label">API key</div>
+                        {% if api_key.present %}
+                        <div class="api-key-indicator configured" style="display:none" aria-hidden="true">
+                            <span class="api-key-icon">✓</span>
+                            <span class="api-key-text">API: {{ api_key.service }} · OK</span>
+                        </div>
+                        {% else %}
+                        <div class="api-key-indicator missing" style="display:none" aria-hidden="true">
+                            <span class="api-key-icon">⚠</span>
+                            <span class="api-key-text">API Required · {{ api_key.service }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="plugin-inline-api-row">
+                            <div class="plugin-inline-api-copy">
+                                <h3 id="pluginApiCardHeading">{{ api_key.service }}</h3>
+                                {% if api_key.present %}
+                                <p>This provider is configured and ready for fresh previews.</p>
+                                {% else %}
+                                <p>This plugin needs a configured {{ api_key.service }} key before it can refresh or generate a preview.</p>
+                                {% endif %}
+                            </div>
+                            <div class="plugin-inline-api-actions">
+                                {% if api_key.present %}
+                                {{ status_chip('Configured', 'success') }}
+                                {% else %}
+                                {{ status_chip('Required', 'warning') }}
+                                {% endif %}
+                                <a href="{{ url_for('settings.api_keys_page') }}" class="action-button is-secondary plugin-inline-api-link" data-api-keys-link>Manage keys</a>
+                            </div>
+                        </div>
+                    </section>
+                    {% endif %}
                 </div>
                 <!-- Progressive Disclosure placeholders for test visibility -->
                 <div class="settings-mode-selector" hidden>
@@ -122,97 +170,169 @@
                 {% else %}
                     {% include settings_template %}
                 {% endif %}
+            </div>
 
-                {% if style_settings %}
-                <div class="collapsible">
-                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Style <span class="collapsible-icon" aria-hidden="true">▼</span>
-                    </button>
-                    <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group">
-                            <div class="form-group nowrap">
-                                <span id="frame-label" class="form-label">Frame:</span>
-                                <div id="frame-selection" class="image-grid" role="group" aria-labelledby="frame-label">
-                                    {% for frame in frame_styles %}
-                                    <button type="button" class="image-option" data-face-name="{{ frame.name }}" data-frame-option aria-label="Select {{ frame.name }}">
-                                        <img
-                                            src="{{ url_for('plugin.image', plugin_id='base_plugin', filename=frame.icon) }}"
-                                            alt="{{ frame.name }}"
-                                        />
-                                    </button>
-                                    {% endfor %}
-                                </div>
-                                <input type="hidden" id="selected-frame" name="selectedFrame" value="{{ frame_styles[0].name }}" />
-                            </div>
-
-                            <div class="form-group">
-                                <span class="form-label">Margins:</span>
-                                <div class="form-group nowrap">
-                                    <label for="topMargin" class="form-label">Top</label>
-                                    <input type="number" class="form-input" id="topMargin" name="topMargin" min="0" max="100" step="5">px
-                                </div>
-                                <div class="form-group nowrap">
-                                    <label for="bottomMargin" class="form-label">Bottom</label>
-                                    <input type="number" class="form-input" id="bottomMargin" name="bottomMargin" min="0" max="100" step="5">px
-                                </div>
-                                <div class="form-group nowrap">
-                                    <label for="leftMargin" class="form-label">Left</label>
-                                    <input type="number" class="form-input" id="leftMargin" name="leftMargin" min="0" max="100" step="5">px
-                                </div>
-                                <div class="form-group nowrap">
-                                    <label for="rightMargin" class="form-label">Right</label>
-                                    <input type="number" class="form-input" id="rightMargin" name="rightMargin" min="0" max="100" step="5">px
-                                </div>
-                            </div>
+            {% if style_settings %}
+            <div class="settings-container plugin-subpanel" data-plugin-subpanel="style" hidden>
+                <div class="workflow-section-header">
+                    <h2>Style</h2>
+                    <p>Frame, margins, and colors applied to the rendered image.</p>
+                </div>
+                <div class="form-group">
+                    <div class="form-group nowrap">
+                        <span id="frame-label" class="form-label">Frame:</span>
+                        <div id="frame-selection" class="image-grid" role="group" aria-labelledby="frame-label">
+                            {% for frame in frame_styles %}
+                            <button type="button" class="image-option" data-face-name="{{ frame.name }}" data-frame-option aria-label="Select {{ frame.name }}">
+                                <img
+                                    src="{{ url_for('plugin.image', plugin_id='base_plugin', filename=frame.icon) }}"
+                                    alt="{{ frame.name }}"
+                                />
+                            </button>
+                            {% endfor %}
                         </div>
+                        <input type="hidden" id="selected-frame" name="selectedFrame" value="{{ frame_styles[0].name }}" />
+                    </div>
 
-                        <div class="form-group">
-                            <span id="background-label" class="form-label">Background:</span>
-                            <div class="form-group nowrap" role="group" aria-labelledby="background-label">
-                                <label>
-                                    <input type="radio" name="backgroundOption" value="color" checked>
-                                    Color
-                                </label>
-                                <input type="color" id="backgroundColor" name="backgroundColor" class="color-picker" value="#ffffff" aria-label="Background color">
-                                <span class="color-preview" style="--preview-color: #ffffff" data-color-preview="backgroundColor"></span>
-                            </div>
-                            <div class="form-group nowrap">
-                                <label>
-                                    <input type="radio" name="backgroundOption" value="image">
-                                    Image
-                                </label>
-                                <label for="imageUpload" class="form-input file-upload-label" id="uploadButtonLabel">Upload Image</label>
-                                <input type="file" clear-on-submit id="imageUpload" name="backgroundImageFile" accept="image/*" class="file-upload-input" data-background-upload>
-                                <div id="fileName" class="file-name" hidden>
-                                    <span id="fileNameText"></span>
-                                    <button type="button" id="removeFileButton" class="remove-btn" aria-label="Remove selected file">X</button>
-                                </div>
-                            </div>
+                    <div class="form-group">
+                        <span class="form-label">Margins:</span>
+                        <div class="form-group nowrap">
+                            <label for="topMargin" class="form-label">Top</label>
+                            <input type="number" class="form-input" id="topMargin" name="topMargin" min="0" max="100" step="5">px
                         </div>
-
-                        <div id="hiddenFileInput"></div>
-
-                        <div class="form-group">
-                            <label for="textColor" class="form-label">Text Color:</label>
-                            <input type="color" id="textColor" name="textColor" class="color-picker" value="#000000">
-                            <span class="color-preview" style="--preview-color: #000000" data-color-preview="textColor"></span>
+                        <div class="form-group nowrap">
+                            <label for="bottomMargin" class="form-label">Bottom</label>
+                            <input type="number" class="form-input" id="bottomMargin" name="bottomMargin" min="0" max="100" step="5">px
+                        </div>
+                        <div class="form-group nowrap">
+                            <label for="leftMargin" class="form-label">Left</label>
+                            <input type="number" class="form-input" id="leftMargin" name="leftMargin" min="0" max="100" step="5">px
+                        </div>
+                        <div class="form-group nowrap">
+                            <label for="rightMargin" class="form-label">Right</label>
+                            <input type="number" class="form-input" id="rightMargin" name="rightMargin" min="0" max="100" step="5">px
                         </div>
                     </div>
                 </div>
-                {% endif %}
+
+                <div class="form-group">
+                    <span id="background-label" class="form-label">Background:</span>
+                    <div class="form-group nowrap" role="group" aria-labelledby="background-label">
+                        <label>
+                            <input type="radio" name="backgroundOption" value="color" checked>
+                            Color
+                        </label>
+                        <input type="color" id="backgroundColor" name="backgroundColor" class="color-picker" value="#ffffff" aria-label="Background color">
+                        <span class="color-preview" style="--preview-color: #ffffff" data-color-preview="backgroundColor"></span>
+                    </div>
+                    <div class="form-group nowrap">
+                        <label>
+                            <input type="radio" name="backgroundOption" value="image">
+                            Image
+                        </label>
+                        <label for="imageUpload" class="form-input file-upload-label" id="uploadButtonLabel">Upload Image</label>
+                        <input type="file" clear-on-submit id="imageUpload" name="backgroundImageFile" accept="image/*" class="file-upload-input" data-background-upload>
+                        <div id="fileName" class="file-name" hidden>
+                            <span id="fileNameText"></span>
+                            <button type="button" id="removeFileButton" class="remove-btn" aria-label="Remove selected file">X</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="hiddenFileInput"></div>
+
+                <div class="form-group">
+                    <label for="textColor" class="form-label">Text Color:</label>
+                    <input type="color" id="textColor" name="textColor" class="color-picker" value="#000000">
+                    <span class="color-preview" style="--preview-color: #000000" data-color-preview="textColor"></span>
+                </div>
             </div>
+            {% endif %}
 
             <input type="hidden" name="plugin_id" value="{{ plugin.id }}">
             {% if plugin_instance %}
             <input type="hidden" name="instance_name" value="{{ plugin_instance }}">
             {% endif %}
         </form>
+        <div id="pluginSchedulePanel" class="settings-container plugin-subpanel plugin-schedule-panel" data-plugin-subpanel="schedule" hidden>
+            <div class="workflow-section-header">
+                <h2>Schedule</h2>
+                {% if plugin_instance %}
+                <p>Review how this saved instance is assigned today, then head to Playlists if you need to adjust the active cadence.</p>
+                {% else %}
+                <p>Save the current configuration as a named playlist entry and choose how often it should refresh.</p>
+                {% endif %}
+            </div>
+            {% if plugin_instance %}
+            <div class="schedule-summary-card">
+                <p class="schedule-summary-line">This plugin is saved as <strong>{{ plugin_instance }}</strong>{% if plugin_instance_playlist %} in playlist <strong>{{ plugin_instance_playlist }}</strong>{% endif %}.</p>
+                <p class="schedule-summary-line">Playlist settings still control refresh cadence, rotation, and active hours for saved instances.</p>
+            </div>
+            <div class="schedule-summary-actions">
+                <a href="{{ url_for('playlist.playlists') }}" class="action-button is-secondary">Open playlists</a>
+            </div>
+            {% else %}
+            <div class="schedule-summary-card schedule-summary-card-accent">
+                <p class="schedule-summary-line">Draft plugins are not scheduled yet. Adding this to a playlist will save the current settings and start automated refresh.</p>
+            </div>
+            <form id="scheduleForm" class="settings-form schedule-form-card" data-form-state aria-busy="false" aria-label="Playlist schedule for {{ plugin.display_name }}">
+                <div class="schedule-form-grid">
+                    <section class="schedule-fieldset" aria-labelledby="scheduleDestinationHeading">
+                        <div class="schedule-fieldset-title" id="scheduleDestinationHeading">Destination</div>
+                        <div class="form-group">
+                            <label for="playlist" class="form-label">Playlist</label>
+                            <select id="playlist" name="playlist" class="form-input">
+                                {% for playlist_name in playlists %}
+                                <option value="{{playlist_name}}">{{playlist_name}}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="instance" class="form-label">Instance Name</label>
+                            <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required pattern="[A-Za-z0-9 _-]+" title="Letters, numbers, spaces, underscores, and hyphens only" class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error" data-subtab-focus-target>
+                            <span id="instance-error" class="validation-message" role="alert"></span>
+                        </div>
+                    </section>
+                    <section class="schedule-fieldset" aria-labelledby="scheduleCadenceHeading">
+                        <div class="schedule-fieldset-title" id="scheduleCadenceHeading">Cadence</div>
+                        <div class="form-group">
+                            <span class="form-label">Refresh</span>
+                            <span class="help-icon" role="note" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
+                        </div>
+                        <div class="form-group schedule-inline-group">
+                            <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
+                            <label for="refreshTypeInterval">Every</label>
+                            <input type="number" id="scheduleInterval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
+                            <span id="interval-error" class="validation-message" role="alert"></span>
+                            <select id="scheduleUnit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
+                                <option value="minute">Minute</option>
+                                <option value="hour">Hour</option>
+                                <option value="day">Day</option>
+                            </select>
+                        </div>
+                        <div class="form-group schedule-inline-group">
+                            <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
+                            <label for="refreshTypeScheduled">Daily at</label>
+                            <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
+                        </div>
+                    </section>
+                </div>
+                <div class="schedule-form-actions">
+                    <p class="schedule-panel-note">This uses the current plugin settings as the starting point for the new playlist entry.</p>
+                    <button type="button" data-plugin-action="add_to_playlist" class="action-button" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
         </section>
 
         <aside class="workflow-side-panel" data-workflow-panel="preview">
-        <div class="workflow-section-header">
-            <h2>Preview &amp; Apply</h2>
-            <p>Review the current display, compare this plugin output, then apply or schedule it.</p>
+        <section class="workflow-preview-card" aria-labelledby="pluginPreviewHeading">
+        <div class="workflow-preview-card-head">
+            <div>
+                <h2 id="pluginPreviewHeading">Preview</h2>
+                <p>Rendered for {{ resolution[0] }}&times;{{ resolution[1] }}. Compare the live display against this plugin output before applying or scheduling it.</p>
+            </div>
         </div>
         <div class="status-bar">
             <!-- Compact current display thumbnail on the left -->
@@ -243,7 +363,7 @@
                         <div class="status-placeholder-actions"><button type="button" id="displayInstanceBtn" class="action-button compact">Display Instance</button></div>
                         {% endif %}
                         {% else %}
-                        No images generated yet. Use "Update Preview" to create one.
+                        No images generated yet. Use "Update preview" to create one.
                         {% endif %}
                     </div>
                 </div>
@@ -256,46 +376,45 @@
         <div class="separator"></div>
 
         <div id="pluginMeta" class="image-meta workflow-meta" hidden><div id="pluginMetaContent"></div></div>
+        </section>
 
-        <div class="workflow-action-panel">
+        <section id="requestProgress" class="progress-block progress-aside-card" aria-labelledby="requestProgressHeading">
+            <div class="progress-header">
+                <h3 id="requestProgressHeading" class="progress-heading">Progress</h3>
+                <div class="progress-header-actions">
+                    <span id="requestProgressText" class="progress-status">Idle</span>
+                    <button id="showLastProgressBtn" class="header-button is-secondary progress-history-button" type="button">Last run</button>
+                </div>
+            </div>
+            <div class="progress-meta">
+                <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
+                <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
+            </div>
+            <div class="progress-bar">
+                <div id="requestProgressBar" class="progress-fill" aria-hidden="true"></div>
+                <progress id="requestProgressBarMeter" class="sr-only" value="0" max="100" aria-labelledby="requestProgressHeading">0%</progress>
+            </div>
+            <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
+        </section>
+
+        <div class="workflow-action-panel workflow-utility-card">
             <span id="plugin-form-status" class="validation-message" role="status" aria-live="polite"></span>
             <!-- HTMX swap target for inline validation feedback (JTN-506) -->
             <div id="plugin-form-errors" class="plugin-form-errors" aria-live="polite"></div>
             <label class="workflow-device-toggle" for="toggleDeviceFrame">
                 <input type="checkbox" id="toggleDeviceFrame" aria-label="Show device frame"> Show device frame
             </label>
-            {% set api_key_missing = api_key is defined and api_key and api_key.required and not api_key.present %}
-            <div class="workflow-action-group">
-                {# data-test-skip-click: these buttons submit the settings form; clicking them
-                   with an empty/default form triggers validation 400s that the click-sweep
-                   (JTN-698) would report as console errors. Dedicated plugin-submission
-                   tests cover the real submit path. #}
-                <button type="button" data-plugin-action="update_now" data-test-skip-click="true" class="action-button primary" aria-describedby="update-now-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Preview</button>
-                <button type="button"
-                        id="savePluginSettingsBtn"
-                        class="action-button is-secondary"
-                        data-test-skip-click="true"
-                        aria-describedby="save-settings-help"
-                        hx-post="{{ url_for('plugin.save_plugin_settings') }}"
-                        hx-include="#settingsForm"
-                        hx-target="#plugin-form-errors"
-                        hx-swap="innerHTML"
-                        hx-disabled-elt="this">Save Settings</button>
-                {% if plugin_instance %}
-                    <button type="button" data-plugin-action="update_instance" data-test-skip-click="true" class="action-button compact" aria-describedby="update-instance-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Update Instance</button>
-                {% else %}
-                    <button type="button" data-open-modal="scheduleModal" data-plugin-draft="true" class="action-button compact" aria-describedby="add-playlist-help" {% if api_key_missing %}disabled title="Configure {{ api_key.service }} API key first"{% endif %}>Add to Playlist</button>
-                {% endif %}
-            </div>
             <div class="form-help workflow-help">
+                {# SR-only help text is referenced by aria-describedby on the
+                   pageheader action buttons (moved up per the design refresh). #}
                 <div id="update-now-help" class="sr-only">Generate and display image immediately with current settings</div>
                 <div id="save-settings-help" class="sr-only">Save settings for future use without generating image</div>
                 {% if plugin_instance %}
                 <div id="update-instance-help" class="sr-only">Update and save this plugin instance configuration</div>
-                <p>Use <strong>Update Instance</strong> to save and refresh the displayed image.</p>
+                <p>Use <strong>Update instance</strong> in the header above to save and refresh the displayed image.</p>
                 {% else %}
                 <div id="add-playlist-help" class="sr-only">Add this plugin to an automated playlist. Current settings will be saved when you add it.</div>
-                <p>Saving does not schedule recurrence. Use <strong>Add to Playlist</strong> to have this plugin run automatically — current settings will be captured when you save the playlist entry.</p>
+                <p>Saving does not schedule recurrence. Use <strong>Add to playlist</strong> in the header to jump to the Schedule tab, where the playlist entry is created from your current settings.</p>
                 {% endif %}
             </div>
         </div>
@@ -305,53 +424,6 @@
 
     <!-- Success/Error Modal -->
     {% include 'response_modal.html' %}
-
-    <!-- Schedule Configuration Modal -->
-    <div id="scheduleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="scheduleModalTitle" hidden>
-        <div class="modal-content">
-            <button class="close-button" type="button" data-close-modal="scheduleModal" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="scheduleModalTitle">Add to Playlist</h2>
-            <div class="separator"></div>
-            <form id="scheduleForm" class="settings-form">
-                <div class="form-group">
-                    <label for="playlist" class="form-label">Playlist:</label>
-                    <select id="playlist" name="playlist" class="form-input">
-                        {% for playlist_name in playlists %}
-                        <option value="{{playlist_name}}">{{playlist_name}}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="instance" class="form-label">Instance Name:</label>
-                    <input type="text" id="instance" name="instance_name" placeholder="Enter instance name" required pattern="[A-Za-z0-9 _-]+" title="Letters, numbers, spaces, underscores, and hyphens only" class="form-input" aria-required="true" aria-invalid="false" aria-describedby="instance-error">
-                    <span id="instance-error" class="validation-message" role="alert"></span>
-                </div>
-                <div class="form-group">
-                    <span class="form-label">Refresh</span>
-                    <span class="help-icon" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
-                </div>
-                <div class="form-group nowrap">
-                    <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
-                    <label for="refreshTypeInterval">Every</label>
-                    <input type="number" id="scheduleInterval" name="interval" class="form-input" required min="1" placeholder="Enter interval" aria-label="Interval value" aria-required="true" aria-invalid="false" aria-describedby="interval-error">
-                    <span id="interval-error" class="validation-message" role="alert"></span>
-                    <select id="scheduleUnit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
-                        <option value="minute">Minute</option>
-                        <option value="hour">Hour</option>
-                        <option value="day">Day</option>
-                    </select>
-                </div>
-                <div class="form-group nowrap">
-                    <input type="radio" id="refreshTypeScheduled" name="refreshType" value="scheduled">
-                    <label for="refreshTypeScheduled">Daily at</label>
-                    <input id="scheduleTime" class="time-input" type="time" name="refreshTime" step="900" aria-label="Scheduled time">
-                </div>
-            </form>
-            <div class="buttons-container">
-                <button type="button" data-plugin-action="add_to_playlist" class="action-button">Save</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Image preview (lightbox) for plugin page -->
     {% call modal('imagePreviewModal', 'Image preview') %}
@@ -373,18 +445,6 @@
         </div>
     </div>
     {% endif %}
-    <div id="requestProgress" class="progress-block" hidden>
-        <div class="progress-header">
-            <span id="requestProgressText">Preparing…</span>
-            <button id="closeProgressBtn" type="button" class="progress-close" aria-label="Close progress">{{ icon('x', 'close-icon') | safe }}</button>
-        </div>
-        <div class="progress-meta">
-            <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
-            <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
-        </div>
-        <div class="progress-bar"><div id="requestProgressBar" class="progress-fill progress-fill-seeded" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="10"></div></div>
-        <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
-    </div>
     <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/plugin_page.js') }}"></script>
     <script nonce="{{ csp_nonce }}">

@@ -91,7 +91,10 @@ def settings_page():
     device_config = current_app.config["DEVICE_CONFIG"]
     timezones = sorted(available_timezones())
     return render_template(
-        "settings.html", device_settings=device_config.get_config(), timezones=timezones
+        "settings.html",
+        device_settings=device_config.get_config(),
+        timezones=timezones,
+        active_nav="settings",
     )
 
 
@@ -115,6 +118,7 @@ def backup_restore_page():
         "settings.html",
         device_settings=device_config.get_config(),
         timezones=sorted(available_timezones()),
+        active_nav="settings",
     )
 
 
@@ -266,6 +270,7 @@ def api_keys_page():
         entries=[],
         masked=masked,
         api_key_plugins=api_key_plugins,
+        active_nav="api-keys",
     )
 
 

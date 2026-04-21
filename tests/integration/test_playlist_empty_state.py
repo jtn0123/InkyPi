@@ -1,5 +1,7 @@
 """Tests for empty-state UX on playlist pages (JTN-151, JTN-172)."""
 
+import re
+
 
 def test_playlist_display_next_hidden_when_empty(client, device_config_dev):
     """Display Next button should not render for empty playlists."""
@@ -43,8 +45,8 @@ def test_playlist_display_next_shown_when_has_plugins(client, device_config_dev)
     assert 'data-playlist="WithPlugins"' in html
 
 
-def test_playlist_plugin_actions_render_visible_labels(client, device_config_dev):
-    """Plugin action buttons should include visible labels, not just icons."""
+def test_playlist_plugin_actions_match_handoff_row_balance(client, device_config_dev):
+    """Playlist rows should keep Display visible and the utility actions compact."""
     pm = device_config_dev.get_playlist_manager()
     pm.add_playlist("WithLabels", "06:00", "09:00")
     pl = pm.get_playlist("WithLabels")
@@ -62,10 +64,28 @@ def test_playlist_plugin_actions_render_visible_labels(client, device_config_dev
     assert resp.status_code == 200
     html = resp.data.decode()
 
-    assert '<span class="action-button-label">Edit</span>' in html
-    assert '<span class="action-button-label">Refresh settings</span>' in html
     assert '<span class="action-button-label">Display</span>' in html
-    assert '<span class="action-button-label">Delete</span>' in html
+    assert "playlist-row-display-btn" in html
+    assert "playlist-row-icon-btn" in html
+    # Accessible names come from the visible .sr-only spans — the aria-label
+    # attributes were removed to satisfy SonarCloud S7927 ("Label in Name").
+    assert '<span class="sr-only">Edit schedule for ' in html
+    assert '<span class="sr-only">Edit plugin ' in html
+    assert '<span class="sr-only">Delete plugin instance ' in html
+
+
+def test_playlist_add_plugin_link_points_to_plugins_page(client, device_config_dev):
+    resp = client.get("/playlist")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+
+    # Bind the assertion to the add-row anchor so it cannot be satisfied by
+    # unrelated sidebar or navigation links that also point to /plugins
+    # (CodeRabbit review, PR #570).
+    assert re.search(
+        r'<a\b(?=[^>]*\bclass="[^"]*\bpl-add-row\b)(?=[^>]*\bhref="/plugins")[^>]*>',
+        html,
+    )
 
 
 def test_playlist_display_next_mixed(client, device_config_dev):

@@ -1,8 +1,8 @@
 """Regression tests for JTN-633.
 
 Clicking "Add to Playlist" on a DRAFT plugin page (no saved settings yet)
-must either open the scheduling modal or surface a clear message — never
-fail silently.
+must either reveal the inline Schedule tab or surface a clear message —
+never fail silently.
 """
 
 import os
@@ -22,23 +22,24 @@ def _render_clock_draft(client):
     return resp.get_data(as_text=True)
 
 
-def test_draft_add_to_playlist_button_renders_with_open_modal_attr(client):
-    """DRAFT page must render an Add-to-Playlist trigger that targets the modal."""
+def test_draft_add_to_playlist_button_renders_with_schedule_target(client):
+    """DRAFT page must render an Add-to-Playlist trigger that targets Schedule."""
     html = _render_clock_draft(client)
     # DRAFT chip present
     assert "Draft" in html
-    # Button exposes data-open-modal so a click is never silently absorbed. JTN-633.
-    assert 'data-open-modal="scheduleModal"' in html
+    # Button exposes a Schedule target so a click is never silently absorbed. JTN-633.
+    assert 'data-plugin-subtab-target="schedule"' in html
     # DRAFT-state marker is present so JS can attach the defensive handler.
     assert 'data-plugin-draft="true"' in html
-    # The modal target markup exists
-    assert 'id="scheduleModal"' in html
-    # Help text explains that current settings will be captured.
-    assert "current settings will be captured" in html
+    # The inline schedule UI exists.
+    assert 'id="pluginSchedulePanel"' in html
+    assert 'id="scheduleForm"' in html
+    # Help text explains that current settings seed the playlist entry.
+    assert "current settings" in html
 
 
-def test_draft_add_to_playlist_button_opens_modal_with_real_handlers(client):
-    """Real plugin_page.js handlers must open the modal when the button is clicked.
+def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(client):
+    """Real plugin_page.js handlers must reveal Schedule when the button is clicked.
 
     The previous test harness injected its own listeners. This test instead
     wires up the real plugin_page.js module so we catch regressions where the
@@ -94,23 +95,39 @@ def test_draft_add_to_playlist_button_opens_modal_with_real_handlers(client):
             """)
 
         # Click the DRAFT-state "Add to Playlist" button.
-        page.click('button[data-open-modal="scheduleModal"]')
-
-        # Modal must become visible (display:flex via openModal) — not silently no-op.
-        page.wait_for_selector("#scheduleModal", state="visible", timeout=2000)
-        is_visible = page.evaluate(
-            "() => { const m = document.getElementById('scheduleModal'); return !!m && m.classList.contains('is-open') && m.style.display === 'flex'; }"
+        # Target the DRAFT-marked Add-to-Playlist trigger specifically. The
+        # Schedule subtab button itself also matches
+        # `[data-plugin-subtab-target="schedule"]`, so without the draft
+        # marker this test could pass without exercising the DRAFT click path.
+        page.click(
+            'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
         )
-        assert (
-            is_visible
-        ), "scheduleModal did not open when Add to Playlist was clicked in DRAFT state"
+
+        # Poll for the observable schedule-active state instead of sleeping a
+        # fixed 250ms. The real click handler reveals the schedule panel via a
+        # rAF + focus call, which can be slower on CI than on dev machines.
+        # wait_for_function raises TimeoutError if the predicate never becomes
+        # true, which is the only failure mode we care about here — a
+        # follow-up page.evaluate would just re-run the same predicate
+        # (CodeRabbit review, PR #570).
+        page.wait_for_function(
+            """() => {
+                const tab = document.querySelector('[data-plugin-subtab="schedule"]');
+                const panel = document.getElementById('pluginSchedulePanel');
+                const instance = document.getElementById('instance');
+                return !!tab && tab.getAttribute('aria-selected') === 'true'
+                    && !!panel && panel.hidden === false
+                    && !!instance && document.activeElement === instance;
+            }""",
+            timeout=5000,
+        )
 
         browser.close()
 
 
-def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
-    """If the scheduling modal is ever removed, the click must surface a visible
-    error — never silently no-op. JTN-633 defensive path."""
+def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(client):
+    """If the inline scheduling panel is ever removed, the click must surface a
+    visible error — never silently no-op. JTN-633 defensive path."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     html = _render_clock_draft(client)
 
@@ -143,13 +160,34 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
                        update_instance: "/update_plugin_instance", update_now: "/update_now"}
             };
             window.fetch = () => Promise.resolve(new Response("{}", {status: 200, headers: {"Content-Type": "application/json"}}));
-            // Simulate the scheduleModal missing from the DOM to exercise the fallback.
-            document.getElementById('scheduleModal')?.remove();
+            // Simulate the schedule panel missing from the DOM to exercise the fallback.
+            document.getElementById('pluginSchedulePanel')?.remove();
             window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
             """)
 
-        page.click('button[data-plugin-draft="true"]')
-        page.wait_for_timeout(400)
+        # Target the DRAFT-marked Add-to-Playlist trigger specifically. The
+        # Schedule subtab button itself also matches
+        # `[data-plugin-subtab-target="schedule"]`, so without the draft
+        # marker this test could pass without exercising the DRAFT click path.
+        page.click(
+            'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
+        )
+
+        # Poll for the observable failure feedback rather than sleeping a
+        # fixed 400ms. The fallback path renders either a toast or the
+        # response modal — wait for either to surface the expected copy.
+        page.wait_for_function(
+            """() => {
+                const toast = document.querySelector('.toast-container .toast');
+                const toastText = toast ? (toast.textContent || '') : '';
+                const modal = document.getElementById('responseModal');
+                const modalText = modal ? (modal.textContent || '') : '';
+                const combined = toastText + '\\n' + modalText;
+                return combined.includes('scheduling controls')
+                    || combined.includes('refresh the page');
+            }""",
+            timeout=5000,
+        )
 
         # A visible toast or response modal must surface actionable feedback —
         # not a silent no-op. JTN-633.
@@ -160,7 +198,7 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
                 return m ? (m.textContent || '') : '';
             }""")
         assert (
-            "Add to Playlist" in feedback or "refresh the page" in feedback
+            "scheduling controls" in feedback or "refresh the page" in feedback
         ), f"Expected visible failure feedback, got: {feedback!r}"
 
         browser.close()

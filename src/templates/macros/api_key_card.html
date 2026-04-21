@@ -1,5 +1,15 @@
 {#- Reusable API-key card for the managed-keys form.
 
+    Compact single-row layout per the handoff design:
+        svc + usage hint on the left, status-chip + mask + Change/Add button
+        on the right. The actual password input is hidden until the user
+        clicks "Change" (configured) or "Add key" (unconfigured), so the
+        default state is information-dense and read-only.
+
+    The hidden ``.api-key-actions`` container still holds the <input> so it
+    participates in FormData on save, preserving the contract that the
+    backend sees the provider key (name= {{ key_name }}) in every submission.
+
     Parameters:
         label         – Human-readable provider name (e.g. "OpenAI")
         key_name      – Env-var / secret key name  (e.g. "OPEN_AI_SECRET")
@@ -9,17 +19,30 @@
         masked        – The full `masked` dict from the template context
         api_key_plugins – The plugin-usage dict (may be None)
 -#}
-{% macro api_key_card(label, key_name, input_id, status_id, placeholder, masked, api_key_plugins) %}
-<div class="form-group api-key-card">
-    <div class="api-key-card-head">
-        <label class="form-label" for="{{ input_id }}">{{ label }}</label>
-        <div id="{{ status_id }}" class="api-key-status"><strong>Status:</strong> {{ 'Configured (' ~ masked[key_name] ~ ')' if masked[key_name] else 'Not configured' }}</div>
-        {% if api_key_plugins and api_key_plugins.get(key_name) %}<div class="api-key-usage">Used by: {{ api_key_plugins[key_name] | join(', ') }}</div>{% endif %}
+{% macro api_key_card(label, key_name, input_id, status_id, placeholder, masked, api_key_plugins, delete_label=None) %}
+<div class="form-group api-key-card" data-key-card data-configured="{{ 'true' if masked[key_name] else 'false' }}">
+    <div class="key-row">
+        <div class="key-row-left api-key-card-head">
+            <label class="form-label key-svc" for="{{ input_id }}">{{ label }}</label>
+            {% if api_key_plugins and api_key_plugins.get(key_name) %}<div class="key-use api-key-usage">Used by {{ api_key_plugins[key_name] | join(', ') }}</div>{% endif %}
+        </div>
+        <div class="key-row-right">
+            {% if masked[key_name] %}
+                <span class="api-mask mono" aria-hidden="true">{{ masked[key_name] }}</span>
+                <span class="status-chip success has-dot" data-role="key-chip">Configured</span>
+                <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Configured ({{ masked[key_name] }})</div>
+                <button type="button" class="header-button is-secondary api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions"><span data-role="toggle-label">Change</span></button>
+            {% else %}
+                <span class="status-chip warning has-dot" data-role="key-chip">Not set</span>
+                <div id="{{ status_id }}" class="api-key-status sr-only"><strong>Status:</strong> Not configured</div>
+                <button type="button" class="header-button api-key-toggle" data-api-action="reveal-input" data-input-id="{{ input_id }}" aria-expanded="false" aria-controls="{{ input_id }}-actions"><span data-role="toggle-label">Add key</span></button>
+            {% endif %}
+        </div>
     </div>
-    <div class="input-container api-key-actions">
-        <input type="password" id="{{ input_id }}" name="{{ key_name }}" placeholder="{{ '(leave blank to keep current)' if masked[key_name] else placeholder }}" class="form-input" value="" autocomplete="off" spellcheck="false">
+    <div class="input-container api-key-actions" id="{{ input_id }}-actions" hidden>
+        <input type="password" id="{{ input_id }}" name="{{ key_name }}" placeholder="{{ '(leave blank to keep current)' if masked[key_name] else placeholder }}" data-empty-placeholder="{{ placeholder }}" class="form-input" value="" autocomplete="off" spellcheck="false">
         {# data-test-skip-click: permanently removes the stored API key from .env #}
-        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}" data-test-skip-click="true" aria-label="Delete {{ label }} key permanently" title="Permanently remove key from .env">Delete</button>{% endif %}
+        {% if masked[key_name] %}<button type="button" class="header-button delete-button delete-button-danger" data-api-action="delete-key" data-key-name="{{ key_name }}" data-test-skip-click="true" aria-label="Delete {{ delete_label or label }} key permanently" title="Permanently remove key from .env">Delete</button>{% endif %}
     </div>
 </div>
 {% endmacro %}

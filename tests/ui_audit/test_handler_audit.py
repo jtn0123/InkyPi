@@ -58,7 +58,7 @@ _DELEGATED_MARKERS = frozenset(
         "data-open-modal",
         "data-close-modal",
         "data-settings-tab",
-        "data-workflow-mode",
+        "data-plugin-subtab",
         "data-playlist-toggle",
         "data-collapsible-toggle",
         "data-frame-option",

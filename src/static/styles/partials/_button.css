@@ -156,13 +156,56 @@
     }
 }
 
-/* Secondary/outline variants for action buttons to keep consistency app-wide */
+/* Secondary/outline variants for action buttons to keep consistency app-wide.
+   Handoff parity: .is-secondary is a ghost/subtle variant that contrasts
+   against the filled primary (Refresh vs Display next on dashboard;
+   "Check for updates" vs "Update now" on settings). */
 .action-button.is-secondary {
-    background-color: var(--primary);
+    background-color: transparent;
+    color: var(--text);
+    border: 1px solid var(--surface-border);
 }
 .action-button.is-secondary:hover {
+    background-color: var(--panel-bg);
+    border-color: var(--border-strong, var(--surface-border));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Explicit primary modifier — same visual as the base .action-button but
+   named so templates can opt in without ambiguity (screens.jsx uses
+   variant="primary"). */
+.action-button.primary {
+    background-color: var(--primary);
+    color: var(--on-accent);
+    border: none;
+}
+.action-button.primary:hover {
     background-color: var(--primary-hover);
 }
+
+/* Warning / Danger variants for .action-button — previously only defined on
+   .header-button, which caused the Power & Recovery buttons to fall back to
+   the default accent fill. */
+.action-button.is-warning {
+    background-color: var(--warning);
+    color: var(--warning-ink, #1a1408);
+    border: none;
+}
+.action-button.is-warning:hover {
+    background-color: var(--warning);
+    filter: brightness(1.08);
+}
+
+.action-button.is-danger {
+    background-color: var(--error);
+    color: var(--on-accent);
+    border: none;
+}
+.action-button.is-danger:hover {
+    background-color: var(--danger-hover);
+}
+
 .action-button.is-outline {
     background: transparent;
     color: var(--text);
@@ -239,7 +282,6 @@ a:focus-visible,
 .icon-button:focus-visible,
 .toggle-container:focus-visible,
 .playlist-toggle-button:focus-visible,
-.workflow-mode-tab:focus-visible,
 .btn:focus-visible,
 select:focus-visible,
 input:focus-visible,

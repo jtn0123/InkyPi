@@ -1,11 +1,13 @@
 # pyright: reportMissingImports=false
 """Tests for plugin page layout fixes (JTN-89, JTN-152).
 
-JTN-89:  Tab bar hidden on desktop, visible only on mobile.
-JTN-152: API status chips removed from status row (header indicator is sole source).
+JTN-89:  Historical — a Configure/Preview mode toggle used to sit above the
+         workflow grid; the design refresh removed it so both panels render
+         together on every viewport.
+JTN-152: API status chips removed from status row (header indicator is sole
+         source).
 """
 
-import re
 from pathlib import Path
 
 _STYLES_DIR = Path(__file__).resolve().parents[2] / "src" / "static" / "styles"
@@ -16,32 +18,27 @@ def _read_partial(name: str) -> str:
     return (_STYLES_DIR / "partials" / name).read_text(encoding="utf-8")
 
 
-# --- JTN-89: desktop tab bar hidden, mobile visible --------------------------
+# --- JTN-89: mode bar removed; both panels always render ---------------------
 
 
-def test_workflow_mode_bar_hidden_on_desktop():
-    """The .workflow-mode-bar rule in _plugins.css must include display: none."""
+def test_workflow_mode_bar_removed_from_plugin_css():
+    """The Configure/Preview mode bar was retired — no selectors should remain."""
     css = _read_partial("_plugins.css")
-    # Find the .workflow-mode-bar block and verify display: none
-    block = re.search(r"\.workflow-mode-bar\s*\{([^}]+)\}", css, re.DOTALL)
-    assert block, ".workflow-mode-bar rule not found in _plugins.css"
-    assert "display: none" in block.group(
-        1
-    ), ".workflow-mode-bar should have display: none on desktop"
-
-
-def test_workflow_mode_bar_visible_on_mobile():
-    """Inside a @media query in _responsive.css, .workflow-mode-bar must be display: flex."""
-    css = _read_partial("_responsive.css")
-    # Find .workflow-mode-bar rule and check it has display: flex
+    assert ".workflow-mode-bar" not in css, (
+        ".workflow-mode-bar rule should no longer exist in _plugins.css "
+        "(both panels now render together)"
+    )
     assert (
-        ".workflow-mode-bar" in css
-    ), ".workflow-mode-bar must exist in _responsive.css"
-    # Find the specific rule block
-    pattern = r"\.workflow-mode-bar\s*\{[^}]*display:\s*flex"
-    assert re.search(
-        pattern, css
-    ), ".workflow-mode-bar should have display: flex in responsive CSS"
+        ".workflow-mode-tab" not in css
+    ), ".workflow-mode-tab rule should no longer exist in _plugins.css"
+
+
+def test_plugin_template_has_no_workflow_mode_bar():
+    """plugin.html must not render the workflow-mode-bar tablist."""
+    template = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
+    assert "workflow-mode-bar" not in template
+    assert "configureModeBtn" not in template
+    assert "previewModeBtn" not in template
 
 
 # --- JTN-152: duplicate API status chips removed -----------------------------
@@ -70,3 +67,10 @@ def test_header_api_indicator_still_present():
     assert (
         "api-key-indicator" in template
     ), "Header API key indicator must remain in plugin.html"
+
+
+def test_plugin_template_uses_overview_and_preview_cards():
+    """The plugin page should keep the handoff-style overview + preview framing."""
+    template = (_TEMPLATES_DIR / "plugin.html").read_text(encoding="utf-8")
+    assert "plugin-editor-overview" in template
+    assert "workflow-preview-card" in template

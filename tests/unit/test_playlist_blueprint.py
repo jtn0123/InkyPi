@@ -721,7 +721,9 @@ class TestDisplayNextInPlaylist:
             )
             assert resp.status_code == 200
             assert resp.get_json()["success"] is True
+            assert resp.get_json()["playlist"] == "Next"
             assert mock_update.called
+        assert device_config_dev.get_playlist_manager().active_playlist == "Next"
 
 
 # ---------------------------------------------------------------------------

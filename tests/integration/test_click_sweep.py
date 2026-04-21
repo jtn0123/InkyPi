@@ -176,7 +176,7 @@ _ENUMERATE_JS = """
   const candidates = new Set();
   const selectors = ['button', 'a', '[data-plugin-action]', '[data-api-action]',
                      '[data-settings-tab]', '[data-history-action]',
-                     '[data-collapsible-toggle]', '[data-workflow-mode]',
+                     '[data-collapsible-toggle]',
                      '[data-playlist-toggle]'];
   for (const sel of selectors) {
     for (const el of document.querySelectorAll(sel)) candidates.add(el);

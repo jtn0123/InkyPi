@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}InkyPi - Settings{% endblock %}
+{% block body_attrs %} data-page="settings"{% endblock %}
 {% block head %}
+    <meta name="status-badge-disabled" content="1">
     {% set settings_scripts = [
         'scripts/ui_helpers.js',
         'scripts/settings/shared.js',
@@ -17,46 +19,73 @@
     {% endfor %}
 {% endblock %}
 {% block body %}
-    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
+    <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management page-shell-settings" data-page-shell="management">
     <div class="settings-grid">
     <div class="frame settings-panel">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
-        <!-- Settings Header -->
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('gear-six', 'app-icon') | safe }}
-                        <h1 class="app-title">Settings</h1>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button type="button" class="header-button is-secondary" id="downloadLogsBtn">Download Logs</button>
-                    <a class="header-button is-dark" href="{{ url_for('settings.api_keys_page') }}">Manage API Keys</a>
-                </div>
-            </div>
-        </header>
-        <div class="separator"></div>
+        {% from 'macros/pageheader.html' import pageheader %}
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings'}]) }}
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Manage device behavior, scheduling, recovery tools, and image processing from one control surface.</p>
-            </div>
-            <div class="page-summary">
-                <span class="status-chip info settings-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
-                <span class="status-chip">{{ device_settings.orientation | capitalize }}</span>
-                <span class="status-chip">{{ device_settings.timezone }}</span>
-            </div>
-        </div>
+        {# JTN-340/JTN-748: device-name chip carries the full device name via
+           `title=` for hover disclosure and ellipsis-truncates at narrow
+           widths via the `.settings-device-name` rule. The page-header chip
+           uses a dedicated `.settings-page-device-name` class so it escapes
+           the chrome-level hide rule that targets the redundant top-bar
+           chip on this page. #}
+        {% set settings_chips_html %}
+            <span class="status-chip settings-page-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
+        {% endset %}
+        {% call pageheader(
+            title='Device & system',
+            eyebrow='Settings',
+            description='Core device preferences, schedule, image, and updates in one place.',
+            chips_html=settings_chips_html
+        ) %}
+            <button type="button" class="header-button is-secondary" id="downloadLogsBtn">Download logs</button>
+            <a class="header-button primary" href="{{ url_for('settings.api_keys_page') }}">
+                <svg class="btn-leading-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <circle cx="8" cy="15" r="4"/><path d="M10.85 12.15 19 4"/><path d="M18 5l3 3"/><path d="M15 8l3 3"/>
+                </svg>
+                <span>API keys</span>
+            </a>
+        {% endcall %}
         <div class="settings-console-layout">
         <button type="button" class="settings-mobile-toggle header-button" id="settingsMobileNavToggle" aria-expanded="false" aria-controls="settingsSideNav">Sections</button>
         <nav class="settings-side-nav" id="settingsSideNav" role="navigation" aria-label="Settings groups">
-            <button type="button" class="settings-side-link active" data-settings-tab="device">Device</button>
-            <button type="button" class="settings-side-link" data-settings-tab="scheduling">Scheduling</button>
-            <button type="button" class="settings-side-link" data-settings-tab="image">Image Processing</button>
-            <button type="button" class="settings-side-link" data-settings-tab="maintenance">Updates</button>
+            {# Handoff parity: each tab carries a small leading icon. Inline SVGs
+               (Phosphor-ish) keep the template self-contained — we don't have
+               the Phosphor web font loaded, and adding 5 SVG assets for this
+               alone isn't worth it. `aria-hidden="true"` keeps the label as
+               the accessible name. #}
+            <button type="button" class="settings-side-link active" data-settings-tab="device">
+                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>
+                </svg>
+                <span>Device</span>
+            </button>
+            <button type="button" class="settings-side-link" data-settings-tab="scheduling">
+                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                </svg>
+                <span>Scheduling</span>
+            </button>
+            <button type="button" class="settings-side-link" data-settings-tab="image">
+                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2a2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-10z"/><circle cx="7.5" cy="10.5" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="10.5" r="1"/>
+                </svg>
+                <span>Image</span>
+            </button>
+            <button type="button" class="settings-side-link" data-settings-tab="maintenance">
+                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+                </svg>
+                <span>Updates</span>
+            </button>
+            <button type="button" class="settings-side-link" data-settings-tab="power">
+                <svg class="settings-side-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <path d="M12 3v9"/><path d="M7.5 6.5a7 7 0 1 0 9 0"/>
+                </svg>
+                <span>Power</span>
+            </button>
         </nav>
         <div class="settings-console-main">
         <!-- Settings Content -->
@@ -64,100 +93,142 @@
             <div id="settings-container">
                 <section class="settings-console-panel active" data-settings-panel="device">
                 <!-- Basics -->
-                <div class="section" id="section-basics">
-                    <div class="section-title">Basics</div>
+                <div class="card card-dense" id="section-basics">
+                    <div class="card-head"><h2 class="card-title">Basics</h2></div>
+                    <div class="card-body">
+                    <div class="settings-container">
                     <div class="form-group">
-                        <label for="deviceName" class="form-label">Device Name</label>
+                        <label for="deviceName" class="form-label">Device name</label>
                         {# JTN-780: mirror server-side constraints from JTN-746 so users see inline feedback
                            before hitting Save. maxlength caps input at 64; pattern forbids control characters
                            (Cc category) except tab, matching blueprints/settings/_config.py::_validate_device_name. #}
                         <input type="text" id="deviceName" name="deviceName" placeholder="Enter device name" value="{{ device_settings.name }}" required maxlength="64" pattern="[^\u0000-\u0008\u000A-\u001F\u007F-\u009F]*" title="Up to 64 characters. Tabs are allowed; other control characters are not." class="form-input" aria-required="true" aria-invalid="false" aria-describedby="deviceName-error">
                         <span id="deviceName-error" class="validation-message" role="alert"></span>
                     </div>
-                    <div class="form-group nowrap">
+                    {# Handoff parity: Orientation | Preview size sit in a
+                       two-column row, and the Invert toggle is its own row
+                       below — not crammed onto a single `nowrap` line. #}
+                    <div class="row-2">
                         <div class="form-group">
-                            <label for="orientation" class="form-label">Orientation</label>
-                            <select id="orientation" name="orientation" class="form-input">
-                                <option value="horizontal" {% if device_settings.orientation == "horizontal" %}selected{% endif %}>Horizontal</option>
-                                <option value="vertical" {% if device_settings.orientation == "vertical" %}selected{% endif %}>Vertical</option>
-                            </select>
+                            <span class="form-label" id="orientationLabel">Orientation</span>
+                            <div class="seg seg-radio" role="radiogroup" aria-labelledby="orientationLabel">
+                                <label class="seg-btn">
+                                    <input type="radio" id="orientation" name="orientation" value="horizontal" {% if device_settings.orientation == "horizontal" %}checked{% endif %}>
+                                    Horizontal
+                                </label>
+                                <label class="seg-btn">
+                                    <input type="radio" name="orientation" value="vertical" {% if device_settings.orientation == "vertical" %}checked{% endif %}>
+                                    Vertical
+                                </label>
+                            </div>
                         </div>
                         <div class="form-group">
-                            <label for="previewSizeMode" class="form-label">Preview Size</label>
-                            <select id="previewSizeMode" name="previewSizeMode" class="form-input">
-                                <option value="fit" {% if device_settings.preview_size_mode == "fit" %}selected{% endif %}>Fit to container</option>
-                                <option value="native" {% if device_settings.preview_size_mode != "fit" %}selected{% endif %}>Native pixels</option>
-                            </select>
+                            <span class="form-label" id="previewSizeLabel">Preview size</span>
+                            <div class="seg seg-radio" role="radiogroup" aria-labelledby="previewSizeLabel">
+                                <label class="seg-btn">
+                                    <input type="radio" id="previewSizeMode" name="previewSizeMode" value="fit" {% if device_settings.preview_size_mode == "fit" %}checked{% endif %}>
+                                    Fit to container
+                                </label>
+                                <label class="seg-btn">
+                                    <input type="radio" name="previewSizeMode" value="native" {% if device_settings.preview_size_mode != "fit" %}checked{% endif %}>
+                                    Native pixels
+                                </label>
+                            </div>
                         </div>
-                        <div class="form-group nowrap">
-                            <label class="form-label" for="invertImage">Invert Image</label>
-                            <span class="toggle-container">
-                                <input type="checkbox" id="invertImage" name="invertImage" class="toggle-checkbox" {% if device_settings.inverted_image %}checked{% endif %}>
-                                <span class="toggle-label"></span>
-                            </span>
-                        </div>
+                    </div>
+                    <div class="form-group nowrap toggle-row">
+                        <span class="toggle-item-text">
+                            <label class="form-label toggle-item-label" for="invertImage">Invert image</label>
+                            <span class="toggle-item-hint">Swap light/dark. Useful for certain e-ink panels.</span>
+                        </span>
+                        <span class="toggle-container">
+                            <input type="checkbox" id="invertImage" name="invertImage" class="toggle-checkbox" {% if device_settings.inverted_image %}checked{% endif %}>
+                            <span class="toggle-label"></span>
+                        </span>
+                    </div>
+                    </div>
                     </div>
                 </div>
 
                 <!-- Time & Locale -->
-                <div class="collapsible" id="section-time-locale">
-                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Time & Locale <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
-                    </button>
-                    <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group nowrap">
-                            <label for="timezone" class="form-label">Time Zone</label>
-                            <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.get('timezone', 'UTC') }}" />
-                            <datalist id="timezoneList">
-                                {% for timezone in timezones %}
-                                <option value="{{ timezone }}"></option>
-                                {% endfor %}
-                            </datalist>
+                <div class="card card-dense" id="section-time-locale">
+                    <div class="card-head"><h2 class="card-title">Time &amp; locale</h2></div>
+                    <div class="card-body">
+                    <div class="settings-container">
+                        <div class="row-2">
+                            <div class="form-group">
+                                <label for="timezone" class="form-label">Time zone</label>
+                                <input type="text" id="timezone" name="timezoneName" class="form-input" list="timezoneList" placeholder="Type to search..." value="{{ device_settings.get('timezone', 'UTC') }}" />
+                                <datalist id="timezoneList">
+                                    {% for timezone in timezones %}
+                                    <option value="{{ timezone }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="form-group">
+                                <span class="form-label" id="timeFormatLabel">Time format</span>
+                                <div class="seg seg-radio" role="radiogroup" aria-labelledby="timeFormatLabel">
+                                    <label class="seg-btn">
+                                        <input type="radio" id="timeFormat" name="timeFormat" value="12h" {% if device_settings.time_format == "12h" %}checked{% endif %}>
+                                        12 h
+                                    </label>
+                                    <label class="seg-btn">
+                                        <input type="radio" name="timeFormat" value="24h" {% if device_settings.time_format == "24h" %}checked{% endif %}>
+                                        24 h
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group nowrap">
-                            <label class="form-label" for="useDeviceLocation">Use this browser's location on save</label>
+                        <div class="form-group nowrap toggle-row">
+                            <span class="toggle-item-text">
+                                <label class="form-label toggle-item-label" for="useDeviceLocation">Use this browser's location on save</label>
+                                <span class="toggle-item-hint">Populate timezone from the browser when you save changes.</span>
+                            </span>
                             <span class="toggle-container">
                                 <input type="checkbox" id="useDeviceLocation" class="toggle-checkbox">
                                 <span class="toggle-label"></span>
                             </span>
                         </div>
-                        <div class="form-group nowrap">
-                            <label for="timeFormat" class="form-label">Time Format</label>
-                            <select id="timeFormat" name="timeFormat" class="form-input">
-                                <option value="12h" {% if device_settings.time_format == "12h" %}selected{% endif %}>12 Hour (AM/PM)</option>
-                                <option value="24h" {% if device_settings.time_format == "24h" %}selected{% endif %}>24 Hour</option>
-                            </select>
-                        </div>
+                    </div>
                     </div>
                 </div>
                 </section>
 
                 <!-- Plugin cycle & system -->
                 <section class="settings-console-panel" data-settings-panel="scheduling">
-                <div class="collapsible" id="section-display-cycle">
-                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Display Cycle & System <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
-                    </button>
-                    <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group">
-                            <label for="interval" class="form-label">Plugin Cycle Interval</label>
-                            <span class="help-icon" title="Determines how often the display switches to a new plugin." aria-label="Determines how often the display switches to a new plugin.">{% include 'icons/ph/info.svg' ignore missing %}</span>
-                            <span>Every</span>
-                            <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
-                            <span id="interval-settings-error" class="validation-message" role="alert"></span>
-                            <select id="unit" name="unit" class="form-input" required aria-label="Time unit" aria-required="true">
-                                <option value="minute">Minute</option>
-                                <option value="hour">Hour</option>
-                            </select>
+                <div class="card card-dense" id="section-display-cycle">
+                    <div class="card-head"><h2 class="card-title">Display cycle</h2></div>
+                    <div class="card-body">
+                    <div class="settings-container">
+                        <div class="row-2">
+                            <div class="form-group">
+                                <label for="interval" class="form-label">
+                                    Plugin cycle interval
+                                    <span class="help-icon" role="note" title="Determines how often the display switches to a new plugin." aria-label="Determines how often the display switches to a new plugin.">{% include 'icons/ph/info.svg' ignore missing %}</span>
+                                </label>
+                                <input type="number" id="interval" name="interval" class="form-input" required min="1" aria-required="true" aria-invalid="false" aria-describedby="interval-settings-error">
+                                <span id="interval-settings-error" class="validation-message" role="alert"></span>
+                            </div>
+                            <div class="form-group">
+                                <label for="unit" class="form-label">Unit</label>
+                                <select id="unit" name="unit" class="form-input" required aria-required="true">
+                                    <option value="minute">Minutes</option>
+                                    <option value="hour">Hours</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <div class="form-group nowrap">
-                            <label class="form-label" for="logSystemStats">Log System Stats</label>
+                        <div class="form-group nowrap toggle-row">
+                            <span class="toggle-item-text">
+                                <label class="form-label toggle-item-label" for="logSystemStats">Log system stats</label>
+                                <span class="toggle-item-hint">Record CPU, memory, temperature every cycle.</span>
+                            </span>
                             <span class="toggle-container">
                                 <input type="checkbox" id="logSystemStats" name="logSystemStats" class="toggle-checkbox" {% if device_settings.log_system_stats %}checked{% endif %}>
                                 <span class="toggle-label"></span>
                             </span>
                         </div>
+                    </div>
                     </div>
                 </div>
                 </section>
@@ -165,11 +236,13 @@
                 <section class="settings-console-panel" data-settings-panel="maintenance">
 
                 <!-- Software Update — always visible, top of Updates tab -->
+                <div class="card" id="section-software-update">
+                <div class="card-head">
+                    <h2 class="card-title">Software update</h2>
+                    <span class="status-chip" id="updateBadge">Checking...</span>
+                </div>
+                <div class="card-body">
                 <div class="update-panel" id="updatePanel">
-                    <div class="update-header">
-                        <h3>Software Update</h3>
-                        <span class="status-chip" id="updateBadge">Checking...</span>
-                    </div>
                     {# JTN-710: banner populated from /settings/update_status
                        when install/update.sh's EXIT trap (JTN-704) wrote a
                        .last-update-failure record on the previous run. #}
@@ -190,12 +263,16 @@
                            inside the failure banner so the visibility rule
                            is obvious to readers of the template. #}
                         <div class="update-failure-actions">
-                            <button type="button" id="rollbackUpdateBtn" class="action-button compact warn" hidden>
+                            <button type="button" id="rollbackUpdateBtn" class="action-button compact is-warning" hidden>
                                 Roll back to <span id="rollbackTargetVersion">previous version</span>
                             </button>
                         </div>
                     </div>
-                    <div class="update-version-row">
+                    {# Handoff parity: version tiles on the left, action
+                       buttons pushed to the right via `margin-left:auto` on
+                       `.update-actions`. Release notes live below as a
+                       plain <details> to keep the row compact. #}
+                    <div class="update-row">
                         <div class="update-version-card">
                             <span class="update-version-label">Installed</span>
                             <span class="update-version-number" id="currentVersion">{{ app_version }}</span>
@@ -205,137 +282,252 @@
                             <span class="update-version-label">Latest</span>
                             <span class="update-version-number" id="latestVersion">—</span>
                         </div>
+                        <div class="update-actions">
+                            <button type="button" id="checkUpdatesBtn" class="action-button compact is-secondary"><span class="btn-spinner" aria-hidden="true"></span> Check for updates</button>
+                            <button type="button" id="startUpdateBtn" class="action-button compact primary" disabled>Update now</button>
+                            <button type="button" id="whatsNewBtn" class="action-button compact is-secondary" hidden>What's new</button>
+                        </div>
                     </div>
                     <div id="releaseNotesContainer" class="update-release-notes" hidden>
                         <details>
-                            <summary class="update-release-notes-toggle">Release Notes</summary>
+                            <summary class="update-release-notes-toggle">Release notes <span class="update-release-version" id="releaseNotesVersion"></span></summary>
                             <div id="releaseNotesBody" class="update-release-notes-body"></div>
                         </details>
                     </div>
-                    <div class="update-actions">
-                        <button type="button" id="checkUpdatesBtn" class="action-button compact"><span class="btn-spinner" aria-hidden="true"></span> Check for Updates</button>
-                        <button type="button" id="startUpdateBtn" class="action-button compact" disabled>Update Now</button>
-                        <button type="button" id="whatsNewBtn" class="action-button compact" hidden>What's New</button>
-                    </div>
+                </div>
+                </div>
                 </div>
 
                 <!-- Backup & Restore -->
-                <div class="collapsible" id="section-backup-restore">
-                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Backup & Restore <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
-                    </button>
-                    <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group">
-                            <button type="button" id="exportConfigBtn" class="action-button compact">Download Backup</button>
+                <div class="card card-dense" id="section-backup-restore">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Backup &amp; restore</h2>
+                            <p class="card-sub">Export a full config snapshot or restore from a prior backup.</p>
                         </div>
-                        <div class="form-group nowrap">
-                            <label class="form-label" for="includeKeys">Include API keys</label>
-                            <span class="toggle-container">
-                                <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
-                                <span class="toggle-label"></span>
-                            </span>
-                        </div>
-                        <div class="form-group">
+                    </div>
+                    <div class="card-body">
+                    {# Handoff parity: a single horizontal `inline-row` packs Download,
+                       Restore-from-file, and the Include-API-keys toggle together. #}
+                    <div class="inline-row backup-restore-row">
+                        <button type="button" id="exportConfigBtn" class="action-button compact">Download backup</button>
+                        <div class="backup-restore-restore">
                             <input type="file" id="importFile" accept="application/json" class="form-input" aria-label="Select backup file to restore" />
-                            <button type="button" id="importConfigBtn" class="action-button compact warn" disabled>Restore from File</button>
+                            <button type="button" id="importConfigBtn" class="action-button compact is-secondary" disabled>Restore from file</button>
                         </div>
+                    </div>
+                    {# Handoff parity: Include-API-keys sits on its own row as a
+                       left-aligned label + hint with the switch on the right —
+                       matching Invert image / Log system stats elsewhere. The
+                       previous `.toggle-inline` wrapper right-aligned the text
+                       which broke rhythm with the other toggles. #}
+                    <div class="form-group nowrap toggle-row">
+                        <span class="toggle-item-text">
+                            <label class="form-label toggle-item-label" for="includeKeys">Include API keys</label>
+                            <span class="toggle-item-hint">Package provider secrets with the backup.</span>
+                        </span>
+                        <span class="toggle-container">
+                            {# Opt-in: API keys are provider secrets, so the
+                               default backup should not package them. Users
+                               must explicitly tick this box to include them. #}
+                            <input type="checkbox" id="includeKeys" class="toggle-checkbox">
+                            <span class="toggle-label"></span>
+                        </span>
+                    </div>
                     </div>
                 </div>
 
-                <!-- Diagnostics -->
-                <div class="collapsible" id="section-observability">
+                <!-- Advanced tools -->
+                <div class="card collapsible observability-card" id="section-observability">
                     <span id="diagnostics" class="anchor-target" aria-hidden="true"></span>
+                    <div class="observability-toolbar">
+                        <div class="observability-copy">
+                            <div class="observability-eyebrow">Advanced tools</div>
+                            <p class="observability-summary">Keep diagnostics and live logs nearby for troubleshooting without crowding the core settings flow.</p>
+                        </div>
+                    </div>
                     <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Diagnostics <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
+                        Diagnostics snapshot
+                        <svg class="collapsible-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
                     </button>
                     <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group nowrap">
-                            <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh Benchmarks</button>
-                            <!-- data-test-skip-click: destructive reset, excluded from test_click_sweep -->
-                            <button type="button" id="safeResetBtn" class="action-button compact warn" data-test-skip-click="true">Safe Reset</button>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
-                            <input id="isolatePluginInput" type="text" class="form-input" placeholder="e.g. weather" />
-                            <div class="inline-action-row">
-                                <!-- data-test-skip-click: isolate/unisolate mutate plugin state globally -->
-                                <button type="button" id="isolatePluginBtn" class="action-button compact warn" data-test-skip-click="true">Isolate</button>
-                                <button type="button" id="unIsolatePluginBtn" class="action-button compact" data-test-skip-click="true">Unisolate</button>
-                                <button type="button" id="refreshIsolationBtn" class="action-button compact">Refresh List</button>
-                            </div>
-                        </div>
-                        <div class="sections-grid two-col">
-                            <div class="form-group">
-                                <span class="form-label">Benchmark Summary</span>
-                                <div id="benchSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Benchmark Summary" aria-busy="true">Benchmark summary loading...</div>
+                        <section class="observability-section" aria-labelledby="diagnosticsToolsHeading">
+                            <div class="observability-section-head">
+                                <div class="observability-section-title">
+                                    <h3 id="diagnosticsToolsHeading">Diagnostics</h3>
+                                    <p>Snapshot render health, benchmark timings, and temporary plugin isolation controls.</p>
+                                </div>
+                                <button type="button" id="refreshBenchmarksBtn" class="action-button compact">Refresh diagnostics</button>
                             </div>
                             <div class="form-group">
-                                <span class="form-label">Health Summary</span>
-                                <div id="healthSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Health Summary" aria-busy="true">Health summary loading...</div>
+                                <label class="form-label" for="isolatePluginInput">Isolate Plugin ID</label>
+                                <input id="isolatePluginInput" type="text" class="form-input" placeholder="e.g. weather" />
+                                <div class="inline-action-row">
+                                    <!-- data-test-skip-click: isolate/unisolate mutate plugin state globally -->
+                                    <button type="button" id="isolatePluginBtn" class="action-button compact is-warning" data-test-skip-click="true">Isolate</button>
+                                    <button type="button" id="unIsolatePluginBtn" class="action-button compact" data-test-skip-click="true">Unisolate</button>
+                                    <button type="button" id="refreshIsolationBtn" class="action-button compact">Refresh List</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <span class="form-label">Isolation Summary</span>
-                            <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-label="Isolation Summary" aria-busy="true">Isolation list loading...</div>
-                        </div>
+                            <div class="sections-grid two-col">
+                                <div class="form-group">
+                                    <span class="form-label">Benchmark Summary</span>
+                                    <div id="benchSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Benchmark Summary" aria-busy="true">Benchmark summary loading...</div>
+                                </div>
+                                <div class="form-group">
+                                    <span class="form-label">Health Summary</span>
+                                    <div id="healthSummary" class="logs-viewer loading-panel diagnostics-panel" aria-label="Health Summary" aria-busy="true">Health summary loading...</div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <span class="form-label">Isolation Summary</span>
+                                <div id="isolationSummary" class="logs-viewer loading-panel diagnostics-panel diagnostics-panel-sm" aria-label="Isolation Summary" aria-busy="true">Isolation list loading...</div>
+                            </div>
+                        </section>
+                        <section class="observability-section" aria-labelledby="settingsLogsHeading">
+                            <div class="observability-section-head">
+                                <div class="observability-section-title">
+                                    <h3 id="settingsLogsHeading">Live logs</h3>
+                                    <p>Filter recent device and service output without leaving the Updates tab.</p>
+                                </div>
+                            </div>
+                            <div class="logs-panel logs-panel-inline frame" id="settingsLogsPanel" hidden>
+                                <div class="logs-toolbar">
+                                    <div class="logs-header">
+                                        <div class="title-container">
+                                            <!-- Inline SVG log icon (document-like) to differentiate from gear -->
+                                            <svg class="app-icon logs-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path class="icon-fill" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6"/>
+                                                <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="1.6"/>
+                                                <path class="icon-accent" d="M8 12h8M8 16h8M8 20h8" stroke="currentColor" stroke-width="1.6"/>
+                                            </svg>
+                                            <h4 class="app-title">Logs</h4>
+                                        </div>
+                                        <div class="logs-filters">
+                                            <input id="logsFilter" type="text" placeholder="Filter" class="form-input" aria-label="Filter logs" />
+                                            <label for="logsLevel" class="form-label">Show:</label>
+                                            <select id="logsLevel" class="form-input">
+                                                <option value="all" selected>All</option>
+                                                <option value="errors">Errors</option>
+                                                <option value="warn_errors">Warnings + Errors</option>
+                                            </select>
+                                            <label for="logsHours" class="form-label">Since:</label>
+                                            <select id="logsHours" class="form-input">
+                                                <option value="1">1 hour</option>
+                                                <option value="2" selected>2 hours</option>
+                                                <option value="6">6 hours</option>
+                                                <option value="12">12 hours</option>
+                                                <option value="24">24 hours</option>
+                                            </select>
+                                            <label for="logsMaxLines" class="form-label">Max lines:</label>
+                                            <input id="logsMaxLines" type="number" min="50" value="500" class="form-input" />
+                                        </div>
+                                        <div class="logs-actions">
+                                            <button id="logsAutoScrollBtn" class="header-button is-secondary" type="button" aria-pressed="true">Auto-Scroll: On</button>
+                                            <button id="logsWrapBtn" class="header-button is-secondary" type="button" aria-pressed="true">Wrap: On</button>
+                                            <button id="logsRefreshBtn" class="header-button is-secondary" type="button">Refresh</button>
+                                            <button id="logsCopyBtn" class="header-button is-secondary" type="button">Copy</button>
+                                            <!-- data-test-skip-click: clears the on-device log buffer -->
+                                            <button id="logsClearBtn" class="header-button is-dark" type="button" data-test-skip-click="true">Clear</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="separator"></div>
+                                <div class="logs-updated-row">
+                                    <span id="logsUpdated" class="logs-updated">Updated --:--:--</span>
+                                </div>
+                                <pre id="logsViewer" class="logs-viewer"></pre>
+                            </div>
+                        </section>
                     </div>
                 </div>
 
-                <!-- Device Actions -->
-                <div class="danger-zone">
-                    <div>
-                        <h3>Device Actions</h3>
-                        <p>Lifecycle operations on the device itself.</p>
+                </section>
+
+                <!-- Power & recovery — dedicated tab (matches handoff design:
+                     Device / Scheduling / Image / Updates / Power). Tests that
+                     drive reboot/shutdown must open the "power" tab first. -->
+                <section class="settings-console-panel" data-settings-panel="power">
+                <div class="card card-danger" id="section-power">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Power &amp; recovery</h2>
+                            <p class="card-sub">Lifecycle operations on the device itself. Physical access may be required to recover.</p>
+                        </div>
                     </div>
+                    <div class="card-body">
                     <div class="inline-action-row">
                         <!-- data-test-skip-click: reboot/shutdown physically power-cycle the Pi -->
-                        <button type="button" id="rebootBtn" class="action-button is-warning" data-test-skip-click="true">Reboot</button>
-                        <button type="button" id="shutdownBtn" class="action-button is-danger" data-test-skip-click="true">Shutdown</button>
+                        <button type="button" id="rebootBtn" class="action-button compact is-warning" data-test-skip-click="true">Reboot</button>
+                        <button type="button" id="shutdownBtn" class="action-button compact is-danger" data-test-skip-click="true">Shut down</button>
+                        <!-- data-test-skip-click: destructive reset, excluded from test_click_sweep -->
+                        <button type="button" id="safeResetBtn" class="action-button compact is-secondary" data-test-skip-click="true">Safe reset</button>
+                    </div>
                     </div>
                 </div>
                 </section>
 
                 <!-- Image Settings -->
                 <section class="settings-console-panel" data-settings-panel="image">
-                <div class="collapsible" id="section-image-settings">
-                    <button type="button" class="collapsible-header" aria-expanded="false" data-collapsible-toggle>
-                        Image Settings <span class="collapsible-icon" aria-hidden="true">&#9660;</span>
-                    </button>
-                    <div class="settings-container collapsible-content" hidden>
-                        <div class="form-group">
-                            <label for="saturation" class="form-label form-label-min-width">Saturation</label>
-                            <span id="saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
-                            <input type="range" id="saturation" name="saturation" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
+                <div class="card" id="section-image-settings">
+                    <div class="card-head">
+                        <div>
+                            <h2 class="card-title">Image processing</h2>
+                            <p class="card-sub">Applied to every rendered frame before display.</p>
                         </div>
-                        <div class="form-group">
-                            <label for="contrast" class="form-label form-label-min-width">Contrast</label>
-                            <span id="contrast-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
-                            <input type="range" id="contrast" name="contrast" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
-                         </div>
-                        <div class="form-group">
-                            <label for="sharpness" class="form-label form-label-min-width">Sharpness</label>
-                            <span id="sharpness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
-                            <input type="range" id="sharpness" name="sharpness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
+                    </div>
+                    <div class="card-body">
+                    <div class="settings-container">
+                        {# Handoff parity: stacked `slider-head` (label + mono value) over a
+                           full-width range. IDs and names preserved so settings_page.js
+                           keeps binding value-update listeners unchanged. #}
+                        <div class="form-group slider-row">
+                            <div class="slider-head">
+                                <label for="saturation" class="form-label">Saturation</label>
+                                <span id="saturation-value" class="slider-val">{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}</span>
+                            </div>
+                            <input type="range" id="saturation" name="saturation" class="form-input settings-slider slider-range" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('saturation', 1.0) }}" />
                         </div>
-                        <div class="form-group">
-                            <label for="brightness" class="form-label form-label-min-width">Brightness</label>
-                            <span id="brightness-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
-                            <input type="range" id="brightness" name="brightness" class="form-input slider-max-width settings-slider" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
+                        <div class="form-group slider-row">
+                            <div class="slider-head">
+                                <label for="contrast" class="form-label">Contrast</label>
+                                <span id="contrast-value" class="slider-val">{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}</span>
+                            </div>
+                            <input type="range" id="contrast" name="contrast" class="form-input settings-slider slider-range" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('contrast', 1.0) }}" />
+                        </div>
+                        <div class="form-group slider-row">
+                            <div class="slider-head">
+                                <label for="sharpness" class="form-label">Sharpness</label>
+                                <span id="sharpness-value" class="slider-val">{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}</span>
+                            </div>
+                            <input type="range" id="sharpness" name="sharpness" class="form-input settings-slider slider-range" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('sharpness', 1.0) }}" />
+                        </div>
+                        <div class="form-group slider-row">
+                            <div class="slider-head">
+                                <label for="brightness" class="form-label">Brightness</label>
+                                <span id="brightness-value" class="slider-val">{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}</span>
+                            </div>
+                            <input type="range" id="brightness" name="brightness" class="form-input settings-slider slider-range" min="0" max="2" step="0.1" value="{{ device_settings.get('image_settings', {}).get('brightness', 1.0) }}" />
                         </div>
                         {% if device_settings.get('display_type', 'inky') == 'inky' %}
-                        <div class="form-group">
-                            <label for="inky_saturation" class="form-label form-label-min-width">Inky Driver Saturation</label>
-                            <span id="inky_saturation-value" class="slider-value">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
+                        <div class="form-group slider-row">
+                            <div class="slider-head">
+                                <label for="inky_saturation" class="form-label">Inky driver saturation</label>
+                                <span id="inky_saturation-value" class="slider-val">{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}</span>
+                            </div>
                             <input
                                 type="range"
                                 id="inky_saturation"
                                 name="inky_saturation"
-                                class="form-input slider-max-width settings-slider"
+                                class="form-input settings-slider slider-range"
                                 min="0" max="1" step="0.05"
                                 value="{{ device_settings.get('image_settings', {}).get('inky_saturation', 0.5) }}"
                             />
                         </div>
                         {% endif %}
+                    </div>
                     </div>
                 </div>
                 </section>
@@ -345,62 +537,18 @@
         <!-- Buttons -->
         <div class="buttons-container">
             <span id="settings-form-status" class="validation-message" role="status" aria-live="polite"></span>
-            <button type="button" id="saveSettingsBtn" class="action-button" data-form-state-submit aria-describedby="settings-form-status"><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
+            <button type="button" id="saveSettingsBtn" class="action-button" data-form-state-submit aria-describedby="settings-form-status"><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save settings</button>
         </div>
         </div>
         </div>
-    </div>
-    <!-- Live Logs Section -->
-    <div class="frame settings-panel logs-panel">
-        <div class="app-header logs-toolbar">
-            <div class="header-content logs-header">
-                <div class="title-container">
-                    <!-- Inline SVG log icon (document-like) to differentiate from gear -->
-                    <svg class="app-icon logs-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <path class="icon-fill" d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" stroke="currentColor" stroke-width="1.6"/>
-                        <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" stroke-width="1.6"/>
-                        <path class="icon-accent" d="M8 12h8M8 16h8M8 20h8" stroke="currentColor" stroke-width="1.6"/>
-                    </svg>
-                    <h1 class="app-title">Logs</h1>
-                </div>
-                <div class="logs-filters">
-                    <input id="logsFilter" type="text" placeholder="Filter" class="form-input" />
-                    <label for="logsLevel" class="form-label">Show:</label>
-                    <select id="logsLevel" class="form-input">
-                        <option value="all" selected>All</option>
-                        <option value="errors">Errors</option>
-                        <option value="warn_errors">Warnings + Errors</option>
-                    </select>
-                    <label for="logsHours" class="form-label">Since:</label>
-                    <select id="logsHours" class="form-input">
-                        <option value="1">1 hour</option>
-                        <option value="2" selected>2 hours</option>
-                        <option value="6">6 hours</option>
-                        <option value="12">12 hours</option>
-                        <option value="24">24 hours</option>
-                    </select>
-                    <label for="logsMaxLines" class="form-label">Max lines:</label>
-                    <input id="logsMaxLines" type="number" min="50" value="500" class="form-input" />
-                </div>
-                <div class="logs-actions">
-                    <button id="logsAutoScrollBtn" class="header-button is-secondary" type="button" aria-pressed="true">Auto-Scroll: On</button>
-                    <button id="logsWrapBtn" class="header-button is-secondary" type="button" aria-pressed="true">Wrap: On</button>
-                    <button id="logsRefreshBtn" class="header-button is-secondary" type="button">Refresh</button>
-                    <button id="logsCopyBtn" class="header-button is-secondary" type="button">Copy</button>
-                    <!-- data-test-skip-click: clears the on-device log buffer -->
-                    <button id="logsClearBtn" class="header-button is-dark" type="button" data-test-skip-click="true">Clear</button>
-                </div>
-            </div>
-        </div>
-        <div class="separator"></div>
-        <div class="logs-updated-row">
-            <span id="logsUpdated" class="logs-updated">Updated --:--:--</span>
-        </div>
-        <pre id="logsViewer" class="logs-viewer"></pre>
     </div>
     </div>
 
-    <button type="button" class="action-button settings-logs-toggle" id="settingsLogsToggle">Show Logs</button>
+    <button type="button"
+            class="action-button settings-logs-toggle"
+            id="settingsLogsToggle"
+            aria-expanded="false"
+            aria-controls="settingsLogsPanel">Show live logs</button>
 
     <!-- What's New modal (JTN-589) -->
     <div id="whatsNewModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="whatsNewModalTitle" hidden>
@@ -416,12 +564,12 @@
     <div id="rebootConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rebootConfirmTitle" hidden>
         <div class="modal-content">
             <button type="button" id="closeRebootConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="rebootConfirmTitle">Reboot Device?</h2>
+            <h2 id="rebootConfirmTitle">Reboot device?</h2>
             <div class="separator"></div>
             <p>This will interrupt the display and make the web UI unavailable for approximately 30 seconds. If the device fails to come back online, physical access will be required to recover.</p>
             <div class="buttons-container">
-                <button type="button" class="action-button warn" id="confirmRebootBtn">Reboot</button>
-                <button type="button" class="action-button" id="cancelRebootBtn">Cancel</button>
+                <button type="button" class="action-button is-warning" id="confirmRebootBtn">Reboot</button>
+                <button type="button" class="action-button is-secondary" id="cancelRebootBtn">Cancel</button>
             </div>
         </div>
     </div>
@@ -430,12 +578,12 @@
     <div id="rollbackConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="rollbackConfirmTitle" hidden>
         <div class="modal-content">
             <button type="button" id="closeRollbackConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="rollbackConfirmTitle">Roll Back Update?</h2>
+            <h2 id="rollbackConfirmTitle">Roll back update?</h2>
             <div class="separator"></div>
             <p>This will check out the previous version (<span id="rollbackConfirmVersion">—</span>) and re-run the installer. The UI may be briefly unavailable while the service restarts.</p>
             <div class="buttons-container">
-                <button type="button" class="action-button warn" id="confirmRollbackBtn">Roll Back</button>
-                <button type="button" class="action-button" id="cancelRollbackBtn">Cancel</button>
+                <button type="button" class="action-button is-warning" id="confirmRollbackBtn">Roll back</button>
+                <button type="button" class="action-button is-secondary" id="cancelRollbackBtn">Cancel</button>
             </div>
         </div>
     </div>
@@ -444,12 +592,12 @@
     <div id="shutdownConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="shutdownConfirmTitle" hidden>
         <div class="modal-content">
             <button type="button" id="closeShutdownConfirmModalBtn" class="close-button" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="shutdownConfirmTitle">Shut Down Device?</h2>
+            <h2 id="shutdownConfirmTitle">Shut down device?</h2>
             <div class="separator"></div>
             <p>This will power off the device. The web UI will remain unavailable until the device is manually restarted. <strong>Physical access is required to turn it back on.</strong></p>
             <div class="buttons-container">
-                <button type="button" class="action-button warn" id="confirmShutdownBtn">Shut Down</button>
-                <button type="button" class="action-button" id="cancelShutdownBtn">Cancel</button>
+                <button type="button" class="action-button is-danger" id="confirmShutdownBtn">Shut down</button>
+                <button type="button" class="action-button is-secondary" id="cancelShutdownBtn">Cancel</button>
             </div>
         </div>
     </div>

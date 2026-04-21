@@ -23,6 +23,10 @@
       block: $('requestProgress'),
       text: $('requestProgressText'),
       bar: $('requestProgressBar'),
+      // Native <progress> twin of the visual bar — updated alongside it so
+      // screen-reader users get standard progressbar semantics without the
+      // custom role="progressbar" (SonarCloud Web:S6819).
+      meter: $('requestProgressBarMeter'),
       list: $('requestProgressList'),
       clock: $('requestProgressClock'),
       elapsed: $('requestProgressElapsed')
@@ -30,11 +34,11 @@
     function fmtElapsed(ms){
       const s = Math.floor(ms / 1000); const m = Math.floor(s / 60); const rem = s % 60; return m > 0 ? `${m}m ${rem}s` : `${s}s`; }
     function tickClock(){ try { if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); const elapsedMs = Date.now() - getT0(); if (els.elapsed) els.elapsed.textContent = fmtElapsed(elapsedMs); if (elapsedMs > 15000 && getLastStepBase() && els.text && !getLastStepBase().includes('Done') && !getLastStepBase().includes('Failed')) { els.text.textContent = getLastStepBase() + ' (' + fmtElapsed(elapsedMs) + ')'; } } catch(e){} }
-    function setStep(text, pct){ setLastStepBase(text); if (els.block) { els.block.hidden = false; els.block.style.display = ''; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; els.bar.setAttribute('aria-valuenow', pct); }
+    function setStep(text, pct){ setLastStepBase(text); if (els.block) { els.block.hidden = false; els.block.style.display = ''; } if (els.text) els.text.textContent = text; if (els.bar && typeof pct === 'number') { els.bar.style.width = pct + '%'; if (els.meter) els.meter.value = pct; }
       if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch(e){} }
     }
-    function start(){ setT0(Date.now()); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; } catch(e){} tickClock(); setClockTimer(setInterval(tickClock, 1000)); setStep('Preparing…', 10); }
-    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} setTimeout(() => { if (els.block) { els.block.style.display = ''; els.block.hidden = true; } }, 2000); }
+    function start(){ setT0(Date.now()); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; if (els.meter) els.meter.value = 10; } catch(e){} tickClock(); setClockTimer(setInterval(tickClock, 1000)); setStep('Preparing…', 10); }
+    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
     return { setStep, start, stop };
   }
 

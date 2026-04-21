@@ -42,6 +42,32 @@
     'year_progress': 'chart-line-up'
 } %}
 
+{#- Short one-line blurbs for the dashboard plugin grid. Missing ids just render
+    the plugin name on its own. Kept inline (vs. per-plugin `plugin-info.json`)
+    so copy tweaks don't require touching every plugin folder. -#}
+{% set PLUGIN_DESC_MAP = {
+    'ai_text': 'Generate captions and prompts with your LLM provider.',
+    'ai_image': 'Generate wallpaper-grade images from a prompt.',
+    'weather': 'Forecast, sunrise/sunset, and current conditions for a location.',
+    'calendar': 'Upcoming events pulled from a public iCal feed.',
+    'clock': 'Large display clock with selectable faces and colors.',
+    'countdown': 'Count down to a date with a custom label.',
+    'github': 'Repo stats, stars, and contribution streaks.',
+    'image_album': 'Rotate through an album of images on a schedule.',
+    'newspaper': 'A daily newspaper-style front page.',
+    'apod': 'NASA Astronomy Picture of the Day with caption.',
+    'rss': 'Latest headlines from any RSS feed.',
+    'todo_list': 'Render a compact list of tasks.',
+    'unsplash': 'Fresh imagery from Unsplash.',
+    'image_url': 'Display an image from a URL.',
+    'image_upload': 'Upload a still image from your device.',
+    'image_folder': 'Cycle through a local folder of images.',
+    'screenshot': 'Capture a web page and display it as an image.',
+    'wpotd': 'Wikipedia Picture of the Day.',
+    'comic': 'A daily comic strip from your favorite source.',
+    'year_progress': 'Progress bar showing how much of the year is left.'
+} %}
+
 {% macro breadcrumb(items) -%}
 <nav aria-label="Breadcrumb" class="breadcrumb">
     <ol>

@@ -77,8 +77,15 @@ def test_response_modal_restores_focus_to_trigger():
     assert "responseModalClose" in content
 
 
-def test_plugin_workflow_panels_use_inert_for_hidden_panels():
-    """Plugin workflow tabs must keep inactive panels out of the focus order."""
+def test_plugin_workflow_panels_do_not_hide_content_from_assistive_tech():
+    """Design refresh: both Configure and Preview panels render together on every
+    viewport (the old Configure/Preview mode bar was removed). Neither panel
+    should be force-hidden via inert or aria-hidden='true' by setWorkflowMode —
+    every interactive control must stay in the focus order.
+    """
     content = _read_script("plugin_page.js")
 
-    assert 'toggleAttribute("inert"' in content
+    # The panels should be marked aria-hidden="false" (not "true") in the
+    # mode setter, and inert should be *removed*, not applied.
+    assert 'removeAttribute("inert")' in content
+    assert 'setAttribute("aria-hidden", "false")' in content

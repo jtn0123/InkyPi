@@ -4,6 +4,9 @@ import argparse
 import logging
 import os
 import warnings
+from collections.abc import Callable
+from datetime import UTC, datetime
+from pathlib import Path
 from time import perf_counter
 
 from flask import Flask, g, url_for as flask_url_for
@@ -93,6 +96,70 @@ logger = logging.getLogger(__name__)
 _TRUTHY = frozenset({"1", "true", "yes"})
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
 _DEFAULT_WEB_THREADS = 2
+
+
+def _parse_refresh_datetime(iso_value: object) -> datetime | None:
+    """Parse an ISO timestamp from refresh_info, assuming UTC when naive."""
+    if not isinstance(iso_value, str) or not iso_value:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_value)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
+def _format_sidebar_refresh_time(
+    iso_value: object, device_config: Config | None
+) -> str | None:
+    """Return a compact human-readable refresh label for the shell sidebar."""
+    refresh_dt = _parse_refresh_datetime(iso_value)
+    if refresh_dt is None:
+        return None
+
+    try:
+        from utils.time_utils import now_device_tz
+
+        now_dt = (
+            now_device_tz(device_config)
+            if device_config is not None
+            else datetime.now(refresh_dt.tzinfo)
+        )
+    except Exception:
+        now_dt = datetime.now(refresh_dt.tzinfo)
+
+    refresh_local = refresh_dt.astimezone(now_dt.tzinfo)
+    diff_seconds = (now_dt - refresh_local).total_seconds()
+    diff_minutes = diff_seconds / 60
+
+    if diff_seconds < 120:
+        return "just now"
+    if diff_minutes < 60:
+        return f"{int(diff_minutes)} min ago"
+
+    # Bucket "today"/"yesterday" by local calendar date rather than elapsed
+    # seconds. The naive `< 24h` / `< 48h` check mis-labels an 8am refresh of
+    # a 23:00-last-night event as "today at 11:00 PM" (it's actually
+    # yesterday), and misses cross-DST boundaries. Anchor off the local date.
+    today_local = now_dt.date()
+    refresh_date = refresh_local.date()
+    days_ago = (today_local - refresh_date).days
+    if days_ago <= 0:
+        return "today at " + refresh_local.strftime("%I:%M %p").lstrip("0")
+    if days_ago == 1:
+        return "yesterday at " + refresh_local.strftime("%I:%M %p").lstrip("0")
+    return refresh_local.strftime("%b %d at %I:%M %p").replace(" 0", " ")
+
+
+def _format_sidebar_load_average() -> str | None:
+    """Return a compact 1-minute load-average label for the shell footer."""
+    try:
+        load_avg = os.getloadavg()[0]
+    except (AttributeError, OSError):
+        return None
+    return f"{load_avg:.2f} avg"
 
 
 def _get_web_threads() -> int:
@@ -337,6 +404,144 @@ def _register_before_request_hooks(app):
             pass
 
 
+def _lookup_static_version_factory(
+    app: Flask, version: str, cache: dict[str, str]
+) -> Callable[[str], str]:
+    """Return a closure that resolves static-file version tokens.
+
+    Extracted from ``create_app`` to keep that function under Sonar's
+    cognitive-complexity threshold (python:S3776).
+    """
+
+    def _lookup_static_version(filename: str) -> str:
+        cached = cache.get(filename)
+        if cached is not None:
+            return cached
+        static_path = Path(app.static_folder) / filename
+        try:
+            if static_path.is_file():
+                token = f"{version}-{int(static_path.stat().st_mtime)}"
+            else:
+                token = version
+        except OSError:
+            token = version
+        cache[filename] = token
+        return token
+
+    return _lookup_static_version
+
+
+def _compute_now_showing(device_config: Config) -> dict[str, object] | None:
+    """Build the ``now_showing`` dict consumed by the shell footer.
+
+    Returns ``None`` on any failure so the template's ``{% if now_showing %}``
+    branch falls through cleanly. Extracted from ``create_app`` to reduce its
+    cognitive complexity (python:S3776).
+    """
+    from utils.display_names import instance_suffix_label
+
+    try:
+        info = device_config.get_refresh_info().to_dict()
+    except Exception:
+        return None
+
+    plugin_id = info.get("plugin_id") or ""
+    try:
+        refreshed = _format_sidebar_refresh_time(
+            info.get("refresh_time"), device_config
+        )
+    except Exception:
+        refreshed = None
+
+    if not plugin_id:
+        has_last_display = bool(info.get("refresh_time") or info.get("image_hash"))
+        return {
+            "label": None,
+            "meta": (
+                f"refreshed {refreshed}" if refreshed and has_last_display else "Idle"
+            ),
+            "state": "idle",
+        }
+
+    # Resolve the display name from the plugin registry when possible.
+    display_name = plugin_id
+    try:
+        for plugin in device_config.get_plugins() or []:
+            if plugin.get("id") == plugin_id and plugin.get("display_name"):
+                display_name = plugin["display_name"]
+                break
+    except Exception:
+        pass
+
+    instance = instance_suffix_label(info.get("plugin_instance"), plugin_id)
+    if instance and instance.lower() != plugin_id.lower():
+        label = f"{display_name} · {instance}"
+    else:
+        label = display_name
+
+    meta_parts = []
+    if info.get("playlist"):
+        meta_parts.append(str(info["playlist"]))
+    elif info.get("refresh_type"):
+        meta_parts.append(str(info["refresh_type"]))
+    if refreshed:
+        meta_parts.append(f"refreshed {refreshed}")
+
+    return {
+        "label": label,
+        "meta": " · ".join(meta_parts) if meta_parts else "live",
+        "state": "live",
+    }
+
+
+def _register_context_processors(app: Flask) -> None:
+    """Register all Jinja context processors.
+
+    Extracted from ``create_app`` so that function stays under Sonar's
+    cognitive-complexity cap (python:S3776). The nested closures and
+    try/except branches originally lived inline and dominated create_app's
+    score.
+    """
+    # Cache static-file mtime lookups so the per-request context processor
+    # does not hit the filesystem for every static URL it renders.
+    static_mtime_cache: dict[str, str] = {}
+
+    @app.context_processor
+    def _inject_app_version():  # type: ignore[no-untyped-def]
+        version = app.config["APP_VERSION"]
+        lookup_static_version = _lookup_static_version_factory(
+            app, version, static_mtime_cache
+        )
+
+        def versioned_url_for(endpoint, **values):  # type: ignore[no-untyped-def]
+            if endpoint == "static":
+                filename = values.get("filename")
+                if filename:
+                    values.setdefault("v", lookup_static_version(filename))
+                else:
+                    values.setdefault("v", version)
+            return flask_url_for(endpoint, **values)
+
+        return {"app_version": version, "url_for": versioned_url_for}
+
+    @app.context_processor
+    def _inject_now_showing_label():  # type: ignore[no-untyped-def]
+        """Expose sidebar now-playing data derived from refresh_info."""
+        device_config = app.config.get("DEVICE_CONFIG")
+        if device_config is None:
+            return {"now_showing": None}
+        return {"now_showing": _compute_now_showing(device_config)}
+
+    @app.context_processor
+    def _inject_sidebar_system():  # type: ignore[no-untyped-def]
+        return {
+            "sidebar_system": {
+                "online_label": "online",
+                "load_label": _format_sidebar_load_average(),
+            }
+        }
+
+
 def create_app():
     """Build and configure the Flask application.
 
@@ -353,17 +558,7 @@ def create_app():
     )
 
     app.config["APP_VERSION"] = _read_version()
-
-    @app.context_processor
-    def _inject_app_version():
-        version = app.config["APP_VERSION"]
-
-        def versioned_url_for(endpoint, **values):
-            if endpoint == "static":
-                values.setdefault("v", version)
-            return flask_url_for(endpoint, **values)
-
-        return {"app_version": version, "url_for": versioned_url_for}
+    _register_context_processors(app)
 
     device_config = _init_core_services(app)
 

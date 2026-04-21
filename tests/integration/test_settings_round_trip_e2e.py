@@ -40,8 +40,10 @@ def test_change_timezone_persists(live_server, browser_page):
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
+    # Time & Locale is now a flat section (design handoff) inside the Device
+    # panel — no expand click needed.
     tz_input = page.locator("#timezone")
-    tz_input.wait_for(state="attached", timeout=5000)
+    tz_input.wait_for(state="visible", timeout=5000)
     tz_input.scroll_into_view_if_needed()
     tz_input.fill("")
     tz_input.fill("US/Eastern")
@@ -82,13 +84,17 @@ def test_image_slider_values_persist(live_server, browser_page):
 
 
 def test_orientation_persists(live_server, browser_page):
+    """Orientation is now a segmented-radio control — check() the vertical
+    option instead of select_option(). FormData still serializes the chosen
+    radio as `orientation=vertical` so the round-trip contract is preserved.
+    """
     page = browser_page
     navigate_and_wait(page, live_server, "/settings")
 
-    orientation = page.locator("#orientation")
-    orientation.wait_for(state="attached", timeout=5000)
-    orientation.scroll_into_view_if_needed()
-    orientation.select_option("vertical")
+    vertical_radio = page.locator("input[name='orientation'][value='vertical']")
+    vertical_radio.wait_for(state="attached", timeout=5000)
+    vertical_radio.scroll_into_view_if_needed()
+    vertical_radio.check()
 
     save_btn = page.locator("#saveSettingsBtn")
     save_btn.scroll_into_view_if_needed()
@@ -96,7 +102,6 @@ def test_orientation_persists(live_server, browser_page):
     page.wait_for_timeout(2000)
 
     navigate_and_wait(page, live_server, "/settings")
-    orientation = page.locator("#orientation")
-    orientation.wait_for(state="attached", timeout=5000)
-    value = orientation.input_value()
-    assert value == "vertical", f"Orientation should persist, got '{value}'"
+    vertical_radio = page.locator("input[name='orientation'][value='vertical']")
+    vertical_radio.wait_for(state="attached", timeout=5000)
+    assert vertical_radio.is_checked(), "Vertical orientation should persist"

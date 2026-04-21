@@ -1,6 +1,10 @@
 @import "partials/_reset.css";
 @import "partials/_tokens.css";
 @import "partials/_layout.css";
+@import "partials/_sidebar.css";
+@import "partials/_tweaks.css";
+@import "partials/_pageheader.css";
+@import "partials/_card.css";
 @import "partials/_navigation.css";
 @import "partials/_button.css";
 @import "partials/_form.css";

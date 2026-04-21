@@ -67,6 +67,21 @@ def _read_field(page, field_id: str, *, kind: str) -> str | bool:
                 f"#{field_id}",
             )
         )
+    if kind == "radio":
+        # ``#{field_id}`` is the first radio in the group by convention;
+        # the group's checked value is the value of whichever sibling
+        # radio (same ``name``) carries ``checked``.
+        return page.evaluate(
+            """(sel) => {
+                const anchor = document.querySelector(sel);
+                if (!anchor || !anchor.name) return "";
+                const checked = document.querySelector(
+                    `input[type="radio"][name="${anchor.name}"]:checked`
+                );
+                return checked ? checked.value : "";
+            }""",
+            f"#{field_id}",
+        )
     return loc.input_value()
 
 
@@ -116,6 +131,24 @@ def _write_field(page, field_id: str, value, *, kind: str) -> None:
             }""",
             [f"#{field_id}", bool(value)],
         )
+    elif kind == "radio":
+        # Select the sibling radio matching ``value`` in the group anchored
+        # at ``#{field_id}``. Dispatching ``change`` triggers the form
+        # dirty-state tracker that gates the Save button.
+        page.evaluate(
+            """([sel, val]) => {
+                const anchor = document.querySelector(sel);
+                if (!anchor || !anchor.name) return;
+                const target = document.querySelector(
+                    `input[type="radio"][name="${anchor.name}"][value="${val}"]`
+                );
+                if (target) {
+                    target.checked = true;
+                    target.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }""",
+            [f"#{field_id}", str(value)],
+        )
     else:
         raise ValueError(f"Unknown field kind: {kind}")
 
@@ -137,11 +170,14 @@ def _save_settings(page) -> None:
 
 
 # Tuple layout: (field_id, kind, test_value)
-# kind in {"text", "select", "slider", "checkbox"}
+# kind in {"text", "select", "slider", "checkbox", "radio"}
 SETTINGS_FIELDS = [
     ("deviceName", "text", "RoundTripDevice"),
     ("timezone", "text", "US/Pacific"),
-    ("orientation", "select", "vertical"),
+    # Orientation was migrated from <select> to a segmented-radio control;
+    # ``#orientation`` is the first radio in the group (value=horizontal),
+    # and the ``radio`` kind knows how to pick any sibling by ``value``.
+    ("orientation", "radio", "vertical"),
     ("saturation", "slider", "1.4"),
     ("invertImage", "checkbox", True),
 ]

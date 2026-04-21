@@ -31,5 +31,8 @@ def test_preview_helper_text_is_conditional():
     assert (
         "{% if plugin_instance %}" in help_section
     ), "workflow-help must use conditional rendering for plugin_instance"
-    assert "Update Instance" in help_section
-    assert "Add to Playlist" in help_section
+    # Design refresh: button labels are now sentence-cased ("Update instance",
+    # "Add to playlist") after the actions were promoted into the pageheader.
+    # Test with case-insensitive matching so copy tweaks don't regress here.
+    assert re.search(r"update\s+instance", help_section, re.IGNORECASE)
+    assert re.search(r"add\s+to\s+playlist", help_section, re.IGNORECASE)

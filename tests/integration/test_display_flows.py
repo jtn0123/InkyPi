@@ -68,6 +68,8 @@ def test_display_next_in_playlist_success(client, device_config_dev, monkeypatch
     # Even if background task is not running, endpoint should respond cleanly
     assert resp.status_code == 200
     assert resp.json.get("success") is True
+    assert resp.json.get("playlist") == "Default"
+    assert device_config_dev.get_playlist_manager().active_playlist == "Default"
 
 
 def test_main_display_next_happy_path(

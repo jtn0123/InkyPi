@@ -7,35 +7,23 @@
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, breadcrumb %}
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('warning', 'app-icon') | safe }}
-                        <h1 class="app-title">Error Logs</h1>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    {# data-test-skip-click: opens destructive confirm modal #}
-                    <button id="errorsClearBtn" class="header-button is-danger" type="button"
-                            {% if not reports %}disabled{% endif %}
-                            data-test-skip-click="true">Clear All</button>
-                </div>
-            </div>
-        </header>
-        <div class="separator"></div>
+        {% from 'macros/pageheader.html' import pageheader %}
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Error Logs'}]) }}
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.</p>
-            </div>
-            <div class="page-summary">
-                <span class="status-chip {% if reports %}warn{% else %}info{% endif %}">{{ reports | length }} report{{ 's' if reports | length != 1 else '' }}</span>
-            </div>
-        </div>
-        <div class="separator"></div>
+        {% set _report_count = reports | length %}
+        {% call pageheader(
+            title='Error Logs',
+            description='Browser-side error and warning reports captured from this session. Use this page to diagnose client-side failures.',
+            eyebrow='Diagnostics',
+            chips=[{
+                'label': _report_count ~ ' report' ~ ('s' if _report_count != 1 else ''),
+                'variant': 'warn' if reports else 'info',
+            }]
+        ) %}
+            {# data-test-skip-click: opens destructive confirm modal #}
+            <button id="errorsClearBtn" class="header-button is-danger" type="button"
+                    {% if not reports %}disabled{% endif %}
+                    data-test-skip-click="true">Clear All</button>
+        {% endcall %}
 
         <div id="errorsEmptyState" {% if reports %}hidden{% endif %} class="empty-state">
             <p>No error reports captured in this session.</p>

@@ -1,21 +1,28 @@
-/* Enhanced plugins section hierarchy */
+/* Handoff parity: Plugins section heading is a sans-serif UPPERCASE label at
+   14px/600 with tighter tracking (matches `.section-head h2` in the handoff).
+   Previously rendered mono/500 which read like a code comment next to the
+   count chip. */
 .plugins-title {
-    font-size: var(--text-2xs);
+    font-family: inherit;
+    font-size: 0.88rem;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--text-secondary, var(--muted));
     margin: 0;
     text-align: left;
     text-transform: uppercase;
-    letter-spacing: var(--tracking-wider);
+    /* Handoff parity: `.section-head h2` in styles.css:388 uses 0.02em tracking;
+       0.04em read too spaced-out against the count chip. */
+    letter-spacing: 0.02em;
     transition: color var(--transition-speed) ease;
 }
 
-/* Toggle Container */
+/* Toggle Container — handoff parity: refined 34×20 track (was chunky 50×24).
+   Matches the `<Toggle>` primitive in components.jsx. */
 .toggle-container {
     display: inline-block;
     position: relative;
-    width: 50px;
-    height: 24px;
+    width: 34px;
+    height: 20px;
 }
 
 /* Legacy hidden checkbox implementation removed to avoid hiding controls */
@@ -26,25 +33,25 @@
     position: absolute;
     cursor: pointer;
     background-color: var(--divider);
-    border-radius: 15px;
+    border-radius: 12px;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    transition: 0.3s;
+    transition: 0.2s;
 }
 
-/* Toggle Knob */
+/* Toggle Knob — 14×14 centered in a 20-high track (3px inset). */
 .toggle-label::before {
     position: absolute;
     content: "";
-    height: 20px;
-    width: 20px;
+    height: 14px;
+    width: 14px;
     background-color: var(--surface);
     border-radius: 50%;
-    top: 2px;
-    left: 2px;
-    transition: 0.25s;
+    top: 3px;
+    left: 3px;
+    transition: 0.2s;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
@@ -54,7 +61,7 @@
 }
 
 .toggle-checkbox:checked + .toggle-label::before {
-    transform: translateX(26px);
+    transform: translateX(14px);
 }
 
 /* Collapsible sections */
@@ -78,6 +85,14 @@
     float: right;
     opacity: 50%;
     transition: transform 0.2s ease;
+    /* Handoff parity: the collapsible toggle used to render a unicode ▼
+       glyph sized by the surrounding font-size. Swapped to an inline SVG
+       chevron so it matches every other chevron in the UI; give it an
+       explicit box so float-right still lines up with the label. */
+    width: 16px;
+    height: 16px;
+    color: currentColor;
+    vertical-align: middle;
 }
 
 .collapsible-header[aria-expanded="true"] .collapsible-icon {

@@ -1,23 +1,26 @@
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .history-card {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: var(--card-border);
-  border-radius: var(--card-radius);
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--transition-speed) ease, border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+  transition: border-color var(--transition-speed) ease;
+}
+
+.history-card:hover {
+  border-color: var(--text-3);
 }
 
 .history-card-body {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -48,19 +51,23 @@
 
 .history-meta {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .history-name {
-  font-weight: 700;
+  font-weight: 500;
+  font-size: 0.82rem;
   color: var(--text);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-sub {
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  line-height: 1.4;
 }
 
 .history-actions {
@@ -83,9 +90,11 @@
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
 
+/* Handoff parity: button hover uses --surface-2 + --border-strong directly
+   rather than the legacy --bg-secondary / --muted aliases. */
 .history-actions .btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .history-actions .btn-primary {
@@ -108,15 +117,19 @@
   background: var(--danger-hover);
 }
 
+/* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
+   single 1px error-tinted border, no double-up via box-shadow. Padding
+   matches the 16px .card standard instead of the old 20px overhang. */
 .history-danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-top: 8px;
-  padding: 20px;
-  border-width: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 20%, transparent);
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
 }
 
 .history-danger-zone .danger-zone-body {
@@ -135,10 +148,12 @@
   color: var(--error);
 }
 
+/* Handoff uses --surface-border (aliased to --border) for every separator;
+   --panel-border is a legacy token that skews slightly darker. */
 .danger-zone-divider {
   margin: 28px 0 16px;
   border: 0;
-  border-top: 1px solid var(--panel-border);
+  border-top: 1px solid var(--surface-border);
   opacity: 0.75;
 }
 

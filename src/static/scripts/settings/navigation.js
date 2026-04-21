@@ -11,6 +11,12 @@
     }
 
     function initializeMobilePanelState() {
+      // Only auto-expand the first collapsible when we're on mobile widths —
+      // on desktop the user expects the baseline collapsed state so they can
+      // choose what to open. Without this guard, tabs with collapsibles (e.g.
+      // Diagnostics on the "maintenance" tab) auto-expand on tab switch,
+      // which breaks the JTN-643 chevron contract on desktop.
+      if (!mobileQuery?.matches) return;
       const panel = document.querySelector(
         `[data-settings-panel="${state.activeTab}"]`
       );
@@ -83,7 +89,37 @@
       if (logsToggle && logsPanel) {
         logsToggle.addEventListener("click", () => {
           const isOpen = logsPanel.classList.toggle("is-open");
-          logsToggle.textContent = isOpen ? "Hide Logs" : "Show Logs";
+          if (isOpen) {
+            logsPanel.removeAttribute("hidden");
+            // The logs panel now lives inside the "maintenance" tab and the
+            // "observability" collapsible (handoff parity layout). The floating
+            // "Show live logs" button needs to activate the tab and expand the
+            // collapsible so the viewer is actually rendered.
+            const parentTab = logsPanel.closest("[data-settings-panel]");
+            if (parentTab?.dataset.settingsPanel) {
+              setActiveTab(parentTab.dataset.settingsPanel);
+            }
+            const collapsibleContent = logsPanel.closest(".collapsible-content");
+            if (
+              collapsibleContent &&
+              !collapsibleContent.classList.contains("is-open")
+            ) {
+              const collapsible = collapsibleContent.closest(".collapsible");
+              const header = collapsible?.querySelector(".collapsible-header");
+              if (header && ui.toggleCollapsible) {
+                ui.toggleCollapsible(header);
+              } else {
+                // collapsibleContent is already confirmed truthy by the
+                // enclosing if-condition; no need to re-check.
+                collapsibleContent.classList.add("is-open");
+                collapsibleContent.removeAttribute("hidden");
+              }
+            }
+          } else {
+            logsPanel.setAttribute("hidden", "");
+          }
+          logsToggle.setAttribute("aria-expanded", String(isOpen));
+          logsToggle.textContent = isOpen ? "Hide live logs" : "Show live logs";
           if (isOpen) {
             logsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
           }

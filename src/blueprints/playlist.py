@@ -537,6 +537,7 @@ def playlists():
         device_cycle_minutes=device_cycle_minutes,
         playlist_timing=playlist_timing,
         rotation_eta=rotation_eta,
+        active_nav="playlists",
     )
 
 
@@ -1009,6 +1010,11 @@ def display_next_in_playlist():
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
 
+        def _persist_active_playlist(_cfg):
+            playlist_manager.active_playlist = playlist.name
+
+        device_config.update_atomic(_persist_active_playlist)
+
         # Include latest metrics from refresh info if available
         metrics = {}
         try:
@@ -1022,7 +1028,9 @@ def display_next_in_playlist():
         except Exception:
             pass
 
-        return json_success("Displayed next instance", metrics=metrics)
+        return json_success(
+            "Displayed next instance", metrics=metrics, playlist=playlist.name
+        )
 
 
 @playlist_bp.route("/playlist/eta/<string:playlist_name>", methods=["GET"])

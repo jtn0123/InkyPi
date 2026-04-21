@@ -1,5 +1,6 @@
 """Regression tests for the /settings layout fixes in JTN-748."""
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,7 +18,23 @@ def test_settings_summary_device_name_truncates_cleanly():
     assert "white-space: nowrap" in css
 
     html = SETTINGS_HTML.read_text(encoding="utf-8")
-    assert 'class="status-chip info settings-device-name"' in html
+    # JTN-748's concern is the truncation rule — the chip variant
+    # (info/neutral/accent) is an unrelated styling choice that should be
+    # free to change with the design system. Since the settings page has
+    # both chrome-level (`.settings-device-name`) and page-header
+    # (`.settings-page-device-name`) chips — with the former hidden by
+    # CSS to avoid redundancy (CodeRabbit review, PR #570) — accept
+    # either truncation-styled class. Lookaheads keep the test agnostic
+    # to class-attribute token order.
+    chip_match = re.search(
+        r'class="(?=[^"]*\bstatus-chip\b)'
+        r'(?=[^"]*\bsettings(?:-page)?-device-name\b)[^"]*"',
+        html,
+    )
+    assert chip_match, (
+        "expected a .status-chip with either .settings-device-name or "
+        ".settings-page-device-name"
+    )
     assert 'title="{{ device_settings.name }}"' in html
 
 

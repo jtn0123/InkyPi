@@ -165,16 +165,22 @@
     max-width: 100px;
 }
 
-/* API Keys page layout */
+/* API Keys page layout — handoff parity rolled into the base declarations
+   (previously a second block at the bottom of this file re-declared each
+   selector; merged here to avoid duplicate-selector flags). */
 .api-keys-frame {
-  max-width: 860px;
+  max-width: 980px;
   margin: 0 auto;
 }
 
+/* Compact single-row layout per the handoff design: stack cards vertically,
+   each card is one row with svc+usage on the left and chip+mask+button on
+   the right. The <input> row lives in a hidden container below and only
+   reveals when the user clicks "Change" / "Add key". */
 .api-keys-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+  gap: 14px;
+  width: 100%;
 }
 
 .api-keys-panel {
@@ -182,25 +188,81 @@
   gap: 16px;
 }
 
+/* Handoff parity: API-key rows are .card primitives (1px border, radius-xl,
+   --surface) — flatter row style for the handoff Settings layout. */
 .api-key-card {
-  padding: 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--panel-bg);
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.api-key-card-head {
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-xl);
+  background: var(--surface);
   display: grid;
-  gap: 4px;
+  gap: 10px;
   width: 100%;
 }
 
-.api-key-card .form-label {
-  font-size: 1rem;
+.key-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
+.key-row-left {
+  display: flex;
+  flex-direction: column;
+  /* Gap widened from 2px to 4px for handoff parity. */
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.key-row-right {
+  display: inline-flex;
+  align-items: center;
+  /* Handoff parity: tighter single-row layout — no wrap, push to end. */
+  gap: 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.api-key-card .key-svc {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.api-key-card .key-use {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-top: 0;
+}
+
+.api-mask {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  /* Handoff parity: pill-shaped mask with border + surface-2 fill. */
+  padding: 5px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-key-toggle {
+  /* Handoff parity: 34px minimum with tighter 6/12 padding. */
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+/* Visually-hidden status text is still exposed to assistive tech so screen
+   readers hear "Status: Configured (mask)" / "Status: Not configured". */
 .api-key-status {
   display: inline-flex;
   align-items: center;
@@ -224,10 +286,81 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  /* Handoff parity: separator between the headline row and the expanded
+     input row inside the same card. */
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in oklab, var(--surface-border) 80%, transparent);
+}
+
+.api-key-actions[hidden] {
+  display: none;
 }
 
 .api-key-actions .header-button {
   min-width: 0;
+}
+
+.api-keys-frame .pageheader-actions {
+  align-items: center;
+}
+
+.api-keys-frame .pageheader-actions .action-button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.settings-container.api-keys-grid {
+  justify-content: stretch;
+  padding: 0;
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.api-keys-note {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Handoff parity: secondary "advanced" panels sit on --surface-2 (one step
+   up from --surface), not an opaque mix. Radius matches .card (10px). */
+.api-keys-more {
+  margin-top: 4px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.api-keys-more summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 16px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.api-keys-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-keys-more-grid {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
 }
 
 .apikey-row {
@@ -238,22 +371,25 @@
   margin-bottom: 12px;
 }
 
+/* Handoff parity: API-key form fields mirror `.input` in styles.css:239–249
+   (8 10 padding, 13px, --radius-1). We keep the mono face since these carry
+   raw secret tokens the user wants to eyeball character-by-character. */
 .apikey-key,
 .apikey-value {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 14px;
-  background: var(--input-bg);
-  color: var(--text-primary);
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .apikey-value.masked {
   color: var(--text-secondary);
   letter-spacing: 2px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
 }
 
 .btn-delete,
@@ -270,15 +406,25 @@
   transform: translateY(-1px);
 }
 
+/* Handoff parity: delete control in dense rows is a ghost-danger icon
+   (transparent → error-tinted on hover), not a solid red pill. See the
+   `.btn-ghostDanger` primitive in _card.css:119–140. */
 .btn-delete {
   width: 36px;
   height: 36px;
-  border: none;
-  background: var(--error);
-  color: var(--on-accent);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 18px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-delete:hover {
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 30%, transparent);
 }
 
 .add-buttons-grid {
@@ -291,23 +437,37 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border: 2px dashed var(--border-color);
+  padding: 8px 14px;
+  border: 1px dashed var(--surface-border);
   background: transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-weak, transparent);
 }
 
 .btn-preset {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2);
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-family: monospace;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-preset:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .clear-button {

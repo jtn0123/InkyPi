@@ -32,7 +32,22 @@
     for (const el of target.querySelectorAll("input, select, textarea")) {
       const key = el.name || el.id;
       if (!key) continue;
-      snap[key] = el.type === "checkbox" ? el.checked : el.value;
+      if (el.type === "checkbox") {
+        snap[key] = el.checked;
+      } else if (el.type === "radio") {
+        // Radio groups share a name — only capture the value of the
+        // currently-checked radio so the dirty check can tell when the
+        // user toggles between options (e.g. orientation: horizontal ↔
+        // vertical). Without this guard the last radio in DOM order
+        // always wins and toggling never looks dirty.
+        if (el.checked) {
+          snap[key] = el.value;
+        } else if (!(key in snap)) {
+          snap[key] = null;
+        }
+      } else {
+        snap[key] = el.value;
+      }
     }
     return snap;
   }
@@ -44,6 +59,8 @@
       if (!key || !(key in snapshot)) continue;
       if (el.type === "checkbox") {
         el.checked = snapshot[key];
+      } else if (el.type === "radio") {
+        el.checked = snapshot[key] === el.value;
       } else {
         el.value = snapshot[key];
       }

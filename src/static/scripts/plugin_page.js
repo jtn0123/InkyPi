@@ -63,6 +63,24 @@
     combined.style.color = textPicker.value;
   }
 
+  /**
+   * Toggle visibility of the Configure / Style / Schedule sub-panels.
+   * Mirrors the React `tabline` design from the UI handoff (JTN design refresh).
+   * Hoisted to module scope — uses only DOM, no createPluginPage state
+   * (SonarCloud javascript:S7721).
+   */
+  function setPluginSubtab(id) {
+    document.querySelectorAll("[data-plugin-subtab]").forEach((btn) => {
+      const active = btn.dataset.pluginSubtab === id;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    document.querySelectorAll("[data-plugin-subpanel]").forEach((panel) => {
+      const active = panel.dataset.pluginSubpanel === id;
+      panel.hidden = !active;
+    });
+  }
+
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -138,7 +156,11 @@
           if (textEl) textEl.textContent = "No progress data yet";
           if (clockEl) clockEl.textContent = "—";
           if (elapsedEl) elapsedEl.textContent = "—";
-          if (bar) { bar.style.width = "0%"; bar.setAttribute("aria-valuenow", 0); }
+          if (bar) {
+            bar.style.width = "0%";
+            const meter = document.getElementById("requestProgressBarMeter");
+            if (meter) meter.value = 0;
+          }
           if (progress) {
             setHidden(progress, false);
             progress.style.display = "";
@@ -165,7 +187,11 @@
           clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
         }
         if (elapsedEl) elapsedEl.textContent = "—";
-        if (bar) { bar.style.width = "100%"; bar.setAttribute("aria-valuenow", 100); }
+        if (bar) {
+          bar.style.width = "100%";
+          const meter = document.getElementById("requestProgressBarMeter");
+          if (meter) meter.value = 100;
+        }
         // JTN-312: clear the HTML `hidden` attribute so the block is visible;
         // setting style.display alone does not override the `hidden` attribute.
         // JTN-347: also clear inline display:none left by progress.stop() —
@@ -260,6 +286,26 @@
     }
 
     async function handleAction(action, triggerButton) {
+      if (action === "add_to_playlist") {
+        // If the schedule panel is already visible (e.g. the user clicked the
+        // inline "Add to Playlist" button that lives at the bottom of
+        // scheduleForm), a side-effect-free existence check avoids the smooth
+        // scroll that would yank the user back to the top of the form
+        // mid-submit. Only switch/scroll the subtab when it isn't already
+        // active or is missing entirely.
+        const schedulePanel = document.querySelector(
+          '[data-plugin-subpanel="schedule"]'
+        );
+        if (!schedulePanel) {
+          // Panel missing — fall through to the full showPluginSubtab call so
+          // the "refresh the page" modal still surfaces via reportMissing.
+          showPluginSubtab("schedule", { reportMissing: true });
+          return;
+        }
+        if (schedulePanel.hidden) {
+          if (!showPluginSubtab("schedule", { reportMissing: true })) return;
+        }
+      }
       if (!validateAddToPlaylistAction(action)) return;
 
       // Validate settingsForm required fields. Use validateAllInputsDetailed so
@@ -589,6 +635,13 @@
     function initApiIndicator() {
       const apiIndicator = document.getElementById("apiKeyIndicator");
       if (!apiIndicator) return;
+      // When the indicator lives in the plugin title-stack meta row it is
+      // already styled as a compact chip — skip the legacy auto-collapse
+      // animation that assumed a full-width header badge (JTN-design refresh).
+      if (apiIndicator.closest(".plugin-mode-row")) {
+        apiIndicator.classList.remove("auto-collapse", "collapsed");
+        return;
+      }
       setTimeout(() => {
         apiIndicator.classList.add("auto-collapse");
         setTimeout(() => collapseApiIndicator(apiIndicator), 3000);
@@ -632,22 +685,29 @@
       return false;
     }
 
+    // Extracted to keep the links.forEach callback from nesting
+    // addEventListener 5 levels deep (SonarCloud javascript:S2004). Uses
+    // event.currentTarget to recover the link reference without closing
+    // over it.
+    function handleApiKeysLinkClick(event) {
+      if (!isSettingsFormDirty()) return; // fall through to normal navigation
+      event.preventDefault();
+      const link = event.currentTarget;
+      const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
+      if (confirmBtn && link.href) confirmBtn.href = link.href;
+      openModal("apiKeysLeaveConfirmModal", link);
+    }
+
     function initApiKeysLeaveGuard() {
-      const link = document.querySelector("[data-api-keys-link]");
+      const links = Array.from(document.querySelectorAll("[data-api-keys-link]"));
       const modal = document.getElementById("apiKeysLeaveConfirmModal");
-      if (!link || !modal) return;
+      if (links.length === 0 || !modal) return;
       // Snapshot AFTER the rest of init runs so schema-populated defaults are
       // captured as the baseline, not flagged as "dirty" on first click.
       setTimeout(() => {
         _settingsFormSnapshot = getSettingsFormSnapshot();
       }, 0);
-      link.addEventListener("click", (event) => {
-        if (!isSettingsFormDirty()) return; // fall through to normal navigation
-        event.preventDefault();
-        const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
-        if (confirmBtn && link.href) confirmBtn.href = link.href;
-        openModal("apiKeysLeaveConfirmModal", link);
-      });
+      links.forEach((link) => link.addEventListener("click", handleApiKeysLinkClick));
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         if (modal.hidden) return;
@@ -677,38 +737,68 @@
       });
     }
 
+    // JTN design refresh: the Configure/Preview mode bar was removed in favor
+    // of always showing both panels side-by-side on desktop and stacked on
+    // mobile. setWorkflowMode is kept as a no-op to preserve the existing
+    // public surface; callers no longer change the visible panel.
     function setWorkflowMode(mode) {
       workflowMode = mode;
       document.documentElement.setAttribute("data-mobile-workflow-mode", mode);
-      document.querySelectorAll("[data-workflow-mode]").forEach((button) => {
-        const isActive = button.dataset.workflowMode === mode;
-        button.classList.toggle("active", isActive);
-        button.setAttribute("aria-selected", isActive ? "true" : "false");
-      });
       document.querySelectorAll("[data-workflow-panel]").forEach((panel) => {
-        const isActive = panel.dataset.workflowPanel === mode;
-        panel.classList.toggle("active", isActive);
-        panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-        panel.toggleAttribute("inert", !isActive);
+        panel.classList.add("active");
+        panel.setAttribute("aria-hidden", "false");
+        panel.removeAttribute("inert");
       });
-      const targetPanel = document.querySelector(
-        `[data-workflow-panel="${mode}"]`,
-      );
-      if (mobileQuery.matches) {
-        document.querySelector(".workflow-mode-bar")?.scrollIntoView({
-          block: "start",
-          behavior: "smooth",
-        });
-      } else if (targetPanel) {
-        targetPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
     }
 
     function bindWorkflowMode() {
-      document.querySelectorAll("[data-workflow-mode]").forEach((button) => {
-        button.addEventListener("click", () => setWorkflowMode(button.dataset.workflowMode));
-      });
+      // Both panels are always visible; no buttons to bind.
       setWorkflowMode("configure");
+    }
+
+    // Extracted to avoid nesting this handler 5 levels deep inside
+    // IIFE → createPluginPage → bindPluginSubtabs → forEach → addEventListener
+    // (SonarCloud javascript:S2004 caps function nesting at 4).
+    function onSubtabButtonClick(event) {
+      setPluginSubtab(event.currentTarget.dataset.pluginSubtab);
+    }
+
+    function bindPluginSubtabs() {
+      const buttons = document.querySelectorAll("[data-plugin-subtab]");
+      if (!buttons.length) return;
+      buttons.forEach((btn) => btn.addEventListener("click", onSubtabButtonClick));
+      setPluginSubtab("configure");
+    }
+
+    function showPluginSubtab(id, { focus = false, reportMissing = false } = {}) {
+      const panel = document.querySelector(`[data-plugin-subpanel="${id}"]`);
+      if (!panel) {
+        if (reportMissing) {
+          showResponseModal(
+            "failure",
+            "Unable to open scheduling controls. Please refresh the page and try again."
+          );
+        }
+        return false;
+      }
+      setPluginSubtab(id);
+      try {
+        const scrollTarget = document.getElementById("scheduleForm") || panel;
+        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch {
+        // scrollIntoView can throw if the panel was detached between the
+        // lookup above and this call; the subtab switch itself already
+        // succeeded, so silently absorb the scroll failure.
+      }
+      if (focus) {
+        const focusTarget =
+          panel.querySelector("[data-subtab-focus-target]") ||
+          panel.querySelector(
+            'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+          );
+        if (focusTarget) setTimeout(() => focusTarget.focus(), 0);
+      }
+      return true;
     }
 
     function bindControls() {
@@ -736,34 +826,31 @@
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
+      // Extracted handler — nesting forEach → addEventListener → arrow
+      // tripped javascript:S2004's 4-level limit at L809.
+      function onSubtabTargetClick(event) {
+        const button = event.currentTarget;
+        if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+        const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
+          focus: true,
+          reportMissing: true,
+        });
+        if (!ok) event.preventDefault();
+      }
+      document.querySelectorAll("[data-plugin-subtab-target]").forEach((button) => {
+        button.addEventListener("click", onSubtabTargetClick);
+      });
       document.addEventListener("click", (event) => {
         const opener = event.target.closest("[data-open-modal]");
         if (opener) openModal(opener.dataset.openModal, opener);
       });
-      // JTN-633: the DRAFT-state "Add to Playlist" button relies on the delegated
-      // opener above to surface the scheduling modal. Attach a direct listener
-      // as a belt-and-suspenders safeguard so the click can never silently
-      // no-op — if the modal target ever goes missing, the user gets a clear
-      // response modal instead of nothing happening.
-      document.querySelectorAll('[data-plugin-draft="true"][data-open-modal]').forEach((button) => {
-        button.addEventListener("click", (event) => {
-          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
-          const target = document.getElementById(button.dataset.openModal);
-          if (!target) {
-            event.preventDefault();
-            showResponseModal(
-              "failure",
-              "Unable to open the Add to Playlist dialog. Please refresh the page and try again."
-            );
-            return;
-          }
-          // Ensure the modal opens even if the delegated handler above is
-          // removed or an earlier listener called stopPropagation.
-          if (!target.classList.contains("is-open")) {
-            openModal(button.dataset.openModal, button);
-          }
-        });
-      });
+      // JTN-633: the DRAFT-state "Add to Playlist" button routes into the
+      // inline Schedule tab. The preceding loop (line 790) already matches
+      // `[data-plugin-subtab-target]` — which `[data-plugin-draft="true"]`
+      // buttons satisfy — and its `reportMissing: true` path already raises
+      // the missing-panel modal, so we intentionally don't bind a second
+      // handler here (it would double-fire setPluginSubtab, scrollIntoView,
+      // and the focus timeout on every draft click).
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
         button.addEventListener("click", () => closeModal(button.dataset.closeModal));
       });
@@ -779,9 +866,12 @@
         });
       });
       document.getElementById("showLastProgressBtn")?.addEventListener("click", showLastProgress);
-      document.getElementById("closeProgressBtn")?.addEventListener("click", () => {
-        setHidden(document.getElementById("requestProgress"), true);
-      });
+      // Persistent progress card: render whatever the last snapshot is
+      // (or the empty-state) on first load so the aside card always has content.
+      // showLastProgress reads cached snapshot JSON from localStorage and can
+      // throw if the stored value was corrupted (bad JSON, partial write).
+      // Swallow — a missing snapshot just means no last-progress card.
+      try { showLastProgress(); } catch { /* ignore bad snapshot */ }
       document.getElementById("displayInstanceBtn")?.addEventListener("click", displayInstanceNow);
       document.querySelector("[data-background-upload]")?.addEventListener("change", showFileName);
       document.getElementById("removeFileButton")?.addEventListener("click", removeFile);
@@ -829,6 +919,7 @@
         globalThis.FormValidator.initFormValidation(scheduleForm);
       }
       bindWorkflowMode();
+      bindPluginSubtabs();
       initStatusBar();
       initPreviewInteractions();
       initApiIndicator();

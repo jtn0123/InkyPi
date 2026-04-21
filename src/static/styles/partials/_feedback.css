@@ -925,11 +925,13 @@ body.modal-open {
     overflow: hidden;
 }
 
+/* Handoff parity: modal body padding aligns to the 16px .card standard;
+   10px radius matches --radius-2 / --border-radius-lg. */
 .modal-content {
     background-color: var(--surface);
     margin: 15% auto; /* Center the modal */
-    padding: 20px;
-    border-radius: 10px;
+    padding: 16px;
+    border-radius: var(--border-radius-lg);
     width: 90%;
     max-width: 400px;
     box-shadow: 0 8px 20px var(--shadow-medium, rgba(0, 0, 0, 0.2));
@@ -938,7 +940,7 @@ body.modal-open {
 
 .modal-sheet {
     background: var(--modal-bg);
-    border: 1px solid var(--panel-border);
+    border: 1px solid var(--surface-border);
 }
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {
@@ -1170,35 +1172,61 @@ body.modal-open {
     margin-bottom: var(--spacing-md);
 }
 
+/* Handoff parity: unified horizontal update row. Installed / Latest tiles
+   at the left, action buttons at the right via `margin-left:auto` on
+   `.update-actions` (rule below, unchanged). */
+.update-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 6px 0 14px;
+    border-bottom: 1px solid var(--surface-border);
+    margin-bottom: 14px;
+}
+
+.update-row .update-actions {
+    margin-left: auto;
+}
+
+.update-release-version {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    color: var(--text-3, var(--muted));
+    font-size: 0.78rem;
+    margin-left: 6px;
+}
+
 .update-version-card {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 12px 20px;
+    padding: 8px 14px;
     border: 1px solid var(--surface-border);
     border-radius: var(--border-radius-md);
-    background: var(--surface);
+    background: var(--surface-2, var(--surface));
     min-width: 100px;
-    flex: 1;
 }
 
 .update-version-label {
-    font-size: 0.75rem;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.65rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.12em;
 }
 
 .update-version-number {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--text);
+    margin-top: 2px;
 }
 
 .update-arrow {
-    font-size: 1.25rem;
+    font-size: 1rem;
     color: var(--text-muted);
     flex-shrink: 0;
 }
@@ -1207,16 +1235,16 @@ body.modal-open {
 .update-failure-banner {
     margin: var(--spacing-sm) 0 var(--spacing-md);
     padding: 12px 14px;
-    border: 1px solid var(--color-danger, #b94a48);
+    border: 1px solid var(--error);
     border-left-width: 4px;
     border-radius: var(--border-radius-sm);
     background: var(--surface);
-    color: var(--text-primary);
+    color: var(--text);
 }
 
 .update-failure-title {
     font-weight: 600;
-    color: var(--color-danger, #b94a48);
+    color: var(--error);
     margin-bottom: 4px;
 }
 
@@ -1246,22 +1274,38 @@ body.modal-open {
     margin-bottom: var(--spacing-md);
 }
 
+/* Handoff parity: release notes render as a plain disclosure — muted
+   summary, lightweight body without the nested card-in-card border/bg.
+   The scroll cap stays so marathon changelogs don't blow out the card. */
 .update-release-notes-toggle {
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 500;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 6px 0;
+    padding: 4px 0;
+    list-style: none;
+}
+
+.update-release-notes-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.update-release-notes-toggle::before {
+    content: '\25B8'; /* ▸ */
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+}
+
+details[open] > .update-release-notes-toggle::before {
+    transform: rotate(90deg);
 }
 
 .update-release-notes-body {
-    margin-top: var(--spacing-sm);
-    padding: 12px;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--surface);
-    font-size: 0.85rem;
-    line-height: 1.6;
+    margin-top: 6px;
+    padding: 0 0 0 18px;
+    font-size: 0.82rem;
+    line-height: 1.55;
     color: var(--text-secondary);
     max-height: 200px;
     overflow-y: auto;
@@ -1347,48 +1391,40 @@ body.modal-open {
     background-color: var(--error);
 }
 
-/* Request progress block */
+/* Request progress card — always visible in the plugin aside. */
 .progress-block {
-    margin: 10px;
-    position: fixed;
-    left: 50%;
-    top: 14px;
-    transform: translateX(-50%);
-    z-index: 1100;
-    min-width: min(720px, 92vw);
     background: var(--surface);
     border: 1px solid var(--surface-border);
-    border-radius: 12px;
-    padding: 10px 12px 12px 12px;
-    box-shadow: 0 14px 40px rgba(0,0,0,0.35);
-    animation: slideDown .20s ease-out;
+    border-radius: var(--border-radius-lg);
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translate(-50%, -12px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+.progress-aside-card {
+    margin: 0;
 }
+
 .progress-header {
     font-size: 0.9rem;
     color: var(--text);
-    margin-bottom: 6px;
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
+    gap: 8px;
 }
-.progress-close {
-    background: none;
-    border: 1px solid var(--surface-border);
-    color: var(--muted);
-    border-radius: 999px;
-    width: 24px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+
+.progress-heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
 }
-.progress-close:hover { color: var(--text); background: rgba(0,0,0,0.04); }
+
+.progress-status {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
 .progress-bar {
     width: 100%;
     height: 8px;

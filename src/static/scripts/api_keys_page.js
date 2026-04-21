@@ -2,14 +2,26 @@
   // Module-scoped DOM helpers for the delete button inside a managed API key
   // card. Hoisted out of `createApiKeysPage` because they don't close over any
   // state (SonarCloud javascript:S7721).
+  function _cardForSection(sectionId) {
+    return document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+  }
+
+  // Helper — find the label for a given provider key_name by reading the
+  // <label for=INPUT_ID> text inside the same card. Used to produce accurate
+  // delete-button aria-labels after a save without hard-coding names.
+  function _labelForCard(card) {
+    const label = card?.querySelector(".api-key-card-head .key-svc");
+    return label ? (label.textContent || "").trim() : "";
+  }
+
   function addDeleteButton(sectionId, keyName) {
     // The Delete button lives inside `.api-key-actions` (the input row), NOT
     // `.api-key-card-head` (which holds the label + status). Walk up to the
     // card and then into the actions container so new buttons land next to
     // the input rather than next to the status line.
-    const card = document
-      .getElementById(`${sectionId}-status`)
-      ?.closest(".api-key-card");
+    const card = _cardForSection(sectionId);
     const actions = card?.querySelector(".api-key-actions");
     if (!actions) return;
     if (
@@ -20,20 +32,196 @@
       deleteButton.className = "header-button delete-button delete-button-danger";
       deleteButton.dataset.apiAction = "delete-key";
       deleteButton.dataset.keyName = keyName;
+      deleteButton.dataset.testSkipClick = "true";
+      deleteButton.setAttribute(
+        "aria-label",
+        `Delete ${_labelForCard(card) || keyName} key permanently`
+      );
+      deleteButton.title = "Permanently remove key from .env";
       deleteButton.textContent = "Delete";
       actions.appendChild(deleteButton);
     }
   }
 
   function removeDeleteButton(sectionId) {
-    const card = document
-      .getElementById(`${sectionId}-status`)
-      ?.closest(".api-key-card");
+    const card = _cardForSection(sectionId);
     card
       ?.querySelector(
         '.api-key-actions .delete-button[data-api-action="delete-key"]'
       )
       ?.remove();
+  }
+
+  function setToggleLabel(toggle, label) {
+    const textNode = toggle?.querySelector("[data-role='toggle-label']");
+    if (textNode) {
+      textNode.textContent = label;
+      return;
+    }
+    if (toggle) toggle.textContent = label;
+  }
+
+  // Sub-helpers extracted from setCardConfigured to stay under the
+  // cognitive-complexity threshold (SonarCloud javascript:S3776).
+  function _updateKeyChip(card, configured) {
+    const chip = card.querySelector("[data-role='key-chip']");
+    if (!chip) return;
+    chip.classList.toggle("success", !!configured);
+    chip.classList.toggle("warning", !configured);
+    chip.textContent = configured ? "Configured" : "Not set";
+  }
+
+  function _updateKeyToggle(card, configured) {
+    const toggle = card.querySelector(".api-key-toggle");
+    if (!toggle) return;
+    const visibleLabel = configured ? "Change" : "Add key";
+    // Keep the accessible name in sync with the visible label so
+    // screen-reader users and tooltip consumers don't see stale copy
+    // after a save/delete transition.
+    const actionLabel = configured ? "Change" : "Add";
+    const providerLabel = _labelForCard(card);
+    const accessibleLabel = providerLabel
+      ? `${actionLabel} ${providerLabel} key`
+      : visibleLabel;
+    setToggleLabel(toggle, visibleLabel);
+    if (toggle.hasAttribute("aria-label")) {
+      toggle.setAttribute("aria-label", accessibleLabel);
+    }
+    if (toggle.hasAttribute("title")) {
+      toggle.title = accessibleLabel;
+    }
+    toggle.classList.toggle("is-secondary", !!configured);
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
+  // Transition a card's visible chip / toggle button between the configured
+  // and "not set" states without reloading the page. Called from the
+  // save-success and delete-success paths so users see immediate feedback.
+  function setCardConfigured(card, configured) {
+    if (!card) return;
+    card.dataset.configured = configured ? "true" : "false";
+    _updateKeyChip(card, configured);
+    _updateKeyToggle(card, configured);
+    // Ensure the input row is collapsed again after a successful save/delete.
+    const actions = card.querySelector(".api-key-actions");
+    if (actions) actions.setAttribute("hidden", "");
+  }
+
+  // Mapping for managed-key providers. Hoisted above the functions that
+  // consume it so updateConfiguredStatus / updateDeletedStatus can live at
+  // module scope (SonarCloud javascript:S7721 — no closure use required).
+  const MANAGED_KEY_MAPPING = {
+    OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
+    OPEN_WEATHER_MAP_SECRET: [
+      "openweather-status",
+      "openweather-input",
+      "openweather",
+    ],
+    NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
+    UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
+    GITHUB_SECRET: ["github-status", "github-input", "github"],
+    GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
+  };
+
+  // Mirror the server's `mask()` helper in src/blueprints/settings/_config.py
+  // so the transient post-save state matches what the server will render on
+  // reload (CodeRabbit review, PR #570). If the algorithms ever diverge the
+  // worst case is a cosmetic flash between save and next navigation.
+  function _maskApiKeyValue(value) {
+    if (!value) return "";
+    if (value.length >= 4) {
+      return `...${value.slice(-4)} (${value.length} chars)`;
+    }
+    return `set (${value.length} chars)`;
+  }
+
+  function _upsertMaskChip(card, maskedValue) {
+    if (!card || !maskedValue) return;
+    const target = card.querySelector(".key-row-right");
+    if (!target) return;
+    let chip = target.querySelector(".api-mask");
+    if (!chip) {
+      chip = document.createElement("span");
+      chip.className = "api-mask mono";
+      chip.setAttribute("aria-hidden", "true");
+      target.insertBefore(chip, target.firstChild);
+    }
+    chip.textContent = maskedValue;
+  }
+
+  function updateConfiguredStatus(updatedKeys) {
+    updatedKeys.forEach((key) => {
+      const entry = MANAGED_KEY_MAPPING[key];
+      if (!entry) return;
+      const [statusId, inputId, sectionId] = entry;
+      const statusElement = document.getElementById(statusId);
+      const inputElement = document.getElementById(inputId);
+      const value = inputElement ? inputElement.value : "";
+      if (statusElement && value) {
+        statusElement.textContent = "";
+        const strong1 = document.createElement("strong");
+        strong1.textContent = "Status:";
+        statusElement.appendChild(strong1);
+        statusElement.appendChild(document.createTextNode(" Configured"));
+        // Insert/update the masked-key preview pill so the card's transient
+        // state matches the server-rendered version after a reload.
+        _upsertMaskChip(_cardForSection(sectionId), _maskApiKeyValue(value));
+        // Clear the input and update its placeholder so subsequent edits
+        // start from empty rather than appending to the prior entry.
+        inputElement.value = "";
+        inputElement.placeholder = "(leave blank to keep current)";
+        addDeleteButton(sectionId, key);
+        setCardConfigured(_cardForSection(sectionId), true);
+      }
+    });
+  }
+
+  function updateDeletedStatus(keyName) {
+    const entry = MANAGED_KEY_MAPPING[keyName];
+    if (!entry) return;
+    const [statusId, inputId, sectionId] = entry;
+    const statusElement = document.getElementById(statusId);
+    const inputElement = document.getElementById(inputId);
+    if (statusElement) {
+      statusElement.textContent = "";
+      const strong3 = document.createElement("strong");
+      strong3.textContent = "Status:";
+      statusElement.appendChild(strong3);
+      statusElement.appendChild(document.createTextNode(" Not configured"));
+    }
+    if (inputElement) {
+      inputElement.value = "";
+      inputElement.placeholder =
+        inputElement.dataset.emptyPlaceholder || "Enter API key";
+    }
+    removeDeleteButton(sectionId);
+    const card = _cardForSection(sectionId);
+    setCardConfigured(card, false);
+    // Also remove the "Configured" mask chip since the key is gone.
+    card?.querySelector(".api-mask")?.remove();
+  }
+
+  // Reveal the hidden .api-key-actions container (which holds the password
+  // input and optional Delete button) for a managed-key card. The card
+  // starts collapsed so the UI is a compact summary row; clicking
+  // "Change" / "Add key" expands it and focuses the input. Hoisted because
+  // it closes over no createApiKeysPage state (SonarCloud javascript:S7721).
+  function revealInput(button) {
+    const inputId = button.dataset.inputId;
+    if (!inputId) return;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const actions = input.closest(".api-key-actions");
+    if (!actions) return;
+    actions.removeAttribute("hidden");
+    button.setAttribute("aria-expanded", "true");
+    try {
+      input.focus();
+    } catch {
+      // focus() can throw if the input became detached between the lookup
+      // above and this call (e.g. concurrent re-render). Swallow rather than
+      // surface a blocking error — the reveal itself already succeeded.
+    }
   }
 
   function createApiKeysPage(config) {
@@ -55,52 +243,6 @@
       _isDirty = false;
       const saveBtn = document.getElementById("saveApiKeysBtn");
       if (saveBtn) saveBtn.disabled = true;
-    }
-
-    function updateManagedSummary() {
-      const configured = Array.from(document.querySelectorAll(".api-key-status")).filter(
-        (node) => !/not configured/i.test(node.textContent || "")
-      ).length;
-      const configuredChip = document.getElementById("configuredCountSummary");
-      const providerChip = document.getElementById("providerCountSummary");
-      if (configuredChip) configuredChip.textContent = `${configured} configured`;
-      if (providerChip && config.mode === "managed") providerChip.textContent = "6 providers";
-    }
-
-    function updateConfiguredStatus(updatedKeys) {
-      updatedKeys.forEach((key) => {
-        const mapping = {
-          OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
-          OPEN_WEATHER_MAP_SECRET: [
-            "openweather-status",
-            "openweather-input",
-            "openweather",
-          ],
-          NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
-          UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
-          GITHUB_SECRET: ["github-status", "github-input", "github"],
-          GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
-        };
-        const entry = mapping[key];
-        if (!entry) return;
-        const [statusId, inputId, sectionId] = entry;
-        const statusElement = document.getElementById(statusId);
-        const inputElement = document.getElementById(inputId);
-        const value = inputElement ? inputElement.value : "";
-        if (statusElement && value) {
-          statusElement.textContent = "";
-          const strong1 = document.createElement("strong");
-          strong1.textContent = "Status:";
-          statusElement.appendChild(strong1);
-          statusElement.appendChild(document.createTextNode(" Configured"));
-          // Clear the input and update its placeholder so subsequent edits start from empty
-          // rather than appending to the prior entry.
-          inputElement.value = "";
-          inputElement.placeholder = "(leave blank to keep current)";
-          addDeleteButton(sectionId, key);
-        }
-      });
-      updateManagedSummary();
     }
 
     // Extracted to keep saveManagedKeys below the cognitive-complexity
@@ -131,7 +273,7 @@
 
     function finalizeSaveButton(saveBtn, savedOk) {
       if (!saveBtn) return;
-      saveBtn.textContent = "Save";
+      saveBtn.textContent = "Save API keys";
       if (savedOk) {
         markClean();
       } else {
@@ -184,39 +326,6 @@
       } catch (e) {
         showResponseModal("failure", "Failed to delete key. Please try again.");
       }
-    }
-
-    function updateDeletedStatus(keyName) {
-      const mapping = {
-        OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
-        OPEN_WEATHER_MAP_SECRET: [
-          "openweather-status",
-          "openweather-input",
-          "openweather",
-        ],
-        NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
-        UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
-        GITHUB_SECRET: ["github-status", "github-input", "github"],
-        GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
-      };
-      const entry = mapping[keyName];
-      if (!entry) return;
-      const [statusId, inputId, sectionId] = entry;
-      const statusElement = document.getElementById(statusId);
-      const inputElement = document.getElementById(inputId);
-      if (statusElement) {
-        statusElement.textContent = "";
-        const strong3 = document.createElement("strong");
-        strong3.textContent = "Status:";
-        statusElement.appendChild(strong3);
-        statusElement.appendChild(document.createTextNode(" Not configured"));
-      }
-      if (inputElement) {
-        inputElement.value = "";
-        inputElement.placeholder = "Enter API key";
-      }
-      removeDeleteButton(sectionId);
-      updateManagedSummary();
     }
 
     // Keep delete-button + value-input aria-labels in sync with the current
@@ -440,8 +549,6 @@
     function init() {
       if (config.mode === "generic") {
         hideExistingPresets();
-      } else {
-        updateManagedSummary();
       }
       // Add show/hide toggle buttons next to password inputs
       document.querySelectorAll('input[type="password"].form-input').forEach((input) => {
@@ -493,6 +600,8 @@
           addPreset(actionEl);
         } else if (action === "toggle-password") {
           togglePasswordVisibility(actionEl);
+        } else if (action === "reveal-input") {
+          revealInput(actionEl);
         }
       });
     }

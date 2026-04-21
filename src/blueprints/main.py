@@ -1,8 +1,9 @@
 import logging
 import math
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
+from typing import Any
 from uuid import uuid4
 
 from flask import (
@@ -49,6 +50,109 @@ def _current_dt(device_config):
         return datetime.now(UTC)
 
 
+def _device_cycle_minutes(device_config: Any) -> int:
+    try:
+        cycle_seconds = int(
+            device_config.get_config("plugin_cycle_interval_seconds", default=3600)
+        )
+        # Mirror the playlist override clamp: avoid a zero-minute cycle (which
+        # would schedule the next refresh in the past and surface "Due now"
+        # immediately) for any configured interval below 60 seconds.
+        return max(1, cycle_seconds // 60)
+    except Exception:
+        return 60
+
+
+def _playlist_cycle_minutes(device_config: Any, playlist_name: Any) -> int:
+    cycle_minutes = _device_cycle_minutes(device_config)
+    if not playlist_name:
+        return cycle_minutes
+
+    try:
+        playlist_manager = device_config.get_playlist_manager()
+        playlist = playlist_manager.get_playlist(playlist_name)
+        cycle_seconds = getattr(playlist, "cycle_interval_seconds", None)
+        if cycle_seconds:
+            return max(1, int(cycle_seconds) // 60)
+    except Exception:
+        pass
+
+    return cycle_minutes
+
+
+def _parse_refresh_datetime(iso_value: Any) -> datetime | None:
+    if not iso_value:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_value)
+    except Exception:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
+def _format_next_refresh_relative(next_dt: datetime, now_dt: datetime) -> str:
+    diff_seconds = max(0, int(math.ceil((next_dt - now_dt).total_seconds())))
+    if diff_seconds <= 30:
+        return "Due now"
+    if diff_seconds < 60:
+        return f"in {diff_seconds}s"
+
+    diff_minutes = math.ceil(diff_seconds / 60)
+    if diff_minutes < 60:
+        return f"in {diff_minutes}m"
+
+    hours, minutes = divmod(diff_minutes, 60)
+    if hours < 24:
+        if minutes:
+            return f"in {hours}h {minutes}m"
+        return f"in {hours}h"
+
+    local_dt = next_dt.astimezone(now_dt.tzinfo)
+    return "at " + local_dt.strftime("%I:%M %p").lstrip("0")
+
+
+def _build_next_refresh_meta(
+    next_dt: datetime | None, cycle_minutes: int, now_dt: datetime
+) -> str:
+    parts: list[str] = []
+    if next_dt:
+        local_dt = next_dt.astimezone(now_dt.tzinfo)
+        parts.append(f"ETA {local_dt.strftime('%I:%M %p').lstrip('0')}")
+    if cycle_minutes:
+        parts.append(f"Every {cycle_minutes} min")
+    parts.append("auto")
+    return " · ".join(parts)
+
+
+def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
+    """Attach next-refresh timing metadata for dashboard rendering."""
+    if not isinstance(payload, dict):
+        return payload
+
+    now_dt = _current_dt(device_config)
+    cycle_minutes = _playlist_cycle_minutes(device_config, payload.get("playlist"))
+    payload["cycle_minutes"] = cycle_minutes
+
+    refresh_dt = _parse_refresh_datetime(payload.get("refresh_time"))
+    if not refresh_dt:
+        payload["next_refresh_time"] = None
+        payload["next_refresh_relative"] = None
+        payload["next_refresh_meta"] = _build_next_refresh_meta(
+            None, cycle_minutes, now_dt
+        )
+        return payload
+
+    next_dt = refresh_dt.astimezone(now_dt.tzinfo) + timedelta(minutes=cycle_minutes)
+    payload["next_refresh_time"] = next_dt.isoformat()
+    payload["next_refresh_relative"] = _format_next_refresh_relative(next_dt, now_dt)
+    payload["next_refresh_meta"] = _build_next_refresh_meta(
+        next_dt, cycle_minutes, now_dt
+    )
+    return payload
+
+
 def _is_dev_mode() -> bool:
     env = (os.getenv("INKYPI_ENV") or os.getenv("FLASK_ENV") or "").strip().lower()
     return env in {"dev", "development"}
@@ -84,13 +188,31 @@ def main_page():
         device_config.current_image_file
     )
 
+    device_cycle_minutes = _device_cycle_minutes(device_config)
+    # Mirror /refresh-info's degrade-to-{} behaviour so a broken or missing
+    # refresh info file cannot 500 the dashboard shell. The template guards
+    # against empty refresh_info with `| default({})` helpers, so an empty
+    # mapping is a safe render-time fallback.
+    try:
+        refresh_info = device_config.get_refresh_info().to_dict()
+    except Exception:
+        logger.exception("Failed to load refresh info for dashboard")
+        refresh_info = {}
+    else:
+        _annotate_instance_labels(refresh_info)
+        _annotate_refresh_schedule(refresh_info, device_config)
+
     return render_template(
         "inky.html",
         config=device_config.get_config(),
         plugins=device_config.get_plugins(),
-        refresh_info=device_config.get_refresh_info().to_dict(),
+        refresh_info=refresh_info,
         next_up=next_up,
         has_preview=has_preview,
+        playlists=playlist_manager.playlists,
+        active_playlist_name=playlist_manager.active_playlist,
+        device_cycle_minutes=device_cycle_minutes,
+        active_nav="dashboard",
     )
 
 
@@ -255,8 +377,13 @@ def refresh_info():
     try:
         info = device_config.get_refresh_info().to_dict()
     except Exception:
-        info = {}
+        # Return an empty payload on failure — callers (dashboard JS and
+        # unit tests in test_blueprint_coverage / test_startup_recovery) expect
+        # `{}` rather than partial schedule metadata when refresh_info is
+        # broken or missing.
+        return jsonify({})
     _annotate_instance_labels(info)
+    _annotate_refresh_schedule(info, device_config)
     return jsonify(info)
 
 

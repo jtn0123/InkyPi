@@ -88,7 +88,7 @@ _ENUMERATE_JS = r"""
     'button', 'a', 'input', '[role=button]',
     '[data-plugin-action]', '[data-api-action]',
     '[data-settings-tab]', '[data-history-action]',
-    '[data-collapsible-toggle]', '[data-workflow-mode]',
+    '[data-collapsible-toggle]',
     '[data-playlist-toggle]', '[data-clock-action]',
   ];
 

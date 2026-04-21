@@ -1,0 +1,109 @@
+{% from 'macros/icons.html' import icon, theme_toggle %}
+
+{%- macro sidebar(active=None, host=None, device_name=None, now_showing=None, sidebar_system=None) -%}
+{# Accept either a plain string label or a mapping with optional
+   label/meta/state keys. Guard each mapping access with "is defined" so a
+   partial mapping (e.g. only `label` set) still gets the sensible defaults
+   below rather than rendering an undefined meta/state. -#}
+{% if now_showing is mapping %}
+    {% set now_label = now_showing.label if now_showing.label is defined else none %}
+    {% set now_meta = now_showing.meta if now_showing.meta is defined else 'live' %}
+    {% set now_state = now_showing.state if now_showing.state is defined else ('idle' if not now_label else 'live') %}
+{% else %}
+    {% set now_label = now_showing %}
+    {% set now_meta = 'live' %}
+    {% set now_state = 'idle' if not now_label else 'live' %}
+{% endif %}
+{% set system_online = sidebar_system.online_label if sidebar_system is mapping and sidebar_system.online_label is defined else 'online' %}
+{% set system_load = sidebar_system.load_label if sidebar_system is mapping and sidebar_system.load_label is defined else none %}
+{% set brand_parts = [] %}
+{#- Only render the brand-host row when the configured device name is
+    something the user has customized. Normalize case and surrounding
+    whitespace so 'inkypi', ' InkyPi ', etc. still suppress the row. -#}
+{% set _device_name_norm = (device_name|string).strip().lower() if device_name else '' %}
+{% if _device_name_norm and _device_name_norm != 'inkypi' %}
+    {% set _ = brand_parts.append(device_name) %}
+{% endif %}
+{% if host %}
+    {% set _ = brand_parts.append(host) %}
+{% endif %}
+<aside class="shell-sidebar" aria-label="Primary navigation">
+    <a href="{{ url_for('main.main_page') }}" class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">I</span>
+        <span class="brand-meta">
+            <span class="brand-name">InkyPi</span>
+            {% if brand_parts %}<span class="brand-host">{{ brand_parts | join(' · ') }}</span>{% endif %}
+        </span>
+    </a>
+
+    <nav class="sidebar-nav" aria-label="Site navigation">
+        <div class="nav-section">Main</div>
+        <a href="{{ url_for('main.main_page') }}"
+           class="nav-item{% if active == 'dashboard' %} active{% endif %}"
+           {% if active == 'dashboard' %}aria-current="page"{% endif %}>
+            {{ icon('house', 'icon-image') | safe }}
+            <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('playlist.playlists') }}"
+           class="nav-item{% if active == 'playlists' %} active{% endif %}"
+           {% if active == 'playlists' %}aria-current="page"{% endif %}>
+            {{ icon('squares-four', 'icon-image') | safe }}
+            <span>Playlists</span>
+        </a>
+        <a href="{{ url_for('plugin.plugins_page') }}"
+           class="nav-item{% if active == 'plugins' %} active{% endif %}"
+           {% if active == 'plugins' %}aria-current="page"{% endif %}>
+            {{ icon('magic-wand', 'icon-image') | safe }}
+            <span>Plugins</span>
+        </a>
+        <a href="{{ url_for('history.history_page') }}"
+           class="nav-item{% if active == 'history' %} active{% endif %}"
+           {% if active == 'history' %}aria-current="page"{% endif %}>
+            {{ icon('clock-counter-clockwise', 'icon-image') | safe }}
+            <span>History</span>
+        </a>
+
+        <div class="nav-section">System</div>
+        <a href="{{ url_for('settings.settings_page') }}"
+           class="nav-item{% if active == 'settings' %} active{% endif %}"
+           {% if active == 'settings' %}aria-current="page"{% endif %}>
+            {{ icon('gear-six', 'icon-image') | safe }}
+            <span>Settings</span>
+        </a>
+        <a href="{{ url_for('settings.api_keys_page') }}"
+           class="nav-item{% if active == 'api-keys' %} active{% endif %}"
+           {% if active == 'api-keys' %}aria-current="page"{% endif %}>
+            {{ icon('key', 'icon-image') | safe }}
+            <span>API Keys</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-foot">
+        <div class="now-card is-{{ now_state }}">
+            {#- Scope aria-live to just the fields that actually change (title
+                + meta). Wrapping the whole card meant screen readers re-read
+                the static "NOW PLAYING" eyebrow on every re-render/nav. A
+                single live region wraps both dynamic rows so state changes
+                announce once per transition, not twice (CodeRabbit review,
+                PR #570). -#}
+            <div class="now-label">NOW PLAYING</div>
+            <div class="now-live" aria-live="polite" aria-atomic="false">
+                <div class="now-title">{{ now_label or '—' }}</div>
+                <div class="now-meta">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span>{{ now_meta if now_label else 'Idle' }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="sys-row">
+            <div class="sys-stats">
+                <span class="sys-online" id="sidebarOnlineDot" aria-label="Online status"><span class="live-dot" aria-hidden="true"></span><span id="sidebarOnlineLabel">{{ system_online }}</span></span>
+                {% if system_load %}
+                <span class="sys-load" aria-label="Load average">{{ system_load }}</span>
+                {% endif %}
+            </div>
+            {{ theme_toggle() }}
+        </div>
+    </div>
+</aside>
+{%- endmacro -%}

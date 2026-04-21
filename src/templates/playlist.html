@@ -26,41 +26,28 @@
     <script src="{{ url_for('static', filename='scripts/playlist/page.js') }}"></script>
     <script src="{{ url_for('static', filename='scripts/playlist.js') }}"></script>
 {% endblock %}
+{% block body_attrs %} data-page="playlist"{% endblock %}
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
+    {% from 'macros/pageheader.html' import pageheader %}
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div id="playlist-page-content">
     <div class="frame playlist-frame">
-        <!-- Settings Header -->
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('squares-four', 'app-icon') | safe }}
-                        <h1 class="app-title">Playlists</h1>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button id="newPlaylistBtn" class="header-button" type="button">New Playlist</button>
-                </div>
-            </div>
-        </header>
-        <div class="separator"></div>
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Playlists'}]) }}
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Organize plugin instances into time-based playlists so the display can rotate between curated sets instead of one flat queue.</p>
-            </div>
-            <div class="page-summary">
-                {% set playlist_count = playlist_config.playlists | length %}
-                <span class="status-chip info">{{ playlist_count }} {{ 'playlist' if playlist_count == 1 else 'playlists' }}</span>
-                {% if playlist_config.active_playlist %}
-                <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
-                {% endif %}
-                <span class="status-chip">Refresh interval: {{ device_cycle_minutes }} min</span>
-            </div>
+        {% call pageheader(
+            title='Rotations & schedules',
+            eyebrow='Playlists',
+            description='Group plugin instances into time-based rotations. The device plays the active playlist on cycle.'
+        ) %}
+            <button id="newPlaylistBtn" class="action-button primary" type="button">New playlist</button>
+        {% endcall %}
+
+        {% set playlist_count = playlist_config.playlists | length %}
+        <div class="page-summary playlist-summary">
+            <span class="status-chip info">{{ playlist_count }} {{ 'playlist' if playlist_count == 1 else 'playlists' }}</span>
+            {% if playlist_config.active_playlist %}
+            <span class="status-chip">Active: {{ playlist_config.active_playlist }}</span>
+            {% endif %}
         </div>
 
         <!-- Playlists Container -->
@@ -69,31 +56,34 @@
             {{ empty_state('squares-four', 'No playlists yet.', 'Click New Playlist to create one.') }}
             {% endif %}
             {% for playlist in playlist_config.playlists %}
-            <div class="playlist-item {% if playlist.name == playlist_config.active_playlist %}active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
-                    <div class="playlist-header">
+            <div class="playlist-item pl-card {% if playlist.name == playlist_config.active_playlist %}active is-active{% endif %}" data-playlist-name="{{ playlist.name }}" data-playlist-card>
+                    <div class="playlist-header" data-playlist-action="toggle-card">
                         <div class="playlist-heading">
-                        <h3 class="playlist-title">{{ playlist.name }}</h3>
-                        <div class="playlist-summary-row">
-                            {% set playlist_item_count = playlist.plugins | length %}
-                            <span class="status-chip info">{{ playlist_item_count }} {{ 'item' if playlist_item_count == 1 else 'items' }}</span>
-                            {% if playlist.name == playlist_config.active_playlist %}
-                            <span class="status-chip success">Active</span>
-                            {% endif %}
-                            {% set _is_all_day = playlist.start_time == '00:00' and playlist.end_time in ('24:00', '23:59') %}
-                            <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }} - {{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %}{% if playlist.cycle_minutes %} • {{ playlist.cycle_minutes }} min cycle{% endif %}</span>
-                        </div>
+                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false" aria-label="Toggle {{ playlist.name }}" title="Toggle {{ playlist.name }}">Open</button>
+                            <div class="playlist-heading-copy">
+                                <div class="playlist-title-row">
+                                    <h2 class="playlist-title">{{ playlist.name }}</h2>
+                                    {% if playlist.name == playlist_config.active_playlist %}
+                                    <span class="status-chip success">Active</span>
+                                    {% endif %}
+                                </div>
+                                <div class="playlist-summary-row">
+                                    {% set playlist_item_count = playlist.plugins | length %}
+                                    {% set _is_all_day = playlist.start_time == '00:00' and playlist.end_time in ('24:00', '23:59') %}
+                                    <span class="playlist-summary-copy">{% if _is_all_day %}All day{% else %}{{ playlist.start_time }} - {{ playlist.end_time }}{% endif %}{% if not _is_all_day and playlist.end_time < playlist.start_time %} <span class="playlist-wrap-label" title="This playlist wraps past midnight">(next day)</span>{% endif %} · {{ playlist.cycle_minutes or device_cycle_minutes }} min cycle · {{ playlist_item_count }} {{ 'item' if playlist_item_count == 1 else 'items' }}</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="playlist-toolbar">
                             {% if playlist.plugins %}
-                            <button class="header-button is-secondary run-next-btn" type="button" data-playlist-action="confirm-display-next" data-playlist="{{ playlist.name }}">Display Next</button>
+                            <button class="header-button is-secondary run-next-btn" type="button" data-playlist-action="confirm-display-next" data-playlist="{{ playlist.name }}">{{ icon('skip-forward', 'btn-leading-icon') | safe }}<span class="action-button-label">Display next</span></button>
                             {% endif %}
                             {# data-test-skip-click: click-sweep leaves modals open while iterating, so
                                background Edit buttons become non-interactive by design on mobile. Dedicated
                                browser tests cover the real edit-modal path directly. #}
-                            <button class="edit-button edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist {{ playlist.name }}" data-playlist-action="edit-playlist" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}" data-test-skip-click="true">{{ icon('pencil-simple', 'action-icon') | safe }}<span class="action-button-label">Edit</span></button>
+                            <button class="header-button is-secondary edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist {{ playlist.name }}" data-playlist-action="edit-playlist" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}" data-test-skip-click="true">{{ icon('pencil-simple', 'btn-leading-icon') | safe }}<span class="action-button-label">Edit</span></button>
                             {# data-test-skip-click: deletes the playlist #}
-                            <button class="delete-button delete-playlist-btn playlist-secondary-button" type="button" aria-label="Delete playlist {{ playlist.name }}" data-playlist-action="delete-playlist" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'action-icon') | safe }}<span class="action-button-label">Delete</span></button>
-                            <button class="playlist-toggle-button" type="button" data-playlist-action="toggle-card" data-playlist-toggle data-collapsed-label="Open" data-expanded-label="Hide" aria-expanded="false">Open</button>
+                            <button class="header-button is-secondary ghost-danger delete-playlist-btn playlist-secondary-button is-icon-only" type="button" title="Delete playlist {{ playlist.name }}" data-playlist-action="delete-playlist" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'btn-leading-icon') | safe }}<span class="sr-only">Delete playlist {{ playlist.name }}</span></button>
                         </div>
                     </div>
                     <div class="playlist-card-body" data-playlist-body>
@@ -103,13 +93,26 @@
                         {% for plugin_instance in playlist.plugins %}
                         {% set pi_label = plugin_instance.name | friendly_instance_label(plugin_instance.plugin_id) %}
                         {% set pi_suffix = plugin_instance.name | instance_suffix_label(plugin_instance.plugin_id) %}
-                        <div class="plugin-item" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                        {% set is_playing = playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
+                        <div class="plugin-item pl-item{% if is_playing %} is-playing{% endif %}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance-name="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                             <span class="drag-handle" aria-hidden="true">{{ icon('dots-six-vertical', 'drag-handle-icon') | safe }}</span>
-                            <div class="plugin-info" id="{{plugin_instance.name}}">
-                                <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="Plugin Icon" class="plugin-icon">
-                                <span class="plugin-instance">{{ pi_label }}{% if pi_suffix and pi_suffix != pi_label %} <span class="plugin-instance-suffix">({{ pi_suffix }})</span>{% endif %}</span>
+                            <span class="pl-item-icon" aria-hidden="true">
+                                <img src="{{ url_for('plugin.image', plugin_id=plugin_instance.plugin_id, filename='icon.png') }}" alt="" class="plugin-icon">
+                            </span>
+                            <div class="pl-item-main plugin-info" id="{{plugin_instance.name}}">
+                                <div class="pl-item-name"><span class="plugin-instance">{{ pi_label }}{% if pi_suffix and pi_suffix != pi_label %} <span class="plugin-instance-suffix">({{ pi_suffix }})</span>{% endif %}</span>{% if is_playing %}<span class="displayed-now">Playing</span>{% endif %}</div>
+                                <div class="pl-item-meta">
+                                    {% if plugin_instance.latest_refresh_time %}
+                                        {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
+                                        <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">Refreshed {{ refresh_time }}</span>
+                                    {% else %}
+                                        <span class="latest-refresh">Never refreshed</span>
+                                    {% endif %}
+                                </div>
+                                <div class="loading-indicator small left-align"></div>
+                            </div>
 
-                                <!-- Thumbnail preview - only show if image has been generated -->
+                            <div class="pl-item-thumb">
                                 {% if plugin_instance.latest_refresh_time %}
                                 <div class="plugin-thumbnail-container lightboxable"
                                      data-thumbnail-playlist="{{ playlist.name }}"
@@ -127,28 +130,15 @@
                                     >
                                 </div>
                                 {% endif %}
-
-                                <!-- Check if the current plugin is the one being displayed -->
-                                {% if playlist.name == refresh_info.playlist and plugin_instance.name == refresh_info.plugin_instance %}
-                                <span class="displayed-now">Displayed Now</span>
-                                {% endif %}
-                                <div class="loading-indicator small left-align"></div>
-
                             </div>
-                            <div class="plugin-actions">
-                                {% if plugin_instance.latest_refresh_time %}
-                                    {% set refresh_time = plugin_instance.latest_refresh_time | format_relative_time %}
-                                    <span class="latest-refresh" title="{{plugin_instance.latest_refresh_time}}">
-                                        Refreshed {{ refresh_time }}
-                                    </span>
-                                {% endif %}
 
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="edit-button" title="Edit plugin {{ pi_label }}">
-                                    {{ icon('pencil-simple', 'action-icon') | safe }}
-                                    <span class="action-button-label">Edit</span>
-                                    <span class="sr-only"> plugin {{ pi_label }}</span>
-                                </a>
-                                <button class="edit-button refresh-settings-btn" type="button"
+                            <div class="plugin-actions pl-item-actions">
+                                <button class="header-button is-secondary plugin-display-btn playlist-row-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                    {{ icon('monitor', 'action-icon') | safe }}
+                                    <span class="action-button-label">Display</span>
+                                    <span class="sr-only"> {{ pi_label }} now</span>
+                                </button>
+                                <button class="header-button is-secondary edit-button refresh-settings-btn playlist-row-icon-btn" type="button"
                                         title="Edit refresh settings for {{ pi_label }}"
                                         data-playlist-action="edit-refresh"
                                         data-playlist="{{ playlist.name }}"
@@ -157,19 +147,16 @@
                                         data-instance-label="{{ pi_label }}"
                                         data-refresh='{{ plugin_instance.refresh | tojson }}'>
                                     {{ icon('clock', 'action-icon') | safe }}
-                                    <span class="action-button-label">Refresh settings</span>
-                                    <span class="sr-only"> for {{ pi_label }}</span>
+                                    <span class="sr-only">Edit schedule for {{ pi_label }}</span>
                                 </button>
-                                <button class="edit-button plugin-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
-                                    {{ icon('monitor', 'action-icon') | safe }}
-                                    <span class="action-button-label">Display</span>
-                                    <span class="sr-only"> {{ pi_label }} now</span>
-                                </button>
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}">
+                                    {{ icon('pencil-simple', 'action-icon') | safe }}
+                                    <span class="sr-only">Edit plugin {{ pi_label }}</span>
+                                </a>
                                 {# data-test-skip-click: removes a plugin instance from the playlist #}
-                                <button class="delete-button delete-instance-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
+                                <button class="header-button is-secondary ghost-danger delete-button delete-instance-btn playlist-row-icon-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
                                     {{ icon('trash', 'action-icon') | safe }}
-                                    <span class="action-button-label">Delete</span>
-                                    <span class="sr-only"> plugin instance {{ pi_label }}</span>
+                                    <span class="sr-only">Delete plugin instance {{ pi_label }}</span>
                                 </button>
                             </div>
                         </div>
@@ -178,6 +165,9 @@
                     {% else %}
                     {{ empty_state('squares-four', 'No plugin instances in this playlist yet.', 'Add instances from a plugin page, then return here to schedule and reorder them.', compact=true) }}
                     {% endif %}
+                    <a href="{{ url_for('plugin.plugins_page') }}" class="pl-add-row" title="Add plugin instance to {{ playlist.name }}">
+                        {{ icon('plus', 'icon-xs') | safe }}<span>Add plugin instance</span><span class="sr-only"> to {{ playlist.name }}</span>
+                    </a>
                     </div>
             </div>
             {% endfor %}
@@ -189,7 +179,7 @@
     <div id="playlistModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
         <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closePlaylistModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="modalTitle">New Playlist</h2>
+            <h2 id="modalTitle">New playlist</h2>
             <div class="separator"></div>
             <form id="scheduleForm" class="settings-form" data-form-state aria-busy="false">
                 <input type="hidden" id="editingPlaylistName" value="">  <!-- Track existing playlist -->
@@ -215,7 +205,7 @@
                 </div>
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveButton" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
+                <button type="button" class="action-button" id="saveButton" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save playlist</button>
                 <button type="button" class="action-button warn hidden" id="deleteButton">Delete</button>
             </div>
         </div>
@@ -225,14 +215,14 @@
     <div id="refreshSettingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="refreshSettingsTitle" hidden>
         <div class="modal-content modal-sheet">
             <button class="close-button" type="button" id="closeRefreshModalBtn" aria-label="Close">{{ icon('x', 'close-icon') | safe }}</button>
-            <h2 id="refreshSettingsTitle">Refresh Settings</h2>
+            <h2 id="refreshSettingsTitle">Edit schedule</h2>
             <div class="separator"></div>
             <form id="refreshSettingsForm" class="settings-form" data-form-state aria-busy="false">
                 {% set prefix = "modal" %}
                 {% include 'refresh_settings_form.html' %}
             </form>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="saveRefreshSettingsBtn" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save</button>
+                <button type="button" class="action-button" id="saveRefreshSettingsBtn" data-form-state-submit><span class="btn-spinner" aria-hidden="true" style="display:none"></span>Save schedule</button>
             </div>
         </div>
     </div>
@@ -249,13 +239,13 @@
         </div>
     </div>
 
-    <!-- Display Next Confirm Modal -->
+    <!-- Display next Confirm Modal -->
     <div id="displayNextConfirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="displayNextConfirmTitle" hidden>
         <div class="modal-content modal-sheet">
             <h2 id="displayNextConfirmTitle" class="sr-only">Confirm display next plugin</h2>
             <p id="displayNextConfirmText"></p>
             <div class="buttons-container">
-                <button type="button" class="action-button" id="confirmDisplayNextBtn">Display Next</button>
+                <button type="button" class="action-button" id="confirmDisplayNextBtn">Display next</button>
                 <button type="button" class="action-button is-secondary" id="cancelDisplayNextBtn">Cancel</button>
             </div>
         </div>

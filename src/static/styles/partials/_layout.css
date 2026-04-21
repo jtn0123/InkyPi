@@ -152,12 +152,31 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
+    /* Left-align count chips under the pageheader so they read as part of the
+       page header context rather than floating as orphans on the right edge.
+       The previous `flex-end` alignment made chips like "1 playlist" or
+       "0 providers / 0 configured" appear disconnected from the title. */
+    justify-content: flex-start;
+    /* Tighter rhythm between the pageheader description and the summary row.
+       The handoff pulls these chips just under the header without a full
+       vertical-xl gap. */
+    margin-top: -4px;
+    margin-bottom: var(--spacing-md, 12px);
 }
 
 .page-shell {
   width: 100%;
   animation: pageIn 0.25s ease-out;
+}
+
+/* Reserve space at the bottom so the fixed tweaks FAB (44px at right:18px,
+   bottom:18px + breathing room) never overlaps interactive content in the
+   page flow on viewports where the grid reaches the bottom of the window.
+   Applied to the dashboard and workflow shells; the management shell has
+   its own padding-bottom for the mobile logs FAB. */
+.page-shell-dashboard,
+.page-shell-workflow {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
 @keyframes pageIn {
@@ -217,23 +236,30 @@ main[data-page-shell="workflow"] .frame {
 .image-container.show-frame .device-frame-overlay { display: block; }
 
 /* Status bar (top previews) */
+/* Side-by-side preview pair — mirrors the React `preview-pair` in
+   screens.jsx. Each side gets an equal-width card with a monospace eyebrow
+   header (status-title) above the preview image. */
 .status-bar {
     display: grid;
-    grid-template-columns: auto 1fr; /* auto-size compact card, remaining space for instance */
-    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
     margin: 6px 0 0 0;
 }
 .status-card {
     border: 1px solid var(--surface-border);
     border-radius: 10px;
     background: var(--surface);
-    padding: 8px;
+    padding: 10px;
+    min-width: 0;
 }
 .status-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 4px;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 6px;
 }
 .status-body {
     display: flex;
@@ -258,9 +284,9 @@ main[data-page-shell="workflow"] .frame {
 }
 .status-body img { max-width: 100%; max-height: 160px; display: block; }
 
-/* Compact current display thumbnail */
+/* Compact current display thumbnail — now a full-width equal-pair partner */
 .status-card.compact .image-container {
-    width: 200px;
+    width: 100%;
     max-width: 100%;
 }
 .status-card.compact .image-container img {
@@ -271,7 +297,7 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .status-card.compact .image-container.native {
-    width: 200px;
+    width: 100%;
     max-width: 100%;
     overflow: hidden;
 }
@@ -332,16 +358,40 @@ main[data-page-shell="workflow"] .frame {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 5px;
     border-radius: 999px;
-    padding: 3px 10px;
+    padding: 2px 9px;
     border: 1px solid var(--surface-border);
-    background: var(--surface);
-    color: var(--text);
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.3;
+    background: var(--surface-2, var(--surface));
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.status-chip .chip-dot,
+.status-chip.has-dot::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+.status-chip.has-dot::before {
+    content: '';
+    display: inline-block;
+}
+
+.status-chip.mono {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    letter-spacing: 0;
+    text-transform: none;
+    font-feature-settings: 'ss01';
 }
 
 .status-chip.success {
@@ -368,10 +418,72 @@ main[data-page-shell="workflow"] .frame {
     color: var(--error-contrast);
 }
 
+/* Handoff parity: accent chip + dot variant. Used by the dashboard stage
+   "Live" descriptor and anywhere a ghost accent chip is desired. The `.dot`
+   modifier prefixes a small filled circle (same as `.has-dot` but scoped to
+   match the handoff's `chip-dot` naming in screens.jsx). */
+.status-chip.accent {
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.status-chip.dot::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 25%, transparent);
+    flex-shrink: 0;
+}
+
 .plugin-mode-row {
     margin: 2px 0 10px 0;
     justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* When the API-key indicator lives inside the title-stack meta row, render it
+   as a compact chip that matches .status-chip sizing. */
+.plugin-mode-row .api-key-indicator,
+.plugin-mode-row .api-key-indicator.collapsed,
+.plugin-mode-row .api-key-indicator.auto-collapse {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    gap: 5px;
+    animation: none;
+}
+
+.plugin-mode-row .api-key-indicator .api-key-icon {
+    width: 10px;
+    height: 10px;
+    font-size: 0.7rem;
+}
+
+.plugin-mode-row .api-key-indicator.collapsed .api-key-text,
+.plugin-mode-row .api-key-indicator.auto-collapse .api-key-text {
+    opacity: 1;
+    max-width: none;
+    overflow: visible;
+    animation: none;
+}
+
+.plugin-mode-row .api-key-indicator.missing:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 /* Compact meta styling when inside status-body */

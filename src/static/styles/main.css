@@ -27,30 +27,62 @@
     padding: 0;
 }
 
-/* Base body styling */
+/* Base body styling.
+ *
+ * Font stack notes: Inter / JetBrains Mono are preferred by the handoff
+ * design but we don't ship @font-face rules for them. On Raspberry Pi OS /
+ * Debian the device will not have them installed, so the stack intentionally
+ * resolves to `system-ui` (and Jost where available) for a legible native
+ * fallback. If/when we bundle Inter and JetBrains Mono WOFF2s under
+ * static/fonts/, add matching @font-face declarations above and the named
+ * families will start being used automatically.
+ */
 body {
-    font-family: Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-sans, system-ui), 'Inter', Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background-color: var(--bg);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.5;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Let content flow naturally; pages control their own centering */
 }
 
-/* Refined Industrial — warm paper + hardware console */
+/* Monospace utility — JetBrains Mono for refined labels and metrics */
+.mono,
+code,
+pre,
+kbd,
+samp {
+    font-family: var(--font-mono, ui-monospace), 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+    font-feature-settings: 'ss01';
+    letter-spacing: -0.01em;
+}
+
+/* Refined UI — paper-cream light, dark-first console */
 :root {
+    /* Font families — refined typographic system */
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
     /* Core palette — warm paper stock with ink */
     --bg: #f5f3ef;
     --surface: #ffffff;
     --surface-border: #d8d4cd;
+    --surface-2: #eceae5;
+    --surface-3: #e0dcd4;
+    --border-strong: #c6c0b6;
     --text: #1c1917;
     --muted: #6b6560;
+    --text-3: #8a857d;
     --divider: var(--surface-border);
     --button-bg: #f0ede8;
     --input-bg: #ffffff;
-    --accent: #b5522f;
+    /* Refined teal accent — oklch for consistent perceptual luminance */
+    --accent: oklch(56% 0.08 170);
+    --accent-hover: oklch(48% 0.09 170);
+    --accent-ink: #ffffff;
+    --accent-weak: color-mix(in oklab, var(--accent) 14%, transparent);
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
     --subtext: #6b6560;
@@ -60,11 +92,17 @@ body {
     --error: #c4453a;
     --success: #3d6b5d;
     --warning: #b8862e;
-    --primary: #3d6b5d;
-    --primary-hover: #2d5347;
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
     --bg-secondary: #eceae5;
@@ -74,26 +112,27 @@ body {
     --shadow-medium: rgba(28, 25, 23, 0.14);
     --close-btn-color: var(--muted);
     --close-btn-hover: var(--text);
-    --success-bg: rgba(61, 107, 93, 0.10);
-    --success-border: rgba(61, 107, 93, 0.30);
-    --error-bg: rgba(196, 69, 58, 0.10);
-    --error-border: rgba(196, 69, 58, 0.30);
+    --success-bg: color-mix(in oklab, var(--success) 12%, transparent);
+    --success-border: color-mix(in oklab, var(--success) 32%, transparent);
+    --error-bg: color-mix(in oklab, var(--error) 12%, transparent);
+    --error-border: color-mix(in oklab, var(--error) 32%, transparent);
     --error-contrast: #a03530;
-    --primary-bg: rgba(61, 107, 93, 0.10);
-    --primary-border: rgba(61, 107, 93, 0.30);
-    --info-contrast: #2d5347;
-    --warning-bg: rgba(184, 134, 46, 0.12);
-    --warning-border: rgba(184, 134, 46, 0.30);
+    --primary-bg: color-mix(in oklab, var(--accent) 12%, transparent);
+    --primary-border: color-mix(in oklab, var(--accent) 32%, transparent);
+    --info-contrast: color-mix(in oklab, var(--accent) 80%, #000);
+    --warning-bg: color-mix(in oklab, var(--warning) 14%, transparent);
+    --warning-border: color-mix(in oklab, var(--warning) 32%, transparent);
     --warning-contrast: #8a6500;
     --danger: #c4453a;
     --danger-hover: #a93530;
-    --accent-hover: #984428;
     --on-accent: #ffffff;
     --storage-track: #d8d4cd;
-    --storage-fill-start: #5aab7a;
-    --storage-fill-end: #3d6b5d;
-    --info-bg: rgba(196, 93, 62, 0.07);
-    --info-border: rgba(196, 93, 62, 0.20);
+    --storage-fill-start: color-mix(in oklab, var(--accent) 70%, #fff);
+    --storage-fill-end: var(--accent);
+    /* Pure black backdrop for e-ink preview canvas (both themes) */
+    --preview-bg: #000;
+    --info-bg: color-mix(in oklab, var(--accent) 8%, transparent);
+    --info-border: color-mix(in oklab, var(--accent) 22%, transparent);
     --icon-accent: var(--accent);
 
     /* Standardized Typography System */
@@ -190,59 +229,72 @@ body {
        --bp-2xl: 1440px  Large screens */
 }
 [data-theme="dark"] {
-    /* Hardware diagnostic console */
-    --bg: #121210;
-    --surface: #1c1b18;
-    --surface-border: #333028;
-    --text: #e8e4de;
-    --muted: #9a9590;
+    /* Console aesthetic — dark-first refined UI */
+    --bg: #0e0f10;
+    --surface: #141618;
+    --surface-2: #191c1e;
+    --surface-3: #20252a;
+    --surface-border: #262b30;
+    --border-strong: #2f3640;
+    --text: #e4e6e8;
+    --muted: #a7adb3;
+    --text-3: #6f767d;
     --divider: var(--surface-border);
-    --button-bg: #252320;
-    --input-bg: #161513;
-    --accent: #e07a5c;
-    --panel-bg: #211f1c;
-    --panel-border: #333028;
-    --subtext: #9a9590;
-    --frame-lining: #6b6560;
-    --skeleton-base: rgba(232, 228, 222, 0.06);
-    --skeleton-highlight: rgba(232, 228, 222, 0.10);
-    --error: #e8685e;
-    --success: #6db89f;
-    --warning: #d4a03a;
-    --primary: #6db89f;
-    --primary-hover: #8acab2;
+    --button-bg: #191c1e;
+    --input-bg: #191c1e;
+    /* Refined teal — muted, perceptually consistent */
+    --accent: oklch(68% 0.08 170);
+    --accent-hover: oklch(74% 0.09 170);
+    --accent-ink: oklch(20% 0.02 170);
+    --accent-weak: color-mix(in oklab, var(--accent) 18%, transparent);
+    --panel-bg: #191c1e;
+    --panel-border: #262b30;
+    --subtext: #a7adb3;
+    --frame-lining: #6f767d;
+    --skeleton-base: rgba(228, 230, 232, 0.06);
+    --skeleton-highlight: rgba(228, 230, 232, 0.10);
+    --error: oklch(70% 0.17 25);
+    --success: oklch(72% 0.11 160);
+    --warning: oklch(80% 0.12 82);
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
+    /* Handoff naming alias: the prototype's styles.css uses `--text-2` /
+       `--text-3` for muted + quieter text; we've always used --subtext /
+       --text-secondary. Keep the alias so new rules copied from the
+       handoff can reference --text-2 without breaking. */
+    --text-2: var(--subtext);
+    --border: var(--surface-border);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
-    --bg-secondary: #1a1816;
-    --card-bg: rgba(28, 27, 24, 0.88);
-    --modal-overlay: rgba(12, 11, 10, 0.68);
-    --modal-bg: #211f1c;
+    --bg-secondary: #0e0f10;
+    --card-bg: var(--surface);
+    --modal-overlay: rgba(0, 0, 0, 0.6);
+    --modal-bg: var(--surface);
     --shadow-medium: rgba(0, 0, 0, 0.35);
     --close-btn-color: var(--muted);
     --close-btn-hover: var(--text);
-    --success-bg: rgba(109, 184, 159, 0.14);
-    --success-border: rgba(109, 184, 159, 0.30);
-    --error-bg: rgba(232, 104, 94, 0.14);
-    --error-border: rgba(232, 104, 94, 0.30);
-    --error-contrast: #ffb1ab;
-    --primary-bg: rgba(109, 184, 159, 0.14);
-    --primary-border: rgba(109, 184, 159, 0.30);
-    --info-contrast: #8acab2;
-    --warning-bg: rgba(212, 160, 58, 0.14);
-    --warning-border: rgba(212, 160, 58, 0.30);
-    --warning-contrast: #f0c060;
-    --danger: #e8685e;
-    --danger-hover: #f08070;
-    --accent-hover: #f09880;
-    --on-accent: #121210;
-    --storage-track: #333028;
-    --storage-fill-start: #6db89f;
-    --storage-fill-end: #4a9a80;
-    --info-bg: rgba(224, 122, 92, 0.10);
-    --info-border: rgba(224, 122, 92, 0.20);
+    --success-bg: color-mix(in oklab, var(--success) 14%, transparent);
+    --success-border: color-mix(in oklab, var(--success) 35%, transparent);
+    --error-bg: color-mix(in oklab, var(--error) 14%, transparent);
+    --error-border: color-mix(in oklab, var(--error) 35%, transparent);
+    --error-contrast: color-mix(in oklab, var(--error) 85%, #fff);
+    --primary-bg: var(--accent-weak);
+    --primary-border: color-mix(in oklab, var(--accent) 40%, transparent);
+    --info-contrast: var(--accent);
+    --warning-bg: color-mix(in oklab, var(--warning) 14%, transparent);
+    --warning-border: color-mix(in oklab, var(--warning) 35%, transparent);
+    --warning-contrast: color-mix(in oklab, var(--warning) 85%, #fff);
+    --danger: var(--error);
+    --danger-hover: color-mix(in oklab, var(--error) 85%, #fff);
+    --on-accent: var(--accent-ink);
+    --storage-track: var(--surface-3);
+    --storage-fill-start: var(--accent);
+    --storage-fill-end: var(--accent-hover);
+    --info-bg: color-mix(in oklab, var(--accent) 10%, transparent);
+    --info-border: color-mix(in oklab, var(--accent) 22%, transparent);
     --icon-accent: var(--accent);
 
     /* Dark shadow overrides */
@@ -250,6 +302,45 @@ body {
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.30);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Aesthetic: Paper — warm charcoal, paper-cream surfaces (dark mode variant) */
+[data-theme="dark"][data-aesthetic="paper"] {
+    --bg: #16130f;
+    --surface: #1d1915;
+    --surface-2: #241f1a;
+    --surface-3: #2b2520;
+    --surface-border: #33302a;
+    --border-strong: #403a33;
+    --text: #efe8dc;
+    --muted: #b5ac9e;
+    --text-3: #827a6e;
+    --accent: oklch(72% 0.07 168);
+    --accent-hover: oklch(78% 0.08 168);
+    --accent-ink: #16130f;
+    --panel-bg: #241f1a;
+    --panel-border: #33302a;
+    --input-bg: #241f1a;
+    --button-bg: #241f1a;
+    --bg-secondary: #16130f;
+}
+
+/* Aesthetic: Minimal — flatter, cooler, less ornament (dark mode variant) */
+[data-theme="dark"][data-aesthetic="minimal"] {
+    --bg: #0b0c0d;
+    --surface: #0f1113;
+    --surface-2: #131619;
+    --surface-3: #171b1f;
+    --surface-border: #1c2126;
+    --border-strong: #242a31;
+    --text: #ececed;
+    --muted: #9ea4ac;
+    --text-3: #60666d;
+    --panel-bg: #131619;
+    --panel-border: #1c2126;
+    --input-bg: #131619;
+    --button-bg: #131619;
+    --bg-secondary: #0b0c0d;
 }
 
 [hidden] { display: none !important; }
@@ -406,12 +497,31 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: flex-end;
+    /* Left-align count chips under the pageheader so they read as part of the
+       page header context rather than floating as orphans on the right edge.
+       The previous `flex-end` alignment made chips like "1 playlist" or
+       "0 providers / 0 configured" appear disconnected from the title. */
+    justify-content: flex-start;
+    /* Tighter rhythm between the pageheader description and the summary row.
+       The handoff pulls these chips just under the header without a full
+       vertical-xl gap. */
+    margin-top: -4px;
+    margin-bottom: var(--spacing-md, 12px);
 }
 
 .page-shell {
   width: 100%;
   animation: pageIn 0.25s ease-out;
+}
+
+/* Reserve space at the bottom so the fixed tweaks FAB (44px at right:18px,
+   bottom:18px + breathing room) never overlaps interactive content in the
+   page flow on viewports where the grid reaches the bottom of the window.
+   Applied to the dashboard and workflow shells; the management shell has
+   its own padding-bottom for the mobile logs FAB. */
+.page-shell-dashboard,
+.page-shell-workflow {
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
 @keyframes pageIn {
@@ -471,23 +581,30 @@ main[data-page-shell="workflow"] .frame {
 .image-container.show-frame .device-frame-overlay { display: block; }
 
 /* Status bar (top previews) */
+/* Side-by-side preview pair — mirrors the React `preview-pair` in
+   screens.jsx. Each side gets an equal-width card with a monospace eyebrow
+   header (status-title) above the preview image. */
 .status-bar {
     display: grid;
-    grid-template-columns: auto 1fr; /* auto-size compact card, remaining space for instance */
-    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
     margin: 6px 0 0 0;
 }
 .status-card {
     border: 1px solid var(--surface-border);
     border-radius: 10px;
     background: var(--surface);
-    padding: 8px;
+    padding: 10px;
+    min-width: 0;
 }
 .status-title {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: var(--text);
-    margin-bottom: 4px;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    margin-bottom: 6px;
 }
 .status-body {
     display: flex;
@@ -512,9 +629,9 @@ main[data-page-shell="workflow"] .frame {
 }
 .status-body img { max-width: 100%; max-height: 160px; display: block; }
 
-/* Compact current display thumbnail */
+/* Compact current display thumbnail — now a full-width equal-pair partner */
 .status-card.compact .image-container {
-    width: 200px;
+    width: 100%;
     max-width: 100%;
 }
 .status-card.compact .image-container img {
@@ -525,7 +642,7 @@ main[data-page-shell="workflow"] .frame {
 }
 
 .status-card.compact .image-container.native {
-    width: 200px;
+    width: 100%;
     max-width: 100%;
     overflow: hidden;
 }
@@ -586,16 +703,40 @@ main[data-page-shell="workflow"] .frame {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 5px;
     border-radius: 999px;
-    padding: 3px 10px;
+    padding: 2px 9px;
     border: 1px solid var(--surface-border);
-    background: var(--surface);
-    color: var(--text);
-    font-size: 0.7rem;
-    font-weight: 600;
-    line-height: 1.3;
+    background: var(--surface-2, var(--surface));
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.status-chip .chip-dot,
+.status-chip.has-dot::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.9;
+    flex-shrink: 0;
+}
+
+.status-chip.has-dot::before {
+    content: '';
+    display: inline-block;
+}
+
+.status-chip.mono {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    letter-spacing: 0;
+    text-transform: none;
+    font-feature-settings: 'ss01';
 }
 
 .status-chip.success {
@@ -622,10 +763,72 @@ main[data-page-shell="workflow"] .frame {
     color: var(--error-contrast);
 }
 
+/* Handoff parity: accent chip + dot variant. Used by the dashboard stage
+   "Live" descriptor and anywhere a ghost accent chip is desired. The `.dot`
+   modifier prefixes a small filled circle (same as `.has-dot` but scoped to
+   match the handoff's `chip-dot` naming in screens.jsx). */
+.status-chip.accent {
+    background: color-mix(in oklab, var(--accent) 14%, transparent);
+    border-color: color-mix(in oklab, var(--accent) 40%, transparent);
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+}
+
+.status-chip.dot::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 25%, transparent);
+    flex-shrink: 0;
+}
+
 .plugin-mode-row {
     margin: 2px 0 10px 0;
     justify-content: flex-start;
     flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* When the API-key indicator lives inside the title-stack meta row, render it
+   as a compact chip that matches .status-chip sizing. */
+.plugin-mode-row .api-key-indicator,
+.plugin-mode-row .api-key-indicator.collapsed,
+.plugin-mode-row .api-key-indicator.auto-collapse {
+    min-height: 0;
+    min-width: 0;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    gap: 5px;
+    animation: none;
+}
+
+.plugin-mode-row .api-key-indicator .api-key-icon {
+    width: 10px;
+    height: 10px;
+    font-size: 0.7rem;
+}
+
+.plugin-mode-row .api-key-indicator.collapsed .api-key-text,
+.plugin-mode-row .api-key-indicator.auto-collapse .api-key-text {
+    opacity: 1;
+    max-width: none;
+    overflow: visible;
+    animation: none;
+}
+
+.plugin-mode-row .api-key-indicator.missing:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 /* Compact meta styling when inside status-body */
@@ -1002,6 +1205,1011 @@ main[data-page-shell="workflow"] .frame {
 .debug-console-msg {
   color: var(--error);
   word-break: break-word;
+}
+
+/* Refined shell — persistent left sidebar, dark-first */
+
+.shell {
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.shell.density-compact { grid-template-columns: 220px minmax(0, 1fr); }
+.shell.density-cozy { grid-template-columns: 280px minmax(0, 1fr); }
+
+.shell-sidebar {
+  border-right: 1px solid var(--surface-border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px 14px;
+  gap: 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Handoff parity follow-up: compact footer card identity. */
+  padding: 2px 8px 6px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.brand-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-host {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.nav-section {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  padding: 12px 10px 6px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--accent-weak);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.nav-item.active svg,
+.nav-item.active .icon-image {
+  color: var(--accent);
+}
+
+.nav-item .icon-image,
+.nav-item svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex-shrink: 0;
+}
+
+.sidebar-foot {
+  border-top: 1px solid var(--surface-border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.now-card {
+  display: grid;
+  gap: 5px;
+  background: color-mix(in oklab, var(--surface-2) 92%, var(--surface));
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 12px 11px;
+}
+
+.now-label {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+/* Wrapper that groups the dynamic title + meta rows under a single
+   `aria-live="polite"` region so state transitions announce once per
+   change (CodeRabbit review, PR #570). Uses the same grid+gap as the
+   outer `.now-card` so the two children keep the original 5px rhythm
+   they had as direct siblings of the card. */
+.now-live {
+  display: grid;
+  gap: 5px;
+}
+
+.now-title {
+  font-weight: 600;
+  margin-top: 2px;
+  min-height: 2.5em;
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Clamp to two lines of the (usually wrapped) plugin name. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+}
+
+.now-meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin-top: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.sys-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.sys-row .sys-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sys-row #themeToggle {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.sys-row #themeToggle:hover {
+  color: var(--text);
+}
+
+.sys-row #themeToggle .theme-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Handoff parity follow-up: the "is-idle" variants are scoped to the
+   .now-card state and don't duplicate earlier selectors. */
+.now-card.is-idle {
+  background: color-mix(in oklab, var(--surface-2) 84%, var(--surface));
+}
+
+.now-card.is-idle .live-dot {
+  background: var(--text-3);
+  box-shadow: none;
+  opacity: 0.55;
+}
+
+.sys-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sys-load {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+}
+
+/* Main content column */
+.shell-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* When the persistent sidebar is active (desktop), hide redundant in-page
+   navigation links and the per-page home button — the sidebar already
+   provides those. Keep the identity, title, and theme toggle. */
+@media (min-width: 901px) {
+  .shell-sidebar .sys-row {
+    justify-content: space-between;
+  }
+
+  /* Keep #themeToggle visible here. The handoff tucks theme switching into
+     the sidebar footer on desktop, and tests/integration/test_theme_toggle_e2e.py
+     asserts the button is clickable on /. An earlier parity pass added a
+     display:none here; that hid the only instance of the toggle on desktop,
+     so it's removed. */
+
+  .shell .app-header nav.header-actions,
+  .shell .app-header .header-identity .header-button.icon.current-page {
+    display: none;
+  }
+  .shell .frame {
+    margin-top: 12px;
+  }
+}
+
+/* Responsive: collapse sidebar to a top strip on small screens.
+   We keep the sidebar in the DOM (instead of display:none) so the theme
+   toggle inside .sidebar-foot remains accessible — the mobile smoke test
+   asserts #themeToggle is visible/scrollable on phone viewports. The nav
+   links are hidden (primary nav is reached via the tweaks FAB / per-page
+   breadcrumbs on mobile); the brand + theme toggle remain. */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .shell.density-compact,
+  .shell.density-cozy {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--surface-border);
+    overflow: visible;
+  }
+
+  .shell-sidebar .sidebar-nav,
+  .shell-sidebar .now-card,
+  .shell-sidebar .sys-stats {
+    display: none;
+  }
+
+  .shell-sidebar .sidebar-foot {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    flex-shrink: 0;
+  }
+
+  .shell-sidebar .sidebar-foot .sys-row {
+    margin: 0;
+  }
+}
+
+/* Tweaks FAB + panel — aesthetic / density / accent switcher */
+
+body[data-page="settings"] .tweaks-fab,
+body[data-page="settings"] .tweaks-panel,
+body[data-page="history"] .tweaks-fab,
+body[data-page="history"] .tweaks-panel,
+body[data-page="api-keys"] .tweaks-fab,
+body[data-page="api-keys"] .tweaks-panel,
+body[data-page="dashboard"] .tweaks-fab,
+body[data-page="dashboard"] .tweaks-panel,
+body[data-page="playlist"] .tweaks-fab,
+body[data-page="playlist"] .tweaks-panel,
+body[data-page="plugin"] .tweaks-fab,
+body[data-page="plugin"] .tweaks-panel {
+  display: none;
+}
+
+.tweaks-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 40;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease, transform var(--transition-speed) ease;
+}
+
+.tweaks-fab:hover {
+  background: var(--surface-2);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.tweaks-fab svg,
+.tweaks-fab .icon-image {
+  width: var(--icon-md);
+  height: var(--icon-md);
+}
+
+.tweaks-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 74px;
+  z-index: 41;
+  width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--border-radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: 16px;
+  color: var(--text);
+  display: none;
+}
+
+.tweaks-panel[data-open="true"] {
+  display: block;
+}
+
+.tweaks-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* Match whichever heading level base.html renders (currently <h2>); keep
+   h3/h4 in scope so future refactors that restore the older heading level
+   don't silently drop the compact style. */
+.tweaks-head h2,
+.tweaks-head h3,
+.tweaks-head h4 {
+  margin: 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tweaks-close {
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tweaks-close:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tweak-group {
+  margin-bottom: 14px;
+}
+
+.tweak-group:last-child {
+  margin-bottom: 0;
+}
+
+.tweak-label {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--text-3);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.aesthetic-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.aesthetic-option {
+  padding: 8px 6px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  background: var(--surface-2);
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition-speed) ease, color var(--transition-speed) ease, background-color var(--transition-speed) ease;
+}
+
+.aesthetic-option:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.aesthetic-option.active {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.aesthetic-swatch {
+  display: block;
+  width: 100%;
+  height: 18px;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  border: 1px solid var(--surface-border);
+}
+
+.aesthetic-swatch-console { background: linear-gradient(135deg, #0e0f10, #262b30); }
+.aesthetic-swatch-paper { background: linear-gradient(135deg, #16130f, #33302a); }
+.aesthetic-swatch-minimal { background: linear-gradient(135deg, #0b0c0d, #1c2126); }
+
+.density-options {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  width: 100%;
+}
+
+.density-option {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  color: var(--muted);
+  border-radius: var(--border-radius-sm);
+  text-align: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.density-option:hover { color: var(--text); }
+
+.density-option.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.accent-slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.accent-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+
+.accent-value {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text);
+}
+
+@media (max-width: 520px) {
+  .tweaks-panel {
+    right: 10px;
+    left: 10px;
+    width: auto;
+    bottom: 68px;
+  }
+
+  .tweaks-fab {
+    display: none;
+  }
+
+  .tweaks-panel[data-open="true"] {
+    display: block;
+  }
+}
+
+/* Refined page header — eyebrow + title + description + actions */
+
+.pageheader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.pageheader-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.pageheader .eyebrow {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  /* Handoff parity: styles.css:149–152 uses 11px (0.6875rem); we were slightly
+     under at 0.68rem (~10.9px). Exact match keeps the eyebrow's x-height
+     lined up with section-head eyebrows on the dashboard hero. */
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+
+.pageheader .page-title,
+.pageheader h1.app-title {
+  font-size: 1.6rem;
+  letter-spacing: -0.018em;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.pageheader .page-desc {
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 620px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.pageheader .page-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* Handoff parity: page-meta chips render device name and "Showing: …"
+   plugin name — natural-case human labels, not ALL-CAPS eyebrow text.
+   Scoped so success/warning status badges elsewhere still uppercase. */
+.pageheader .page-meta .status-chip {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.pageheader-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .pageheader {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pageheader-actions {
+    width: 100%;
+  }
+}
+
+/* Plugin detail pageheader: icon + title + debug slug + mode chips */
+.pageheader-plugin .plugin-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .app-icon {
+  width: var(--icon-lg, 28px);
+  height: var(--icon-lg, 28px);
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.pageheader-plugin .plugin-titlerow .title-stack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .eyebrow {
+  margin-bottom: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .app-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+}
+
+.pageheader-plugin .plugin-mode-row {
+  margin-top: 10px;
+}
+
+/* At medium widths the plugin detail header has 3 action buttons competing
+   with the icon + title + description column, forcing the title to wrap in a
+   narrow ribbon on the left. The workflow layout itself collapses to a single
+   column at 1200px, so stack the pageheader a touch earlier (~960px) to give
+   the title its full width and push the action row cleanly below. */
+@media (max-width: 960px) {
+  .pageheader-plugin {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pageheader-plugin .pageheader-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Refined metrics strip — a 4-up KPI band, evolves the existing .metric-strip */
+.metric-strip.refined,
+.metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+
+.metric-strip.refined .metric-pill,
+.metrics-strip .metric {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-strip.refined .metric-pill-label,
+.metrics-strip .metric-k {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.metric-strip.refined .metric-pill-value,
+.metrics-strip .metric-v {
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.metrics-strip .metric-v em {
+  color: var(--text-3);
+  font-style: normal;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  margin-left: 4px;
+}
+
+/* Refined underline-tab pattern for in-page section switching */
+.tabline {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 16px;
+}
+
+.tabline button,
+.tabline a {
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tabline button:hover,
+.tabline a:hover {
+  color: var(--text);
+}
+
+.tabline button.active,
+.tabline a.active,
+.tabline button[aria-selected="true"],
+.tabline a[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}
+
+/* Refined card primitive — unified surface wrapper for dashboards, settings, aside KPIs.
+   Designed to coexist with existing *-card classes; apply .card additively when adopting. */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 10px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+
+.card-sub {
+  margin: 3px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.card-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.card-body {
+  padding: 0 16px 16px;
+}
+
+.card-dense .card-head {
+  padding-bottom: 8px;
+}
+
+.card-dense .card-body {
+  padding-bottom: 12px;
+}
+
+.card-click {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.card-click:hover {
+  border-color: var(--border-strong);
+}
+
+.card-danger {
+  border-color: color-mix(in oklab, var(--error) 30%, var(--surface-border));
+}
+
+/* Dashed dividers between kv rows inside a card (e.g., Today KPI list) */
+.kv-list > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.82rem;
+  border-bottom: 1px dashed var(--surface-border);
+}
+
+.kv-list > div:last-child {
+  border-bottom: 0;
+}
+
+.kv-list span {
+  color: var(--text-secondary);
+}
+
+/* =============== InkyPreview =============== */
+/* Wraps any e-ink render surface with a pure-black canvas, subtle inset ring,
+   and drop-ring. Apply additively to existing preview containers. */
+.inky-preview {
+  position: relative;
+  background: var(--preview-bg);
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.inky-preview img,
+.inky-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.inky-preview-label {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.95);
+  letter-spacing: 0.04em;
+}
+
+/* =============== Ghost-danger button variant =============== */
+/* Transparent → error-tinted on hover. Intended for delete icons
+   (trash, remove) inside dense rows where a filled danger pill would be heavy. */
+.btn-ghostDanger,
+.action-button.ghost-danger,
+.header-button.ghost-danger {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-ghostDanger:hover,
+.action-button.ghost-danger:hover,
+.header-button.ghost-danger:hover {
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 30%, transparent);
+}
+
+.btn-ghostDanger svg,
+.action-button.ghost-danger svg,
+.header-button.ghost-danger svg {
+  color: currentColor;
+}
+
+/* =============== Chip dot indicator =============== */
+/* Small colored circle inline with chip label (e.g., Active, Live). */
+.chip-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.9;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+/* =============== Segmented control =============== */
+/* Compact toggle group (e.g., Fit / Native on dashboard hero). */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+}
+
+.seg-btn {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  border: 0;
+  background: transparent;
+  border-radius: var(--border-radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.seg-btn:hover {
+  color: var(--text);
+}
+
+.seg-btn.active,
+.seg-btn[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Radio-input variant — native radios inside labels, so FormData submission
+   works without JS plumbing. The radio itself is visually hidden; the label
+   reflects the pressed state via :has(). */
+.seg-radio {
+  position: relative;
+}
+
+.seg-radio input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.seg-btn:has(input[type="radio"]:checked) {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xs);
+}
+
+.seg-btn:has(input[type="radio"]:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Enhanced app header layout */
@@ -1385,6 +2593,28 @@ svg.icon-thin {
     background-color: var(--warning);
 }
 
+/* Explicit primary modifier — matches the default filled appearance. Useful
+   when callers want to make the intent visible in markup (e.g. the Settings
+   "API keys" CTA pairs `primary` with a leading key icon). */
+.header-button.primary {
+    background-color: var(--primary);
+    color: var(--on-accent);
+    border: none;
+}
+.header-button.primary:hover {
+    background-color: var(--primary-hover);
+}
+
+/* Leading icon inside an action/header button — keeps the glyph at a fixed
+   16x16 size, inherits the button's text color, and sits to the left of the
+   label via the flex gap already on `.header-button` / `.action-button`. */
+.btn-leading-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: currentColor;
+}
+
 /* Breadcrumb navigation */
 .breadcrumb {
     margin-bottom: var(--spacing-md);
@@ -1430,6 +2660,21 @@ svg.icon-thin {
 .breadcrumb [aria-current="page"] span {
     color: var(--text);
     font-weight: var(--font-medium);
+}
+
+/* Breadcrumb is still rendered in the DOM on these pages (the shared
+   pageheader macro emits it) and unit tests assert the markup is present
+   (see tests/integration/test_breadcrumbs.py). The sidebar shell provides
+   "Home" and a page-title eyebrow for shell-layout pages, so the breadcrumb
+   is visually redundant there and we hide it rather than conditionally
+   omit from the template — keeping the landmark available to assistive tech
+   that opts into navigation via hidden-navigation affordances. */
+body[data-page="playlist"] .breadcrumb,
+body[data-page="plugin"] .breadcrumb,
+body[data-page="settings"] .breadcrumb,
+body[data-page="history"] .breadcrumb,
+body[data-page="api-keys"] .breadcrumb {
+    display: none;
 }
 
 /* Optimized button grid with better performance and consistency */
@@ -1590,13 +2835,56 @@ svg.icon-thin {
     }
 }
 
-/* Secondary/outline variants for action buttons to keep consistency app-wide */
+/* Secondary/outline variants for action buttons to keep consistency app-wide.
+   Handoff parity: .is-secondary is a ghost/subtle variant that contrasts
+   against the filled primary (Refresh vs Display next on dashboard;
+   "Check for updates" vs "Update now" on settings). */
 .action-button.is-secondary {
-    background-color: var(--primary);
+    background-color: transparent;
+    color: var(--text);
+    border: 1px solid var(--surface-border);
 }
 .action-button.is-secondary:hover {
+    background-color: var(--panel-bg);
+    border-color: var(--border-strong, var(--surface-border));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Explicit primary modifier — same visual as the base .action-button but
+   named so templates can opt in without ambiguity (screens.jsx uses
+   variant="primary"). */
+.action-button.primary {
+    background-color: var(--primary);
+    color: var(--on-accent);
+    border: none;
+}
+.action-button.primary:hover {
     background-color: var(--primary-hover);
 }
+
+/* Warning / Danger variants for .action-button — previously only defined on
+   .header-button, which caused the Power & Recovery buttons to fall back to
+   the default accent fill. */
+.action-button.is-warning {
+    background-color: var(--warning);
+    color: var(--warning-ink, #1a1408);
+    border: none;
+}
+.action-button.is-warning:hover {
+    background-color: var(--warning);
+    filter: brightness(1.08);
+}
+
+.action-button.is-danger {
+    background-color: var(--error);
+    color: var(--on-accent);
+    border: none;
+}
+.action-button.is-danger:hover {
+    background-color: var(--danger-hover);
+}
+
 .action-button.is-outline {
     background: transparent;
     color: var(--text);
@@ -1673,7 +2961,6 @@ a:focus-visible,
 .icon-button:focus-visible,
 .toggle-container:focus-visible,
 .playlist-toggle-button:focus-visible,
-.workflow-mode-tab:focus-visible,
 .btn:focus-visible,
 select:focus-visible,
 input:focus-visible,
@@ -1785,7 +3072,11 @@ textarea:focus-visible {
 
 .form-group label {
     white-space: nowrap; /* Prevent label wrapping */
-    font-weight: 600;
+    /* Handoff parity: labels are regular-weight muted text, not 600 strong.
+       The `.form-label` rule below sets the canonical scale; this selector
+       used to override it with `font-weight: 600` which made every label
+       read 2px heavier than the handoff's refined scale. */
+    font-weight: 500;
     color: var(--text);
 }
 
@@ -1832,23 +3123,28 @@ textarea:focus-visible {
     width: 100%;
 }
 
-/* Label styling */
+/* Label styling — handoff parity (styles.css:261): 12px/500 muted. R4 took
+   this 16→13; R5 is the final 13→12 nudge so .field-label sits in the
+   refined 12 / 13 / 14 scale exactly. */
 .form-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-secondary, var(--text));
     white-space: nowrap; /* Prevent the label from wrapping */
 }
 
-/* Input field styling */
+/* Input field styling — handoff parity (styles.css:239–249): 13px on
+   `--surface-2` with 8px/10px padding. R4 took this 16→14; R5 finishes
+   the scale correction to 13 so inputs sit visually lighter than labels'
+   neighbouring copy. */
 .form-input {
     flex: auto;
-    padding: 0.4rem;
-    font-size: 1rem;
+    padding: 0.5rem 0.625rem; /* 8px 10px */
+    font-size: 0.81rem; /* ~13px */
     border: 1px solid var(--surface-border);
     border-radius: var(--border-radius-sm);
     box-sizing: border-box;
-    background-color: var(--input-bg);
+    background-color: var(--surface-2, var(--input-bg));
     color: var(--text);
     min-height: var(--form-input-height);
     display: flex;
@@ -1899,9 +3195,11 @@ select.form-input option {
     margin-bottom: 1rem;
 }
 
+/* Handoff parity: error focus ring derives from --error so theme recolors
+   propagate correctly, rather than a hardcoded red rgba. */
 .form-field.has-error .form-input {
     border-color: var(--error);
-    box-shadow: 0 0 0 2px rgba(229, 62, 62, 0.2);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--error) 20%, transparent);
 }
 
 .form-field.has-error .form-label {
@@ -1922,9 +3220,11 @@ select.form-input option {
     font-size: 1rem;
 }
 
+/* Handoff parity: tint the focus ring from the --success token rather than a
+   hardcoded green rgba — keeps themes + future recolors consistent. */
 .form-field.has-success .form-input {
     border-color: var(--success);
-    box-shadow: 0 0 0 2px rgba(56, 161, 105, 0.2);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--success) 20%, transparent);
 }
 
 .form-success {
@@ -2072,7 +3372,9 @@ select.form-input option {
 
 .remove-btn:focus {
     outline: none;
-    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5); /* Adding a focus effect similar to inputs */
+    /* Handoff parity: focus ring derives from --accent (brand teal) instead
+       of a hardcoded rgba. */
+    box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
 /* Time input styling */
@@ -2089,7 +3391,7 @@ select.form-input option {
 .time-input:focus {
     outline: none;
     border-color: var(--accent);
-    box-shadow: 0 0 3px rgba(26, 188, 156, 0.5);
+    box-shadow: 0 0 3px color-mix(in oklab, var(--accent) 50%, transparent);
 }
 
 .form-help {
@@ -2122,6 +3424,60 @@ input:disabled, select:disabled, textarea:disabled {
     border: 1px solid var(--panel-border);
     border-radius: 6px;
     font-variant-numeric: tabular-nums;
+}
+
+/* Handoff parity: stacked slider pattern — label + mono value on top,
+   full-width range below. Mirrors components.jsx's <Slider> primitive.
+   Opt-in via `.slider-row` on the form-group so legacy three-column
+   sliders elsewhere keep their current layout. */
+.form-group.slider-row {
+    display: block;
+    margin-bottom: 14px;
+}
+
+.form-group.slider-row .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.75rem;
+    color: var(--text-secondary, var(--text-2));
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.form-group.slider-row .slider-head .form-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+    margin: 0;
+    min-width: 0;
+}
+
+.form-group.slider-row .slider-val {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    color: var(--text);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+
+.form-group.slider-row .slider-range,
+.form-group.slider-row input[type="range"].settings-slider {
+    width: 100%;
+    max-width: none;
+    accent-color: var(--accent);
+    margin: 0;
+}
+
+/* Handoff parity: the prototype's Slider primitive renders a plain
+   `<input type="range" class="slider-range">`, with accent-color applied
+   to the class itself — not nested inside `.form-group.slider-row`. Keep
+   both selectors so any stray `.slider-range` element picks up the brand
+   thumb/track color even outside the settings slider-row layout. */
+.slider-range {
+    accent-color: var(--accent);
 }
 
 /* ── Form responsive: tablet ── */
@@ -2183,24 +3539,31 @@ input:disabled, select:disabled, textarea:disabled {
     }
 }
 
-/* Enhanced plugins section hierarchy */
+/* Handoff parity: Plugins section heading is a sans-serif UPPERCASE label at
+   14px/600 with tighter tracking (matches `.section-head h2` in the handoff).
+   Previously rendered mono/500 which read like a code comment next to the
+   count chip. */
 .plugins-title {
-    font-size: var(--text-2xs);
+    font-family: inherit;
+    font-size: 0.88rem;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--text-secondary, var(--muted));
     margin: 0;
     text-align: left;
     text-transform: uppercase;
-    letter-spacing: var(--tracking-wider);
+    /* Handoff parity: `.section-head h2` in styles.css:388 uses 0.02em tracking;
+       0.04em read too spaced-out against the count chip. */
+    letter-spacing: 0.02em;
     transition: color var(--transition-speed) ease;
 }
 
-/* Toggle Container */
+/* Toggle Container — handoff parity: refined 34×20 track (was chunky 50×24).
+   Matches the `<Toggle>` primitive in components.jsx. */
 .toggle-container {
     display: inline-block;
     position: relative;
-    width: 50px;
-    height: 24px;
+    width: 34px;
+    height: 20px;
 }
 
 /* Legacy hidden checkbox implementation removed to avoid hiding controls */
@@ -2211,25 +3574,25 @@ input:disabled, select:disabled, textarea:disabled {
     position: absolute;
     cursor: pointer;
     background-color: var(--divider);
-    border-radius: 15px;
+    border-radius: 12px;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    transition: 0.3s;
+    transition: 0.2s;
 }
 
-/* Toggle Knob */
+/* Toggle Knob — 14×14 centered in a 20-high track (3px inset). */
 .toggle-label::before {
     position: absolute;
     content: "";
-    height: 20px;
-    width: 20px;
+    height: 14px;
+    width: 14px;
     background-color: var(--surface);
     border-radius: 50%;
-    top: 2px;
-    left: 2px;
-    transition: 0.25s;
+    top: 3px;
+    left: 3px;
+    transition: 0.2s;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
@@ -2239,7 +3602,7 @@ input:disabled, select:disabled, textarea:disabled {
 }
 
 .toggle-checkbox:checked + .toggle-label::before {
-    transform: translateX(26px);
+    transform: translateX(14px);
 }
 
 /* Collapsible sections */
@@ -2263,6 +3626,14 @@ input:disabled, select:disabled, textarea:disabled {
     float: right;
     opacity: 50%;
     transition: transform 0.2s ease;
+    /* Handoff parity: the collapsible toggle used to render a unicode ▼
+       glyph sized by the surrounding font-size. Swapped to an inline SVG
+       chevron so it matches every other chevron in the UI; give it an
+       explicit box so float-right still lines up with the label. */
+    width: 16px;
+    height: 16px;
+    color: currentColor;
+    vertical-align: middle;
 }
 
 .collapsible-header[aria-expanded="true"] .collapsible-icon {
@@ -2290,9 +3661,11 @@ input:disabled, select:disabled, textarea:disabled {
 
 .dashboard-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  /* Handoff parity: 12px inter-card gap, 14px bottom margin (was 16/var). */
+  gap: 12px;
   align-items: start;
+  margin-bottom: 14px;
 }
 
 .dashboard-stage,
@@ -2303,39 +3676,168 @@ input:disabled, select:disabled, textarea:disabled {
   min-width: 0;
 }
 
+/* Handoff parity: primary card surfaces use radius-2 (10px) per styles.css:301
+   not radius-3 (14px). The old XL radius was one bucket too soft; aligning to
+   --border-radius-lg keeps the hero stage flush with .card elsewhere. */
 .dashboard-stage,
 .dashboard-status-card,
 .storage-card {
   padding: 16px;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
-  background: var(--panel-bg);
+  background: var(--surface);
 }
 
 .dashboard-stage {
   display: grid;
-  gap: 14px;
+  /* Handoff parity: tighter vertical rhythm inside the hero stage. */
+  gap: 10px;
+}
+
+/* Refined hero KPI strip shown below the preview image — mono labels,
+   3 cells (NOW | NEXT | REFRESH) separated by thin dividers. */
+.hero-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 18px;
+  /* Handoff parity (styles.css:347–354): the KPI strip sits 16px below the
+     preview canvas, not flush against it (was 4px). */
+  margin-top: 16px;
+  padding: 4px 8px;
+  align-items: center;
+}
+
+.hero-strip .hero-cell {
+  min-width: 0;
+  display: block;
+}
+
+.hero-strip .k {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  /* Handoff parity: 10.5px (~0.656rem) for the mono eyebrow. */
+  font-size: 0.656rem;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.hero-strip .v {
+  font-weight: 600;
+  /* Handoff parity (styles.css:359): 15px value with 3px top margin so the
+     rhythm under the mono .k reads as the refined 10.5 → 3 → 15 → 2 → 12
+     stack rather than a uniform grid gap. */
+  font-size: 0.9375rem; /* 15px */
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  /* Handoff parity: do NOT ellipsis-clip the primary value — long plugin
+     names should wrap rather than silently disappear. `.m` (meta line) still
+     clips because it carries timestamp/playlist detail that can be truncated
+     without losing essential information. */
+  overflow-wrap: anywhere;
+}
+
+.hero-strip .v.is-empty {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.hero-strip .m {
+  /* Handoff (styles.css:360): .m uses --text-2 (≡ our --text-secondary alias)
+     at 12px with a 2px top margin, not a grid gap. */
+  color: var(--text-2, var(--text-secondary));
+  font-size: 0.75rem;
+  margin-top: 2px;
+  /* Allow the meta line to wrap to at most two rows rather than single-line
+     ellipsis-clipping. At narrow viewports (~900px) the 3-column hero grid
+     squeezes each cell to ~60px, which was chopping strings like
+     "Every 60 min" to "Every 60…". Two lines fits the common "Playlist:
+     Default · refreshed 3 min ago" case without losing the tail word. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.hero-divider {
+  width: 1px;
+  height: 34px;
+  background: var(--surface-border);
+}
+
+@media (max-width: 640px) {
+  .hero-strip {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .hero-divider { display: none; }
 }
 
 .dashboard-stage-header,
 .storage-card-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 
-.dashboard-stage-header h2,
+.dashboard-stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Note: the `.dashboard-stage-header h2` is `.sr-only` in the template (an
+   accessible heading for screen readers); visual styling intentionally lives
+   on `.dashboard-stage-descriptor` below. This rule only targets the storage
+   card title which does render visibly. */
 .storage-card-title {
   margin: 0;
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
-.dashboard-stage-copy,
+/* Dashboard stage descriptor: Live chip + resolution/driver line on the
+   left of the preview header (matches Claude Design handoff). */
+.dashboard-stage-descriptor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.dashboard-resolution-mono {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  /* Allow the "<WxH> · <driver>" descriptor to wrap onto a second line at
+     narrow viewports rather than silently truncating with an ellipsis. The
+     ` · ` between pieces is a natural break point, so wrapping reads cleanly
+     and avoids the "800×480 · Mock dis…" cut-off that previously hid half
+     the driver label on the desktop stage header. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  min-width: 0;
+}
+
+.dashboard-stage-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
 .storage-card-copy {
   color: var(--text-secondary);
   font-size: 0.92rem;
@@ -2344,7 +3846,9 @@ input:disabled, select:disabled, textarea:disabled {
 
 .dashboard-overview {
   display: grid;
-  gap: 12px;
+  /* Handoff parity: tighter 8px stack, align cards to the top. */
+  gap: 8px;
+  align-content: start;
 }
 
 .dashboard-status-card {
@@ -2375,25 +3879,101 @@ input:disabled, select:disabled, textarea:disabled {
   justify-self: start;
 }
 
+/* Today KPI card — mirrors the React `Today` card in screens.jsx.
+   A four-row label/value list with monospace eyebrow labels. */
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+}
+
+.kpi-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kpi-card-head h3 {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--muted);
+}
+
+.kpi-card-sub {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+.kv-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.kv-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed color-mix(in oklab, var(--surface-border) 70%, transparent);
+}
+
+.kv-list > div:last-child {
+  border-bottom: 0;
+}
+
+.kv-list dt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.kv-list dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: -0.005em;
+}
+
+.kv-list dd.ok {
+  color: var(--success, #22c55e);
+}
+
+.kv-list dd.warn {
+  color: var(--warning, #f59e0b);
+}
+
 .dashboard-stage .image-container {
   width: 100%;
   max-width: min(100%, 50rem);
   margin: 0 auto;
-  padding: 4px;
+  padding: 20px;
   aspect-ratio: 5 / 3;
   min-height: unset;
   display: block;
   overflow: hidden;
   border-radius: var(--border-radius-lg);
-  background: var(--surface);
+  background: var(--preview-bg);
   border: 1px solid var(--surface-border);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-sm);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), var(--shadow-sm);
   transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
 }
 
 .dashboard-stage .image-container:hover {
-  border-color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-md);
+  border-color: var(--border-strong, var(--surface-border));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), var(--shadow-md);
 }
 
 .dashboard-stage .image-container img {
@@ -2463,30 +4043,33 @@ input:disabled, select:disabled, textarea:disabled {
     width: var(--meter-width, 0%);
 }
 
+/* Handoff parity: the empty state reads as a compact inline banner (row,
+   solid border, tighter padding) rather than a large centered card. */
 .dashboard-overview-empty {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 32px 20px;
-  border: 1px dashed var(--surface-border);
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
   border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
   color: var(--text-secondary);
-  text-align: center;
-  min-height: 120px;
+  text-align: left;
+  min-height: 0;
 }
 
 .dashboard-overview-empty .empty-state-icon {
-  width: var(--icon-xl, 32px);
-  height: var(--icon-xl, 32px);
-  opacity: 0.5;
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
 }
 
 .dashboard-overview-empty p {
   margin: 0;
-  font-size: 0.9rem;
-  max-width: 24ch;
+  font-size: 0.82rem;
+  max-width: none;
 }
 
 .icon-fallback {
@@ -2502,10 +4085,263 @@ input:disabled, select:disabled, textarea:disabled {
   border-radius: var(--border-radius-md);
 }
 
+/* Quick switch playlist card (dashboard aside). Padding/gap tightened to
+   handoff parity spec (12px 14px / 8px gap). */
+.quick-switch-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-switch-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* When used as a plain muted link (no .header-button companion class) the
+   original styling applies. The handoff renders this as a small button, so
+   templates now also tag it `.header-button.is-secondary`; we just shrink
+   it to a compact size here. */
+.quick-switch-link:not(.header-button),
+a.quick-switch-link:not(.header-button):link,
+a.quick-switch-link:not(.header-button):visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.quick-switch-link:not(.header-button):hover {
+  color: var(--accent);
+}
+
+a.quick-switch-link.header-button {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  min-height: 0;
+  text-decoration: none;
+}
+
+.quick-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Handoff parity (styles.css:374–381): quick-rows render as card-in-card
+   chips with a resting surface-2 background + border. The active state is
+   a subtle 5% accent tint with a 40% accent-border mix against --border,
+   not the louder 18%-weak / 25%-border we previously used. */
+.quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: var(--border-radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.quick-row:hover {
+  border-color: var(--border-strong, var(--surface-border));
+}
+
+.quick-row.is-active {
+  background: color-mix(in oklab, var(--accent) 5%, var(--surface-2));
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--surface-border));
+}
+
+.quick-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.quick-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quick-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-sub {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+a.quick-row-link:link,
+a.quick-row-link:visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--surface-border);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+a.quick-row-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.quick-row-btn.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+/* Visual parity pass: tighter dashboard rhythm, grouped header actions, and a
+   compact empty-state note so the aside no longer creates a dead panel. */
+.dashboard-pageheader-actions {
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.dashboard-header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.dashboard-header-button .btn-leading-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dashboard-header-button.is-secondary {
+  background: transparent;
+  color: var(--text-2);
+  border-color: transparent;
+}
+
+.dashboard-header-button.is-secondary:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.dashboard-header-button.is-secondary .btn-leading-icon {
+  color: var(--text-3);
+}
+
+.dashboard-header-button.is-secondary:hover .btn-leading-icon {
+  color: var(--text);
+}
+
+.dashboard-header-button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.dashboard-header-button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+/* The compact empty-state variant is used where the overview banner sits
+   inline with a live card rather than as its own card. */
+.dashboard-overview-empty.is-compact {
+  padding: 6px 0 0;
+  background: transparent;
+  border: 0;
+  min-height: 0;
+  color: var(--text-3);
+}
+
+.dashboard-overview-empty.is-compact .empty-state-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.45;
+}
+
+.dashboard-overview-empty.is-compact p {
+  font-size: 0.78rem;
+}
+
+#plugins-grid {
+  margin-top: 0;
+}
+
+#plugins-grid .section-head {
+  margin-bottom: 8px;
+}
+
+#plugins-grid .plugins-container.plugin-tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
 /* Plugin List */
 .plugin-list {
     display: flex;
     flex-direction: column;
+}
+
+/* Handoff parity: section-head wraps a left-aligned title and a right-aligned
+   count/link on the same baseline. Used by the dashboard Plugins section. */
+.section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.section-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.section-count {
+    color: var(--text-3, var(--muted));
+    font-size: 0.72rem;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.section-link {
+    white-space: nowrap;
 }
 
 /* Plugin Item */
@@ -2618,10 +4454,10 @@ input:disabled, select:disabled, textarea:disabled {
     border-color: var(--success);
 }
 
-/* Grid View (default) */
+/* Grid View (default) — refined tile with subtle lift */
 .plugins-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
     justify-items: stretch;
 }
@@ -2633,20 +4469,21 @@ input:disabled, select:disabled, textarea:disabled {
     justify-content: flex-start;
     text-decoration: none;
     color: var(--text);
-    padding: 12px 8px 10px;
-    border-radius: 8px;
+    padding: 14px 10px 12px;
+    border-radius: var(--border-radius-lg);
     border: 1px solid var(--surface-border);
+    background: var(--surface);
     box-sizing: border-box;
     width: 100%;
     justify-self: stretch;
-    transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .plugins-container .plugin-item:hover {
-    background: var(--button-bg);
-    border-color: var(--muted);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background: var(--surface);
+    border-color: var(--border-strong, var(--muted));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .plugins-container .plugin-item:active {
@@ -2656,20 +4493,30 @@ input:disabled, select:disabled, textarea:disabled {
 }
 
 .plugins-container .plugin-item .icon-image {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
-    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    border-radius: var(--border-radius-md);
+    background: var(--surface-2, var(--button-bg));
+    border: 1px solid var(--surface-border);
+    color: var(--accent);
     object-fit: cover;
+    transition: border-color 0.15s ease;
+}
+
+.plugins-container .plugin-item:hover .icon-image {
+    border-color: color-mix(in oklab, var(--accent) 30%, var(--surface-border));
 }
 
 .plugin-name {
-    margin-top: 8px;
-    font-size: 0.78rem;
+    margin-top: 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
     line-height: 1.3;
     text-align: center;
-    color: var(--muted);
+    color: var(--text);
     width: 100%;
     padding: 0 2px;
     box-sizing: border-box;
@@ -2679,6 +4526,7 @@ input:disabled, select:disabled, textarea:disabled {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     min-height: 2.4em;
+    letter-spacing: -0.005em;
 }
 
 /* List View */
@@ -2710,6 +4558,98 @@ input:disabled, select:disabled, textarea:disabled {
     width: auto;
     padding: 0;
     white-space: nowrap;
+}
+
+/* Horizontal plugin tile — icon left, name+desc center, chevron right.
+   Mirrors the React `plugin-tile` in screens.jsx. Only applies when both
+   `.plugin-tile` (on the anchor) and `.plugin-tile-grid` (on the container)
+   are present, so other consumers of `.plugin-item` stay unaffected. */
+/* Handoff parity: 220px min-width (was 280px) gives ~27% more tiles per row. */
+.plugins-container.plugin-tile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 14px;
+    gap: 12px;
+    text-align: left;
+}
+
+/* Handoff parity: wrap the tile icon in a 36x36 rounded surface-2 box with
+   a border. The icon itself is the accent color; the container gives it
+   visual weight that matches screens.jsx's plugin-tile-icon. */
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-tile-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    background: var(--surface-2, var(--panel-bg));
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    color: var(--accent);
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile .icon-image {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.plugin-tile-body {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-name,
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-tile-name {
+    margin: 0;
+    /* Handoff: 13.5px/600. Was 14.4px — drops a notch to match the refined
+       typography scale (tile desc sits at 12.5px). */
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: left;
+    width: auto;
+    padding: 0;
+    min-height: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: unset;
+}
+
+.plugin-tile-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plugin-tile-chev {
+    width: 14px;
+    height: 14px;
+    color: var(--text-3);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile:hover .plugin-tile-chev {
+    transform: translateX(2px);
+    color: var(--accent);
 }
 
 /* Sorting Mode */
@@ -2750,48 +4690,264 @@ input:disabled, select:disabled, textarea:disabled {
   gap: var(--spacing-md);
 }
 
-.workflow-mode-bar {
-  display: none;
-  gap: 8px;
-  padding: 6px;
-  border-radius: 999px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  align-self: flex-start;
-  position: relative;
-  margin-bottom: 12px;
+/* Plugin sub-tab bar (Configure / Style / Schedule) — lives inside the
+   workflow-main-panel and is visible on every viewport. Mirrors the React
+   `tabline` design from screens.jsx. */
+.plugin-subtab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 14px;
+  align-self: stretch;
 }
 
-.workflow-mode-tab {
+.plugin-subtab {
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.workflow-mode-tab.active {
-  background: var(--accent);
-  color: var(--on-accent);
+.plugin-subtab:hover {
+  color: var(--text);
 }
 
-.workflow-mode-bar::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--panel-border);
+.plugin-subtab.active,
+.plugin-subtab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.plugin-page-desc {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.pageheader-plugin .pageheader-actions {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Plugin pageheader buttons use tighter horizontal padding than the base
+   `.header-button` (10px 16px) so the eyebrow row fits Save/Display/Schedule
+   together on narrow desktop viewports. We intentionally avoid `min-height`
+   here because the 36px touch-target height is reserved for mobile media
+   queries (see tests/static/test_mobile_touch_targets.py). Default padding
+   already lands around 34-35px tall on desktop, which matches the handoff. */
+.pageheader-plugin .pageheader-actions .header-button,
+.pageheader-plugin .pageheader-actions .action-button {
+  padding-inline: 12px;
+}
+
+.pageheader-plugin .plugin-mode-row .api-key-indicator,
+.pageheader-plugin .plugin-mode-row .api-key-indicator.collapsed,
+.pageheader-plugin .plugin-mode-row .api-key-indicator.auto-collapse {
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+
+.plugin-editor-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.9fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.plugin-editor-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+}
+
+.plugin-editor-card-label {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.plugin-editor-card h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.plugin-editor-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.plugin-editor-summary-meta {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.plugin-editor-summary-meta strong {
+  color: var(--text);
+}
+
+.plugin-inline-api-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-inline-api-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.plugin-inline-api-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.plugin-inline-api-actions .status-chip,
+.plugin-inline-api-link {
+  white-space: nowrap;
+}
+
+/* Schedule sub-panel summary card */
+.schedule-summary-card {
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2, var(--surface));
+  display: grid;
+  gap: 6px;
+}
+
+.schedule-summary-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.schedule-summary-line strong {
+  color: var(--text);
+}
+
+.plugin-schedule-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-summary-card-accent {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--surface-border));
+}
+
+.schedule-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.schedule-form-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--panel-bg);
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.schedule-fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  background: var(--surface);
+}
+
+.schedule-fieldset-title {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schedule-inline-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-inline-group .form-input {
+  flex: 1 1 140px;
+}
+
+.schedule-inline-group .validation-message {
+  flex-basis: 100%;
+}
+
+.schedule-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-panel-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 38rem;
 }
 
 .workflow-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) 420px;
   gap: 20px;
   align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .workflow-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .workflow-main-panel,
@@ -2803,6 +4959,79 @@ input:disabled, select:disabled, textarea:disabled {
 .workflow-side-panel {
   display: grid;
   gap: 16px;
+}
+
+/* Handoff parity: matches .card standard (14/16 padding, --border-radius-lg,
+   --surface). Previously used symmetric 14px padding which made the preview
+   header feel pinched against the card edge. */
+.workflow-preview-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+}
+
+.workflow-preview-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-preview-card-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.workflow-preview-card-head p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: 34rem;
+}
+
+.workflow-preview-card .status-bar {
+  margin: 0;
+  gap: 12px;
+}
+
+.workflow-preview-card .status-card {
+  min-height: 100%;
+  border-color: var(--surface-border);
+  background: var(--surface-2, var(--panel-bg));
+  box-shadow: none;
+}
+
+.workflow-preview-card .status-title {
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workflow-preview-card .status-meta {
+  margin-top: 10px;
+}
+
+.workflow-preview-card .status-meta .label {
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-preview-card .status-meta .value {
+  font-size: 0.86rem;
+}
+
+.workflow-preview-card .separator {
+  margin: 0;
 }
 
 .workflow-section-header {
@@ -2829,11 +5058,17 @@ input:disabled, select:disabled, textarea:disabled {
 
 .workflow-action-panel {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--border-radius-md);
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.workflow-utility-card {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
 }
 
 .workflow-device-toggle {
@@ -2841,6 +5076,33 @@ input:disabled, select:disabled, textarea:disabled {
   align-items: center;
   gap: 8px;
   font-weight: 600;
+}
+
+body[data-page="plugin"] .workflow-device-toggle {
+  display: none;
+}
+
+body[data-page="plugin"] .workflow-help {
+  margin-top: 0;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+body[data-page="plugin"] .workflow-help p {
+  margin: 0;
+}
+
+.progress-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-history-button {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
 }
 
 .workflow-action-group {
@@ -2851,6 +5113,33 @@ input:disabled, select:disabled, textarea:disabled {
 
 .workflow-help {
   margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .plugin-editor-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plugin-inline-api-row {
+    flex-direction: column;
+  }
+
+  .schedule-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-form-actions {
+    align-items: stretch;
+  }
+
+  .schedule-form-actions .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .workflow-preview-card {
+    padding: 14px;
+  }
 }
 
 /* Playlist plugin thumbnails */
@@ -2936,31 +5225,42 @@ input:disabled, select:disabled, textarea:disabled {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 20px 25px 10px 25px;
-    gap: 14px;
+    padding: 14px 18px;
+    gap: 16px;
+    cursor: pointer;
+    transition: background-color var(--transition-speed) ease;
+}
+
+/* Handoff parity: hover rows use --surface-2 directly rather than mixing
+   text-3 into surface — cleaner token reference and matches the handoff's
+   .quick-row / .pl-item hover grammar. */
+.playlist-header:hover {
+    background: var(--surface-2);
 }
 
 /* Playlist Item */
 .playlist-item {
     display: flex;
-    padding: 0px 0px 5px 0px;
-    transition: all var(--transition-speed) ease;
-    border: 2px solid var(--surface-border);
-    border-radius: 10px;
+    padding: 0;
+    transition: border-color var(--transition-speed) ease;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-lg);
+    background: var(--surface);
+    overflow: hidden;
     flex-direction: column;
     width: 100%
 }
 
 /* Active Playlist Item */
 .playlist-item.active {
-    border-color: var(--accent);
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--surface-border));
 }
 
 .playlist-title {
-    font-size: 1.2rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text);
+    letter-spacing: -0.01em;
 }
 
 .playlist-heading {
@@ -3088,6 +5388,418 @@ input:disabled, select:disabled, textarea:disabled {
     gap: 8px;
 }
 
+/* =============== Refined playlist row (.pl-item) ===============
+   5-col grid: drag · icon tile · main · inline thumb · actions.
+   Applied additively on playlist plugin rows. */
+.pl-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "drag icon main thumb actions";
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 6px;
+}
+
+.pl-item.is-playing {
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--surface-border));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.pl-item .drag-handle,
+.pl-item .pl-drag {
+  grid-area: drag;
+  color: var(--text-3);
+  opacity: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px;
+}
+
+.pl-item-icon {
+  grid-area: icon;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--border-radius-md);
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  color: var(--accent);
+  overflow: hidden;
+}
+
+.pl-item-icon img,
+.pl-item-icon svg {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.pl-item-main {
+  grid-area: main;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pl-item-name {
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-item-name .plugin-instance-suffix {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.pl-item-meta {
+  color: var(--text-3);
+  font-size: 0.72rem;
+  margin-top: 0;
+}
+
+.pl-item-thumb {
+  grid-area: thumb;
+  width: 96px;
+  height: 56px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+  background: var(--preview-bg);
+  position: relative;
+}
+
+.pl-item-thumb:empty { display: none; }
+
+.pl-item-thumb .plugin-thumbnail-container,
+.pl-item-thumb .plugin-thumb {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  flex: none;
+  background: transparent;
+}
+
+.pl-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.pl-item-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.playlist-row-display-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+
+.playlist-row-display-btn .action-button-label {
+  display: inline;
+  font-size: 0.78rem;
+}
+
+.playlist-row-display-btn .action-icon,
+.playlist-row-display-btn .btn-leading-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.playlist-row-icon-btn {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playlist-row-icon-btn .action-icon,
+.playlist-row-icon-btn .btn-leading-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.playlist-row-icon-btn .action-button-label {
+  display: none;
+}
+
+/* Handoff parity: empty-state panels sit on --surface-2 directly (no mix).
+   This matches the handoff's subtle "inner container" treatment and keeps
+   the token graph resolvable in both themes. */
+.playlist-card-body .empty-state.compact {
+  display: grid;
+  gap: 8px;
+  padding: 18px 18px 16px;
+  background: var(--surface-2);
+  border-color: var(--surface-border);
+}
+
+.playlist-card-body .empty-state.compact .empty-state-icon {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 0;
+}
+
+.playlist-card-body .empty-state.compact .empty-state-primary {
+  font-size: 0.9rem;
+}
+
+.playlist-card-body .empty-state.compact .empty-state-secondary {
+  font-size: 0.82rem;
+}
+
+/* Dashed "add plugin instance" row */
+.pl-add-row,
+a.pl-add-row:link,
+a.pl-add-row:visited {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  width: 100%;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px dashed var(--surface-border);
+  border-radius: var(--border-radius-md);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pl-add-row:hover,
+a.pl-add-row:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Visual parity pass: restore the handoff's rotation-card header/body split
+   and visible desktop controls instead of icon-only admin actions. This
+   block intentionally re-declares some selectors above as a focused
+   override layer; consolidating each pair into the earlier rule risks
+   visual regressions across the playlist grid. The re-declaration is
+   additive and documented here rather than merged blind. */
+/* stylelint-disable no-duplicate-selectors */
+.playlist-frame {
+  max-width: 1040px;
+}
+
+.playlist-list {
+  gap: 14px;
+}
+
+.playlist-item {
+  border-radius: var(--border-radius-xl);
+}
+
+.playlist-header {
+  padding: 14px 16px;
+  align-items: center;
+  gap: 16px;
+}
+
+.playlist-header:hover {
+  background: var(--surface-2);
+}
+
+.playlist-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playlist-heading-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+}
+
+.playlist-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.playlist-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.playlist-summary-row {
+  gap: 0;
+}
+
+.playlist-summary-copy {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
+.playlist-toolbar {
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.playlist-toolbar .run-next-btn,
+.playlist-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+}
+
+.playlist-toolbar .run-next-btn .action-button-label,
+.playlist-toolbar .playlist-secondary-button .action-button-label {
+  display: inline;
+  font-size: 0.78rem;
+}
+
+.playlist-secondary-button.is-icon-only {
+  padding: 6px 7px;
+}
+
+.playlist-secondary-button .btn-leading-icon,
+.playlist-toolbar .run-next-btn .btn-leading-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.displayed-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 32%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.displayed-now::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 18%, transparent);
+}
+
+.playlist-card-body {
+  gap: 10px;
+  padding: 6px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--surface-border);
+}
+
+/* Desktop refinement: base rule at line 165 already sets `display: none;` so
+   the toggle stays hidden on desktop (the details section is expanded by
+   default). The mobile @media in _responsive.css flips display to
+   inline-flex on narrow viewports. Properties here apply whenever the
+   button does become visible (e.g. defensive fallback paths). */
+.playlist-toggle-button {
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  flex: 0 0 auto;
+}
+
+.playlist-toggle-button::after {
+  content: "\203A";
+  margin-left: 0;
+  color: var(--text-3);
+  font-size: 1.05rem;
+  transform: rotate(0deg);
+}
+
+.playlist-toggle-button[aria-expanded="true"]::after {
+  transform: rotate(90deg);
+}
+
+.playlist-toggle-button:hover {
+  border-color: var(--border-strong, var(--surface-border));
+  background: var(--surface-2);
+}
+
+.playlist-header .playlist-toggle-button {
+  order: -1;
+}
+
+/* Caret toggle for collapse/expand */
+.pl-caret {
+  color: var(--text-3);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.2s ease;
+}
+
+.pl-caret:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.pl-caret[aria-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* stylelint-enable no-duplicate-selectors */
+
+/* Collapse thumb column on narrow viewports */
+@media (max-width: 720px) {
+  .pl-item {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "drag icon main actions";
+  }
+  .pl-item-thumb { display: none; }
+}
+
 /* Compact grid for groups of options */
 .options-grid {
   display: grid;
@@ -3107,6 +5819,72 @@ input:disabled, select:disabled, textarea:disabled {
   font-weight: var(--font-semibold);
   color: var(--text);
   margin-bottom: 10px;
+}
+
+/* Card framing for each settings panel section. Scoped to the settings
+   console so other consumers of .section / .collapsible are unaffected.
+   Mirrors the React prototype where every panel is wrapped in a Card. */
+.settings-console-panel .section,
+.settings-console-panel .collapsible {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.settings-console-panel .section {
+  padding: 14px 16px 12px;
+}
+
+.settings-console-panel .section-title {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+
+.settings-console-panel .collapsible .collapsible-header {
+  background: transparent;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--text);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.settings-console-panel .collapsible .collapsible-header:hover {
+  background: color-mix(in oklab, var(--surface-border) 40%, transparent);
+}
+
+.settings-console-panel .collapsible .collapsible-header[aria-expanded="true"] {
+  border-bottom-color: var(--surface-border);
+}
+
+.settings-console-panel .collapsible .collapsible-content {
+  padding: 0;
+}
+
+.settings-console-panel .collapsible .collapsible-content.is-open {
+  padding: 12px 16px 14px;
+}
+
+.settings-console-panel .update-panel,
+.settings-console-panel .danger-zone {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 14px;
+  padding: 14px 16px;
+}
+
+.settings-console-panel .danger-zone {
+  border-color: color-mix(in oklab, var(--error) 30%, var(--surface-border));
 }
 
 .settings-schema {
@@ -3210,6 +5988,21 @@ input:disabled, select:disabled, textarea:disabled {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
+}
+
+/* Handoff parity: toggle row pairs a stacked [label + hint] column with the
+   switch on the far right. Used on form-groups that opt in with `.toggle-row`. */
+.form-group.nowrap.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
+.form-group.nowrap.toggle-row .toggle-container {
+  flex-shrink: 0;
 }
 
 .toggle-item-label {
@@ -3260,6 +6053,12 @@ input:disabled, select:disabled, textarea:disabled {
   display: grid;
   gap: 10px;
   padding: 10px 12px;
+  /* Grid tracks default to min-content, which lets a textarea's intrinsic
+     cols attribute (default 20) or a URL input's placeholder prevent the
+     container from shrinking below ~300px — causing horizontal overflow
+     on 360px phone viewports. Clamping to minmax(0, 1fr) forces the
+     column to honour the container width. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dynamic-list-toolbar {
@@ -3272,6 +6071,13 @@ input:disabled, select:disabled, textarea:disabled {
 
 .dynamic-list-toolbar .form-input {
   flex: 1;
+  /* Without min-width: 0 the input cannot shrink below its intrinsic
+     min-content width (which, for a URL input with a long placeholder
+     like "https://calendar.google.com/…/basic.ics", approaches 300px on
+     Linux/Chromium). On a 360px viewport that pushes the toolbar past
+     the viewport edge and breaks the no-horizontal-overflow smoke test
+     for calendar/todo_list plugin pages. */
+  min-width: 0;
 }
 
 .compact-repeater-toolbar {
@@ -3314,7 +6120,8 @@ input:disabled, select:disabled, textarea:disabled {
   align-items: start;
 }
 
-.settings-device-name {
+.settings-device-name,
+.settings-page-device-name {
   max-width: min(100%, 18rem);
   min-width: 0;
   overflow: hidden;
@@ -3326,8 +6133,36 @@ input:disabled, select:disabled, textarea:disabled {
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Handoff parity: the settings status stays left-aligned while the sticky
+   footer right-aligns a compact Save button (see `#saveSettingsBtn` rule
+   below — `width: auto` with a clamped `min-width`). The logs toggle now
+   renders in-flow rather than as a fixed FAB, so it no longer overlaps the
+   sticky action area. */
+.settings-panel .buttons-container #settings-form-status {
+  margin-right: auto;
+  min-height: 1.25rem;
+}
+
 .settings-panel {
   gap: 16px;
+}
+
+.settings-panel .buttons-container {
+  position: sticky;
+  bottom: 16px;
+  z-index: 6;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 12px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+}
+
+.settings-panel .buttons-container #saveSettingsBtn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: clamp(12rem, 24vw, 15rem);
+  padding-inline: 24px;
 }
 
 .logs-panel {
@@ -3339,6 +6174,14 @@ input:disabled, select:disabled, textarea:disabled {
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 32px);
+}
+
+.logs-panel-inline {
+  margin-top: 0;
+}
+
+.logs-panel-inline.is-open {
+  max-height: none;
 }
 
 .logs-toolbar,
@@ -3401,38 +6244,40 @@ input:disabled, select:disabled, textarea:disabled {
     stroke: var(--icon-accent);
 }
 
-/* Settings console layout */
+/* Settings console layout — handoff parity: 180px nav, 28px gap. */
 .settings-console-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 28px;
 }
 
 .settings-side-nav {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   align-self: start;
   position: sticky;
   top: 16px;
   border-right: 1px solid var(--divider);
-  padding-right: var(--spacing-lg);
+  padding-right: var(--spacing-md);
 }
 
 .settings-side-link {
   border: none;
-  border-left: 2px solid transparent;
   background: transparent;
   color: var(--muted);
-  border-radius: 0;
-  padding: 10px 14px;
+  border-radius: var(--border-radius-md, 6px);
+  padding: 8px 10px;
   text-align: left;
   font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
+  font-weight: 500;
+  letter-spacing: 0;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: color var(--transition-speed) ease,
               background-color var(--transition-speed) ease,
-              border-color var(--transition-speed) ease;
+              box-shadow var(--transition-speed) ease;
 }
 
 .settings-side-link:hover {
@@ -3440,10 +6285,31 @@ input:disabled, select:disabled, textarea:disabled {
   background: var(--panel-bg);
 }
 
+/* Handoff: active state uses inset box-shadow instead of a border so the
+   nav row width doesn't shift between states. */
 .settings-side-link.active {
-  border-left-color: var(--accent);
   color: var(--text);
   background: var(--panel-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.settings-side-link .settings-side-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-3, var(--muted));
+  flex-shrink: 0;
+}
+
+/* Handoff parity: icon only takes accent color on the ACTIVE tab, not on
+   hover. Hover still darkens the label via the hover rule above, but the
+   icon shouldn't flash teal every time the mouse passes over a row — that
+   read as jittery next to the refined handoff navigation. */
+.settings-side-link:hover .settings-side-icon {
+  color: var(--text);
+}
+
+.settings-side-link.active .settings-side-icon {
+  color: var(--accent);
 }
 
 .settings-console-panel {
@@ -3455,10 +6321,76 @@ input:disabled, select:disabled, textarea:disabled {
   display: grid;
 }
 
+.observability-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 20px 0;
+}
+
+.observability-copy {
+  display: grid;
+  gap: 4px;
+  max-width: 42rem;
+}
+
+.observability-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.observability-summary {
+  margin: 0;
+  color: var(--text-3, var(--muted));
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
 .diagnostics-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.observability-section {
+  display: grid;
+  gap: 14px;
+}
+
+.observability-section + .observability-section {
+  border-top: 1px solid var(--divider);
+  padding-top: 18px;
+}
+
+.observability-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.observability-section-title {
+  display: grid;
+  gap: 4px;
+}
+
+.observability-section-title h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.observability-section-title p {
+  margin: 0;
+  color: var(--text-3, var(--muted));
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .inline-action-row {
@@ -3466,6 +6398,61 @@ input:disabled, select:disabled, textarea:disabled {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+/* Handoff parity: horizontal row variant used inside card-bodies (e.g.
+   Backup & restore) to pack mixed controls (button + input/button pair +
+   toggle) onto one line. Wraps at narrow widths. */
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.backup-restore-row {
+  align-items: center;
+}
+
+.backup-restore-restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.backup-restore-restore .form-input[type="file"] {
+  max-width: 220px;
+  font-size: 0.78rem;
+}
+
+/* Compact inline toggle used inside `.inline-row` — label + hint stacked
+   on the left, switch on the right. Mirrors the handoff `<Toggle>` primitive
+   while reusing the existing `.toggle-container`/`.toggle-label` switch. */
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.toggle-inline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.toggle-inline-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.toggle-inline-hint {
+  font-size: 0.72rem;
+  color: var(--text-3, var(--muted));
 }
 
 .diagnostics-panel {
@@ -3516,29 +6503,31 @@ input:disabled, select:disabled, textarea:disabled {
     animation: shake-item 0.35s ease-in-out;
 }
 
-/* Mobile logs toggle (JTN-339)
-   Uses env(safe-area-inset-bottom) so the floating "Show Logs" action
-   stays above the iOS home indicator and the dynamic mobile address bar
-   on narrow viewports. The companion padding-bottom on
-   .page-shell-management ensures the last in-flow element isn't hidden
-   underneath this fixed button. */
+/* Logs toggle defaults to an in-flow action on larger viewports. Narrow-screen
+   floating behavior is restored in _responsive.css so it does not overlap the
+   sticky Save bar on short laptops. */
 .settings-logs-toggle {
-  display: block;
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px) + 8px);
-  bottom: max(16px, env(safe-area-inset-bottom, 0px) + 16px);
-  z-index: 10;
-  border-radius: 999px;
-  padding: 12px 18px;
+  display: inline-flex;
+  margin: 8px 0 0 auto;
+  width: auto;
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-/* Reserve space at the bottom of the settings page so the fixed
-   "Show Logs" toggle never overlaps the last action in the panel
-   (e.g. Save / Reset buttons) on narrow mobile viewports. */
-.page-shell-management {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+/* The chrome-level `.settings-device-name` chip is redundant on the
+   settings page itself (the Device tab heading already shows the name),
+   so hide it. Do NOT hide `#settingsLogsToggle` — it's the affordance
+   that opens the live-logs panel on the Updates tab, and tests +
+   real users depend on it. The handoff's "Download logs" header
+   action is a different feature (file download, not streaming). */
+body[data-page="settings"] .settings-device-name {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .settings-panel .buttons-container #saveSettingsBtn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .api-key-label {
@@ -3708,16 +6697,22 @@ input:disabled, select:disabled, textarea:disabled {
     max-width: 100px;
 }
 
-/* API Keys page layout */
+/* API Keys page layout — handoff parity rolled into the base declarations
+   (previously a second block at the bottom of this file re-declared each
+   selector; merged here to avoid duplicate-selector flags). */
 .api-keys-frame {
-  max-width: 860px;
+  max-width: 980px;
   margin: 0 auto;
 }
 
+/* Compact single-row layout per the handoff design: stack cards vertically,
+   each card is one row with svc+usage on the left and chip+mask+button on
+   the right. The <input> row lives in a hidden container below and only
+   reveals when the user clicks "Change" / "Add key". */
 .api-keys-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+  gap: 14px;
+  width: 100%;
 }
 
 .api-keys-panel {
@@ -3725,25 +6720,81 @@ input:disabled, select:disabled, textarea:disabled {
   gap: 16px;
 }
 
+/* Handoff parity: API-key rows are .card primitives (1px border, radius-xl,
+   --surface) — flatter row style for the handoff Settings layout. */
 .api-key-card {
-  padding: 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  background: var(--panel-bg);
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.api-key-card-head {
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-xl);
+  background: var(--surface);
   display: grid;
-  gap: 4px;
+  gap: 10px;
   width: 100%;
 }
 
-.api-key-card .form-label {
-  font-size: 1rem;
+.key-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
+.key-row-left {
+  display: flex;
+  flex-direction: column;
+  /* Gap widened from 2px to 4px for handoff parity. */
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.key-row-right {
+  display: inline-flex;
+  align-items: center;
+  /* Handoff parity: tighter single-row layout — no wrap, push to end. */
+  gap: 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.api-key-card .key-svc {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.api-key-card .key-use {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-top: 0;
+}
+
+.api-mask {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  /* Handoff parity: pill-shaped mask with border + surface-2 fill. */
+  padding: 5px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-key-toggle {
+  /* Handoff parity: 34px minimum with tighter 6/12 padding. */
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
+/* Visually-hidden status text is still exposed to assistive tech so screen
+   readers hear "Status: Configured (mask)" / "Status: Not configured". */
 .api-key-status {
   display: inline-flex;
   align-items: center;
@@ -3767,10 +6818,81 @@ input:disabled, select:disabled, textarea:disabled {
   align-items: center;
   gap: 10px;
   width: 100%;
+  /* Handoff parity: separator between the headline row and the expanded
+     input row inside the same card. */
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in oklab, var(--surface-border) 80%, transparent);
+}
+
+.api-key-actions[hidden] {
+  display: none;
 }
 
 .api-key-actions .header-button {
   min-width: 0;
+}
+
+.api-keys-frame .pageheader-actions {
+  align-items: center;
+}
+
+.api-keys-frame .pageheader-actions .action-button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.settings-container.api-keys-grid {
+  justify-content: stretch;
+  padding: 0;
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.api-keys-note {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Handoff parity: secondary "advanced" panels sit on --surface-2 (one step
+   up from --surface), not an opaque mix. Radius matches .card (10px). */
+.api-keys-more {
+  margin-top: 4px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.api-keys-more summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 16px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.api-keys-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-keys-more-grid {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
 }
 
 .apikey-row {
@@ -3781,22 +6903,25 @@ input:disabled, select:disabled, textarea:disabled {
   margin-bottom: 12px;
 }
 
+/* Handoff parity: API-key form fields mirror `.input` in styles.css:239–249
+   (8 10 padding, 13px, --radius-1). We keep the mono face since these carry
+   raw secret tokens the user wants to eyeball character-by-character. */
 .apikey-key,
 .apikey-value {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-family: monospace;
-  font-size: 14px;
-  background: var(--input-bg);
-  color: var(--text-primary);
+  padding: 8px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 6px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.8125rem;
+  background: var(--surface);
+  color: var(--text);
 }
 
 .apikey-value.masked {
   color: var(--text-secondary);
   letter-spacing: 2px;
-  background: var(--bg-secondary);
+  background: var(--surface-2);
 }
 
 .btn-delete,
@@ -3813,15 +6938,25 @@ input:disabled, select:disabled, textarea:disabled {
   transform: translateY(-1px);
 }
 
+/* Handoff parity: delete control in dense rows is a ghost-danger icon
+   (transparent → error-tinted on hover), not a solid red pill. See the
+   `.btn-ghostDanger` primitive in _card.css:119–140. */
 .btn-delete {
   width: 36px;
   height: 36px;
-  border: none;
-  background: var(--error);
-  color: var(--on-accent);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 18px;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-delete:hover {
+  background: color-mix(in oklab, var(--error) 14%, transparent);
+  color: var(--error);
+  border-color: color-mix(in oklab, var(--error) 30%, transparent);
 }
 
 .add-buttons-grid {
@@ -3834,23 +6969,37 @@ input:disabled, select:disabled, textarea:disabled {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
-  border: 2px dashed var(--border-color);
+  padding: 8px 14px;
+  border: 1px dashed var(--surface-border);
   background: transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
+  font-size: 0.8125rem;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-add:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-weak, transparent);
 }
 
 .btn-preset {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  background: var(--bg-secondary);
-  border-radius: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2);
+  border-radius: 6px;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-family: monospace;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-preset:hover {
+  color: var(--text);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .clear-button {
@@ -3886,24 +7035,27 @@ input:disabled, select:disabled, textarea:disabled {
 
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .history-card {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: var(--card-border);
-  border-radius: var(--card-radius);
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--transition-speed) ease, border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+  transition: border-color var(--transition-speed) ease;
+}
+
+.history-card:hover {
+  border-color: var(--text-3);
 }
 
 .history-card-body {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -3934,19 +7086,23 @@ input:disabled, select:disabled, textarea:disabled {
 
 .history-meta {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .history-name {
-  font-weight: 700;
+  font-weight: 500;
+  font-size: 0.82rem;
   color: var(--text);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-sub {
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  line-height: 1.4;
 }
 
 .history-actions {
@@ -3969,9 +7125,11 @@ input:disabled, select:disabled, textarea:disabled {
   transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
 
+/* Handoff parity: button hover uses --surface-2 + --border-strong directly
+   rather than the legacy --bg-secondary / --muted aliases. */
 .history-actions .btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--muted);
+  background: var(--surface-2);
+  border-color: var(--border-strong, var(--surface-border));
 }
 
 .history-actions .btn-primary {
@@ -3994,15 +7152,19 @@ input:disabled, select:disabled, textarea:disabled {
   background: var(--danger-hover);
 }
 
+/* Handoff parity: danger zones mirror `.card-danger` (see _card.css:61) —
+   single 1px error-tinted border, no double-up via box-shadow. Padding
+   matches the 16px .card standard instead of the old 20px overhang. */
 .history-danger-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-top: 8px;
-  padding: 20px;
-  border-width: 2px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--error) 20%, transparent);
+  padding: 16px;
+  border: 1px solid color-mix(in oklab, var(--error) 30%, var(--surface-border));
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
 }
 
 .history-danger-zone .danger-zone-body {
@@ -4021,10 +7183,12 @@ input:disabled, select:disabled, textarea:disabled {
   color: var(--error);
 }
 
+/* Handoff uses --surface-border (aliased to --border) for every separator;
+   --panel-border is a legacy token that skews slightly darker. */
 .danger-zone-divider {
   margin: 28px 0 16px;
   border: 0;
-  border-top: 1px solid var(--panel-border);
+  border-top: 1px solid var(--surface-border);
   opacity: 0.75;
 }
 
@@ -5038,11 +8202,13 @@ body.modal-open {
     overflow: hidden;
 }
 
+/* Handoff parity: modal body padding aligns to the 16px .card standard;
+   10px radius matches --radius-2 / --border-radius-lg. */
 .modal-content {
     background-color: var(--surface);
     margin: 15% auto; /* Center the modal */
-    padding: 20px;
-    border-radius: 10px;
+    padding: 16px;
+    border-radius: var(--border-radius-lg);
     width: 90%;
     max-width: 400px;
     box-shadow: 0 8px 20px var(--shadow-medium, rgba(0, 0, 0, 0.2));
@@ -5051,7 +8217,7 @@ body.modal-open {
 
 .modal-sheet {
     background: var(--modal-bg);
-    border: 1px solid var(--panel-border);
+    border: 1px solid var(--surface-border);
 }
 /* For image preview modal, allow larger canvas */
 .image-modal .modal-content {
@@ -5283,35 +8449,61 @@ body.modal-open {
     margin-bottom: var(--spacing-md);
 }
 
+/* Handoff parity: unified horizontal update row. Installed / Latest tiles
+   at the left, action buttons at the right via `margin-left:auto` on
+   `.update-actions` (rule below, unchanged). */
+.update-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 6px 0 14px;
+    border-bottom: 1px solid var(--surface-border);
+    margin-bottom: 14px;
+}
+
+.update-row .update-actions {
+    margin-left: auto;
+}
+
+.update-release-version {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    color: var(--text-3, var(--muted));
+    font-size: 0.78rem;
+    margin-left: 6px;
+}
+
 .update-version-card {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 12px 20px;
+    padding: 8px 14px;
     border: 1px solid var(--surface-border);
     border-radius: var(--border-radius-md);
-    background: var(--surface);
+    background: var(--surface-2, var(--surface));
     min-width: 100px;
-    flex: 1;
 }
 
 .update-version-label {
-    font-size: 0.75rem;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.65rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.12em;
 }
 
 .update-version-number {
-    font-size: 1.25rem;
-    font-weight: 700;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.95rem;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
     color: var(--text);
+    margin-top: 2px;
 }
 
 .update-arrow {
-    font-size: 1.25rem;
+    font-size: 1rem;
     color: var(--text-muted);
     flex-shrink: 0;
 }
@@ -5320,16 +8512,16 @@ body.modal-open {
 .update-failure-banner {
     margin: var(--spacing-sm) 0 var(--spacing-md);
     padding: 12px 14px;
-    border: 1px solid var(--color-danger, #b94a48);
+    border: 1px solid var(--error);
     border-left-width: 4px;
     border-radius: var(--border-radius-sm);
     background: var(--surface);
-    color: var(--text-primary);
+    color: var(--text);
 }
 
 .update-failure-title {
     font-weight: 600;
-    color: var(--color-danger, #b94a48);
+    color: var(--error);
     margin-bottom: 4px;
 }
 
@@ -5359,22 +8551,38 @@ body.modal-open {
     margin-bottom: var(--spacing-md);
 }
 
+/* Handoff parity: release notes render as a plain disclosure — muted
+   summary, lightweight body without the nested card-in-card border/bg.
+   The scroll cap stays so marathon changelogs don't blow out the card. */
 .update-release-notes-toggle {
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 500;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 6px 0;
+    padding: 4px 0;
+    list-style: none;
+}
+
+.update-release-notes-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.update-release-notes-toggle::before {
+    content: '\25B8'; /* ▸ */
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.15s ease;
+}
+
+details[open] > .update-release-notes-toggle::before {
+    transform: rotate(90deg);
 }
 
 .update-release-notes-body {
-    margin-top: var(--spacing-sm);
-    padding: 12px;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--surface);
-    font-size: 0.85rem;
-    line-height: 1.6;
+    margin-top: 6px;
+    padding: 0 0 0 18px;
+    font-size: 0.82rem;
+    line-height: 1.55;
     color: var(--text-secondary);
     max-height: 200px;
     overflow-y: auto;
@@ -5460,48 +8668,40 @@ body.modal-open {
     background-color: var(--error);
 }
 
-/* Request progress block */
+/* Request progress card — always visible in the plugin aside. */
 .progress-block {
-    margin: 10px;
-    position: fixed;
-    left: 50%;
-    top: 14px;
-    transform: translateX(-50%);
-    z-index: 1100;
-    min-width: min(720px, 92vw);
     background: var(--surface);
     border: 1px solid var(--surface-border);
-    border-radius: 12px;
-    padding: 10px 12px 12px 12px;
-    box-shadow: 0 14px 40px rgba(0,0,0,0.35);
-    animation: slideDown .20s ease-out;
+    border-radius: var(--border-radius-lg);
+    padding: 12px 14px;
+    display: grid;
+    gap: 8px;
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translate(-50%, -12px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+.progress-aside-card {
+    margin: 0;
 }
+
 .progress-header {
     font-size: 0.9rem;
     color: var(--text);
-    margin-bottom: 6px;
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
+    gap: 8px;
 }
-.progress-close {
-    background: none;
-    border: 1px solid var(--surface-border);
-    color: var(--muted);
-    border-radius: 999px;
-    width: 24px;
-    height: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
+
+.progress-heading {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
 }
-.progress-close:hover { color: var(--text); background: rgba(0,0,0,0.04); }
+
+.progress-status {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
 .progress-bar {
     width: 100%;
     height: 8px;
@@ -5861,6 +9061,27 @@ body.modal-open {
     animation: status-badge-pulse 2s ease-in-out infinite;
 }
 
+body[data-page="settings"] .status-badge {
+    bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+body[data-page="settings"] .status-popover {
+    bottom: calc(9.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+body[data-page="dashboard"] .status-badge,
+body[data-page="dashboard"] .status-popover,
+body[data-page="playlist"] .status-badge,
+body[data-page="playlist"] .status-popover,
+body[data-page="plugin"] .status-badge,
+body[data-page="plugin"] .status-popover,
+body[data-page="history"] .status-badge,
+body[data-page="history"] .status-popover,
+body[data-page="api-keys"] .status-badge,
+body[data-page="api-keys"] .status-popover {
+    display: none !important;
+}
+
 @keyframes status-badge-pulse {
     0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25); }
     50% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55); }
@@ -6133,7 +9354,6 @@ body.modal-open {
 
 /* ── Progress block small screens ── */
 @media (max-width: 520px) {
-    .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
     .playlist-toolbar {
@@ -6191,11 +9411,6 @@ body.modal-open {
     .settings-side-nav {
         position: static;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .workflow-mode-bar {
-        width: 100%;
-        justify-content: space-between;
     }
 
     .workflow-action-group,
@@ -6403,6 +9618,25 @@ body.modal-open {
         align-items: stretch;
     }
 
+    /* Allow the Fit/Native segmented control + Live chip + resolution chip
+       to wrap onto multiple lines at narrow widths so the flex row's
+       min-content doesn't blow out the parent grid track. The long
+       resolution chip (e.g. "800×480 · 7-color Inky Impression") would
+       otherwise force horizontal overflow at ~360px. */
+    .dashboard-stage-controls {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        min-width: 0;
+    }
+
+    .dashboard-stage-controls .status-chip {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .header-actions,
     .playlist-toolbar,
     .history-toolbar,
@@ -6522,8 +9756,7 @@ body.modal-open {
         min-height: 180px;
     }
 
-    .settings-panel .buttons-container,
-    .api-keys-frame .buttons-container {
+    .settings-panel .buttons-container {
         position: sticky;
         bottom: 8px;
         z-index: 6;
@@ -6531,16 +9764,20 @@ body.modal-open {
         background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
     }
 
-    .workflow-mode-bar {
-        position: sticky;
-        top: 8px;
-        z-index: 6;
-        display: flex;
-        width: 100%;
+    .page-shell-settings {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 
-    .workflow-mode-tab {
-        justify-content: center;
+    .page-shell-settings .settings-logs-toggle {
+        display: block;
+        position: fixed;
+        right: max(16px, env(safe-area-inset-right, 0px) + 8px);
+        bottom: max(74px, env(safe-area-inset-bottom, 0px) + 74px);
+        z-index: 10;
+        border-radius: 999px;
+        padding: 12px 18px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        margin: 0;
     }
 
     .title-stack {
@@ -6560,13 +9797,11 @@ body.modal-open {
         display: block;
     }
 
+    /* JTN design refresh: both panels always visible on mobile; user scrolls
+       through main → aside stacked. Replaces the old Configure/Preview mode
+       toggle (workflow-mode-bar) which is no longer rendered. */
     .workflow-main-panel,
     .workflow-side-panel {
-        display: none;
-    }
-
-    .workflow-main-panel.active,
-    .workflow-side-panel.active {
         display: grid;
         gap: 14px;
     }
@@ -6640,6 +9875,7 @@ body.modal-open {
         justify-content: center;
         align-items: center;
         min-height: 44px;
+        min-width: 44px;
     }
 
     .playlist-secondary-button {
@@ -6901,13 +10137,12 @@ body.modal-open {
 
 /* ── Short laptop viewports (JTN-572 / JTN-599) ──
    On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
-   the Save button at the bottom of /settings and /settings/api-keys sits below
-   the fold, and there is no visible scroll affordance to reveal it. Pin the
-   buttons container to the bottom of the viewport so the primary action is
-   always one click away regardless of scroll position. */
+   the Save button at the bottom of /settings sits below the fold, and there is
+   no visible scroll affordance to reveal it. Pin the buttons container to the
+   bottom of the viewport so the primary action is always one click away
+   regardless of scroll position. */
 @media (max-height: 860px) {
-    .settings-panel .buttons-container,
-    .api-keys-frame .buttons-container {
+    .settings-panel .buttons-container {
         position: sticky;
         bottom: 8px;
         z-index: 6;
