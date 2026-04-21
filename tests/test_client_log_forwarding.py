@@ -176,10 +176,25 @@ class TestRateLimit:
         importlib.reload(cl_mod)
 
         # Freeze time in the rate-limit module so elapsed == 0 on every call.
+        # Patch a *proxy* bound to `rl_mod.time` rather than mutating the
+        # shared `time` module attribute process-wide. A direct
+        # `monkeypatch.setattr(rl_mod.time, "monotonic", ...)` would replace
+        # `time.monotonic` for every importer, including pytest's own
+        # scheduling — the scoped proxy keeps the freeze to this module.
+        import time as _time_mod
+
         import utils.rate_limit as rl_mod
 
-        frozen = rl_mod.time.monotonic()
-        monkeypatch.setattr(rl_mod.time, "monotonic", lambda: frozen)
+        frozen = _time_mod.monotonic()
+
+        class _FrozenTime:
+            def __getattr__(self, name: str):
+                return getattr(_time_mod, name)
+
+            def monotonic(self) -> float:
+                return frozen
+
+        monkeypatch.setattr(rl_mod, "time", _FrozenTime())
 
         app = Flask(__name__)
         app.config["TESTING"] = True

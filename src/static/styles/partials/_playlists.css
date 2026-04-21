@@ -460,8 +460,8 @@ a.pl-add-row:hover {
    block intentionally re-declares some selectors above as a focused
    override layer; consolidating each pair into the earlier rule risks
    visual regressions across the playlist grid. The re-declaration is
-   additive and documented here rather than merged blind.
-   stylelint-disable no-duplicate-selectors */
+   additive and documented here rather than merged blind. */
+/* stylelint-disable no-duplicate-selectors */
 .playlist-frame {
   max-width: 1040px;
 }

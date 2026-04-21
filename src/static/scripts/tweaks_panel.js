@@ -59,14 +59,27 @@
     function highlightActiveNav() {
         var items = document.querySelectorAll('.shell-sidebar .nav-item');
         if (!items.length) return;
-        var path = window.location.pathname || '/';
+        // Normalise by trimming a trailing slash so "/plugins" and "/plugins/"
+        // compare equal. Require an exact match or a "/" segment boundary
+        // before treating a longer href as active; a bare prefix check would
+        // light up "/plugins" when navigating to a sibling route like
+        // "/plugins-library".
+        var path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
         var best = null;
         var bestLen = -1;
         items.forEach(function (a) {
             var href = a.getAttribute('href') || '';
             if (!href || href === '#') return;
-            if (path === href || (href !== '/' && path.indexOf(href) === 0)) {
-                if (href.length > bestLen) { best = a; bestLen = href.length; }
+            var hrefPath = new URL(href, window.location.origin)
+                .pathname.replace(/\/+$/, '') || '/';
+            if (
+                path === hrefPath
+                || (hrefPath !== '/' && path.indexOf(hrefPath + '/') === 0)
+            ) {
+                if (hrefPath.length > bestLen) {
+                    best = a;
+                    bestLen = hrefPath.length;
+                }
             }
         });
         items.forEach(function (a) { a.classList.remove('active'); a.removeAttribute('aria-current'); });

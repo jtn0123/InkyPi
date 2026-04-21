@@ -103,7 +103,20 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
             'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
         )
 
-        page.wait_for_timeout(250)
+        # Poll for the observable schedule-active state instead of sleeping a
+        # fixed 250ms. The real click handler reveals the schedule panel via a
+        # rAF + focus call, which can be slower on CI than on dev machines.
+        page.wait_for_function(
+            """() => {
+                const tab = document.querySelector('[data-plugin-subtab="schedule"]');
+                const panel = document.getElementById('pluginSchedulePanel');
+                const instance = document.getElementById('instance');
+                return !!tab && tab.getAttribute('aria-selected') === 'true'
+                    && !!panel && panel.hidden === false
+                    && !!instance && document.activeElement === instance;
+            }""",
+            timeout=5000,
+        )
         is_active = page.evaluate("""() => {
                 const tab = document.querySelector('[data-plugin-subtab="schedule"]');
                 const panel = document.getElementById('pluginSchedulePanel');
@@ -166,7 +179,22 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(
         page.click(
             'button[data-plugin-draft="true"][data-plugin-subtab-target="schedule"]'
         )
-        page.wait_for_timeout(400)
+
+        # Poll for the observable failure feedback rather than sleeping a
+        # fixed 400ms. The fallback path renders either a toast or the
+        # response modal — wait for either to surface the expected copy.
+        page.wait_for_function(
+            """() => {
+                const toast = document.querySelector('.toast-container .toast');
+                const toastText = toast ? (toast.textContent || '') : '';
+                const modal = document.getElementById('responseModal');
+                const modalText = modal ? (modal.textContent || '') : '';
+                const combined = toastText + '\\n' + modalText;
+                return combined.includes('scheduling controls')
+                    || combined.includes('refresh the page');
+            }""",
+            timeout=5000,
+        )
 
         # A visible toast or response modal must surface actionable feedback —
         # not a silent no-op. JTN-633.

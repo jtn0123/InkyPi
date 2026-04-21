@@ -189,9 +189,18 @@ def main_page():
     )
 
     device_cycle_minutes = _device_cycle_minutes(device_config)
-    refresh_info = device_config.get_refresh_info().to_dict()
-    _annotate_instance_labels(refresh_info)
-    _annotate_refresh_schedule(refresh_info, device_config)
+    # Mirror /refresh-info's degrade-to-{} behaviour so a broken or missing
+    # refresh info file cannot 500 the dashboard shell. The template guards
+    # against empty refresh_info with `| default({})` helpers, so an empty
+    # mapping is a safe render-time fallback.
+    try:
+        refresh_info = device_config.get_refresh_info().to_dict()
+    except Exception:
+        logger.exception("Failed to load refresh info for dashboard")
+        refresh_info = {}
+    else:
+        _annotate_instance_labels(refresh_info)
+        _annotate_refresh_schedule(refresh_info, device_config)
 
     return render_template(
         "inky.html",

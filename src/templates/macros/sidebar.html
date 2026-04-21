@@ -1,9 +1,19 @@
 {% from 'macros/icons.html' import icon, theme_toggle %}
 
 {%- macro sidebar(active=None, host=None, device_name=None, now_showing=None, sidebar_system=None) -%}
-{% set now_label = now_showing.label if now_showing is mapping else now_showing %}
-{% set now_meta = now_showing.meta if now_showing is mapping else 'live' %}
-{% set now_state = now_showing.state if now_showing is mapping and now_showing.state is defined else ('idle' if not now_label else 'live') %}
+{# Accept either a plain string label or a mapping with optional
+   label/meta/state keys. Guard each mapping access with "is defined" so a
+   partial mapping (e.g. only `label` set) still gets the sensible defaults
+   below rather than rendering an undefined meta/state. -#}
+{% if now_showing is mapping %}
+    {% set now_label = now_showing.label if now_showing.label is defined else none %}
+    {% set now_meta = now_showing.meta if now_showing.meta is defined else 'live' %}
+    {% set now_state = now_showing.state if now_showing.state is defined else ('idle' if not now_label else 'live') %}
+{% else %}
+    {% set now_label = now_showing %}
+    {% set now_meta = 'live' %}
+    {% set now_state = 'idle' if not now_label else 'live' %}
+{% endif %}
 {% set system_online = sidebar_system.online_label if sidebar_system is mapping and sidebar_system.online_label is defined else 'online' %}
 {% set system_load = sidebar_system.load_label if sidebar_system is mapping and sidebar_system.load_label is defined else none %}
 {% set brand_parts = [] %}

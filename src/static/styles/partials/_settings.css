@@ -330,16 +330,11 @@
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
-/* Handoff parity note: the fresh prototype right-aligns a compact Save in a
-   sticky footer. We previously tried that here, but on desktop the settings
-   page also renders two fixed-position affordances in the bottom-right —
-   `#settingsLogsToggle` (z-index: 10) and the global `.status-badge`
-   (z-index: 9000) — which then intercepted clicks on the shrunken Save
-   button (see test_settings_round_trip_e2e.py). Until the logs FAB becomes
-   mobile-only (JTN-339 is already scoped that way in the handoff), we leave
-   Save at its default `flex: 1; width: 100%`. The full-width Save extends
-   past both fixed buttons so Playwright — and real users — always have a
-   click-accessible region on the left. */
+/* Handoff parity: the settings status stays left-aligned while the sticky
+   footer right-aligns a compact Save button (see `#saveSettingsBtn` rule
+   below — `width: auto` with a clamped `min-width`). The logs toggle now
+   renders in-flow rather than as a fixed FAB, so it no longer overlaps the
+   sticky action area. */
 .settings-panel .buttons-container #settings-form-status {
   margin-right: auto;
   min-height: 1.25rem;

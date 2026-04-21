@@ -181,9 +181,23 @@ def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(client):
     assert resp.status_code == 200
     assert 'data-page-shell="plugins"' in html
     assert 'href="/plugin/' in html
-    assert 'href="/plugins"' in html
-    assert 'class="nav-item active"' in html
-    assert 'aria-current="page"' in html
+    # The previous assertions (`href="/plugins"`, `class="nav-item active"`,
+    # `aria-current="page"`) could each be satisfied by unrelated anchors on
+    # the page — e.g. any other active sidebar entry would match. Scope the
+    # check to the exact `/plugins` anchor in the sidebar nav so we verify
+    # that *this specific link* is marked active. The regex tolerates
+    # attribute ordering (href-first vs class-first).
+    sidebar_active_match = re.search(
+        r'<a\s+href="/plugins"[^>]*\bclass="nav-item active"[^>]*\baria-current="page"',
+        html,
+    ) or re.search(
+        r'<a\s+href="/plugins"[^>]*\baria-current="page"[^>]*\bclass="nav-item active"',
+        html,
+    )
+    assert sidebar_active_match, (
+        'expected /plugins sidebar anchor to carry both `class="nav-item active"` '
+        'and `aria-current="page"`'
+    )
 
 
 def test_shell_marks_sidebar_active_on_management_pages(client):

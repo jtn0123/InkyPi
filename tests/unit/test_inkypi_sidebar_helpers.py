@@ -139,7 +139,11 @@ def test_format_sidebar_refresh_time_falls_back_when_timeutils_fails(
 
 
 def test_format_sidebar_load_average_returns_label(monkeypatch: Any) -> None:
-    monkeypatch.setattr("os.getloadavg", lambda: (1.25, 0.9, 0.5))
+    # ``raising=False`` so the test still sets up the stub on Windows where
+    # ``os.getloadavg`` is intentionally absent — the helper returns ``None``
+    # on that platform via AttributeError, which is the case we're exercising
+    # with the other two tests below.
+    monkeypatch.setattr("os.getloadavg", lambda: (1.25, 0.9, 0.5), raising=False)
     assert _format_sidebar_load_average() == "1.25 avg"
 
 
@@ -149,7 +153,7 @@ def test_format_sidebar_load_average_handles_missing_getloadavg(
     def raise_attr() -> tuple[float, float, float]:
         raise AttributeError("getloadavg unavailable on this platform")
 
-    monkeypatch.setattr("os.getloadavg", raise_attr)
+    monkeypatch.setattr("os.getloadavg", raise_attr, raising=False)
     assert _format_sidebar_load_average() is None
 
 
@@ -157,5 +161,5 @@ def test_format_sidebar_load_average_handles_oserror(monkeypatch: Any) -> None:
     def raise_os() -> tuple[float, float, float]:
         raise OSError("read failed")
 
-    monkeypatch.setattr("os.getloadavg", raise_os)
+    monkeypatch.setattr("os.getloadavg", raise_os, raising=False)
     assert _format_sidebar_load_average() is None

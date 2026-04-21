@@ -75,7 +75,22 @@
     }
     const toggle = card.querySelector(".api-key-toggle");
     if (toggle) {
-      setToggleLabel(toggle, configured ? "Change" : "Add key");
+      const visibleLabel = configured ? "Change" : "Add key";
+      // Keep the accessible name in sync with the visible label so
+      // screen-reader users and tooltip consumers don't see stale copy
+      // after a save/delete transition.
+      const actionLabel = configured ? "Change" : "Add";
+      const providerLabel = _labelForCard(card);
+      const accessibleLabel = providerLabel
+        ? `${actionLabel} ${providerLabel} key`
+        : visibleLabel;
+      setToggleLabel(toggle, visibleLabel);
+      if (toggle.hasAttribute("aria-label")) {
+        toggle.setAttribute("aria-label", accessibleLabel);
+      }
+      if (toggle.hasAttribute("title")) {
+        toggle.title = accessibleLabel;
+      }
       toggle.classList.toggle("is-secondary", !!configured);
       toggle.setAttribute("aria-expanded", "false");
     }

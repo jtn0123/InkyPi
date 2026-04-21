@@ -206,6 +206,7 @@
             'playlist': refresh_info.get('playlist'),
             'cycle_minutes': refresh_info.get('cycle_minutes'),
             'next_refresh_time': refresh_info.get('next_refresh_time'),
+            'next_refresh_relative': refresh_info.get('next_refresh_relative'),
             'next_refresh_meta': refresh_info.get('next_refresh_meta')
         } | tojson }},
         nextUpUrl: {{ url_for('main.next_up') | tojson }},

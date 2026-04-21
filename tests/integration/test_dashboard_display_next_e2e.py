@@ -197,7 +197,18 @@ def test_quick_switch_sends_playlist_request(
     assert quick_switch_calls[0].get("method") == "POST"
     assert '"playlist_name":"Focus"' in (quick_switch_calls[0].get("body") or "")
 
+    # The `is-active` class is toggled by the quick-switch fetch handler
+    # *after* the POST completes. Polling for the request alone (above) is
+    # racy because the response handler runs on a microtask — wait for the
+    # class to actually land before asserting on it.
     focus_row = page.locator('[data-quick-switch-row][data-playlist-name="Focus"]')
+    page.wait_for_function(
+        """() => document
+            .querySelector('[data-quick-switch-row][data-playlist-name=\"Focus\"]')
+            ?.classList.contains('is-active')
+        """,
+        timeout=5000,
+    )
     assert "is-active" in (focus_row.first.get_attribute("class") or "")
 
     rc.assert_no_errors(str(tmp_path), "dashboard_quick_switch_request")

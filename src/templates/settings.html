@@ -324,7 +324,10 @@
                             <span class="toggle-item-hint">Package provider secrets with the backup.</span>
                         </span>
                         <span class="toggle-container">
-                            <input type="checkbox" id="includeKeys" class="toggle-checkbox" checked>
+                            {# Opt-in: API keys are provider secrets, so the
+                               default backup should not package them. Users
+                               must explicitly tick this box to include them. #}
+                            <input type="checkbox" id="includeKeys" class="toggle-checkbox">
                             <span class="toggle-label"></span>
                         </span>
                     </div>
@@ -400,7 +403,7 @@
                                             <h4 class="app-title">Logs</h4>
                                         </div>
                                         <div class="logs-filters">
-                                            <input id="logsFilter" type="text" placeholder="Filter" class="form-input" />
+                                            <input id="logsFilter" type="text" placeholder="Filter" class="form-input" aria-label="Filter logs" />
                                             <label for="logsLevel" class="form-label">Show:</label>
                                             <select id="logsLevel" class="form-input">
                                                 <option value="all" selected>All</option>
