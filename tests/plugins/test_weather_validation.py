@@ -1,7 +1,7 @@
 # pyright: reportMissingImports=false
 """Input validation tests (location, units, API key, provider)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -30,47 +30,77 @@ def test_weather_provider_validation():
         assert "Unknown weather provider" in str(e)
 
 
-def test_weather_units_validation():
-    """Test weather units validation."""
+def test_weather_units_invalid_falls_back_to_imperial():
+    """JTN-784: invalid `units` fall back to imperial at render time so a bare
+    /update_now produces a render. Form-level validation (validate_settings)
+    enforces the allowed set on save."""
     from plugins.weather.weather import Weather
 
     weather = Weather({"id": "weather"})
-
-    # Test invalid units
     settings = {
         "latitude": "40.0",
         "longitude": "-74.0",
         "units": "invalid_units",
-        "weatherProvider": "OpenWeatherMap",
+        "weatherProvider": "OpenMeteo",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
-    device_config.load_env_key.return_value = "fake_key"
+    device_config.load_env_key.return_value = None
+    device_config.get_resolution.return_value = (800, 480)
 
-    try:
+    # OpenMeteo path with no key; stub network + render so the assertion is
+    # about *which units the render path used*, not network behaviour.
+    with (
+        patch.object(Weather, "get_open_meteo_data", return_value={}) as m_data,
+        patch.object(Weather, "get_open_meteo_air_quality", return_value={}),
+        patch.object(
+            Weather,
+            "parse_open_meteo_data",
+            return_value={"dt": 0, "title": "-"},
+        ),
+        patch.object(Weather, "render_image", return_value=object()),
+        patch.object(Weather, "_request_timeout", return_value=None),
+        patch.object(Weather, "get_plugin_dir", return_value=""),
+    ):
         weather.generate_image(settings, device_config)
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError as e:
-        assert "Units are required" in str(e)
+
+    args, _kwargs = m_data.call_args
+    # Signature: get_open_meteo_data(self, lat, long, units, forecast_days)
+    assert args[2] == "imperial"
 
 
-def test_weather_location_validation():
-    """Test weather location validation."""
+def test_weather_missing_latitude_falls_back_to_default():
+    """JTN-784: missing lat/lon default to NYC coords at render time."""
     from plugins.weather.weather import Weather
 
     weather = Weather({"id": "weather"})
-
-    # Test missing latitude
     settings = {
         "longitude": "-74.0",
         "units": "metric",
-        "weatherProvider": "OpenWeatherMap",
+        "weatherProvider": "OpenMeteo",
     }
     device_config = MagicMock()
     device_config.get_config.return_value = "UTC"
+    device_config.load_env_key.return_value = None
+    device_config.get_resolution.return_value = (800, 480)
 
-    with pytest.raises(RuntimeError, match="required"):
+    with (
+        patch.object(Weather, "get_open_meteo_data", return_value={}) as m_data,
+        patch.object(Weather, "get_open_meteo_air_quality", return_value={}),
+        patch.object(
+            Weather,
+            "parse_open_meteo_data",
+            return_value={"dt": 0, "title": "-"},
+        ),
+        patch.object(Weather, "render_image", return_value=object()),
+        patch.object(Weather, "_request_timeout", return_value=None),
+        patch.object(Weather, "get_plugin_dir", return_value=""),
+    ):
         weather.generate_image(settings, device_config)
+
+    args, _kwargs = m_data.call_args
+    # patched classmethod Mock sees (lat, long, units, forecast_days) without self.
+    assert args[0] == pytest.approx(40.7128)  # default latitude (NYC)
 
 
 def test_weather_api_key_validation():
@@ -116,15 +146,32 @@ def test_weather_missing_api_key(device_config_dev, monkeypatch):
         p.generate_image(settings, device_config_dev)
 
 
-def test_weather_missing_coordinates_raises(device_config_dev):
-    """Bug 9: Missing lat/long should raise RuntimeError, not TypeError from float(None)."""
+def test_weather_missing_coordinates_falls_back_to_default(device_config_dev):
+    """JTN-784: missing lat/long no longer raise — defaults (NYC) are applied.
+    Bug 9 regression (TypeError from ``float(None)``) is still covered by
+    ``test_weather_invalid_coordinates_raises`` below, which exercises the
+    ``float()`` path with non-numeric values."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
-    settings = {"units": "metric", "weatherProvider": "OpenWeatherMap"}
+    settings = {"units": "metric", "weatherProvider": "OpenMeteo"}
 
-    with pytest.raises(RuntimeError, match="required"):
+    with (
+        patch.object(Weather, "get_open_meteo_data", return_value={}) as m_data,
+        patch.object(Weather, "get_open_meteo_air_quality", return_value={}),
+        patch.object(
+            Weather,
+            "parse_open_meteo_data",
+            return_value={"dt": 0, "title": "-"},
+        ),
+        patch.object(Weather, "render_image", return_value=object()),
+        patch.object(Weather, "_request_timeout", return_value=None),
+        patch.object(Weather, "get_plugin_dir", return_value=""),
+    ):
         p.generate_image(settings, device_config_dev)
+    args, _kwargs = m_data.call_args
+    assert args[0] == pytest.approx(40.7128)
+    assert args[1] == pytest.approx(-74.0060)
 
 
 def test_weather_invalid_coordinates_raises(device_config_dev):
@@ -266,8 +313,9 @@ def test_weather_plugin_settings_template_has_numeric_inputs(client):
     assert 'max="180"' in html
 
 
-def test_weather_invalid_units(device_config_dev):
-    """Test weather plugin with invalid units."""
+def test_weather_invalid_units_falls_back_to_imperial(device_config_dev):
+    """JTN-784: invalid `units` fall back to imperial at render time; form
+    validation still rejects the bad value on save."""
     from plugins.weather.weather import Weather
 
     p = Weather({"id": "weather"})
@@ -275,11 +323,24 @@ def test_weather_invalid_units(device_config_dev):
         "latitude": "40.7128",
         "longitude": "-74.0060",
         "units": "invalid",
-        "weatherProvider": "OpenWeatherMap",
+        "weatherProvider": "OpenMeteo",
     }
 
-    with pytest.raises(RuntimeError, match="Units are required"):
+    with (
+        patch.object(Weather, "get_open_meteo_data", return_value={}) as m_data,
+        patch.object(Weather, "get_open_meteo_air_quality", return_value={}),
+        patch.object(
+            Weather,
+            "parse_open_meteo_data",
+            return_value={"dt": 0, "title": "-"},
+        ),
+        patch.object(Weather, "render_image", return_value=object()),
+        patch.object(Weather, "_request_timeout", return_value=None),
+        patch.object(Weather, "get_plugin_dir", return_value=""),
+    ):
         p.generate_image(settings, device_config_dev)
+    args, _kwargs = m_data.call_args
+    assert args[2] == "imperial"
 
 
 def test_weather_unknown_provider(device_config_dev, monkeypatch):

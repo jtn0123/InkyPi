@@ -30,12 +30,12 @@ class Newspaper(BasePlugin):
 
     def generate_image(self, settings, device_config):
         newspaper_slug = settings.get("newspaperSlug")
-
-        if not newspaper_slug or not str(newspaper_slug).strip():
-            raise RuntimeError("Newspaper input not provided.")
-        newspaper_slug = str(newspaper_slug).strip().upper()
-        if newspaper_slug not in VALID_NEWSPAPER_SLUGS:
-            raise RuntimeError("Invalid newspaper selection.")
+        if newspaper_slug and str(newspaper_slug).strip():
+            newspaper_slug = str(newspaper_slug).strip().upper()
+            if newspaper_slug not in VALID_NEWSPAPER_SLUGS:
+                raise RuntimeError("Invalid newspaper selection.")
+        else:
+            newspaper_slug = "NY_NYT"
 
         # Get today's date
         today = datetime.now(tz=UTC)
