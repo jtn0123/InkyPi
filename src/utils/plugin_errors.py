@@ -117,6 +117,17 @@ SCREENSHOT_BACKEND_UNAVAILABLE_MSG = (
 )
 
 
+#: Response-safe message returned by the blueprint when ``refresh_task.
+#: manual_update`` raises :class:`TimeoutError`.  Same whitelist-constant
+#: pattern as :data:`SCREENSHOT_BACKEND_UNAVAILABLE_MSG` so CodeQL's
+#: ``py/stack-trace-exposure`` rule cannot taint-track plugin-supplied
+#: exception text into the HTTP response body (JTN-K4).
+MANUAL_UPDATE_TIMEOUT_MSG = (
+    "Plugin render timed out. The device may be slow or under memory "
+    "pressure; see logs for details."
+)
+
+
 class ScreenshotBackendError(RuntimeError):
     """Raised when the chromium screenshot backend fails transiently after retry.
 
