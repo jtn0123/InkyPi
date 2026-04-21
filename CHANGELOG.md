@@ -1,6 +1,109 @@
 # CHANGELOG
 
 
+## v0.64.1 (2026-04-21)
+
+### Bug Fixes
+
+- Retry chromium once, surface screenshot backend errors as 503 (JTN-789)
+  ([#575](https://github.com/jtn0123/InkyPi/pull/575),
+  [`f58d7df`](https://github.com/jtn0123/InkyPi/commit/f58d7df9a58dedd118febe2fc9166416918004d1))
+
+* fix: retry chromium once, surface screenshot backend errors as 503 (JTN-789)
+
+On Pi Zero 2 W under memory pressure, the chromium screenshot subprocess intermittently times out or
+  exits without output (~30% of the time). The previous behaviour surfaced this as a bare `Failed to
+  take screenshot: Browser process timed out.` log followed by a generic HTTP 500 `internal_error`
+  from `/update_now` — cryptic and not actionable.
+
+Two independent changes:
+
+1. `utils.image_utils.take_screenshot` now retries exactly once after a 500ms backoff on transient
+  failures (browser timeout, non-zero exit without output, decode failure). Deterministic failures
+  (no browser installed) are not retried. Each attempt is logged distinctly so journalctl shows what
+  happened.
+
+2. After the bounded retry, still-transient failures raise a typed `ScreenshotBackendError` (new, in
+  `utils.plugin_errors` so it is importable from both the plugin subprocess worker and the
+  blueprint). The `/update_now` blueprint catches it in both the refresh-task and direct-execute
+  paths and returns HTTP 503 with `code: "backend_unavailable"`. The exception class is added to the
+  subprocess worker's allow-list so the type survives the result_queue roundtrip (mirroring the
+  URLValidationError pattern from JTN-776).
+
+Tests: - `tests/unit/test_screenshot_backend_retry.py` covers success-first-try, retry-then-success,
+  both-attempts-fail-raises, deterministic-no-retry, short-bounded-backoff, and the worker
+  `_remote_exception` allow-list. - `tests/integration/test_update_now_screenshot_backend.py`
+  asserts the blueprint maps `ScreenshotBackendError` to HTTP 503 with the documented error code.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* fix(JTN-789): use fixed response message to clear CodeQL py/stack-trace-exposure
+
+CodeQL flagged ``str(exc)`` flowing from ``ScreenshotBackendError`` into ``json_error`` as a
+  potential information-exposure taint. Mirror the ``URLValidationError.safe_message()`` pattern
+  from JTN-776: pin the HTTP response body to a module-level constant string so the rule can prove
+  the response text is not derived from the exception instance.
+
+The full exception details still reach the server log (``exc_info=True``).
+
+* style: apply black to image_utils.py and retry test (JTN-789)
+
+* fix: transient detection on empty file, drop exc_info on backend 503 (JTN-789)
+
+Addresses CodeRabbit (Major) and CodeQL on PR #575.
+
+1. `_take_screenshot_once`: the chromium output tempfile is pre-created as a 0-byte placeholder via
+  `tempfile.NamedTemporaryFile`, so `os.path.exists` is always True on the non-zero-exit branch and
+  the retry logic was effectively dead. Use `os.path.getsize == 0` instead so OOM-pattern exits (no
+  bytes written) retry and real error outputs (non-zero bytes) don't. Added two direct unit tests
+  that pin the new contract.
+
+2. Drop `exc_info=True` from the `ScreenshotBackendError` handler in `blueprints/plugin.py` so
+  CodeQL `py/stack-trace-exposure` can't taint-track exception text into the HTTP response.
+  plugin_id is enough for operators to correlate; the original chromium error was already logged by
+  `take_screenshot`.
+
+* fix: cover all _take_screenshot_once branches + refactor for complexity (JTN-789)
+
+Addresses SonarCloud quality gate (coverage 73.8% -> >80%) and CRITICAL S3776 (cognitive complexity
+  16 -> under 15) on PR #575.
+
+- Extract `_tempfile_is_empty` and `_run_browser_subprocess` helpers so the main function reads as a
+  linear sequence instead of nested try/except/branches. Cognitive complexity drops below the 15
+  cap. - Add unit tests for every branch of `_take_screenshot_once`: missing browser,
+  TimeoutExpired, FileNotFoundError, zero-exit-empty-file, loader returns None, unexpected
+  exception. Plus direct tests for `_tempfile_is_empty` including the OSError path. - Add an
+  integration test for the refresh-task path (outer except in `blueprints.plugin.update_now`) so
+  both ScreenshotBackendError surface points are covered end-to-end.
+
+* fix: relax empty-file check to preserve existing test mocks (JTN-789)
+
+The stricter getsize==0 check on the zero-exit branch broke existing tests in
+  test_take_screenshot.py / test_image_utils_edge.py that mock subprocess.run to return a successful
+  CompletedProcess but leave the tempfile as a 0-byte placeholder (their Image.open mock supplies
+  the fake image). Keep the size check on the non-zero-exit branch (that's where it actually matters
+  — classify OOM-exit vs real-error) and fall back to the load_image_from_path-returns-None path for
+  zero-exit empty tempfiles, which already classifies as transient.
+
+* docs: take_screenshot_html docstring mentions ScreenshotBackendError (CR)
+
+CodeRabbit nit: Returns-only contract is now out of date since the backend-error re-raise was added.
+  Clarify that ScreenshotBackendError propagates to the blueprint layer instead of becoming a silent
+  None.
+
+* fix: ratchet mypy baseline to current main (1442 -> 1446) + typed CompletedProcess (JTN-789)
+
+- Parameterize `_run_browser_subprocess`'s `subprocess.CompletedProcess` return type with `[bytes]`
+  so mypy stops flagging S7788 type-arg on it. - Bump `scripts/mypy_src_baseline.txt` 1442 -> 1446
+  to match the current `origin/main` count after PR #571/#572/#573/#574/#576/#577 merged. The
+  ratchet file wasn't updated across those merges so it fell out of sync. This PR adds zero net mypy
+  errors beyond main; the 4-issue bump is pure debt catch-up.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+
 ## v0.64.0 (2026-04-21)
 
 ### Bug Fixes
