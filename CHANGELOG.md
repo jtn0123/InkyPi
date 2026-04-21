@@ -1,6 +1,234 @@
 # CHANGELOG
 
 
+## v0.64.0 (2026-04-21)
+
+### Bug Fixes
+
+- Apt-get update before apt-get install in update.sh (JTN-788)
+  ([#573](https://github.com/jtn0123/InkyPi/pull/573),
+  [`bcb3eb4`](https://github.com/jtn0123/InkyPi/commit/bcb3eb4d1a55b7383bdff3246b110b1d8efe1291))
+
+* fix: apt-get update before apt-get install in update.sh (JTN-788)
+
+update.sh launched apt-get update in the background (`&`) and raced it against apt-get install. On
+  devices whose /var/lib/apt/lists/ cache was stale relative to the Raspberry Pi archive — the
+  normal state between updates — install read the old index and aborted:
+
+E: Can't find a source to download version '1:147.0.7727.101-...'
+
+of 'chromium:armhf' ERROR: apt-get install failed — aborting update.
+
+Running apt-get update by hand and re-running the updater always succeeded, confirming it was a
+  stale-index race.
+
+Fix: run apt-get update -qq synchronously before apt-get install, log the exit code, and treat a
+  failing update as a soft warning rather than a hard abort — a transient index refresh failure
+  (offline, DNS) should not block a bugfix-only update, and the existing apt-get install abort path
+  still catches cases where a fresh index really is required.
+
+The install abort message ("ERROR: apt-get install failed — aborting update.") is preserved verbatim
+  to keep the /settings/update_status contract from JTN-704 intact.
+
+Regression test asserts apt-get update runs synchronously, precedes apt-get install, captures its
+  exit code, and warns (not aborts) on failure. Verified locally against the full install-scripts
+  and update flow suites (319 tests, all green).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* style: apply black formatting to test_install_scripts.py (JTN-788)
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+- Register plugins in refresh-task subprocess (JTN-783)
+  ([#571](https://github.com/jtn0123/InkyPi/pull/571),
+  [`88e0438`](https://github.com/jtn0123/InkyPi/commit/88e043857c67432adfbb00fe1323b83850d55bb5))
+
+* fix: register plugins in refresh-task subprocess (JTN-783)
+
+Plugin isolation mode `process` (the default, set by INKYPI_PLUGIN_ISOLATION) spawns workers via
+  multiprocessing. With `spawn` / `forkserver` start methods the child gets a fresh interpreter, so
+  the module-level registries in `plugins.plugin_registry` (PLUGIN_CLASSES, _PLUGIN_CONFIGS) are
+  empty.
+
+The worker called `get_plugin_instance(plugin_config)` without first calling `load_plugins(...)`, so
+  every manual `/update_now` failed with:
+
+ValueError: Plugin 'clock' is not registered.
+
+Fix: after `_restore_child_config(...)` returns in `_execute_refresh_attempt_worker`, call
+  `load_plugins(child_config.get_plugins())` before `get_plugin_instance`. `load_plugins` is
+  idempotent (overwrites under a lock), so it's safe to call on every attempt.
+
+Adds a regression test that clears the module-level registries to simulate a cold-start child, runs
+  the worker directly, and asserts the plugin resolves (test fails on main with the exact
+  ValueError, passes with the fix).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* fix: drop defensive try/except around load_plugins in worker
+
+Sonar flagged two uncovered lines in the newly-added `except Exception:` branch. The surrounding
+  outer try in `_execute_refresh_attempt_worker` already converts any exception to a failure
+  payload, so the inner guard was pure gold-plating.
+
+Keep the `hasattr`/`callable(get_plugins)` check for the legacy pickled config path
+  (LegacyConfigLike has no `get_plugins` method).
+
+* test: add real-spawn variant for JTN-783 registry regression (CodeRabbit)
+
+The existing test simulates a cold child registry by wiping the module-level dicts but still runs in
+  the parent address space. This variant drives a real ctx.Process via the production
+  multiprocessing context, so a regression would fail with the exact symptom that shipped to users.
+
+* fix: move SpawnableAction to module scope so spawn can pickle it
+
+Linux multiprocessing default is ``spawn``; locally-defined classes cannot be pickled across the
+  boundary. Move to module scope so the real-spawn regression test runs on Ubuntu CI too.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+- Scale systemd memory caps for 512MB Pi Zero 2 W (JTN-785)
+  ([#576](https://github.com/jtn0123/InkyPi/pull/576),
+  [`c615cf8`](https://github.com/jtn0123/InkyPi/commit/c615cf852dbdb20ed1a4c50e461595d9e6ebe311))
+
+* fix: scale systemd memory caps for 512MB Pi Zero 2 W (JTN-785)
+
+Pi Zero 2 W (512 MB) was being SIGKILLed by the cgroup OOM killer when chromium-heavy plugins
+  refreshed — the historical MemoryHigh=250M / MemoryMax=350M caps in the base systemd unit were
+  tighter than the chromium + PIL + numpy resident set, and after 5 kills the JTN-671
+  StartLimitBurst halted auto-restart until manual reset-failed.
+
+Detect total RAM at install/update time and write per-device caps to a drop-in at
+  /etc/systemd/system/inkypi.service.d/memory.conf: low-mem (<=700 MB MemTotal): MemoryHigh=350M
+  MemoryMax=500M standard (>700 MB MemTotal): MemoryHigh=250M MemoryMax=350M (historical)
+
+The base unit no longer hardcodes Memory*=, so it stays device-agnostic and composes with any
+  user-added drop-ins (e.g. the JTN-783 plugin-isolation.conf). Helpers live in install/_common.sh
+  (pick_memory_caps, install_memory_dropin) with INKYPI_MEMINFO_PATH / INKYPI_DROPIN_DIR env
+  overrides so the tier logic is unit-testable via bash -c without touching /proc or /etc/systemd.
+
+zramswap is already configured by setup_zramswap_service so the raised caps on low-mem devices have
+  compressed-swap headroom.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* style: silence SC2120 on pick_memory_caps + apply black (JTN-785)
+
+Callers intentionally pass no arg; $1 is an explicit override path used only by the unit tests.
+  Silence SC2120 with a narrow, commented disable directive.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+- Surface update failures when do_update.sh aborts early (JTN-787)
+  ([#574](https://github.com/jtn0123/InkyPi/pull/574),
+  [`7df012a`](https://github.com/jtn0123/InkyPi/commit/7df012a2065aacc9d382ea6a2010239f6e46efc9))
+
+* fix: surface update failures when do_update.sh aborts early (JTN-787)
+
+When do_update.sh aborts before delegating to update.sh (e.g. a dirty src/static/styles/main.css
+  blocks git checkout, or the repo can't be located), update.sh's JTN-704 EXIT trap never runs and
+  the Settings -> Updates UI shows nothing to the user — /settings/update_status clears
+  running=false within ~2s with last_failure=null and the user loses 10+ minutes debugging a phantom
+  issue.
+
+Layer 1: add a top-level EXIT trap to install/do_update.sh that writes .last-update-failure with the
+  same JSON shape as update.sh's trap (timestamp/exit_code/last_command/recent_journal_lines) so
+  downstream readers don't need to branch on origin. Track _current_step through each phase
+  (resolve_repo_dir, validate_git_repo, git_fetch, reset_generated_artifacts, git_checkout,
+  exec_update_sh) so the failure record pinpoints where it aborted. Honor INKYPI_LOCKFILE_DIR for
+  tests, same contract as update.sh.
+
+Also reset the known-generated src/static/styles/main.css before the tag checkout so a dirty CSS
+  bundle can't block the update — update.sh's build_css_bundle rebuilds it immediately after.
+  Allowlist kept to exactly that one path.
+
+Layer 2: in src/blueprints/settings/_updates.py::update_status, when the transient systemd unit is
+  `failed` but no .last-update-failure exists on disk, synthesize a record from `journalctl -u
+  <unit> -n 20 --no-pager` with a `"synthesized": true` marker. Covers pre-JTN-787 installs where
+  the on-device do_update.sh doesn't yet write the failure file. Best-effort — any journalctl
+  exception falls through to the original None.
+
+Tests: - tests/integration/test_do_update_failure_surface.py: asserts the EXIT trap writes
+  .last-update-failure when do_update.sh aborts outside a git repo, and that a dirty main.css no
+  longer blocks checkout (real tmpdir git repo with two tags). -
+  tests/unit/test_updates_surface_errors.py: two new cases asserting the synthesized-failure path
+  fires when unit=failed + no file, and does NOT overwrite an existing failure record.
+
+Contract preservation: .last-update-failure JSON shape unchanged from JTN-704; the new writer
+  matches it field-for-field. Does not touch the TOCTOU running-state guard (JTN-319 / JTN-710).
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* fix: CI lint + test-isolation tweaks for JTN-787
+
+- do_update.sh: make prev_version write best-effort so the script does not abort on non-root hosts
+  when $STATE_DIR cannot be created (surfaced in CI by the new integration tests running as a
+  non-root user where /var/lib/inkypi is not writable). - _updates.py: ruff UP017 — use
+  `datetime.UTC` instead of `datetime.timezone.utc`. - _updates.py: Sonar S3776 — split
+  update_status' systemd-probe and journal-synthesis logic into `_probe_finished_unit` and
+  `_synthesize_failure_from_journal` helpers to drop cognitive complexity from 26 to under 15. Also
+  narrows mypy return type on the new helper (dict[str, object] | None). - black autoformat of
+  tests/unit/test_updates_surface_errors.py. - tests/integration/test_do_update_failure_surface.py:
+  copy do_update.sh to a tmpdir before running the "no git repo" case so the script's
+  $SCRIPT_DIR/../.git fallback cannot resolve to the CI runner's own checkout (which is a real git
+  repo).
+
+* refactor: extract _auto_clear_stale_update_state to drop complexity (JTN-787)
+
+SonarCloud CRITICAL S3776: update_status cognitive complexity 18 > 15. Split the "check systemd unit
+  + maybe clear state + remember failed-unit name" dance into a helper so the endpoint reads as a
+  linear sequence. No behaviour change.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+### Features
+
+- Plugin defaults so bare /update_now renders without settings (JTN-784)
+  ([#572](https://github.com/jtn0123/InkyPi/pull/572),
+  [`22f6f3b`](https://github.com/jtn0123/InkyPi/commit/22f6f3bcb186c22cfe79dbd7f30550860122f90c))
+
+* feat: render plugins with sensible defaults when settings are empty (JTN-784)
+
+So a bare `/update_now` with only `plugin_id=<name>` produces a visible render instead of a generic
+  500 for plugins that don't need a token:
+
+- comic: default to XKCD when missing/invalid - countdown: default title "Countdown", date 30 days
+  out - newspaper: default slug NY_NYT - rss: default BBC World News feed, title "Top Stories" -
+  weather: default NYC coords, imperial, OpenMeteo provider (no API key needed)
+
+save-time validate_settings() is untouched — form validation stays strict. Only the render path
+  falls back to defaults.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* fix: align legacy tests with plugin-default fallback (JTN-784)
+
+tests/plugins/test_{countdown,newspaper,rss_errors,weather_validation}.py previously asserted "X is
+  required" RuntimeErrors at render time. Those guards were intentionally removed in this PR so bare
+  /update_now renders with defaults; update the tests to match the new contract.
+
+validate_settings() tests (form-time) are untouched — save-time validation still rejects empty
+  required fields.
+
+* fix: align test_generate_image_invalid_comic with default-fallback (JTN-784)
+
+Comic plugin now falls back to XKCD for an unknown `comic` setting at render time; test updated to
+  verify the fallback instead of expecting a RuntimeError.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+
 ## v0.63.1 (2026-04-21)
 
 ### Bug Fixes
