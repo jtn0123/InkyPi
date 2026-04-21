@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import warnings
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
@@ -403,7 +404,9 @@ def _register_before_request_hooks(app):
             pass
 
 
-def _lookup_static_version_factory(app, version: str, cache: dict[str, str]):
+def _lookup_static_version_factory(
+    app: Flask, version: str, cache: dict[str, str]
+) -> Callable[[str], str]:
     """Return a closure that resolves static-file version tokens.
 
     Extracted from ``create_app`` to keep that function under Sonar's
@@ -428,7 +431,7 @@ def _lookup_static_version_factory(app, version: str, cache: dict[str, str]):
     return _lookup_static_version
 
 
-def _compute_now_showing(device_config):
+def _compute_now_showing(device_config: Config) -> dict[str, object] | None:
     """Build the ``now_showing`` dict consumed by the shell footer.
 
     Returns ``None`` on any failure so the template's ``{% if now_showing %}``
@@ -491,7 +494,7 @@ def _compute_now_showing(device_config):
     }
 
 
-def _register_context_processors(app) -> None:
+def _register_context_processors(app: Flask) -> None:
     """Register all Jinja context processors.
 
     Extracted from ``create_app`` so that function stays under Sonar's
@@ -504,13 +507,13 @@ def _register_context_processors(app) -> None:
     static_mtime_cache: dict[str, str] = {}
 
     @app.context_processor
-    def _inject_app_version():
+    def _inject_app_version():  # type: ignore[no-untyped-def]
         version = app.config["APP_VERSION"]
         lookup_static_version = _lookup_static_version_factory(
             app, version, static_mtime_cache
         )
 
-        def versioned_url_for(endpoint, **values):
+        def versioned_url_for(endpoint, **values):  # type: ignore[no-untyped-def]
             if endpoint == "static":
                 filename = values.get("filename")
                 if filename:
@@ -522,7 +525,7 @@ def _register_context_processors(app) -> None:
         return {"app_version": version, "url_for": versioned_url_for}
 
     @app.context_processor
-    def _inject_now_showing_label():
+    def _inject_now_showing_label():  # type: ignore[no-untyped-def]
         """Expose sidebar now-playing data derived from refresh_info."""
         device_config = app.config.get("DEVICE_CONFIG")
         if device_config is None:
@@ -530,7 +533,7 @@ def _register_context_processors(app) -> None:
         return {"now_showing": _compute_now_showing(device_config)}
 
     @app.context_processor
-    def _inject_sidebar_system():
+    def _inject_sidebar_system():  # type: ignore[no-untyped-def]
         return {
             "sidebar_system": {
                 "online_label": "online",
