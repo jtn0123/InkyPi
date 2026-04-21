@@ -152,7 +152,9 @@ def test_stop_while_refresh_in_progress(device_config_dev, monkeypatch):
     slow_plugin_started = threading.Event()
     slow_plugin_can_finish = threading.Event()
 
-    def fake_perform(refresh_action, latest_refresh, current_dt, request_id=None):
+    def fake_perform(
+        refresh_action, latest_refresh, current_dt, request_id=None, **kwargs
+    ):
         slow_plugin_started.set()
         slow_plugin_can_finish.wait(timeout=2)
         return (
@@ -210,7 +212,7 @@ def test_manual_update_queue_ordering(device_config_dev, monkeypatch):
     monkeypatch.setattr(
         task,
         "_perform_refresh",
-        lambda refresh_action, latest_refresh, current_dt, request_id=None: (
+        lambda refresh_action, latest_refresh, current_dt, request_id=None, **kwargs: (
             processed_order.append(refresh_action.get_plugin_id())
             or (
                 {
@@ -251,7 +253,9 @@ def test_exception_during_refresh_does_not_crash_task(device_config_dev, monkeyp
 
     calls = {"count": 0}
 
-    def fake_perform(refresh_action, latest_refresh, current_dt, request_id=None):
+    def fake_perform(
+        refresh_action, latest_refresh, current_dt, request_id=None, **kwargs
+    ):
         calls["count"] += 1
         if calls["count"] == 1:
             raise RuntimeError("Simulated plugin failure")

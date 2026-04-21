@@ -57,6 +57,13 @@ class ManualUpdateRequest:
     request_id: str
     refresh_action: "RefreshAction"
     done: threading.Event = field(default_factory=threading.Event)
+    # JTN-786: ``image_saved`` fires after the processed image is persisted to
+    # disk but before the (slow) e-paper SPI write completes.  ``manual_update``
+    # returns as soon as this event is set so the API response is not held
+    # hostage by the display hardware.  ``done`` still fires at the end of the
+    # full refresh and carries the final metrics/exception.
+    image_saved: threading.Event = field(default_factory=threading.Event)
+    image_saved_metrics: Metrics | None = None
     metrics: Metrics | None = None
     exception: BaseException | None = None
 

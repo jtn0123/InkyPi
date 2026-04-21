@@ -41,8 +41,20 @@ def test_manual_update_triggers_display_and_refresh_info(
         # Validate current image saved
         assert Path(device_config_dev.current_image_file).exists()
 
-        # Validate refresh info updated with timing fields present
+        # JTN-786: manual_update now returns after image-save, so the
+        # background thread may still be writing refresh_info.  Poll briefly
+        # for the full metrics to land.
+        import time
+
+        deadline = time.perf_counter() + 5.0
         info = device_config_dev.get_refresh_info()
+        while (
+            getattr(info, "request_ms", None) is None
+            and time.perf_counter() < deadline
+        ):
+            time.sleep(0.05)
+            info = device_config_dev.get_refresh_info()
+
         assert info.plugin_id == "ai_text"
         assert info.refresh_type == "Manual Update"
         assert info.image_hash is not None

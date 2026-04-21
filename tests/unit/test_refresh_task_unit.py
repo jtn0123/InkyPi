@@ -239,6 +239,108 @@ def test_handle_process_result_error():
     assert isinstance(exc, Exception)
 
 
+# ---------------------------------------------------------------------------
+# JTN-786: manual_update returns after image-save, not after display finishes
+# ---------------------------------------------------------------------------
+
+
+def test_manual_update_returns_after_image_saved_not_display(
+    device_config_dev, monkeypatch
+):
+    """JTN-786 regression test.
+
+    On slow hardware (Inky 7.3" Impression / Pi Zero 2 W), the e-paper SPI
+    write can take ~27s on top of a slow generate phase, pushing the total
+    manual-update time past the 60s cap even though the image was safely
+    on disk after ~30s.  The API should return as soon as the processed
+    image lands on disk — not wait for the hardware to finish.
+    """
+    import time
+
+    from display.display_manager import DisplayManager
+    from refresh_task import ManualRefresh, RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    def slow_display(image_arg, **kwargs):
+        # Simulate: image gets saved quickly, display push drags on for 90s.
+        on_image_saved = kwargs.get("on_image_saved")
+        if on_image_saved is not None:
+            on_image_saved({"preprocess_ms": 100})
+        time.sleep(90)
+        return {"preprocess_ms": 100, "display_ms": 90000, "display_driver": "Fake"}
+
+    monkeypatch.setattr(dm, "display_image", slow_display, raising=True)
+
+    dummy_cfg = {"id": "dummy", "class": "Dummy"}
+    monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
+    monkeypatch.setattr(
+        "refresh_task.task.get_plugin_instance",
+        lambda cfg: _dummy_plugin(device_config_dev),
+        raising=True,
+    )
+
+    def fake_execute_with_policy(self, action, cfg, dt, request_id=None):
+        img = Image.new("RGB", device_config_dev.get_resolution(), "white")
+        return img, {}
+
+    monkeypatch.setattr(
+        RefreshTask, "_execute_with_policy", fake_execute_with_policy
+    )
+
+    # Keep the manual-update cap at its default 60s — the point of the test
+    # is that we return in well under 60s despite the 90s display sleep.
+    try:
+        task.start()
+        t0 = time.perf_counter()
+        result = task.manual_update(ManualRefresh("dummy", {}))
+        elapsed = time.perf_counter() - t0
+        assert elapsed < 10, (
+            f"manual_update returned in {elapsed:.1f}s — expected <10s, "
+            "not the full 90s display sleep"
+        )
+        # The early-return metrics payload indicates the image-saved stage.
+        assert isinstance(result, dict)
+        assert result.get("stage") == "image_saved"
+    finally:
+        task.stop()
+
+
+def test_manual_update_still_surfaces_generate_errors(
+    device_config_dev, monkeypatch
+):
+    """JTN-786: errors raised before image-save must still reach the caller.
+
+    If ``_execute_with_policy`` raises (e.g. ``Plugin 'X' is not registered``
+    from JTN-783), the background thread sets both ``done`` and
+    ``image_saved`` via ``_complete_manual_request``, and the waiter must
+    re-raise the underlying exception — not return an "image_saved" stub.
+    """
+    import pytest
+
+    from display.display_manager import DisplayManager
+    from refresh_task import ManualRefresh, RefreshTask
+
+    dm = DisplayManager(device_config_dev)
+    task = RefreshTask(device_config_dev, dm)
+
+    dummy_cfg = {"id": "dummy", "class": "Dummy"}
+    monkeypatch.setattr(device_config_dev, "get_plugin", lambda pid: dummy_cfg)
+
+    def boom(self, action, cfg, dt, request_id=None):
+        raise RuntimeError("generate failed")
+
+    monkeypatch.setattr(RefreshTask, "_execute_with_policy", boom)
+
+    try:
+        task.start()
+        with pytest.raises(RuntimeError, match="generate failed"):
+            task.manual_update(ManualRefresh("dummy", {}))
+    finally:
+        task.stop()
+
+
 def test_handle_process_result_empty_queue_raises():
     import queue
 

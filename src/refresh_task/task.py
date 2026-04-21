@@ -173,8 +173,10 @@ class RefreshTask:
     def _complete_manual_request(manual_request, metrics=None, exception=None):
         """Signal the waiting caller that a manual update request has finished.
 
-        Sets the ``done`` event on *manual_request* so the thread blocked in
-        :meth:`manual_update` can unblock and inspect the outcome.
+        Sets both the ``done`` and ``image_saved`` events on *manual_request*
+        so that any thread blocked in :meth:`manual_update` — whether it is
+        waiting for the early "image on disk" signal (JTN-786) or for full
+        completion — unblocks and inspects the outcome.
 
         Args:
             manual_request: A :class:`ManualUpdateRequest` to complete, or
@@ -190,6 +192,11 @@ class RefreshTask:
         if metrics is not None:
             manual_request.metrics = metrics
         manual_request.done.set()
+        # Also unblock anyone still waiting on image_saved — e.g. if the
+        # refresh failed before the image could be persisted (generate error,
+        # dimension mismatch) the API caller needs to see the exception
+        # instead of timing out waiting for a signal that will never come.
+        manual_request.image_saved.set()
 
     def _run(self):
         """Background thread loop coordinating refresh operations."""
@@ -212,6 +219,7 @@ class RefreshTask:
                         latest_refresh,
                         current_dt,
                         request_id=request_id,
+                        manual_request=manual_request,
                     )
                     if refresh_info is not None:
                         self._update_refresh_info(refresh_info, metrics, used_cached)
@@ -281,7 +289,12 @@ class RefreshTask:
         return refresh_action, request_id
 
     def _perform_refresh(
-        self, refresh_action, latest_refresh, current_dt, request_id=None
+        self,
+        refresh_action,
+        latest_refresh,
+        current_dt,
+        request_id=None,
+        manual_request=None,
     ):
         """Execute the refresh action and update the display if needed.
 
@@ -495,12 +508,19 @@ class RefreshTask:
                 plugin_id,
                 instance_name,
                 request_id,
+                manual_request=manual_request,
             )
         else:
             display_duration_ms = preprocess_ms = None
             logger.info(
                 f"Image already displayed, skipping refresh. | refresh_info: {refresh_info}"
             )
+            # JTN-786: no display push means no ``on_image_saved`` callback,
+            # but the image-on-disk invariant still holds (the previous
+            # refresh already wrote it), so unblock the manual-update waiter
+            # immediately.
+            if manual_request is not None:
+                manual_request.image_saved.set()
 
         request_ms = int((perf_counter() - _t_req_start) * 1000)
         metrics = {
@@ -548,6 +568,7 @@ class RefreshTask:
         plugin_id,
         instance_name,
         request_id,
+        manual_request=None,
     ):
         """Push image to the display hardware and record benchmark stages."""
         logger.info(f"Updating display. | refresh_info: {refresh_info}")
@@ -566,11 +587,28 @@ class RefreshTask:
         display_duration_ms = None
         preprocess_ms = None
         display_driver = None
+        # JTN-786: wire a callback so ``manual_update`` can return once the
+        # processed image is persisted to disk — the hardware write that
+        # follows can take ~27s on an Inky 7.3" Impression and was tripping
+        # the 60s manual-update cap for renders with a slow generate phase.
+        on_image_saved = None
+        if manual_request is not None:
+
+            def on_image_saved(save_metrics: dict):  # noqa: E306
+                manual_request.image_saved_metrics = {
+                    "generate_ms": None,  # filled in by the waiter if needed
+                    "preprocess_ms": save_metrics.get("preprocess_ms"),
+                    "display_ms": None,  # still running
+                    "stage": "image_saved",
+                }
+                manual_request.image_saved.set()
+
         try:
             display_metrics = self.display_manager.display_image(
                 image,
                 image_settings=plugin_config.get("image_settings", []),
                 history_meta=history_meta,
+                on_image_saved=on_image_saved,
             )
             if isinstance(display_metrics, dict):
                 preprocess_ms = display_metrics.get("preprocess_ms")
@@ -744,8 +782,13 @@ class RefreshTask:
                 self.condition.notify_all()  # Wake the thread to process manual update
 
             wait_s = float(os.getenv("INKYPI_MANUAL_UPDATE_WAIT_S", "60") or "60")
-            completed = request.done.wait(timeout=max(0.0, wait_s))
-            if not completed:
+            # JTN-786: wait for the image to hit disk rather than for the full
+            # refresh (including the slow e-paper SPI write) to finish.
+            # ``image_saved`` is also set by ``_complete_manual_request`` on
+            # any terminal outcome, so this wait unblocks on error/cached
+            # paths too — the post-wait branches below distinguish them.
+            signalled = request.image_saved.wait(timeout=max(0.0, wait_s))
+            if not signalled:
                 with self.condition:
                     try:
                         self.manual_update_requests.remove(request)
@@ -770,21 +813,45 @@ class RefreshTask:
                     }
                 )
                 raise timeout_exc
-            metrics = request.metrics
-            exc = request.exception
-            if exc is not None:
-                self.progress_bus.publish(
-                    {
-                        "state": "error",
-                        "plugin_id": refresh_action.get_plugin_id(),
-                        "request_id": request.request_id,
-                        "error": str(exc),
-                    }
-                )
-                if isinstance(exc, BaseException):
-                    raise exc
-                raise RuntimeError(str(exc))
-            return metrics
+            # Small grace period: if the display hardware is fast (mock
+            # display, cached image, unit tests) ``done`` will fire almost
+            # immediately after ``image_saved``.  Prefer the richer
+            # full-refresh metrics when they're readily available so
+            # well-behaved callers still see ``request_ms`` etc. without a
+            # second round-trip to ``/refresh-info``.
+            grace_s = float(
+                os.getenv("INKYPI_MANUAL_UPDATE_DONE_GRACE_S", "0.25") or "0.25"
+            )
+            if grace_s > 0:
+                request.done.wait(timeout=grace_s)
+            # If the request finished (error, cached, or fully complete)
+            # ``done`` is set as well — prefer its richer metrics/exception.
+            if request.done.is_set():
+                exc = request.exception
+                if exc is not None:
+                    self.progress_bus.publish(
+                        {
+                            "state": "error",
+                            "plugin_id": refresh_action.get_plugin_id(),
+                            "request_id": request.request_id,
+                            "error": str(exc),
+                        }
+                    )
+                    if isinstance(exc, BaseException):
+                        raise exc
+                    raise RuntimeError(str(exc))
+                return request.metrics
+            # Image is on disk but the hardware write is still in progress —
+            # return early so the caller is not blocked on slow SPI writes.
+            # ``/refresh-info`` will reflect the full metrics once the
+            # background thread finishes.
+            logger.info(
+                "manual_update: returning after image_saved; "
+                "display hardware write continues asynchronously | plugin_id=%s request_id=%s",
+                refresh_action.get_plugin_id(),
+                request.request_id,
+            )
+            return request.image_saved_metrics or {"stage": "image_saved"}
         logger.warning(
             "Background refresh task is not running, unable to do a manual update"
         )
