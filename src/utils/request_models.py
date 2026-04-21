@@ -342,8 +342,6 @@ def _parse_enum(
             raise RequestValidationError(required_message, status=422, field=field)
         return None
     if value not in allowed:
-        if required:
-            raise RequestValidationError(required_message, status=422, field=field)
         allowed_str = ", ".join(repr(item) for item in allowed)
         raise RequestValidationError(
             f"{field} must be one of {allowed_str}", status=422, field=field
@@ -397,10 +395,10 @@ class PlaylistUpdateRequest:
         new_name = _parse_playlist_name(data.get("new_name"), field="new_name")
         start_raw = data.get("start_time")
         end_raw = data.get("end_time")
-        if not start_raw or not end_raw:
-            missing_field = "start_time" if not start_raw else "end_time"
+        if start_raw is None or end_raw is None:
+            missing_field = "start_time" if start_raw is None else "end_time"
             raise RequestValidationError(
-                "Missing required fields", status=400, field=missing_field
+                "Start time and End time are required", status=400, field=missing_field
             )
         start_time, start_min = _parse_time_field(start_raw, field="start_time")
         end_time, end_min = _parse_time_field(end_raw, field="end_time")
@@ -801,15 +799,17 @@ class SettingsImportRequest:
             raise RequestValidationError(
                 "env_keys must be a JSON object", status=400, field="env_keys"
             )
+        allowed_config_set = set(allowed_config_keys)
+        allowed_env_set = set(allowed_env_keys)
         config = {
             str(key): value
             for key, value in config_raw.items()
-            if str(key) in set(allowed_config_keys)
+            if str(key) in allowed_config_set
         }
         env_keys = {
             str(key): str(value)
             for key, value in env_keys_raw.items()
-            if str(key) in set(allowed_env_keys) and value is not None
+            if str(key) in allowed_env_set and value is not None
         }
         return cls(config=config, env_keys=env_keys)
 
