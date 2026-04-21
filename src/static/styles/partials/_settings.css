@@ -251,6 +251,12 @@
   display: grid;
   gap: 10px;
   padding: 10px 12px;
+  /* Grid tracks default to min-content, which lets a textarea's intrinsic
+     cols attribute (default 20) or a URL input's placeholder prevent the
+     container from shrinking below ~300px — causing horizontal overflow
+     on 360px phone viewports. Clamping to minmax(0, 1fr) forces the
+     column to honour the container width. */
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dynamic-list-toolbar {
@@ -263,6 +269,13 @@
 
 .dynamic-list-toolbar .form-input {
   flex: 1;
+  /* Without min-width: 0 the input cannot shrink below its intrinsic
+     min-content width (which, for a URL input with a long placeholder
+     like "https://calendar.google.com/…/basic.ics", approaches 300px on
+     Linux/Chromium). On a 360px viewport that pushes the toolbar past
+     the viewport edge and breaks the no-horizontal-overflow smoke test
+     for calendar/todo_list plugin pages. */
+  min-width: 0;
 }
 
 .compact-repeater-toolbar {
