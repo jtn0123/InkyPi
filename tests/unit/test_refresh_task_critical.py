@@ -235,6 +235,66 @@ class TestExecuteRefreshAttemptWorker:
             plugin_registry.PLUGIN_CLASSES.update(saved_classes)
             plugin_registry._PLUGIN_CONFIGS.update(saved_configs)
 
+    def test_worker_reloads_plugin_registry_in_real_spawned_child(
+        self, device_config_dev
+    ):
+        """JTN-783: end-to-end variant that spawns a real subprocess.
+
+        The inline variant above simulates a cold registry by clearing the
+        parent's module-level dicts, but it still executes in the parent's
+        address space. This variant drives the full multiprocessing start
+        method (``spawn`` on macOS + the production systemd service), which
+        is the path that actually shipped the JTN-783 bug to users. If the
+        worker ever regresses back to calling ``get_plugin_instance`` on
+        the spawned child's empty registry, this test fails with the exact
+        production error instead of the simulation.
+        """
+        from refresh_task import _execute_refresh_attempt_worker
+        from refresh_task.context import RefreshContext
+
+        class SpawnableAction:
+            """Picklable so the spawned child can unpickle it."""
+
+            def execute(self, plugin, cfg, dt):
+                return Image.new("RGB", (10, 10), "green")
+
+        plugin_config = {"id": "clock", "class": "Clock"}
+        refresh_context = RefreshContext.from_config(device_config_dev)
+
+        ctx = _get_mp_context()
+        result_queue = ctx.Queue(maxsize=1)
+        proc = ctx.Process(
+            target=_execute_refresh_attempt_worker,
+            args=(
+                result_queue,
+                plugin_config,
+                SpawnableAction(),
+                refresh_context,
+                datetime.now(UTC),
+            ),
+            daemon=True,
+        )
+        proc.start()
+        # 30s is generous for spawn + plugin-info.json discovery + one fake
+        # action call; well below the per-attempt 60s default in production.
+        proc.join(timeout=30)
+        try:
+            assert not proc.is_alive(), (
+                "spawned worker did not exit within 30s — "
+                "probably stuck before result_queue.put()"
+            )
+            payload = result_queue.get(timeout=5)
+        finally:
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=5)
+
+        assert payload["ok"] is True, (
+            f"Real spawned child failed to resolve plugin from cold "
+            f"registry — JTN-783 regression. payload={payload}"
+        )
+        assert "image_bytes" in payload
+
 
 # ---------------------------------------------------------------------------
 # RefreshTask.stop()
