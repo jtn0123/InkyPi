@@ -91,12 +91,26 @@ def test_generate_image_vertical_orientation(
     assert img.size == (h, w)
 
 
-def test_generate_image_invalid_comic_raises(plugin_config, device_config_dev):
+def test_generate_image_invalid_comic_falls_back_to_xkcd(
+    monkeypatch, plugin_config, device_config_dev
+):
+    """JTN-784: an invalid `comic` setting silently falls back to XKCD at
+    render time so a bare /update_now renders. Form validation is in the
+    settings schema, not here."""
+    from plugins.comic import comic as comic_mod
     from plugins.comic.comic import Comic
 
+    captured = {}
+
+    def fake_get_panel(name):
+        captured["comic"] = name
+        return {"image_url": "http://img/latest.png", "title": "", "caption": ""}
+
+    monkeypatch.setattr(comic_mod, "get_panel", fake_get_panel)
     p = Comic(plugin_config)
-    with pytest.raises(RuntimeError):
-        p.generate_image({"comic": "NotARealOne"}, device_config_dev)
+    monkeypatch.setattr(p, "_compose_image", lambda *a, **kw: object())
+    p.generate_image({"comic": "NotARealOne"}, device_config_dev)
+    assert captured["comic"] == "XKCD"
 
 
 def test_generate_image_centering(monkeypatch, plugin_config, device_config_dev):
