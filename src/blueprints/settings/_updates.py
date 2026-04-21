@@ -166,6 +166,9 @@ def update_status():
         started_at = _mod._UPDATE_STATE.get("started_at")
 
         # Auto-clear stale update state
+        synthesized_failure: dict | None = None
+        cleared_unit_was_failed = False
+        cleared_unit_name: str | None = None
         if running:
             cleared = False
             # Check if the systemd transient unit has finished
@@ -182,6 +185,17 @@ def update_status():
                         _mod._UPDATE_STATE["last_unit"] = unit
                         _mod._set_update_state(False, None)
                         cleared = True
+                        # JTN-787: Remember whether the unit transitioned into
+                        # ``failed`` so that if no ``.last-update-failure`` file
+                        # was written we can still surface *something* to the
+                        # UI. The common case this catches is do_update.sh
+                        # aborting before delegating to update.sh (e.g. a dirty
+                        # working tree blocks `git checkout`), leaving the
+                        # transient systemd unit as failed with no on-disk
+                        # failure metadata.
+                        if status == "failed":
+                            cleared_unit_was_failed = True
+                            cleared_unit_name = unit
                 except Exception:
                     pass
             # Timeout fallback: force-clear if started >30 min ago
@@ -202,6 +216,51 @@ def update_status():
         # in install/update.sh) so the UI can show *why* an update failed
         # without the user SSHing in to read the system journal.
         last_failure = read_last_update_failure()
+
+        # JTN-787: If the transient systemd unit transitioned to ``failed``
+        # but no ``.last-update-failure`` file was written, synthesize one
+        # from the unit's journal tail. This covers the case where
+        # ``install/do_update.sh`` aborts before delegating to
+        # ``install/update.sh`` (e.g. a dirty working tree blocks
+        # ``git checkout``) on a pre-JTN-787 installed script, or if the
+        # failure file write itself failed for any reason. Best-effort:
+        # any exception falls through to the original ``last_failure`` value
+        # so this path never makes status worse.
+        if last_failure is None and cleared_unit_was_failed and cleared_unit_name:
+            try:
+                journal_result = subprocess.run(
+                    [
+                        "journalctl",
+                        "-u",
+                        cleared_unit_name,
+                        "-n",
+                        "20",
+                        "--no-pager",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                journal_tail = (journal_result.stdout or "").strip()
+                if journal_tail:
+                    import datetime as _dt
+
+                    synthesized_failure = {
+                        "timestamp": _dt.datetime.now(_dt.timezone.utc)
+                        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "exit_code": None,
+                        "last_command": "systemd_unit_failed",
+                        "recent_journal_lines": journal_tail,
+                        "unit": cleared_unit_name,
+                        "synthesized": True,
+                    }
+            except Exception:  # pragma: no cover — best-effort
+                _mod.logger.debug(
+                    "Failed to synthesize last_failure from journalctl",
+                    exc_info=True,
+                )
+            if synthesized_failure is not None:
+                last_failure = synthesized_failure
 
         # JTN-708: surface the prev_version breadcrumb so the UI can gate the
         # "Roll back" button on whether a valid previous tag exists.  The read
