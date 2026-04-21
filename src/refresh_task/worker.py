@@ -175,16 +175,12 @@ def _execute_refresh_attempt_worker(
         # don't cross the process boundary. Re-register plugins from the
         # restored Config so `get_plugin_instance` can resolve plugin_id.
         # `load_plugins` is idempotent (overwrites under a lock), so this is
-        # safe even if the child happens to share memory with the parent
-        # (fork start method).
-        try:
-            get_plugins = getattr(child_config, "get_plugins", None)
-            if callable(get_plugins):
-                load_plugins(get_plugins())
-        except Exception:
-            # Registry repopulation is best-effort; get_plugin_instance will
-            # raise a clear ValueError below if the plugin can't be resolved.
-            logger.exception("Failed to reload plugin registry in child process")
+        # safe to call every attempt. If the restored config somehow lacks
+        # a `get_plugins` method (legacy pickled payload), skip and let
+        # `get_plugin_instance` raise a clear ValueError below.
+        get_plugins = getattr(child_config, "get_plugins", None)
+        if callable(get_plugins):
+            load_plugins(get_plugins())
         plugin_loader = cast(
             Callable[[Mapping[str, object]], PluginLike],
             get_plugin_instance,
