@@ -524,6 +524,47 @@ def _find_browser_command(
     return None
 
 
+def _tempfile_is_empty(img_file_path: str | None) -> bool:
+    """Return True when the screenshot tempfile holds zero bytes (or is missing).
+
+    ``tempfile.NamedTemporaryFile`` pre-creates a 0-byte placeholder, so a
+    simple ``os.path.exists`` check is useless for "did chromium actually
+    produce output?".  A zero-byte tempfile after a non-zero chromium exit
+    is the Pi-Zero memory-pressure signature — treat those as transient.
+    """
+    if not img_file_path:
+        return True
+    try:
+        return not os.path.exists(img_file_path) or os.path.getsize(img_file_path) == 0
+    except OSError:
+        return True
+
+
+def _run_browser_subprocess(
+    command: list[str], timeout_seconds: float, attempt: int
+) -> tuple[subprocess.CompletedProcess | None, bool]:
+    """Run the chromium subprocess. Returns ``(result, transient_flag)``.
+
+    On hard errors (missing binary, process timeout) returns ``(None, flag)``
+    so the caller can short-circuit without stringifying ``result``.
+    ``transient`` is ``True`` for retryable errors (timeout) and ``False`` for
+    deterministic ones (binary vanished between probe and run).
+    """
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=timeout_seconds)
+    except FileNotFoundError:
+        logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
+        return None, False
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "%s Browser process timed out (attempt %s).",
+            _SCREENSHOT_ERROR_PREFIX,
+            attempt,
+        )
+        return None, True
+    return result, False
+
+
 def _take_screenshot_once(
     target: str,
     dimensions: tuple,
@@ -542,41 +583,27 @@ def _take_screenshot_once(
     img_file_path: str | None = None
     transient = False
     try:
-        # Create a temporary output file for the screenshot
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
             img_file_path = img_file.name
 
         command = _find_browser_command(target, img_file_path, dimensions, timeout_ms)
-
         if command is None:
             logger.error(
                 "%s No supported browser found. Install Chromium or Google Chrome.",
                 _SCREENSHOT_ERROR_PREFIX,
             )
-            # Deterministic — missing binary will not appear on retry.
             return None, False
 
         timeout_seconds = min(
             (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
             _MAX_SCREENSHOT_TIMEOUT_S,
         )
+        result, hard_fail_transient = _run_browser_subprocess(
+            command, timeout_seconds, attempt
+        )
+        if result is None:
+            return None, hard_fail_transient
 
-        try:
-            result = subprocess.run(
-                command, capture_output=True, timeout=timeout_seconds
-            )
-        except FileNotFoundError:
-            logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
-            return None, False
-        except subprocess.TimeoutExpired:
-            logger.error(
-                "%s Browser process timed out (attempt %s).",
-                _SCREENSHOT_ERROR_PREFIX,
-                attempt,
-            )
-            return None, True
-
-        # Check if the process failed or the output file is missing
         if result.returncode != 0:
             stderr = result.stderr.decode("utf-8", errors="replace").strip()
             logger.error(
@@ -586,38 +613,22 @@ def _take_screenshot_once(
                 attempt,
                 stderr,
             )
-            # A non-zero exit with no *bytes written* is the other shape of
-            # the Pi-Zero memory-pressure flake — the browser process exited
-            # before producing PNG output. The tempfile was pre-created as a
-            # 0-byte placeholder, so ``os.path.exists`` is always True here;
-            # use the file size as the transient-vs-deterministic signal.
-            try:
-                empty = (
-                    not img_file_path
-                    or not os.path.exists(img_file_path)
-                    or os.path.getsize(img_file_path) == 0
-                )
-            except OSError:
-                empty = True
-            return None, empty
-        if not (img_file_path and os.path.exists(img_file_path)):
+            return None, _tempfile_is_empty(img_file_path)
+
+        if _tempfile_is_empty(img_file_path):
             logger.error(
-                "%s screenshot file not found (attempt %s)",
+                "%s screenshot file missing or empty (attempt %s)",
                 _SCREENSHOT_ERROR_PREFIX,
                 attempt,
             )
             return None, True
 
-        # Load the image using standardized helper
         image = load_image_from_path(img_file_path)
         if image is None:
             logger.error(
                 "Failed to load screenshot image from temp file (attempt %s)",
                 attempt,
             )
-            # Decoding a freshly-written PNG should always succeed — if it
-            # didn't, something weird happened with the tempfile.  Retrying
-            # with a clean tempfile is cheap and often works.
             return None, True
 
     except Exception as e:

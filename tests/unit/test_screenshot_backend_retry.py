@@ -260,3 +260,170 @@ class TestRunSingleAttemptTransientDetection:
         )
         assert image is None
         assert transient is False
+
+
+class TestTakeScreenshotOnceBranchCoverage:
+    """JTN-789 + SonarCloud ``new_coverage``: exercise every branch of
+    ``_take_screenshot_once`` directly, so the quality gate clears 80% on the
+    PR diff. The retry orchestrator above (``TestTakeScreenshotRetry``) uses
+    injected outcomes; this suite drives the real helper.
+    """
+
+    def _base_patches(self, monkeypatch):
+        """Install the minimal monkeypatches to call ``_take_screenshot_once``
+        without invoking a real browser. Returns the module under test."""
+        import sys
+
+        from utils import image_utils as iu
+
+        monkeypatch.setattr(
+            iu,
+            "_find_browser_command",
+            lambda target, out, dims, timeout_ms: [sys.executable, "-c", "pass", out],
+        )
+        return iu
+
+    def test_missing_browser_returns_deterministic(self, monkeypatch):
+        """No browser on the system is deterministic — don't retry."""
+        from utils import image_utils as iu
+
+        monkeypatch.setattr(iu, "_find_browser_command", lambda *a, **kw: None)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is False
+
+    def test_timeout_expired_is_transient(self, monkeypatch):
+        """subprocess.TimeoutExpired should retry."""
+        import subprocess
+
+        iu = self._base_patches(monkeypatch)
+
+        def fake_run(*args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd="chromium", timeout=1)
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is True
+
+    def test_file_not_found_is_deterministic(self, monkeypatch):
+        """FileNotFoundError on subprocess.run = binary vanished between
+        probe and invocation, deterministic (don't retry)."""
+        iu = self._base_patches(monkeypatch)
+
+        def fake_run(*args, **kwargs):
+            raise FileNotFoundError("browser")
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is False
+
+    def test_zero_exit_empty_file_is_transient(self, monkeypatch):
+        """Clean exit but no PNG bytes — retry."""
+        from types import SimpleNamespace
+
+        iu = self._base_patches(monkeypatch)
+
+        def fake_run(command, **kwargs):
+            # leave tempfile empty
+            return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is True
+
+    def test_loader_returns_none_is_transient(self, monkeypatch):
+        """Chromium succeeded, wrote bytes, but PIL can't decode — retry
+        once because PNG decode is deterministic in theory, but real-world
+        tempfile races can leave incomplete data."""
+        from types import SimpleNamespace
+
+        iu = self._base_patches(monkeypatch)
+
+        def fake_run(command, **kwargs):
+            out = command[-1]
+            with open(out, "wb") as f:
+                f.write(b"some bytes")
+            return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        monkeypatch.setattr(iu, "load_image_from_path", lambda p: None)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is True
+
+    def test_unexpected_exception_is_transient(self, monkeypatch):
+        """Any unexpected exception inside the happy path is treated as
+        transient so we at least retry once before surfacing."""
+        from types import SimpleNamespace
+
+        iu = self._base_patches(monkeypatch)
+
+        def fake_run(command, **kwargs):
+            out = command[-1]
+            with open(out, "wb") as f:
+                f.write(b"some bytes")
+            return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
+
+        def boom(_path):
+            raise RuntimeError("decoder exploded")
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        monkeypatch.setattr(iu, "load_image_from_path", boom)
+        image, transient = iu._take_screenshot_once(
+            "http://example.invalid", (800, 480), None, attempt=1
+        )
+        assert image is None
+        assert transient is True
+
+
+class TestTempfileIsEmpty:
+    """Direct unit tests for the tempfile-empty helper."""
+
+    def test_none_path_is_empty(self):
+        from utils.image_utils import _tempfile_is_empty
+
+        assert _tempfile_is_empty(None) is True
+
+    def test_missing_file_is_empty(self, tmp_path):
+        from utils.image_utils import _tempfile_is_empty
+
+        assert _tempfile_is_empty(str(tmp_path / "nonexistent.png")) is True
+
+    def test_zero_byte_file_is_empty(self, tmp_path):
+        from utils.image_utils import _tempfile_is_empty
+
+        p = tmp_path / "empty.png"
+        p.write_bytes(b"")
+        assert _tempfile_is_empty(str(p)) is True
+
+    def test_nonempty_file_is_not_empty(self, tmp_path):
+        from utils.image_utils import _tempfile_is_empty
+
+        p = tmp_path / "content.png"
+        p.write_bytes(b"chromium-output")
+        assert _tempfile_is_empty(str(p)) is False
+
+    def test_oserror_treated_as_empty(self, monkeypatch, tmp_path):
+        """If getsize raises (e.g. permissions), err on the side of transient."""
+        from utils import image_utils as iu
+
+        def raise_os(_path):
+            raise OSError("fake permission error")
+
+        monkeypatch.setattr(iu.os.path, "getsize", raise_os)
+        p = tmp_path / "content.png"
+        p.write_bytes(b"anything")
+        assert iu._tempfile_is_empty(str(p)) is True

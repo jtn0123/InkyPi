@@ -57,3 +57,44 @@ class TestUpdateNowScreenshotBackend:
 
         assert body["error"] == SCREENSHOT_BACKEND_UNAVAILABLE_MSG
         assert body["error"] != "An internal error occurred"
+
+
+class TestUpdateNowScreenshotBackendViaRefreshTask:
+    """/update_now's *outer* except block (the async refresh-task path)
+    must also map ``ScreenshotBackendError`` to HTTP 503.
+
+    The test above covers the ``_update_now_direct`` in-process path. This
+    one covers the alternate path where ``refresh_task.running`` is True and
+    ``manual_update`` re-raises ``ScreenshotBackendError`` from the
+    subprocess worker (preserved via ``_remote_exception`` since JTN-789
+    added it to the allow-list).
+    """
+
+    def test_screenshot_backend_error_from_refresh_task_returns_503(
+        self, client, flask_app, monkeypatch
+    ):
+        from utils.plugin_errors import (
+            SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+            ScreenshotBackendError,
+        )
+
+        # Force the outer path: refresh_task.running=True + manual_update raises.
+        refresh_task = flask_app.config["REFRESH_TASK"]
+        monkeypatch.setattr(refresh_task, "running", True)
+
+        def _raise(_refresh_action):
+            raise ScreenshotBackendError(
+                "Screenshot backend failed after retry: chromium subprocess "
+                "did not produce an image."
+            )
+
+        monkeypatch.setattr(refresh_task, "manual_update", _raise)
+
+        resp = client.post("/update_now", data={"plugin_id": "clock"})
+        assert resp.status_code == 503, (
+            "outer refresh-task path must map ScreenshotBackendError to 503, "
+            f"got {resp.status_code}: {resp.get_data(as_text=True)}"
+        )
+        body = resp.get_json()
+        assert body["code"] == "backend_unavailable"
+        assert body["error"] == SCREENSHOT_BACKEND_UNAVAILABLE_MSG
