@@ -1368,6 +1368,16 @@ main[data-page-shell="workflow"] .frame {
   text-transform: uppercase;
 }
 
+/* Wrapper that groups the dynamic title + meta rows under a single
+   `aria-live="polite"` region so state transitions announce once per
+   change (CodeRabbit review, PR #570). Uses the same grid+gap as the
+   outer `.now-card` so the two children keep the original 5px rhythm
+   they had as direct siblings of the card. */
+.now-live {
+  display: grid;
+  gap: 5px;
+}
+
 .now-title {
   font-weight: 600;
   margin-top: 2px;
