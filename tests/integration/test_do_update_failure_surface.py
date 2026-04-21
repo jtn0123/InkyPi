@@ -59,24 +59,42 @@ class TestFailureTrapWritesRecord:
     def test_aborts_with_failure_file_outside_git_repo(self, tmp_path: Path) -> None:
         """When PROJECT_DIR/src isn't a symlink and SCRIPT_DIR/../.git is
         missing, do_update.sh must exit non-zero AND write a parseable
-        ``.last-update-failure`` JSON record to $INKYPI_LOCKFILE_DIR."""
+        ``.last-update-failure`` JSON record to $INKYPI_LOCKFILE_DIR.
+
+        We copy do_update.sh to a fresh tmpdir so its SCRIPT_DIR/../.git
+        fallback path cannot resolve to the real repo checkout (on CI the
+        runner's workdir IS a git repo, which would otherwise let the
+        script proceed past the resolve_repo_dir phase).
+        """
         _require_bash_git()
         state_dir = tmp_path / "state"
         state_dir.mkdir()
 
-        # Point PROJECT_DIR at an empty tmpdir so the symlink branch fails.
-        # The script also checks $SCRIPT_DIR/../.git — our worktree has a
-        # ``.git`` *file* (not directory) there, so the `-d` test also fails
-        # and the script correctly falls through to the "cannot determine"
-        # error path.
+        # Isolate the script from any ambient git repo so both branches of
+        # the repo-resolution logic fail cleanly.
+        install_dir = tmp_path / "isolated_install"
+        install_dir.mkdir()
+        copied_script = install_dir / "do_update.sh"
+        copied_script.write_bytes(DO_UPDATE_SH.read_bytes())
+        copied_script.chmod(0o755)
+
         empty_proj = tmp_path / "empty_proj"
         empty_proj.mkdir()
 
-        proc = _run(
+        env = dict(os.environ)
+        env.update(
             {
                 "INKYPI_LOCKFILE_DIR": str(state_dir),
                 "PROJECT_DIR": str(empty_proj),
             }
+        )
+        proc = subprocess.run(
+            ["bash", str(copied_script)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
         )
         assert proc.returncode != 0, (
             f"do_update.sh must exit non-zero when no repo is found. "

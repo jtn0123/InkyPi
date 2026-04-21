@@ -105,6 +105,7 @@ class TestSynthesizeFailureFromJournal:
         import subprocess as real_subprocess
 
         import blueprints.settings as mod
+
         # Mark an update as running with a known unit so the auto-clear
         # path is reached.
         mod._UPDATE_STATE["running"] = True
@@ -167,6 +168,7 @@ class TestSynthesizeFailureFromJournal:
         import subprocess as real_subprocess
 
         import blueprints.settings as mod
+
         real_failure = {
             "timestamp": "2026-04-20T00:00:00Z",
             "exit_code": 97,

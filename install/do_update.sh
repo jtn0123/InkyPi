@@ -136,9 +136,15 @@ echo "Repository root: $REPO_DIR"
 CURRENT_VERSION=$(git -C "$REPO_DIR" describe --tags --abbrev=0 2>/dev/null || echo "unknown")
 # JTN-787: honour INKYPI_LOCKFILE_DIR so tests can redirect state writes
 # without needing write access to /var/lib. Production callers do not set it.
+# Failure to create the state dir (e.g. running as non-root on a fresh box)
+# is non-fatal — the prev_version breadcrumb is best-effort and its absence
+# only disables the rollback button, it does not block the update itself.
 STATE_DIR="${INKYPI_LOCKFILE_DIR:-/var/lib/inkypi}"
-mkdir -p "$STATE_DIR"
-echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version"
+if mkdir -p "$STATE_DIR" 2>/dev/null; then
+  echo "$CURRENT_VERSION" > "$STATE_DIR/prev_version" 2>/dev/null || true
+else
+  echo "Warning: could not create $STATE_DIR; skipping prev_version breadcrumb." >&2
+fi
 echo "Current version: $CURRENT_VERSION"
 
 # ---------------------------------------------------------------------------
