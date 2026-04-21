@@ -8,6 +8,7 @@ import threading
 from collections import deque
 from datetime import UTC, datetime
 from time import perf_counter, sleep
+from typing import Any, NoReturn
 from uuid import uuid4
 
 from model import PlaylistManager, RefreshInfo
@@ -103,7 +104,7 @@ class RefreshTask:
         """
         return PluginHealthTracker.circuit_breaker_threshold()
 
-    def start(self):
+    def start(self) -> None:
         """Starts the background thread for refreshing the display."""
         if not self.thread or not self.thread.is_alive():
             logger.info("Starting refresh task")
@@ -550,17 +551,17 @@ class RefreshTask:
     def _push_or_skip_display(
         self,
         *,
-        used_cached,
-        image,
-        plugin_config,
-        refresh_action,
-        refresh_info,
-        benchmark_id,
-        plugin_id,
-        instance_name,
-        request_id,
-        manual_request,
-    ):
+        used_cached: bool,
+        image: Any,
+        plugin_config: dict[str, Any],
+        refresh_action: Any,
+        refresh_info: RefreshInfo,
+        benchmark_id: str | None,
+        plugin_id: str,
+        instance_name: str | None,
+        request_id: str | None,
+        manual_request: ManualUpdateRequest | None,
+    ) -> tuple[int, int]:
         """Push the image to the display, or skip when the cache is warm.
 
         Returns ``(display_duration_ms, preprocess_ms)``.  Also unblocks the
@@ -790,7 +791,7 @@ class RefreshTask:
         )
         self.device_config.write_config()
 
-    def _enqueue_manual_request(self, refresh_action):
+    def _enqueue_manual_request(self, refresh_action: Any) -> ManualUpdateRequest:
         """Create and queue a ManualUpdateRequest; wake the background thread."""
         request = ManualUpdateRequest(str(uuid4()), refresh_action)
         with self.condition:
@@ -809,7 +810,12 @@ class RefreshTask:
             self.condition.notify_all()
         return request
 
-    def _handle_manual_update_timeout(self, request, refresh_action, wait_s):
+    def _handle_manual_update_timeout(
+        self,
+        request: ManualUpdateRequest,
+        refresh_action: Any,
+        wait_s: float,
+    ) -> NoReturn:
         """Remove the request from the queue and raise a canonical TimeoutError."""
         with self.condition:
             try:
@@ -834,7 +840,9 @@ class RefreshTask:
         )
         raise timeout_exc
 
-    def _resolve_completed_request(self, request, refresh_action):
+    def _resolve_completed_request(
+        self, request: ManualUpdateRequest, refresh_action: Any
+    ) -> dict[str, Any] | None:
         """Return metrics or raise the stored exception for a finished request."""
         exc = request.exception
         if exc is None:
