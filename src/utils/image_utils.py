@@ -586,11 +586,20 @@ def _take_screenshot_once(
                 attempt,
                 stderr,
             )
-            # A non-zero exit with no output file is the other shape of the
-            # Pi-Zero memory-pressure flake — the browser process exits
-            # before producing PNG bytes.  Treat as transient.
-            transient = not (img_file_path and os.path.exists(img_file_path))
-            return None, transient
+            # A non-zero exit with no *bytes written* is the other shape of
+            # the Pi-Zero memory-pressure flake — the browser process exited
+            # before producing PNG output. The tempfile was pre-created as a
+            # 0-byte placeholder, so ``os.path.exists`` is always True here;
+            # use the file size as the transient-vs-deterministic signal.
+            try:
+                empty = (
+                    not img_file_path
+                    or not os.path.exists(img_file_path)
+                    or os.path.getsize(img_file_path) == 0
+                )
+            except OSError:
+                empty = True
+            return None, empty
         if not (img_file_path and os.path.exists(img_file_path)):
             logger.error(
                 "%s screenshot file not found (attempt %s)",

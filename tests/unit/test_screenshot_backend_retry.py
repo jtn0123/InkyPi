@@ -195,3 +195,68 @@ class TestWorkerRemoteExceptionAllowlist:
 
         exc = _remote_exception("TotallyUnknownError", "boom")
         assert type(exc) is RuntimeError
+
+
+class TestRunSingleAttemptTransientDetection:
+    """JTN-789 regression: non-zero chromium exits must be classified correctly.
+
+    The tempfile pre-created by ``_take_screenshot_once`` exists as a 0-byte
+    placeholder before chromium runs, so ``os.path.exists`` alone cannot
+    distinguish "chromium died without producing bytes" (transient — worth a
+    retry) from "chromium emitted a real error page" (deterministic). The
+    implementation uses ``os.path.getsize == 0`` as the signal; these tests
+    pin that.
+    """
+
+    @staticmethod
+    def _run_once_with_fake_subprocess(monkeypatch, returncode, write_bytes):
+        """Invoke `_take_screenshot_once` with a patched subprocess.run whose
+        side effect writes *write_bytes* to the output tempfile and returns
+        *returncode*. Returns the ``(image, transient)`` tuple under test."""
+        import subprocess
+        import sys
+        from types import SimpleNamespace
+
+        from utils import image_utils as iu
+
+        monkeypatch.setattr(
+            iu,
+            "_find_browser_command",
+            lambda target, out, dims, timeout_ms: [sys.executable, "-c", "pass", out],
+        )
+
+        real_run = subprocess.run
+
+        def fake_run(command, **kwargs):
+            # command[-1] is the tempfile path the wrapper injected.
+            out = command[-1]
+            with open(out, "wb") as f:
+                f.write(write_bytes)
+            return SimpleNamespace(returncode=returncode, stderr=b"", stdout=b"")
+
+        monkeypatch.setattr(iu.subprocess, "run", fake_run)
+        try:
+            return iu._take_screenshot_once(
+                target="http://example.invalid",
+                dimensions=(800, 480),
+                timeout_ms=5_000,
+                attempt=1,
+            )
+        finally:
+            monkeypatch.setattr(iu.subprocess, "run", real_run)
+
+    def test_nonzero_exit_empty_file_is_transient(self, monkeypatch):
+        """Chromium OOM-exit with no PNG bytes should retry."""
+        image, transient = self._run_once_with_fake_subprocess(
+            monkeypatch, returncode=1, write_bytes=b""
+        )
+        assert image is None
+        assert transient is True
+
+    def test_nonzero_exit_nonempty_file_is_deterministic(self, monkeypatch):
+        """Chromium exit with some bytes on disk is NOT a memory-pressure flake."""
+        image, transient = self._run_once_with_fake_subprocess(
+            monkeypatch, returncode=2, write_bytes=b"<not a valid png>"
+        )
+        assert image is None
+        assert transient is False

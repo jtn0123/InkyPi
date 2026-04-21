@@ -925,18 +925,15 @@ def update_now():
         )
     except ScreenshotBackendError:
         # JTN-789: chromium subprocess failed twice in a row (initial + one
-        # retry).  Surface a specific 503 ``backend_unavailable`` so the
-        # client — and journalctl — see an actionable signal instead of the
-        # generic 500 ``internal_error`` that a bare RuntimeError would
-        # produce.  The response body uses a module-level constant rather
-        # than ``str(exc)`` so CodeQL's ``py/stack-trace-exposure`` rule
-        # cannot trace any exception-derived text into the HTTP body
-        # (mirroring the ``URLValidationError.safe_message`` pattern from
-        # JTN-776).  The full exception text is still logged server-side.
+        # retry). Surface a specific 503 ``backend_unavailable`` with a
+        # whitelisted constant message so CodeQL ``py/stack-trace-exposure``
+        # cannot taint-track exception text into the HTTP body (mirrors the
+        # JTN-776 URLValidationError pattern). exc_info is intentionally
+        # NOT captured — plugin_id is enough for operators to correlate
+        # with the upstream chromium error ``take_screenshot`` already logged.
         logger.warning(
             "update_now: screenshot backend unavailable for plugin %s",
             sanitize_log_field(plugin_id or "?"),
-            exc_info=True,
         )
         return json_error(
             SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
