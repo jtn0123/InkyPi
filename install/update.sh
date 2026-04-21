@@ -292,7 +292,28 @@ stop_service
 
 _current_step="apt_install"
 _inkypi_maybe_inject_failure "apt_install"
-apt-get update -y > /dev/null &
+# JTN-788: Refresh the apt index *synchronously* before installing. The
+# previous implementation launched `apt-get update` in the background (`&`)
+# which raced with apt-get install and, in practice, meant install ran
+# against a stale /var/lib/apt/lists/ cache. When the Raspberry Pi archive
+# publishes a chromium point-release between updates, the cached index
+# refers to a version the mirror no longer serves and apt-get install
+# aborts with "Can't find a source to download version ...". Running
+# update first (and waiting for it to finish) fixes this.
+#
+# A failing `apt-get update` is treated as a soft warning, not a hard
+# abort: a transient index refresh failure (offline, DNS, mirror hiccup)
+# should not block a bugfix-only update. If no new package versions are
+# actually required, the subsequent install succeeds against the cached
+# index; if they are, the existing abort path below still fires.
+echo "Refreshing apt package index..."
+sudo apt-get update -qq
+apt_update_rc=$?
+if [ "$apt_update_rc" -ne 0 ]; then
+  echo_error "WARNING: apt-get update exited $apt_update_rc — continuing with cached index."
+else
+  echo_success "apt-get update succeeded (rc=0)."
+fi
 if [ -f "$APT_REQUIREMENTS_FILE" ]; then
   echo "Installing system dependencies... "
   if ! xargs -a "$APT_REQUIREMENTS_FILE" sudo apt-get install -y > /dev/null; then
