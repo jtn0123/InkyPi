@@ -104,13 +104,17 @@ def test_rss_http_500():
             p.parse_rss_feed("http://example.com/feed.xml")
 
 
-def test_rss_missing_feed_url():
-    """Missing feedUrl raises RuntimeError."""
+def test_rss_missing_feed_url_falls_back_to_default():
+    """JTN-784: missing feedUrl at render time falls back to the BBC World News
+    default so a bare /update_now renders. validate_settings still rejects an
+    empty feedUrl on save — see tests/plugins/test_rss.py for that contract."""
     p = _make_rss_plugin()
     cfg = _make_device_config()
 
-    with pytest.raises(RuntimeError, match="RSS Feed Url is required"):
+    with patch.object(p, "parse_rss_feed", return_value=[]) as m_parse:
         p.generate_image({"title": "Test"}, cfg)
+    args, _kwargs = m_parse.call_args
+    assert args[0] == "https://feeds.bbci.co.uk/news/rss.xml"
 
 
 def test_rss_connection_error():

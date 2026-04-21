@@ -54,12 +54,16 @@ def test_countdown_today(plugin_config, device_config_dev):
     assert isinstance(result, Image.Image)
 
 
-def test_countdown_missing_date(plugin_config, device_config_dev):
+def test_countdown_missing_date_falls_back_to_default(plugin_config, device_config_dev):
+    """JTN-784: missing/empty date renders with a ~30-day default rather than
+    raising, so a bare /update_now call produces a visible render. Form-time
+    validation (validate_settings) still rejects the empty date; see
+    ``test_countdown_validate_settings_rejects_missing_date`` below."""
     from plugins.countdown.countdown import Countdown
 
     p = Countdown(plugin_config)
-    with pytest.raises(RuntimeError, match="Date is required"):
-        p.generate_image({"title": "No Date"}, device_config_dev)
+    result = p.generate_image({"title": "No Date"}, device_config_dev)
+    assert isinstance(result, Image.Image)
 
 
 def test_countdown_validate_settings_rejects_missing_date(plugin_config):

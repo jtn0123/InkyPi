@@ -68,23 +68,24 @@ def test_newspaper_slug_case_variants(monkeypatch, device_config_dev):
     assert img is not None
 
 
-def test_newspaper_missing_slug_raises(device_config_dev):
-    """Empty or missing slug raises RuntimeError."""
+def test_newspaper_missing_slug_falls_back_to_default(monkeypatch, device_config_dev):
+    """JTN-784: missing/empty slug falls back to NY_NYT at render time so a
+    bare /update_now produces a visible render."""
+    from plugins.newspaper import newspaper as np_mod
     from plugins.newspaper.newspaper import Newspaper
 
+    captured: dict = {}
+
+    def fake_get_image(url):
+        captured["url"] = url
+        return _png_image((400, 800))
+
+    monkeypatch.setattr(np_mod, "get_image", fake_get_image)
+
     plugin = Newspaper({"id": "newspaper"})
-
-    # Empty string slug
-    with pytest.raises(RuntimeError, match="Newspaper input not provided"):
-        plugin.generate_image({"newspaperSlug": ""}, device_config_dev)
-
-    # None slug
-    with pytest.raises(RuntimeError, match="Newspaper input not provided"):
-        plugin.generate_image({"newspaperSlug": None}, device_config_dev)
-
-    # Missing slug key
-    with pytest.raises(RuntimeError, match="Newspaper input not provided"):
-        plugin.generate_image({}, device_config_dev)
+    for empty in ({"newspaperSlug": ""}, {"newspaperSlug": None}, {}):
+        plugin.generate_image(empty, device_config_dev)
+        assert "NY_NYT" in captured["url"]
 
 
 def test_newspaper_invalid_slug_raises(device_config_dev):
