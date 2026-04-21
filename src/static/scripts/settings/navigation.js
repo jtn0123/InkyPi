@@ -108,7 +108,9 @@
               const header = collapsible?.querySelector(".collapsible-header");
               if (header && ui.toggleCollapsible) {
                 ui.toggleCollapsible(header);
-              } else if (collapsibleContent) {
+              } else {
+                // collapsibleContent is already confirmed truthy by the
+                // enclosing if-condition; no need to re-check.
                 collapsibleContent.classList.add("is-open");
                 collapsibleContent.removeAttribute("hidden");
               }

@@ -44,7 +44,7 @@
         <p id="history-metric-strip-desc" class="sr-only">
             Latencies from the most recent refresh. Values are per-stage durations in milliseconds.
         </p>
-        <div class="metric-strip compact refined" role="group" aria-label="Latest refresh latency" aria-describedby="history-metric-strip-desc">
+        <section class="metric-strip compact refined" aria-label="Latest refresh latency" aria-describedby="history-metric-strip-desc">
             {% if metrics.request_ms is not none %}
             <div class="metric-pill" title="Time spent fetching upstream data during the last refresh" aria-label="Request latency: {{ metrics.request_ms }} milliseconds (time fetching upstream data on last refresh)">
                 <span class="metric-pill-label">Request</span>
@@ -69,7 +69,7 @@
                 <span class="metric-pill-value">{{ metrics.display_ms }} ms</span>
             </div>
             {% endif %}
-        </div>
+        </section>
         {% endif %}
         <div class="separator"></div>
 

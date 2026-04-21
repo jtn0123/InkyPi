@@ -27,11 +27,14 @@
                 <p class="page-desc">What's on the e-ink panel right now, what's next, and quick access to plugins.</p>
             </div>
             <div class="pageheader-actions dashboard-pageheader-actions">
-                <button id="dashboardRefreshBtn" type="button" class="header-button is-secondary dashboard-header-button" aria-label="Refresh" data-test-skip-click="true">
+                {# Buttons drop their aria-label attributes so the visible
+                   `.button-text` span IS the accessible name — Sonar S7927
+                   flags aria-labels that don't share the visible label. #}
+                <button id="dashboardRefreshBtn" type="button" class="header-button is-secondary dashboard-header-button" data-test-skip-click="true">
                     {{ icon('arrow-clockwise', 'btn-leading-icon') | safe }}
                     <span class="button-text">Refresh</span>
                 </button>
-                <button id="displayNextBtn" type="button" class="header-button primary dashboard-header-button" aria-label="Display next plugin in the rotation" data-default-label="Display Next" data-test-skip-click="true">
+                <button id="displayNextBtn" type="button" class="header-button primary dashboard-header-button" data-default-label="Display Next" data-test-skip-click="true">
                     {{ icon('skip-forward', 'btn-leading-icon') | safe }}
                     <span class="button-text">Display Next</span>
                 </button>
@@ -57,7 +60,7 @@
                             <span class="dashboard-resolution-mono">{{ config.resolution[0] }}&times;{{ config.resolution[1] }}{% set _display_type = config.display_type or '' %}{% if _display_type == 'inky' %} &middot; 7-color Inky Impression{% elif _display_type == 'mock' %} &middot; Mock display{% elif _display_type %} &middot; {{ _display_type | title }}{% endif %}</span>
                         </div>
                         <div class="dashboard-stage-controls">
-                            <div class="seg" role="group" aria-label="Preview size">
+                            <div class="seg" role="toolbar" aria-label="Preview size">
                                 <button type="button" class="seg-btn active" id="previewFitBtn" data-preview-mode="fit" aria-pressed="true" data-test-skip-click="true">Fit</button>
                                 <button type="button" class="seg-btn" id="previewNativeBtn" data-preview-mode="native" aria-pressed="false" data-test-skip-click="true">Native px</button>
                             </div>
@@ -70,7 +73,11 @@
                              width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
                              data-native-width="{{ config.resolution[0] }}" data-native-height="{{ config.resolution[1] }}">
                     </div>
-                    <div class="hero-strip" role="group" aria-label="Device refresh status">
+                    {# Drop role="group" (Sonar S6819 wants <fieldset>/<details>
+                       here, but this is a read-only data strip, not a form
+                       grouping). The individual .k/.v/.m labels already carry
+                       the semantics a screen reader needs. #}
+                    <div class="hero-strip">
                         <div class="hero-cell">
                             <div class="k">Now</div>
                             <div class="v {% if not refresh_info.plugin_id %}is-empty{% endif %}" id="heroNowValue">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) if refresh_info.plugin_id else 'Idle' }}</div>
@@ -131,9 +138,10 @@
                         <div id="imageMetaContent" class="dashboard-status-meta"></div>
                     </div>
 
-                    <div id="connectivityWarning" class="dashboard-connectivity-warning" role="status" aria-live="polite" hidden>
-                        <p>Unable to reach the server. Retrying&hellip;</p>
-                    </div>
+                    {# <output> carries implicit role="status" and satisfies
+                       Sonar S6819 (which prefers native-semantic elements over
+                       explicit role="status"). #}
+                    <output id="connectivityWarning" class="dashboard-connectivity-warning" aria-live="polite" hidden>Unable to reach the server. Retrying&hellip;</output>
 
                     <div id="overviewEmpty" class="dashboard-overview-empty{% if has_preview %} is-compact{% endif %}" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
                         {{ icon('monitor', 'empty-state-icon') | safe }}
@@ -162,20 +170,29 @@
                                 </div>
                                 <div class="quick-row-actions" data-quick-switch-actions>
                                     <span class="status-chip success quick-row-status" data-quick-switch-status{% if not _is_active %} hidden{% endif %}>Active</span>
+                                    {# aria-labels embed the visible button
+                                       text so Sonar S7927 is satisfied
+                                       ("Switch now" / "Open playlist" appear
+                                       verbatim as a substring of the
+                                       accessible name). The `hidden`
+                                       attribute already removes the control
+                                       from the a11y tree, so an additional
+                                       aria-hidden on a focusable element
+                                       (Sonar S6825) is redundant — dropped. #}
                                     {% if _has_items %}
                                     <button type="button"
                                             class="header-button is-secondary quick-row-btn"
                                             data-quick-switch-button
                                             data-playlist-name="{{ p.name }}"
                                             data-default-label="Switch now"
-                                            aria-label="Switch to {{ p.name }} playlist"
-                                            {% if _is_active %}hidden disabled aria-hidden="true"{% endif %}>Switch now</button>
+                                            aria-label="Switch now to {{ p.name }} playlist"
+                                            {% if _is_active %}hidden disabled{% endif %}>Switch now</button>
                                     {% else %}
                                     <a href="{{ url_for('playlist.playlists') }}"
                                        class="header-button is-secondary quick-row-btn"
                                        data-quick-switch-fallback
-                                       aria-label="Open {{ p.name }} playlist"
-                                       {% if _is_active %}hidden aria-hidden="true"{% endif %}>Open playlist</a>
+                                       aria-label="Open playlist {{ p.name }}"
+                                       {% if _is_active %}hidden{% endif %}>Open playlist</a>
                                     {% endif %}
                                 </div>
                             </div>

@@ -297,7 +297,7 @@
                         <div class="schedule-fieldset-title" id="scheduleCadenceHeading">Cadence</div>
                         <div class="form-group">
                             <span class="form-label">Refresh</span>
-                            <span class="help-icon" role="img" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
+                            <span class="help-icon" role="note" title="Determines how often the data and image should be refreshed." aria-label="Determines how often the data and image should be refreshed.">{% include 'icons/ph/info.svg' ignore missing %}</span>
                         </div>
                         <div class="form-group schedule-inline-group">
                             <input type="radio" id="refreshTypeInterval" name="refreshType" value="interval" checked>
@@ -390,7 +390,10 @@
                 <span class="meta-item"><span>Now:</span> <span id="requestProgressClock" class="value">—</span></span>
                 <span class="meta-item"><span>Elapsed:</span> <span id="requestProgressElapsed" class="value">0s</span></span>
             </div>
-            <div class="progress-bar"><div id="requestProgressBar" class="progress-fill" role="progressbar" aria-labelledby="requestProgressHeading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+            <div class="progress-bar">
+                <div id="requestProgressBar" class="progress-fill" aria-hidden="true"></div>
+                <progress id="requestProgressBarMeter" class="sr-only" value="0" max="100" aria-labelledby="requestProgressHeading">0%</progress>
+            </div>
             <ol id="requestProgressList" class="progress-log" aria-live="polite"></ol>
         </section>
 

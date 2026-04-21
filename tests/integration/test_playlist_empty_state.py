@@ -65,9 +65,11 @@ def test_playlist_plugin_actions_match_handoff_row_balance(client, device_config
     assert '<span class="action-button-label">Display</span>' in html
     assert "playlist-row-display-btn" in html
     assert "playlist-row-icon-btn" in html
-    assert 'aria-label="Edit schedule for ' in html
-    assert 'aria-label="Edit plugin ' in html
-    assert 'aria-label="Delete plugin instance ' in html
+    # Accessible names come from the visible .sr-only spans — the aria-label
+    # attributes were removed to satisfy SonarCloud S7927 ("Label in Name").
+    assert '<span class="sr-only">Edit schedule for ' in html
+    assert '<span class="sr-only">Edit plugin ' in html
+    assert '<span class="sr-only">Delete plugin instance ' in html
 
 
 def test_playlist_add_plugin_link_points_to_plugins_page(client, device_config_dev):

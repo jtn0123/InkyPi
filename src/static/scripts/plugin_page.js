@@ -63,6 +63,24 @@
     combined.style.color = textPicker.value;
   }
 
+  /**
+   * Toggle visibility of the Configure / Style / Schedule sub-panels.
+   * Mirrors the React `tabline` design from the UI handoff (JTN design refresh).
+   * Hoisted to module scope — uses only DOM, no createPluginPage state
+   * (SonarCloud javascript:S7721).
+   */
+  function setPluginSubtab(id) {
+    document.querySelectorAll("[data-plugin-subtab]").forEach((btn) => {
+      const active = btn.dataset.pluginSubtab === id;
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-selected", active ? "true" : "false");
+    });
+    document.querySelectorAll("[data-plugin-subpanel]").forEach((panel) => {
+      const active = panel.dataset.pluginSubpanel === id;
+      panel.hidden = !active;
+    });
+  }
+
   function createPluginPage(config) {
     const ui = globalThis.InkyPiUI || {};
     const mobileQuery = globalThis.matchMedia ? globalThis.matchMedia("(max-width: 768px)") : { matches: false, addEventListener() {} };
@@ -138,7 +156,11 @@
           if (textEl) textEl.textContent = "No progress data yet";
           if (clockEl) clockEl.textContent = "—";
           if (elapsedEl) elapsedEl.textContent = "—";
-          if (bar) { bar.style.width = "0%"; bar.setAttribute("aria-valuenow", 0); }
+          if (bar) {
+            bar.style.width = "0%";
+            const meter = document.getElementById("requestProgressBarMeter");
+            if (meter) meter.value = 0;
+          }
           if (progress) {
             setHidden(progress, false);
             progress.style.display = "";
@@ -165,7 +187,11 @@
           clockEl.textContent = new Date(data.finishedAtIso).toLocaleTimeString();
         }
         if (elapsedEl) elapsedEl.textContent = "—";
-        if (bar) { bar.style.width = "100%"; bar.setAttribute("aria-valuenow", 100); }
+        if (bar) {
+          bar.style.width = "100%";
+          const meter = document.getElementById("requestProgressBarMeter");
+          if (meter) meter.value = 100;
+        }
         // JTN-312: clear the HTML `hidden` attribute so the block is visible;
         // setting style.display alone does not override the `hidden` attribute.
         // JTN-347: also clear inline display:none left by progress.stop() —
@@ -659,6 +685,19 @@
       return false;
     }
 
+    // Extracted to keep the links.forEach callback from nesting
+    // addEventListener 5 levels deep (SonarCloud javascript:S2004). Uses
+    // event.currentTarget to recover the link reference without closing
+    // over it.
+    function handleApiKeysLinkClick(event) {
+      if (!isSettingsFormDirty()) return; // fall through to normal navigation
+      event.preventDefault();
+      const link = event.currentTarget;
+      const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
+      if (confirmBtn && link.href) confirmBtn.href = link.href;
+      openModal("apiKeysLeaveConfirmModal", link);
+    }
+
     function initApiKeysLeaveGuard() {
       const links = Array.from(document.querySelectorAll("[data-api-keys-link]"));
       const modal = document.getElementById("apiKeysLeaveConfirmModal");
@@ -668,15 +707,7 @@
       setTimeout(() => {
         _settingsFormSnapshot = getSettingsFormSnapshot();
       }, 0);
-      links.forEach((link) => {
-        link.addEventListener("click", (event) => {
-          if (!isSettingsFormDirty()) return; // fall through to normal navigation
-          event.preventDefault();
-          const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
-          if (confirmBtn && link.href) confirmBtn.href = link.href;
-          openModal("apiKeysLeaveConfirmModal", link);
-        });
-      });
+      links.forEach((link) => link.addEventListener("click", handleApiKeysLinkClick));
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
         if (modal.hidden) return;
@@ -725,28 +756,17 @@
       setWorkflowMode("configure");
     }
 
-    /**
-     * Toggle visibility of the Configure / Style / Schedule sub-panels.
-     * Mirrors the React `tabline` design from the UI handoff (JTN design refresh).
-     */
-    function setPluginSubtab(id) {
-      document.querySelectorAll("[data-plugin-subtab]").forEach((btn) => {
-        const active = btn.dataset.pluginSubtab === id;
-        btn.classList.toggle("active", active);
-        btn.setAttribute("aria-selected", active ? "true" : "false");
-      });
-      document.querySelectorAll("[data-plugin-subpanel]").forEach((panel) => {
-        const active = panel.dataset.pluginSubpanel === id;
-        panel.hidden = !active;
-      });
+    // Extracted to avoid nesting this handler 5 levels deep inside
+    // IIFE → createPluginPage → bindPluginSubtabs → forEach → addEventListener
+    // (SonarCloud javascript:S2004 caps function nesting at 4).
+    function onSubtabButtonClick(event) {
+      setPluginSubtab(event.currentTarget.dataset.pluginSubtab);
     }
 
     function bindPluginSubtabs() {
       const buttons = document.querySelectorAll("[data-plugin-subtab]");
       if (!buttons.length) return;
-      buttons.forEach((btn) => {
-        btn.addEventListener("click", () => setPluginSubtab(btn.dataset.pluginSubtab));
-      });
+      buttons.forEach((btn) => btn.addEventListener("click", onSubtabButtonClick));
       setPluginSubtab("configure");
     }
 
@@ -765,8 +785,10 @@
       try {
         const scrollTarget = document.getElementById("scheduleForm") || panel;
         scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch (_) {
-        /* noop */
+      } catch {
+        // scrollIntoView can throw if the panel was detached between the
+        // lookup above and this call; the subtab switch itself already
+        // succeeded, so silently absorb the scroll failure.
       }
       if (focus) {
         const focusTarget =
@@ -804,15 +826,19 @@
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
-      document.querySelectorAll("[data-plugin-subtab-target]").forEach((button) => {
-        button.addEventListener("click", (event) => {
-          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
-          const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
-            focus: true,
-            reportMissing: true,
-          });
-          if (!ok) event.preventDefault();
+      // Extracted handler — nesting forEach → addEventListener → arrow
+      // tripped javascript:S2004's 4-level limit at L809.
+      function onSubtabTargetClick(event) {
+        const button = event.currentTarget;
+        if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+        const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
+          focus: true,
+          reportMissing: true,
         });
+        if (!ok) event.preventDefault();
+      }
+      document.querySelectorAll("[data-plugin-subtab-target]").forEach((button) => {
+        button.addEventListener("click", onSubtabTargetClick);
       });
       document.addEventListener("click", (event) => {
         const opener = event.target.closest("[data-open-modal]");
@@ -842,7 +868,10 @@
       document.getElementById("showLastProgressBtn")?.addEventListener("click", showLastProgress);
       // Persistent progress card: render whatever the last snapshot is
       // (or the empty-state) on first load so the aside card always has content.
-      try { showLastProgress(); } catch (_) { /* noop */ }
+      // showLastProgress reads cached snapshot JSON from localStorage and can
+      // throw if the stored value was corrupted (bad JSON, partial write).
+      // Swallow — a missing snapshot just means no last-progress card.
+      try { showLastProgress(); } catch { /* ignore bad snapshot */ }
       document.getElementById("displayInstanceBtn")?.addEventListener("click", displayInstanceNow);
       document.querySelector("[data-background-upload]")?.addEventListener("change", showFileName);
       document.getElementById("removeFileButton")?.addEventListener("click", removeFile);

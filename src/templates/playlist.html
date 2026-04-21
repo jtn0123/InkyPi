@@ -83,7 +83,7 @@
                                browser tests cover the real edit-modal path directly. #}
                             <button class="header-button is-secondary edit-playlist-btn playlist-secondary-button" type="button" title="Edit playlist {{ playlist.name }}" data-playlist-action="edit-playlist" data-playlist-name="{{ playlist.name }}" data-start-time="{{ playlist.start_time }}" data-end-time="{{ playlist.end_time }}" data-cycle-minutes="{{ playlist.cycle_minutes or '' }}" data-test-skip-click="true">{{ icon('pencil-simple', 'btn-leading-icon') | safe }}<span class="action-button-label">Edit</span></button>
                             {# data-test-skip-click: deletes the playlist #}
-                            <button class="header-button is-secondary ghost-danger delete-playlist-btn playlist-secondary-button is-icon-only" type="button" aria-label="Delete playlist {{ playlist.name }}" title="Delete playlist {{ playlist.name }}" data-playlist-action="delete-playlist" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'btn-leading-icon') | safe }}<span class="sr-only">Delete</span></button>
+                            <button class="header-button is-secondary ghost-danger delete-playlist-btn playlist-secondary-button is-icon-only" type="button" title="Delete playlist {{ playlist.name }}" data-playlist-action="delete-playlist" data-playlist="{{ playlist.name }}" data-test-skip-click="true">{{ icon('trash', 'btn-leading-icon') | safe }}<span class="sr-only">Delete playlist {{ playlist.name }}</span></button>
                         </div>
                     </div>
                     <div class="playlist-card-body" data-playlist-body>
@@ -133,14 +133,13 @@
                             </div>
 
                             <div class="plugin-actions pl-item-actions">
-                                <button class="header-button is-secondary plugin-display-btn playlist-row-display-btn" type="button" title="Display {{ pi_label }} now" aria-label="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
+                                <button class="header-button is-secondary plugin-display-btn playlist-row-display-btn" type="button" title="Display {{ pi_label }} now" data-playlist-action="display-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}">
                                     {{ icon('monitor', 'action-icon') | safe }}
                                     <span class="action-button-label">Display</span>
                                     <span class="sr-only"> {{ pi_label }} now</span>
                                 </button>
                                 <button class="header-button is-secondary edit-button refresh-settings-btn playlist-row-icon-btn" type="button"
                                         title="Edit refresh settings for {{ pi_label }}"
-                                        aria-label="Edit schedule for {{ pi_label }}"
                                         data-playlist-action="edit-refresh"
                                         data-playlist="{{ playlist.name }}"
                                         data-plugin-id="{{ plugin_instance.plugin_id }}"
@@ -150,12 +149,12 @@
                                     {{ icon('clock', 'action-icon') | safe }}
                                     <span class="sr-only">Edit schedule for {{ pi_label }}</span>
                                 </button>
-                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}" aria-label="Edit plugin {{ pi_label }}">
+                                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin_instance.plugin_id) }}?instance={{ plugin_instance.name }}" class="header-button is-secondary edit-button playlist-row-icon-btn edit-plugin-link" title="Edit plugin {{ pi_label }}">
                                     {{ icon('pencil-simple', 'action-icon') | safe }}
                                     <span class="sr-only">Edit plugin {{ pi_label }}</span>
                                 </a>
                                 {# data-test-skip-click: removes a plugin instance from the playlist #}
-                                <button class="header-button is-secondary ghost-danger delete-button delete-instance-btn playlist-row-icon-btn" type="button" title="Delete plugin instance {{ pi_label }}" aria-label="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
+                                <button class="header-button is-secondary ghost-danger delete-button delete-instance-btn playlist-row-icon-btn" type="button" title="Delete plugin instance {{ pi_label }}" data-playlist-action="delete-instance" data-playlist="{{ playlist.name }}" data-plugin-id="{{ plugin_instance.plugin_id }}" data-instance="{{ plugin_instance.name }}" data-instance-label="{{ pi_label }}" data-test-skip-click="true">
                                     {{ icon('trash', 'action-icon') | safe }}
                                     <span class="sr-only">Delete plugin instance {{ pi_label }}</span>
                                 </button>
@@ -166,8 +165,8 @@
                     {% else %}
                     {{ empty_state('squares-four', 'No plugin instances in this playlist yet.', 'Add instances from a plugin page, then return here to schedule and reorder them.', compact=true) }}
                     {% endif %}
-                    <a href="{{ url_for('plugin.plugins_page') }}" class="pl-add-row" aria-label="Add plugin instance to {{ playlist.name }}">
-                        {{ icon('plus', 'icon-xs') | safe }}<span>Add plugin instance</span>
+                    <a href="{{ url_for('plugin.plugins_page') }}" class="pl-add-row" title="Add plugin instance to {{ playlist.name }}">
+                        {{ icon('plus', 'icon-xs') | safe }}<span>Add plugin instance</span><span class="sr-only"> to {{ playlist.name }}</span>
                     </a>
                     </div>
             </div>

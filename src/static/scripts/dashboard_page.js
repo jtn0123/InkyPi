@@ -23,6 +23,56 @@
     );
   }
 
+  // Pure helpers — hoisted to module scope so Sonar S7721 ("move function to
+  // outer scope") stops flagging them as closure-bound. None of these touch
+  // `config`, the store, or any createDashboardPage-local state.
+  function setCell(valueId, metaId, value, meta, title) {
+    const v = document.getElementById(valueId);
+    const m = document.getElementById(metaId);
+    if (v) {
+      v.textContent = value || "\u2014";
+      v.classList.toggle("is-empty", !value);
+    }
+    if (m) {
+      m.textContent = meta || "\u2014";
+      if (title !== undefined) m.title = title || "";
+    }
+  }
+
+  function formatRelativeSeconds(iso) {
+    if (!iso) return "";
+    const ts = Date.parse(iso);
+    if (Number.isNaN(ts)) return "";
+    const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+  }
+
+  function parseIsoDate(iso) {
+    if (!iso) return null;
+    const parsed = new Date(iso);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function formatClockTime(date) {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date);
+  }
+
+  function setQuickSwitchButtonPending(button, pending) {
+    if (!button) return;
+    const defaultLabel = button.dataset.defaultLabel || button.textContent || "Switch now";
+    button.dataset.defaultLabel = defaultLabel;
+    button.disabled = !!pending;
+    button.classList.toggle("is-busy", !!pending);
+    button.textContent = pending ? "Switching\u2026" : defaultLabel;
+  }
+
   function createDashboardPage(config) {
     const pollIntervalMs = config.pollIntervalMs || DEFAULTS.pollIntervalMs;
     const refreshDelayMs = config.refreshDelayMs || DEFAULTS.refreshDelayMs;
@@ -175,29 +225,10 @@
       }
     }
 
-    function setCell(valueId, metaId, value, meta, title) {
-      const v = document.getElementById(valueId);
-      const m = document.getElementById(metaId);
-      if (v) {
-        v.textContent = value || "\u2014";
-        v.classList.toggle("is-empty", !value);
-      }
-      if (m) {
-        m.textContent = meta || "\u2014";
-        if (title !== undefined) m.title = title || "";
-      }
-    }
-
-    function formatRelativeSeconds(iso) {
-      if (!iso) return "";
-      const ts = Date.parse(iso);
-      if (Number.isNaN(ts)) return "";
-      const diff = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-      if (diff < 60) return `${diff}s ago`;
-      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-      return `${Math.floor(diff / 86400)}d ago`;
-    }
+    // setCell, formatRelativeSeconds, parseIsoDate, formatClockTime and
+    // setQuickSwitchButtonPending are pure helpers hoisted to module scope
+    // above (Sonar S7721). buildNowMeta stays in the closure only because it
+    // delegates to formatRelativeSeconds.
 
     function buildNowMeta(info) {
       // Handoff parity: "Playlist: Morning · refreshed 3 min ago". When no
@@ -212,20 +243,6 @@
       }
       if (info.refresh_type) return info.refresh_type;
       return "";
-    }
-
-    function parseIsoDate(iso) {
-      if (!iso) return null;
-      const parsed = new Date(iso);
-      return Number.isNaN(parsed.getTime()) ? null : parsed;
-    }
-
-    function formatClockTime(date) {
-      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
-      return new Intl.DateTimeFormat(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      }).format(date);
     }
 
     function resolveCycleMinutes(info) {
@@ -321,15 +338,6 @@
       updateRefreshCountdown(info);
     }
 
-    function setQuickSwitchButtonPending(button, pending) {
-      if (!button) return;
-      const defaultLabel = button.dataset.defaultLabel || button.textContent || "Switch now";
-      button.dataset.defaultLabel = defaultLabel;
-      button.disabled = !!pending;
-      button.classList.toggle("is-busy", !!pending);
-      button.textContent = pending ? "Switching…" : defaultLabel;
-    }
-
     function setQuickSwitchActiveRow(playlistName) {
       if (!playlistName) return;
       document.querySelectorAll("[data-quick-switch-row]").forEach((row) => {
@@ -382,7 +390,9 @@
           refreshPreview();
           refreshKpis();
         }, refreshDelayMs);
-      } catch (error) {
+      } catch {
+        // Network failure — surface a generic modal rather than rethrowing.
+        // The detailed error is of no use to the user here.
         showResponseModal("failure", "Failed to switch playlist");
       } finally {
         setQuickSwitchButtonPending(button, false);
@@ -544,10 +554,16 @@
           console.warn('Plugin card missing href:', el.textContent.trim());
         }
       });
+      // Named click handler so the listener isn't a callback-in-callback-in-
+      // callback (Sonar S2004: no more than 4 levels of nested functions).
+      // `currentTarget` is always the element the listener was bound to, so
+      // we recover the button without closing over the loop variable.
+      function handleQuickSwitchClick(event) {
+        const button = event.currentTarget;
+        quickSwitchPlaylist(button.dataset.playlistName, button);
+      }
       document.querySelectorAll("[data-quick-switch-button]").forEach((button) => {
-        button.addEventListener("click", () => {
-          quickSwitchPlaylist(button.dataset.playlistName, button);
-        });
+        button.addEventListener("click", handleQuickSwitchClick);
       });
       document.getElementById("displayNextBtn")?.addEventListener("click", displayNextNow);
       document.getElementById("dashboardRefreshBtn")?.addEventListener("click", () => {
@@ -575,71 +591,97 @@
     }
 
     // Today KPI card — populated from /api/stats (24h window) + /api/health/system.
-    async function refreshKpis() {
-      // Only manage the "ok"/"warn" state classes with classList so future
-      // base classes on the <dd id="kpi*"> elements (e.g. layout or
-      // typography utilities) aren't clobbered by state updates.
-      const KPI_STATE_CLASSES = ["ok", "warn"];
-      const setText = (id, value, extraClass) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.textContent = value;
-        if (extraClass !== undefined) {
-          el.classList.remove(...KPI_STATE_CLASSES);
-          if (extraClass) {
-            el.classList.add(extraClass);
-          }
-        }
-      };
-      const setStatus = (value) => {
-        const el = document.getElementById("todayKpiSub");
-        if (!el) return;
-        el.textContent = value;
-      };
+    //
+    // Split into tiny helpers (setKpiText, fetchStatsSnapshot,
+    // fetchHealthSnapshot) so `refreshKpis` itself stays under the cognitive
+    // complexity cap (Sonar S3776 ≤15). Each helper returns the two signals
+    // we aggregate at the bottom: whether the endpoint was reachable at all,
+    // and whether we surfaced any telemetry values.
+    const KPI_STATE_CLASSES = ["ok", "warn"];
 
-      const statsUrl = config.statsUrl || "/api/stats";
-      const healthUrl = config.systemHealthUrl || "/api/health/system";
-      let statsReachable = false;
-      let healthReachable = false;
-      let hasTelemetry = false;
+    function setKpiText(id, value, extraClass) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value;
+      if (extraClass === undefined) return;
+      el.classList.remove(...KPI_STATE_CLASSES);
+      if (extraClass) {
+        el.classList.add(extraClass);
+      }
+    }
 
+    function errorsStateClass(errs) {
+      // Extracted from a nested ternary (Sonar S3358) so the three-way
+      // cascade reads as a normal if/else.
+      if (errs === 0) return "ok";
+      if (errs > 0) return "warn";
+      return "";
+    }
+
+    async function fetchStatsSnapshot(statsUrl) {
       try {
         const resp = await fetch(statsUrl, { headers: { Accept: "application/json" } });
-        if (resp.ok) {
-          statsReachable = true;
-          const body = await resp.json();
-          const w = body.last_24h || {};
-          const total = Number(w.total);
-          setText("kpiRefreshes", Number.isFinite(total) ? String(total) : "—");
-          const p50 = Number(w.p50_duration_ms);
-          setText("kpiAvgRender", Number.isFinite(p50) && p50 > 0 ? `${(p50 / 1000).toFixed(1)} s` : "—");
-          const errs = Number.isFinite(w.failure) ? Number(w.failure) : NaN;
-          setText("kpiErrors", Number.isFinite(errs) ? String(errs) : "—", errs === 0 ? "ok" : errs > 0 ? "warn" : "");
-          hasTelemetry = hasTelemetry || Number.isFinite(total) || (Number.isFinite(p50) && p50 > 0) || Number.isFinite(errs);
-        }
+        if (!resp.ok) return { reachable: false, hasTelemetry: false };
+        const body = await resp.json();
+        const w = body.last_24h || {};
+        const total = Number(w.total);
+        setKpiText("kpiRefreshes", Number.isFinite(total) ? String(total) : "\u2014");
+        const p50 = Number(w.p50_duration_ms);
+        setKpiText(
+          "kpiAvgRender",
+          Number.isFinite(p50) && p50 > 0 ? `${(p50 / 1000).toFixed(1)} s` : "\u2014",
+        );
+        const errs = Number.isFinite(w.failure) ? Number(w.failure) : Number.NaN;
+        setKpiText(
+          "kpiErrors",
+          Number.isFinite(errs) ? String(errs) : "\u2014",
+          errorsStateClass(errs),
+        );
+        const hasTelemetry =
+          Number.isFinite(total)
+          || (Number.isFinite(p50) && p50 > 0)
+          || Number.isFinite(errs);
+        return { reachable: true, hasTelemetry };
       } catch (error) {
         console.warn("Failed to fetch refresh stats:", error);
+        return { reachable: false, hasTelemetry: false };
       }
+    }
 
+    async function fetchHealthSnapshot(healthUrl) {
       try {
         const resp = await fetch(healthUrl, { headers: { Accept: "application/json" } });
-        if (resp.ok) {
-          healthReachable = true;
-          const body = await resp.json();
-          const free = Number(body.disk_free_gb);
-          setText("kpiStorageFree", Number.isFinite(free) ? `${free.toFixed(1)} GB` : "—");
-          hasTelemetry = hasTelemetry || Number.isFinite(free);
-        }
+        if (!resp.ok) return { reachable: false, hasTelemetry: false };
+        const body = await resp.json();
+        const free = Number(body.disk_free_gb);
+        setKpiText(
+          "kpiStorageFree",
+          Number.isFinite(free) ? `${free.toFixed(1)} GB` : "\u2014",
+        );
+        return { reachable: true, hasTelemetry: Number.isFinite(free) };
       } catch (error) {
         console.warn("Failed to fetch system health:", error);
+        return { reachable: false, hasTelemetry: false };
       }
+    }
 
+    function setKpiStatus(value) {
+      const el = document.getElementById("todayKpiSub");
+      if (el) el.textContent = value;
+    }
+
+    async function refreshKpis() {
+      const statsUrl = config.statsUrl || "/api/stats";
+      const healthUrl = config.systemHealthUrl || "/api/health/system";
+      const stats = await fetchStatsSnapshot(statsUrl);
+      const health = await fetchHealthSnapshot(healthUrl);
+      const hasTelemetry = stats.hasTelemetry || health.hasTelemetry;
       if (hasTelemetry) {
-        setStatus("Last 24h snapshot");
-      } else if (statsReachable || healthReachable) {
-        setStatus("Awaiting telemetry");
+        setKpiStatus("Last 24h snapshot");
+      } else if (stats.reachable || health.reachable) {
+        setKpiStatus("Awaiting telemetry");
       } else {
-        setStatus("Telemetry unavailable");
+        setKpiStatus("Telemetry unavailable");
       }
     }
 

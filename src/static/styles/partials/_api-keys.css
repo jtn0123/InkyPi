@@ -165,9 +165,11 @@
     max-width: 100px;
 }
 
-/* API Keys page layout */
+/* API Keys page layout — handoff parity rolled into the base declarations
+   (previously a second block at the bottom of this file re-declared each
+   selector; merged here to avoid duplicate-selector flags). */
 .api-keys-frame {
-  max-width: 860px;
+  max-width: 980px;
   margin: 0 auto;
 }
 
@@ -177,7 +179,8 @@
    reveals when the user clicks "Change" / "Add key". */
 .api-keys-grid {
   display: grid;
-  gap: 10px;
+  gap: 14px;
+  width: 100%;
 }
 
 .api-keys-panel {
@@ -185,17 +188,16 @@
   gap: 16px;
 }
 
-/* Handoff parity: API-key rows are .card primitives (1px border, radius-lg,
-   --surface). The second `.api-key-card` block further down refines to 14px
-   radius for the flatter handoff row style. Use canonical tokens here so
-   the cascade resolves cleanly in both themes. */
+/* Handoff parity: API-key rows are .card primitives (1px border, radius-xl,
+   --surface) — flatter row style for the handoff Settings layout. */
 .api-key-card {
   padding: 14px 16px;
   border: 1px solid var(--surface-border);
-  border-radius: var(--border-radius-lg);
+  border-radius: var(--border-radius-xl);
   background: var(--surface);
   display: grid;
   gap: 10px;
+  width: 100%;
 }
 
 .key-row {
@@ -209,7 +211,8 @@
 .key-row-left {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  /* Gap widened from 2px to 4px for handoff parity. */
+  gap: 4px;
   min-width: 0;
   flex: 1 1 200px;
 }
@@ -217,9 +220,11 @@
 .key-row-right {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  /* Handoff parity: tighter single-row layout — no wrap, push to end. */
+  gap: 12px;
+  flex-wrap: nowrap;
   justify-content: flex-end;
+  margin-left: auto;
 }
 
 .api-key-card .key-svc {
@@ -238,18 +243,21 @@
   color: var(--text-secondary);
   font-size: 0.8rem;
   letter-spacing: 0.02em;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: var(--bg-secondary, var(--surface-2, transparent));
-  max-width: 180px;
+  /* Handoff parity: pill-shaped mask with border + surface-2 fill. */
+  padding: 5px 10px;
+  border: 1px solid var(--surface-border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .api-key-toggle {
-  min-height: 32px;
-  padding: 6px 14px;
+  /* Handoff parity: 34px minimum with tighter 6/12 padding. */
+  min-height: 34px;
+  padding: 6px 12px;
   font-size: 0.85rem;
 }
 
@@ -278,6 +286,10 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  /* Handoff parity: separator between the headline row and the expanded
+     input row inside the same card. */
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in oklab, var(--surface-border) 80%, transparent);
 }
 
 .api-key-actions[hidden] {
@@ -286,12 +298,6 @@
 
 .api-key-actions .header-button {
   min-width: 0;
-}
-
-/* Visual parity pass: widen the managed page and flatten cards into fuller
-   single-row entries like the handoff. */
-.api-keys-frame {
-  max-width: 980px;
 }
 
 .api-keys-frame .pageheader-actions {
@@ -308,49 +314,6 @@
   padding: 0;
 }
 
-.api-keys-grid {
-  width: 100%;
-  gap: 14px;
-}
-
-.api-key-card {
-  width: 100%;
-  padding: 14px 16px;
-  /* Handoff parity: large, flatter cards use radius-3 (14px). This override
-     keeps the API-keys list visually consistent with the handoff Settings
-     layout while the base .api-key-card above falls back to radius-lg. */
-  border-radius: var(--border-radius-xl);
-  background: var(--surface);
-  border-color: var(--surface-border);
-}
-
-.key-row {
-  align-items: center;
-}
-
-.key-row-left {
-  gap: 4px;
-}
-
-.key-row-right {
-  margin-left: auto;
-  gap: 12px;
-  flex-wrap: nowrap;
-}
-
-.api-mask {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--surface-border);
-  background: var(--surface-2);
-  max-width: 220px;
-}
-
-.api-key-toggle {
-  min-height: 34px;
-  padding: 6px 12px;
-}
-
 .api-key-card[data-configured="false"] .api-key-toggle {
   background: var(--accent);
   color: var(--accent-ink);
@@ -360,11 +323,6 @@
 .api-key-card[data-configured="false"] .api-key-toggle:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-}
-
-.api-key-actions {
-  padding-top: 4px;
-  border-top: 1px solid color-mix(in oklab, var(--surface-border) 80%, transparent);
 }
 
 .api-keys-note {

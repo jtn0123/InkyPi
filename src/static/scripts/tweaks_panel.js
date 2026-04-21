@@ -1,41 +1,47 @@
 (function () {
     'use strict';
 
-    var STORAGE_KEY = 'inkypi_tweaks_v1';
-    var DEFAULT_AESTHETIC = 'console';
-    var DEFAULT_DENSITY = 'balanced';
-    var DEFAULT_ACCENT = 170;
-    var MIN_ACCENT = 0;
-    var MAX_ACCENT = 360;
+    const STORAGE_KEY = 'inkypi_tweaks_v1';
+    const DEFAULT_AESTHETIC = 'console';
+    const DEFAULT_DENSITY = 'balanced';
+    const DEFAULT_ACCENT = 170;
+    const MIN_ACCENT = 0;
+    const MAX_ACCENT = 360;
 
     function load() {
         try {
-            var raw = window.localStorage && window.localStorage.getItem(STORAGE_KEY);
+            const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
             if (!raw) return {};
-            var parsed = JSON.parse(raw);
+            const parsed = JSON.parse(raw);
             return parsed && typeof parsed === 'object' ? parsed : {};
-        } catch (e) {
+        } catch {
+            // localStorage can throw in private/incognito windows or when
+            // quota is exceeded. Fall back to defaults rather than surfacing
+            // a blocking error to the user.
             return {};
         }
     }
 
     function save(state) {
         try {
-            window.localStorage && window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (e) { /* no-op */ }
+            globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch {
+            // Intentionally ignore storage failures (quota/private mode) —
+            // user-visible tweaks still apply, just won't survive reload.
+        }
     }
 
     function applyAesthetic(aesthetic) {
-        var root = document.documentElement;
+        const root = document.documentElement;
         if (!aesthetic || aesthetic === 'console') {
-            root.removeAttribute('data-aesthetic');
+            delete root.dataset.aesthetic;
         } else {
-            root.setAttribute('data-aesthetic', aesthetic);
+            root.dataset.aesthetic = aesthetic;
         }
     }
 
     function applyDensity(density) {
-        var shell = document.querySelector('.shell');
+        const shell = document.querySelector('.shell');
         if (!shell) return;
         shell.classList.remove('density-compact', 'density-balanced', 'density-cozy');
         if (density && density !== 'balanced') {
@@ -44,14 +50,14 @@
     }
 
     function applyAccent(hue) {
-        var h = parseInt(hue, 10);
-        if (isNaN(h)) return;
+        let h = Number.parseInt(hue, 10);
+        if (Number.isNaN(h)) return;
         h = Math.max(MIN_ACCENT, Math.min(MAX_ACCENT, h));
-        var root = document.documentElement;
+        const root = document.documentElement;
         // Override the default --accent hue while preserving lightness/chroma from tokens
-        var isDark = root.getAttribute('data-theme') !== 'light';
-        var l = isDark ? '68%' : '56%';
-        var c = '0.08';
+        const isDark = root.dataset.theme !== 'light';
+        const l = isDark ? '68%' : '56%';
+        const c = '0.08';
         root.style.setProperty('--accent', 'oklch(' + l + ' ' + c + ' ' + h + ')');
         root.style.setProperty('--accent-hover', 'oklch(' + (isDark ? '74%' : '48%') + ' 0.09 ' + h + ')');
     }
@@ -61,29 +67,29 @@
     // cheaper to sidestep than to waive per-PR), and this helper is also
     // easier to read than the regex it replaces.
     function trimTrailingSlashes(s) {
-        var end = s.length;
-        while (end > 0 && s.charCodeAt(end - 1) === 47 /* '/' */) {
+        let end = s.length;
+        while (end > 0 && s.codePointAt(end - 1) === 47 /* '/' */) {
             end--;
         }
         return end === s.length ? s : s.slice(0, end);
     }
 
     function highlightActiveNav() {
-        var items = document.querySelectorAll('.shell-sidebar .nav-item');
+        const items = document.querySelectorAll('.shell-sidebar .nav-item');
         if (!items.length) return;
         // Normalise by trimming a trailing slash so "/plugins" and "/plugins/"
         // compare equal. Require an exact match or a "/" segment boundary
         // before treating a longer href as active; a bare prefix check would
         // light up "/plugins" when navigating to a sibling route like
         // "/plugins-library".
-        var path = trimTrailingSlashes(window.location.pathname || '/') || '/';
-        var best = null;
-        var bestLen = -1;
+        const path = trimTrailingSlashes(globalThis.location.pathname || '/') || '/';
+        let best = null;
+        let bestLen = -1;
         items.forEach(function (a) {
-            var href = a.getAttribute('href') || '';
+            const href = a.getAttribute('href') || '';
             if (!href || href === '#') return;
-            var hrefPath = trimTrailingSlashes(
-                new URL(href, window.location.origin).pathname
+            const hrefPath = trimTrailingSlashes(
+                new URL(href, globalThis.location.origin).pathname
             ) || '/';
             if (
                 path === hrefPath
@@ -99,73 +105,71 @@
         if (best) {
             best.classList.add('active');
             best.setAttribute('aria-current', 'page');
-        } else {
+        } else if (path === '/' && items[0]) {
             // Fallback: root path → first nav-item (Dashboard)
-            if (path === '/' && items[0]) {
-                items[0].classList.add('active');
-                items[0].setAttribute('aria-current', 'page');
-            }
+            items[0].classList.add('active');
+            items[0].setAttribute('aria-current', 'page');
         }
     }
 
     function init() {
         highlightActiveNav();
 
-        var state = load();
-        var aesthetic = state.aesthetic || DEFAULT_AESTHETIC;
-        var density = state.density || DEFAULT_DENSITY;
-        var accent = typeof state.accent === 'number' ? state.accent : DEFAULT_ACCENT;
+        const state = load();
+        const aesthetic = state.aesthetic || DEFAULT_AESTHETIC;
+        const density = state.density || DEFAULT_DENSITY;
+        const accent = typeof state.accent === 'number' ? state.accent : DEFAULT_ACCENT;
 
         applyAesthetic(aesthetic);
         applyDensity(density);
         if (typeof state.accent === 'number') applyAccent(accent);
 
-        var fab = document.getElementById('tweaksFab');
-        var panel = document.getElementById('tweaksPanel');
+        const fab = document.getElementById('tweaksFab');
+        const panel = document.getElementById('tweaksPanel');
         if (!fab || !panel) return;
 
         function setPanelOpen(open) {
-            panel.setAttribute('data-open', open ? 'true' : 'false');
+            panel.dataset.open = open ? 'true' : 'false';
             fab.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
 
         fab.addEventListener('click', function () {
-            var isOpen = panel.getAttribute('data-open') === 'true';
+            const isOpen = panel.dataset.open === 'true';
             setPanelOpen(!isOpen);
         });
 
         document.addEventListener('click', function (e) {
-            if (panel.getAttribute('data-open') !== 'true') return;
+            if (panel.dataset.open !== 'true') return;
             if (panel.contains(e.target) || fab.contains(e.target)) return;
             setPanelOpen(false);
         });
 
         document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && panel.getAttribute('data-open') === 'true') {
+            if (e.key === 'Escape' && panel.dataset.open === 'true') {
                 setPanelOpen(false);
                 fab.focus();
             }
         });
 
-        var closeBtn = panel.querySelector('.tweaks-close');
+        const closeBtn = panel.querySelector('.tweaks-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', function () { setPanelOpen(false); });
         }
 
         // Aesthetic buttons
-        var aestheticButtons = panel.querySelectorAll('.aesthetic-option');
+        const aestheticButtons = panel.querySelectorAll('.aesthetic-option');
         function syncAestheticActive(val) {
             aestheticButtons.forEach(function (btn) {
-                btn.classList.toggle('active', btn.getAttribute('data-aesthetic') === val);
-                btn.setAttribute('aria-pressed', btn.getAttribute('data-aesthetic') === val ? 'true' : 'false');
+                btn.classList.toggle('active', btn.dataset.aesthetic === val);
+                btn.setAttribute('aria-pressed', btn.dataset.aesthetic === val ? 'true' : 'false');
             });
         }
         syncAestheticActive(aesthetic);
         aestheticButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var val = btn.getAttribute('data-aesthetic') || DEFAULT_AESTHETIC;
+                const val = btn.dataset.aesthetic || DEFAULT_AESTHETIC;
                 applyAesthetic(val);
-                var s = load();
+                const s = load();
                 s.aesthetic = val;
                 save(s);
                 syncAestheticActive(val);
@@ -173,19 +177,19 @@
         });
 
         // Density buttons
-        var densityButtons = panel.querySelectorAll('.density-option');
+        const densityButtons = panel.querySelectorAll('.density-option');
         function syncDensityActive(val) {
             densityButtons.forEach(function (btn) {
-                btn.classList.toggle('active', btn.getAttribute('data-density') === val);
-                btn.setAttribute('aria-pressed', btn.getAttribute('data-density') === val ? 'true' : 'false');
+                btn.classList.toggle('active', btn.dataset.density === val);
+                btn.setAttribute('aria-pressed', btn.dataset.density === val ? 'true' : 'false');
             });
         }
         syncDensityActive(density);
         densityButtons.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var val = btn.getAttribute('data-density') || DEFAULT_DENSITY;
+                const val = btn.dataset.density || DEFAULT_DENSITY;
                 applyDensity(val);
-                var s = load();
+                const s = load();
                 s.density = val;
                 save(s);
                 syncDensityActive(val);
@@ -193,23 +197,23 @@
         });
 
         // Accent slider
-        var accentSlider = panel.querySelector('#accentHueSlider');
-        var accentValue = panel.querySelector('#accentHueValue');
+        const accentSlider = panel.querySelector('#accentHueSlider');
+        const accentValue = panel.querySelector('#accentHueValue');
         if (accentSlider) {
             accentSlider.value = String(accent);
             if (accentValue) accentValue.textContent = accent + '°';
             accentSlider.addEventListener('input', function () {
-                var v = parseInt(accentSlider.value, 10);
-                if (isNaN(v)) return;
+                const v = Number.parseInt(accentSlider.value, 10);
+                if (Number.isNaN(v)) return;
                 applyAccent(v);
                 if (accentValue) accentValue.textContent = v + '°';
-                var s = load();
+                const s = load();
                 s.accent = v;
                 save(s);
             });
         }
 
-        var resetBtn = panel.querySelector('#tweaksReset');
+        const resetBtn = panel.querySelector('#tweaksReset');
         if (resetBtn) {
             resetBtn.addEventListener('click', function () {
                 save({});
@@ -228,13 +232,16 @@
     // Apply persisted settings as early as possible to prevent FOUC
     function earlyApply() {
         try {
-            var raw = window.localStorage && window.localStorage.getItem(STORAGE_KEY);
+            const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
             if (!raw) return;
-            var state = JSON.parse(raw);
+            const state = JSON.parse(raw);
             if (!state) return;
             if (state.aesthetic) applyAesthetic(state.aesthetic);
             if (typeof state.accent === 'number') applyAccent(state.accent);
-        } catch (e) { /* no-op */ }
+        } catch {
+            // Same rationale as load()/save(): silently fall back when
+            // localStorage isn't usable.
+        }
     }
     earlyApply();
 

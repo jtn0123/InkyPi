@@ -403,6 +403,142 @@ def _register_before_request_hooks(app):
             pass
 
 
+def _lookup_static_version_factory(app, version: str, cache: dict[str, str]):
+    """Return a closure that resolves static-file version tokens.
+
+    Extracted from ``create_app`` to keep that function under Sonar's
+    cognitive-complexity threshold (python:S3776).
+    """
+
+    def _lookup_static_version(filename: str) -> str:
+        cached = cache.get(filename)
+        if cached is not None:
+            return cached
+        static_path = Path(app.static_folder) / filename
+        try:
+            if static_path.is_file():
+                token = f"{version}-{int(static_path.stat().st_mtime)}"
+            else:
+                token = version
+        except OSError:
+            token = version
+        cache[filename] = token
+        return token
+
+    return _lookup_static_version
+
+
+def _compute_now_showing(device_config):
+    """Build the ``now_showing`` dict consumed by the shell footer.
+
+    Returns ``None`` on any failure so the template's ``{% if now_showing %}``
+    branch falls through cleanly. Extracted from ``create_app`` to reduce its
+    cognitive complexity (python:S3776).
+    """
+    from utils.display_names import instance_suffix_label
+
+    try:
+        info = device_config.get_refresh_info().to_dict()
+    except Exception:
+        return None
+
+    plugin_id = info.get("plugin_id") or ""
+    try:
+        refreshed = _format_sidebar_refresh_time(
+            info.get("refresh_time"), device_config
+        )
+    except Exception:
+        refreshed = None
+
+    if not plugin_id:
+        has_last_display = bool(info.get("refresh_time") or info.get("image_hash"))
+        return {
+            "label": None,
+            "meta": (
+                f"refreshed {refreshed}" if refreshed and has_last_display else "Idle"
+            ),
+            "state": "idle",
+        }
+
+    # Resolve the display name from the plugin registry when possible.
+    display_name = plugin_id
+    try:
+        for plugin in device_config.get_plugins() or []:
+            if plugin.get("id") == plugin_id and plugin.get("display_name"):
+                display_name = plugin["display_name"]
+                break
+    except Exception:
+        pass
+
+    instance = instance_suffix_label(info.get("plugin_instance"), plugin_id)
+    if instance and instance.lower() != plugin_id.lower():
+        label = f"{display_name} · {instance}"
+    else:
+        label = display_name
+
+    meta_parts = []
+    if info.get("playlist"):
+        meta_parts.append(str(info["playlist"]))
+    elif info.get("refresh_type"):
+        meta_parts.append(str(info["refresh_type"]))
+    if refreshed:
+        meta_parts.append(f"refreshed {refreshed}")
+
+    return {
+        "label": label,
+        "meta": " · ".join(meta_parts) if meta_parts else "live",
+        "state": "live",
+    }
+
+
+def _register_context_processors(app) -> None:
+    """Register all Jinja context processors.
+
+    Extracted from ``create_app`` so that function stays under Sonar's
+    cognitive-complexity cap (python:S3776). The nested closures and
+    try/except branches originally lived inline and dominated create_app's
+    score.
+    """
+    # Cache static-file mtime lookups so the per-request context processor
+    # does not hit the filesystem for every static URL it renders.
+    static_mtime_cache: dict[str, str] = {}
+
+    @app.context_processor
+    def _inject_app_version():
+        version = app.config["APP_VERSION"]
+        lookup_static_version = _lookup_static_version_factory(
+            app, version, static_mtime_cache
+        )
+
+        def versioned_url_for(endpoint, **values):
+            if endpoint == "static":
+                filename = values.get("filename")
+                if filename:
+                    values.setdefault("v", lookup_static_version(filename))
+                else:
+                    values.setdefault("v", version)
+            return flask_url_for(endpoint, **values)
+
+        return {"app_version": version, "url_for": versioned_url_for}
+
+    @app.context_processor
+    def _inject_now_showing_label():
+        """Expose sidebar now-playing data derived from refresh_info."""
+        device_config = app.config.get("DEVICE_CONFIG")
+        if device_config is None:
+            return {"now_showing": None}
+        return {"now_showing": _compute_now_showing(device_config)}
+
+    @app.context_processor
+    def _inject_sidebar_system():
+        return {
+            "sidebar_system": {
+                "online_label": "online",
+                "load_label": _format_sidebar_load_average(),
+            }
+        }
+
+
 def create_app():
     """Build and configure the Flask application.
 
@@ -419,123 +555,7 @@ def create_app():
     )
 
     app.config["APP_VERSION"] = _read_version()
-
-    # Cache static-file mtime lookups so the per-request context processor does
-    # not hit the filesystem for every static URL it renders. The templates call
-    # `url_for('static', filename=...)` dozens of times per page; without this
-    # cache, each call triggers a fresh `stat()` syscall. Bust the cache on
-    # process restart (good enough for release-keyed URL versioning).
-    _static_mtime_cache: dict[str, str] = {}
-
-    @app.context_processor
-    def _inject_app_version():
-        version = app.config["APP_VERSION"]
-
-        def _lookup_static_version(filename: str) -> str:
-            cached = _static_mtime_cache.get(filename)
-            if cached is not None:
-                return cached
-            static_path = Path(app.static_folder) / filename
-            try:
-                if static_path.is_file():
-                    token = f"{version}-{int(static_path.stat().st_mtime)}"
-                else:
-                    token = version
-            except OSError:
-                token = version
-            _static_mtime_cache[filename] = token
-            return token
-
-        def versioned_url_for(endpoint, **values):
-            if endpoint == "static":
-                filename = values.get("filename")
-                if filename:
-                    values.setdefault("v", _lookup_static_version(filename))
-                else:
-                    values.setdefault("v", version)
-            return flask_url_for(endpoint, **values)
-
-        return {"app_version": version, "url_for": versioned_url_for}
-
-    @app.context_processor
-    def _inject_now_showing_label():
-        """Expose sidebar now-playing data derived from refresh_info.
-
-        Returns ``now_showing`` as ``{"label": ..., "meta": ..., "state": ...}``
-        so the shell footer stays informative even when the display is idle or
-        the last preview has no resolvable plugin source metadata.
-        """
-        now_showing = None
-        try:
-            device_config = app.config.get("DEVICE_CONFIG")
-            if device_config is None:
-                return {"now_showing": None}
-            info = device_config.get_refresh_info().to_dict()
-            plugin_id = info.get("plugin_id") or ""
-            if not plugin_id:
-                refreshed = _format_sidebar_refresh_time(
-                    info.get("refresh_time"), device_config
-                )
-                has_last_display = bool(
-                    info.get("refresh_time") or info.get("image_hash")
-                )
-                now_showing = {
-                    "label": None,
-                    "meta": (
-                        f"refreshed {refreshed}"
-                        if refreshed and has_last_display
-                        else "Idle"
-                    ),
-                    "state": "idle",
-                }
-                return {"now_showing": now_showing}
-            # Resolve the display name from the plugin registry when possible.
-            display_name = plugin_id
-            try:
-                for plugin in device_config.get_plugins() or []:
-                    if plugin.get("id") == plugin_id and plugin.get("display_name"):
-                        display_name = plugin["display_name"]
-                        break
-            except Exception:
-                pass
-            # Filter out the auto-generated `{plugin_id}_saved_settings` key
-            # — it's an internal filesystem name that must never leak into UI.
-            from utils.display_names import instance_suffix_label
-
-            instance = instance_suffix_label(info.get("plugin_instance"), plugin_id)
-            if instance and instance.lower() != plugin_id.lower():
-                label = f"{display_name} · {instance}"
-            else:
-                label = display_name
-            meta_parts = []
-            if info.get("playlist"):
-                meta_parts.append(str(info["playlist"]))
-            elif info.get("refresh_type"):
-                meta_parts.append(str(info["refresh_type"]))
-
-            refreshed = _format_sidebar_refresh_time(
-                info.get("refresh_time"), device_config
-            )
-            if refreshed:
-                meta_parts.append(f"refreshed {refreshed}")
-
-            now_showing = {
-                "label": label,
-                "meta": " · ".join(meta_parts) if meta_parts else "live",
-                "state": "live",
-            }
-        except Exception:
-            now_showing = None
-        return {"now_showing": now_showing}
-
-    @app.context_processor
-    def _inject_sidebar_system():
-        return {
-            "sidebar_system": {
-                "online_label": "online",
-                "load_label": _format_sidebar_load_average(),
-            }
-        }
+    _register_context_processors(app)
 
     device_config = _init_core_services(app)
 

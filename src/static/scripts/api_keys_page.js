@@ -61,42 +61,138 @@
     if (toggle) toggle.textContent = label;
   }
 
+  // Sub-helpers extracted from setCardConfigured to stay under the
+  // cognitive-complexity threshold (SonarCloud javascript:S3776).
+  function _updateKeyChip(card, configured) {
+    const chip = card.querySelector("[data-role='key-chip']");
+    if (!chip) return;
+    chip.classList.toggle("success", !!configured);
+    chip.classList.toggle("warning", !configured);
+    chip.textContent = configured ? "Configured" : "Not set";
+  }
+
+  function _updateKeyToggle(card, configured) {
+    const toggle = card.querySelector(".api-key-toggle");
+    if (!toggle) return;
+    const visibleLabel = configured ? "Change" : "Add key";
+    // Keep the accessible name in sync with the visible label so
+    // screen-reader users and tooltip consumers don't see stale copy
+    // after a save/delete transition.
+    const actionLabel = configured ? "Change" : "Add";
+    const providerLabel = _labelForCard(card);
+    const accessibleLabel = providerLabel
+      ? `${actionLabel} ${providerLabel} key`
+      : visibleLabel;
+    setToggleLabel(toggle, visibleLabel);
+    if (toggle.hasAttribute("aria-label")) {
+      toggle.setAttribute("aria-label", accessibleLabel);
+    }
+    if (toggle.hasAttribute("title")) {
+      toggle.title = accessibleLabel;
+    }
+    toggle.classList.toggle("is-secondary", !!configured);
+    toggle.setAttribute("aria-expanded", "false");
+  }
+
   // Transition a card's visible chip / toggle button between the configured
   // and "not set" states without reloading the page. Called from the
   // save-success and delete-success paths so users see immediate feedback.
   function setCardConfigured(card, configured) {
     if (!card) return;
     card.dataset.configured = configured ? "true" : "false";
-    const chip = card.querySelector("[data-role='key-chip']");
-    if (chip) {
-      chip.classList.toggle("success", !!configured);
-      chip.classList.toggle("warning", !configured);
-      chip.textContent = configured ? "Configured" : "Not set";
-    }
-    const toggle = card.querySelector(".api-key-toggle");
-    if (toggle) {
-      const visibleLabel = configured ? "Change" : "Add key";
-      // Keep the accessible name in sync with the visible label so
-      // screen-reader users and tooltip consumers don't see stale copy
-      // after a save/delete transition.
-      const actionLabel = configured ? "Change" : "Add";
-      const providerLabel = _labelForCard(card);
-      const accessibleLabel = providerLabel
-        ? `${actionLabel} ${providerLabel} key`
-        : visibleLabel;
-      setToggleLabel(toggle, visibleLabel);
-      if (toggle.hasAttribute("aria-label")) {
-        toggle.setAttribute("aria-label", accessibleLabel);
-      }
-      if (toggle.hasAttribute("title")) {
-        toggle.title = accessibleLabel;
-      }
-      toggle.classList.toggle("is-secondary", !!configured);
-      toggle.setAttribute("aria-expanded", "false");
-    }
+    _updateKeyChip(card, configured);
+    _updateKeyToggle(card, configured);
     // Ensure the input row is collapsed again after a successful save/delete.
     const actions = card.querySelector(".api-key-actions");
     if (actions) actions.setAttribute("hidden", "");
+  }
+
+  // Mapping for managed-key providers. Hoisted above the functions that
+  // consume it so updateConfiguredStatus / updateDeletedStatus can live at
+  // module scope (SonarCloud javascript:S7721 — no closure use required).
+  const MANAGED_KEY_MAPPING = {
+    OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
+    OPEN_WEATHER_MAP_SECRET: [
+      "openweather-status",
+      "openweather-input",
+      "openweather",
+    ],
+    NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
+    UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
+    GITHUB_SECRET: ["github-status", "github-input", "github"],
+    GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
+  };
+
+  function updateConfiguredStatus(updatedKeys) {
+    updatedKeys.forEach((key) => {
+      const entry = MANAGED_KEY_MAPPING[key];
+      if (!entry) return;
+      const [statusId, inputId, sectionId] = entry;
+      const statusElement = document.getElementById(statusId);
+      const inputElement = document.getElementById(inputId);
+      const value = inputElement ? inputElement.value : "";
+      if (statusElement && value) {
+        statusElement.textContent = "";
+        const strong1 = document.createElement("strong");
+        strong1.textContent = "Status:";
+        statusElement.appendChild(strong1);
+        statusElement.appendChild(document.createTextNode(" Configured"));
+        // Clear the input and update its placeholder so subsequent edits
+        // start from empty rather than appending to the prior entry.
+        inputElement.value = "";
+        inputElement.placeholder = "(leave blank to keep current)";
+        addDeleteButton(sectionId, key);
+        setCardConfigured(_cardForSection(sectionId), true);
+      }
+    });
+  }
+
+  function updateDeletedStatus(keyName) {
+    const entry = MANAGED_KEY_MAPPING[keyName];
+    if (!entry) return;
+    const [statusId, inputId, sectionId] = entry;
+    const statusElement = document.getElementById(statusId);
+    const inputElement = document.getElementById(inputId);
+    if (statusElement) {
+      statusElement.textContent = "";
+      const strong3 = document.createElement("strong");
+      strong3.textContent = "Status:";
+      statusElement.appendChild(strong3);
+      statusElement.appendChild(document.createTextNode(" Not configured"));
+    }
+    if (inputElement) {
+      inputElement.value = "";
+      inputElement.placeholder =
+        inputElement.dataset.emptyPlaceholder || "Enter API key";
+    }
+    removeDeleteButton(sectionId);
+    const card = _cardForSection(sectionId);
+    setCardConfigured(card, false);
+    // Also remove the "Configured" mask chip since the key is gone.
+    card?.querySelector(".api-mask")?.remove();
+  }
+
+  // Reveal the hidden .api-key-actions container (which holds the password
+  // input and optional Delete button) for a managed-key card. The card
+  // starts collapsed so the UI is a compact summary row; clicking
+  // "Change" / "Add key" expands it and focuses the input. Hoisted because
+  // it closes over no createApiKeysPage state (SonarCloud javascript:S7721).
+  function revealInput(button) {
+    const inputId = button.dataset.inputId;
+    if (!inputId) return;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const actions = input.closest(".api-key-actions");
+    if (!actions) return;
+    actions.removeAttribute("hidden");
+    button.setAttribute("aria-expanded", "true");
+    try {
+      input.focus();
+    } catch {
+      // focus() can throw if the input became detached between the lookup
+      // above and this call (e.g. concurrent re-render). Swallow rather than
+      // surface a blocking error — the reveal itself already succeeded.
+    }
   }
 
   function createApiKeysPage(config) {
@@ -118,42 +214,6 @@
       _isDirty = false;
       const saveBtn = document.getElementById("saveApiKeysBtn");
       if (saveBtn) saveBtn.disabled = true;
-    }
-
-    function updateConfiguredStatus(updatedKeys) {
-      updatedKeys.forEach((key) => {
-        const mapping = {
-          OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
-          OPEN_WEATHER_MAP_SECRET: [
-            "openweather-status",
-            "openweather-input",
-            "openweather",
-          ],
-          NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
-          UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
-          GITHUB_SECRET: ["github-status", "github-input", "github"],
-          GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
-        };
-        const entry = mapping[key];
-        if (!entry) return;
-        const [statusId, inputId, sectionId] = entry;
-        const statusElement = document.getElementById(statusId);
-        const inputElement = document.getElementById(inputId);
-        const value = inputElement ? inputElement.value : "";
-        if (statusElement && value) {
-          statusElement.textContent = "";
-          const strong1 = document.createElement("strong");
-          strong1.textContent = "Status:";
-          statusElement.appendChild(strong1);
-          statusElement.appendChild(document.createTextNode(" Configured"));
-          // Clear the input and update its placeholder so subsequent edits start from empty
-          // rather than appending to the prior entry.
-          inputElement.value = "";
-          inputElement.placeholder = "(leave blank to keep current)";
-          addDeleteButton(sectionId, key);
-          setCardConfigured(_cardForSection(sectionId), true);
-        }
-      });
     }
 
     // Extracted to keep saveManagedKeys below the cognitive-complexity
@@ -237,43 +297,6 @@
       } catch (e) {
         showResponseModal("failure", "Failed to delete key. Please try again.");
       }
-    }
-
-    function updateDeletedStatus(keyName) {
-      const mapping = {
-        OPEN_AI_SECRET: ["openai-status", "openai-input", "openai"],
-        OPEN_WEATHER_MAP_SECRET: [
-          "openweather-status",
-          "openweather-input",
-          "openweather",
-        ],
-        NASA_SECRET: ["nasa-status", "nasa-input", "nasa"],
-        UNSPLASH_ACCESS_KEY: ["unsplash-status", "unsplash-input", "unsplash"],
-        GITHUB_SECRET: ["github-status", "github-input", "github"],
-        GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
-      };
-      const entry = mapping[keyName];
-      if (!entry) return;
-      const [statusId, inputId, sectionId] = entry;
-      const statusElement = document.getElementById(statusId);
-      const inputElement = document.getElementById(inputId);
-      if (statusElement) {
-        statusElement.textContent = "";
-        const strong3 = document.createElement("strong");
-        strong3.textContent = "Status:";
-        statusElement.appendChild(strong3);
-        statusElement.appendChild(document.createTextNode(" Not configured"));
-      }
-      if (inputElement) {
-        inputElement.value = "";
-        inputElement.placeholder =
-          inputElement.dataset.emptyPlaceholder || "Enter API key";
-      }
-      removeDeleteButton(sectionId);
-      const card = _cardForSection(sectionId);
-      setCardConfigured(card, false);
-      // Also remove the "Configured" mask chip since the key is gone.
-      card?.querySelector(".api-mask")?.remove();
     }
 
     // Keep delete-button + value-input aria-labels in sync with the current
@@ -492,26 +515,6 @@
       input.type = isPassword ? "text" : "password";
       button.textContent = isPassword ? "\u25CF" : "\u25CB";
       button.setAttribute("aria-label", isPassword ? "Hide key" : "Show key");
-    }
-
-    // Reveal the hidden .api-key-actions container (which holds the password
-    // input and optional Delete button) for a managed-key card. The card
-    // starts collapsed so the UI is a compact summary row; clicking
-    // "Change" / "Add key" expands it and focuses the input.
-    function revealInput(button) {
-      const inputId = button.dataset.inputId;
-      if (!inputId) return;
-      const input = document.getElementById(inputId);
-      if (!input) return;
-      const actions = input.closest(".api-key-actions");
-      if (!actions) return;
-      actions.removeAttribute("hidden");
-      button.setAttribute("aria-expanded", "true");
-      try {
-        input.focus();
-      } catch (_) {
-        // focus() can throw if the input became detached; ignore.
-      }
     }
 
     function init() {

@@ -65,7 +65,7 @@
         </svg>
     </button>
 
-    <div id="tweaksPanel" class="tweaks-panel" role="dialog" aria-label="Appearance tweaks" data-open="false">
+    <aside id="tweaksPanel" class="tweaks-panel" aria-label="Appearance tweaks" data-open="false">
         <div class="tweaks-head">
             <h2>Appearance</h2>
             <button type="button" class="tweaks-close" aria-label="Close tweaks panel">
@@ -74,7 +74,7 @@
         </div>
         <div class="tweak-group">
             <div class="tweak-label">Aesthetic</div>
-            <div class="aesthetic-options" role="group" aria-label="Aesthetic">
+            <div class="aesthetic-options" role="toolbar" aria-label="Aesthetic">
                 <button type="button" class="aesthetic-option active" data-aesthetic="console" aria-pressed="true"><span class="aesthetic-swatch aesthetic-swatch-console" aria-hidden="true"></span>Console</button>
                 <button type="button" class="aesthetic-option" data-aesthetic="paper" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-paper" aria-hidden="true"></span>Paper</button>
                 <button type="button" class="aesthetic-option" data-aesthetic="minimal" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-minimal" aria-hidden="true"></span>Minimal</button>
@@ -82,7 +82,7 @@
         </div>
         <div class="tweak-group">
             <div class="tweak-label">Density</div>
-            <div class="density-options" role="group" aria-label="Density">
+            <div class="density-options" role="toolbar" aria-label="Density">
                 <button type="button" class="density-option" data-density="compact" aria-pressed="false">Compact</button>
                 <button type="button" class="density-option active" data-density="balanced" aria-pressed="true">Balanced</button>
                 <button type="button" class="density-option" data-density="cozy" aria-pressed="false">Cozy</button>
@@ -98,6 +98,6 @@
         <div class="tweak-group">
             <button id="tweaksReset" type="button" class="density-option" style="width:100%;">Reset to defaults</button>
         </div>
-    </div>
+    </aside>
 </body>
 </html>
