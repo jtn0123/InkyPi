@@ -436,7 +436,14 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
             headless browser subprocess.
 
     Returns:
-        A ``PIL.Image.Image`` of the rendered page, or ``None`` on failure.
+        A ``PIL.Image.Image`` of the rendered page, or ``None`` on a
+        deterministic failure (missing binary, unrecoverable decode error).
+
+    Raises:
+        ScreenshotBackendError: When the headless-browser fallback exhausts
+            its transient retry. Intentionally re-raised (not swallowed)
+            so the blueprint layer can translate it to HTTP 503
+            ``backend_unavailable`` instead of an ambiguous ``None``.
     """
     image = None
     html_file_path = None
