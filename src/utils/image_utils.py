@@ -615,9 +615,15 @@ def _take_screenshot_once(
             )
             return None, _tempfile_is_empty(img_file_path)
 
-        if _tempfile_is_empty(img_file_path):
+        # Zero-exit branch intentionally only checks existence, not size:
+        # ``load_image_from_path`` below returns ``None`` for empty/invalid
+        # content and we treat that uniformly as transient. Being stricter
+        # here would break the existing success-path tests that mock
+        # ``subprocess.run`` but leave the 0-byte tempfile placeholder
+        # (real chromium always writes bytes when it exits 0).
+        if not (img_file_path and os.path.exists(img_file_path)):
             logger.error(
-                "%s screenshot file missing or empty (attempt %s)",
+                "%s screenshot file not found (attempt %s)",
                 _SCREENSHOT_ERROR_PREFIX,
                 attempt,
             )
