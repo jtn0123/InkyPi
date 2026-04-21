@@ -1947,8 +1947,7 @@ class TestUpdateScript:
             and not line.strip().startswith("#")
         ]
         assert apt_update_lines, (
-            "update.sh must call apt-get update before apt-get install "
-            "(JTN-788)"
+            "update.sh must call apt-get update before apt-get install " "(JTN-788)"
         )
         for line in apt_update_lines:
             assert not line.rstrip().endswith("&"), (
@@ -1959,15 +1958,15 @@ class TestUpdateScript:
         # body so the install sees a freshly-refreshed index.
         update_pos = self.content.index("apt-get update")
         install_pos = self.content.index("apt-get install")
-        assert update_pos < install_pos, (
-            "JTN-788: apt-get update must run before apt-get install"
-        )
+        assert (
+            update_pos < install_pos
+        ), "JTN-788: apt-get update must run before apt-get install"
         # The exit code of apt-get update must be observed/logged so a
         # transient failure is visible in the journal for later debugging,
         # per the issue's "Log the update result" requirement.
-        assert "apt_update_rc" in self.content, (
-            "JTN-788: update.sh must capture apt-get update's exit code"
-        )
+        assert (
+            "apt_update_rc" in self.content
+        ), "JTN-788: update.sh must capture apt-get update's exit code"
 
     def test_update_does_not_abort_on_apt_update_failure(self):
         # JTN-788: A transient apt-get update failure (offline, DNS, mirror
