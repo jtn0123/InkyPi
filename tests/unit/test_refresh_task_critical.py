@@ -40,6 +40,21 @@ class _SpawnableAction:
         return Image.new("RGB", (10, 10), "green")
 
 
+class _LargeImageAction:
+    """Module-scope action that returns an image whose PNG encoding is
+    guaranteed to exceed 64 KB (the Linux default pipe buffer).  Used by
+    the pipe-buffer deadlock regression test.
+
+    Random pixels ensure the PNG barely compresses — 800x480 RGB random
+    data yields a PNG of ~1.1 MB, well past the 64 KB threshold at which
+    the old ``result_queue.put(image_bytes)`` path deadlocked.
+    """
+
+    def execute(self, plugin, cfg, dt):
+        data = os.urandom(800 * 480 * 3)
+        return Image.frombytes("RGB", (800, 480), data)
+
+
 class TestRemoteException:
     def test_known_types(self):
         for name, cls in [
@@ -117,10 +132,12 @@ class TestExecuteRefreshAttemptWorker:
 
         payload = result_queue.get_nowait()
         assert payload["ok"] is True
-        assert "image_bytes" in payload
-        # Verify it's valid PNG bytes
-        img = Image.open(io.BytesIO(payload["image_bytes"]))
+        assert "image_path" in payload
+        # Verify it's a valid PNG at the returned path
+        img = Image.open(payload["image_path"])
         assert img.size == (10, 10)
+        img.close()
+        os.unlink(payload["image_path"])
 
     def test_none_image_puts_error(self, device_config_dev):
         from refresh_task import _execute_refresh_attempt_worker
@@ -235,7 +252,8 @@ class TestExecuteRefreshAttemptWorker:
             assert (
                 payload["ok"] is True
             ), f"Expected ok=True after registry reload; got: {payload}"
-            assert "image_bytes" in payload
+            assert "image_path" in payload
+            os.unlink(payload["image_path"])
             # Registry should now contain clock (populated by load_plugins).
             assert "clock" in plugin_registry.get_registered_plugin_ids()
         finally:
@@ -297,7 +315,106 @@ class TestExecuteRefreshAttemptWorker:
             f"Real spawned child failed to resolve plugin from cold "
             f"registry — JTN-783 regression. payload={payload}"
         )
-        assert "image_bytes" in payload
+        assert "image_path" in payload
+        os.unlink(payload["image_path"])
+
+
+# ---------------------------------------------------------------------------
+# Pipe-buffer deadlock regression
+# ---------------------------------------------------------------------------
+
+
+class TestSubprocessPipeBufferDeadlockRegression:
+    """Guards the Linux pipe-buffer deadlock that made every /update_now
+    time out on real hardware.
+
+    The prior shape of the worker payload was
+    ``{"image_bytes": <PNG bytes>, ...}``.  ``multiprocessing.Queue.put``
+    hands the pickled payload to a background feeder thread which writes
+    it to a pipe with a 65,536-byte buffer.  For any payload over 64 KB
+    (i.e. every real-world plugin PNG), the feeder blocks on the second
+    pipe write until the reader drains the pipe — but the parent is
+    blocked inside ``proc.join()`` waiting for the child to exit, and
+    the child cannot exit until the feeder completes.  Result: every
+    render hit the 60s manual-update timeout.
+
+    The fix (this PR) is to write the PNG to a tempfile in the child and
+    put only the path (< 1 KB) on the queue.  If anyone reverts that and
+    reintroduces a large-payload ``put``, this test hangs until its own
+    short timeout fires — and fails loudly instead of silently.
+    """
+
+    def test_large_image_round_trips_under_deadlock_threshold(
+        self, device_config_dev
+    ):
+        """Real spawned subprocess + 800x480 random-pixel image.
+
+        Must complete well under 10 s.  With the pipe-buffer deadlock
+        regressed, this hangs for the full timeout and then fails on
+        ``not proc.is_alive()``.
+        """
+        from refresh_task import _execute_refresh_attempt_worker
+        from refresh_task.context import RefreshContext
+
+        plugin_config = {"id": "clock", "class": "Clock"}
+        refresh_context = RefreshContext.from_config(device_config_dev)
+
+        ctx = _get_mp_context()
+        result_queue = ctx.Queue(maxsize=1)
+        proc = ctx.Process(
+            target=_execute_refresh_attempt_worker,
+            args=(
+                result_queue,
+                plugin_config,
+                _LargeImageAction(),
+                refresh_context,
+                datetime.now(UTC),
+            ),
+            daemon=True,
+        )
+        proc.start()
+        # 10 s is generous for spawn + plugin-info discovery + one action call
+        # + tempfile write on the tightest CI hardware.  The pre-fix deadlock
+        # path never exits, so any wait long enough to ~exclude~ the deadlock
+        # is fine; 10 s gives a clean signal without slowing the suite.
+        proc.join(timeout=10)
+        try:
+            assert not proc.is_alive(), (
+                "spawned worker did not exit within 10s — pipe-buffer "
+                "deadlock regressed; the child is stuck in queue.feeder "
+                "waiting for the parent to drain a >64 KB payload, but "
+                "the parent is waiting on proc.join()."
+            )
+            payload = result_queue.get(timeout=5)
+        finally:
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=5)
+
+        assert payload["ok"] is True, f"worker reported failure: {payload}"
+        # Payload must carry a path, not bytes — the whole point of the fix.
+        assert "image_path" in payload, (
+            "worker payload must carry 'image_path' (tempfile), not "
+            "'image_bytes' — raw bytes through a multiprocessing.Queue "
+            "deadlock on payloads > 64 KB."
+        )
+        assert "image_bytes" not in payload, (
+            "worker payload must NOT carry 'image_bytes' — that reintroduces "
+            "the pipe-buffer deadlock for any real-size PNG."
+        )
+
+        # Verify the tempfile exists, is a valid large PNG, then clean up.
+        png_path = payload["image_path"]
+        assert os.path.exists(png_path), f"tempfile missing: {png_path}"
+        size_bytes = os.path.getsize(png_path)
+        assert size_bytes > 64 * 1024, (
+            f"test fixture is too small ({size_bytes} bytes) to exercise "
+            "the >64 KB deadlock threshold; expected >65,536 bytes"
+        )
+        img = Image.open(png_path)
+        assert img.size == (800, 480)
+        img.close()
+        os.unlink(png_path)
 
 
 # ---------------------------------------------------------------------------

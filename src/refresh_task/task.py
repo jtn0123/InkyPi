@@ -951,8 +951,20 @@ class RefreshTask:
         if payload.get("ok"):
             from PIL import Image
 
-            with Image.open(io.BytesIO(payload["image_bytes"])) as image:
-                result_image = image.copy()
+            # Worker writes PNG to a tempfile and passes the path via the
+            # queue (see worker.py for the pipe-buffer-deadlock rationale).
+            # Load into memory with image.copy() so we can unlink the
+            # underlying file immediately; the in-memory PIL.Image does
+            # not retain a reference to it.
+            image_path = payload["image_path"]
+            try:
+                with Image.open(image_path) as image:
+                    result_image = image.copy()
+            finally:
+                try:
+                    os.unlink(image_path)
+                except OSError:
+                    pass
             logger.info(
                 "plugin_lifecycle: attempt_success | plugin_id=%s attempt=%s",
                 plugin_id,

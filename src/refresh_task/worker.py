@@ -1,9 +1,9 @@
 """Subprocess worker helpers for plugin execution."""
 
-import io
 import logging
 import multiprocessing
 import sys
+import tempfile
 import traceback
 from collections.abc import Callable, Mapping
 from datetime import datetime
@@ -36,7 +36,7 @@ class LegacyConfigLike(Protocol):
 
 class WorkerSuccessPayload(TypedDict):
     ok: bool
-    image_bytes: bytes
+    image_path: str
     plugin_meta: object
 
 
@@ -168,9 +168,18 @@ def _execute_refresh_attempt_worker(
 
     Intended to be the ``target`` of a ``multiprocessing.Process``.
     Restores the config singleton in the child process, executes the refresh
-    action, serialises the resulting image to PNG bytes, and pushes a result
-    dict onto *result_queue*.  Any exception is caught and pushed as a
-    failure payload so the parent process can reconstruct it.
+    action, writes the resulting image to a tempfile, and pushes a result
+    dict carrying the **path** (not the bytes) onto *result_queue*.  Any
+    exception is caught and pushed as a failure payload so the parent
+    process can reconstruct it.
+
+    Why a tempfile instead of raw bytes on the queue: ``Queue.put`` hands
+    large payloads to a background feeder thread whose write to the pipe
+    blocks at ~64 KB (Linux default pipe buffer).  The parent is usually
+    waiting in ``proc.join()``, which cannot return until the child exits,
+    which cannot happen until the feeder drains the pipe, which the parent
+    only reads after ``proc.join()`` returns — classic deadlock.  A path
+    round-trip keeps the queue payload under 1 KB and avoids the deadlock.
 
     Args:
         result_queue: A ``multiprocessing.Queue`` used to return exactly one
@@ -206,12 +215,27 @@ def _execute_refresh_attempt_worker(
             plugin_meta = metadata_getter()
         if image is None:
             raise RuntimeError("Plugin returned None image")
-        image_bytes = io.BytesIO()
-        image.save(image_bytes, format="PNG")
+        # Write PNG to a tempfile and hand off the path via the queue instead
+        # of the raw bytes.  multiprocessing.Queue.put spawns a feeder thread
+        # that writes the pickled payload to a pipe whose default buffer is
+        # 65,536 bytes on Linux.  Any payload bigger than that blocks the
+        # feeder on the second write until the reader drains the pipe — but
+        # the parent is inside ``proc.join()`` waiting for the child to exit,
+        # and the child can't exit until the feeder finishes.  Classic
+        # deadlock.  Every real plugin's PNG is larger than 64 KB (e.g.
+        # clock at 800x480 is ~89 KB), so this manifested on every single
+        # render.  Passing a filesystem path keeps the queue payload < 1 KB
+        # and sidesteps the pipe buffer entirely.  Parent deletes the file
+        # after reading in task.py::_handle_process_result.
+        with tempfile.NamedTemporaryFile(
+            suffix=".png", prefix="inkypi_render_", delete=False
+        ) as png_file:
+            image.save(png_file, format="PNG")
+            image_path = png_file.name
         result_queue.put(
             {
                 "ok": True,
-                "image_bytes": image_bytes.getvalue(),
+                "image_path": image_path,
                 "plugin_meta": plugin_meta,
             }
         )

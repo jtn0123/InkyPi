@@ -202,18 +202,17 @@ def test_cleanup_subprocess_escalates_to_kill(monkeypatch):
     assert proc._kill_count >= 1
 
 
-def test_handle_process_result_success():
-    import io
+def test_handle_process_result_success(tmp_path):
     import queue
 
     from refresh_task import RefreshTask
 
     img = Image.new("RGB", (100, 100), "red")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    png_path = tmp_path / "rendered.png"
+    img.save(png_path, format="PNG")
 
     q = queue.Queue()
-    q.put({"ok": True, "image_bytes": buf.getvalue(), "plugin_meta": {"key": "val"}})
+    q.put({"ok": True, "image_path": str(png_path), "plugin_meta": {"key": "val"}})
 
     class FakeProc:
         exitcode = 0
@@ -221,6 +220,8 @@ def test_handle_process_result_success():
     result_img, meta = RefreshTask._handle_process_result(q, FakeProc(), "test", 1)
     assert result_img is not None
     assert meta == {"key": "val"}
+    # _handle_process_result must unlink the tempfile after reading.
+    assert not png_path.exists(), "handler should delete the tempfile after read"
 
 
 def test_handle_process_result_error():
