@@ -6,7 +6,7 @@ Null values should display as an em-dash, not the literal string 'null'.
 
 from pathlib import Path
 
-JS_PATH = Path("src/static/scripts/settings_page.js")
+JS_PATH = Path("src/static/scripts/settings/diagnostics.js")
 
 
 def _read_js():

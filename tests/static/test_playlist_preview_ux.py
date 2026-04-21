@@ -6,7 +6,7 @@ from pathlib import Path
 
 def test_playlist_modal_defaults_to_non_overlapping_range():
     """openCreateModal should default to 09:00-17:00, not 00:00-24:00."""
-    js = Path("src/static/scripts/playlist.js").read_text()
+    js = Path("src/static/scripts/playlist/modals.js").read_text()
     # Find openCreateModal function body
     match = re.search(
         r"function\s+openCreateModal\s*\([^)]*\)\s*\{(.*?)\n\s*\}", js, re.DOTALL

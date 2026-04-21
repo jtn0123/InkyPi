@@ -30,6 +30,48 @@ def test_create_update_delete_playlist_flow(client):
     assert resp.status_code == 200
 
 
+def test_delete_default_playlist_is_refused(client, device_config_dev):
+    """JTN-781: DELETE /delete_playlist/Default must return 400 and keep the playlist."""
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Default"):
+        pm.add_playlist("Default", "00:00", "24:00")
+    device_config_dev.write_config()
+
+    resp = client.delete("/delete_playlist/Default")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["success"] is False
+    assert body["code"] == "validation_error"
+    assert "default" in body["error"].lower()
+    # Default must still exist after the rejected delete
+    assert pm.get_playlist("Default") is not None
+
+
+def test_delete_non_default_playlist_still_succeeds(client, device_config_dev):
+    """JTN-781: guard must not regress deletion of regular user-created playlists."""
+    pm = device_config_dev.get_playlist_manager()
+    pm.add_playlist("Evening", "18:00", "22:00")
+    device_config_dev.write_config()
+
+    resp = client.delete("/delete_playlist/Evening")
+    assert resp.status_code == 200
+    assert pm.get_playlist("Evening") is None
+
+
+def test_delete_lowercase_default_playlist_is_allowed(client, device_config_dev):
+    """JTN-781: the guard is case-sensitive — 'default' (lowercase) is a
+    user-created playlist and remains deletable. Matches how create/update
+    elsewhere key off the exact string 'Default'."""
+    pm = device_config_dev.get_playlist_manager()
+    # Create a lowercase 'default' that is distinct from the canonical one.
+    pm.add_playlist("default", "09:00", "10:00")
+    device_config_dev.write_config()
+
+    resp = client.delete("/delete_playlist/default")
+    assert resp.status_code == 200
+    assert pm.get_playlist("default") is None
+
+
 def test_add_plugin_to_playlist_validation(client):
     # Missing fields
     resp = client.post("/add_plugin", data={})

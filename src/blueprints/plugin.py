@@ -18,17 +18,24 @@ from flask import (
 from plugins.plugin_registry import get_plugin_instance
 from refresh_task import ManualRefresh, PlaylistRefresh
 from refresh_task.job_queue import get_job_queue
+from services.plugin_workflows import save_plugin_settings_workflow
 from utils.app_utils import handle_request_files, parse_form, resolve_path
+from utils.backend_errors import (
+    ClientInputError,
+    ResourceLookupError,
+    UnsupportedMediaTypeRouteError,
+    route_error_boundary,
+)
 from utils.fallback_image import render_error_image
 from utils.form_utils import (
     sanitize_log_field,
     validate_plugin_required_fields,
 )
-from utils.http_utils import APIError, json_error, json_success
+from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
-from utils.security_utils import validate_file_path
+from utils.security_utils import URLValidationError, validate_file_path
 
 logger = logging.getLogger(__name__)
 plugin_bp = Blueprint("plugin", __name__)
@@ -76,7 +83,11 @@ def plugin_page(plugin_id: str):
     if not plugin_config:
         abort(404)
 
-    try:
+    with route_error_boundary(
+        "render plugin page",
+        logger=logger,
+        hint="Check plugin configuration and template generation.",
+    ):
         plugin = get_plugin_instance(plugin_config)
         template_params = plugin.generate_settings_template()
 
@@ -99,7 +110,7 @@ def plugin_page(plugin_id: str):
                     sanitize_log_field(plugin_id),
                     sanitize_log_field(plugin_instance_name),
                 )
-                return json_error(
+                raise ResourceLookupError(
                     _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                     status=404,
                 )
@@ -125,10 +136,6 @@ def plugin_page(plugin_id: str):
         )
         if plugin_latest_refresh:
             template_params["plugin_latest_refresh"] = plugin_latest_refresh
-
-    except Exception as e:  # pragma: no cover - safety net
-        logger.exception("EXCEPTION CAUGHT: %s", e)
-        return json_error(_ERR_INTERNAL, status=500)
 
     return render_template(
         "plugin.html",
@@ -318,7 +325,7 @@ def delete_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return json_error("Unsupported media type", status=415)
+        raise UnsupportedMediaTypeRouteError
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
@@ -330,13 +337,17 @@ def delete_plugin_instance():
         or not isinstance(playlist_name, str)
         or not playlist_name.strip()
     ):
-        return json_error(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
+        raise ClientInputError(PLAYLIST_NAME_REQUIRED_ERROR, status=400)
     playlist_name = playlist_name.strip()
 
-    try:
+    with route_error_boundary(
+        "delete plugin instance",
+        logger=logger,
+        hint="Ensure the playlist and plugin instance exist before deleting.",
+    ):
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
-            return json_error("Playlist not found", status=400)
+            raise ResourceLookupError("Playlist not found", status=400)
 
         existing = playlist.find_plugin(plugin_id, plugin_instance)
         plugin_settings = dict(existing.settings) if existing else {}
@@ -348,13 +359,10 @@ def delete_plugin_instance():
 
         device_config.update_atomic(_do_delete)
         if not del_result or not del_result[0]:
-            return json_error("Plugin instance not found", status=400)
+            raise ResourceLookupError("Plugin instance not found", status=400)
         _cleanup_plugin_resources(
             device_config, plugin_id, plugin_instance, plugin_settings
         )
-    except Exception as e:
-        logger.exception("EXCEPTION CAUGHT: %s", e)
-        return json_error(_ERR_INTERNAL, status=500)
 
     return json_success(message="Deleted plugin instance.")
 
@@ -364,25 +372,29 @@ def update_plugin_instance(instance_name: str):
     device_config = current_app.config[_CONFIG_KEY]
     playlist_manager = device_config.get_playlist_manager()
 
-    try:
+    with route_error_boundary(
+        "update plugin instance",
+        logger=logger,
+        hint="Check submitted plugin settings and config persistence.",
+    ):
         form_data = parse_form(request.form)
         if not instance_name:
-            raise APIError(
+            raise ClientInputError(
                 "Instance name is required",
                 status=422,
                 code="validation_error",
-                details={"field": "instance_name"},
+                field="instance_name",
             )
         plugin_settings = form_data
         plugin_settings.update(handle_request_files(request.files, request.form))
 
         plugin_id = plugin_settings.pop(_PLUGIN_ID, None)
         if not plugin_id:
-            raise APIError(
+            raise ClientInputError(
                 _ERR_PLUGIN_ID_REQUIRED,
                 status=422,
                 code="validation_error",
-                details={"field": _PLUGIN_ID},
+                field=_PLUGIN_ID,
             )
         plugin_instance = playlist_manager.find_plugin(plugin_id, instance_name)
         if not plugin_instance:
@@ -391,7 +403,7 @@ def update_plugin_instance(instance_name: str):
                 sanitize_log_field(plugin_id),
                 sanitize_log_field(instance_name),
             )
-            return json_error(
+            raise ResourceLookupError(
                 _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                 status=404,
             )
@@ -406,19 +418,19 @@ def update_plugin_instance(instance_name: str):
         if raw_refresh is not None:
             try:
                 refresh_payload = json.loads(raw_refresh)
-            except (TypeError, ValueError):
-                return json_error(
+            except (TypeError, ValueError) as exc:
+                raise ClientInputError(
                     "Refresh settings must be valid JSON",
                     status=400,
                     code="validation_error",
-                    details={"field": "refresh_settings"},
-                )
+                    field="refresh_settings",
+                ) from exc
             if not isinstance(refresh_payload, dict):
-                return json_error(
+                raise ClientInputError(
                     "Refresh settings must be an object",
                     status=400,
                     code="validation_error",
-                    details={"field": "refresh_settings"},
+                    field="refresh_settings",
                 )
             from blueprints.playlist import validate_plugin_refresh_settings
 
@@ -445,29 +457,31 @@ def update_plugin_instance(instance_name: str):
                     validation_error = validate_plugin_required_fields(
                         plugin, plugin_settings
                     )
-                    if validation_error:
-                        return json_error(validation_error, status=400)
                 except Exception:
                     logger.warning(
                         "Required-field validation failed for %s",
                         sanitize_log_field(plugin_id),
                         exc_info=True,
                     )
+                else:
+                    if validation_error:
+                        raise ClientInputError(validation_error, status=400)
 
                 try:
                     settings_error = plugin.validate_settings(plugin_settings)
-                    if settings_error:
-                        return json_error(settings_error, status=400)
-                except Exception:
+                except Exception as exc:
                     logger.warning(
                         "Plugin validate_settings raised for %s",
                         sanitize_log_field(plugin_id),
                         exc_info=True,
                     )
-                    return json_error(
+                    raise ClientInputError(
                         "Settings validation failed. Please check your input.",
                         status=400,
-                    )
+                    ) from exc
+                else:
+                    if settings_error:
+                        raise ClientInputError(settings_error, status=400)
 
         before_settings = dict(plugin_instance.settings or {})
 
@@ -481,10 +495,6 @@ def update_plugin_instance(instance_name: str):
         _record_plugin_change(
             config_dir, instance_name, before_settings, plugin_settings
         )
-    except APIError as e:
-        return json_error(e.message, status=e.status, code=e.code, details=e.details)
-    except Exception:
-        return json_error(_ERR_INTERNAL, status=500)
 
     return json_success(message=f"Updated plugin instance {instance_name}.")
 
@@ -496,21 +506,25 @@ def display_plugin_instance():
     playlist_manager = device_config.get_playlist_manager()
 
     if not request.is_json:
-        return json_error("Unsupported media type", status=415)
+        raise UnsupportedMediaTypeRouteError
     data = request.json or {}
 
     playlist_name = data.get("playlist_name")
     plugin_id = data.get(_PLUGIN_ID)
     plugin_instance_name = data.get("plugin_instance")
 
-    try:
+    with route_error_boundary(
+        "display plugin instance",
+        logger=logger,
+        hint="Ensure the playlist exists and the refresh task can run the instance.",
+    ):
         playlist = playlist_manager.get_playlist(playlist_name)
         if not playlist:
             logger.warning(
                 "display_plugin_instance: playlist not found name=%s",
                 sanitize_log_field(playlist_name),
             )
-            return json_error(_ERR_PLAYLIST_NOT_FOUND, status=400)
+            raise ResourceLookupError(_ERR_PLAYLIST_NOT_FOUND, status=400)
 
         plugin_instance = playlist.find_plugin(plugin_id, plugin_instance_name)
         if not plugin_instance:
@@ -521,7 +535,7 @@ def display_plugin_instance():
                 sanitize_log_field(plugin_id),
                 sanitize_log_field(plugin_instance_name),
             )
-            return json_error(
+            raise ResourceLookupError(
                 _ERR_PLUGIN_INSTANCE_NOT_FOUND,
                 status=400,
             )
@@ -529,8 +543,6 @@ def display_plugin_instance():
         refresh_task.manual_update(
             PlaylistRefresh(playlist, plugin_instance, force=True)
         )
-    except Exception:
-        return json_error(_ERR_INTERNAL, status=500)
 
     return json_success(message=_MSG_DISPLAY_UPDATED)
 
@@ -609,6 +621,27 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
         _t_gen_start = perf_counter()
         try:
             image = plugin.generate_image(plugin_settings, device_config)
+        except URLValidationError as e:
+            # JTN-776: URL validation failures are user errors, not server
+            # errors. ``safe_message()`` returns a response string looked up
+            # from the module-level whitelist in :mod:`utils.security_utils`,
+            # which avoids any exception-derived text flowing to the client
+            # (CodeQL ``py/stack-trace-exposure``).
+            safe_msg = e.safe_message()
+            logger.info(
+                "Plugin %s rejected URL: %s",
+                sanitize_log_field(plugin_id),
+                sanitize_log_field(safe_msg),
+            )
+            _push_update_now_fallback(
+                plugin_id, plugin_config, device_config, display_manager, e
+            )
+            return json_error(
+                safe_msg,
+                status=422,
+                code="validation_error",
+                details={"field": "url"},
+            )
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
             # failure (bad config, upstream API returned empty, etc.).  Do not
@@ -811,6 +844,7 @@ def update_now():
     refresh_task = current_app.config["REFRESH_TASK"]
     display_manager = current_app.config["DISPLAY_MANAGER"]
 
+    plugin_id: str | None = None
     try:
         plugin_settings = parse_form(request.form)
         plugin_settings.update(handle_request_files(request.files))
@@ -842,6 +876,25 @@ def update_now():
         logger.info("Refresh task not running, updating display directly")
         return _update_now_direct(
             plugin_id, plugin_settings, device_config, display_manager
+        )
+    except URLValidationError as e:
+        # JTN-776: URL validation failures surfaced through the refresh-task
+        # path (manual_update re-raises the plugin's exception) must become
+        # HTTP 4xx, not 500, so the user sees the real reason. ``safe_message``
+        # returns a whitelisted string from :mod:`utils.security_utils`, so no
+        # exception-derived text reaches the response body (CodeQL
+        # ``py/stack-trace-exposure``).
+        safe_msg = e.safe_message()
+        logger.info(
+            "update_now: URL validation rejected plugin %s: %s",
+            sanitize_log_field(plugin_id or "?"),
+            sanitize_log_field(safe_msg),
+        )
+        return json_error(
+            safe_msg,
+            status=422,
+            code="validation_error",
+            details={"field": "url"},
         )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)
@@ -952,92 +1005,36 @@ def _save_plugin_settings_common(
     plugin_id, plugin_settings, device_config, playlist_manager
 ):
     htmx = _is_htmx_request()
-    plugin_config = device_config.get_plugin(plugin_id)
-    if not plugin_config:
-        logger.warning(
-            "_save_plugin_settings_common: plugin not found plugin_id=%s",
-            sanitize_log_field(plugin_id),
-        )
-        if htmx:
-            return _render_plugin_form_error(_ERR_PLUGIN_NOT_FOUND, status=404)
-        return json_error(_ERR_PLUGIN_NOT_FOUND, status=404)
-
-    # Validate required fields and plugin-specific settings
-    try:
-        plugin = get_plugin_instance(plugin_config)
-    except Exception:
-        logger.warning(
-            "Could not load plugin instance for validation: %s",
-            sanitize_log_field(plugin_id),
-        )
-        plugin = None
-
-    if plugin is not None:
-        try:
-            validation_error = validate_plugin_required_fields(plugin, plugin_settings)
-            if validation_error:
-                if htmx:
-                    return _render_plugin_form_error(validation_error, status=400)
-                return json_error(validation_error, status=400)
-        except Exception:
-            logger.warning(
-                "Required-field validation failed for %s",
+    result = save_plugin_settings_workflow(
+        plugin_id,
+        plugin_settings,
+        device_config,
+        playlist_manager,
+    )
+    if not result.ok:
+        error = result.error
+        if error is None:
+            logger.error(
+                "_save_plugin_settings_common: workflow failed without error plugin_id=%s",
                 sanitize_log_field(plugin_id),
-                exc_info=True,
             )
-
-        try:
-            settings_error = plugin.validate_settings(plugin_settings)
-            if settings_error:
-                if htmx:
-                    return _render_plugin_form_error(settings_error, status=400)
-                return json_error(settings_error, status=400)
-        except Exception:
-            logger.warning(
-                "Plugin validate_settings raised for %s",
-                sanitize_log_field(plugin_id),
-                exc_info=True,
-            )
-            error_msg = "Settings validation failed. Please check your input."
             if htmx:
-                return _render_plugin_form_error(error_msg, status=400)
-            return json_error(error_msg, status=400)
-
-    default_playlist_name = "Default"
-    playlist = playlist_manager.get_playlist(default_playlist_name)
-    if not playlist:
-        playlist_manager.add_playlist(default_playlist_name)
-        playlist = playlist_manager.get_playlist(default_playlist_name)
-
-    instance_name = f"{plugin_id}_saved_settings"
-    before_settings: dict = {}
-
-    def _do_save_settings(cfg):
-        nonlocal before_settings
-        inst = playlist.find_plugin(plugin_id, instance_name)
-        if inst:
-            before_settings = dict(inst.settings or {})
-            inst.settings = plugin_settings
-        else:
-            playlist.add_plugin(
-                {
-                    _PLUGIN_ID: plugin_id,
-                    "refresh": {"interval": 3600},
-                    "plugin_settings": plugin_settings,
-                    "name": instance_name,
-                }
+                return _render_plugin_form_error(_ERR_INTERNAL, status=500)
+            return json_error(_ERR_INTERNAL, status=500, code="internal_error")
+        if htmx:
+            return _render_plugin_form_error(
+                error.message,
+                status=error.status,
+                field=error.field,
             )
-        cfg["playlist_config"] = playlist_manager.to_dict()
+        return json_error(error.message, **error.as_json_kwargs())
 
-    device_config.update_atomic(_do_save_settings)
-    config_dir = os.path.dirname(device_config.config_file)
-    _record_plugin_change(config_dir, instance_name, before_settings, plugin_settings)
-    success_message = "Settings saved. Add to Playlist to schedule this instance."
+    success_message = result.message
     if htmx:
         return _render_plugin_form_success(success_message)
     return json_success(
         message=success_message,
-        instance_name=instance_name,
+        instance_name=result.instance_name,
     )
 
 

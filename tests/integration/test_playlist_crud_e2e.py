@@ -95,6 +95,15 @@ def test_edit_playlist_opens_modal_mobile(
 
 def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp_path):
     prepare_playlist(device_config_dev)
+    # JTN-781: the server refuses to delete the canonical "Default" playlist,
+    # so seed a second, deletable playlist to exercise the modal flow. Without
+    # this, the DELETE request returns 400 and surfaces a console error that
+    # fails `rc.assert_no_errors`.
+    pm = device_config_dev.get_playlist_manager()
+    if not pm.get_playlist("Deletable"):
+        pm.add_playlist("Deletable", "00:00", "24:00")
+    device_config_dev.write_config()
+
     page = browser_page
     rc = navigate_and_wait(page, live_server, "/playlist")
 
@@ -112,8 +121,8 @@ def test_delete_playlist_modal(live_server, device_config_dev, browser_page, tmp
         window.location.reload = function() {};
     }""")
 
-    # Click delete button on a playlist
-    delete_btn = page.locator(".delete-playlist-btn").first
+    # Target the non-Default playlist card so the DELETE is actually permitted.
+    delete_btn = page.locator('[data-playlist-name="Deletable"] .delete-playlist-btn')
     delete_btn.wait_for(state="visible", timeout=5000)
     delete_btn.click()
     page.wait_for_timeout(500)

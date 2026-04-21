@@ -3,8 +3,20 @@
 {% block body_attrs %} data-page="settings"{% endblock %}
 {% block head %}
     <meta name="status-badge-disabled" content="1">
-    <script src="{{ url_for('static', filename='scripts/ui_helpers.js') }}"></script>
-    <script src="{{ url_for('static', filename='scripts/settings_page.js') }}"></script>
+    {% set settings_scripts = [
+        'scripts/ui_helpers.js',
+        'scripts/settings/shared.js',
+        'scripts/settings/form.js',
+        'scripts/settings/modals.js',
+        'scripts/settings/logs.js',
+        'scripts/settings/diagnostics.js',
+        'scripts/settings/navigation.js',
+        'scripts/settings/actions.js',
+        'scripts/settings_page.js',
+    ] %}
+    {% for script_path in settings_scripts %}
+    <script defer src="{{ url_for('static', filename=script_path) }}"></script>
+    {% endfor %}
 {% endblock %}
 {% block body %}
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management page-shell-settings" data-page-shell="management">

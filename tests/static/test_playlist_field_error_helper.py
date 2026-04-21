@@ -1,4 +1,4 @@
-"""JTN-658: playlist.js reads ``details.field`` from server validation errors
+"""JTN-658: playlist/form.js reads ``details.field`` from server validation errors
 and highlights the offending input via FormState.
 
 The helper ``applyFieldErrorFromResponse`` is a shared shim used by the
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 
 def test_playlist_script_exposes_field_error_helper(client):
-    resp = client.get("/static/scripts/playlist.js")
+    resp = client.get("/static/scripts/playlist/form.js")
     assert resp.status_code == 200
     js = resp.get_data(as_text=True)
 

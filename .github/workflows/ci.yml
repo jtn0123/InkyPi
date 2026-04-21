@@ -560,6 +560,22 @@ jobs:
         run: |
           scripts/preflash_validate.sh
 
+  # Mutation nightly — runs daily at 09:00 UTC and weekly on Sunday 03:00 UTC
+  # via the workflow-level ``schedule:`` trigger. See docs/mutation_testing.md.
+  #
+  # JTN-595 (2026-04-19) finding: every nightly run since the JTN-508 scope
+  # expansion has hit the 120-minute timeout without finishing, producing no
+  # ``mutmut-cache`` artifact. Two bugs compound the problem:
+  #   1. Full-scope mutmut on src/app_setup/+blueprints/+utils/+refresh_task/
+  #      does not complete inside 120 minutes on ubuntu-latest.
+  #   2. The previous upload step did not set ``include-hidden-files: true``,
+  #      so even a successful run would have silently dropped the hidden
+  #      ``.mutmut-cache`` directory (actions/upload-artifact@v4 excludes
+  #      hidden paths by default).
+  # The hidden-files flag below is the minimum fix so a successful run can
+  # publish an artifact. Sharding the mutmut scope across a matrix of
+  # directories (or tightening the runner) is tracked for follow-up —
+  # otherwise the nightly will keep producing no actionable signal.
   mutation-nightly:
     name: Mutation nightly
     if: github.event_name == 'schedule'
@@ -604,6 +620,10 @@ jobs:
           name: mutmut-cache
           path: .mutmut-cache
           if-no-files-found: ignore
+          # ``.mutmut-cache`` is a hidden directory; without this flag
+          # actions/upload-artifact@v4 silently excludes it and the
+          # artifact is never published, even on successful runs.
+          include-hidden-files: true
 
   browser-smoke:
     name: Browser smoke (tabs + plugins)
@@ -677,85 +697,10 @@ jobs:
           if-no-files-found: ignore
 
   install-matrix:
-    # JTN-530: end-to-end install.sh matrix against every supported Pi OS base.
-    # JTN-528 silently broke Trixie installs for an entire release cycle
-    # because no CI job ran install.sh against each OS. This job guarantees
-    # that never happens again: every PR runs the real install.sh inside an
-    # arm64 Debian container (with the Pi OS apt repo layered on for
-    # liblgpio-dev / chromium-headless-shell) for each codename and asserts
-    # exit 0 + venv + systemd unit parse.
-    #
-    # The Dockerfile is scripts/Dockerfile.install-matrix; the verification
-    # script that runs inside the container is scripts/ci_install_matrix_verify.sh.
-    # Memory is capped at 512 MB to inherit the JTN-536 OOM regression gate so
-    # this job also catches codename-specific OOMs during install.
-    #
-    # JTN-615: bullseye (Debian 11) ships Python 3.9.2 but InkyPi's
-    # requirements.txt pins packages that require Python>=3.10 (anyio==4.13.0
-    # is the first to bomb the uv resolver; others follow). The project also
-    # declares `target-version = "py311"` in pyproject.toml's ruff + black
-    # config, so bullseye has never been a real install target — the matrix
-    # only appeared to cover it historically because install.sh silently
-    # swallowed uv/pip failures (see JTN-615 root cause analysis). Dropping
-    # bullseye here reflects reality; the standalone Install matrix (arm64 e2e)
-    # workflow still runs bullseye via test_install_memcap.sh, which uses a
-    # python:3.12-slim base image and therefore isn't blocked by Debian 11's
-    # interpreter version.
-    name: Install matrix (${{ matrix.codename }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        codename: [bookworm, trixie]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU (arm64 emulation)
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build install-matrix image (${{ matrix.codename }})
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: scripts/Dockerfile.install-matrix
-          platforms: linux/arm64
-          build-args: |
-            CODENAME=${{ matrix.codename }}
-          tags: inkypi-install-matrix:${{ matrix.codename }}
-          load: true
-          cache-from: type=gha,scope=install-matrix-${{ matrix.codename }}
-          cache-to: type=gha,mode=max,scope=install-matrix-${{ matrix.codename }}
-
-      - name: Run install.sh + verification (${{ matrix.codename }}, 512 MB cap)
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/install-matrix-logs
-          # JTN-536 parity: cap container memory at 512 MB to mimic the Pi
-          # Zero 2 W. Exit 137 = OOM kill = regression.
-          docker run \
-            --rm \
-            --platform linux/arm64 \
-            --memory=512m \
-            --memory-swap=512m \
-            --entrypoint bash \
-            inkypi-install-matrix:${{ matrix.codename }} \
-            /InkyPi/scripts/ci_install_matrix_verify.sh \
-            2>&1 | tee "/tmp/install-matrix-logs/${{ matrix.codename }}.log"
-
-      - name: Upload container logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: install-matrix-logs-${{ matrix.codename }}
-          path: /tmp/install-matrix-logs
-          if-no-files-found: ignore
+    # Keep the required install matrix in a reusable workflow so ci.yml and any
+    # manual reruns share one implementation instead of drifting apart.
+    name: Install matrix
+    uses: ./.github/workflows/install-matrix.yml
 
   install-smoke-memcap:
     name: Install smoke (512 MB memory cap)

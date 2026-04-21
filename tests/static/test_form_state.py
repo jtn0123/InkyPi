@@ -88,7 +88,7 @@ def test_playlist_schedule_form_has_data_form_state(client):
 
 
 def test_settings_page_script_invokes_form_state(client):
-    js = client.get("/static/scripts/settings_page.js").get_data(as_text=True)
+    js = client.get("/static/scripts/settings/form.js").get_data(as_text=True)
     # handleAction must route through FormState so the submit button is
     # disabled and aria-busy set for the duration of the save request.
     assert "FormState.attach" in js
@@ -98,9 +98,20 @@ def test_settings_page_script_invokes_form_state(client):
 
 
 def test_playlist_script_invokes_form_state(client):
-    js = client.get("/static/scripts/playlist.js").get_data(as_text=True)
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
     # Both create and update flows must wrap submission in FormState.run.
     assert "FormState.attach" in js
     assert "fs.run(submit)" in js
     # Inline error handling for server-side field errors.
     assert "field_errors" in js
+
+
+def test_playlist_create_includes_cycle_minutes(client):
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
+    assert "cycle_minutes: cycleMinutes || null" in js
+
+
+def test_playlist_device_cycle_rejects_partial_numeric_values(client):
+    js = client.get("/static/scripts/playlist/form.js").get_data(as_text=True)
+    assert 'const raw = (input?.value || "").trim();' in js
+    assert "!/^\\d+$/.test(raw)" in js

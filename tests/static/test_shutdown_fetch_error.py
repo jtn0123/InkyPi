@@ -11,7 +11,7 @@ from pathlib import Path
 def test_handle_shutdown_fetch_wrapped_in_try_catch():
     """handleShutdown must catch network errors from fetch so the device
     going offline doesn't show an error after the success modal."""
-    js = Path("src/static/scripts/settings_page.js").read_text()
+    js = Path("src/static/scripts/settings/actions.js").read_text()
 
     # Locate the handleShutdown function
     assert "async function handleShutdown" in js, "handleShutdown function not found"

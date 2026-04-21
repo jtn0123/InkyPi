@@ -5,6 +5,29 @@ import os
 import socket
 import urllib.parse
 
+# URLValidationError — and the whitelist of hardcoded validator messages —
+# live in ``utils.plugin_errors`` so the subprocess worker and cross-process
+# tests can reference the exception type without importing ``security_utils``
+# (SonarCloud architecture rule S7788; JTN-776 PR #563). The class is
+# re-exported here for backward compatibility with the blueprint and plugin
+# call sites that also use the validator functions.
+from utils.plugin_errors import (
+    URL_ERR_EMPTY as _URL_ERR_EMPTY,
+    URL_ERR_LOCALHOST as _URL_ERR_LOCALHOST,
+    URL_ERR_NO_HOST as _URL_ERR_NO_HOST,
+    URL_ERR_PRIVATE as _URL_ERR_PRIVATE,
+    URL_ERR_SCHEME as _URL_ERR_SCHEME,
+    URL_ERR_UNRESOLVABLE as _URL_ERR_UNRESOLVABLE,
+    URLValidationError,
+)
+
+__all__ = [
+    "URLValidationError",
+    "validate_url",
+    "validate_url_with_ips",
+    "validate_file_path",
+]
+
 
 def validate_url(url: str) -> str:
     """Validate that a URL uses an allowed scheme and does not resolve to a private IP.
@@ -46,19 +69,19 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
         or resolves to a private/reserved IP address.
     """
     if not url:
-        raise ValueError("URL must not be empty")
+        raise ValueError(_URL_ERR_EMPTY)
 
     parsed = urllib.parse.urlparse(url)
 
     if parsed.scheme not in {"http", "https"}:
-        raise ValueError("URL scheme must be http or https")
+        raise ValueError(_URL_ERR_SCHEME)
 
     hostname = parsed.hostname
     if not hostname:
-        raise ValueError("URL must include a hostname")
+        raise ValueError(_URL_ERR_NO_HOST)
 
     if hostname.lower() == "localhost":
-        raise ValueError("URL must not target localhost")
+        raise ValueError(_URL_ERR_LOCALHOST)
 
     # Reject bare IP addresses that are private/loopback/etc. before DNS
     try:
@@ -74,7 +97,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
     try:
         addr_infos = socket.getaddrinfo(hostname, None)
     except socket.gaierror as exc:
-        raise ValueError("Cannot resolve hostname") from exc
+        raise ValueError(_URL_ERR_UNRESOLVABLE) from exc
 
     resolved: list[str] = []
     for info in addr_infos:
@@ -85,7 +108,7 @@ def validate_url_with_ips(url: str) -> tuple[str, tuple[str, ...]]:
             resolved.append(ip_str)
 
     if not resolved:
-        raise ValueError("Cannot resolve hostname")
+        raise ValueError(_URL_ERR_UNRESOLVABLE)
 
     return url, tuple(resolved)
 
@@ -101,9 +124,7 @@ def _reject_private_ip(
         or addr.is_reserved
         or addr.is_multicast
     ):
-        raise ValueError(
-            "URL must not resolve to a private, loopback, link-local, reserved, or multicast address"
-        )
+        raise ValueError(_URL_ERR_PRIVATE)
 
 
 def validate_file_path(file_path: str, allowed_directory: str) -> str:
