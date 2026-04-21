@@ -123,6 +123,32 @@
     GOOGLE_AI_SECRET: ["googleai-status", "googleai-input", "googleai"],
   };
 
+  // Mirror the server's `mask()` helper in src/blueprints/settings/_config.py
+  // so the transient post-save state matches what the server will render on
+  // reload (CodeRabbit review, PR #570). If the algorithms ever diverge the
+  // worst case is a cosmetic flash between save and next navigation.
+  function _maskApiKeyValue(value) {
+    if (!value) return "";
+    if (value.length >= 4) {
+      return `...${value.slice(-4)} (${value.length} chars)`;
+    }
+    return `set (${value.length} chars)`;
+  }
+
+  function _upsertMaskChip(card, maskedValue) {
+    if (!card || !maskedValue) return;
+    const target = card.querySelector(".key-row-right");
+    if (!target) return;
+    let chip = target.querySelector(".api-mask");
+    if (!chip) {
+      chip = document.createElement("span");
+      chip.className = "api-mask mono";
+      chip.setAttribute("aria-hidden", "true");
+      target.insertBefore(chip, target.firstChild);
+    }
+    chip.textContent = maskedValue;
+  }
+
   function updateConfiguredStatus(updatedKeys) {
     updatedKeys.forEach((key) => {
       const entry = MANAGED_KEY_MAPPING[key];
@@ -137,6 +163,9 @@
         strong1.textContent = "Status:";
         statusElement.appendChild(strong1);
         statusElement.appendChild(document.createTextNode(" Configured"));
+        // Insert/update the masked-key preview pill so the card's transient
+        // state matches the server-rendered version after a reload.
+        _upsertMaskChip(_cardForSection(sectionId), _maskApiKeyValue(value));
         // Clear the input and update its placeholder so subsequent edits
         // start from empty rather than appending to the prior entry.
         inputElement.value = "";

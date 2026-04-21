@@ -106,6 +106,10 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
         # Poll for the observable schedule-active state instead of sleeping a
         # fixed 250ms. The real click handler reveals the schedule panel via a
         # rAF + focus call, which can be slower on CI than on dev machines.
+        # wait_for_function raises TimeoutError if the predicate never becomes
+        # true, which is the only failure mode we care about here — a
+        # follow-up page.evaluate would just re-run the same predicate
+        # (CodeRabbit review, PR #570).
         page.wait_for_function(
             """() => {
                 const tab = document.querySelector('[data-plugin-subtab="schedule"]');
@@ -117,17 +121,6 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
             }""",
             timeout=5000,
         )
-        is_active = page.evaluate("""() => {
-                const tab = document.querySelector('[data-plugin-subtab="schedule"]');
-                const panel = document.getElementById('pluginSchedulePanel');
-                const instance = document.getElementById('instance');
-                return !!tab && tab.getAttribute('aria-selected') === 'true'
-                    && !!panel && panel.hidden === false
-                    && !!instance && document.activeElement === instance;
-            }""")
-        assert (
-            is_active
-        ), "Schedule tab did not become active when Add to Playlist was clicked in DRAFT state"
 
         browser.close()
 

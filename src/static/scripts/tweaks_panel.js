@@ -131,6 +131,12 @@
         function setPanelOpen(open) {
             panel.dataset.open = open ? 'true' : 'false';
             fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+            // Keep the screen-reader-announced label in sync with the action
+            // the next click will perform (CodeRabbit review, PR #570).
+            fab.setAttribute(
+                'aria-label',
+                open ? 'Close appearance tweaks' : 'Open appearance tweaks'
+            );
         }
 
         fab.addEventListener('click', function () {

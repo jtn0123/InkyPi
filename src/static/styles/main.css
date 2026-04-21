@@ -6110,7 +6110,8 @@ a.pl-add-row:hover {
   align-items: start;
 }
 
-.settings-device-name {
+.settings-device-name,
+.settings-page-device-name {
   max-width: min(100%, 18rem);
   min-width: 0;
   overflow: hidden;

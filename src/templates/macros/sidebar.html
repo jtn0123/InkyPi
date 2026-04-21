@@ -82,12 +82,17 @@
         <div class="now-card is-{{ now_state }}">
             {#- Scope aria-live to just the fields that actually change (title
                 + meta). Wrapping the whole card meant screen readers re-read
-                the static "NOW PLAYING" eyebrow on every re-render/nav. -#}
+                the static "NOW PLAYING" eyebrow on every re-render/nav. A
+                single live region wraps both dynamic rows so state changes
+                announce once per transition, not twice (CodeRabbit review,
+                PR #570). -#}
             <div class="now-label">NOW PLAYING</div>
-            <div class="now-title" aria-live="polite" aria-atomic="false">{{ now_label or '—' }}</div>
-            <div class="now-meta" aria-live="polite" aria-atomic="false">
-                <span class="live-dot" aria-hidden="true"></span>
-                <span>{{ now_meta if now_label else 'Idle' }}</span>
+            <div class="now-live" aria-live="polite" aria-atomic="false">
+                <div class="now-title">{{ now_label or '—' }}</div>
+                <div class="now-meta">
+                    <span class="live-dot" aria-hidden="true"></span>
+                    <span>{{ now_meta if now_label else 'Idle' }}</span>
+                </div>
             </div>
         </div>
         <div class="sys-row">

@@ -27,9 +27,12 @@
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings'}]) }}
         {# JTN-340/JTN-748: device-name chip carries the full device name via
            `title=` for hover disclosure and ellipsis-truncates at narrow
-           widths via the `.settings-device-name` rule. #}
+           widths via the `.settings-device-name` rule. The page-header chip
+           uses a dedicated `.settings-page-device-name` class so it escapes
+           the chrome-level hide rule that targets the redundant top-bar
+           chip on this page. #}
         {% set settings_chips_html %}
-            <span class="status-chip settings-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
+            <span class="status-chip settings-page-device-name" title="{{ device_settings.name }}">{{ device_settings.name }}</span>
         {% endset %}
         {% call pageheader(
             title='Device & system',

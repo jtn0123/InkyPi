@@ -1,5 +1,7 @@
 """Tests for empty-state UX on playlist pages (JTN-151, JTN-172)."""
 
+import re
+
 
 def test_playlist_display_next_hidden_when_empty(client, device_config_dev):
     """Display Next button should not render for empty playlists."""
@@ -77,8 +79,13 @@ def test_playlist_add_plugin_link_points_to_plugins_page(client, device_config_d
     assert resp.status_code == 200
     html = resp.data.decode()
 
-    assert 'class="pl-add-row"' in html
-    assert 'href="/plugins"' in html
+    # Bind the assertion to the add-row anchor so it cannot be satisfied by
+    # unrelated sidebar or navigation links that also point to /plugins
+    # (CodeRabbit review, PR #570).
+    assert re.search(
+        r'<a\b(?=[^>]*\bclass="[^"]*\bpl-add-row\b)(?=[^>]*\bhref="/plugins")[^>]*>',
+        html,
+    )
 
 
 def test_playlist_display_next_mixed(client, device_config_dev):
