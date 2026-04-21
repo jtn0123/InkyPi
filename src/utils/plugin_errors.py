@@ -105,6 +105,26 @@ class URLValidationError(PermanentPluginError):
         return f"Invalid URL: {_URL_ERR_GENERIC}"
 
 
+class ScreenshotBackendError(RuntimeError):
+    """Raised when the chromium screenshot backend fails transiently after retry.
+
+    On Pi Zero 2 W (and other memory-constrained hardware) the chromium
+    subprocess can intermittently time out or exit without producing output
+    when the device is under memory pressure.  :func:`utils.image_utils.take_screenshot`
+    absorbs the single-tick flake by retrying once with a fresh browser
+    process after a short backoff.  When both attempts still fail to produce
+    an image, this exception is raised so the plugin blueprint can surface
+    a specific HTTP 503 ``backend_unavailable`` response instead of a
+    generic 500 ``internal_error`` (JTN-789).
+
+    Subclasses :class:`RuntimeError` so existing ``except RuntimeError``
+    handlers in plugin code continue to catch it.  Kept in this module (not
+    in ``utils.security_utils`` or a Flask-aware module) so it is importable
+    from both the plugin subprocess worker — which may not have a Flask app
+    context — and the ``blueprints.plugin`` translator.
+    """
+
+
 def _extract_reason(message: str) -> str:
     """Extract the validator text from a wrapped "Invalid URL: X" message."""
     prefix = "Invalid URL: "
