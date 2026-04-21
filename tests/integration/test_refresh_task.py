@@ -49,8 +49,7 @@ def test_manual_update_triggers_display_and_refresh_info(
         deadline = time.perf_counter() + 5.0
         info = device_config_dev.get_refresh_info()
         while (
-            getattr(info, "request_ms", None) is None
-            and time.perf_counter() < deadline
+            getattr(info, "request_ms", None) is None and time.perf_counter() < deadline
         ):
             time.sleep(0.05)
             info = device_config_dev.get_refresh_info()

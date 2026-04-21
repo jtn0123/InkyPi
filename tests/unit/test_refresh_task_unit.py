@@ -285,9 +285,7 @@ def test_manual_update_returns_after_image_saved_not_display(
         img = Image.new("RGB", device_config_dev.get_resolution(), "white")
         return img, {}
 
-    monkeypatch.setattr(
-        RefreshTask, "_execute_with_policy", fake_execute_with_policy
-    )
+    monkeypatch.setattr(RefreshTask, "_execute_with_policy", fake_execute_with_policy)
 
     # Keep the manual-update cap at its default 60s — the point of the test
     # is that we return in well under 60s despite the 90s display sleep.
@@ -307,9 +305,7 @@ def test_manual_update_returns_after_image_saved_not_display(
         task.stop()
 
 
-def test_manual_update_still_surfaces_generate_errors(
-    device_config_dev, monkeypatch
-):
+def test_manual_update_still_surfaces_generate_errors(device_config_dev, monkeypatch):
     """JTN-786: errors raised before image-save must still reach the caller.
 
     If ``_execute_with_policy`` raises (e.g. ``Plugin 'X' is not registered``
