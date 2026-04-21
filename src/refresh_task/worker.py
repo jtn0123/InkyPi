@@ -9,7 +9,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
-from plugins.plugin_registry import get_plugin_instance
+from plugins.plugin_registry import get_plugin_instance, load_plugins
 from refresh_task.actions import PluginLike, RefreshAction
 from refresh_task.context import RefreshContext, SupportsRefreshConfig
 from utils.plugin_errors import PermanentPluginError, URLValidationError
@@ -170,6 +170,17 @@ def _execute_refresh_attempt_worker(
     """
     try:
         child_config = _restore_child_config(refresh_context)
+        # JTN-783: spawned / forkserver children start with an empty plugin
+        # registry because module-level dicts in `plugins.plugin_registry`
+        # don't cross the process boundary. Re-register plugins from the
+        # restored Config so `get_plugin_instance` can resolve plugin_id.
+        # `load_plugins` is idempotent (overwrites under a lock), so this is
+        # safe to call every attempt. If the restored config somehow lacks
+        # a `get_plugins` method (legacy pickled payload), skip and let
+        # `get_plugin_instance` raise a clear ValueError below.
+        get_plugins = getattr(child_config, "get_plugins", None)
+        if callable(get_plugins):
+            load_plugins(get_plugins())
         plugin_loader = cast(
             Callable[[Mapping[str, object]], PluginLike],
             get_plugin_instance,

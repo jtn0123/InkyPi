@@ -30,6 +30,16 @@ from refresh_task import (
 # ---------------------------------------------------------------------------
 
 
+class _SpawnableAction:
+    """Module-scope so `multiprocessing.spawn` can pickle instances
+    across the subprocess boundary (local classes are unpicklable).
+    Used only by `test_worker_reloads_plugin_registry_in_real_spawned_child`.
+    """
+
+    def execute(self, plugin, cfg, dt):
+        return Image.new("RGB", (10, 10), "green")
+
+
 class TestRemoteException:
     def test_known_types(self):
         for name, cls in [
@@ -174,6 +184,120 @@ class TestExecuteRefreshAttemptWorker:
         assert payload["error_type"] == "ValueError"
         assert "bad config" in payload["error_message"]
         assert "traceback" in payload
+
+    def test_worker_reloads_plugin_registry_in_child(self, device_config_dev):
+        """JTN-783: spawned subprocess starts with empty plugin registry.
+
+        Simulates the real bug: when multiprocessing spawn/forkserver starts a
+        child process, the module-level `PLUGIN_CLASSES` / `_PLUGIN_CONFIGS`
+        dicts in `plugins.plugin_registry` are empty. The worker must call
+        `load_plugins(child_config.get_plugins())` so `get_plugin_instance`
+        can resolve the plugin_id, otherwise every manual `/update_now` in
+        the default `process` isolation mode raises
+        `ValueError: Plugin 'clock' is not registered.`.
+
+        This test fails on main (before the fix) because the worker calls
+        `get_plugin_instance` against an empty registry.
+        """
+        # Simulate a freshly-spawned child: wipe the module-level registries
+        # the same way `spawn` would (child gets a fresh interpreter).
+        from plugins import plugin_registry
+        from refresh_task import _execute_refresh_attempt_worker
+        from refresh_task.context import RefreshContext
+
+        saved_classes = dict(plugin_registry.PLUGIN_CLASSES)
+        saved_configs = dict(plugin_registry._PLUGIN_CONFIGS)
+        plugin_registry.PLUGIN_CLASSES.clear()
+        plugin_registry._PLUGIN_CONFIGS.clear()
+
+        # Use a real plugin_id the bundled Config will discover from the
+        # plugins/ directory tree. `clock` is a stable, always-present plugin.
+        plugin_config = {"id": "clock", "class": "Clock"}
+        refresh_context = RefreshContext.from_config(device_config_dev)
+
+        class FakeAction:
+            def execute(self, plugin, cfg, dt):
+                return Image.new("RGB", (10, 10), "blue")
+
+        result_queue = queue.Queue()
+        try:
+            _execute_refresh_attempt_worker(
+                result_queue,
+                plugin_config,
+                FakeAction(),
+                refresh_context,
+                datetime.now(UTC),
+            )
+            payload = result_queue.get_nowait()
+            # With the fix: worker calls load_plugins(child_config.get_plugins())
+            # before get_plugin_instance, so the clock plugin resolves and the
+            # fake action returns a valid image.
+            assert (
+                payload["ok"] is True
+            ), f"Expected ok=True after registry reload; got: {payload}"
+            assert "image_bytes" in payload
+            # Registry should now contain clock (populated by load_plugins).
+            assert "clock" in plugin_registry.get_registered_plugin_ids()
+        finally:
+            # Restore whatever the suite had before this test ran.
+            plugin_registry.PLUGIN_CLASSES.clear()
+            plugin_registry._PLUGIN_CONFIGS.clear()
+            plugin_registry.PLUGIN_CLASSES.update(saved_classes)
+            plugin_registry._PLUGIN_CONFIGS.update(saved_configs)
+
+    def test_worker_reloads_plugin_registry_in_real_spawned_child(
+        self, device_config_dev
+    ):
+        """JTN-783: end-to-end variant that spawns a real subprocess.
+
+        The inline variant above simulates a cold registry by clearing the
+        parent's module-level dicts, but it still executes in the parent's
+        address space. This variant drives the full multiprocessing start
+        method (``spawn`` on macOS + the production systemd service), which
+        is the path that actually shipped the JTN-783 bug to users. If the
+        worker ever regresses back to calling ``get_plugin_instance`` on
+        the spawned child's empty registry, this test fails with the exact
+        production error instead of the simulation.
+        """
+        from refresh_task import _execute_refresh_attempt_worker
+        from refresh_task.context import RefreshContext
+
+        plugin_config = {"id": "clock", "class": "Clock"}
+        refresh_context = RefreshContext.from_config(device_config_dev)
+
+        ctx = _get_mp_context()
+        result_queue = ctx.Queue(maxsize=1)
+        proc = ctx.Process(
+            target=_execute_refresh_attempt_worker,
+            args=(
+                result_queue,
+                plugin_config,
+                _SpawnableAction(),
+                refresh_context,
+                datetime.now(UTC),
+            ),
+            daemon=True,
+        )
+        proc.start()
+        # 30s is generous for spawn + plugin-info.json discovery + one fake
+        # action call; well below the per-attempt 60s default in production.
+        proc.join(timeout=30)
+        try:
+            assert not proc.is_alive(), (
+                "spawned worker did not exit within 30s — "
+                "probably stuck before result_queue.put()"
+            )
+            payload = result_queue.get(timeout=5)
+        finally:
+            if proc.is_alive():
+                proc.terminate()
+                proc.join(timeout=5)
+
+        assert payload["ok"] is True, (
+            f"Real spawned child failed to resolve plugin from cold "
+            f"registry — JTN-783 regression. payload={payload}"
+        )
+        assert "image_bytes" in payload
 
 
 # ---------------------------------------------------------------------------
