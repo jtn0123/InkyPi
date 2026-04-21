@@ -89,9 +89,7 @@ class TestTakeScreenshotRetry:
         monkeypatch.setattr(image_utils, "_take_screenshot_once", rec)
 
         slept: list[float] = []
-        monkeypatch.setattr(
-            image_utils.time, "sleep", lambda s: slept.append(s)
-        )
+        monkeypatch.setattr(image_utils.time, "sleep", lambda s: slept.append(s))
 
         result = image_utils.take_screenshot("http://example.com", (80, 60))
 
@@ -155,9 +153,7 @@ class TestTakeScreenshotRetry:
         monkeypatch.setattr(image_utils, "_take_screenshot_once", rec)
 
         slept: list[float] = []
-        monkeypatch.setattr(
-            image_utils.time, "sleep", lambda s: slept.append(s)
-        )
+        monkeypatch.setattr(image_utils.time, "sleep", lambda s: slept.append(s))
 
         image_utils.take_screenshot("http://example.com", (80, 60))
 

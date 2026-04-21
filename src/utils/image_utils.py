@@ -612,9 +612,7 @@ def _take_screenshot_once(
             return None, True
 
     except Exception as e:
-        logger.error(
-            "%s %s (attempt %s)", _SCREENSHOT_ERROR_PREFIX, str(e), attempt
-        )
+        logger.error("%s %s (attempt %s)", _SCREENSHOT_ERROR_PREFIX, str(e), attempt)
         transient = True
     finally:
         if img_file_path and os.path.exists(img_file_path):
@@ -664,9 +662,7 @@ def take_screenshot(target, dimensions, timeout_ms=None):
         )
         if image is not None:
             if attempt > 1:
-                logger.info(
-                    "Screenshot backend succeeded on retry attempt %s", attempt
-                )
+                logger.info("Screenshot backend succeeded on retry attempt %s", attempt)
             return image
         last_transient = transient
         if not transient:
