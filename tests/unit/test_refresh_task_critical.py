@@ -9,7 +9,6 @@ Covers:
 - _execute_with_policy() error/timeout paths
 """
 
-import io
 import os
 import queue
 import threading
@@ -202,6 +201,16 @@ class TestExecuteRefreshAttemptWorker:
         assert payload["error_type"] == "ValueError"
         assert "bad config" in payload["error_message"]
         assert "traceback" in payload
+        # Pin the error path: failures must NOT carry an image_path.  The
+        # tempfile is only created in the success branch (after generate_image
+        # succeeds).  If a future refactor moves tempfile creation earlier
+        # — e.g. up next to the try block — the error branch could leak a
+        # 0-byte file the parent never reads or unlinks.  Asserting absence
+        # here keeps the leak-free contract pinned.
+        assert "image_path" not in payload, (
+            "error payloads must not include 'image_path' — that would leak "
+            "a tempfile the parent's _handle_process_result never reads"
+        )
 
     def test_worker_reloads_plugin_registry_in_child(self, device_config_dev):
         """JTN-783: spawned subprocess starts with empty plugin registry.
@@ -345,9 +354,7 @@ class TestSubprocessPipeBufferDeadlockRegression:
     short timeout fires — and fails loudly instead of silently.
     """
 
-    def test_large_image_round_trips_under_deadlock_threshold(
-        self, device_config_dev
-    ):
+    def test_large_image_round_trips_under_deadlock_threshold(self, device_config_dev):
         """Real spawned subprocess + 800x480 random-pixel image.
 
         Must complete well under 10 s.  With the pipe-buffer deadlock
@@ -594,9 +601,9 @@ class TestWorkerSessionLeaderCleanup:
         )
         # Critical ordering: killpg MUST come before terminate so the
         # group is taken down even when the worker is graceful.
-        assert events.index("killpg") < events.index("terminate"), (
-            f"killpg must precede terminate; saw {events}"
-        )
+        assert events.index("killpg") < events.index(
+            "terminate"
+        ), f"killpg must precede terminate; saw {events}"
 
 
 # ---------------------------------------------------------------------------

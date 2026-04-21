@@ -373,9 +373,9 @@ class TestK2SafeDirectoryAndAutoStash:
             f"another user. rc={proc.returncode}\n{combined}"
         )
         # Neither the masking error nor the raw git warning should leak.
-        assert "not a git repository" not in combined, (
-            f"ownership guard masked as 'not a git repository': {combined!r}"
-        )
+        assert (
+            "not a git repository" not in combined
+        ), f"ownership guard masked as 'not a git repository': {combined!r}"
         assert "dubious ownership" not in combined, (
             "raw dubious-ownership warning reached the user — wrapper "
             f"is missing the safe.directory override: {combined!r}"

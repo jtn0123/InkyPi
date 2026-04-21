@@ -1,6 +1,5 @@
 """RefreshTask — main coordinator for display refresh operations."""
 
-import io
 import logging
 import os
 import queue

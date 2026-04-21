@@ -397,16 +397,12 @@ class TestStartUpdateReapsStaleRunningState:
             data = resp.get_json()
             assert data["success"] is True
             assert data["running"] is True
-            assert (
-                data["unit"] != stale_unit
-            ), "new unit must replace the stale one"
+            assert data["unit"] != stale_unit, "new unit must replace the stale one"
             fallback_mock.assert_called_once()
         finally:
             mod._set_update_state(False, None)
 
-    def test_post_preserves_409_for_genuinely_active_update(
-        self, client, monkeypatch
-    ):
+    def test_post_preserves_409_for_genuinely_active_update(self, client, monkeypatch):
         """With a fresh running state (started just now), the reaper is a
         no-op and the "already running" 409 still fires.  Prevents the
         K3 fix from trampling a legitimate concurrent update.
