@@ -419,6 +419,187 @@ class TestSubprocessPipeBufferDeadlockRegression:
 
 
 # ---------------------------------------------------------------------------
+# Worker session-leader cleanup (JTN-S2)
+# ---------------------------------------------------------------------------
+
+
+class TestWorkerSessionLeaderCleanup:
+    """JTN-S2: the worker becomes a session leader on startup so the
+    parent's ``_cleanup_subprocess`` can ``killpg(SIGKILL)`` the entire
+    chromium tree (worker + chromium + zygote + renderers + utility) in
+    one syscall.  Without this, chromium descendants get reparented to
+    PID 1 and leak.
+    """
+
+    def test_worker_calls_setsid_to_become_session_leader(self, monkeypatch):
+        """The worker must call ``os.setsid()`` before doing any plugin
+        work so chromium spawned later inherits the worker's pgid.
+        """
+        import queue as _queue
+
+        from refresh_task import _execute_refresh_attempt_worker
+
+        called: list[bool] = []
+
+        def fake_setsid():
+            called.append(True)
+
+        # Patch the worker module's ``os`` reference.
+        monkeypatch.setattr("refresh_task.worker.os.setsid", fake_setsid)
+
+        # Provide enough mock context for the worker to no-op a render.
+        from PIL import Image as _Image
+
+        class _FakePlugin:
+            def generate_image(self, settings, cfg):
+                return _Image.new("RGB", (10, 10), "red")
+
+        class _FakeAction:
+            def execute(self, plugin, cfg, dt):
+                return plugin.generate_image(None, cfg)
+
+        from unittest.mock import MagicMock
+
+        with (
+            patch(
+                "refresh_task.worker.get_plugin_instance",
+                return_value=_FakePlugin(),
+            ),
+            patch(
+                "refresh_task.worker._restore_child_config",
+                return_value=MagicMock(),
+            ),
+        ):
+            _execute_refresh_attempt_worker(
+                _queue.Queue(),
+                {"id": "test"},
+                _FakeAction(),
+                MagicMock(),
+                datetime.now(UTC),
+            )
+
+        assert called, (
+            "worker did not call os.setsid() — chromium descendants will "
+            "leak when the parent's _cleanup_subprocess only signals the "
+            "worker pid (JTN-S2 regression)"
+        )
+
+    def test_worker_setsid_eperm_is_swallowed(self, monkeypatch):
+        """If setsid fails (already a session leader, e.g. under some test
+        mocks), the worker must still complete its render — the signal
+        propagation path is best-effort, not load-bearing."""
+        import queue as _queue
+
+        from refresh_task import _execute_refresh_attempt_worker
+
+        def setsid_eperm():
+            raise OSError(1, "Operation not permitted")
+
+        monkeypatch.setattr("refresh_task.worker.os.setsid", setsid_eperm)
+
+        from PIL import Image as _Image
+
+        class _FakePlugin:
+            def generate_image(self, settings, cfg):
+                return _Image.new("RGB", (10, 10), "blue")
+
+        class _FakeAction:
+            def execute(self, plugin, cfg, dt):
+                return plugin.generate_image(None, cfg)
+
+        q = _queue.Queue()
+        from unittest.mock import MagicMock
+
+        with (
+            patch(
+                "refresh_task.worker.get_plugin_instance",
+                return_value=_FakePlugin(),
+            ),
+            patch(
+                "refresh_task.worker._restore_child_config",
+                return_value=MagicMock(),
+            ),
+        ):
+            _execute_refresh_attempt_worker(
+                q,
+                {"id": "test"},
+                _FakeAction(),
+                MagicMock(),
+                datetime.now(UTC),
+            )
+        payload = q.get_nowait()
+        assert payload["ok"] is True
+        os.unlink(payload["image_path"])
+
+    def test_cleanup_subprocess_killpgs_unconditionally_before_terminate(
+        self, monkeypatch
+    ):
+        """JTN-S2 regression: cleanup must call ``killpg(SIGKILL)`` BEFORE
+        the terminate/alive dance, not gated behind ``proc.is_alive()``.
+
+        On the device, a worker that exits cleanly on SIGTERM would
+        leave the killpg branch unreached — which was the original
+        9-process-per-timeout leak.  Pinning the unconditional ordering
+        keeps that bug from coming back.
+        """
+        import signal as _signal
+
+        from refresh_task import RefreshTask
+
+        killpg_calls: list[tuple[int, int]] = []
+        events: list[str] = []
+
+        def fake_getpgid(pid):
+            # Returning a non-zero pgid distinct from getpgid(0) so the
+            # production code's ``pgid != os.getpgid(0)`` guard passes.
+            return 99999 if pid != 0 else 1
+
+        def fake_killpg(pgid, sig):
+            killpg_calls.append((pgid, sig))
+            events.append("killpg")
+
+        monkeypatch.setattr("refresh_task.task.os.getpgid", fake_getpgid)
+        monkeypatch.setattr("refresh_task.task.os.killpg", fake_killpg)
+
+        # Worker that exits gracefully on terminate() (the case that
+        # used to bypass the killpg branch).
+        class GracefulProc:
+            pid = 12345
+
+            def terminate(self):
+                events.append("terminate")
+
+            def join(self, timeout=None):
+                events.append("join")
+
+            def is_alive(self):
+                return False  # dies cleanly on SIGTERM
+
+            def kill(self):  # pragma: no cover  should not be reached
+                events.append("kill")
+
+        proc = GracefulProc()
+        RefreshTask._cleanup_subprocess(proc, "graceful-plugin")
+
+        assert killpg_calls, (
+            "killpg never fired — chromium descendants leak when the "
+            "worker exits cleanly on SIGTERM (JTN-S2 regression)"
+        )
+        pgid, sig = killpg_calls[0]
+        assert pgid == 99999, f"expected killpg on worker pgid 99999; got {pgid}"
+        assert sig == _signal.SIGKILL, (
+            f"expected SIGKILL to the group; got {sig}. SIGTERM is "
+            "insufficient — chromium renderers ignore it under memory "
+            "pressure."
+        )
+        # Critical ordering: killpg MUST come before terminate so the
+        # group is taken down even when the worker is graceful.
+        assert events.index("killpg") < events.index("terminate"), (
+            f"killpg must precede terminate; saw {events}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Orphan render tempfile sweep
 # ---------------------------------------------------------------------------
 

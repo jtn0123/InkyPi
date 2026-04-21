@@ -210,10 +210,9 @@ class TestRunSingleAttemptTransientDetection:
 
     @staticmethod
     def _run_once_with_fake_subprocess(monkeypatch, returncode, write_bytes):
-        """Invoke `_take_screenshot_once` with a patched subprocess.run whose
-        side effect writes *write_bytes* to the output tempfile and returns
-        *returncode*. Returns the ``(image, transient)`` tuple under test."""
-        import subprocess
+        """Invoke ``_take_screenshot_once`` with a patched subprocess.run
+        whose side effect writes *write_bytes* to the output tempfile and
+        returns *returncode*. Returns the ``(image, transient)`` tuple."""
         import sys
         from types import SimpleNamespace
 
@@ -225,25 +224,19 @@ class TestRunSingleAttemptTransientDetection:
             lambda target, out, dims, timeout_ms: [sys.executable, "-c", "pass", out],
         )
 
-        real_run = subprocess.run
-
         def fake_run(command, **kwargs):
-            # command[-1] is the tempfile path the wrapper injected.
             out = command[-1]
             with open(out, "wb") as f:
                 f.write(write_bytes)
             return SimpleNamespace(returncode=returncode, stderr=b"", stdout=b"")
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
-        try:
-            return iu._take_screenshot_once(
-                target="http://example.invalid",
-                dimensions=(800, 480),
-                timeout_ms=5_000,
-                attempt=1,
-            )
-        finally:
-            monkeypatch.setattr(iu.subprocess, "run", real_run)
+        return iu._take_screenshot_once(
+            target="http://example.invalid",
+            dimensions=(800, 480),
+            timeout_ms=5_000,
+            attempt=1,
+        )
 
     def test_nonzero_exit_empty_file_is_transient(self, monkeypatch):
         """Chromium OOM-exit with no PNG bytes should retry."""
@@ -332,7 +325,6 @@ class TestTakeScreenshotOnceBranchCoverage:
         iu = self._base_patches(monkeypatch)
 
         def fake_run(command, **kwargs):
-            # leave tempfile empty
             return SimpleNamespace(returncode=0, stderr=b"", stdout=b"")
 
         monkeypatch.setattr(iu.subprocess, "run", fake_run)
@@ -343,9 +335,7 @@ class TestTakeScreenshotOnceBranchCoverage:
         assert transient is True
 
     def test_loader_returns_none_is_transient(self, monkeypatch):
-        """Chromium succeeded, wrote bytes, but PIL can't decode — retry
-        once because PNG decode is deterministic in theory, but real-world
-        tempfile races can leave incomplete data."""
+        """Chromium succeeded, wrote bytes, but PIL can't decode — retry."""
         from types import SimpleNamespace
 
         iu = self._base_patches(monkeypatch)

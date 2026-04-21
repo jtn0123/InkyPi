@@ -239,6 +239,20 @@ def _execute_refresh_attempt_worker(
             ``Config`` object) used to restore the child Config singleton.
         current_dt: The current device-timezone datetime passed to the plugin.
     """
+    # JTN-S2: become a session leader so any chromium subprocess spawned
+    # below shares the worker's session/process group.  When the parent
+    # times the worker out and calls ``_cleanup_subprocess``, that
+    # cleanup ``killpg``-s the whole session — collecting chromium plus
+    # its zygote/renderer/utility descendants in one syscall.  Without
+    # this, chromium descendants get reparented to PID 1 and leak.
+    # Best-effort — ``setsid`` fails harmlessly if the worker is already
+    # a session leader (rare but possible under some test mocks), so we
+    # swallow the error rather than abort the whole render.
+    try:
+        os.setsid()
+    except OSError:
+        pass
+
     try:
         child_config = _restore_child_config(refresh_context)
         # JTN-783: spawned / forkserver children start with an empty plugin

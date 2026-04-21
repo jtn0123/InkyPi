@@ -930,9 +930,34 @@ class RefreshTask:
     def _cleanup_subprocess(proc, plugin_id: str) -> None:
         """Terminate a subprocess that is still alive after its timeout.
 
-        Attempts graceful termination first, escalates to SIGKILL if needed,
-        and logs a warning if the process becomes a zombie.
+        JTN-S2: ``killpg(SIGKILL)`` the worker's process group up front,
+        before any terminate/join dance.  The worker calls ``os.setsid()``
+        at startup, so it is a session leader and its pgid equals its
+        pid; the chromium screenshot subprocess plus chromium's zygote /
+        renderer / utility descendants all inherit that same pgid.  Doing
+        the killpg BEFORE checking ``proc.is_alive()`` is critical — if
+        we only killpg "when the worker survives terminate", a worker
+        that exits gracefully on SIGTERM would skip the killpg entirely
+        and leave its chromium descendants reparented to PID 1.  That
+        was the on-device leak: 9 chromium processes survived per
+        timeout because the worker's own SIGTERM handler returned cleanly.
+
+        ``getpgid(0) != pgid`` guards against signaling our own group in
+        the (impossible-in-production) case where the worker never made
+        it past setsid.
         """
+        import signal as _signal
+
+        # 1. Take down the whole worker session up front — catches the
+        #    chromium tree before any of it can be reparented.
+        try:
+            pgid = os.getpgid(proc.pid)
+            if pgid != os.getpgid(0):
+                os.killpg(pgid, _signal.SIGKILL)
+        except (ProcessLookupError, PermissionError, OSError):
+            pass
+
+        # 2. Standard terminate/kill dance to reap the worker entry.
         proc.terminate()
         proc.join(timeout=2)
         if proc.is_alive():

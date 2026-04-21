@@ -104,16 +104,6 @@ def test_take_screenshot_browser_detection_chrome_first(monkeypatch):
     def fake_run(*args, **kwargs):
         cmd = args[0] if args else kwargs.get("cmd", [])
         recorded["cmds"].append(cmd)
-
-        # Handle "which" commands - only return success for browsers that should exist in this test
-        if cmd and len(cmd) >= 2 and cmd[0] == "which":
-            browser = cmd[1]
-            # In this test, we want Chrome to be found, others not
-            if browser in ["chromium", "chromium-headless-shell", "google-chrome"]:
-                result = Result()
-                result.returncode = 1  # Not found
-                return result
-
         return Result()
 
     monkeypatch.setattr("utils.image_utils.subprocess.run", fake_run)
