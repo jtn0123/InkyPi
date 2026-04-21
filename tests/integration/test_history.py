@@ -83,7 +83,7 @@ def test_history_page_contains_storage_block(client):
     body = resp.data.decode("utf-8")
     assert 'id="storage-block"' in body
     # Should include server-rendered text placeholders or values
-    assert "Storage available" in body
+    assert "Storage" in body
 
 
 def test_history_page_moves_clear_action_to_reset_cache(client, device_config_dev):

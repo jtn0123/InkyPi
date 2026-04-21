@@ -202,7 +202,6 @@
 
 /* ── Progress block small screens ── */
 @media (max-width: 520px) {
-    .progress-block { left: 8px; right: 8px; transform: none; min-width: auto; }
     .progress-meta { flex-wrap: wrap; gap: 6px 10px; }
 
     .playlist-toolbar {
@@ -260,11 +259,6 @@
     .settings-side-nav {
         position: static;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .workflow-mode-bar {
-        width: 100%;
-        justify-content: space-between;
     }
 
     .workflow-action-group,
@@ -472,6 +466,25 @@
         align-items: stretch;
     }
 
+    /* Allow the Fit/Native segmented control + Live chip + resolution chip
+       to wrap onto multiple lines at narrow widths so the flex row's
+       min-content doesn't blow out the parent grid track. The long
+       resolution chip (e.g. "800×480 · 7-color Inky Impression") would
+       otherwise force horizontal overflow at ~360px. */
+    .dashboard-stage-controls {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        min-width: 0;
+    }
+
+    .dashboard-stage-controls .status-chip {
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
     .header-actions,
     .playlist-toolbar,
     .history-toolbar,
@@ -591,8 +604,7 @@
         min-height: 180px;
     }
 
-    .settings-panel .buttons-container,
-    .api-keys-frame .buttons-container {
+    .settings-panel .buttons-container {
         position: sticky;
         bottom: 8px;
         z-index: 6;
@@ -600,16 +612,20 @@
         background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
     }
 
-    .workflow-mode-bar {
-        position: sticky;
-        top: 8px;
-        z-index: 6;
-        display: flex;
-        width: 100%;
+    .page-shell-settings {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 
-    .workflow-mode-tab {
-        justify-content: center;
+    .page-shell-settings .settings-logs-toggle {
+        display: block;
+        position: fixed;
+        right: max(16px, env(safe-area-inset-right, 0px) + 8px);
+        bottom: max(74px, env(safe-area-inset-bottom, 0px) + 74px);
+        z-index: 10;
+        border-radius: 999px;
+        padding: 12px 18px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+        margin: 0;
     }
 
     .title-stack {
@@ -629,13 +645,11 @@
         display: block;
     }
 
+    /* JTN design refresh: both panels always visible on mobile; user scrolls
+       through main → aside stacked. Replaces the old Configure/Preview mode
+       toggle (workflow-mode-bar) which is no longer rendered. */
     .workflow-main-panel,
     .workflow-side-panel {
-        display: none;
-    }
-
-    .workflow-main-panel.active,
-    .workflow-side-panel.active {
         display: grid;
         gap: 14px;
     }
@@ -970,13 +984,12 @@
 
 /* ── Short laptop viewports (JTN-572 / JTN-599) ──
    On common laptop screens shorter than ~860px (1280x800, 1366x768, 1280x768),
-   the Save button at the bottom of /settings and /settings/api-keys sits below
-   the fold, and there is no visible scroll affordance to reveal it. Pin the
-   buttons container to the bottom of the viewport so the primary action is
-   always one click away regardless of scroll position. */
+   the Save button at the bottom of /settings sits below the fold, and there is
+   no visible scroll affordance to reveal it. Pin the buttons container to the
+   bottom of the viewport so the primary action is always one click away
+   regardless of scroll position. */
 @media (max-height: 860px) {
-    .settings-panel .buttons-container,
-    .api-keys-frame .buttons-container {
+    .settings-panel .buttons-container {
         position: sticky;
         bottom: 8px;
         z-index: 6;

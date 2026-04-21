@@ -83,9 +83,11 @@ def _open_settings_device_panel(page, live_server: str) -> RuntimeCollector:
               return original.call(this, status, message, ...rest);
             };
         }""")
-    page.locator('[data-settings-tab="maintenance"]').first.click()
-    page.wait_for_selector("#rebootBtn", timeout=10000)
-    page.wait_for_selector("#shutdownBtn", timeout=10000)
+    # Reboot/shutdown live on the dedicated "Power" tab (matches the handoff
+    # design grouping: Device / Scheduling / Image / Updates / Power).
+    page.locator('[data-settings-tab="power"]').first.click()
+    page.wait_for_selector("#rebootBtn", state="visible", timeout=10000)
+    page.wait_for_selector("#shutdownBtn", state="visible", timeout=10000)
     return collector
 
 

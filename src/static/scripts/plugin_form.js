@@ -34,7 +34,7 @@
       if (els.list){ const li = document.createElement('li'); const ts = document.createElement('time'); ts.dateTime = new Date().toISOString(); ts.textContent = new Date().toLocaleTimeString(); li.appendChild(ts); li.appendChild(document.createTextNode(' ' + text)); els.list.appendChild(li); try { els.list.scrollTop = els.list.scrollHeight; } catch(e){} }
     }
     function start(){ setT0(Date.now()); try { if (els.list) els.list.innerHTML = ''; if (els.elapsed) els.elapsed.textContent = '0s'; if (els.clock) els.clock.textContent = new Date().toLocaleTimeString(); if (els.bar) els.bar.style.width = '10%'; } catch(e){} tickClock(); setClockTimer(setInterval(tickClock, 1000)); setStep('Preparing…', 10); }
-    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} setTimeout(() => { if (els.block) { els.block.style.display = ''; els.block.hidden = true; } }, 2000); }
+    function stop(){ try { if (getClockTimer()) clearInterval(getClockTimer()); } catch(e){} /* Persistent progress card: leave the final state visible in the aside rather than hiding the block. */ }
     return { setStep, start, stop };
   }
 

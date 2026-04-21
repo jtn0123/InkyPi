@@ -179,6 +179,7 @@ def apikeys_page():
         api_keys_mode="generic",
         masked={},
         api_key_plugins=api_key_plugins,
+        active_nav="api-keys",
     )
 
 

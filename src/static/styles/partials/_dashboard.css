@@ -1,8 +1,9 @@
 .dashboard-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 16px;
   align-items: start;
+  margin-bottom: var(--spacing-xl);
 }
 
 .dashboard-stage,
@@ -17,32 +18,129 @@
 .dashboard-status-card,
 .storage-card {
   padding: 16px;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--border-radius-lg);
-  background: var(--panel-bg);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-xl);
+  background: var(--surface);
 }
 
 .dashboard-stage {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+}
+
+/* Refined hero KPI strip shown below the preview image — mono labels,
+   3 cells (NOW | NEXT | REFRESH) separated by thin dividers. */
+.hero-strip {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 18px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  align-items: center;
+}
+
+.hero-strip .hero-cell {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.hero-strip .k {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.hero-strip .v {
+  font-weight: 600;
+  font-size: 0.94rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  /* Handoff parity: do NOT ellipsis-clip the primary value — long plugin
+     names should wrap rather than silently disappear. `.m` (meta line) still
+     clips because it carries timestamp/playlist detail that can be truncated
+     without losing essential information. */
+  overflow-wrap: anywhere;
+}
+
+.hero-strip .v.is-empty {
+  color: var(--text-3);
+  font-weight: 500;
+}
+
+.hero-strip .m {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hero-divider {
+  width: 1px;
+  height: 34px;
+  background: var(--surface-border);
+}
+
+@media (max-width: 640px) {
+  .hero-strip {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .hero-divider { display: none; }
 }
 
 .dashboard-stage-header,
 .storage-card-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 
-.dashboard-stage-header h2,
+.dashboard-stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Note: the `.dashboard-stage-header h2` is `.sr-only` in the template (an
+   accessible heading for screen readers); visual styling intentionally lives
+   on `.dashboard-stage-descriptor` below. This rule only targets the storage
+   card title which does render visibly. */
 .storage-card-title {
   margin: 0;
-  font-size: var(--text-2xs);
-  font-weight: 600;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
+  letter-spacing: 0.08em;
   color: var(--muted);
+}
+
+/* Dashboard stage descriptor: Live chip + resolution/driver line on the
+   left of the preview header (matches Claude Design handoff). */
+.dashboard-stage-descriptor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.dashboard-resolution-mono {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .dashboard-stage-copy,
@@ -85,25 +183,101 @@
   justify-self: start;
 }
 
+/* Today KPI card — mirrors the React `Today` card in screens.jsx.
+   A four-row label/value list with monospace eyebrow labels. */
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+}
+
+.kpi-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.kpi-card-head h3 {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--muted);
+}
+
+.kpi-card-sub {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+.kv-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.kv-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed color-mix(in oklab, var(--surface-border) 70%, transparent);
+}
+
+.kv-list > div:last-child {
+  border-bottom: 0;
+}
+
+.kv-list dt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.kv-list dd {
+  margin: 0;
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: -0.005em;
+}
+
+.kv-list dd.ok {
+  color: var(--success, #22c55e);
+}
+
+.kv-list dd.warn {
+  color: var(--warning, #f59e0b);
+}
+
 .dashboard-stage .image-container {
   width: 100%;
   max-width: min(100%, 50rem);
   margin: 0 auto;
-  padding: 4px;
+  padding: 20px;
   aspect-ratio: 5 / 3;
   min-height: unset;
   display: block;
   overflow: hidden;
   border-radius: var(--border-radius-lg);
-  background: var(--surface);
+  background: var(--preview-bg);
   border: 1px solid var(--surface-border);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-sm);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), var(--shadow-sm);
   transition: border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
 }
 
 .dashboard-stage .image-container:hover {
-  border-color: var(--accent);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.06), var(--shadow-md);
+  border-color: var(--border-strong, var(--surface-border));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), var(--shadow-md);
 }
 
 .dashboard-stage .image-container img {
@@ -210,4 +384,267 @@
   color: var(--text-secondary);
   background: var(--surface);
   border-radius: var(--border-radius-md);
+}
+
+/* Quick switch playlist card (dashboard aside) */
+.quick-switch-card {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quick-switch-head h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* When used as a plain muted link (no .header-button companion class) the
+   original styling applies. The handoff renders this as a small button, so
+   templates now also tag it `.header-button.is-secondary`; we just shrink
+   it to a compact size here. */
+.quick-switch-link:not(.header-button),
+a.quick-switch-link:not(.header-button):link,
+a.quick-switch-link:not(.header-button):visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+
+.quick-switch-link:not(.header-button):hover {
+  color: var(--accent);
+}
+
+a.quick-switch-link.header-button {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  min-height: 0;
+  text-decoration: none;
+}
+
+.quick-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quick-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.quick-row:hover {
+  background: var(--surface-2);
+}
+
+.quick-row.is-active {
+  background: var(--accent-weak);
+  border-color: color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+.quick-row-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.quick-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quick-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-sub {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+a.quick-row-link:link,
+a.quick-row-link:visited {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--surface-border);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+a.quick-row-link:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.quick-row-btn.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+
+/* Visual parity pass: tighter dashboard rhythm, grouped header actions, and a
+   compact empty-state note so the aside no longer creates a dead panel. */
+.dashboard-pageheader-actions {
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.dashboard-header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.dashboard-header-button .btn-leading-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.dashboard-header-button.is-secondary {
+  background: transparent;
+  color: var(--text-2);
+  border-color: transparent;
+}
+
+.dashboard-header-button.is-secondary:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.dashboard-header-button.is-secondary .btn-leading-icon {
+  color: var(--text-3);
+}
+
+.dashboard-header-button.is-secondary:hover .btn-leading-icon {
+  color: var(--text);
+}
+
+.dashboard-header-button.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid var(--accent);
+  box-shadow: var(--shadow-xs);
+}
+
+.dashboard-header-button.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.dashboard-hero {
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dashboard-stage {
+  gap: 10px;
+}
+
+.dashboard-stage-copy {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-3);
+}
+
+.dashboard-overview {
+  gap: 8px;
+  align-content: start;
+}
+
+.dashboard-overview-empty {
+  min-height: 0;
+  padding: 12px 14px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 10px;
+  text-align: left;
+  background: var(--surface-2);
+  border-style: solid;
+}
+
+.dashboard-overview-empty .empty-state-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+}
+
+.dashboard-overview-empty p {
+  max-width: none;
+  font-size: 0.82rem;
+}
+
+.dashboard-overview-empty.is-compact {
+  padding: 6px 0 0;
+  background: transparent;
+  border: 0;
+  min-height: 0;
+  color: var(--text-3);
+}
+
+.dashboard-overview-empty.is-compact .empty-state-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.45;
+}
+
+.dashboard-overview-empty.is-compact p {
+  font-size: 0.78rem;
+}
+
+.quick-switch-card {
+  padding: 12px 14px;
+  gap: 8px;
+}
+
+#plugins-grid {
+  margin-top: 0;
+}
+
+#plugins-grid .section-head {
+  margin-bottom: 8px;
+}
+
+#plugins-grid .plugins-container.plugin-tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
 }

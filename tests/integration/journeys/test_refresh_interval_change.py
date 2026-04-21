@@ -45,11 +45,8 @@ def _open_settings_scheduling(page, live_server: str):
     page.wait_for_selector(".settings-console-layout", timeout=10000)
     page.click('[data-settings-tab="scheduling"]')
     page.wait_for_selector('[data-settings-panel="scheduling"].active', timeout=5000)
-    toggle = page.locator(
-        '[data-settings-panel="scheduling"] [data-collapsible-toggle]'
-    ).first
-    if toggle.get_attribute("aria-expanded") != "true":
-        toggle.click()
+    # The scheduling panel's display-cycle section is now flat (no collapsible
+    # toggle), so the interval input is visible once the panel is active.
     page.wait_for_selector("#interval:visible", timeout=5000)
     return collector
 
@@ -104,11 +101,9 @@ def test_refresh_interval_change_save_persist_cadence_respected(
     page.goto(f"{live_server}/settings", wait_until="domcontentloaded", timeout=30000)
     page.click('[data-settings-tab="scheduling"]')
     page.wait_for_selector('[data-settings-panel="scheduling"].active', timeout=5000)
-    toggle = page.locator(
-        '[data-settings-panel="scheduling"] [data-collapsible-toggle]'
-    ).first
-    if toggle.get_attribute("aria-expanded") != "true":
-        toggle.click()
+    # Display-cycle section is now flat (no collapsible toggle) after the
+    # Settings refactor, so the interval input is visible once the panel is
+    # active.
     page.wait_for_selector("#interval:visible", timeout=5000)
     assert page.locator("#interval").input_value() == str(_NEW_INTERVAL_MINUTES)
 

@@ -1,67 +1,44 @@
 {% extends "base.html" %}
-{% block title %}InkyPi - API Keys{% endblock %}
+{% block title %}InkyPi - API keys{% endblock %}
+{% block body_attrs %} data-page="api-keys"{% endblock %}
 {% block head %}
+    <meta name="status-badge-disabled" content="1">
     <script src="{{ url_for('static', filename='scripts/api_keys_page.js') }}" defer></script>
 {% endblock %}
 {% block body %}
     {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
     {% from 'macros/api_key_card.html' import api_key_card %}
+    {% from 'macros/pageheader.html' import pageheader %}
     <div class="frame api-keys-frame"
          data-delete-managed-url="{{ url_for('settings.delete_api_key') }}"
          data-mode="{{ api_keys_mode | default('managed') }}"
          data-save-generic-url="{{ url_for('apikeys.save_apikeys') }}"
          data-save-managed-url="{{ url_for('settings.save_api_keys') }}"
     >
-        {% set key_summary = namespace(provider_count=(entries|length if entries is defined else 0), configured_count=0) %}
-        {% if api_keys_mode == 'managed' %}
-            {% set key_summary.provider_count = 6 %}
-            {% if masked.OPEN_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.OPEN_WEATHER_MAP_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.NASA_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.UNSPLASH_ACCESS_KEY %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.GITHUB_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-            {% if masked.GOOGLE_AI_SECRET %}{% set key_summary.configured_count = key_summary.configured_count + 1 %}{% endif %}
-        {% else %}
-            {% set key_summary.configured_count = entries|length if entries is defined else 0 %}
-        {% endif %}
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('gear-six', 'app-icon') | safe }}
-                        <h1 class="app-title">API Keys</h1>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <a href="{{ url_for('settings.settings_page') }}" class="header-button is-secondary">Settings</a>
-                </div>
-            </div>
-        </header>
-        <div class="separator"></div>
-        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
         <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-management" data-page-shell="management">
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Store service credentials in one place. Configured fields start blank — leave a field blank to keep its current key, or type to replace it.</p>
-            </div>
-            <div class="page-summary">
-                <span id="providerCountSummary" class="status-chip info">{{ key_summary.provider_count }} providers</span>
-                <span id="configuredCountSummary" class="status-chip success">{{ key_summary.configured_count }} configured</span>
-                <span class="status-chip">{{ api_keys_mode | capitalize }}</span>
-            </div>
-        </div>
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Settings', 'url': url_for('settings.settings_page')}, {'label': 'API Keys'}]) }}
+        {% call pageheader(
+            title='API keys',
+            eyebrow='System',
+            description='Third-party credentials used by plugins.'
+        ) %}
+            <button type="button" id="saveApiKeysBtn" class="header-button is-secondary" disabled>Save API keys</button>
+        {% endcall %}
 
         {% if api_keys_mode == 'managed' %}
         <form id="apiKeysForm" class="settings-form">
             <div class="settings-container api-keys-grid">
+                {{ api_key_card('OpenWeather', 'OPEN_WEATHER_MAP_SECRET', 'openweather-input', 'openweather-status', 'Enter OpenWeather API key', masked, api_key_plugins) }}
                 {{ api_key_card('OpenAI', 'OPEN_AI_SECRET', 'openai-input', 'openai-status', 'Enter OpenAI API key', masked, api_key_plugins) }}
-                {{ api_key_card('OpenWeatherMap', 'OPEN_WEATHER_MAP_SECRET', 'openweather-input', 'openweather-status', 'Enter OpenWeatherMap API key', masked, api_key_plugins) }}
-                {{ api_key_card('NASA APOD', 'NASA_SECRET', 'nasa-input', 'nasa-status', 'Enter NASA API key', masked, api_key_plugins) }}
+                {{ api_key_card('NASA', 'NASA_SECRET', 'nasa-input', 'nasa-status', 'Enter NASA API key', masked, api_key_plugins, delete_label='NASA APOD') }}
                 {{ api_key_card('Unsplash', 'UNSPLASH_ACCESS_KEY', 'unsplash-input', 'unsplash-status', 'Enter Unsplash access key', masked, api_key_plugins) }}
-                {{ api_key_card('GitHub', 'GITHUB_SECRET', 'github-input', 'github-status', 'Enter GitHub personal access token', masked, api_key_plugins) }}
-                {{ api_key_card('Google AI', 'GOOGLE_AI_SECRET', 'googleai-input', 'googleai-status', 'Enter Google AI API key', masked, api_key_plugins) }}
+                <details class="api-keys-more">
+                    <summary>More providers</summary>
+                    <div class="api-keys-more-grid">
+                        {{ api_key_card('GitHub', 'GITHUB_SECRET', 'github-input', 'github-status', 'Enter GitHub personal access token', masked, api_key_plugins) }}
+                        {{ api_key_card('Google AI', 'GOOGLE_AI_SECRET', 'googleai-input', 'googleai-status', 'Enter Google AI API key', masked, api_key_plugins) }}
+                    </div>
+                </details>
             </div>
         </form>
         {% else %}
@@ -95,17 +72,9 @@
         </div>
         {% endif %}
 
-        <div class="info-banner">
-            <span class="info-banner-icon">{{ icon('info', 'icon-image') | safe }}</span>
-            <span class="info-banner-text">
-                API keys are stored in the <code>.env</code> file on the device.
-                Leave an input blank to keep the existing key. Some plugins may require a restart after changes.
-            </span>
-        </div>
-
-        <div class="buttons-container">
-            <button type="button" id="saveApiKeysBtn" class="action-button" disabled>Save</button>
-        </div>
+        <p class="api-keys-note">
+            API keys are stored in the device <code>.env</code> file. Leave an input blank to keep the existing key; some plugins may require a restart after changes.
+        </p>
     </div>
 
         {% include 'response_modal.html' %}

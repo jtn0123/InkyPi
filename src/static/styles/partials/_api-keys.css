@@ -171,10 +171,13 @@
   margin: 0 auto;
 }
 
+/* Compact single-row layout per the handoff design: stack cards vertically,
+   each card is one row with svc+usage on the left and chip+mask+button on
+   the right. The <input> row lives in a hidden container below and only
+   reveals when the user clicks "Change" / "Add key". */
 .api-keys-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 .api-keys-panel {
@@ -183,24 +186,71 @@
 }
 
 .api-key-card {
-  padding: 16px;
+  padding: 14px 16px;
   border: 1px solid var(--panel-border);
   border-radius: 12px;
   background: var(--panel-bg);
-  align-items: flex-start;
+  display: grid;
   gap: 10px;
 }
 
-.api-key-card-head {
-  display: grid;
-  gap: 4px;
-  width: 100%;
+.key-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-.api-key-card .form-label {
-  font-size: 1rem;
+.key-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 200px;
 }
 
+.key-row-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.api-key-card .key-svc {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.api-key-card .key-use {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-top: 0;
+}
+
+.api-mask {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--bg-secondary, var(--surface-2, transparent));
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-key-toggle {
+  min-height: 32px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
+/* Visually-hidden status text is still exposed to assistive tech so screen
+   readers hear "Status: Configured (mask)" / "Status: Not configured". */
 .api-key-status {
   display: inline-flex;
   align-items: center;
@@ -226,8 +276,124 @@
   width: 100%;
 }
 
+.api-key-actions[hidden] {
+  display: none;
+}
+
 .api-key-actions .header-button {
   min-width: 0;
+}
+
+/* Visual parity pass: widen the managed page and flatten cards into fuller
+   single-row entries like the handoff. */
+.api-keys-frame {
+  max-width: 980px;
+}
+
+.api-keys-frame .pageheader-actions {
+  align-items: center;
+}
+
+.api-keys-frame .pageheader-actions .action-button {
+  min-height: 40px;
+  padding: 8px 14px;
+}
+
+.settings-container.api-keys-grid {
+  justify-content: stretch;
+  padding: 0;
+}
+
+.api-keys-grid {
+  width: 100%;
+  gap: 14px;
+}
+
+.api-key-card {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--surface);
+  border-color: var(--surface-border);
+}
+
+.key-row {
+  align-items: center;
+}
+
+.key-row-left {
+  gap: 4px;
+}
+
+.key-row-right {
+  margin-left: auto;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.api-mask {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-2);
+  max-width: 220px;
+}
+
+.api-key-toggle {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.api-key-card[data-configured="false"] .api-key-toggle:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.api-key-actions {
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in oklab, var(--surface-border) 80%, transparent);
+}
+
+.api-keys-note {
+  margin: 8px 0 0;
+  color: var(--text-3);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.api-keys-more {
+  margin-top: 4px;
+  border: 1px solid var(--surface-border);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--surface) 92%, var(--surface-2));
+  overflow: hidden;
+}
+
+.api-keys-more summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 16px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.api-keys-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.api-keys-more-grid {
+  display: grid;
+  gap: 12px;
+  padding: 0 12px 12px;
 }
 
 .apikey-row {

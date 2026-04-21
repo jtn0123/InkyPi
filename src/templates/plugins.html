@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Plugins - InkyPi{% endblock %}
+{% block body %}
+    <div class="frame">
+        {% from 'macros/icons.html' import breadcrumb %}
+        {% from 'macros/pageheader.html' import pageheader %}
+        {% from 'macros/plugin_catalog.html' import plugin_catalog %}
+
+        {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'Plugins'}]) }}
+
+        <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="plugins">
+            {% call pageheader(
+                title='Plugins',
+                description='Browse installed plugins and jump straight into configuration, preview, and scheduling.',
+                eyebrow='Library',
+                chips=[{'label': plugins|length ~ ' installed', 'variant': 'accent'}]
+            ) %}
+                <a href="{{ url_for('playlist.playlists') }}" class="action-button is-secondary">Open playlists</a>
+            {% endcall %}
+
+            {{ plugin_catalog(
+                plugins=plugins,
+                section_id='plugins-library',
+                heading='Installed plugins',
+                count_label=plugins|length ~ ' installed',
+                aria_label='Installed plugins'
+            ) }}
+        </main>
+    </div>
+{% endblock %}

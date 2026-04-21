@@ -128,9 +128,9 @@ def test_update_network_settings_route(client, device_config_dev):
 
 
 def test_plugin_list_route(client, device_config_dev):
-    """Test plugin list endpoint returns 404 (no /plugins GET route)."""
+    """Test plugin list endpoint renders the dedicated plugins page."""
     resp = client.get("/plugins")
-    assert resp.status_code == 404
+    assert resp.status_code == 200
 
 
 def test_plugin_preview_route(client, device_config_dev):

@@ -50,6 +50,12 @@ def _open_updates_tab(page) -> None:
     page.wait_for_selector("#checkUpdatesBtn:visible", timeout=10000)
 
 
+def _open_power_tab(page) -> None:
+    # Reboot/shutdown moved to a dedicated "Power" tab (handoff design parity).
+    page.locator('[data-settings-tab="power"]').first.click()
+    page.wait_for_selector("#rebootBtn:visible", timeout=10000)
+
+
 def _viewer_lines(page) -> list[str]:
     raw = page.locator("#logsViewer").inner_text()
     return [line for line in raw.splitlines() if line.strip()]
@@ -109,7 +115,7 @@ def test_jtn_728_reboot_shutdown_journey(
 
     page = browser_page
     collector = _open_settings_page(page, live_server)
-    _open_updates_tab(page)
+    _open_power_tab(page)
 
     # Reboot path
     page.click("#rebootBtn")
@@ -243,11 +249,8 @@ def test_jtn_726_refresh_cadence_journey(
     page.click('[data-settings-tab="scheduling"]')
     page.wait_for_selector('[data-settings-panel="scheduling"].active', timeout=5000)
 
-    toggle = page.locator(
-        '[data-settings-panel="scheduling"] [data-collapsible-toggle]'
-    ).first
-    if toggle.get_attribute("aria-expanded") != "true":
-        toggle.click()
+    # The scheduling panel's display-cycle section is now flat (no collapsible
+    # toggle), so the interval input is visible once the panel is active.
     page.wait_for_selector("#interval:visible", timeout=5000)
 
     assert page.locator("#interval").input_value() == "5"

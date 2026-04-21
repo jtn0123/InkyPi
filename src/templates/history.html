@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}InkyPi - History{% endblock %}
+{% block title %}InkyPi - Recent renders{% endblock %}
+{% block body_attrs %} data-page="history"{% endblock %}
 {% block head %}
+    <meta name="status-badge-disabled" content="1">
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/history_page.js') }}" defer></script>
 {% endblock %}
@@ -8,40 +10,22 @@
     <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
     <div class="frame">
         {% from 'macros/icons.html' import icon, theme_toggle, empty_state, breadcrumb %}
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon" aria-label="Home">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('clock-counter-clockwise', 'app-icon') | safe }}
-                        <h1 class="app-title">History</h1>
-                    </div>
-                </div>
-                <div class="header-actions history-toolbar">
-                    <a href="{{ url_for('history.history_export_csv') }}" class="header-button" download>Export CSV</a>
-                    {# JTN-682: Skip in click sweep — handler calls location.reload() which destabilises subsequent clicks. #}
-                    <button id="historyRefreshBtn" class="header-button" type="button" data-test-skip-click="true">Refresh</button>
-                </div>
-            </div>
-        </header>
-        <div class="separator"></div>
+        {% from 'macros/pageheader.html' import pageheader %}
         {{ breadcrumb([{'label': 'Home', 'url': url_for('main.main_page')}, {'label': 'History'}]) }}
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Review generated images, redisplay successful renders, and clean up storage when the local cache grows too large.</p>
-            </div>
-            <div class="page-summary">
-                <span class="status-chip info">{{ total }} items</span>
-                {% if storage and storage.pct_free is not none %}
-                <span class="status-chip">{{ storage.pct_free|round(1) }}% free</span>
-                {% endif %}
-            </div>
-        </div>
+        {% set hist_chips = [{'label': total ~ ' items', 'variant': 'info'}] %}
+        {% call pageheader(
+            title='Recent renders',
+            eyebrow='History',
+            description='Past displays, latency per stage, and storage usage.',
+            chips=hist_chips
+        ) %}
+            <a href="{{ url_for('history.history_export_csv') }}" class="header-button is-secondary" download>Export CSV</a>
+            <button id="historyRefreshBtn" class="header-button" type="button" data-test-skip-click="true">Refresh</button>
+        {% endcall %}
         <div id="storage-block" class="storage-card" {% if not storage or storage.pct_free is none %}hidden{% endif %}>
             <div class="storage-card-head">
                 <div>
-                    <div class="storage-card-title">Storage available</div>
+                    <div class="storage-card-title">Storage</div>
                     <div class="storage-card-copy">Track remaining local capacity before the history cache starts competing with new renders.</div>
                 </div>
                 <div id="storage-text" class="storage-card-copy">
@@ -60,7 +44,7 @@
         <p id="history-metric-strip-desc" class="sr-only">
             Latencies from the most recent refresh. Values are per-stage durations in milliseconds.
         </p>
-        <div class="metric-strip compact" role="group" aria-label="Latest refresh latency" aria-describedby="history-metric-strip-desc">
+        <div class="metric-strip compact refined" role="group" aria-label="Latest refresh latency" aria-describedby="history-metric-strip-desc">
             {% if metrics.request_ms is not none %}
             <div class="metric-pill" title="Time spent fetching upstream data during the last refresh" aria-label="Request latency: {{ metrics.request_ms }} milliseconds (time fetching upstream data on last refresh)">
                 <span class="metric-pill-label">Request</span>
@@ -95,7 +79,7 @@
         <section class="danger-zone history-danger-zone" role="region" aria-labelledby="historyDangerZoneTitle">
             <div class="danger-zone-body">
                 <span class="danger-zone-label">Danger zone</span>
-                <h3 id="historyDangerZoneTitle">Reset cache</h3>
+                <h2 id="historyDangerZoneTitle">Reset cache</h2>
                 <p>Remove all saved history images from this device when you want to reclaim local storage quickly. This action cannot be undone.</p>
             </div>
             {# data-test-skip-click: wipes every saved history image #}

@@ -32,7 +32,16 @@
     for (const el of target.querySelectorAll("input, select, textarea")) {
       const key = el.name || el.id;
       if (!key) continue;
-      snap[key] = el.type === "checkbox" ? el.checked : el.value;
+      if (el.type === "checkbox") {
+        snap[key] = el.checked;
+      } else if (el.type === "radio") {
+        // Only record the *checked* radio's value under the group name so
+        // dirty-state detection reacts to selection changes (not just the
+        // last radio in DOM order). Unchecked radios are skipped.
+        if (el.checked) snap[key] = el.value;
+      } else {
+        snap[key] = el.value;
+      }
     }
     return snap;
   }
@@ -327,7 +336,7 @@
         // Fallback path for environments without FormState (should not occur).
         if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving\u2026"; }
         try { await doSubmit(); } finally {
-          if (saveBtn?.textContent === "Saving\u2026") saveBtn.textContent = "Save";
+          if (saveBtn?.textContent === "Saving\u2026") saveBtn.textContent = "Save settings";
         }
       }
     }
@@ -717,6 +726,12 @@
         if (data.release_notes && notesContainer && notesBody) {
           notesBody.textContent = data.release_notes;
           notesContainer.hidden = false;
+          // Handoff parity: append the latest version number as a muted
+          // suffix in the <summary> ("Release notes · v2.5.0").
+          const versionEl = document.getElementById("releaseNotesVersion");
+          if (versionEl) {
+            versionEl.textContent = data.latest ? `\u00b7 ${data.latest}` : "";
+          }
         } else if (notesContainer) {
           notesContainer.hidden = true;
         }
@@ -1389,6 +1404,10 @@
     }
 
     function initializeMobilePanelState() {
+      // Name indicates mobile-only: on desktop the collapsibles should stay
+      // collapsed so users see the section list; on mobile we auto-open the
+      // first section so the active tab isn't a blank screen.
+      if (!mobileQuery.matches) return;
       const panel = document.querySelector(`[data-settings-panel="${state.activeTab}"]`);
       if (!panel) return;
       const openSection = panel.querySelector(".collapsible-content.is-open");
@@ -1419,14 +1438,50 @@
       }
 
       const logsToggle = document.getElementById("settingsLogsToggle");
-      const logsPanel = document.querySelector(".logs-panel");
+      const logsPanel = document.getElementById("settingsLogsPanel");
+      const observabilitySection = document.getElementById("section-observability");
+      const observabilityToggle = observabilitySection?.querySelector(
+        "[data-collapsible-toggle]"
+      );
+
+      function setLogsPanelOpen(open, options = {}) {
+        if (!logsPanel || !logsToggle) return;
+        const shouldOpen = !!open;
+        if (shouldOpen) {
+          if (state.activeTab !== "maintenance") {
+            setActiveTab("maintenance");
+          }
+          if (
+            observabilityToggle &&
+            observabilityToggle.getAttribute("aria-expanded") !== "true" &&
+            ui.toggleCollapsible
+          ) {
+            ui.toggleCollapsible(observabilityToggle);
+          }
+        }
+        logsPanel.classList.toggle("is-open", shouldOpen);
+        logsPanel.toggleAttribute("hidden", !shouldOpen);
+        logsToggle.textContent = shouldOpen ? "Hide live logs" : "Show live logs";
+        logsToggle.setAttribute("aria-expanded", String(shouldOpen));
+        if (shouldOpen && options.scroll) {
+          logsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+
       if (logsToggle && logsPanel) {
         logsToggle.addEventListener("click", () => {
-          const isOpen = logsPanel.classList.toggle("is-open");
-          logsToggle.textContent = isOpen ? "Hide Logs" : "Show Logs";
-          if (isOpen) {
-            logsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
+          const isOpen = logsPanel.classList.contains("is-open");
+          setLogsPanelOpen(!isOpen, { scroll: true });
+        });
+      }
+
+      if (observabilityToggle) {
+        observabilityToggle.addEventListener("click", () => {
+          globalThis.requestAnimationFrame(() => {
+            if (observabilityToggle.getAttribute("aria-expanded") !== "true") {
+              setLogsPanelOpen(false);
+            }
+          });
         });
       }
     }

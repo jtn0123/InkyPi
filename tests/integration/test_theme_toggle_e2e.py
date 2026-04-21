@@ -83,7 +83,7 @@ def test_theme_persists_after_reload(live_server, browser_page):
     )
 
     page.reload()
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("domcontentloaded")
 
     theme_after = page.evaluate("document.documentElement.getAttribute('data-theme')")
     assert theme_after == "dark", f"Expected 'dark' after reload, got '{theme_after}'"

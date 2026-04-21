@@ -1,23 +1,26 @@
 .history-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
 }
 
 .history-card {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: var(--card-border);
-  border-radius: var(--card-radius);
-  background: var(--panel-bg);
-  box-shadow: var(--shadow-xs);
-  transition: transform var(--transition-speed) ease, border-color var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+  transition: border-color var(--transition-speed) ease;
+}
+
+.history-card:hover {
+  border-color: var(--text-3);
 }
 
 .history-card-body {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -48,19 +51,23 @@
 
 .history-meta {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .history-name {
-  font-weight: 700;
+  font-weight: 500;
+  font-size: 0.82rem;
   color: var(--text);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-sub {
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-  line-height: 1.45;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  line-height: 1.4;
 }
 
 .history-actions {

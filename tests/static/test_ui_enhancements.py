@@ -101,7 +101,6 @@ def test_main_css_contains_workflow_and_management_shells(client):
     css_content = _read_all_css()
 
     assert ".workflow-layout" in css_content
-    assert ".workflow-mode-bar" in css_content
     assert ".dashboard-hero" in css_content
     assert ".settings-grid" in css_content
     assert ".logs-viewer" in css_content

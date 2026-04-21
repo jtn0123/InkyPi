@@ -59,8 +59,8 @@ def test_settings_tabs_switch(live_server, browser_page):
 
 
 def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
-    """JTN-643: The Style accordion chevron on plugin pages must visually flip
-    between the collapsed (▼) and expanded (▲) states, matching Settings.
+    """JTN-643: The collapsible accordion chevron must visually flip between the
+    collapsed (▼) and expanded (▲) states.
 
     The CSS contract is driven by `aria-expanded`: when the header has
     `aria-expanded="true"`, `_toggle.css` applies `transform: rotate(180deg)`
@@ -68,9 +68,24 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
     regression (e.g. removing the CSS rule, swapping the chevron to a display
     mode transforms can't apply to, or forgetting to toggle aria-expanded)
     is caught end-to-end.
+
+    Note: this test originally targeted the Style accordion on plugin pages,
+    but that UX was refactored into a tab bar. The collapsible CSS contract
+    is still exercised on the Settings page — the Diagnostics section on the
+    Updates ("maintenance") tab is the last remaining collapsible after the
+    handoff-driven Card refactor flattened the other settings sections. The
+    contract is shared CSS, so testing it there preserves the regression
+    signal.
     """
     page = browser_page
-    navigate_and_wait(page, live_server, "/plugin/weather")
+    navigate_and_wait(page, live_server, "/settings")
+
+    # Diagnostics lives on the Updates/maintenance tab; switch to it so the
+    # collapsible header is in the rendered, interactable panel.
+    page.click('[data-settings-tab="maintenance"]')
+    page.wait_for_selector(
+        '[data-settings-panel="maintenance"].active', timeout=5000
+    )
 
     header = page.locator("button.collapsible-header[data-collapsible-toggle]").first
     icon = header.locator(".collapsible-icon")

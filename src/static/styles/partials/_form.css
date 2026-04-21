@@ -34,7 +34,11 @@
 
 .form-group label {
     white-space: nowrap; /* Prevent label wrapping */
-    font-weight: 600;
+    /* Handoff parity: labels are regular-weight muted text, not 600 strong.
+       The `.form-label` rule below sets the canonical scale; this selector
+       used to override it with `font-weight: 600` which made every label
+       read 2px heavier than the handoff's refined scale. */
+    font-weight: 500;
     color: var(--text);
 }
 
@@ -81,23 +85,27 @@
     width: 100%;
 }
 
-/* Label styling */
+/* Label styling — handoff parity: 13px medium muted (was 16px/600 strong).
+   Every form label in the handoff's screens uses this refined scale so the
+   surrounding content reads as the primary emphasis. */
 .form-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-secondary, var(--text));
     white-space: nowrap; /* Prevent the label from wrapping */
 }
 
-/* Input field styling */
+/* Input field styling — handoff parity: 14px on `--surface-2` with a refined
+   border. Previous values were 16px/`--input-bg` which read as a chunkier
+   legacy Material form. */
 .form-input {
     flex: auto;
-    padding: 0.4rem;
-    font-size: 1rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.88rem;
     border: 1px solid var(--surface-border);
     border-radius: var(--border-radius-sm);
     box-sizing: border-box;
-    background-color: var(--input-bg);
+    background-color: var(--surface-2, var(--input-bg));
     color: var(--text);
     min-height: var(--form-input-height);
     display: flex;
@@ -371,6 +379,51 @@ input:disabled, select:disabled, textarea:disabled {
     border: 1px solid var(--panel-border);
     border-radius: 6px;
     font-variant-numeric: tabular-nums;
+}
+
+/* Handoff parity: stacked slider pattern — label + mono value on top,
+   full-width range below. Mirrors components.jsx's <Slider> primitive.
+   Opt-in via `.slider-row` on the form-group so legacy three-column
+   sliders elsewhere keep their current layout. */
+.form-group.slider-row {
+    display: block;
+    margin-bottom: 14px;
+}
+
+.form-group.slider-row .slider-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.75rem;
+    color: var(--text-secondary, var(--text-2));
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.form-group.slider-row .slider-head .form-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+    margin: 0;
+    min-width: 0;
+}
+
+.form-group.slider-row .slider-val {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    color: var(--text);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    background: transparent;
+    border: 0;
+    padding: 0;
+}
+
+.form-group.slider-row .slider-range,
+.form-group.slider-row input[type="range"].settings-slider {
+    width: 100%;
+    max-width: none;
+    accent-color: var(--accent);
+    margin: 0;
 }
 
 /* ── Form responsive: tablet ── */

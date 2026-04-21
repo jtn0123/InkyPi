@@ -1,0 +1,195 @@
+/* Refined page header — eyebrow + title + description + actions */
+
+.pageheader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 20px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.pageheader-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.pageheader .eyebrow {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+
+.pageheader .page-title,
+.pageheader h1.app-title {
+  font-size: 1.6rem;
+  letter-spacing: -0.018em;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.pageheader .page-desc {
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 620px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.pageheader .page-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+/* Handoff parity: page-meta chips render device name and "Showing: …"
+   plugin name — natural-case human labels, not ALL-CAPS eyebrow text.
+   Scoped so success/warning status badges elsewhere still uppercase. */
+.pageheader .page-meta .status-chip {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.pageheader-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .pageheader {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pageheader-actions {
+    width: 100%;
+  }
+}
+
+/* Plugin detail pageheader: icon + title + debug slug + mode chips */
+.pageheader-plugin .plugin-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .app-icon {
+  width: var(--icon-lg, 28px);
+  height: var(--icon-lg, 28px);
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.pageheader-plugin .plugin-titlerow .title-stack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .eyebrow {
+  margin-bottom: 0;
+}
+
+.pageheader-plugin .plugin-titlerow .app-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+}
+
+.pageheader-plugin .plugin-mode-row {
+  margin-top: 10px;
+}
+
+/* Refined metrics strip — a 4-up KPI band, evolves the existing .metric-strip */
+.metric-strip.refined,
+.metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+
+.metric-strip.refined .metric-pill,
+.metrics-strip .metric {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-strip.refined .metric-pill-label,
+.metrics-strip .metric-k {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.metric-strip.refined .metric-pill-value,
+.metrics-strip .metric-v {
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.metrics-strip .metric-v em {
+  color: var(--text-3);
+  font-style: normal;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  margin-left: 4px;
+}
+
+/* Refined underline-tab pattern for in-page section switching */
+.tabline {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 16px;
+}
+
+.tabline button,
+.tabline a {
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tabline button:hover,
+.tabline a:hover {
+  color: var(--text);
+}
+
+.tabline button.active,
+.tabline a.active,
+.tabline button[aria-selected="true"],
+.tabline a[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 500;
+}

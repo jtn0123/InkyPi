@@ -55,6 +55,27 @@
     animation: status-badge-pulse 2s ease-in-out infinite;
 }
 
+body[data-page="settings"] .status-badge {
+    bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+body[data-page="settings"] .status-popover {
+    bottom: calc(9.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+body[data-page="dashboard"] .status-badge,
+body[data-page="dashboard"] .status-popover,
+body[data-page="playlist"] .status-badge,
+body[data-page="playlist"] .status-popover,
+body[data-page="plugin"] .status-badge,
+body[data-page="plugin"] .status-popover,
+body[data-page="history"] .status-badge,
+body[data-page="history"] .status-popover,
+body[data-page="api-keys"] .status-badge,
+body[data-page="api-keys"] .status-popover {
+    display: none !important;
+}
+
 @keyframes status-badge-pulse {
     0%, 100% { box-shadow: 0 4px 14px rgba(220, 38, 38, 0.25); }
     50% { box-shadow: 0 4px 20px rgba(220, 38, 38, 0.55); }

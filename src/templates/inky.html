@@ -4,112 +4,134 @@
     <script src="{{ url_for('static', filename='scripts/lightbox.js') }}" defer></script>
     <script src="{{ url_for('static', filename='scripts/dashboard_page.js') }}" defer></script>
 {% endblock %}
+{% block body_attrs %} data-page="dashboard"{% endblock %}
 {% block body %}
+    {% from 'macros/plugin_catalog.html' import plugin_catalog %}
     {% set plugin_names = {} %}
     {% for p in plugins %}{% if p.display_name %}{% set _ = plugin_names.update({p.id: p.display_name}) %}{% endif %}{% endfor %}
     <!-- Subtle frame container -->
     <div class="frame">
-        {% from 'macros/icons.html' import icon, theme_toggle, PLUGIN_ICON_MAP, empty_state %}
-        <header class="app-header" role="banner">
-            <div class="header-content">
-                <div class="header-identity">
-                    <a href="{{ url_for('main.main_page') }}" class="header-button icon current-page" aria-label="Home" aria-current="page">{{ icon('house', 'icon-image') | safe }}</a>
-                    {{ theme_toggle() }}
-                    <div class="title-container">
-                        {{ icon('squares-four', 'app-icon') | safe }}
-                        <h1 class="app-title" title="{{ config.name }}">{{ config.name }}</h1>
-                    </div>
-                </div>
-                <nav class="header-actions" role="navigation" aria-label="Site navigation">
-                    <a href="{{ url_for('history.history_page') }}" class="header-button icon" aria-label="History">{{ icon('clock-counter-clockwise', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('playlist.playlists') }}" class="header-button icon" aria-label="Playlists">{{ icon('squares-four', 'icon-image') | safe }}</a>
-                    <a href="{{ url_for('settings.settings_page') }}" class="header-button icon" aria-label="Settings">{{ icon('gear-six', 'icon-image') | safe }}</a>
-                </nav>
+        {% from 'macros/icons.html' import icon, theme_toggle, empty_state %}
+        {% from 'macros/pageheader.html' import pageheader %}
+        <header class="pageheader" role="banner">
+            <div class="pageheader-main">
+                <div class="eyebrow">Dashboard</div>
+                {# JTN-340: keep the `title` attribute on the H1 so the full
+                   device name still surfaces via hover/AT when it's shown as
+                   a chip below; useful when the chip itself is truncated. #}
+                <h1 class="app-title" title="{{ config.name }}">Current display</h1>
+                <p class="page-desc">What's on the e-ink panel right now, what's next, and quick access to plugins.</p>
+            </div>
+            <div class="pageheader-actions dashboard-pageheader-actions">
+                <button id="dashboardRefreshBtn" type="button" class="header-button is-secondary dashboard-header-button" aria-label="Refresh" data-test-skip-click="true">
+                    {{ icon('arrow-clockwise', 'btn-leading-icon') | safe }}
+                    <span class="button-text">Refresh</span>
+                </button>
+                <button id="displayNextBtn" type="button" class="header-button primary dashboard-header-button" aria-label="Display next plugin in the rotation" data-default-label="Display Next" data-test-skip-click="true">
+                    {{ icon('skip-forward', 'btn-leading-icon') | safe }}
+                    <span class="button-text">Display Next</span>
+                </button>
             </div>
         </header>
-        <div class="separator"></div>
-        <div class="page-intro">
-            <div class="page-intro-body">
-                <p class="page-subtitle">Preview the current display, inspect what is showing now and next, and jump directly into the plugins that drive the device.</p>
-            </div>
-            <div class="page-summary">
-                <span class="status-chip info">{{ plugins|length }} plugins</span>
-                {% if refresh_info.playlist %}
-                <span class="status-chip">Playlist: {{ refresh_info.playlist }}</span>
-                {% endif %}
-                {% if refresh_info.plugin_id %}
-                <span class="status-chip" title="Currently displayed plugin">Showing: {{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) }}</span>
-                {% endif %}
-            </div>
-        </div>
         <!-- Main content area -->
         <main id="main-content" role="main" tabindex="-1" class="page-shell page-shell-dashboard" data-page-shell="dashboard">
             <div class="dashboard-hero">
-                <section class="dashboard-stage">
+                <section class="dashboard-stage" aria-labelledby="dashboardStageHeading">
+                    {# Visually-hidden H2 keeps the heading hierarchy valid
+                       (H1 → H2 → H3 in aside cards) after the handoff redesign
+                       dropped the visible "Current Display" subheading from
+                       the stage header. #}
+                    <h2 id="dashboardStageHeading" class="sr-only">Preview</h2>
                     <div class="dashboard-stage-header">
-                        <div>
-                            <h2>Current Display</h2>
-                            <p id="dashboardStageCopy" class="dashboard-stage-copy">Click the preview to inspect it in the lightbox. On desktop, double-click to toggle native pixels.</p>
+                        {# Handoff: left-side shows a Live chip + resolution/driver
+                           descriptor as a single stable line. The previous H2
+                           duplicated the page H1 ("Current display") and the
+                           stage-copy sentence is now communicated by the cursor
+                           affordance on the preview itself. #}
+                        <div class="dashboard-stage-descriptor">
+                            <span class="status-chip accent dot" title="Preview mirrors the device in near-real-time">Live</span>
+                            <span class="dashboard-resolution-mono">{{ config.resolution[0] }}&times;{{ config.resolution[1] }}{% set _display_type = config.display_type or '' %}{% if _display_type == 'inky' %} &middot; 7-color Inky Impression{% elif _display_type == 'mock' %} &middot; Mock display{% elif _display_type %} &middot; {{ _display_type | title }}{% endif %}</span>
                         </div>
-                        <span class="status-chip info">{{ config.resolution[0] }}&times;{{ config.resolution[1] }}</span>
+                        <div class="dashboard-stage-controls">
+                            <div class="seg" role="group" aria-label="Preview size">
+                                <button type="button" class="seg-btn active" id="previewFitBtn" data-preview-mode="fit" aria-pressed="true" data-test-skip-click="true">Fit</button>
+                                <button type="button" class="seg-btn" id="previewNativeBtn" data-preview-mode="native" aria-pressed="false" data-test-skip-click="true">Native px</button>
+                            </div>
+                        </div>
                     </div>
+                    <p id="dashboardStageCopy" class="dashboard-stage-copy sr-only">Tap the preview to inspect it in the lightbox.</p>
                     <div class="image-container">
                         <div id="previewSkeleton" class="img-skeleton" aria-hidden="true"></div>
                         <img id="previewImage" src="{{ url_for('main.preview_image') }}" alt="Current display for {{ config.name }}"
                              width="{{ config.resolution[0] }}" height="{{ config.resolution[1] }}"
                              data-native-width="{{ config.resolution[0] }}" data-native-height="{{ config.resolution[1] }}">
                     </div>
+                    <div class="hero-strip" role="group" aria-label="Device refresh status">
+                        <div class="hero-cell">
+                            <div class="k">Now</div>
+                            <div class="v {% if not refresh_info.plugin_id %}is-empty{% endif %}" id="heroNowValue">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) if refresh_info.plugin_id else 'Idle' }}</div>
+                            {# Handoff shows "Playlist · refreshed 3 min ago" here so the
+                               redundant Now-showing block in the aside can go away. #}
+                            <div class="m" id="heroNowMeta">{% if refresh_info.playlist %}Playlist: {{ refresh_info.playlist }}{% if refresh_info.refresh_time %} &middot; refreshed {{ refresh_info.refresh_time | format_relative_time }}{% endif %}{% elif refresh_info.refresh_type %}{{ refresh_info.refresh_type }}{% else %}&mdash;{% endif %}</div>
+                        </div>
+                        <div class="hero-divider" aria-hidden="true"></div>
+                        <div class="hero-cell">
+                            <div class="k">Next</div>
+                            <div class="v {% if not next_up or not next_up.plugin_id %}is-empty{% endif %}" id="heroNextValue">{{ plugin_names.get(next_up.plugin_id, next_up.plugin_id) if next_up and next_up.plugin_id else '&mdash;' | safe }}</div>
+                            <div class="m" id="heroNextMeta">{% if next_up and next_up.playlist %}Playlist: {{ next_up.playlist }}{% else %}&mdash;{% endif %}</div>
+                        </div>
+                        <div class="hero-divider" aria-hidden="true"></div>
+                        <div class="hero-cell">
+                            {# Handoff parity: the third cell is forward-looking
+                               again. SSR renders the current ETA, then the page JS
+                               keeps the countdown ticking from refresh-info data. #}
+                            <div class="k">Refresh</div>
+                            <div class="v {% if not refresh_info.next_refresh_relative %}is-empty{% endif %}" id="heroRefreshValue">{% if refresh_info.next_refresh_relative %}{{ refresh_info.next_refresh_relative }}{% else %}&mdash;{% endif %}</div>
+                            <div class="m" id="heroRefreshMeta" title="{{ refresh_info.next_refresh_time or '' }}">{% if refresh_info.next_refresh_meta %}{{ refresh_info.next_refresh_meta }}{% else %}&mdash;{% endif %}</div>
+                        </div>
+                    </div>
                 </section>
 
                 <aside class="dashboard-overview">
-                    <div id="statusRow" class="dashboard-status-card" {% if not refresh_info.plugin_id and (not next_up or not next_up.plugin_id) %}hidden{% endif %}>
-                        <div id="nowShowingBlock" class="dashboard-status-meta" aria-live="polite" {% if not refresh_info.plugin_id %}hidden{% endif %}>
-                            <h3>Now showing:</h3>
+                    <section class="dashboard-status-card kpi-card" id="todayKpiCard" aria-labelledby="todayKpiTitle">
+                        <header class="kpi-card-head">
+                            <h3 id="todayKpiTitle">Today</h3>
+                            <span class="kpi-card-sub" id="todayKpiSub">Awaiting telemetry</span>
+                        </header>
+                        <dl class="kv-list kpi-list">
                             <div>
-                                <strong id="nsPlugin">{{ plugin_names.get(refresh_info.plugin_id, refresh_info.plugin_id) if refresh_info.plugin_id else '' }}</strong>
-                                {% set ns_suffix = refresh_info.plugin_instance | instance_suffix_label(refresh_info.plugin_id) %}
-                                {% if ns_suffix %}
-                                <span>(<span id="nsInstance">{{ ns_suffix }}</span>)</span>
-                                {% else %}
-                                <span id="nsInstance" hidden></span>
-                                {% endif %}
+                                <dt>Refreshes</dt>
+                                <dd id="kpiRefreshes">&mdash;</dd>
                             </div>
-                            {% if refresh_info.playlist %}
-                            <div>Playlist: <span id="nsPlaylist">{{ refresh_info.playlist }}</span></div>
-                            {% else %}
-                            <span id="nsPlaylist" hidden></span>
-                            {% endif %}
-                        </div>
-                        <div id="nextUpBlock" class="dashboard-status-meta" aria-live="polite" {% if not next_up or not next_up.plugin_id %}hidden{% endif %}>
-                            <h3>Next up:</h3>
                             <div>
-                                <strong id="nuPlugin">{{ plugin_names.get(next_up.plugin_id, next_up.plugin_id) if next_up and next_up.plugin_id else '' }}</strong>
-                                {% set nu_suffix = (next_up.plugin_instance | instance_suffix_label(next_up.plugin_id)) if next_up else '' %}
-                                {% if nu_suffix %}
-                                <span>(<span id="nuInstance">{{ nu_suffix }}</span>)</span>
-                                {% else %}
-                                <span id="nuInstance" hidden></span>
-                                {% endif %}
+                                <dt>Avg render</dt>
+                                <dd id="kpiAvgRender">&mdash;</dd>
                             </div>
-                            {% if next_up and next_up.playlist %}
-                            <div>Playlist: <span id="nuPlaylist">{{ next_up.playlist }}</span></div>
-                            {% else %}
-                            <span id="nuPlaylist" hidden></span>
-                            {% endif %}
-                            <button id="displayNextBtn" class="action-button compact">Display Next</button>
-                        </div>
-                    </div>
+                            <div>
+                                <dt>Errors</dt>
+                                <dd id="kpiErrors">&mdash;</dd>
+                            </div>
+                            <div>
+                                <dt>Storage free</dt>
+                                <dd id="kpiStorageFree">&mdash;</dd>
+                            </div>
+                        </dl>
+                    </section>
+                    {# #statusRow (Now showing / Next up) removed — the hero-strip
+                       below the preview already conveys the same information with
+                       the same aria-live semantics. Design handoff only shows the
+                       hero-strip; keeping both caused visual duplication. #}
 
                     <div id="imageMeta" class="dashboard-status-card dashboard-meta" hidden>
                         <h3>Image details</h3>
                         <div id="imageMetaContent" class="dashboard-status-meta"></div>
                     </div>
 
-                    <div id="connectivityWarning" class="dashboard-connectivity-warning" hidden>
+                    <div id="connectivityWarning" class="dashboard-connectivity-warning" role="status" aria-live="polite" hidden>
                         <p>Unable to reach the server. Retrying&hellip;</p>
                     </div>
 
-                    <div id="overviewEmpty" class="dashboard-overview-empty" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
+                    <div id="overviewEmpty" class="dashboard-overview-empty{% if has_preview %} is-compact{% endif %}" {% if refresh_info.plugin_id or (next_up and next_up.plugin_id) %}hidden{% endif %}>
                         {{ icon('monitor', 'empty-state-icon') | safe }}
                         {% if has_preview %}
                         <p>Last display info unavailable.</p>
@@ -117,46 +139,80 @@
                         <p>Display a plugin to see details here.</p>
                         {% endif %}
                     </div>
+
+                    {% if playlists %}
+                    <section class="quick-switch-card" aria-labelledby="quickSwitchTitle">
+                        <header class="quick-switch-head">
+                            <h3 id="quickSwitchTitle">Quick switch</h3>
+                            <a href="{{ url_for('playlist.playlists') }}" class="header-button is-secondary quick-switch-link">All playlists</a>
+                        </header>
+                            <div class="quick-switch-list">
+                            {% for p in playlists %}
+                            {% set _all_day = p.start_time == '00:00' and p.end_time in ('24:00', '23:59') %}
+                            {% set _is_active = p.name == active_playlist_name %}
+                            {% set _has_items = p.plugins|length > 0 %}
+                            <div class="quick-row{% if _is_active %} is-active{% endif %}" data-quick-switch-row data-playlist-name="{{ p.name }}" data-playlist-switchable="{{ 'true' if _has_items else 'false' }}" data-playlist-open-url="{{ url_for('playlist.playlists') }}">
+                                <div class="quick-row-main">
+                                    <div class="quick-name">{{ p.name }}</div>
+                                    <div class="quick-sub">{% if _all_day %}All day{% else %}{{ p.start_time }}–{{ p.end_time }}{% endif %} · {{ p.cycle_minutes or device_cycle_minutes }} min cycle · {{ p.plugins|length }} item{{ '' if p.plugins|length == 1 else 's' }}</div>
+                                </div>
+                                <div class="quick-row-actions" data-quick-switch-actions>
+                                    <span class="status-chip success quick-row-status" data-quick-switch-status{% if not _is_active %} hidden{% endif %}>Active</span>
+                                    {% if _has_items %}
+                                    <button type="button"
+                                            class="header-button is-secondary quick-row-btn"
+                                            data-quick-switch-button
+                                            data-playlist-name="{{ p.name }}"
+                                            data-default-label="Switch now"
+                                            aria-label="Switch to {{ p.name }} playlist"
+                                            {% if _is_active %}hidden disabled aria-hidden="true"{% endif %}>Switch now</button>
+                                    {% else %}
+                                    <a href="{{ url_for('playlist.playlists') }}"
+                                       class="header-button is-secondary quick-row-btn"
+                                       data-quick-switch-fallback
+                                       aria-label="Open {{ p.name }} playlist"
+                                       {% if _is_active %}hidden aria-hidden="true"{% endif %}>Open playlist</a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
                 </aside>
             </div>
+            {% set quick_launch_limit = 10 %}
+            {% set quick_launch_plugins = plugins[:quick_launch_limit] %}
+            {{ plugin_catalog(
+                plugins=quick_launch_plugins,
+                heading='Plugins',
+                count_label=(plugins|length ~ ' installed'),
+                action_href=url_for('plugin.plugins_page'),
+                action_label='Open library'
+            ) }}
         </main>
-
-        <!-- Plugin navigation section -->
-        <section id="plugins-grid" aria-label="Available plugins">
-            <h2 class="plugins-title compact">Plugins</h2>
-        {% set icon_map = PLUGIN_ICON_MAP %}
-            <div class="plugins-container dashboard-grid">
-                {% for plugin in plugins %}
-                <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="plugin-item"
-                   aria-label="Open {{ plugin.display_name }} plugin settings">
-                    {% set ph = icon_map.get(plugin.id) %}
-                    {% if ph %}
-                    {{ icon(ph, 'icon-image') | safe }}
-                    {% else %}
-                    <img
-                        src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}"
-                        alt=""
-                        class="icon-image"
-                        loading="lazy">
-                    {% endif %}
-                    <span class="plugin-name">{{ plugin.display_name }}</span>
-                </a>
-                {% else %}
-                {{ empty_state('squares-four', 'No plugins available.', 'Check your installation.', compact=true) }}
-                {% endfor %}
-            </div>
-        </section>
     </div>
     {% include 'response_modal.html' %}
 <script nonce="{{ csp_nonce }}">
     window.__INKYPI_DASHBOARD_BOOT__ = {
         displayNextUrl: {{ url_for('main.display_next') | tojson }},
         imageHash: {{ refresh_info.get('image_hash')|tojson }},
+        initialRefreshInfo: {{ {
+            'refresh_time': refresh_info.get('refresh_time'),
+            'playlist': refresh_info.get('playlist'),
+            'cycle_minutes': refresh_info.get('cycle_minutes'),
+            'next_refresh_time': refresh_info.get('next_refresh_time'),
+            'next_refresh_meta': refresh_info.get('next_refresh_meta')
+        } | tojson }},
         nextUpUrl: {{ url_for('main.next_up') | tojson }},
         previewUrl: {{ url_for('main.preview_image') | tojson }},
         pushUrl: {{ (INKYPI_PUSH_URL if INKYPI_PUSH_URL is defined else url_for('events.sse_events')) | tojson }},
+        quickSwitchUrl: {{ url_for('playlist.display_next_in_playlist') | tojson }},
         refreshInfoUrl: {{ url_for('main.refresh_info') | tojson }},
+        statsUrl: "/api/stats",
+        systemHealthUrl: "/api/health/system",
         resolution: {{ config.resolution | tojson }},
+        cycleMinutes: {{ device_cycle_minutes | tojson }},
     };
     document.addEventListener('DOMContentLoaded', () => {
         window.InkyPiDashboardPage.create(window.__INKYPI_DASHBOARD_BOOT__).init();

@@ -7,7 +7,10 @@ def test_api_keys_page_loads(client):
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
     assert 'data-page-shell="management"' in body
-    assert "6 providers" in body
+    assert 'id="saveApiKeysBtn"' in body
+    assert "Save API keys" in body
+    assert "Third-party credentials used by plugins." in body
+    assert "6 providers" not in body
 
 
 def test_api_keys_page_shows_configured_count(client, device_config_dev):
@@ -17,7 +20,7 @@ def test_api_keys_page_shows_configured_count(client, device_config_dev):
     resp = client.get("/settings/api-keys")
     assert resp.status_code == 200
     body = resp.data.decode("utf-8")
-    assert "2 configured" in body
+    assert body.count('data-role="key-chip">Configured</span>') == 2
 
 
 def test_save_api_keys_and_read_back(client, monkeypatch, tmp_path):
@@ -315,10 +318,13 @@ def test_api_keys_template_no_longer_references_bullet_placeholder():
     )
 
 
-def test_api_keys_responsive_css_has_short_viewport_sticky_rule():
-    """JTN-599: the Save button must be sticky on short laptop viewports
-    (max-height ≤ 860px covers 1280x800, 1366x768, 1280x768). Static check
-    against accidental deletion of the media query."""
+def test_api_keys_responsive_css_reserves_short_viewport_sticky_rule_for_settings():
+    """JTN-599: API keys no longer uses a bottom sticky save bar.
+
+    The short-viewport sticky treatment is now intentionally reserved for
+    /settings, while /settings/api-keys moved its save action into the header.
+    Keep the shared media query, but prevent the old API-key selector from
+    creeping back in."""
     css_path = (
         Path(__file__).resolve().parents[2]
         / "src"
@@ -328,13 +334,13 @@ def test_api_keys_responsive_css_has_short_viewport_sticky_rule():
         / "_responsive.css"
     )
     content = css_path.read_text(encoding="utf-8")
-    # Must include the max-height: 860px media query scoped at .api-keys-frame.
+    # Must keep the max-height: 860px media query for /settings.
     assert "max-height: 860px" in content, (
         "JTN-599: _responsive.css must define a @media (max-height: 860px) "
-        "rule to pin the Save button on short laptop screens."
+        "rule to pin the Settings save button on short laptop screens."
     )
-    # And the api-keys-frame selector must appear inside a sticky rule.
-    assert ".api-keys-frame .buttons-container" in content
+    assert ".settings-panel .buttons-container" in content
+    assert ".api-keys-frame .buttons-container" not in content
 
 
 def test_delete_api_key(client, monkeypatch, tmp_path):

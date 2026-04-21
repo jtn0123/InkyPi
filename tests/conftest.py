@@ -366,8 +366,19 @@ def client(flask_app):
 
 @pytest.fixture()
 def live_server(
-    flask_app, free_tcp_port_factory
+    flask_app, free_tcp_port_factory, monkeypatch
 ):  # free_tcp_port_factory: from anyio pytest plugin
+    # Relax CSP for integration tests so Playwright's page.add_script_tag(content=...)
+    # (used by axe-core and other in-page probes) isn't blocked as an inline script.
+    # Unit CSP tests (tests/test_csp_report.py) use the `client` fixture instead and
+    # override INKYPI_CSP in their own monkeypatch scope.
+    monkeypatch.setenv(
+        "INKYPI_CSP",
+        "default-src 'self'; img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "script-src 'self' 'unsafe-inline'; "
+        "font-src 'self' data: https: https://fonts.gstatic.com",
+    )
     host = "127.0.0.1"
     port = free_tcp_port_factory()
     server = make_server(host, port, flask_app, threaded=True)

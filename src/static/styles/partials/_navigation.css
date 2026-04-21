@@ -379,6 +379,28 @@ svg.icon-thin {
     background-color: var(--warning);
 }
 
+/* Explicit primary modifier — matches the default filled appearance. Useful
+   when callers want to make the intent visible in markup (e.g. the Settings
+   "API keys" CTA pairs `primary` with a leading key icon). */
+.header-button.primary {
+    background-color: var(--primary);
+    color: var(--on-accent);
+    border: none;
+}
+.header-button.primary:hover {
+    background-color: var(--primary-hover);
+}
+
+/* Leading icon inside an action/header button — keeps the glyph at a fixed
+   16x16 size, inherits the button's text color, and sits to the left of the
+   label via the flex gap already on `.header-button` / `.action-button`. */
+.btn-leading-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: currentColor;
+}
+
 /* Breadcrumb navigation */
 .breadcrumb {
     margin-bottom: var(--spacing-md);
@@ -424,4 +446,12 @@ svg.icon-thin {
 .breadcrumb [aria-current="page"] span {
     color: var(--text);
     font-weight: var(--font-medium);
+}
+
+body[data-page="playlist"] .breadcrumb,
+body[data-page="plugin"] .breadcrumb,
+body[data-page="settings"] .breadcrumb,
+body[data-page="history"] .breadcrumb,
+body[data-page="api-keys"] .breadcrumb {
+    display: none;
 }

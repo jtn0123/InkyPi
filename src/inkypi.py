@@ -4,6 +4,8 @@ import argparse
 import logging
 import os
 import warnings
+from datetime import UTC, datetime
+from pathlib import Path
 from time import perf_counter
 
 from flask import Flask, g, url_for as flask_url_for
@@ -93,6 +95,62 @@ logger = logging.getLogger(__name__)
 _TRUTHY = frozenset({"1", "true", "yes"})
 _DEFAULT_MAX_UPLOAD = 10 * 1024 * 1024
 _DEFAULT_WEB_THREADS = 2
+
+
+def _parse_refresh_datetime(iso_value: object) -> datetime | None:
+    """Parse an ISO timestamp from refresh_info, assuming UTC when naive."""
+    if not isinstance(iso_value, str) or not iso_value:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso_value)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
+
+
+def _format_sidebar_refresh_time(
+    iso_value: object, device_config: Config | None
+) -> str | None:
+    """Return a compact human-readable refresh label for the shell sidebar."""
+    refresh_dt = _parse_refresh_datetime(iso_value)
+    if refresh_dt is None:
+        return None
+
+    try:
+        from utils.time_utils import now_device_tz
+
+        now_dt = (
+            now_device_tz(device_config)
+            if device_config is not None
+            else datetime.now(refresh_dt.tzinfo)
+        )
+    except Exception:
+        now_dt = datetime.now(refresh_dt.tzinfo)
+
+    refresh_local = refresh_dt.astimezone(now_dt.tzinfo)
+    diff_seconds = (now_dt - refresh_local).total_seconds()
+    diff_minutes = diff_seconds / 60
+
+    if diff_seconds < 120:
+        return "just now"
+    if diff_minutes < 60:
+        return f"{int(diff_minutes)} min ago"
+    if diff_seconds < 60 * 60 * 24:
+        return "today at " + refresh_local.strftime("%I:%M %p").lstrip("0")
+    if diff_seconds < 60 * 60 * 48:
+        return "yesterday at " + refresh_local.strftime("%I:%M %p").lstrip("0")
+    return refresh_local.strftime("%b %d at %I:%M %p").replace(" 0", " ")
+
+
+def _format_sidebar_load_average() -> str | None:
+    """Return a compact 1-minute load-average label for the shell footer."""
+    try:
+        load_avg = os.getloadavg()[0]
+    except (AttributeError, OSError):
+        return None
+    return f"{load_avg:.2f} avg"
 
 
 def _get_web_threads() -> int:
@@ -360,10 +418,100 @@ def create_app():
 
         def versioned_url_for(endpoint, **values):
             if endpoint == "static":
-                values.setdefault("v", version)
+                filename = values.get("filename")
+                if filename:
+                    static_path = Path(app.static_folder) / filename
+                    if static_path.is_file():
+                        values.setdefault(
+                            "v", f"{version}-{int(static_path.stat().st_mtime)}"
+                        )
+                    else:
+                        values.setdefault("v", version)
+                else:
+                    values.setdefault("v", version)
             return flask_url_for(endpoint, **values)
 
         return {"app_version": version, "url_for": versioned_url_for}
+
+    @app.context_processor
+    def _inject_now_showing_label():
+        """Expose sidebar now-playing data derived from refresh_info.
+
+        Returns ``now_showing`` as ``{"label": ..., "meta": ..., "state": ...}``
+        so the shell footer stays informative even when the display is idle or
+        the last preview has no resolvable plugin source metadata.
+        """
+        now_showing = None
+        try:
+            device_config = app.config.get("DEVICE_CONFIG")
+            if device_config is None:
+                return {"now_showing": None}
+            info = device_config.get_refresh_info().to_dict()
+            plugin_id = info.get("plugin_id") or ""
+            if not plugin_id:
+                refreshed = _format_sidebar_refresh_time(
+                    info.get("refresh_time"), device_config
+                )
+                has_last_display = bool(info.get("refresh_time") or info.get("image_hash"))
+                now_showing = {
+                    "label": None,
+                    "meta": (
+                        f"refreshed {refreshed}"
+                        if refreshed and has_last_display
+                        else "Idle"
+                    ),
+                    "state": "idle",
+                }
+                return {"now_showing": now_showing}
+            # Resolve the display name from the plugin registry when possible.
+            display_name = plugin_id
+            try:
+                for plugin in device_config.get_plugins() or []:
+                    if plugin.get("id") == plugin_id and plugin.get("display_name"):
+                        display_name = plugin["display_name"]
+                        break
+            except Exception:
+                pass
+            # Filter out the auto-generated `{plugin_id}_saved_settings` key
+            # — it's an internal filesystem name that must never leak into UI.
+            from utils.display_names import instance_suffix_label
+
+            instance = instance_suffix_label(
+                info.get("plugin_instance"), plugin_id
+            )
+            if instance and instance.lower() != plugin_id.lower():
+                label = f"{display_name} · {instance}"
+            else:
+                label = display_name
+            meta_parts = []
+            if info.get("playlist"):
+                meta_parts.append(str(info["playlist"]))
+            elif info.get("refresh_type"):
+                meta_parts.append(str(info["refresh_type"]))
+
+            refreshed = _format_sidebar_refresh_time(
+                info.get("refresh_time"), device_config
+            )
+            if refreshed:
+                meta_parts.append(f"refreshed {refreshed}")
+
+            now_showing = {
+                "label": label,
+                "meta": " · ".join(meta_parts) if meta_parts else "live",
+                "state": "live",
+            }
+        except Exception:
+            now_showing = None
+        return {"now_showing": now_showing}
+
+    @app.context_processor
+    def _inject_sidebar_system():
+        return {
+            "sidebar_system": {
+                "online_label": "online",
+                "load_label": _format_sidebar_load_average(),
+            }
+        }
 
     device_config = _init_core_services(app)
 

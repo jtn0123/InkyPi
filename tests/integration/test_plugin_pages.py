@@ -235,6 +235,19 @@ def test_api_key_indicator_shows_missing_when_no_key(client, device_config_dev):
     assert "API Required" in body or "API Key required" in body
 
 
+def test_plugin_page_renders_inline_api_management_card(client, device_config_dev):
+    """API-key backed plugins should surface the calmer in-content management card."""
+    device_config_dev.unset_env_key("OPEN_WEATHER_MAP_SECRET")
+
+    resp = client.get("/plugin/weather")
+    assert resp.status_code == 200
+    body = resp.data.decode("utf-8")
+
+    assert 'class="plugin-editor-card-label">API key' in body
+    assert "Manage keys" in body
+    assert "workflow-preview-card" in body
+
+
 def test_api_key_indicator_shows_configured_when_key_present(client, device_config_dev):
     """Test that API key indicator shows 'configured' status when key is present.
 
@@ -268,19 +281,19 @@ def test_action_buttons_disabled_when_api_key_missing(client, device_config_dev)
 
     # "Update Preview" should be disabled
     assert 'disabled title="Configure Unsplash API key first"' in body
-    # "Save Settings" should NOT be disabled.  JTN-506 added HTMX attributes
+    # "Save settings" should NOT be disabled.  JTN-506 added HTMX attributes
     # between aria-describedby and the button closing tag; assert on the
     # button id + content rather than a rigid substring so the test covers
     # intent instead of attribute ordering.
     assert 'id="savePluginSettingsBtn"' in body
-    assert ">Save Settings</button>" in body
-    # Between the save-settings-help anchor and "Save Settings" text, the
+    assert ">Save settings</button>" in body
+    # Between the save-settings-help anchor and "Save settings" text, the
     # bare ``disabled`` HTML attribute must not appear (the button must
     # remain enabled).  Use a regex to avoid matching substrings like
     # ``hx-disabled-elt`` which is an HTMX hint, not an HTML attribute.
     import re
 
-    save_segment = body.split("Save Settings")[0].split("save-settings-help")[1]
+    save_segment = body.split("Save settings")[0].split("save-settings-help")[1]
     assert not re.search(r"(?:^|\s)disabled(?:=|\s|>)", save_segment)
 
 
@@ -453,7 +466,7 @@ def test_plugin_page_draft_badge_has_explanation(client):
     ), f"Draft chip missing aria-describedby: {chip_html}"
     # And the hidden describedby element must exist.
     assert 'id="draft-chip-help"' in body
-    assert "save action" in body or "Save Settings" in body
+    assert "save action" in body or "Save settings" in body
 
 
 def test_wizard_ids_not_duplicated_in_static_html(client):

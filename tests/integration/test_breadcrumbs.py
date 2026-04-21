@@ -54,9 +54,19 @@ def test_plugin_breadcrumb_includes_plugins_level(client):
     assert resp.status_code == 200
     html = resp.data.decode()
     assert '<nav aria-label="Breadcrumb"' in html
-    # Intermediate "Plugins" entry should be present and linked to the home page anchor
+    # Intermediate "Plugins" entry should be present and linked to the dedicated list page.
     assert "Plugins" in html
-    assert "#plugins-grid" in html
+    assert 'href="/plugins"' in html
+
+
+def test_plugins_page_breadcrumb(client):
+    """GET /plugins contains breadcrumb with Home and Plugins."""
+    resp = client.get("/plugins")
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert '<nav aria-label="Breadcrumb"' in html
+    assert "Home" in html
+    assert "Plugins" in html
 
 
 def test_home_page_has_plugins_grid_anchor(client):

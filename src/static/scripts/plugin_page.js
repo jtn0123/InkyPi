@@ -260,6 +260,9 @@
     }
 
     async function handleAction(action, triggerButton) {
+      if (action === "add_to_playlist" && !showPluginSubtab("schedule", { reportMissing: true })) {
+        return;
+      }
       if (!validateAddToPlaylistAction(action)) return;
 
       // Validate settingsForm required fields. Use validateAllInputsDetailed so
@@ -589,6 +592,13 @@
     function initApiIndicator() {
       const apiIndicator = document.getElementById("apiKeyIndicator");
       if (!apiIndicator) return;
+      // When the indicator lives in the plugin title-stack meta row it is
+      // already styled as a compact chip — skip the legacy auto-collapse
+      // animation that assumed a full-width header badge (JTN-design refresh).
+      if (apiIndicator.closest(".plugin-mode-row")) {
+        apiIndicator.classList.remove("auto-collapse", "collapsed");
+        return;
+      }
       setTimeout(() => {
         apiIndicator.classList.add("auto-collapse");
         setTimeout(() => collapseApiIndicator(apiIndicator), 3000);
@@ -633,20 +643,22 @@
     }
 
     function initApiKeysLeaveGuard() {
-      const link = document.querySelector("[data-api-keys-link]");
+      const links = Array.from(document.querySelectorAll("[data-api-keys-link]"));
       const modal = document.getElementById("apiKeysLeaveConfirmModal");
-      if (!link || !modal) return;
+      if (links.length === 0 || !modal) return;
       // Snapshot AFTER the rest of init runs so schema-populated defaults are
       // captured as the baseline, not flagged as "dirty" on first click.
       setTimeout(() => {
         _settingsFormSnapshot = getSettingsFormSnapshot();
       }, 0);
-      link.addEventListener("click", (event) => {
-        if (!isSettingsFormDirty()) return; // fall through to normal navigation
-        event.preventDefault();
-        const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
-        if (confirmBtn && link.href) confirmBtn.href = link.href;
-        openModal("apiKeysLeaveConfirmModal", link);
+      links.forEach((link) => {
+        link.addEventListener("click", (event) => {
+          if (!isSettingsFormDirty()) return; // fall through to normal navigation
+          event.preventDefault();
+          const confirmBtn = document.getElementById("confirmApiKeysLeaveBtn");
+          if (confirmBtn && link.href) confirmBtn.href = link.href;
+          openModal("apiKeysLeaveConfirmModal", link);
+        });
       });
       document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape") return;
@@ -677,38 +689,77 @@
       });
     }
 
+    // JTN design refresh: the Configure/Preview mode bar was removed in favor
+    // of always showing both panels side-by-side on desktop and stacked on
+    // mobile. setWorkflowMode is kept as a no-op to preserve the existing
+    // public surface; callers no longer change the visible panel.
     function setWorkflowMode(mode) {
       workflowMode = mode;
       document.documentElement.setAttribute("data-mobile-workflow-mode", mode);
-      document.querySelectorAll("[data-workflow-mode]").forEach((button) => {
-        const isActive = button.dataset.workflowMode === mode;
-        button.classList.toggle("active", isActive);
-        button.setAttribute("aria-selected", isActive ? "true" : "false");
-      });
       document.querySelectorAll("[data-workflow-panel]").forEach((panel) => {
-        const isActive = panel.dataset.workflowPanel === mode;
-        panel.classList.toggle("active", isActive);
-        panel.setAttribute("aria-hidden", isActive ? "false" : "true");
-        panel.toggleAttribute("inert", !isActive);
+        panel.classList.add("active");
+        panel.setAttribute("aria-hidden", "false");
+        panel.removeAttribute("inert");
       });
-      const targetPanel = document.querySelector(
-        `[data-workflow-panel="${mode}"]`,
-      );
-      if (mobileQuery.matches) {
-        document.querySelector(".workflow-mode-bar")?.scrollIntoView({
-          block: "start",
-          behavior: "smooth",
-        });
-      } else if (targetPanel) {
-        targetPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
-      }
     }
 
     function bindWorkflowMode() {
-      document.querySelectorAll("[data-workflow-mode]").forEach((button) => {
-        button.addEventListener("click", () => setWorkflowMode(button.dataset.workflowMode));
-      });
+      // Both panels are always visible; no buttons to bind.
       setWorkflowMode("configure");
+    }
+
+    /**
+     * Toggle visibility of the Configure / Style / Schedule sub-panels.
+     * Mirrors the React `tabline` design from the UI handoff (JTN design refresh).
+     */
+    function setPluginSubtab(id) {
+      document.querySelectorAll("[data-plugin-subtab]").forEach((btn) => {
+        const active = btn.dataset.pluginSubtab === id;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll("[data-plugin-subpanel]").forEach((panel) => {
+        const active = panel.dataset.pluginSubpanel === id;
+        panel.hidden = !active;
+      });
+    }
+
+    function bindPluginSubtabs() {
+      const buttons = document.querySelectorAll("[data-plugin-subtab]");
+      if (!buttons.length) return;
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => setPluginSubtab(btn.dataset.pluginSubtab));
+      });
+      setPluginSubtab("configure");
+    }
+
+    function showPluginSubtab(id, { focus = false, reportMissing = false } = {}) {
+      const panel = document.querySelector(`[data-plugin-subpanel="${id}"]`);
+      if (!panel) {
+        if (reportMissing) {
+          showResponseModal(
+            "failure",
+            "Unable to open scheduling controls. Please refresh the page and try again."
+          );
+        }
+        return false;
+      }
+      setPluginSubtab(id);
+      try {
+        const scrollTarget = document.getElementById("scheduleForm") || panel;
+        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        /* noop */
+      }
+      if (focus) {
+        const focusTarget =
+          panel.querySelector("[data-subtab-focus-target]") ||
+          panel.querySelector(
+            'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+          );
+        if (focusTarget) setTimeout(() => focusTarget.focus(), 0);
+      }
+      return true;
     }
 
     function bindControls() {
@@ -736,32 +787,32 @@
       document.querySelectorAll("[data-plugin-action]").forEach((button) => {
         button.addEventListener("click", () => handleAction(button.dataset.pluginAction, button));
       });
+      document.querySelectorAll("[data-plugin-subtab-target]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
+          const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
+            focus: true,
+            reportMissing: true,
+          });
+          if (!ok) event.preventDefault();
+        });
+      });
       document.addEventListener("click", (event) => {
         const opener = event.target.closest("[data-open-modal]");
         if (opener) openModal(opener.dataset.openModal, opener);
       });
-      // JTN-633: the DRAFT-state "Add to Playlist" button relies on the delegated
-      // opener above to surface the scheduling modal. Attach a direct listener
-      // as a belt-and-suspenders safeguard so the click can never silently
-      // no-op — if the modal target ever goes missing, the user gets a clear
-      // response modal instead of nothing happening.
-      document.querySelectorAll('[data-plugin-draft="true"][data-open-modal]').forEach((button) => {
+      // JTN-633: the DRAFT-state "Add to Playlist" button now routes into the
+      // inline Schedule tab. Keep a direct safeguard so the click can never
+      // silently no-op — if the schedule panel ever goes missing, the user
+      // gets clear feedback instead of nothing happening.
+      document.querySelectorAll('[data-plugin-draft="true"][data-plugin-subtab-target]').forEach((button) => {
         button.addEventListener("click", (event) => {
           if (button.disabled || button.getAttribute("aria-disabled") === "true") return;
-          const target = document.getElementById(button.dataset.openModal);
-          if (!target) {
-            event.preventDefault();
-            showResponseModal(
-              "failure",
-              "Unable to open the Add to Playlist dialog. Please refresh the page and try again."
-            );
-            return;
-          }
-          // Ensure the modal opens even if the delegated handler above is
-          // removed or an earlier listener called stopPropagation.
-          if (!target.classList.contains("is-open")) {
-            openModal(button.dataset.openModal, button);
-          }
+          const ok = showPluginSubtab(button.dataset.pluginSubtabTarget, {
+            focus: true,
+            reportMissing: true,
+          });
+          if (!ok) event.preventDefault();
         });
       });
       document.querySelectorAll("[data-close-modal]").forEach((button) => {
@@ -779,9 +830,9 @@
         });
       });
       document.getElementById("showLastProgressBtn")?.addEventListener("click", showLastProgress);
-      document.getElementById("closeProgressBtn")?.addEventListener("click", () => {
-        setHidden(document.getElementById("requestProgress"), true);
-      });
+      // Persistent progress card: render whatever the last snapshot is
+      // (or the empty-state) on first load so the aside card always has content.
+      try { showLastProgress(); } catch (_) { /* noop */ }
       document.getElementById("displayInstanceBtn")?.addEventListener("click", displayInstanceNow);
       document.querySelector("[data-background-upload]")?.addEventListener("change", showFileName);
       document.getElementById("removeFileButton")?.addEventListener("click", removeFile);
@@ -829,6 +880,7 @@
         globalThis.FormValidator.initFormValidation(scheduleForm);
       }
       bindWorkflowMode();
+      bindPluginSubtabs();
       initStatusBar();
       initPreviewInteractions();
       initApiIndicator();

@@ -81,31 +81,39 @@
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    padding: 20px 25px 10px 25px;
-    gap: 14px;
+    padding: 14px 18px;
+    gap: 16px;
+    cursor: pointer;
+    transition: background-color var(--transition-speed) ease;
+}
+
+.playlist-header:hover {
+    background: color-mix(in oklab, var(--surface) 88%, var(--text-3));
 }
 
 /* Playlist Item */
 .playlist-item {
     display: flex;
-    padding: 0px 0px 5px 0px;
-    transition: all var(--transition-speed) ease;
-    border: 2px solid var(--surface-border);
-    border-radius: 10px;
+    padding: 0;
+    transition: border-color var(--transition-speed) ease;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--border-radius-lg);
+    background: var(--surface);
+    overflow: hidden;
     flex-direction: column;
     width: 100%
 }
 
 /* Active Playlist Item */
 .playlist-item.active {
-    border-color: var(--accent);
-    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--surface-border));
 }
 
 .playlist-title {
-    font-size: 1.2rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text);
+    letter-spacing: -0.01em;
 }
 
 .playlist-heading {
@@ -231,4 +239,402 @@
     display: flex;
     align-items: flex-start;
     gap: 8px;
+}
+
+/* =============== Refined playlist row (.pl-item) ===============
+   5-col grid: drag · icon tile · main · inline thumb · actions.
+   Applied additively on playlist plugin rows. */
+.pl-item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "drag icon main thumb actions";
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  margin-bottom: 6px;
+}
+
+.pl-item.is-playing {
+  border-color: color-mix(in oklab, var(--accent) 35%, var(--surface-border));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.pl-item .drag-handle,
+.pl-item .pl-drag {
+  grid-area: drag;
+  color: var(--text-3);
+  opacity: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 4px;
+}
+
+.pl-item-icon {
+  grid-area: icon;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--border-radius-md);
+  display: grid;
+  place-items: center;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  color: var(--accent);
+  overflow: hidden;
+}
+
+.pl-item-icon img,
+.pl-item-icon svg {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.pl-item-main {
+  grid-area: main;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.pl-item-name {
+  font-weight: 500;
+  font-size: 0.82rem;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pl-item-name .plugin-instance-suffix {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.pl-item-meta {
+  color: var(--text-3);
+  font-size: 0.72rem;
+  margin-top: 0;
+}
+
+.pl-item-thumb {
+  grid-area: thumb;
+  width: 96px;
+  height: 56px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-sm);
+  overflow: hidden;
+  background: var(--preview-bg);
+  position: relative;
+}
+
+.pl-item-thumb:empty { display: none; }
+
+.pl-item-thumb .plugin-thumbnail-container,
+.pl-item-thumb .plugin-thumb {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  flex: none;
+  background: transparent;
+}
+
+.pl-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.pl-item-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.playlist-row-display-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+
+.playlist-row-display-btn .action-button-label {
+  display: inline;
+  font-size: 0.78rem;
+}
+
+.playlist-row-display-btn .action-icon,
+.playlist-row-display-btn .btn-leading-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.playlist-row-icon-btn {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playlist-row-icon-btn .action-icon,
+.playlist-row-icon-btn .btn-leading-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.playlist-row-icon-btn .action-button-label {
+  display: none;
+}
+
+.playlist-card-body .empty-state.compact {
+  display: grid;
+  gap: 8px;
+  padding: 18px 18px 16px;
+  background: color-mix(in oklab, var(--surface) 86%, var(--surface-2));
+  border-color: var(--surface-border);
+}
+
+.playlist-card-body .empty-state.compact .empty-state-icon {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 0;
+}
+
+.playlist-card-body .empty-state.compact .empty-state-primary {
+  font-size: 0.9rem;
+}
+
+.playlist-card-body .empty-state.compact .empty-state-secondary {
+  font-size: 0.82rem;
+}
+
+/* Dashed "add plugin instance" row */
+.pl-add-row,
+a.pl-add-row:link,
+a.pl-add-row:visited {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  width: 100%;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px dashed var(--surface-border);
+  border-radius: var(--border-radius-md);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pl-add-row:hover,
+a.pl-add-row:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Visual parity pass: restore the handoff's rotation-card header/body split
+   and visible desktop controls instead of icon-only admin actions. */
+.playlist-frame {
+  max-width: 1040px;
+}
+
+.playlist-list {
+  gap: 14px;
+}
+
+.playlist-item {
+  border-radius: var(--border-radius-xl);
+}
+
+.playlist-header {
+  padding: 14px 16px;
+  align-items: center;
+  gap: 16px;
+}
+
+.playlist-header:hover {
+  background: var(--surface-2);
+}
+
+.playlist-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.playlist-heading-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+}
+
+.playlist-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.playlist-title {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.playlist-summary-row {
+  gap: 0;
+}
+
+.playlist-summary-copy {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+}
+
+.playlist-toolbar {
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.playlist-toolbar .run-next-btn,
+.playlist-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 9px;
+  font-size: 0.78rem;
+}
+
+.playlist-toolbar .run-next-btn .action-button-label,
+.playlist-toolbar .playlist-secondary-button .action-button-label {
+  display: inline;
+  font-size: 0.78rem;
+}
+
+.playlist-secondary-button.is-icon-only {
+  padding: 6px 7px;
+}
+
+.playlist-secondary-button .btn-leading-icon,
+.playlist-toolbar .run-next-btn .btn-leading-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.displayed-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in oklab, var(--accent) 32%, transparent);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.displayed-now::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 18%, transparent);
+}
+
+.playlist-card-body {
+  gap: 10px;
+  padding: 6px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--surface-border);
+}
+
+.playlist-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  flex: 0 0 auto;
+}
+
+.playlist-toggle-button::after {
+  content: "\203A";
+  margin-left: 0;
+  color: var(--text-3);
+  font-size: 1.05rem;
+  transform: rotate(0deg);
+}
+
+.playlist-toggle-button[aria-expanded="true"]::after {
+  transform: rotate(90deg);
+}
+
+.playlist-toggle-button:hover {
+  border-color: var(--border-strong, var(--surface-border));
+  background: var(--surface-2);
+}
+
+.playlist-header .playlist-toggle-button {
+  order: -1;
+}
+
+/* Caret toggle for collapse/expand */
+.pl-caret {
+  color: var(--text-3);
+  padding: 4px;
+  border-radius: var(--border-radius-sm);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease, transform 0.2s ease;
+}
+
+.pl-caret:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.pl-caret[aria-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* Collapse thumb column on narrow viewports */
+@media (max-width: 720px) {
+  .pl-item {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "drag icon main actions";
+  }
+  .pl-item-thumb { display: none; }
 }

@@ -1,0 +1,44 @@
+{% from 'macros/icons.html' import icon, empty_state, PLUGIN_ICON_MAP, PLUGIN_DESC_MAP %}
+
+{%- macro plugin_catalog(plugins, section_id='plugins-grid', heading='Plugins', count_label=None, aria_label='Available plugins', action_href=None, action_label=None) -%}
+<section id="{{ section_id }}" aria-label="{{ aria_label }}">
+    <header class="section-head">
+        <h2 class="plugins-title compact">{{ heading }}</h2>
+        <div class="section-head-actions">
+            <span class="section-count">{{ count_label or (plugins|length ~ ' installed') }}</span>
+            {% if action_href and action_label %}
+            <a href="{{ action_href }}" class="header-button is-secondary section-link">{{ action_label }}</a>
+            {% endif %}
+        </div>
+    </header>
+    <div class="plugins-container plugin-tile-grid">
+        {% for plugin in plugins %}
+        <a href="{{ url_for('plugin.plugin_page', plugin_id=plugin.id) }}" class="plugin-item plugin-tile"
+           aria-label="Open {{ plugin.display_name }} plugin settings">
+            <span class="plugin-tile-icon">
+            {% set ph = PLUGIN_ICON_MAP.get(plugin.id) %}
+            {% if ph %}
+            {{ icon(ph, 'icon-image') | safe }}
+            {% else %}
+            <img
+                src="{{ url_for('plugin.image', plugin_id=plugin.id, filename='icon.png') }}"
+                alt=""
+                class="icon-image"
+                loading="lazy">
+            {% endif %}
+            </span>
+            <span class="plugin-tile-body">
+                <span class="plugin-name plugin-tile-name">{{ plugin.display_name }}</span>
+                {% set plugin_desc = PLUGIN_DESC_MAP.get(plugin.id) %}
+                {% if plugin_desc %}
+                <span class="plugin-tile-desc">{{ plugin_desc }}</span>
+                {% endif %}
+            </span>
+            <svg class="plugin-tile-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 6 15 12 9 18"></polyline></svg>
+        </a>
+        {% else %}
+        {{ empty_state('squares-four', 'No plugins available.', 'Check your installation.', compact=true) }}
+        {% endfor %}
+    </div>
+</section>
+{%- endmacro -%}

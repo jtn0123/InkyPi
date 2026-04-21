@@ -27,6 +27,7 @@
     {% endif %}
     <script src="{{ url_for('static', filename='vendor/htmx.min.js') }}" defer
             integrity="{{ sri_for('vendor/htmx.min.js') }}" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='scripts/tweaks_panel.js') }}" defer></script>
     {% block head %}{% endblock %}
     <script nonce="{{ csp_nonce }}">
       if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
@@ -34,10 +35,69 @@
       }
     </script>
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
     <nav class="skip-links" aria-label="Skip links">
         <a href="#main-content" class="skip-link">Skip to main content</a>
     </nav>
-    {% block body %}{% endblock %}
+    {% from 'macros/sidebar.html' import sidebar %}
+    <div class="shell" data-density="balanced">
+        {{ sidebar(active=(active_nav if active_nav is defined else None),
+                    host=(request.host if request is defined else None),
+                    device_name=(config.name if config is defined and config.name is defined else None),
+                    now_showing=(now_showing if now_showing is defined else None),
+                    sidebar_system=(sidebar_system if sidebar_system is defined else None)) }}
+        <div class="shell-main">
+            {% block body %}{% endblock %}
+        </div>
+    </div>
+
+    <button id="tweaksFab" class="tweaks-fab" type="button" aria-expanded="false" aria-controls="tweaksPanel" aria-label="Open appearance tweaks">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="6" x2="13" y2="6"></line>
+            <line x1="17" y1="6" x2="20" y2="6"></line>
+            <line x1="4" y1="12" x2="7" y2="12"></line>
+            <line x1="11" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="18" x2="15" y2="18"></line>
+            <line x1="19" y1="18" x2="20" y2="18"></line>
+            <circle cx="15" cy="6" r="2"></circle>
+            <circle cx="9" cy="12" r="2"></circle>
+            <circle cx="17" cy="18" r="2"></circle>
+        </svg>
+    </button>
+
+    <div id="tweaksPanel" class="tweaks-panel" role="dialog" aria-label="Appearance tweaks" data-open="false">
+        <div class="tweaks-head">
+            <h2>Appearance</h2>
+            <button type="button" class="tweaks-close" aria-label="Close tweaks panel">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="tweak-group">
+            <div class="tweak-label">Aesthetic</div>
+            <div class="aesthetic-options" role="group" aria-label="Aesthetic">
+                <button type="button" class="aesthetic-option" data-aesthetic="console" aria-pressed="true"><span class="aesthetic-swatch aesthetic-swatch-console" aria-hidden="true"></span>Console</button>
+                <button type="button" class="aesthetic-option" data-aesthetic="paper" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-paper" aria-hidden="true"></span>Paper</button>
+                <button type="button" class="aesthetic-option" data-aesthetic="minimal" aria-pressed="false"><span class="aesthetic-swatch aesthetic-swatch-minimal" aria-hidden="true"></span>Minimal</button>
+            </div>
+        </div>
+        <div class="tweak-group">
+            <div class="tweak-label">Density</div>
+            <div class="density-options" role="group" aria-label="Density">
+                <button type="button" class="density-option" data-density="compact" aria-pressed="false">Compact</button>
+                <button type="button" class="density-option active" data-density="balanced" aria-pressed="true">Balanced</button>
+                <button type="button" class="density-option" data-density="cozy" aria-pressed="false">Cozy</button>
+            </div>
+        </div>
+        <div class="tweak-group">
+            <div class="accent-head">
+                <span class="tweak-label" style="margin-bottom:0;">Accent hue</span>
+                <span id="accentHueValue" class="accent-value">170°</span>
+            </div>
+            <input id="accentHueSlider" class="accent-slider" type="range" min="0" max="360" step="1" value="170" aria-label="Accent hue">
+        </div>
+        <div class="tweak-group">
+            <button id="tweaksReset" type="button" class="density-option" style="width:100%;">Reset to defaults</button>
+        </div>
+    </div>
 </body>
 </html>

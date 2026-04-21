@@ -1,8 +1,8 @@
 """Regression tests for JTN-633.
 
 Clicking "Add to Playlist" on a DRAFT plugin page (no saved settings yet)
-must either open the scheduling modal or surface a clear message — never
-fail silently.
+must either reveal the inline Schedule tab or surface a clear message —
+never fail silently.
 """
 
 import os
@@ -22,23 +22,24 @@ def _render_clock_draft(client):
     return resp.get_data(as_text=True)
 
 
-def test_draft_add_to_playlist_button_renders_with_open_modal_attr(client):
-    """DRAFT page must render an Add-to-Playlist trigger that targets the modal."""
+def test_draft_add_to_playlist_button_renders_with_schedule_target(client):
+    """DRAFT page must render an Add-to-Playlist trigger that targets Schedule."""
     html = _render_clock_draft(client)
     # DRAFT chip present
     assert "Draft" in html
-    # Button exposes data-open-modal so a click is never silently absorbed. JTN-633.
-    assert 'data-open-modal="scheduleModal"' in html
+    # Button exposes a Schedule target so a click is never silently absorbed. JTN-633.
+    assert 'data-plugin-subtab-target="schedule"' in html
     # DRAFT-state marker is present so JS can attach the defensive handler.
     assert 'data-plugin-draft="true"' in html
-    # The modal target markup exists
-    assert 'id="scheduleModal"' in html
-    # Help text explains that current settings will be captured.
-    assert "current settings will be captured" in html
+    # The inline schedule UI exists.
+    assert 'id="pluginSchedulePanel"' in html
+    assert 'id="scheduleForm"' in html
+    # Help text explains that current settings seed the playlist entry.
+    assert "current settings" in html
 
 
-def test_draft_add_to_playlist_button_opens_modal_with_real_handlers(client):
-    """Real plugin_page.js handlers must open the modal when the button is clicked.
+def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(client):
+    """Real plugin_page.js handlers must reveal Schedule when the button is clicked.
 
     The previous test harness injected its own listeners. This test instead
     wires up the real plugin_page.js module so we catch regressions where the
@@ -94,23 +95,29 @@ def test_draft_add_to_playlist_button_opens_modal_with_real_handlers(client):
             """)
 
         # Click the DRAFT-state "Add to Playlist" button.
-        page.click('button[data-open-modal="scheduleModal"]')
+        page.click('button[data-plugin-subtab-target="schedule"]')
 
-        # Modal must become visible (display:flex via openModal) — not silently no-op.
-        page.wait_for_selector("#scheduleModal", state="visible", timeout=2000)
-        is_visible = page.evaluate(
-            "() => { const m = document.getElementById('scheduleModal'); return !!m && m.classList.contains('is-open') && m.style.display === 'flex'; }"
+        page.wait_for_timeout(250)
+        is_active = page.evaluate(
+            """() => {
+                const tab = document.querySelector('[data-plugin-subtab="schedule"]');
+                const panel = document.getElementById('pluginSchedulePanel');
+                const instance = document.getElementById('instance');
+                return !!tab && tab.getAttribute('aria-selected') === 'true'
+                    && !!panel && panel.hidden === false
+                    && !!instance && document.activeElement === instance;
+            }"""
         )
         assert (
-            is_visible
-        ), "scheduleModal did not open when Add to Playlist was clicked in DRAFT state"
+            is_active
+        ), "Schedule tab did not become active when Add to Playlist was clicked in DRAFT state"
 
         browser.close()
 
 
-def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
-    """If the scheduling modal is ever removed, the click must surface a visible
-    error — never silently no-op. JTN-633 defensive path."""
+def test_draft_add_to_playlist_click_surfaces_failure_if_schedule_panel_missing(client):
+    """If the inline scheduling panel is ever removed, the click must surface a
+    visible error — never silently no-op. JTN-633 defensive path."""
     pytest.importorskip("playwright.sync_api", reason="playwright not available")
     html = _render_clock_draft(client)
 
@@ -143,12 +150,12 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
                        update_instance: "/update_plugin_instance", update_now: "/update_now"}
             };
             window.fetch = () => Promise.resolve(new Response("{}", {status: 200, headers: {"Content-Type": "application/json"}}));
-            // Simulate the scheduleModal missing from the DOM to exercise the fallback.
-            document.getElementById('scheduleModal')?.remove();
+            // Simulate the schedule panel missing from the DOM to exercise the fallback.
+            document.getElementById('pluginSchedulePanel')?.remove();
             window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
             """)
 
-        page.click('button[data-plugin-draft="true"]')
+        page.click('button[data-plugin-subtab-target="schedule"]')
         page.wait_for_timeout(400)
 
         # A visible toast or response modal must surface actionable feedback —
@@ -160,7 +167,7 @@ def test_draft_add_to_playlist_click_surfaces_failure_if_modal_missing(client):
                 return m ? (m.textContent || '') : '';
             }""")
         assert (
-            "Add to Playlist" in feedback or "refresh the page" in feedback
+            "scheduling controls" in feedback or "refresh the page" in feedback
         ), f"Expected visible failure feedback, got: {feedback!r}"
 
         browser.close()

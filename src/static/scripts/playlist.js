@@ -557,7 +557,7 @@
 
     function openCreateModal(triggerEl) {
         const modal = document.getElementById("playlistModal");
-        document.getElementById("modalTitle").textContent = "New Playlist";
+        document.getElementById("modalTitle").textContent = "New playlist";
         document.getElementById("playlist_name").value = "";
         document.getElementById("editingPlaylistName").value = "";
         document.getElementById("start_time").value = "09:00";
@@ -571,7 +571,7 @@
 
     function openEditModal(playlistName, startTime, endTime, cycleMinutes, triggerEl) {
         const modal = document.getElementById("playlistModal");
-        document.getElementById("modalTitle").textContent = "Update Playlist";
+        document.getElementById("modalTitle").textContent = "Edit playlist";
         document.getElementById("playlist_name").value = playlistName;
         document.getElementById("editingPlaylistName").value = playlistName;
         document.getElementById("start_time").value = _normaliseTimeForInput(startTime);

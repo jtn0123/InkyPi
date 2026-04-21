@@ -1,0 +1,352 @@
+/* Refined shell — persistent left sidebar, dark-first */
+
+.shell {
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.shell.density-compact { grid-template-columns: 220px minmax(0, 1fr); }
+.shell.density-cozy { grid-template-columns: 280px minmax(0, 1fr); }
+
+.shell-sidebar {
+  border-right: 1px solid var(--surface-border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px 14px;
+  gap: 18px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  color: var(--on-accent);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.brand-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-host {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.nav-section {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  padding: 12px 10px 6px;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--border-radius-md);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--accent-weak);
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.nav-item.active svg,
+.nav-item.active .icon-image {
+  color: var(--accent);
+}
+
+.nav-item .icon-image,
+.nav-item svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  flex-shrink: 0;
+}
+
+.sidebar-foot {
+  border-top: 1px solid var(--surface-border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.now-card {
+  background: var(--surface-2);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  padding: 10px 12px;
+}
+
+.now-label {
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: var(--text-3);
+  text-transform: uppercase;
+}
+
+.now-title {
+  font-weight: 600;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 25%, transparent);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.sys-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  font-size: 0.68rem;
+  color: var(--text-3);
+}
+
+.sys-row .sys-online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sys-row #themeToggle {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.sys-row #themeToggle:hover {
+  color: var(--text);
+}
+
+.sys-row #themeToggle .theme-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Handoff parity follow-up: keep the shell identity compact and ensure the
+   footer card always reads like the prototype's "NOW PLAYING" block. */
+.sidebar-brand {
+  padding-bottom: 6px;
+}
+
+.brand-host {
+  line-height: 1.45;
+}
+
+.sidebar-foot {
+  gap: 10px;
+}
+
+.now-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px 12px 11px;
+  background: color-mix(in oklab, var(--surface-2) 92%, var(--surface));
+}
+
+.now-card.is-idle {
+  background: color-mix(in oklab, var(--surface-2) 84%, var(--surface));
+}
+
+.now-card.is-idle .live-dot {
+  background: var(--text-3);
+  box-shadow: none;
+  opacity: 0.55;
+}
+
+.now-title {
+  min-height: 2.5em;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.now-meta {
+  margin-top: 0;
+  line-height: 1.45;
+}
+
+.sys-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sys-load {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-3);
+}
+
+/* Main content column */
+.shell-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* When the persistent sidebar is active (desktop), hide redundant in-page
+   navigation links and the per-page home button — the sidebar already
+   provides those. Keep the identity, title, and theme toggle. */
+@media (min-width: 901px) {
+  .shell-sidebar .sys-row {
+    justify-content: flex-start;
+  }
+
+  .shell-sidebar .sys-row #themeToggle {
+    display: none;
+  }
+
+  .shell .app-header nav.header-actions,
+  .shell .app-header .header-identity .header-button.icon.current-page {
+    display: none;
+  }
+  .shell .frame {
+    margin-top: 12px;
+  }
+}
+
+/* Responsive: collapse sidebar to a top strip on small screens.
+   We keep the sidebar in the DOM (instead of display:none) so the theme
+   toggle inside .sidebar-foot remains accessible — the mobile smoke test
+   asserts #themeToggle is visible/scrollable on phone viewports. The nav
+   links are hidden (primary nav is reached via the tweaks FAB / per-page
+   breadcrumbs on mobile); the brand + theme toggle remain. */
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .shell.density-compact,
+  .shell.density-cozy {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-sidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--surface-border);
+    overflow: visible;
+  }
+
+  .shell-sidebar .sidebar-nav,
+  .shell-sidebar .now-card,
+  .shell-sidebar .sys-stats {
+    display: none;
+  }
+
+  .shell-sidebar .sidebar-foot {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    flex-shrink: 0;
+  }
+
+  .shell-sidebar .sidebar-foot .sys-row {
+    margin: 0;
+  }
+}

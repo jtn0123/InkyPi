@@ -22,6 +22,8 @@ def test_settings_page_contains_section_nav_and_loading_panels(client):
 
     assert "section-basics" in html
     assert "section-observability" in html
+    assert 'id="settingsLogsToggle"' in html
+    assert 'id="settingsLogsPanel"' in html
     assert 'id="benchSummary"' in html and "loading-panel" in html
     assert 'id="healthSummary"' in html and "loading-panel" in html
     assert 'id="isolationSummary"' in html and "loading-panel" in html
@@ -34,6 +36,8 @@ def test_plugin_page_contains_status_chips_and_unique_schedule_ids(client):
 
     assert "plugin-mode-row" in html
     assert "status-chip" in html
+    assert 'data-plugin-subtab-target="schedule"' in html
+    assert 'id="scheduleForm"' in html
     assert 'id="scheduleInterval"' in html
     assert 'id="scheduleUnit"' in html
     assert 'id="scheduleTime"' in html
@@ -58,4 +62,4 @@ def test_settings_logs_toggle_respects_safe_area(client):
     # Floating button accounts for the iOS home indicator / chrome.
     assert "env(safe-area-inset-bottom" in css
     # Settings shell reserves bottom padding for the floating action.
-    assert ".page-shell-management" in css
+    assert ".page-shell-settings" in css

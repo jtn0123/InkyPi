@@ -4,6 +4,36 @@
     flex-direction: column;
 }
 
+/* Handoff parity: section-head wraps a left-aligned title and a right-aligned
+   count/link on the same baseline. Used by the dashboard Plugins section. */
+.section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    gap: 12px;
+}
+
+.section-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.section-count {
+    color: var(--text-3, var(--muted));
+    font-size: 0.72rem;
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.section-link {
+    white-space: nowrap;
+}
+
 /* Plugin Item */
 .plugin-item {
     display: flex;
@@ -114,10 +144,10 @@
     border-color: var(--success);
 }
 
-/* Grid View (default) */
+/* Grid View (default) — refined tile with subtle lift */
 .plugins-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 10px;
     justify-items: stretch;
 }
@@ -129,20 +159,21 @@
     justify-content: flex-start;
     text-decoration: none;
     color: var(--text);
-    padding: 12px 8px 10px;
-    border-radius: 8px;
+    padding: 14px 10px 12px;
+    border-radius: var(--border-radius-lg);
     border: 1px solid var(--surface-border);
+    background: var(--surface);
     box-sizing: border-box;
     width: 100%;
     justify-self: stretch;
-    transition: background 0.2s, border-color 0.2s, transform 0.15s ease, box-shadow 0.15s ease;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .plugins-container .plugin-item:hover {
-    background: var(--button-bg);
-    border-color: var(--muted);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    background: var(--surface);
+    border-color: var(--border-strong, var(--muted));
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .plugins-container .plugin-item:active {
@@ -152,20 +183,30 @@
 }
 
 .plugins-container .plugin-item .icon-image {
-    width: 48px;
-    height: 48px;
-    min-width: 48px;
-    min-height: 48px;
-    border-radius: 10px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px;
+    border-radius: var(--border-radius-md);
+    background: var(--surface-2, var(--button-bg));
+    border: 1px solid var(--surface-border);
+    color: var(--accent);
     object-fit: cover;
+    transition: border-color 0.15s ease;
+}
+
+.plugins-container .plugin-item:hover .icon-image {
+    border-color: color-mix(in oklab, var(--accent) 30%, var(--surface-border));
 }
 
 .plugin-name {
-    margin-top: 8px;
-    font-size: 0.78rem;
+    margin-top: 10px;
+    font-size: 0.82rem;
+    font-weight: 500;
     line-height: 1.3;
     text-align: center;
-    color: var(--muted);
+    color: var(--text);
     width: 100%;
     padding: 0 2px;
     box-sizing: border-box;
@@ -175,6 +216,7 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     min-height: 2.4em;
+    letter-spacing: -0.005em;
 }
 
 /* List View */
@@ -206,6 +248,98 @@
     width: auto;
     padding: 0;
     white-space: nowrap;
+}
+
+/* Horizontal plugin tile — icon left, name+desc center, chevron right.
+   Mirrors the React `plugin-tile` in screens.jsx. Only applies when both
+   `.plugin-tile` (on the anchor) and `.plugin-tile-grid` (on the container)
+   are present, so other consumers of `.plugin-item` stay unaffected. */
+/* Handoff parity: 220px min-width (was 280px) gives ~27% more tiles per row. */
+.plugins-container.plugin-tile-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 12px 14px;
+    gap: 12px;
+    text-align: left;
+}
+
+/* Handoff parity: wrap the tile icon in a 36x36 rounded surface-2 box with
+   a border. The icon itself is the accent color; the container gives it
+   visual weight that matches screens.jsx's plugin-tile-icon. */
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-tile-icon {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    background: var(--surface-2, var(--panel-bg));
+    border: 1px solid var(--surface-border);
+    border-radius: 8px;
+    color: var(--accent);
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile .icon-image {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.plugin-tile-body {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-name,
+.plugins-container.plugin-tile-grid .plugin-tile .plugin-tile-name {
+    margin: 0;
+    /* Handoff: 13.5px/600. Was 14.4px — drops a notch to match the refined
+       typography scale (tile desc sits at 12.5px). */
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.25;
+    text-align: left;
+    width: auto;
+    padding: 0;
+    min-height: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    -webkit-line-clamp: unset;
+    -webkit-box-orient: unset;
+}
+
+.plugin-tile-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.plugin-tile-chev {
+    width: 14px;
+    height: 14px;
+    color: var(--text-3);
+    flex-shrink: 0;
+    transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.plugins-container.plugin-tile-grid .plugin-tile:hover .plugin-tile-chev {
+    transform: translateX(2px);
+    color: var(--accent);
 }
 
 /* Sorting Mode */
@@ -246,48 +380,259 @@
   gap: var(--spacing-md);
 }
 
-.workflow-mode-bar {
-  display: none;
-  gap: 8px;
-  padding: 6px;
-  border-radius: 999px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  align-self: flex-start;
-  position: relative;
-  margin-bottom: 12px;
+/* Plugin sub-tab bar (Configure / Style / Schedule) — lives inside the
+   workflow-main-panel and is visible on every viewport. Mirrors the React
+   `tabline` design from screens.jsx. */
+.plugin-subtab-bar {
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--surface-border);
+  margin-bottom: 14px;
+  align-self: stretch;
 }
 
-.workflow-mode-tab {
+.plugin-subtab {
   border: 0;
   background: transparent;
   color: var(--text-secondary);
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: 0.82rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
 
-.workflow-mode-tab.active {
-  background: var(--accent);
-  color: var(--on-accent);
+.plugin-subtab:hover {
+  color: var(--text);
 }
 
-.workflow-mode-bar::after {
-  content: '';
-  position: absolute;
-  bottom: -8px;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--panel-border);
+.plugin-subtab.active,
+.plugin-subtab[aria-selected="true"] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.plugin-page-desc {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
+.pageheader-plugin .pageheader-actions {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pageheader-plugin .pageheader-actions .header-button,
+.pageheader-plugin .pageheader-actions .action-button {
+  min-height: 36px;
+  padding-inline: 12px;
+}
+
+.pageheader-plugin .plugin-mode-row .api-key-indicator,
+.pageheader-plugin .plugin-mode-row .api-key-indicator.collapsed,
+.pageheader-plugin .plugin-mode-row .api-key-indicator.auto-collapse {
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+
+.plugin-editor-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.9fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.plugin-editor-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+}
+
+.plugin-editor-card-label {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.plugin-editor-card h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.plugin-editor-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.plugin-editor-summary-meta {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.plugin-editor-summary-meta strong {
+  color: var(--text);
+}
+
+.plugin-inline-api-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plugin-inline-api-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.plugin-inline-api-actions {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.plugin-inline-api-actions .status-chip,
+.plugin-inline-api-link {
+  white-space: nowrap;
+}
+
+/* Schedule sub-panel summary card */
+.schedule-summary-card {
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface-2, var(--surface));
+  display: grid;
+  gap: 6px;
+}
+
+.schedule-summary-line {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.schedule-summary-line strong {
+  color: var(--text);
+}
+
+.plugin-schedule-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.schedule-summary-card-accent {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--surface-border));
+}
+
+.schedule-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.schedule-form-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--panel-bg);
+}
+
+.schedule-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.schedule-fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-md);
+  background: var(--surface);
+}
+
+.schedule-fieldset-title {
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.schedule-inline-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.schedule-inline-group .form-input {
+  flex: 1 1 140px;
+}
+
+.schedule-inline-group .validation-message {
+  flex-basis: 100%;
+}
+
+.schedule-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-panel-note {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 38rem;
 }
 
 .workflow-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) 420px;
   gap: 20px;
   align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .workflow-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .workflow-main-panel,
@@ -299,6 +644,76 @@
 .workflow-side-panel {
   display: grid;
   gap: 16px;
+}
+
+.workflow-preview-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  background: var(--surface);
+}
+
+.workflow-preview-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflow-preview-card-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.workflow-preview-card-head p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: 34rem;
+}
+
+.workflow-preview-card .status-bar {
+  margin: 0;
+  gap: 12px;
+}
+
+.workflow-preview-card .status-card {
+  min-height: 100%;
+  border-color: var(--surface-border);
+  background: var(--surface-2, var(--panel-bg));
+  box-shadow: none;
+}
+
+.workflow-preview-card .status-title {
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+  font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.workflow-preview-card .status-meta {
+  margin-top: 10px;
+}
+
+.workflow-preview-card .status-meta .label {
+  color: var(--text-secondary);
+  font-size: 0.71rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workflow-preview-card .status-meta .value {
+  font-size: 0.86rem;
+}
+
+.workflow-preview-card .separator {
+  margin: 0;
 }
 
 .workflow-section-header {
@@ -325,11 +740,17 @@
 
 .workflow-action-panel {
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--border-radius-md);
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.workflow-utility-card {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
 }
 
 .workflow-device-toggle {
@@ -337,6 +758,33 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
+}
+
+body[data-page="plugin"] .workflow-device-toggle {
+  display: none;
+}
+
+body[data-page="plugin"] .workflow-help {
+  margin-top: 0;
+  color: var(--text-3);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+body[data-page="plugin"] .workflow-help p {
+  margin: 0;
+}
+
+.progress-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-history-button {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 0.76rem;
 }
 
 .workflow-action-group {
@@ -347,4 +795,31 @@
 
 .workflow-help {
   margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .plugin-editor-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plugin-inline-api-row {
+    flex-direction: column;
+  }
+
+  .schedule-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-form-actions {
+    align-items: stretch;
+  }
+
+  .schedule-form-actions .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .workflow-preview-card {
+    padding: 14px;
+  }
 }

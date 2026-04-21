@@ -23,10 +23,16 @@ def test_plugin_add_to_playlist_flow(client):
         page = browser.new_page()
         page.set_content(html)
 
-        # Inject response modal helpers and stub fetch
-        with open("src/static/scripts/response_modal.js", encoding="utf-8") as f:
-            js_modal = f.read()
-        page.add_script_tag(content=js_modal)
+        for path in (
+            "src/static/scripts/ui_helpers.js",
+            "src/static/scripts/response_modal.js",
+            "src/static/scripts/form_validator.js",
+            "src/static/scripts/plugin_form.js",
+            "src/static/scripts/plugin_page.js",
+        ):
+            with open(path, encoding="utf-8") as f:
+                page.add_script_tag(content=f.read())
+
         page.evaluate("""
             window.__requests__ = [];
             const ok = (body) => new Response(JSON.stringify(Object.assign({success:true,message:"Added"}, body||{})), {status:200, headers:{'Content-Type':'application/json'}});
@@ -35,45 +41,37 @@ def test_plugin_add_to_playlist_flow(client):
                 try { window.__requests__.push({url: (url && url.toString ? url.toString() : String(url)), body: opts.body, method: (opts && opts.method) || 'GET'}); } catch(e){};
                 return Promise.resolve(ok());
             };
-
-            // Wire up modal open/close and plugin-action handlers
-            // (plugin_page.js normally does this but isn't loaded in set_content)
-            document.querySelectorAll("[data-open-modal]").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const modal = document.getElementById(btn.dataset.openModal);
-                    if (modal) modal.style.display = "flex";
-                });
-            });
-            document.querySelectorAll("[data-close-modal]").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const modal = document.getElementById(btn.dataset.closeModal);
-                    if (modal) modal.style.display = "none";
-                });
-            });
-            document.querySelectorAll("[data-plugin-action]").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const action = btn.dataset.pluginAction;
-                    const form = document.getElementById("settingsForm");
-                    const scheduleForm = document.getElementById("scheduleForm");
-                    const formData = new FormData(form);
-                    if (action === "add_to_playlist" && scheduleForm) {
-                        const sd = new FormData(scheduleForm);
-                        const obj = {}; for (const [k,v] of sd.entries()) obj[k] = v;
-                        formData.append("refresh_settings", JSON.stringify(obj));
-                    }
-                    fetch("/add_plugin", { method: "POST", body: formData });
-                });
-            });
+            window.__INKYPI_PLUGIN_BOOT__ = {
+                deviceFrameUrl: "",
+                displayInstancePayload: {playlist_name: "", plugin_id: "clock", plugin_instance: ""},
+                displayInstanceUrl: "/display_plugin_instance",
+                instanceImageUrl: null,
+                lastRefresh: "",
+                latestPluginImageUrl: "/plugin/clock/latest.png",
+                loadPluginSettings: false,
+                pluginId: "clock",
+                pluginSettings: {},
+                previewUrl: "/preview_image",
+                progressContext: {page: "plugin", pluginId: "clock", instance: null},
+                refreshInfoUrl: "/refresh_info",
+                resolution: [800, 480],
+                styleSettings: false,
+                urls: {
+                    add_to_playlist: "/add_plugin",
+                    save_settings: "/save_plugin_settings",
+                    update_instance: "/update_plugin_instance",
+                    update_now: "/update_now"
+                }
+            };
+            window.InkyPiPluginPage.create(window.__INKYPI_PLUGIN_BOOT__).init();
         """)
 
-        # Open Add to Playlist modal and fill fields (scope to the modal)
-        page.click("text=Add to Playlist")
-        page.wait_for_selector("#scheduleModal", state="visible")
-        page.fill("#scheduleModal #instance", "My Instance")
-        page.fill("#scheduleModal #scheduleInterval", "15")
-        page.select_option("#scheduleModal #scheduleUnit", "minute")
-        # Save using the modal's Save button
-        page.click('#scheduleModal button:has-text("Save")')
+        page.click('button[data-plugin-subtab-target="schedule"]')
+        page.wait_for_timeout(200)
+        page.fill("#instance", "My Instance")
+        page.fill("#scheduleInterval", "15")
+        page.select_option("#scheduleUnit", "minute")
+        page.click('button[data-plugin-action="add_to_playlist"]')
 
         # Small wait for async fetch stub to fire
         page.wait_for_timeout(500)

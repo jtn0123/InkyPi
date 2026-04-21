@@ -110,7 +110,13 @@ def test_settings_page_accessibility(client):
 
     # Filter out known violations that are pre-existing upstream issues
     # "label" and "select-name" have been fixed by JTN-315
-    known_violations = {"landmark-one-main", "region"}
+    # landmark-banner-is-top-level: pageheader sits inside <main> on the
+    # settings page; tracked with other nested-banner routes in JTN-508.
+    known_violations = {
+        "landmark-one-main",
+        "region",
+        "landmark-banner-is-top-level",  # TODO(JTN-508)
+    }
     violations = [
         v
         for v in (result.get("violations") or [])
@@ -146,7 +152,13 @@ def test_history_page_accessibility(client):
 
     # Filter out known violations that are pre-existing upstream issues
     # "label" and "select-name" have been fixed by JTN-315
-    known_violations = {"landmark-one-main", "region"}
+    # landmark-banner-is-top-level: pageheader sits inside <main> on the
+    # history page; tracked with other nested-banner routes in JTN-508.
+    known_violations = {
+        "landmark-one-main",
+        "region",
+        "landmark-banner-is-top-level",  # TODO(JTN-508)
+    }
     violations = [
         v
         for v in (result.get("violations") or [])

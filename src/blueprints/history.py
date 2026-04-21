@@ -384,6 +384,7 @@ def history_page():
         "total_pages": total_pages,
         "total": total,
         "per_page": per_page,
+        "active_nav": "history",
     }
 
     # HTMX partial: return only the grid fragment when requested via hx-get

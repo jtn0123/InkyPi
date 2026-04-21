@@ -1,15 +1,27 @@
-/* Refined Industrial — warm paper + hardware console */
+/* Refined UI — paper-cream light, dark-first console */
 :root {
+    /* Font families — refined typographic system */
+    --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
     /* Core palette — warm paper stock with ink */
     --bg: #f5f3ef;
     --surface: #ffffff;
     --surface-border: #d8d4cd;
+    --surface-2: #eceae5;
+    --surface-3: #e0dcd4;
+    --border-strong: #c6c0b6;
     --text: #1c1917;
     --muted: #6b6560;
+    --text-3: #8a857d;
     --divider: var(--surface-border);
     --button-bg: #f0ede8;
     --input-bg: #ffffff;
-    --accent: #b5522f;
+    /* Refined teal accent — oklch for consistent perceptual luminance */
+    --accent: oklch(56% 0.08 170);
+    --accent-hover: oklch(48% 0.09 170);
+    --accent-ink: #ffffff;
+    --accent-weak: color-mix(in oklab, var(--accent) 14%, transparent);
     --panel-bg: #f0ede8;
     --panel-border: #ddd8d0;
     --subtext: #6b6560;
@@ -19,8 +31,8 @@
     --error: #c4453a;
     --success: #3d6b5d;
     --warning: #b8862e;
-    --primary: #3d6b5d;
-    --primary-hover: #2d5347;
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
@@ -33,26 +45,27 @@
     --shadow-medium: rgba(28, 25, 23, 0.14);
     --close-btn-color: var(--muted);
     --close-btn-hover: var(--text);
-    --success-bg: rgba(61, 107, 93, 0.10);
-    --success-border: rgba(61, 107, 93, 0.30);
-    --error-bg: rgba(196, 69, 58, 0.10);
-    --error-border: rgba(196, 69, 58, 0.30);
+    --success-bg: color-mix(in oklab, var(--success) 12%, transparent);
+    --success-border: color-mix(in oklab, var(--success) 32%, transparent);
+    --error-bg: color-mix(in oklab, var(--error) 12%, transparent);
+    --error-border: color-mix(in oklab, var(--error) 32%, transparent);
     --error-contrast: #a03530;
-    --primary-bg: rgba(61, 107, 93, 0.10);
-    --primary-border: rgba(61, 107, 93, 0.30);
-    --info-contrast: #2d5347;
-    --warning-bg: rgba(184, 134, 46, 0.12);
-    --warning-border: rgba(184, 134, 46, 0.30);
+    --primary-bg: color-mix(in oklab, var(--accent) 12%, transparent);
+    --primary-border: color-mix(in oklab, var(--accent) 32%, transparent);
+    --info-contrast: color-mix(in oklab, var(--accent) 80%, #000);
+    --warning-bg: color-mix(in oklab, var(--warning) 14%, transparent);
+    --warning-border: color-mix(in oklab, var(--warning) 32%, transparent);
     --warning-contrast: #8a6500;
     --danger: #c4453a;
     --danger-hover: #a93530;
-    --accent-hover: #984428;
     --on-accent: #ffffff;
     --storage-track: #d8d4cd;
-    --storage-fill-start: #5aab7a;
-    --storage-fill-end: #3d6b5d;
-    --info-bg: rgba(196, 93, 62, 0.07);
-    --info-border: rgba(196, 93, 62, 0.20);
+    --storage-fill-start: color-mix(in oklab, var(--accent) 70%, #fff);
+    --storage-fill-end: var(--accent);
+    /* Pure black backdrop for e-ink preview canvas (both themes) */
+    --preview-bg: #000;
+    --info-bg: color-mix(in oklab, var(--accent) 8%, transparent);
+    --info-border: color-mix(in oklab, var(--accent) 22%, transparent);
     --icon-accent: var(--accent);
 
     /* Standardized Typography System */
@@ -149,59 +162,66 @@
        --bp-2xl: 1440px  Large screens */
 }
 [data-theme="dark"] {
-    /* Hardware diagnostic console */
-    --bg: #121210;
-    --surface: #1c1b18;
-    --surface-border: #333028;
-    --text: #e8e4de;
-    --muted: #9a9590;
+    /* Console aesthetic — dark-first refined UI */
+    --bg: #0e0f10;
+    --surface: #141618;
+    --surface-2: #191c1e;
+    --surface-3: #20252a;
+    --surface-border: #262b30;
+    --border-strong: #2f3640;
+    --text: #e4e6e8;
+    --muted: #a7adb3;
+    --text-3: #6f767d;
     --divider: var(--surface-border);
-    --button-bg: #252320;
-    --input-bg: #161513;
-    --accent: #e07a5c;
-    --panel-bg: #211f1c;
-    --panel-border: #333028;
-    --subtext: #9a9590;
-    --frame-lining: #6b6560;
-    --skeleton-base: rgba(232, 228, 222, 0.06);
-    --skeleton-highlight: rgba(232, 228, 222, 0.10);
-    --error: #e8685e;
-    --success: #6db89f;
-    --warning: #d4a03a;
-    --primary: #6db89f;
-    --primary-hover: #8acab2;
+    --button-bg: #191c1e;
+    --input-bg: #191c1e;
+    /* Refined teal — muted, perceptually consistent */
+    --accent: oklch(68% 0.08 170);
+    --accent-hover: oklch(74% 0.09 170);
+    --accent-ink: oklch(20% 0.02 170);
+    --accent-weak: color-mix(in oklab, var(--accent) 18%, transparent);
+    --panel-bg: #191c1e;
+    --panel-border: #262b30;
+    --subtext: #a7adb3;
+    --frame-lining: #6f767d;
+    --skeleton-base: rgba(228, 230, 232, 0.06);
+    --skeleton-highlight: rgba(228, 230, 232, 0.10);
+    --error: oklch(70% 0.17 25);
+    --success: oklch(72% 0.11 160);
+    --warning: oklch(80% 0.12 82);
+    --primary: var(--accent);
+    --primary-hover: var(--accent-hover);
     --text-primary: var(--text);
     --text-muted: var(--muted);
     --text-secondary: var(--subtext);
     --border-color: var(--surface-border);
     --bg-primary: var(--surface);
-    --bg-secondary: #1a1816;
-    --card-bg: rgba(28, 27, 24, 0.88);
-    --modal-overlay: rgba(12, 11, 10, 0.68);
-    --modal-bg: #211f1c;
+    --bg-secondary: #0e0f10;
+    --card-bg: var(--surface);
+    --modal-overlay: rgba(0, 0, 0, 0.6);
+    --modal-bg: var(--surface);
     --shadow-medium: rgba(0, 0, 0, 0.35);
     --close-btn-color: var(--muted);
     --close-btn-hover: var(--text);
-    --success-bg: rgba(109, 184, 159, 0.14);
-    --success-border: rgba(109, 184, 159, 0.30);
-    --error-bg: rgba(232, 104, 94, 0.14);
-    --error-border: rgba(232, 104, 94, 0.30);
-    --error-contrast: #ffb1ab;
-    --primary-bg: rgba(109, 184, 159, 0.14);
-    --primary-border: rgba(109, 184, 159, 0.30);
-    --info-contrast: #8acab2;
-    --warning-bg: rgba(212, 160, 58, 0.14);
-    --warning-border: rgba(212, 160, 58, 0.30);
-    --warning-contrast: #f0c060;
-    --danger: #e8685e;
-    --danger-hover: #f08070;
-    --accent-hover: #f09880;
-    --on-accent: #121210;
-    --storage-track: #333028;
-    --storage-fill-start: #6db89f;
-    --storage-fill-end: #4a9a80;
-    --info-bg: rgba(224, 122, 92, 0.10);
-    --info-border: rgba(224, 122, 92, 0.20);
+    --success-bg: color-mix(in oklab, var(--success) 14%, transparent);
+    --success-border: color-mix(in oklab, var(--success) 35%, transparent);
+    --error-bg: color-mix(in oklab, var(--error) 14%, transparent);
+    --error-border: color-mix(in oklab, var(--error) 35%, transparent);
+    --error-contrast: color-mix(in oklab, var(--error) 85%, #fff);
+    --primary-bg: var(--accent-weak);
+    --primary-border: color-mix(in oklab, var(--accent) 40%, transparent);
+    --info-contrast: var(--accent);
+    --warning-bg: color-mix(in oklab, var(--warning) 14%, transparent);
+    --warning-border: color-mix(in oklab, var(--warning) 35%, transparent);
+    --warning-contrast: color-mix(in oklab, var(--warning) 85%, #fff);
+    --danger: var(--error);
+    --danger-hover: color-mix(in oklab, var(--error) 85%, #fff);
+    --on-accent: var(--accent-ink);
+    --storage-track: var(--surface-3);
+    --storage-fill-start: var(--accent);
+    --storage-fill-end: var(--accent-hover);
+    --info-bg: color-mix(in oklab, var(--accent) 10%, transparent);
+    --info-border: color-mix(in oklab, var(--accent) 22%, transparent);
     --icon-accent: var(--accent);
 
     /* Dark shadow overrides */
@@ -209,4 +229,43 @@
     --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.25);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.30);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Aesthetic: Paper — warm charcoal, paper-cream surfaces (dark mode variant) */
+[data-theme="dark"][data-aesthetic="paper"] {
+    --bg: #16130f;
+    --surface: #1d1915;
+    --surface-2: #241f1a;
+    --surface-3: #2b2520;
+    --surface-border: #33302a;
+    --border-strong: #403a33;
+    --text: #efe8dc;
+    --muted: #b5ac9e;
+    --text-3: #827a6e;
+    --accent: oklch(72% 0.07 168);
+    --accent-hover: oklch(78% 0.08 168);
+    --accent-ink: #16130f;
+    --panel-bg: #241f1a;
+    --panel-border: #33302a;
+    --input-bg: #241f1a;
+    --button-bg: #241f1a;
+    --bg-secondary: #16130f;
+}
+
+/* Aesthetic: Minimal — flatter, cooler, less ornament (dark mode variant) */
+[data-theme="dark"][data-aesthetic="minimal"] {
+    --bg: #0b0c0d;
+    --surface: #0f1113;
+    --surface-2: #131619;
+    --surface-3: #171b1f;
+    --surface-border: #1c2126;
+    --border-strong: #242a31;
+    --text: #ececed;
+    --muted: #9ea4ac;
+    --text-3: #60666d;
+    --panel-bg: #131619;
+    --panel-border: #1c2126;
+    --input-bg: #131619;
+    --button-bg: #131619;
+    --bg-secondary: #0b0c0d;
 }

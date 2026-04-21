@@ -91,7 +91,9 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     page = browser_page
 
     navigate_and_wait(page, live_server, "/")
-    assert "Preview the current display" in page.locator("body").inner_text()
+    body_text = page.locator("body").inner_text()
+    assert "Current display" in body_text
+    assert "Check status" in body_text
 
     navigate_and_wait(page, live_server, "/playlist")
     assert (
@@ -99,18 +101,22 @@ def test_jtn_720_first_run_setup_add_schedule_refresh_history(
     )
 
     navigate_and_wait(page, live_server, "/plugin/clock")
-    page.locator('button[data-open-modal="scheduleModal"]').click()
-    page.locator("#scheduleModal").wait_for(state="visible", timeout=5000)
+    page.locator('button[data-plugin-subtab-target="schedule"]').click()
+    page.locator("#scheduleForm").wait_for(state="visible", timeout=5000)
     page.locator("#playlist").select_option("Default")
     page.locator("#instance").fill("First Clock")
     page.locator("#scheduleInterval").fill("5")
     page.locator('button[data-plugin-action="add_to_playlist"]').click()
-    page.locator("#scheduleModal").wait_for(state="hidden", timeout=10000)
+    page.wait_for_timeout(1000)
 
     navigate_and_wait(page, live_server, "/playlist")
     assert "First Clock" in page.locator("body").inner_text()
 
-    page.locator("[data-playlist-toggle]").first.click()
+    # Expand card only when the toggle is visible (mobile viewport). On
+    # desktop the card body is always expanded and the toggle is hidden.
+    toggle = page.locator("[data-playlist-toggle]").first
+    if toggle.is_visible():
+        toggle.click()
     page.locator(".plugin-display-btn").first.click()
     page.wait_for_timeout(1200)
     page.wait_for_url(f"{live_server}/playlist", timeout=10000)
@@ -176,7 +182,11 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
     )
 
     navigate_and_wait(page, live_server, "/playlist")
-    page.locator('[data-playlist-name="Journey List"] [data-playlist-toggle]').click()
+    journey_toggle = page.locator(
+        '[data-playlist-name="Journey List"] [data-playlist-toggle]'
+    )
+    if journey_toggle.is_visible():
+        journey_toggle.click()
     page.wait_for_timeout(300)
     assert _plugin_instance_names(page, "Journey List") == [
         "Clock Alpha",
@@ -197,7 +207,11 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
 
     page.reload(wait_until="domcontentloaded")
     page.wait_for_selector("[data-page-shell]", timeout=10000)
-    page.locator('[data-playlist-name="Journey List"] [data-playlist-toggle]').click()
+    journey_toggle_reload = page.locator(
+        '[data-playlist-name="Journey List"] [data-playlist-toggle]'
+    )
+    if journey_toggle_reload.is_visible():
+        journey_toggle_reload.click()
     page.wait_for_timeout(300)
     assert _plugin_instance_names(page, "Journey List") == [
         "Year Beta",
@@ -217,7 +231,11 @@ def test_jtn_721_playlist_roundtrip_create_add_reorder_delete_persist(
 
     page.reload(wait_until="domcontentloaded")
     page.wait_for_selector("[data-page-shell]", timeout=10000)
-    page.locator('[data-playlist-name="Journey List"] [data-playlist-toggle]').click()
+    journey_toggle_final = page.locator(
+        '[data-playlist-name="Journey List"] [data-playlist-toggle]'
+    )
+    if journey_toggle_final.is_visible():
+        journey_toggle_final.click()
     page.wait_for_timeout(300)
     assert "Journey List" in _playlist_names(page)
     assert _plugin_instance_names(page, "Journey List") == [

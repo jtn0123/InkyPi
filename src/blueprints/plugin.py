@@ -135,7 +135,21 @@ def plugin_page(plugin_id: str):
         plugin=plugin_config,
         resolution=device_config.get_resolution(),
         config=device_config.get_config(),
+        active_nav="plugins",
         **template_params,
+    )
+
+
+@plugin_bp.route("/plugins", methods=["GET"])
+def plugins_page():
+    device_config = current_app.config[_CONFIG_KEY]
+    plugins = device_config.get_plugins()
+
+    return render_template(
+        "plugins.html",
+        plugins=plugins,
+        config=device_config.get_config(),
+        active_nav="plugins",
     )
 
 

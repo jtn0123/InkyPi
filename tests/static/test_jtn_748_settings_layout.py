@@ -17,7 +17,16 @@ def test_settings_summary_device_name_truncates_cleanly():
     assert "white-space: nowrap" in css
 
     html = SETTINGS_HTML.read_text(encoding="utf-8")
-    assert 'class="status-chip info settings-device-name"' in html
+    # JTN-748's concern is the .settings-device-name truncation rule — the
+    # chip variant (info/neutral/accent) is an unrelated styling choice that
+    # should be free to change with the design system. Assert both structural
+    # classes appear on a single element without pinning to a variant.
+    import re
+    chip_match = re.search(
+        r'class="[^"]*\bstatus-chip\b[^"]*\bsettings-device-name\b[^"]*"',
+        html,
+    )
+    assert chip_match, "expected a .status-chip.settings-device-name element"
     assert 'title="{{ device_settings.name }}"' in html
 
 

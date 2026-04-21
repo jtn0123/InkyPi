@@ -1,5 +1,8 @@
 # pyright: reportMissingImports=false
+from datetime import UTC, datetime
+
 import os
+import re
 
 from model import RefreshInfo
 
@@ -10,12 +13,26 @@ def test_main_page(client):
     assert b"/preview" in resp.data
 
 
+def test_dashboard_header_actions_use_compact_handoff_button_pattern(client):
+    resp = client.get("/")
+    html = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'id="dashboardRefreshBtn"' in html
+    assert 'id="displayNextBtn"' in html
+    assert 'class="header-button is-secondary dashboard-header-button"' in html
+    assert 'class="header-button primary dashboard-header-button"' in html
+    assert 'class="action-button is-secondary dashboard-header-button"' not in html
+    assert 'class="action-button primary dashboard-header-button"' not in html
+
+
 def test_preview_size_mode_native_on_home(client, device_config_dev, monkeypatch):
     # native: expect native sizing metadata present for controller-driven preview sizing
     device_config_dev.update_value("preview_size_mode", "native", write=True)
     resp = client.get("/")
     assert resp.status_code == 200
     assert b'data-native-width="' in resp.data and b'data-native-height="' in resp.data
+    assert b'id="dashboardStageCopy"' in resp.data
 
 
 def test_preview_size_mode_fit_on_home(client, device_config_dev, monkeypatch):
@@ -78,12 +95,45 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
 
     resp = client.get("/")
     assert resp.status_code == 200
-    # Ensure the Now showing block exists and contains seeded values
-    assert b"Now showing:" in resp.data
-    assert b"weather" in resp.data
+    # Now-showing metadata is rendered by the hero-strip (#heroNowValue /
+    # #heroNowMeta) since the redundant dashboard-aside block was removed
+    # to match the handoff design. The contract is: plugin display name,
+    # custom instance label, and playlist must all appear in the HTML.
+    assert b'id="heroNowValue"' in resp.data
+    assert b"Weather" in resp.data or b"weather" in resp.data
     assert b"Home Weather" in resp.data
     assert b"Default" in resp.data
+    assert b'NOW PLAYING' in resp.data
+    assert b'class="now-card ' in resp.data
+    assert b"refreshed" in resp.data
     assert b'data-page-shell="dashboard"' in resp.data
+
+
+def test_dashboard_refresh_cell_renders_forward_eta(
+    client, device_config_dev, monkeypatch
+):
+    monkeypatch.setattr(
+        "blueprints.main._current_dt",
+        lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
+        raising=True,
+    )
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="clock",
+        refresh_time="2025-01-01T07:55:00+00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Clock A",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/")
+    html = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'id="heroRefreshValue"' in html
+    assert "in 3m" in html
+    assert "ETA 8:00 AM" in html
 
 
 def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):
@@ -91,9 +141,22 @@ def test_dashboard_plugin_cards_have_valid_hrefs(client, device_config_dev):
     resp = client.get("/")
     assert resp.status_code == 200
     # Each plugin should have a link to its plugin page
-    # The test client's config should have at least one plugin registered
-    assert b'class="plugin-item"' in resp.data
+    # The test client's config should have at least one plugin registered.
+    # The card class is `plugin-item` (optionally with additional modifier
+    # classes like `plugin-tile` from the tile-based redesign).
+    assert b'class="plugin-item' in resp.data
     assert b'href="/plugin/' in resp.data
+
+
+def test_dashboard_plugin_catalog_exposes_library_link(client):
+    resp = client.get("/")
+    html = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'id="todayKpiSub"' in html
+    assert "Plugins" in html
+    assert 'href="/plugins"' in html
+    assert "Open library" in html
 
 
 def test_plugin_page_accessible_from_dashboard_links(client, device_config_dev):
@@ -110,6 +173,39 @@ def test_plugin_page_accessible_from_dashboard_links(client, device_config_dev):
         assert (
             plugin_resp.status_code == 200
         ), f"Plugin page {href.decode()} should be accessible"
+
+
+def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(client):
+    resp = client.get("/plugins")
+    html = resp.get_data(as_text=True)
+
+    assert resp.status_code == 200
+    assert 'data-page-shell="plugins"' in html
+    assert 'href="/plugin/' in html
+    assert 'href="/plugins"' in html
+    assert 'class="nav-item active"' in html
+    assert 'aria-current="page"' in html
+
+
+def test_shell_marks_sidebar_active_on_management_pages(client):
+    cases = [
+        ("/playlist", '/playlist'),
+        ("/history", '/history'),
+        ("/settings", '/settings'),
+        ("/settings/api-keys", '/settings/api-keys'),
+        ("/api-keys", '/settings/api-keys'),
+    ]
+
+    for path, active_href in cases:
+        resp = client.get(path)
+        html = resp.get_data(as_text=True)
+        assert resp.status_code == 200
+        active_link = re.search(
+            rf'href="{re.escape(active_href)}"[^>]*class="nav-item active"'
+            rf'|class="nav-item active"[^>]*href="{re.escape(active_href)}"',
+            html,
+        )
+        assert active_link, f"Expected sidebar link {active_href} to be active on {path}"
 
 
 def test_next_up_endpoint_and_ssr(client, device_config_dev):
@@ -135,10 +231,12 @@ def test_next_up_endpoint_and_ssr(client, device_config_dev):
     )
     device_config_dev.write_config()
 
-    # SSR should include Next up with the first item since index is None -> peek returns first
+    # SSR should include the next-up entry in the hero-strip. With the
+    # redundant "Next up:" aside removed, the contract is that the hero
+    # cell renders the seeded plugin display name.
     resp = client.get("/")
     assert resp.status_code == 200
-    assert b"Next up:" in resp.data
+    assert b'id="heroNextValue"' in resp.data
     assert b"weather" in resp.data or b"clock" in resp.data
 
     # Endpoint should return a structured JSON
@@ -224,8 +322,8 @@ def test_home_hides_auto_generated_instance_suffix(client, device_config_dev):
     assert resp.status_code == 200
     # The auto-generated internal key must not leak into the rendered HTML.
     assert b"weather_saved_settings" not in resp.data
-    # Now showing block still renders.
-    assert b"Now showing:" in resp.data
+    # Hero-strip still surfaces the plugin display name.
+    assert b'id="heroNowValue"' in resp.data
 
 
 def test_home_preserves_user_supplied_instance_name(client, device_config_dev):
@@ -265,6 +363,34 @@ def test_refresh_info_endpoint_annotates_labels(client, device_config_dev):
     # Friendly label should not expose the raw key.
     assert "saved_settings" not in payload["plugin_instance_label"]
     assert payload["plugin_display_name"]
+
+
+def test_refresh_info_endpoint_includes_next_refresh_schedule(
+    client, device_config_dev, monkeypatch
+):
+    monkeypatch.setattr(
+        "blueprints.main._current_dt",
+        lambda _device_config: datetime(2025, 1, 1, 7, 57, tzinfo=UTC),
+        raising=True,
+    )
+    device_config_dev.refresh_info = RefreshInfo(
+        refresh_type="Playlist",
+        plugin_id="clock",
+        refresh_time="2025-01-01T07:55:00+00:00",
+        image_hash=123,
+        playlist="Default",
+        plugin_instance="Clock A",
+    )
+    device_config_dev.write_config()
+
+    resp = client.get("/refresh-info")
+    assert resp.status_code == 200
+
+    payload = resp.get_json()
+    assert payload["cycle_minutes"] == 5
+    assert payload["next_refresh_time"].startswith("2025-01-01T08:00:00")
+    assert payload["next_refresh_relative"] == "in 3m"
+    assert payload["next_refresh_meta"] == "ETA 8:00 AM · Every 5 min · auto"
 
 
 def test_next_up_endpoint_annotates_labels(client, device_config_dev):

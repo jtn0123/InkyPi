@@ -19,6 +19,72 @@
   margin-bottom: 10px;
 }
 
+/* Card framing for each settings panel section. Scoped to the settings
+   console so other consumers of .section / .collapsible are unaffected.
+   Mirrors the React prototype where every panel is wrapped in a Card. */
+.settings-console-panel .section,
+.settings-console-panel .collapsible {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 14px;
+  overflow: hidden;
+}
+
+.settings-console-panel .section {
+  padding: 14px 16px 12px;
+}
+
+.settings-console-panel .section-title {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+
+.settings-console-panel .collapsible .collapsible-header {
+  background: transparent;
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: var(--text);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.settings-console-panel .collapsible .collapsible-header:hover {
+  background: color-mix(in oklab, var(--surface-border) 40%, transparent);
+}
+
+.settings-console-panel .collapsible .collapsible-header[aria-expanded="true"] {
+  border-bottom-color: var(--surface-border);
+}
+
+.settings-console-panel .collapsible .collapsible-content {
+  padding: 0;
+}
+
+.settings-console-panel .collapsible .collapsible-content.is-open {
+  padding: 12px 16px 14px;
+}
+
+.settings-console-panel .update-panel,
+.settings-console-panel .danger-zone {
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--border-radius-lg);
+  margin-bottom: 14px;
+  padding: 14px 16px;
+}
+
+.settings-console-panel .danger-zone {
+  border-color: color-mix(in oklab, var(--error) 30%, var(--surface-border));
+}
+
 .settings-schema {
   display: grid;
   gap: 14px;
@@ -120,6 +186,21 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  flex: 1;
+}
+
+/* Handoff parity: toggle row pairs a stacked [label + hint] column with the
+   switch on the far right. Used on form-groups that opt in with `.toggle-row`. */
+.form-group.nowrap.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: nowrap;
+}
+
+.form-group.nowrap.toggle-row .toggle-container {
+  flex-shrink: 0;
 }
 
 .toggle-item-label {
@@ -236,8 +317,44 @@
   padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* Handoff parity note: the fresh prototype right-aligns a compact Save in a
+   sticky footer. We previously tried that here, but on desktop the settings
+   page also renders two fixed-position affordances in the bottom-right —
+   `#settingsLogsToggle` (z-index: 10) and the global `.status-badge`
+   (z-index: 9000) — which then intercepted clicks on the shrunken Save
+   button (see test_settings_round_trip_e2e.py). Until the logs FAB becomes
+   mobile-only (JTN-339 is already scoped that way in the handoff), we leave
+   Save at its default `flex: 1; width: 100%`. The full-width Save extends
+   past both fixed buttons so Playwright — and real users — always have a
+   click-accessible region on the left. */
+.settings-panel .buttons-container #settings-form-status {
+  margin-right: auto;
+}
+
 .settings-panel {
   gap: 16px;
+}
+
+.settings-panel .buttons-container {
+  position: sticky;
+  bottom: 16px;
+  z-index: 6;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 12px;
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 94%, transparent) 22%);
+}
+
+.settings-panel .buttons-container #settings-form-status {
+  min-height: 1.25rem;
+}
+
+.settings-panel .buttons-container #saveSettingsBtn {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: clamp(12rem, 24vw, 15rem);
+  padding-inline: 24px;
 }
 
 .logs-panel {
@@ -249,6 +366,14 @@
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 32px);
+}
+
+.logs-panel-inline {
+  margin-top: 0;
+}
+
+.logs-panel-inline.is-open {
+  max-height: none;
 }
 
 .logs-toolbar,
@@ -311,38 +436,40 @@
     stroke: var(--icon-accent);
 }
 
-/* Settings console layout */
+/* Settings console layout — handoff parity: 180px nav, 28px gap. */
 .settings-console-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 28px;
 }
 
 .settings-side-nav {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   align-self: start;
   position: sticky;
   top: 16px;
   border-right: 1px solid var(--divider);
-  padding-right: var(--spacing-lg);
+  padding-right: var(--spacing-md);
 }
 
 .settings-side-link {
   border: none;
-  border-left: 2px solid transparent;
   background: transparent;
   color: var(--muted);
-  border-radius: 0;
-  padding: 10px 14px;
+  border-radius: var(--border-radius-md, 6px);
+  padding: 8px 10px;
   text-align: left;
   font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
+  font-weight: 500;
+  letter-spacing: 0;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: color var(--transition-speed) ease,
               background-color var(--transition-speed) ease,
-              border-color var(--transition-speed) ease;
+              box-shadow var(--transition-speed) ease;
 }
 
 .settings-side-link:hover {
@@ -350,10 +477,31 @@
   background: var(--panel-bg);
 }
 
+/* Handoff: active state uses inset box-shadow instead of a border so the
+   nav row width doesn't shift between states. */
 .settings-side-link.active {
-  border-left-color: var(--accent);
   color: var(--text);
   background: var(--panel-bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.settings-side-link .settings-side-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-3, var(--muted));
+  flex-shrink: 0;
+}
+
+/* Handoff parity: icon only takes accent color on the ACTIVE tab, not on
+   hover. Hover still darkens the label via the hover rule above, but the
+   icon shouldn't flash teal every time the mouse passes over a row — that
+   read as jittery next to the refined handoff navigation. */
+.settings-side-link:hover .settings-side-icon {
+  color: var(--text);
+}
+
+.settings-side-link.active .settings-side-icon {
+  color: var(--accent);
 }
 
 .settings-console-panel {
@@ -365,10 +513,76 @@
   display: grid;
 }
 
+.observability-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 18px 20px 0;
+}
+
+.observability-copy {
+  display: grid;
+  gap: 4px;
+  max-width: 42rem;
+}
+
+.observability-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.observability-summary {
+  margin: 0;
+  color: var(--text-3, var(--muted));
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
 .diagnostics-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.observability-section {
+  display: grid;
+  gap: 14px;
+}
+
+.observability-section + .observability-section {
+  border-top: 1px solid var(--divider);
+  padding-top: 18px;
+}
+
+.observability-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.observability-section-title {
+  display: grid;
+  gap: 4px;
+}
+
+.observability-section-title h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.observability-section-title p {
+  margin: 0;
+  color: var(--text-3, var(--muted));
+  font-size: var(--text-sm);
+  line-height: 1.5;
 }
 
 .inline-action-row {
@@ -376,6 +590,61 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
+}
+
+/* Handoff parity: horizontal row variant used inside card-bodies (e.g.
+   Backup & restore) to pack mixed controls (button + input/button pair +
+   toggle) onto one line. Wraps at narrow widths. */
+.inline-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.backup-restore-row {
+  align-items: center;
+}
+
+.backup-restore-restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.backup-restore-restore .form-input[type="file"] {
+  max-width: 220px;
+  font-size: 0.78rem;
+}
+
+/* Compact inline toggle used inside `.inline-row` — label + hint stacked
+   on the left, switch on the right. Mirrors the handoff `<Toggle>` primitive
+   while reusing the existing `.toggle-container`/`.toggle-label` switch. */
+.toggle-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.toggle-inline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+}
+
+.toggle-inline-label {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.toggle-inline-hint {
+  font-size: 0.72rem;
+  color: var(--text-3, var(--muted));
 }
 
 .diagnostics-panel {
@@ -426,27 +695,24 @@
     animation: shake-item 0.35s ease-in-out;
 }
 
-/* Mobile logs toggle (JTN-339)
-   Uses env(safe-area-inset-bottom) so the floating "Show Logs" action
-   stays above the iOS home indicator and the dynamic mobile address bar
-   on narrow viewports. The companion padding-bottom on
-   .page-shell-management ensures the last in-flow element isn't hidden
-   underneath this fixed button. */
+/* Logs toggle defaults to an in-flow action on larger viewports. Narrow-screen
+   floating behavior is restored in _responsive.css so it does not overlap the
+   sticky Save bar on short laptops. */
 .settings-logs-toggle {
-  display: block;
-  position: fixed;
-  right: max(16px, env(safe-area-inset-right, 0px) + 8px);
-  bottom: max(16px, env(safe-area-inset-bottom, 0px) + 16px);
-  z-index: 10;
-  border-radius: 999px;
-  padding: 12px 18px;
+  display: inline-flex;
+  margin: 8px 0 0 auto;
+  width: auto;
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-/* Reserve space at the bottom of the settings page so the fixed
-   "Show Logs" toggle never overlaps the last action in the panel
-   (e.g. Save / Reset buttons) on narrow mobile viewports. */
-.page-shell-management {
-  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+body[data-page="settings"] .settings-device-name,
+body[data-page="settings"] #settingsLogsToggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .settings-panel .buttons-container #saveSettingsBtn {
+    width: 100%;
+    min-width: 0;
+  }
 }

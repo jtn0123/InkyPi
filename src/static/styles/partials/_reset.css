@@ -29,12 +29,23 @@
 
 /* Base body styling */
 body {
-    font-family: Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: var(--font-sans, 'Inter'), Jost, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     background-color: var(--bg);
     color: var(--text);
-    line-height: 1.6;
+    line-height: 1.5;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Let content flow naturally; pages control their own centering */
+}
+
+/* Monospace utility — JetBrains Mono for refined labels and metrics */
+.mono,
+code,
+pre,
+kbd,
+samp {
+    font-family: var(--font-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-feature-settings: 'ss01';
+    letter-spacing: -0.01em;
 }

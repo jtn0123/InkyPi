@@ -392,10 +392,11 @@ def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
             assert page.locator("#deviceName").input_value() == updated_name
 
             _open_settings_tab(page, "maintenance")
-            page.wait_for_selector("#exportConfigBtn", timeout=10000)
+            # Backup & restore is now a flat section inside the maintenance
+            # tab (no collapsible). Wait for visibility before interacting.
+            page.wait_for_selector("#exportConfigBtn", state="visible", timeout=10000)
 
             # Backup & restore path: export feedback + file import round-trip.
-            _expand_settings_section(page, "#section-backup-restore")
             page.locator("#exportConfigBtn").click()
             _wait_for_toast_text(page, "Backup downloaded")
 
@@ -418,6 +419,9 @@ def test_jtn_730_settings_deep_high_risk_paths(live_server, tmp_path):
             _wait_for_toast_text(page, 'Plugin "clock" has been un-isolated.')
 
             # Device action safety gates: modal open/close + focus restore.
+            # Reboot/shutdown now live on their own "Power" tab (matches
+            # handoff design: Device / Scheduling / Image / Updates / Power).
+            _open_settings_tab(page, "power")
             page.locator("#rebootBtn").click()
             page.wait_for_selector("#rebootConfirmModal", state="visible", timeout=8000)
             page.keyboard.press("Escape")
@@ -599,13 +603,15 @@ def test_plugin_pages_phone_layout(live_server, tmp_path, viewport, theme, plugi
                 screenshot_dir,
             )
             _assert_plugin_page_ready(page, plugin_id)
-            page.wait_for_selector("[data-workflow-mode='configure']", state="attached")
-            page.wait_for_selector("[data-workflow-mode='preview']", state="attached")
-            page.locator("[data-workflow-mode='preview']").click()
-            page.wait_for_timeout(200)
+            # Design refresh: the Configure/Preview mode bar was removed; both
+            # panels are always rendered (stacked on mobile, side-by-side on
+            # desktop). Assert both panels attach and are visible.
+            page.wait_for_selector("[data-workflow-panel='configure']", state="attached")
+            page.wait_for_selector("[data-workflow-panel='preview']", state="attached")
             assert page.locator("[data-workflow-panel='preview']").count() >= 1
+            assert page.locator("[data-workflow-panel='configure']").count() >= 1
             _assert_no_horizontal_overflow(page)
-            _assert_action_visible(page, "[data-workflow-mode='preview']")
+            _assert_action_visible(page, "[data-workflow-panel='preview']")
             _maybe_capture_baseline(
                 page,
                 screenshot_dir,

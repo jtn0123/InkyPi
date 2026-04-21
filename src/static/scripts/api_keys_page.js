@@ -2,14 +2,26 @@
   // Module-scoped DOM helpers for the delete button inside a managed API key
   // card. Hoisted out of `createApiKeysPage` because they don't close over any
   // state (SonarCloud javascript:S7721).
+  function _cardForSection(sectionId) {
+    return document
+      .getElementById(`${sectionId}-status`)
+      ?.closest(".api-key-card");
+  }
+
+  // Helper — find the label for a given provider key_name by reading the
+  // <label for=INPUT_ID> text inside the same card. Used to produce accurate
+  // delete-button aria-labels after a save without hard-coding names.
+  function _labelForCard(card) {
+    const label = card?.querySelector(".api-key-card-head .key-svc");
+    return label ? (label.textContent || "").trim() : "";
+  }
+
   function addDeleteButton(sectionId, keyName) {
     // The Delete button lives inside `.api-key-actions` (the input row), NOT
     // `.api-key-card-head` (which holds the label + status). Walk up to the
     // card and then into the actions container so new buttons land next to
     // the input rather than next to the status line.
-    const card = document
-      .getElementById(`${sectionId}-status`)
-      ?.closest(".api-key-card");
+    const card = _cardForSection(sectionId);
     const actions = card?.querySelector(".api-key-actions");
     if (!actions) return;
     if (
@@ -20,20 +32,56 @@
       deleteButton.className = "header-button delete-button delete-button-danger";
       deleteButton.dataset.apiAction = "delete-key";
       deleteButton.dataset.keyName = keyName;
+      deleteButton.dataset.testSkipClick = "true";
+      deleteButton.setAttribute(
+        "aria-label",
+        `Delete ${_labelForCard(card) || keyName} key permanently`
+      );
+      deleteButton.title = "Permanently remove key from .env";
       deleteButton.textContent = "Delete";
       actions.appendChild(deleteButton);
     }
   }
 
   function removeDeleteButton(sectionId) {
-    const card = document
-      .getElementById(`${sectionId}-status`)
-      ?.closest(".api-key-card");
+    const card = _cardForSection(sectionId);
     card
       ?.querySelector(
         '.api-key-actions .delete-button[data-api-action="delete-key"]'
       )
       ?.remove();
+  }
+
+  function setToggleLabel(toggle, label) {
+    const textNode = toggle?.querySelector("[data-role='toggle-label']");
+    if (textNode) {
+      textNode.textContent = label;
+      return;
+    }
+    if (toggle) toggle.textContent = label;
+  }
+
+  // Transition a card's visible chip / toggle button between the configured
+  // and "not set" states without reloading the page. Called from the
+  // save-success and delete-success paths so users see immediate feedback.
+  function setCardConfigured(card, configured) {
+    if (!card) return;
+    card.dataset.configured = configured ? "true" : "false";
+    const chip = card.querySelector("[data-role='key-chip']");
+    if (chip) {
+      chip.classList.toggle("success", !!configured);
+      chip.classList.toggle("warning", !configured);
+      chip.textContent = configured ? "Configured" : "Not set";
+    }
+    const toggle = card.querySelector(".api-key-toggle");
+    if (toggle) {
+      setToggleLabel(toggle, configured ? "Change" : "Add key");
+      toggle.classList.toggle("is-secondary", !!configured);
+      toggle.setAttribute("aria-expanded", "false");
+    }
+    // Ensure the input row is collapsed again after a successful save/delete.
+    const actions = card.querySelector(".api-key-actions");
+    if (actions) actions.setAttribute("hidden", "");
   }
 
   function createApiKeysPage(config) {
@@ -55,16 +103,6 @@
       _isDirty = false;
       const saveBtn = document.getElementById("saveApiKeysBtn");
       if (saveBtn) saveBtn.disabled = true;
-    }
-
-    function updateManagedSummary() {
-      const configured = Array.from(document.querySelectorAll(".api-key-status")).filter(
-        (node) => !/not configured/i.test(node.textContent || "")
-      ).length;
-      const configuredChip = document.getElementById("configuredCountSummary");
-      const providerChip = document.getElementById("providerCountSummary");
-      if (configuredChip) configuredChip.textContent = `${configured} configured`;
-      if (providerChip && config.mode === "managed") providerChip.textContent = "6 providers";
     }
 
     function updateConfiguredStatus(updatedKeys) {
@@ -98,9 +136,9 @@
           inputElement.value = "";
           inputElement.placeholder = "(leave blank to keep current)";
           addDeleteButton(sectionId, key);
+          setCardConfigured(_cardForSection(sectionId), true);
         }
       });
-      updateManagedSummary();
     }
 
     // Extracted to keep saveManagedKeys below the cognitive-complexity
@@ -131,7 +169,7 @@
 
     function finalizeSaveButton(saveBtn, savedOk) {
       if (!saveBtn) return;
-      saveBtn.textContent = "Save";
+      saveBtn.textContent = "Save API keys";
       if (savedOk) {
         markClean();
       } else {
@@ -213,10 +251,14 @@
       }
       if (inputElement) {
         inputElement.value = "";
-        inputElement.placeholder = "Enter API key";
+        inputElement.placeholder =
+          inputElement.dataset.emptyPlaceholder || "Enter API key";
       }
       removeDeleteButton(sectionId);
-      updateManagedSummary();
+      setCardConfigured(_cardForSection(sectionId), false);
+      // Also remove the "Configured" mask chip since the key is gone.
+      const card = _cardForSection(sectionId);
+      card?.querySelector(".api-mask")?.remove();
     }
 
     // Keep delete-button + value-input aria-labels in sync with the current
@@ -437,11 +479,29 @@
       button.setAttribute("aria-label", isPassword ? "Hide key" : "Show key");
     }
 
+    // Reveal the hidden .api-key-actions container (which holds the password
+    // input and optional Delete button) for a managed-key card. The card
+    // starts collapsed so the UI is a compact summary row; clicking
+    // "Change" / "Add key" expands it and focuses the input.
+    function revealInput(button) {
+      const inputId = button.dataset.inputId;
+      if (!inputId) return;
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      const actions = input.closest(".api-key-actions");
+      if (!actions) return;
+      actions.removeAttribute("hidden");
+      button.setAttribute("aria-expanded", "true");
+      try {
+        input.focus();
+      } catch (_) {
+        // focus() can throw if the input became detached; ignore.
+      }
+    }
+
     function init() {
       if (config.mode === "generic") {
         hideExistingPresets();
-      } else {
-        updateManagedSummary();
       }
       // Add show/hide toggle buttons next to password inputs
       document.querySelectorAll('input[type="password"].form-input').forEach((input) => {
@@ -493,6 +553,8 @@
           addPreset(actionEl);
         } else if (action === "toggle-password") {
           togglePasswordVisibility(actionEl);
+        } else if (action === "reveal-input") {
+          revealInput(actionEl);
         }
       });
     }
