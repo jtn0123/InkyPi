@@ -549,7 +549,7 @@ def _tempfile_is_empty(img_file_path: str | None) -> bool:
 
 def _run_browser_subprocess(
     command: list[str], timeout_seconds: float, attempt: int
-) -> tuple[subprocess.CompletedProcess | None, bool]:
+) -> tuple[subprocess.CompletedProcess[bytes] | None, bool]:
     """Run the chromium subprocess. Returns ``(result, transient_flag)``.
 
     On hard errors (missing binary, process timeout) returns ``(None, flag)``
