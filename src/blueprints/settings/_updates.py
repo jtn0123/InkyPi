@@ -58,6 +58,14 @@ def start_update():
         logger=_mod.logger,
         hint="Check update script availability and update process startup.",
     ):
+        # JTN-K3: If a prior update exited before the lockfile/trap machinery
+        # could clear ``_UPDATE_STATE["running"]`` (e.g. do_update.sh bailed
+        # during pre-checkout validation), the stale flag permanently blocks
+        # new updates with 409 until someone happens to hit GET
+        # /settings/update_status — which is the only place that ran the
+        # reaper.  Run the same reaper here so POST self-heals instead of
+        # forcing a manual GET first.
+        _auto_clear_stale_update_state()
         # Accept optional target tag from JSON body before acquiring the lock so
         # we can validate it without holding the lock longer than necessary.
         target_tag: str | None = None
