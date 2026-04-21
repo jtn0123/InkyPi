@@ -30,6 +30,16 @@ from refresh_task import (
 # ---------------------------------------------------------------------------
 
 
+class _SpawnableAction:
+    """Module-scope so `multiprocessing.spawn` can pickle instances
+    across the subprocess boundary (local classes are unpicklable).
+    Used only by `test_worker_reloads_plugin_registry_in_real_spawned_child`.
+    """
+
+    def execute(self, plugin, cfg, dt):
+        return Image.new("RGB", (10, 10), "green")
+
+
 class TestRemoteException:
     def test_known_types(self):
         for name, cls in [
@@ -252,12 +262,6 @@ class TestExecuteRefreshAttemptWorker:
         from refresh_task import _execute_refresh_attempt_worker
         from refresh_task.context import RefreshContext
 
-        class SpawnableAction:
-            """Picklable so the spawned child can unpickle it."""
-
-            def execute(self, plugin, cfg, dt):
-                return Image.new("RGB", (10, 10), "green")
-
         plugin_config = {"id": "clock", "class": "Clock"}
         refresh_context = RefreshContext.from_config(device_config_dev)
 
@@ -268,7 +272,7 @@ class TestExecuteRefreshAttemptWorker:
             args=(
                 result_queue,
                 plugin_config,
-                SpawnableAction(),
+                _SpawnableAction(),
                 refresh_context,
                 datetime.now(UTC),
             ),
