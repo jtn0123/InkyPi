@@ -1946,6 +1946,57 @@ class TestUpdateScript:
                 "--no-cache-dir" in line
             ), f"pip install uv in update.sh missing --no-cache-dir: {line!r}"
 
+    def test_update_refreshes_apt_index_before_install(self):
+        # JTN-788: update.sh must run `apt-get update` synchronously before
+        # `apt-get install` so a stale /var/lib/apt/lists/ cache does not
+        # abort the update when the Raspberry Pi archive has published a
+        # package point-release since the last update. The previous
+        # implementation backgrounded `apt-get update` (with `&`), which
+        # raced against the install and left it reading a stale index in
+        # practice.
+        apt_update_lines = [
+            line
+            for line in self.content.splitlines()
+            if re.search(r"\bapt-get update\b", line)
+            and not line.strip().startswith("#")
+        ]
+        assert apt_update_lines, (
+            "update.sh must call apt-get update before apt-get install " "(JTN-788)"
+        )
+        for line in apt_update_lines:
+            assert not line.rstrip().endswith("&"), (
+                "JTN-788: apt-get update must run synchronously; "
+                f"backgrounded invocation is the bug: {line!r}"
+            )
+        # apt-get update must precede apt-get install in the main script
+        # body so the install sees a freshly-refreshed index.
+        update_pos = self.content.index("apt-get update")
+        install_pos = self.content.index("apt-get install")
+        assert (
+            update_pos < install_pos
+        ), "JTN-788: apt-get update must run before apt-get install"
+        # The exit code of apt-get update must be observed/logged so a
+        # transient failure is visible in the journal for later debugging,
+        # per the issue's "Log the update result" requirement.
+        assert (
+            "apt_update_rc" in self.content
+        ), "JTN-788: update.sh must capture apt-get update's exit code"
+
+    def test_update_does_not_abort_on_apt_update_failure(self):
+        # JTN-788: A transient apt-get update failure (offline, DNS, mirror
+        # hiccup) must NOT abort a bugfix-only update. The failure path
+        # should warn and continue; the subsequent apt-get install decides
+        # whether the stale index is actually fatal.
+        assert "WARNING: apt-get update" in self.content, (
+            "JTN-788: update.sh must warn (not abort) when apt-get update "
+            "fails so transient index refresh errors do not block updates"
+        )
+        # Sanity: the JTN-704 /settings/update_status contract requires the
+        # apt-get install abort message format to remain unchanged.
+        assert (
+            "ERROR: apt-get install failed — aborting update." in self.content
+        ), "JTN-704 contract — apt-get install abort message must not change"
+
     def test_update_uses_uv_pip_install_for_requirements(self):
         # JTN-670 / JTN-605 parity: update.sh must prefer uv pip install when uv
         # is available, mirroring install.sh's create_venv() pattern.
