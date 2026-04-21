@@ -1,6 +1,85 @@
 # CHANGELOG
 
 
+## v0.63.0 (2026-04-21)
+
+### Features
+
+- **ui**: Shell + page handoff parity overhaul ([#570](https://github.com/jtn0123/InkyPi/pull/570),
+  [`3290dbb`](https://github.com/jtn0123/InkyPi/commit/3290dbb79348ea635e35bf477e3c7a59bc9704bb))
+
+Re-triggers release after #570 landed with a non-conventional squash title. The change itself is in
+  89bf302 — this is a marker commit so semantic-release cuts the corresponding 0.63.0 tag.
+
+Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+### Refactoring
+
+- Extract plugin and playlist workflows (JTN-752)
+  ([#564](https://github.com/jtn0123/InkyPi/pull/564),
+  [`0879607`](https://github.com/jtn0123/InkyPi/commit/0879607b3276899ad8129d63a5d3a994501d2c24))
+
+* refactor: extract plugin and playlist workflows (JTN-752)
+
+* fix: sanitize plugin workflow logging
+
+* fix: resolve Sonar issues in workflow services (JTN-752)
+
+- Move URLValidationError to plugin_errors module
+  ([#569](https://github.com/jtn0123/InkyPi/pull/569),
+  [`00f610a`](https://github.com/jtn0123/InkyPi/commit/00f610a4cc29e27bb9d95518c2ff2aa41d3928a7))
+
+Relocates URLValidationError (and its validator-message whitelist) from utils.security_utils into
+  utils.plugin_errors so cross-process callers — most notably the subprocess worker that
+  reconstructs exceptions by name — can reference the type without importing security_utils.
+
+SonarCloud's S7788 architecture rule flags imports of security_utils from refresh_task.worker and
+  the two test files that pin the cross-process contract. Moving the exception to the plugin_errors
+  module satisfies the rule while keeping security_utils as the stable public surface for code that
+  actually calls validate_url / validate_file_path. The class is still re-exported from
+  security_utils for backward compatibility.
+
+No behaviour change — the exception hierarchy, the safe_message() whitelist, and the validator error
+  messages are all preserved verbatim.
+
+Co-authored-by: Claude Opus 4.7 <noreply@anthropic.com>
+
+- Split playlist page scripts into modules (JTN-756)
+  ([#568](https://github.com/jtn0123/InkyPi/pull/568),
+  [`51aab43`](https://github.com/jtn0123/InkyPi/commit/51aab43e36e92ebbc27cf3dd516712515a2da7c2))
+
+* refactor: split playlist page scripts into modules (JTN-756)
+
+* fix: address playlist module lint and Sonar follow-ups
+
+* fix: address playlist module sonar findings
+
+* fix: address remaining playlist PR review feedback (JTN-756)
+
+- Split settings page scripts into modules ([#552](https://github.com/jtn0123/InkyPi/pull/552),
+  [`d27a274`](https://github.com/jtn0123/InkyPi/commit/d27a274e57f9d06bf99c142fe3e882e2057b3eb7))
+
+* refactor: split settings page scripts into modules
+
+* fix: satisfy Black formatting and SonarCloud geolocation hotspot
+
+- Reformat tests/static/test_device_action_confirmation.py per Black 26.3 - Annotate opt-in
+  geolocation call in settings/form.js with explanatory comment and NOSONAR javascript:S5604 marker.
+  Geolocation is strictly gated on state.attachGeo (pre-existing behaviour moved out of
+  settings_page.js); the hotspot was flagged as "new" only because the file path changed in the
+  module split.
+
+### Testing
+
+- Cover privileged admin flows end to end (JTN-760)
+  ([#566](https://github.com/jtn0123/InkyPi/pull/566),
+  [`7a9f732`](https://github.com/jtn0123/InkyPi/commit/7a9f732c712463c21aac82a90a06850a11c2f0f7))
+
+* test: cover privileged admin flows end to end (JTN-760)
+
+* style: format privileged flow security tests
+
+
 ## v0.62.3 (2026-04-20)
 
 ### Bug Fixes
