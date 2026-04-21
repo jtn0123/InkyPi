@@ -7,11 +7,15 @@ title = "InkyPi gitleaks config"
 # Extend the default ruleset
 useDefault = true
 
-# Allowlist intentional fake secrets in the log-redaction test file.
-# These strings are test fixtures that verify the filter pattern works;
-# they are not real credentials.
+# Allowlist false positives.
+# - tests/test_log_redaction.py: intentional fake secrets that verify
+#   the log-redaction filter; these are test fixtures, not credentials.
+# - src/static/scripts/tweaks_panel.js: public client-side localStorage
+#   key name ("inkypi_tweaks_v1") that happens to match the
+#   generic-api-key entropy heuristic by accident.
 [allowlist]
-description = "Intentional fake secrets in log-redaction unit tests"
+description = "False-positive strings that are not real credentials"
 paths = [
     '''tests/test_log_redaction\.py''',
+    '''src/static/scripts/tweaks_panel\.js''',
 ]
