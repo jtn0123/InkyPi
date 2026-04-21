@@ -33,6 +33,10 @@ from utils.form_utils import (
 )
 from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
+from utils.plugin_errors import (
+    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+    ScreenshotBackendError,
+)
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
 from utils.security_utils import URLValidationError, validate_file_path
@@ -642,6 +646,29 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
                 code="validation_error",
                 details={"field": "url"},
             )
+        except ScreenshotBackendError as e:
+            # JTN-789: chromium subprocess failed twice in a row (initial
+            # + one retry) inside the plugin.  Surface a specific 503
+            # ``backend_unavailable`` instead of the generic 400
+            # ``plugin_error`` the RuntimeError handler below would produce
+            # — this signals transience (operators can retry) and points at
+            # the backend, not the user's configuration.  Response body
+            # comes from a module-level constant, never from ``str(exc)``,
+            # to satisfy CodeQL ``py/stack-trace-exposure`` (same pattern
+            # the JTN-776 URLValidationError handler uses).
+            logger.warning(
+                "Plugin %s: screenshot backend unavailable",
+                sanitize_log_field(plugin_id),
+                exc_info=True,
+            )
+            _push_update_now_fallback(
+                plugin_id, plugin_config, device_config, display_manager, e
+            )
+            return json_error(
+                SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+                status=503,
+                code="backend_unavailable",
+            )
         except RuntimeError as e:
             # RuntimeError is raised by plugins to signal a user-actionable
             # failure (bad config, upstream API returned empty, etc.).  Do not
@@ -895,6 +922,23 @@ def update_now():
             status=422,
             code="validation_error",
             details={"field": "url"},
+        )
+    except ScreenshotBackendError:
+        # JTN-789: chromium subprocess failed twice in a row (initial + one
+        # retry). Surface a specific 503 ``backend_unavailable`` with a
+        # whitelisted constant message so CodeQL ``py/stack-trace-exposure``
+        # cannot taint-track exception text into the HTTP body (mirrors the
+        # JTN-776 URLValidationError pattern). exc_info is intentionally
+        # NOT captured — plugin_id is enough for operators to correlate
+        # with the upstream chromium error ``take_screenshot`` already logged.
+        logger.warning(
+            "update_now: screenshot backend unavailable for plugin %s",
+            sanitize_log_field(plugin_id or "?"),
+        )
+        return json_error(
+            SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+            status=503,
+            code="backend_unavailable",
         )
     except Exception as e:
         logger.exception("Error in update_now: %s", e)

@@ -105,6 +105,44 @@ class URLValidationError(PermanentPluginError):
         return f"Invalid URL: {_URL_ERR_GENERIC}"
 
 
+#: Response-safe message returned by the blueprint when ``ScreenshotBackendError``
+#: is raised.  Kept as a module-level constant (rather than ``str(exc)``) so the
+#: string reaching the HTTP response body is provably not derived from the
+#: exception instance — this short-circuits CodeQL's
+#: ``py/stack-trace-exposure`` taint flow, mirroring the
+#: :meth:`URLValidationError.safe_message` whitelist pattern from JTN-776.
+SCREENSHOT_BACKEND_UNAVAILABLE_MSG = (
+    "Screenshot backend unavailable: the rendering process failed after a "
+    "retry. The device may be under memory pressure; see logs for details."
+)
+
+
+class ScreenshotBackendError(RuntimeError):
+    """Raised when the chromium screenshot backend fails transiently after retry.
+
+    On Pi Zero 2 W (and other memory-constrained hardware) the chromium
+    subprocess can intermittently time out or exit without producing output
+    when the device is under memory pressure.  :func:`utils.image_utils.take_screenshot`
+    absorbs the single-tick flake by retrying once with a fresh browser
+    process after a short backoff.  When both attempts still fail to produce
+    an image, this exception is raised so the plugin blueprint can surface
+    a specific HTTP 503 ``backend_unavailable`` response instead of a
+    generic 500 ``internal_error`` (JTN-789).
+
+    Subclasses :class:`RuntimeError` so existing ``except RuntimeError``
+    handlers in plugin code continue to catch it.  Kept in this module (not
+    in ``utils.security_utils`` or a Flask-aware module) so it is importable
+    from both the plugin subprocess worker — which may not have a Flask app
+    context — and the ``blueprints.plugin`` translator.
+
+    Callers returning this error to an HTTP client MUST use the module-level
+    :data:`SCREENSHOT_BACKEND_UNAVAILABLE_MSG` constant rather than
+    ``str(self)``.  Although the current constructor messages are hardcoded,
+    pinning the response string to a constant breaks any accidental
+    information-exposure taint flow that CodeQL might otherwise flag.
+    """
+
+
 def _extract_reason(message: str) -> str:
     """Extract the validator text from a wrapped "Invalid URL: X" message."""
     prefix = "Invalid URL: "

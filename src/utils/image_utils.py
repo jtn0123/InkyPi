@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from collections.abc import Callable
 from io import BytesIO
 from typing import Any
@@ -12,6 +13,7 @@ from PIL import Image
 from PIL.Image import Resampling
 
 from utils.http_utils import http_get, pinned_dns
+from utils.plugin_errors import ScreenshotBackendError
 from utils.security_utils import validate_url_with_ips
 
 # ImageEnhance / ImageFilter / ImageOps are imported lazily from the
@@ -29,6 +31,14 @@ _MAX_SCREENSHOT_TIMEOUT_S = 60
 
 # Common prefix for all screenshot failure log messages.
 _SCREENSHOT_ERROR_PREFIX = "Failed to take screenshot:"
+
+# JTN-789: bounded retry for the chromium screenshot subprocess.  On Pi Zero
+# 2 W, the browser process intermittently times out or exits without output
+# when the device is under memory pressure.  A single short-backoff retry
+# absorbs the transient flake without masking deterministic configuration
+# errors (missing browser, URL validation).
+_SCREENSHOT_RETRY_BACKOFF_S = 0.5
+_SCREENSHOT_MAX_ATTEMPTS = 2  # 1 initial + 1 retry
 
 
 def load_image_from_bytes(
@@ -426,7 +436,14 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
             headless browser subprocess.
 
     Returns:
-        A ``PIL.Image.Image`` of the rendered page, or ``None`` on failure.
+        A ``PIL.Image.Image`` of the rendered page, or ``None`` on a
+        deterministic failure (missing binary, unrecoverable decode error).
+
+    Raises:
+        ScreenshotBackendError: When the headless-browser fallback exhausts
+            its transient retry. Intentionally re-raised (not swallowed)
+            so the blueprint layer can translate it to HTTP 503
+            ``backend_unavailable`` instead of an ambiguous ``None``.
     """
     image = None
     html_file_path = None
@@ -442,6 +459,13 @@ def take_screenshot_html(html_str, dimensions, timeout_ms=None):
         image = _playwright_screenshot_html(html_file_path, dimensions)
         if image is None:
             image = take_screenshot(f"file://{html_file_path}", dimensions, timeout_ms)
+    except ScreenshotBackendError:
+        # JTN-789: Let the typed backend error bubble up so the blueprint
+        # layer can translate it to an actionable HTTP 503 response.  The
+        # generic ``except Exception`` below would swallow it and the caller
+        # would see ``None`` — that's exactly the ambiguous failure shape
+        # this error class was introduced to replace.
+        raise
     except Exception as e:
         logger.error("%s %s", _SCREENSHOT_ERROR_PREFIX, str(e))
     finally:
@@ -507,12 +531,147 @@ def _find_browser_command(
     return None
 
 
+def _tempfile_is_empty(img_file_path: str | None) -> bool:
+    """Return True when the screenshot tempfile holds zero bytes (or is missing).
+
+    ``tempfile.NamedTemporaryFile`` pre-creates a 0-byte placeholder, so a
+    simple ``os.path.exists`` check is useless for "did chromium actually
+    produce output?".  A zero-byte tempfile after a non-zero chromium exit
+    is the Pi-Zero memory-pressure signature — treat those as transient.
+    """
+    if not img_file_path:
+        return True
+    try:
+        return not os.path.exists(img_file_path) or os.path.getsize(img_file_path) == 0
+    except OSError:
+        return True
+
+
+def _run_browser_subprocess(
+    command: list[str], timeout_seconds: float, attempt: int
+) -> tuple[subprocess.CompletedProcess[bytes] | None, bool]:
+    """Run the chromium subprocess. Returns ``(result, transient_flag)``.
+
+    On hard errors (missing binary, process timeout) returns ``(None, flag)``
+    so the caller can short-circuit without stringifying ``result``.
+    ``transient`` is ``True`` for retryable errors (timeout) and ``False`` for
+    deterministic ones (binary vanished between probe and run).
+    """
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=timeout_seconds)
+    except FileNotFoundError:
+        logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
+        return None, False
+    except subprocess.TimeoutExpired:
+        logger.error(
+            "%s Browser process timed out (attempt %s).",
+            _SCREENSHOT_ERROR_PREFIX,
+            attempt,
+        )
+        return None, True
+    return result, False
+
+
+def _take_screenshot_once(
+    target: str,
+    dimensions: tuple,
+    timeout_ms: int | None,
+    attempt: int,
+) -> tuple[Image.Image | None, bool]:
+    """Single-attempt chromium screenshot.
+
+    Returns ``(image, transient)`` where ``image`` is the captured PIL image
+    (or ``None`` on failure) and ``transient`` signals whether the failure
+    looks like a memory-pressure flake worth retrying.  Deterministic
+    failures — no browser installed on the system — set ``transient=False``
+    so the caller short-circuits the retry loop.
+    """
+    image: Image.Image | None = None
+    img_file_path: str | None = None
+    transient = False
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
+            img_file_path = img_file.name
+
+        command = _find_browser_command(target, img_file_path, dimensions, timeout_ms)
+        if command is None:
+            logger.error(
+                "%s No supported browser found. Install Chromium or Google Chrome.",
+                _SCREENSHOT_ERROR_PREFIX,
+            )
+            return None, False
+
+        timeout_seconds = min(
+            (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
+            _MAX_SCREENSHOT_TIMEOUT_S,
+        )
+        result, hard_fail_transient = _run_browser_subprocess(
+            command, timeout_seconds, attempt
+        )
+        if result is None:
+            return None, hard_fail_transient
+
+        if result.returncode != 0:
+            stderr = result.stderr.decode("utf-8", errors="replace").strip()
+            logger.error(
+                "%s (exit code %s, attempt %s): %s",
+                _SCREENSHOT_ERROR_PREFIX,
+                result.returncode,
+                attempt,
+                stderr,
+            )
+            return None, _tempfile_is_empty(img_file_path)
+
+        # Zero-exit branch intentionally only checks existence, not size:
+        # ``load_image_from_path`` below returns ``None`` for empty/invalid
+        # content and we treat that uniformly as transient. Being stricter
+        # here would break the existing success-path tests that mock
+        # ``subprocess.run`` but leave the 0-byte tempfile placeholder
+        # (real chromium always writes bytes when it exits 0).
+        if not (img_file_path and os.path.exists(img_file_path)):
+            logger.error(
+                "%s screenshot file not found (attempt %s)",
+                _SCREENSHOT_ERROR_PREFIX,
+                attempt,
+            )
+            return None, True
+
+        image = load_image_from_path(img_file_path)
+        if image is None:
+            logger.error(
+                "Failed to load screenshot image from temp file (attempt %s)",
+                attempt,
+            )
+            return None, True
+
+    except Exception as e:
+        logger.error("%s %s (attempt %s)", _SCREENSHOT_ERROR_PREFIX, str(e), attempt)
+        transient = True
+    finally:
+        if img_file_path and os.path.exists(img_file_path):
+            try:
+                os.remove(img_file_path)
+            except Exception:
+                pass
+
+    return image, transient
+
+
 def take_screenshot(target, dimensions, timeout_ms=None):
     """Capture a screenshot of *target* using a headless browser subprocess.
 
     Iterates through known browser binaries (Chrome, Chromium) to find one
     available on the system, launches it with ``--headless``, and reads the
     resulting PNG back into a PIL Image.
+
+    On transient failures (browser process timeout, non-zero exit with no
+    output — the canonical Pi-Zero-2W memory-pressure flake described in
+    JTN-789) the subprocess is retried exactly once with a fresh process
+    after a short backoff.  Deterministic failures (browser not installed)
+    are NOT retried.  If both attempts fail transiently, a
+    :class:`~utils.plugin_errors.ScreenshotBackendError` is raised so the
+    blueprint layer can map it to HTTP 503 ``backend_unavailable`` rather
+    than a generic 500.
 
     Args:
         target: A URL or ``file://`` path to render.
@@ -522,68 +681,43 @@ def take_screenshot(target, dimensions, timeout_ms=None):
             browser via ``--timeout``.
 
     Returns:
-        A ``PIL.Image.Image`` of the captured page, or ``None`` if no browser
-        is found or the subprocess fails.
+        A ``PIL.Image.Image`` of the captured page, or ``None`` when the
+        failure is deterministic (e.g. no browser installed).
+
+    Raises:
+        ScreenshotBackendError: When the browser subprocess fails
+            transiently on both the initial attempt and the retry.
     """
-    image = None
-    img_file_path = None
-    try:
-        # Create a temporary output file for the screenshot
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as img_file:
-            img_file_path = img_file.name
-
-        command = _find_browser_command(target, img_file_path, dimensions, timeout_ms)
-
-        if command is None:
-            logger.error(
-                "%s No supported browser found. Install Chromium or Google Chrome.",
-                _SCREENSHOT_ERROR_PREFIX,
-            )
-            return None
-
-        timeout_seconds = min(
-            (timeout_ms / 1000) if timeout_ms else _DEFAULT_SCREENSHOT_TIMEOUT_S,
-            _MAX_SCREENSHOT_TIMEOUT_S,
+    last_transient = False
+    for attempt in range(1, _SCREENSHOT_MAX_ATTEMPTS + 1):
+        image, transient = _take_screenshot_once(
+            target, dimensions, timeout_ms, attempt
         )
-
-        try:
-            result = subprocess.run(
-                command, capture_output=True, timeout=timeout_seconds
+        if image is not None:
+            if attempt > 1:
+                logger.info("Screenshot backend succeeded on retry attempt %s", attempt)
+            return image
+        last_transient = transient
+        if not transient:
+            # Deterministic failure (missing browser, etc.) — retry would
+            # produce the same outcome and just waste cycles.
+            return None
+        if attempt < _SCREENSHOT_MAX_ATTEMPTS:
+            logger.warning(
+                "Screenshot backend attempt %s failed transiently; "
+                "retrying once after %.0fms backoff",
+                attempt,
+                _SCREENSHOT_RETRY_BACKOFF_S * 1000,
             )
-        except FileNotFoundError:
-            logger.error("%s Browser binary not found.", _SCREENSHOT_ERROR_PREFIX)
-            return None
-        except subprocess.TimeoutExpired:
-            logger.error("%s Browser process timed out.", _SCREENSHOT_ERROR_PREFIX)
-            return None
+            time.sleep(_SCREENSHOT_RETRY_BACKOFF_S)
 
-        # Check if the process failed or the output file is missing
-        if result.returncode != 0:
-            stderr = result.stderr.decode("utf-8", errors="replace").strip()
-            logger.error(
-                "%s (exit code %s): %s",
-                _SCREENSHOT_ERROR_PREFIX,
-                result.returncode,
-                stderr,
-            )
-            return None
-        if not (img_file_path and os.path.exists(img_file_path)):
-            logger.error("%s screenshot file not found", _SCREENSHOT_ERROR_PREFIX)
-            return None
-
-        # Load the image using standardized helper
-        image = load_image_from_path(img_file_path)
-        if image is None:
-            logger.error("Failed to load screenshot image from temp file")
-            return None
-
-    except Exception as e:
-        logger.error("%s %s", _SCREENSHOT_ERROR_PREFIX, str(e))
-    finally:
-        if img_file_path and os.path.exists(img_file_path):
-            try:
-                os.remove(img_file_path)
-            except Exception:
-                pass
-
-    return image
+    # Both attempts exhausted — translate transient failure into a typed
+    # exception so the blueprint can surface a specific 503 instead of the
+    # generic 500 that a bare ``None`` return would bubble up as.
+    if last_transient:
+        raise ScreenshotBackendError(
+            "Screenshot backend failed after retry: chromium subprocess "
+            "did not produce an image. The device may be under memory "
+            "pressure; see journalctl for details."
+        )
+    return None
