@@ -1,6 +1,69 @@
 # CHANGELOG
 
 
+## v0.63.1 (2026-04-21)
+
+### Bug Fixes
+
+- Return /update_now after image save, not display (JTN-786)
+  ([#577](https://github.com/jtn0123/InkyPi/pull/577),
+  [`d6b921f`](https://github.com/jtn0123/InkyPi/commit/d6b921ffbe7e46f86715aeef9ebc5acec8799908))
+
+* fix: return /update_now after image save, not display (JTN-786)
+
+On an Inky 7.3" Impression + Pi Zero 2 W the e-paper SPI write takes ~27s on top of
+  generate+preprocess, pushing manual_update past its 60s cap even though the refresh actually
+  succeeds a few seconds later. The API was returning HTTP 500 TimeoutError while the display was
+  still finishing; users would retry, queueing another render and contributing to OOM (JTN-785).
+
+Return the /update_now response as soon as the processed image is persisted to disk rather than
+  waiting for display_done:
+
+- ManualUpdateRequest gains an image_saved event + image_saved_metrics. -
+  display_manager.display_image takes an optional on_image_saved callback, fired right after the
+  processed image is saved and before the hardware push begins. - _push_to_display wires the
+  callback to the in-flight manual_request so the API waiter is released early. - manual_update now
+  waits on image_saved (60s cap) with a short INKYPI_MANUAL_UPDATE_DONE_GRACE_S window (default
+  250ms) so fast paths (mock display, cached image, unit tests) still surface full metrics; on slow
+  hardware the grace is negligible. - _complete_manual_request sets both events so error paths
+  (generate failure, dimension mismatch, plugin not registered) still propagate to the caller
+  instead of returning a spurious image_saved stub.
+
+The cached-image branch and the stop() path also set image_saved so callers never block on a signal
+  that would never fire.
+
+Tests: new unit tests assert manual_update returns in <10s when the mock display sleeps for 90s, and
+  that generate-phase errors still re-raise. Existing chaos display-hang and triggers_display tests
+  adjusted for the async completion ordering.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+* chore: apply ruff format to test files (JTN-786)
+
+* refactor: extract helpers to drop cognitive complexity (JTN-786)
+
+SonarCloud flagged manual_update (22) and _perform_refresh (17) for exceeding the 15
+  cognitive-complexity cap after the JTN-786 changes. Extract small helpers that preserve behaviour
+  but split the branching:
+
+- _enqueue_manual_request: queue + publish + condvar.notify dance. - _handle_manual_update_timeout:
+  dequeue, publish error, raise. - _resolve_completed_request: re-raise stored exception or return
+  metrics. - _push_or_skip_display: pick the display path vs cached path, and handle the
+  manual-update ``image_saved`` signal for the cached branch.
+
+No behaviour change; test suite still green.
+
+* fix: type-annotate 4 new refresh-task helpers + start() for mypy baseline (JTN-786)
+
+The helper extraction in bd743b2 created 4 new methods without type annotations, pushing mypy from
+  1442 to 1448 and breaking the CI ratchet. Annotate them (and one neighbour to ratchet back to
+  baseline) without changing behaviour.
+
+---------
+
+Co-authored-by: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+
+
 ## v0.63.0 (2026-04-21)
 
 ### Features
