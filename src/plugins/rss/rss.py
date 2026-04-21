@@ -95,10 +95,8 @@ class Rss(BasePlugin):
         return template_params
 
     def generate_image(self, settings, device_config):
-        title = settings.get("title")
-        feed_url = settings.get("feedUrl")
-        if not feed_url:
-            raise RuntimeError("RSS Feed Url is required.")
+        title = settings.get("title") or "Top Stories"
+        feed_url = settings.get("feedUrl") or "https://feeds.bbci.co.uk/news/rss.xml"
 
         items = self.parse_rss_feed(feed_url)
 

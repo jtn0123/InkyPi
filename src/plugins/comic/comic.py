@@ -63,8 +63,7 @@ class Comic(BasePlugin):
 
         comic = settings.get("comic")
         if not comic or comic not in COMICS:
-            logger.error(f"Invalid comic: {comic}")
-            raise RuntimeError("Invalid comic provided.")
+            comic = "XKCD"
 
         logger.info(f"Fetching comic: {comic}")
 

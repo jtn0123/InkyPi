@@ -226,10 +226,12 @@ class Weather(BasePlugin):
         return template_params
 
     def generate_image(self, settings, device_config):
-        lat_str = settings.get("latitude")
-        long_str = settings.get("longitude")
-        if not lat_str or not long_str:
-            raise RuntimeError("Latitude and longitude are required.")
+        # Defaults chosen so the plugin renders with an empty settings dict
+        # (first-run preview, bare /update_now): NYC via OpenMeteo, imperial.
+        # OpenMeteo has no API key, so the default path works on fresh devices
+        # where OPEN_WEATHER_MAP_SECRET is unset.
+        lat_str = settings.get("latitude") or "40.7128"
+        long_str = settings.get("longitude") or "-74.0060"
         try:
             lat = float(lat_str)
             long = float(long_str)
@@ -240,9 +242,9 @@ class Weather(BasePlugin):
 
         units = settings.get("units")
         if not units or units not in ["metric", "imperial", "standard"]:
-            raise RuntimeError("Units are required.")
+            units = "imperial"
 
-        weather_provider = settings.get("weatherProvider", "OpenWeatherMap")
+        weather_provider = settings.get("weatherProvider") or "OpenMeteo"
         title = settings.get("customTitle", "")
 
         timezone = device_config.get_config("timezone", default="America/New_York")
