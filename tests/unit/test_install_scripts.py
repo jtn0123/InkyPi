@@ -45,8 +45,22 @@ class TestSystemdService:
 
     def test_service_resource_limits(self):
         assert "CPUQuota=40%" in self.content
-        assert "MemoryHigh=250M" in self.content
-        assert "MemoryMax=350M" in self.content
+
+    def test_service_has_no_memory_caps_in_base_unit(self):
+        # JTN-785: The base unit must NOT hardcode MemoryHigh/MemoryMax.
+        # install.sh and update.sh write device-specific caps to a drop-in at
+        # /etc/systemd/system/inkypi.service.d/memory.conf so Pi Zero 2 W
+        # (512 MB) gets a 350M/500M tier while ≥1 GB Pis keep the 250M/350M
+        # tier. Baking caps into the git-tracked unit file was the root cause
+        # of the chromium OOM-kill incident on 512 MB boards.
+        assert "MemoryHigh=" not in self.content, (
+            "MemoryHigh must live in the drop-in memory.conf (JTN-785), "
+            "not the base unit, so per-device scaling works"
+        )
+        assert "MemoryMax=" not in self.content, (
+            "MemoryMax must live in the drop-in memory.conf (JTN-785), "
+            "not the base unit, so per-device scaling works"
+        )
 
     def test_service_oom_score_adjust_prefers_inkypi_as_victim(self):
         # JTN-601: During memory crunch on Pi Zero 2 W, earlyoom was killing
@@ -3312,3 +3326,212 @@ class TestInstallPreflight:
             "unwritable $LOCKFILE_DIR produces a clean preflight error "
             "(JTN-699)"
         )
+
+
+# ---- JTN-785: per-device memory cap tiering -------------------------------
+
+
+class TestMemoryCapTiering:
+    """JTN-785: install.sh/update.sh must scale MemoryHigh/MemoryMax to the
+    device's total RAM via a drop-in at
+    /etc/systemd/system/inkypi.service.d/memory.conf.
+
+    These tests exercise the `pick_memory_caps` and `install_memory_dropin`
+    helpers in install/_common.sh end-to-end via `bash -c`, so a future
+    refactor that silently breaks the tier thresholds fails loudly here.
+    """
+
+    COMMON_SH = INSTALL_DIR / "_common.sh"
+
+    def _invoke_pick(self, meminfo_body: str, tmp_path):
+        """Write a stub /proc/meminfo body to tmp_path and shell out to
+        pick_memory_caps with INKYPI_MEMINFO_PATH pointing at it."""
+        import subprocess
+
+        stub = tmp_path / "meminfo"
+        stub.write_text(meminfo_body)
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{self.COMMON_SH}" && pick_memory_caps',
+            ],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "INKYPI_MEMINFO_PATH": str(stub),
+            },
+        )
+        assert result.returncode == 0, (
+            f"pick_memory_caps exited non-zero:\nstdout={result.stdout!r}\n"
+            f"stderr={result.stderr!r}"
+        )
+        return result.stdout.strip()
+
+    def test_pick_caps_512mb_pi_zero_2w(self, tmp_path):
+        # Pi Zero 2 W reports ~498 MB MemTotal after kernel + GPU carveout.
+        out = self._invoke_pick("MemTotal:         498064 kB\n", tmp_path)
+        assert out == "350 500 low-mem", (
+            f"512 MB Pi must get low-mem tier (350M/500M); got {out!r}"
+        )
+
+    def test_pick_caps_1gb_pi3(self, tmp_path):
+        # Pi 3B reports ~920 MB.
+        out = self._invoke_pick("MemTotal:         940000 kB\n", tmp_path)
+        assert out == "250 350 standard", (
+            f"1 GB Pi must get standard tier (250M/350M); got {out!r}"
+        )
+
+    def test_pick_caps_4gb_pi4(self, tmp_path):
+        out = self._invoke_pick("MemTotal:        3900000 kB\n", tmp_path)
+        assert out == "250 350 standard"
+
+    def test_pick_caps_missing_meminfo_defaults_to_standard(self, tmp_path):
+        # Safer to under-cap a fast Pi than to wrongly raise caps on an
+        # unidentified device. No MemTotal line → default to standard tier.
+        out = self._invoke_pick("Buffers: 0 kB\n", tmp_path)
+        assert out == "250 350 standard"
+
+    def test_pick_caps_threshold_boundary(self, tmp_path):
+        # Exactly 700000 kB (the threshold) → low-mem. 700001 kB → standard.
+        out_at = self._invoke_pick("MemTotal:         700000 kB\n", tmp_path)
+        out_over = self._invoke_pick("MemTotal:         700001 kB\n", tmp_path)
+        assert out_at == "350 500 low-mem"
+        assert out_over == "250 350 standard"
+
+    def test_install_memory_dropin_writes_low_mem_tier(self, tmp_path):
+        import subprocess
+
+        meminfo = tmp_path / "meminfo"
+        meminfo.write_text("MemTotal:         498064 kB\n")
+        dropin_dir = tmp_path / "inkypi.service.d"
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{self.COMMON_SH}" && install_memory_dropin',
+            ],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "INKYPI_MEMINFO_PATH": str(meminfo),
+                "INKYPI_DROPIN_DIR": str(dropin_dir),
+            },
+        )
+        assert result.returncode == 0, (
+            f"install_memory_dropin failed:\nstderr={result.stderr!r}"
+        )
+        dropin = dropin_dir / "memory.conf"
+        assert dropin.exists(), "memory.conf drop-in must be written"
+        body = dropin.read_text()
+        assert "[Service]" in body
+        assert "MemoryHigh=350M" in body
+        assert "MemoryMax=500M" in body
+        # Filename must NOT collide with the JTN-783 plugin-isolation drop-in.
+        assert dropin.name == "memory.conf"
+
+    def test_install_memory_dropin_writes_standard_tier(self, tmp_path):
+        import subprocess
+
+        meminfo = tmp_path / "meminfo"
+        meminfo.write_text("MemTotal:        3900000 kB\n")
+        dropin_dir = tmp_path / "inkypi.service.d"
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{self.COMMON_SH}" && install_memory_dropin',
+            ],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "INKYPI_MEMINFO_PATH": str(meminfo),
+                "INKYPI_DROPIN_DIR": str(dropin_dir),
+            },
+        )
+        assert result.returncode == 0
+        body = (dropin_dir / "memory.conf").read_text()
+        assert "MemoryHigh=250M" in body
+        assert "MemoryMax=350M" in body
+
+    def test_install_memory_dropin_is_idempotent(self, tmp_path):
+        """Rewriting the same caps on every install/update must be safe."""
+        import subprocess
+
+        meminfo = tmp_path / "meminfo"
+        meminfo.write_text("MemTotal:         498064 kB\n")
+        dropin_dir = tmp_path / "inkypi.service.d"
+        env = {
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "INKYPI_MEMINFO_PATH": str(meminfo),
+            "INKYPI_DROPIN_DIR": str(dropin_dir),
+        }
+        cmd = [
+            "bash",
+            "-c",
+            f'source "{self.COMMON_SH}" && install_memory_dropin',
+        ]
+        first = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        second = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        assert first.returncode == 0 and second.returncode == 0
+        # Content must be identical across repeat invocations.
+        body = (dropin_dir / "memory.conf").read_text()
+        assert "MemoryHigh=350M" in body
+        assert "MemoryMax=500M" in body
+
+    def test_install_sh_calls_install_memory_dropin(self):
+        content = (REPO_ROOT / "install" / "install.sh").read_text()
+        assert "install_memory_dropin" in content, (
+            "install.sh must call install_memory_dropin so fresh installs "
+            "get device-scaled caps (JTN-785)"
+        )
+
+    def test_update_sh_calls_install_memory_dropin(self):
+        content = (REPO_ROOT / "install" / "update.sh").read_text()
+        assert "install_memory_dropin" in content, (
+            "update.sh must call install_memory_dropin so existing installs "
+            "pick up the per-device caps on next update (JTN-785)"
+        )
+
+    def test_dropin_filename_does_not_collide_with_plugin_isolation(self, tmp_path):
+        """JTN-783 ships a plugin-isolation.conf drop-in. The JTN-785 drop-in
+        must use a distinct filename (memory.conf) so both coexist in
+        inkypi.service.d/ without stomping."""
+        import subprocess
+
+        meminfo = tmp_path / "meminfo"
+        meminfo.write_text("MemTotal:         498064 kB\n")
+        dropin_dir = tmp_path / "inkypi.service.d"
+        subprocess.run(
+            [
+                "bash",
+                "-c",
+                f'source "{self.COMMON_SH}" && install_memory_dropin',
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": "/usr/bin:/bin:/usr/local/bin",
+                "INKYPI_MEMINFO_PATH": str(meminfo),
+                "INKYPI_DROPIN_DIR": str(dropin_dir),
+            },
+        )
+        # Only memory.conf must be written — never plugin-isolation.conf.
+        written = sorted(p.name for p in dropin_dir.iterdir())
+        assert written == ["memory.conf"], (
+            f"install_memory_dropin wrote unexpected files: {written}"
+        )
+
+    def test_common_sh_syntax_valid(self):
+        import subprocess
+
+        result = subprocess.run(
+            ["bash", "-n", str(self.COMMON_SH)],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"bash -n failed:\n{result.stderr}"

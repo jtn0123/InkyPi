@@ -27,8 +27,15 @@ KillSignal=SIGINT
 StandardOutput=journal
 StandardError=journal
 CPUQuota=40%
-MemoryHigh=250M
-MemoryMax=350M
+# JTN-785: MemoryHigh / MemoryMax are intentionally NOT set in this base unit.
+# install.sh and update.sh detect the device's total RAM at install time and
+# write the appropriate caps to a drop-in at
+#   /etc/systemd/system/inkypi.service.d/memory.conf
+# so ≥1 GB devices get the historical tight 250M/350M caps while 512 MB boards
+# (Pi Zero 2 W) get a 350M/500M tier that leaves headroom for chromium + PIL
+# without tripping the cgroup OOM killer mid-refresh. Keeping the caps out of
+# this git-tracked unit file means the base unit is device-agnostic and
+# composes cleanly with user-added drop-ins (e.g. plugin-isolation.conf).
 # JTN-601: Prefer inkypi as OOM victim over sshd/systemd-journald so we can
 # still SSH in during memory crunch. Positive value makes the kernel more
 # likely to kill inkypi first. See install/inkypi.service history.
