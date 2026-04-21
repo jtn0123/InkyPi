@@ -3372,16 +3372,16 @@ class TestMemoryCapTiering:
     def test_pick_caps_512mb_pi_zero_2w(self, tmp_path):
         # Pi Zero 2 W reports ~498 MB MemTotal after kernel + GPU carveout.
         out = self._invoke_pick("MemTotal:         498064 kB\n", tmp_path)
-        assert out == "350 500 low-mem", (
-            f"512 MB Pi must get low-mem tier (350M/500M); got {out!r}"
-        )
+        assert (
+            out == "350 500 low-mem"
+        ), f"512 MB Pi must get low-mem tier (350M/500M); got {out!r}"
 
     def test_pick_caps_1gb_pi3(self, tmp_path):
         # Pi 3B reports ~920 MB.
         out = self._invoke_pick("MemTotal:         940000 kB\n", tmp_path)
-        assert out == "250 350 standard", (
-            f"1 GB Pi must get standard tier (250M/350M); got {out!r}"
-        )
+        assert (
+            out == "250 350 standard"
+        ), f"1 GB Pi must get standard tier (250M/350M); got {out!r}"
 
     def test_pick_caps_4gb_pi4(self, tmp_path):
         out = self._invoke_pick("MemTotal:        3900000 kB\n", tmp_path)
@@ -3420,9 +3420,9 @@ class TestMemoryCapTiering:
                 "INKYPI_DROPIN_DIR": str(dropin_dir),
             },
         )
-        assert result.returncode == 0, (
-            f"install_memory_dropin failed:\nstderr={result.stderr!r}"
-        )
+        assert (
+            result.returncode == 0
+        ), f"install_memory_dropin failed:\nstderr={result.stderr!r}"
         dropin = dropin_dir / "memory.conf"
         assert dropin.exists(), "memory.conf drop-in must be written"
         body = dropin.read_text()
@@ -3522,9 +3522,9 @@ class TestMemoryCapTiering:
         )
         # Only memory.conf must be written — never plugin-isolation.conf.
         written = sorted(p.name for p in dropin_dir.iterdir())
-        assert written == ["memory.conf"], (
-            f"install_memory_dropin wrote unexpected files: {written}"
-        )
+        assert written == [
+            "memory.conf"
+        ], f"install_memory_dropin wrote unexpected files: {written}"
 
     def test_common_sh_syntax_valid(self):
         import subprocess

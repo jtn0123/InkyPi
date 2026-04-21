@@ -250,6 +250,8 @@ build_css_bundle() {
 #
 # Exits 0 always. If MemTotal can't be parsed, defaults to the standard tier
 # (safer to under-cap a fast Pi 5 than to raise caps on an unknown device).
+# shellcheck disable=SC2120
+# (callers intentionally pass no arg; $1 is an explicit override for tests.)
 pick_memory_caps() {
   local meminfo_path="${1:-${INKYPI_MEMINFO_PATH:-/proc/meminfo}}"
   local mem_total_kb=0
