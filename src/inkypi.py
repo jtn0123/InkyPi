@@ -476,7 +476,9 @@ def create_app():
                 refreshed = _format_sidebar_refresh_time(
                     info.get("refresh_time"), device_config
                 )
-                has_last_display = bool(info.get("refresh_time") or info.get("image_hash"))
+                has_last_display = bool(
+                    info.get("refresh_time") or info.get("image_hash")
+                )
                 now_showing = {
                     "label": None,
                     "meta": (
@@ -500,9 +502,7 @@ def create_app():
             # — it's an internal filesystem name that must never leak into UI.
             from utils.display_names import instance_suffix_label
 
-            instance = instance_suffix_label(
-                info.get("plugin_instance"), plugin_id
-            )
+            instance = instance_suffix_label(info.get("plugin_instance"), plugin_id)
             if instance and instance.lower() != plugin_id.lower():
                 label = f"{display_name} · {instance}"
             else:

@@ -606,7 +606,9 @@ def test_plugin_pages_phone_layout(live_server, tmp_path, viewport, theme, plugi
             # Design refresh: the Configure/Preview mode bar was removed; both
             # panels are always rendered (stacked on mobile, side-by-side on
             # desktop). Assert both panels attach and are visible.
-            page.wait_for_selector("[data-workflow-panel='configure']", state="attached")
+            page.wait_for_selector(
+                "[data-workflow-panel='configure']", state="attached"
+            )
             page.wait_for_selector("[data-workflow-panel='preview']", state="attached")
             assert page.locator("[data-workflow-panel='preview']").count() >= 1
             assert page.locator("[data-workflow-panel='configure']").count() >= 1

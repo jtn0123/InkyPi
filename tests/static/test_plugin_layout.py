@@ -28,9 +28,9 @@ def test_workflow_mode_bar_removed_from_plugin_css():
         ".workflow-mode-bar rule should no longer exist in _plugins.css "
         "(both panels now render together)"
     )
-    assert ".workflow-mode-tab" not in css, (
-        ".workflow-mode-tab rule should no longer exist in _plugins.css"
-    )
+    assert (
+        ".workflow-mode-tab" not in css
+    ), ".workflow-mode-tab rule should no longer exist in _plugins.css"
 
 
 def test_plugin_template_has_no_workflow_mode_bar():

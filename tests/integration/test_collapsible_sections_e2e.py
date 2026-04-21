@@ -83,16 +83,12 @@ def test_plugin_style_accordion_chevron_flips(live_server, browser_page):
     # Diagnostics lives on the Updates/maintenance tab; switch to it so the
     # collapsible header is in the rendered, interactable panel.
     page.click('[data-settings-tab="maintenance"]')
-    page.wait_for_selector(
-        '[data-settings-panel="maintenance"].active', timeout=5000
-    )
+    page.wait_for_selector('[data-settings-panel="maintenance"].active', timeout=5000)
 
     # Guard loudly if Diagnostics is ever flattened too: without this assert,
     # `.first` on an empty locator would silently time out inside `.click()`
     # and the contract regression would be obscured by a generic timeout.
-    headers = page.locator(
-        "button.collapsible-header[data-collapsible-toggle]"
-    )
+    headers = page.locator("button.collapsible-header[data-collapsible-toggle]")
     assert headers.count() >= 1, (
         "Expected at least one collapsible header on the settings page; "
         "if Diagnostics was flattened, move this contract test to whichever "

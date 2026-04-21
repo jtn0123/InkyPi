@@ -1,8 +1,7 @@
 # pyright: reportMissingImports=false
-from datetime import UTC, datetime
-
 import os
 import re
+from datetime import UTC, datetime
 
 from model import RefreshInfo
 
@@ -103,7 +102,7 @@ def test_home_now_showing_renders_from_refresh_info(client, device_config_dev):
     assert b"Weather" in resp.data or b"weather" in resp.data
     assert b"Home Weather" in resp.data
     assert b"Default" in resp.data
-    assert b'NOW PLAYING' in resp.data
+    assert b"NOW PLAYING" in resp.data
     assert b'class="now-card ' in resp.data
     assert b"refreshed" in resp.data
     assert b'data-page-shell="dashboard"' in resp.data
@@ -189,11 +188,11 @@ def test_plugins_page_lists_plugin_cards_and_marks_sidebar_active(client):
 
 def test_shell_marks_sidebar_active_on_management_pages(client):
     cases = [
-        ("/playlist", '/playlist'),
-        ("/history", '/history'),
-        ("/settings", '/settings'),
-        ("/settings/api-keys", '/settings/api-keys'),
-        ("/api-keys", '/settings/api-keys'),
+        ("/playlist", "/playlist"),
+        ("/history", "/history"),
+        ("/settings", "/settings"),
+        ("/settings/api-keys", "/settings/api-keys"),
+        ("/api-keys", "/settings/api-keys"),
     ]
 
     for path, active_href in cases:
@@ -205,7 +204,9 @@ def test_shell_marks_sidebar_active_on_management_pages(client):
             rf'|class="nav-item active"[^>]*href="{re.escape(active_href)}"',
             html,
         )
-        assert active_link, f"Expected sidebar link {active_href} to be active on {path}"
+        assert (
+            active_link
+        ), f"Expected sidebar link {active_href} to be active on {path}"
 
 
 def test_next_up_endpoint_and_ssr(client, device_config_dev):

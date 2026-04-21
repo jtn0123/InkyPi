@@ -104,16 +104,14 @@ def test_draft_add_to_playlist_button_reveals_schedule_tab_with_real_handlers(cl
         )
 
         page.wait_for_timeout(250)
-        is_active = page.evaluate(
-            """() => {
+        is_active = page.evaluate("""() => {
                 const tab = document.querySelector('[data-plugin-subtab="schedule"]');
                 const panel = document.getElementById('pluginSchedulePanel');
                 const instance = document.getElementById('instance');
                 return !!tab && tab.getAttribute('aria-selected') === 'true'
                     && !!panel && panel.hidden === false
                     && !!instance && document.activeElement === instance;
-            }"""
-        )
+            }""")
         assert (
             is_active
         ), "Schedule tab did not become active when Add to Playlist was clicked in DRAFT state"

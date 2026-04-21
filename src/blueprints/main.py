@@ -3,6 +3,7 @@ import math
 import os
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
+from typing import Any
 from uuid import uuid4
 
 from flask import (
@@ -49,7 +50,7 @@ def _current_dt(device_config):
         return datetime.now(UTC)
 
 
-def _device_cycle_minutes(device_config):
+def _device_cycle_minutes(device_config: Any) -> int:
     try:
         cycle_seconds = int(
             device_config.get_config("plugin_cycle_interval_seconds", default=3600)
@@ -62,7 +63,7 @@ def _device_cycle_minutes(device_config):
         return 60
 
 
-def _playlist_cycle_minutes(device_config, playlist_name):
+def _playlist_cycle_minutes(device_config: Any, playlist_name: Any) -> int:
     cycle_minutes = _device_cycle_minutes(device_config)
     if not playlist_name:
         return cycle_minutes
@@ -79,7 +80,7 @@ def _playlist_cycle_minutes(device_config, playlist_name):
     return cycle_minutes
 
 
-def _parse_refresh_datetime(iso_value):
+def _parse_refresh_datetime(iso_value: Any) -> datetime | None:
     if not iso_value:
         return None
     try:
@@ -91,7 +92,7 @@ def _parse_refresh_datetime(iso_value):
     return dt
 
 
-def _format_next_refresh_relative(next_dt, now_dt):
+def _format_next_refresh_relative(next_dt: datetime, now_dt: datetime) -> str:
     diff_seconds = max(0, int(math.ceil((next_dt - now_dt).total_seconds())))
     if diff_seconds <= 30:
         return "Due now"
@@ -112,8 +113,10 @@ def _format_next_refresh_relative(next_dt, now_dt):
     return "at " + local_dt.strftime("%I:%M %p").lstrip("0")
 
 
-def _build_next_refresh_meta(next_dt, cycle_minutes, now_dt):
-    parts = []
+def _build_next_refresh_meta(
+    next_dt: datetime | None, cycle_minutes: int, now_dt: datetime
+) -> str:
+    parts: list[str] = []
     if next_dt:
         local_dt = next_dt.astimezone(now_dt.tzinfo)
         parts.append(f"ETA {local_dt.strftime('%I:%M %p').lstrip('0')}")
@@ -123,7 +126,7 @@ def _build_next_refresh_meta(next_dt, cycle_minutes, now_dt):
     return " · ".join(parts)
 
 
-def _annotate_refresh_schedule(payload, device_config):
+def _annotate_refresh_schedule(payload: Any, device_config: Any) -> Any:
     """Attach next-refresh timing metadata for dashboard rendering."""
     if not isinstance(payload, dict):
         return payload

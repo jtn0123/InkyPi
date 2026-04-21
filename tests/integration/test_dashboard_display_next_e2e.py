@@ -172,7 +172,9 @@ def test_quick_switch_sends_playlist_request(
         };
     }""")
 
-    switch_btn = page.locator('button[data-quick-switch-button][data-playlist-name="Focus"]')
+    switch_btn = page.locator(
+        'button[data-quick-switch-button][data-playlist-name="Focus"]'
+    )
     switch_btn.wait_for(state="visible", timeout=5000)
     switch_btn.click()
 
@@ -187,11 +189,11 @@ def test_quick_switch_sends_playlist_request(
 
     calls = page.evaluate("() => window.__fetchCalls || []")
     quick_switch_calls = [
-        c
-        for c in calls
-        if "display_next_in_playlist" in c.get("url", "")
+        c for c in calls if "display_next_in_playlist" in c.get("url", "")
     ]
-    assert quick_switch_calls, f"Quick switch should POST to display_next_in_playlist, got: {calls}"
+    assert (
+        quick_switch_calls
+    ), f"Quick switch should POST to display_next_in_playlist, got: {calls}"
     assert quick_switch_calls[0].get("method") == "POST"
     assert '"playlist_name":"Focus"' in (quick_switch_calls[0].get("body") or "")
 
