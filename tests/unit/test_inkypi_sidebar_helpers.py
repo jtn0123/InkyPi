@@ -19,7 +19,6 @@ from inkypi import (
     _parse_refresh_datetime,
 )
 
-
 # ---------------------------------------------------------------------------
 # _parse_refresh_datetime
 # ---------------------------------------------------------------------------
@@ -130,9 +129,7 @@ def test_format_sidebar_refresh_time_falls_back_when_timeutils_fails(
     monkeypatch.setattr("utils.time_utils.now_device_tz", boom, raising=True)
     # Any plausible recent timestamp — the only invariant we care about here
     # is that the function returns *something* rather than propagating.
-    result = _format_sidebar_refresh_time(
-        datetime.now(UTC).isoformat(), object()
-    )
+    result = _format_sidebar_refresh_time(datetime.now(UTC).isoformat(), object())
     assert isinstance(result, str)
 
 

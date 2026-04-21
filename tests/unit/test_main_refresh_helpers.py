@@ -7,7 +7,7 @@ state) so they can be exercised directly.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -22,7 +22,6 @@ from blueprints.main import (
     _parse_refresh_datetime,
     _playlist_cycle_minutes,
 )
-
 
 # ---------------------------------------------------------------------------
 # _device_cycle_minutes
@@ -231,7 +230,9 @@ def test_annotate_refresh_schedule_passes_through_non_dict(monkeypatch: Any) -> 
     assert _annotate_refresh_schedule("refresh-info", cfg) == "refresh-info"
 
 
-def test_annotate_refresh_schedule_handles_missing_refresh_time(monkeypatch: Any) -> None:
+def test_annotate_refresh_schedule_handles_missing_refresh_time(
+    monkeypatch: Any,
+) -> None:
     fixed_now = datetime(2025, 1, 1, 8, 0, tzinfo=UTC)
     monkeypatch.setattr("blueprints.main._current_dt", lambda cfg: fixed_now)
 
@@ -299,4 +300,4 @@ def test_annotate_refresh_schedule_converts_next_to_device_timezone(
     assert parsed.astimezone(ny).hour == 3
     assert parsed.astimezone(ny).minute == 5
     # Regression guard: the isoformat uses the device-tz offset, not UTC.
-    assert parsed.utcoffset() != timezone.utc.utcoffset(None)
+    assert parsed.utcoffset() != UTC.utcoffset(None)
