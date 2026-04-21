@@ -33,7 +33,10 @@ from utils.form_utils import (
 )
 from utils.http_utils import json_error, json_success
 from utils.messages import PLAYLIST_NAME_REQUIRED_ERROR
-from utils.plugin_errors import ScreenshotBackendError
+from utils.plugin_errors import (
+    SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
+    ScreenshotBackendError,
+)
 from utils.plugin_history import record_change as _record_plugin_change
 from utils.progress import track_progress
 from utils.security_utils import URLValidationError, validate_file_path
@@ -649,20 +652,20 @@ def _update_now_direct(plugin_id, plugin_settings, device_config, display_manage
             # ``backend_unavailable`` instead of the generic 400
             # ``plugin_error`` the RuntimeError handler below would produce
             # — this signals transience (operators can retry) and points at
-            # the backend, not the user's configuration.  The exception
-            # message comes from a fixed string literal inside
-            # ``take_screenshot`` so no traceback / env text leaks into the
-            # response (CodeQL ``py/stack-trace-exposure``).
+            # the backend, not the user's configuration.  Response body
+            # comes from a module-level constant, never from ``str(exc)``,
+            # to satisfy CodeQL ``py/stack-trace-exposure`` (same pattern
+            # the JTN-776 URLValidationError handler uses).
             logger.warning(
-                "Plugin %s: screenshot backend unavailable: %s",
+                "Plugin %s: screenshot backend unavailable",
                 sanitize_log_field(plugin_id),
-                sanitize_log_field(str(e)),
+                exc_info=True,
             )
             _push_update_now_fallback(
                 plugin_id, plugin_config, device_config, display_manager, e
             )
             return json_error(
-                str(e),
+                SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
                 status=503,
                 code="backend_unavailable",
             )
@@ -920,20 +923,23 @@ def update_now():
             code="validation_error",
             details={"field": "url"},
         )
-    except ScreenshotBackendError as e:
+    except ScreenshotBackendError:
         # JTN-789: chromium subprocess failed twice in a row (initial + one
         # retry).  Surface a specific 503 ``backend_unavailable`` so the
         # client — and journalctl — see an actionable signal instead of the
         # generic 500 ``internal_error`` that a bare RuntimeError would
-        # produce.  The message is a fixed string from the exception's own
-        # constructor, so no stack-trace / env text leaks into the response.
+        # produce.  The response body uses a module-level constant rather
+        # than ``str(exc)`` so CodeQL's ``py/stack-trace-exposure`` rule
+        # cannot trace any exception-derived text into the HTTP body
+        # (mirroring the ``URLValidationError.safe_message`` pattern from
+        # JTN-776).  The full exception text is still logged server-side.
         logger.warning(
-            "update_now: screenshot backend unavailable for plugin %s: %s",
+            "update_now: screenshot backend unavailable for plugin %s",
             sanitize_log_field(plugin_id or "?"),
-            sanitize_log_field(str(e)),
+            exc_info=True,
         )
         return json_error(
-            str(e),
+            SCREENSHOT_BACKEND_UNAVAILABLE_MSG,
             status=503,
             code="backend_unavailable",
         )

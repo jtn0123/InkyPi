@@ -49,8 +49,11 @@ class TestUpdateNowScreenshotBackend:
         body = resp.get_json()
         assert body["success"] is False
         assert body["code"] == "backend_unavailable"
-        # The exception's own fixed message must reach the client so the user
-        # knows *why* the call failed. The message is constructed from a
-        # string literal inside ``take_screenshot``, so no traceback leaks.
-        assert "Screenshot backend" in body["error"]
+        # The response body must come from the module-level constant
+        # ``SCREENSHOT_BACKEND_UNAVAILABLE_MSG`` rather than ``str(exc)`` —
+        # this is what clears CodeQL's ``py/stack-trace-exposure`` rule.
+        # Mirrors the URLValidationError.safe_message() pattern (JTN-776).
+        from utils.plugin_errors import SCREENSHOT_BACKEND_UNAVAILABLE_MSG
+
+        assert body["error"] == SCREENSHOT_BACKEND_UNAVAILABLE_MSG
         assert body["error"] != "An internal error occurred"
